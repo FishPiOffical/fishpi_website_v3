@@ -38,6 +38,7 @@ VITE_API_TARGET=http://localhost:8080
 - 首页随机帖 `GET /article/random/{size}`、公开日志、通知 `user-channel`
 - 评论楼中楼、聊天室附近消息、公开职业/勋章列表
 - 职业成长榜、最近注册、弹幕花费、聊天室消息原文
+- 设置页表情分组（GET 列表，增删走现网 JSON，验证时不提交）
 
 闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。
 

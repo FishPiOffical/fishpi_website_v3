@@ -301,9 +301,18 @@ export async function updateAvatar(apiKey: string, userAvatarURL: string) {
 }
 
 export interface EmojiItem {
+  oId?: string
   name: string
   url?: string
   text?: string
+  sort?: number
+}
+
+export interface EmojiGroup {
+  oId: string
+  name?: string
+  type?: number
+  sort?: number
 }
 
 function mockEmotions(): EmojiItem[] {
@@ -341,9 +350,9 @@ function parseEmotionsPayload(data: unknown): EmojiItem[] {
         return [{ name: entry, text: entry.startsWith(':') ? entry : `:${entry}:` }]
       }
       if (entry && typeof entry === 'object') {
-        const o = entry as { url?: string; name?: string }
+        const o = entry as { url?: string; name?: string; oId?: string; sort?: number }
         if (typeof o.url === 'string' && o.url) {
-          return [{ name: o.name || 'emoji', url: o.url }]
+          return [{ oId: o.oId, name: o.name || 'emoji', url: o.url, sort: o.sort }]
         }
         return Object.entries(entry as Record<string, unknown>).map(([n, v]) => parseEmotionValue(n, v))
       }
@@ -368,9 +377,9 @@ export async function fetchFrequentEmotions(apiKey: string): Promise<EmojiItem[]
   return mockEmotions()
 }
 
-export async function fetchEmojiGroups(apiKey: string): Promise<{ oId: string; name?: string }[]> {
+export async function fetchEmojiGroups(apiKey: string): Promise<EmojiGroup[]> {
   try {
-    const res = await request<Envelope<{ oId: string; name?: string }[]>>(withKey('/api/emoji/groups', apiKey))
+    const res = await request<Envelope<EmojiGroup[]>>(withKey('/api/emoji/groups', apiKey))
     if (!res.code && Array.isArray(res.data)) return res.data
   } catch {
     /* GET /api/emoji/groups */
@@ -388,6 +397,34 @@ export async function fetchGroupEmojis(apiKey: string, groupId: string): Promise
     /* GET /api/emoji/group/emojis */
   }
   return []
+}
+
+async function emojiPost(path: string, apiKey: string, body: Record<string, unknown>) {
+  const res = await request<Envelope<unknown>>(path, {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, ...body }),
+  })
+  if (res.code) throw new Error(res.msg || '表情操作失败')
+}
+
+export async function createEmojiGroup(apiKey: string, name: string, sort = 0) {
+  await emojiPost('/api/emoji/group/create', apiKey, { name, sort })
+}
+
+export async function updateEmojiGroup(apiKey: string, groupId: string, name: string, sort = 0) {
+  await emojiPost('/api/emoji/group/update', apiKey, { groupId, name, sort })
+}
+
+export async function deleteEmojiGroup(apiKey: string, groupId: string) {
+  await emojiPost('/api/emoji/group/delete', apiKey, { groupId })
+}
+
+export async function addEmojiUrl(apiKey: string, groupId: string, url: string, sort = 0, name = '') {
+  await emojiPost('/api/emoji/group/add-url-emoji', apiKey, { groupId, url, sort, name })
+}
+
+export async function removeGroupEmoji(apiKey: string, groupId: string, emojiId: string) {
+  await emojiPost('/api/emoji/group/remove-emoji', apiKey, { groupId, emojiId })
 }
 
 export async function transferPoints(apiKey: string, userName: string, amount: number, memo: string) {

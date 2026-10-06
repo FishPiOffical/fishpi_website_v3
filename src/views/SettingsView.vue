@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import AppearancePicker from '@/components/packs/AppearancePicker.vue'
+import EmojiPacks from '@/components/EmojiPacks.vue'
 import { fetchProfessionMe, fetchUserProfile, updateAvatar, updateProfile, uploadFiles, type ProfessionProgress } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 
@@ -137,6 +138,7 @@ async function onAvatar(e: Event) {
     <section v-else class="card">
       <p class="hint">登录后可编辑昵称、签名和头像。</p>
     </section>
+    <EmojiPacks v-if="isLoggedIn" />
     <section class="card">
       <h1>外观</h1>
       <p class="hint">主题免费。对话框和头像框的进阶样式后期仅 VIP 可用。</p>
