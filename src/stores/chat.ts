@@ -28,10 +28,15 @@ export interface OnlineUser {
   userNickname?: string
 }
 
-function toDevWs(url: string) {
+/** Same-origin `/chat-room-channel` goes through Vite proxy; remote node hosts connect directly. */
+function resolveWsUrl(url: string) {
   try {
-    const normalized = url.replace(/^ws/i, 'http')
-    const u = new URL(normalized)
+    const httpish = url.replace(/^wss?/i, (m) => (m.toLowerCase() === 'wss' ? 'https' : 'http'))
+    const u = new URL(httpish, location.href)
+    if (u.hostname && u.hostname !== location.hostname) {
+      const proto = u.protocol === 'https:' ? 'wss:' : 'ws:'
+      return `${proto}//${u.host}${u.pathname}${u.search}`
+    }
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     return `${proto}//${location.host}${u.pathname}${u.search}`
   } catch {
@@ -121,13 +126,12 @@ export const useChatStore = defineStore('chat', () => {
       ws = null
     }
 
-    let node = `/chat-room-channel?apiKey=${auth.apiKey}`
+    let node = resolveWsUrl(`/chat-room-channel?apiKey=${auth.apiKey}`)
     try {
       const remote = await fetchChatNode(auth.apiKey)
-      node = toDevWs(remote.includes('apiKey=') ? remote : `${remote}?apiKey=${auth.apiKey}`)
+      node = resolveWsUrl(remote.includes('apiKey=') ? remote : `${remote}?apiKey=${auth.apiKey}`)
     } catch {
-      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-      node = `${proto}//${location.host}/chat-room-channel?apiKey=${auth.apiKey}`
+      node = resolveWsUrl(`/chat-room-channel?apiKey=${auth.apiKey}`)
     }
 
     ws = new WebSocket(node)
