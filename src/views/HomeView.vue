@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   fetchCheckinRank,
@@ -90,9 +91,7 @@ function views(a: ArticleSummary) {
         <ol>
           <li v-for="item in left" :key="item.oId">
             <span v-if="item.articleStick" class="pin" />
-            <a :href="`https://fishpi.cn/article/${item.oId}`" target="_blank" rel="noreferrer">{{
-              item.articleTitleEmoj || item.articleTitle
-            }}</a>
+            <RouterLink :to="`/article/${item.oId}`">{{ item.articleTitleEmoj || item.articleTitle }}</RouterLink>
             <em>{{ views(item) }}</em>
           </li>
         </ol>
@@ -104,9 +103,7 @@ function views(a: ArticleSummary) {
         <p v-if="loading && !right.length" class="hint">加载中…</p>
         <ol>
           <li v-for="item in right" :key="item.oId">
-            <a :href="`https://fishpi.cn/article/${item.oId}`" target="_blank" rel="noreferrer">{{
-              item.articleTitleEmoj || item.articleTitle
-            }}</a>
+            <RouterLink :to="`/article/${item.oId}`">{{ item.articleTitleEmoj || item.articleTitle }}</RouterLink>
             <em>{{ views(item) }}</em>
           </li>
         </ol>

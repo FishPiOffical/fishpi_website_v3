@@ -6,8 +6,6 @@ export interface PublicHomeData {
   online: RankUser[]
 }
 
-const PUBLIC_HOME = '/__rhythm/'
-
 function text(el: Element | null) {
   return (el?.textContent || '').replace(/\s+/g, ' ').trim()
 }
@@ -22,7 +20,7 @@ function parseCount(raw: string) {
   return Number.isFinite(n) ? n : 0
 }
 
-export function parseHomeHtml(html: string): PublicHomeData {
+export function parseArticleLinks(html: string): ArticleSummary[] {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const articles: ArticleSummary[] = []
   const seen = new Set<string>()
@@ -40,12 +38,7 @@ export function parseHomeHtml(html: string): PublicHomeData {
       articleStick: row?.querySelector('.cb-stick') ? 1 : 0,
     })
   }
-
-  return {
-    articles,
-    checkin: parseRank(doc, '今日连签排行', /\/top\/checkin/),
-    online: parseRank(doc, '在线时间排行', /\/top\/online/),
-  }
+  return articles
 }
 
 function parseRank(doc: Document, heading: string, morePath: RegExp): RankUser[] {
@@ -71,12 +64,27 @@ function parseRank(doc: Document, heading: string, morePath: RegExp): RankUser[]
   return users
 }
 
-export async function fetchPublicHome(): Promise<PublicHomeData> {
-  const res = await fetch(PUBLIC_HOME, { headers: { Accept: 'text/html' } })
+export function parseHomeHtml(html: string): PublicHomeData {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  return {
+    articles: parseArticleLinks(html),
+    checkin: parseRank(doc, '今日连签排行', /\/top\/checkin/),
+    online: parseRank(doc, '在线时间排行', /\/top\/online/),
+  }
+}
+
+export async function fetchPublicHtml(path: string) {
+  const url = path.startsWith('/__rhythm') ? path : `/__rhythm${path.startsWith('/') ? path : `/${path}`}`
+  const res = await fetch(url, { headers: { Accept: 'text/html' } })
   const html = await res.text()
   if (!res.ok || html.includes('src="/src/main.ts"')) {
-    throw new Error('无法读取公开首页')
+    throw new Error('无法读取公开页面')
   }
+  return html
+}
+
+export async function fetchPublicHome(): Promise<PublicHomeData> {
+  const html = await fetchPublicHtml('/')
   const data = parseHomeHtml(html)
   if (!data.articles.length) throw new Error('公开首页没有解析到帖子')
   return data

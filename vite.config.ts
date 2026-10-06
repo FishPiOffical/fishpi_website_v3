@@ -29,6 +29,7 @@ export default defineConfig(({ mode }) => {
         '/chat-room': { ...proxy, ws: true },
         '/chat-room-channel': { ...proxy, ws: true },
         '/captcha': proxy,
+        '/comment': proxy,
         '/__rhythm': {
           ...proxy,
           rewrite: (path) => {

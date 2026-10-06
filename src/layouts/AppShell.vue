@@ -67,7 +67,7 @@ function logout() {
     <footer class="foot">
       <p>摸鱼好站</p>
       <AdSlot slot-key="footer.sponsors" />
-      <p class="muted">摸鱼派用户站 P0 · 管理后台不在本仓库</p>
+      <p class="muted">摸鱼派用户站 · 管理后台不在本仓库</p>
     </footer>
   </div>
 </template>

@@ -14,7 +14,9 @@ app.use(pinia)
 app.use(router)
 
 useAppearanceStore(pinia)
-void useAuthStore(pinia).restore()
 void useAdsStore(pinia).load()
-
-app.mount('#app')
+void useAuthStore(pinia)
+  .restore()
+  .finally(() => {
+    app.mount('#app')
+  })

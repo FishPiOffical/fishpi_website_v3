@@ -17,9 +17,43 @@ export interface ArticleSummary {
   articleViewCntDisplayFormat?: string
   articleStick?: number
   articleType?: number
+  articlePerfect?: number
+  articleTags?: string
+  articleCommentCount?: number
+  articleCreateTimeStr?: string
+  timeAgo?: string
   columnTitle?: string
   articleAuthorName?: string
   articleAuthorThumbnailURL48?: string
+}
+
+export interface ArticleComment {
+  oId: string
+  commentAuthorName?: string
+  commentAuthorThumbnailURL?: string
+  commentContent?: string
+  commentCreateTimeStr?: string
+  timeAgo?: string
+  commentThankCnt?: number
+  commentOriginalCommentId?: string
+}
+
+export interface ArticleDetail extends ArticleSummary {
+  articleContent?: string
+  articleToC?: string
+  articleCommentable?: boolean
+  articleComments?: ArticleComment[]
+  articleNiceComments?: ArticleComment[]
+  pagination?: { paginationPageCount?: number; paginationCurrentPageNum?: number }
+}
+
+export interface Breezemoon {
+  oId: string
+  breezemoonAuthorName?: string
+  breezemoonAuthorThumbnailURL48?: string
+  breezemoonContent?: string
+  breezemoonCity?: string
+  timeAgo?: string
 }
 
 export interface RankUser {
@@ -57,14 +91,71 @@ export async function fetchAccount(apiKey: string) {
 }
 
 /** Rhythm 把 `/api/articles/recent*` 挂了 loginCheck，未登录请用 fetchPublicHome。 */
-export async function fetchRecentArticles(apiKey?: string | null, page = 1, size = 40) {
-  const res = await request<Envelope<{ articles?: ArticleSummary[] } | ArticleSummary[]>>(
-    withKey(`/api/articles/recent?p=${page}&size=${size}`, apiKey),
-  )
+async function unwrapArticles(path: string, apiKey?: string | null) {
+  const res = await request<Envelope<{ articles?: ArticleSummary[] } | ArticleSummary[]>>(withKey(path, apiKey))
   if (res.code !== 0) throw new Error(res.msg || '文章列表失败')
   const data = res.data
   if (Array.isArray(data)) return data
   return data?.articles ?? []
+}
+
+export async function fetchRecentArticles(apiKey?: string | null, page = 1, size = 40) {
+  return unwrapArticles(`/api/articles/recent?p=${page}&size=${size}`, apiKey)
+}
+
+export type ArticleFeedKind = 'recent' | 'hot' | 'long' | 'good' | 'qna' | 'perfect' | 'search'
+
+export async function fetchArticleFeed(
+  kind: ArticleFeedKind,
+  apiKey: string,
+  page = 1,
+  size = 40,
+  keyword = '',
+): Promise<ArticleSummary[]> {
+  if (kind === 'hot') return unwrapArticles(`/api/articles/recent/hot?p=${page}&size=${size}`, apiKey)
+  if (kind === 'long') return unwrapArticles(`/api/articles/recent/long?p=${page}&size=${size}`, apiKey)
+  if (kind === 'good') return unwrapArticles(`/api/articles/recent/good?p=${page}&size=${size}`, apiKey)
+  const recent = await unwrapArticles(`/api/articles/recent?p=${page}&size=${size}`, apiKey)
+  if (kind === 'qna') return recent.filter((a) => a.articleType === 5)
+  if (kind === 'perfect') return recent.filter((a) => Number(a.articlePerfect) === 1)
+  if (kind === 'search') {
+    const q = keyword.trim().toLowerCase()
+    if (!q) return recent
+    return recent.filter((a) => (a.articleTitleEmoj || a.articleTitle || '').toLowerCase().includes(q))
+  }
+  return recent
+}
+
+export async function fetchArticle(id: string, apiKey: string, page = 1): Promise<ArticleDetail> {
+  const res = await request<Envelope<{ article?: ArticleDetail }>>(
+    withKey(`/api/article/${id}?p=${page}`, apiKey),
+  )
+  if (res.code !== 0 || !res.data?.article) throw new Error(res.msg || '帖子不存在')
+  return res.data.article
+}
+
+export async function postComment(apiKey: string, articleId: string, content: string, replyId = '') {
+  const body: Record<string, unknown> = {
+    apiKey,
+    articleId,
+    commentContent: content,
+    commentAnonymous: false,
+    commentVisible: false,
+  }
+  if (replyId) body.commentOriginalCommentId = replyId
+  const res = await request<Envelope<unknown>>('/comment', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+  if (res.code) throw new Error(res.msg || '评论失败')
+}
+
+export async function fetchBreezemoons(page = 1, size = 20) {
+  const res = await request<{ code: number; msg?: string; breezemoons?: Breezemoon[] }>(
+    `/api/breezemoons?p=${page}&size=${size}`,
+  )
+  if (res.code !== 0) throw new Error(res.msg || '清风明月失败')
+  return res.breezemoons ?? []
 }
 
 export async function fetchCheckinRank(apiKey?: string | null): Promise<RankUser[]> {
