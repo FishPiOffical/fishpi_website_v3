@@ -52,11 +52,14 @@ function views(a: ArticleSummary) {
 }
 .title {
   flex: 1;
-  color: var(--fp-text);
+  color: var(--fp-title);
   text-decoration: none;
 }
+.title:hover {
+  color: var(--fp-link);
+}
 .count {
-  color: var(--fp-muted);
+  color: var(--fp-head);
   font-size: 12px;
 }
 .empty {

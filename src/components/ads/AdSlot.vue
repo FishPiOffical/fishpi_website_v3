@@ -81,7 +81,9 @@ function attrEntries(item: AdItem) {
   padding: 10px 14px;
   color: inherit;
   text-decoration: none;
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--fp-card);
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 10px;
 }
 .banner img {
   width: 72px;

@@ -184,7 +184,10 @@ function goDownload() {
 }
 .board {
   display: flex;
-  gap: 0;
+  background: var(--fp-card);
+  box-shadow: var(--fp-card-shadow);
+  padding: 15px 0 20px;
+  border-radius: 10px;
 }
 .col {
   flex: 1;
@@ -194,13 +197,15 @@ function goDownload() {
   display: flex;
   justify-content: space-between;
   font-size: 13px;
-  margin: 5px 0 10px;
+  margin: 5px 10px 10px;
+  color: var(--fp-head);
 }
 .index-head b {
   font-weight: 700;
+  color: var(--fp-head);
 }
 .index-head a {
-  color: var(--fp-muted);
+  color: var(--fp-link);
   text-decoration: none;
 }
 .module-list {
@@ -208,19 +213,28 @@ function goDownload() {
   margin: 0;
   padding: 0;
 }
+.module-list li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  min-height: 40px;
+  font-size: 14px;
+}
 .module-list.rank li {
   padding-left: 22px;
 }
 .title {
   flex: 1;
-  color: var(--fp-text);
+  color: var(--fp-title);
   text-decoration: none;
 }
 .title:hover {
   color: var(--fp-link);
 }
 .count {
-  color: var(--fp-muted);
+  color: var(--fp-head);
   font-size: 12px;
   margin-left: auto;
   flex-shrink: 0;
@@ -230,7 +244,12 @@ function goDownload() {
   align-items: center;
   gap: 8px;
   margin: 7px 15px 20px;
+  padding: 10px;
   font-size: 13px;
+  color: var(--fp-head);
+  background: var(--fp-card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
 }
 .download img {
   width: 35px;

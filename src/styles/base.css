@@ -3,13 +3,24 @@
   --fp-nav: #242525;
   --fp-card: #282a2a;
   --fp-text: #cbc5ba;
+  --fp-nav-text: #cbc5ba;
+  --fp-title: #cbc5ba;
+  --fp-head: #aca396;
   --fp-muted: #aca396;
   --fp-primary: #69aa69;
-  --fp-link: #d23f31;
+  --fp-link: #5c9fdf;
+  --fp-accent: #d23f31;
   --fp-border: rgba(255, 255, 255, 0.06);
   --fp-hover: rgba(255, 255, 255, 0.04);
   --fp-self: #2f5d55;
   --fp-green: #69aa69;
+  --fp-income: #69aa69;
+  --fp-nav-shadow: none;
+  --fp-card-shadow: none;
+  --fp-search-bg: #3a3b3b;
+  --fp-income-bg: rgba(39, 40, 39, 0.85);
+  --fp-income-shadow: none;
+  --fp-footer: #282a2a;
   --fp-nav-h: 58px;
   --fp-wrap: 1300px;
 }

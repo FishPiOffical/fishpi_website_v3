@@ -150,9 +150,9 @@ watch(apiKey, () => void load(), { immediate: true })
 }
 .card {
   background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 12px;
-  padding: 18px 20px;
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 10px;
+  padding: 15px;
 }
 h1 {
   margin: 0 0 12px;

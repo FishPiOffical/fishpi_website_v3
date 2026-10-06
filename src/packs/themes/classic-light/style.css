@@ -2,13 +2,28 @@ html[data-theme='classic-light'] {
   --fp-bg: #f6f6f6;
   --fp-nav: #ffffff;
   --fp-card: #ffffff;
-  --fp-text: #333333;
-  --fp-muted: #999999;
-  --fp-primary: #69aa69;
-  --fp-link: #4183c4;
+  --fp-text: #2c2c2c;
+  --fp-nav-text: #3b3e43;
+  --fp-title: #262626;
+  --fp-head: #616161;
+  --fp-muted: #787777;
+  --fp-primary: #60b044;
+  --fp-link: #4285f4;
+  --fp-accent: #e59230;
   --fp-border: #eee;
-  --fp-hover: #fafafa;
-  --fp-self: #d7efe9;
-  --fp-green: #69aa69;
+  --fp-hover: #fff7ec;
+  --fp-self: #e8f5e4;
+  --fp-green: #60b044;
+  --fp-income: #22c55e;
+  --fp-nav-shadow: 0 5px 40px 0 rgba(17, 58, 93, 0.1);
+  --fp-card-shadow: 0 0 2px rgba(98, 124, 153, 0.1);
+  --fp-search-bg: #f2f3f5;
+  --fp-income-bg: rgba(248, 250, 252, 0.85);
+  --fp-income-shadow: 0 6px 24px rgba(60, 80, 120, 0.12), 0 1.5px 6px rgba(60, 80, 120, 0.08);
+  --fp-footer: #ffffff;
   color-scheme: light;
+}
+
+html[data-theme='classic-light'] ::selection {
+  background: rgba(66, 133, 244, 0.4);
 }

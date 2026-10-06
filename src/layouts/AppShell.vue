@@ -110,11 +110,13 @@ function logout() {
       <RouterView />
     </main>
     <footer class="foot">
-      <p>摸鱼好站</p>
-      <AdSlot slot-key="footer.sponsors" />
-      <p class="extra">
-        <RouterLink v-for="item in extraNav" :key="item.to" :to="item.to">{{ item.label }}</RouterLink>
-      </p>
+      <div class="foot-inner">
+        <p>摸鱼好站</p>
+        <AdSlot slot-key="footer.sponsors" />
+        <p class="extra">
+          <RouterLink v-for="item in extraNav" :key="item.to" :to="item.to">{{ item.label }}</RouterLink>
+        </p>
+      </div>
     </footer>
   </div>
 </template>
@@ -124,6 +126,9 @@ function logout() {
   min-height: 100vh;
 }
 .nav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -131,6 +136,7 @@ function logout() {
   padding: 5px 15px;
   height: var(--fp-nav-h);
   background: var(--fp-nav);
+  box-shadow: var(--fp-nav-shadow);
   font-weight: 500;
 }
 .logo {
@@ -149,21 +155,24 @@ nav {
   justify-content: center;
 }
 nav a {
-  color: var(--fp-text);
+  color: var(--fp-nav-text);
   text-decoration: none;
   font-size: 14px;
   white-space: nowrap;
+  padding: 6px 10px;
+  border-radius: 6px;
 }
 nav a.current,
 nav a:hover {
-  color: var(--fp-link);
+  color: var(--fp-accent);
+  background: var(--fp-hover);
 }
 .search {
   width: 210px;
   height: 38px;
-  background: #3a3b3b;
+  background: var(--fp-search-bg);
   border: 0;
-  color: var(--fp-text);
+  color: var(--fp-nav-text);
   border-radius: 3px;
   padding: 5px 8px;
 }
@@ -175,12 +184,12 @@ nav a:hover {
   flex-shrink: 0;
 }
 .user a {
-  color: var(--fp-text);
+  color: var(--fp-nav-text);
   text-decoration: none;
   position: relative;
 }
 .user a:hover {
-  color: var(--fp-link);
+  color: var(--fp-accent);
 }
 .badge {
   position: absolute;
@@ -198,7 +207,7 @@ nav a:hover {
 .user button {
   border: 0;
   background: transparent;
-  color: var(--fp-text);
+  color: var(--fp-nav-text);
   cursor: pointer;
 }
 .theme {
@@ -214,15 +223,16 @@ nav a:hover {
   z-index: 20;
   width: 110px;
   text-align: center;
-  background: rgba(39, 40, 39, 0.85);
+  background: var(--fp-income-bg);
+  box-shadow: var(--fp-income-shadow);
   border-radius: 16px;
   padding: 8px 0 10px;
   font-size: 12px;
-  color: var(--fp-muted);
+  color: var(--fp-text);
 }
 .income b {
   display: block;
-  color: var(--fp-green);
+  color: var(--fp-income);
   font-size: 22px;
   margin-top: 2px;
 }
@@ -232,10 +242,14 @@ main {
   padding: 25px 15px 20px;
 }
 .foot {
+  background: var(--fp-footer);
+  color: var(--fp-nav-text);
+  padding: 16px 0 32px;
+}
+.foot-inner {
   max-width: var(--fp-wrap);
   margin: 0 auto;
-  padding: 24px 15px 40px;
-  color: var(--fp-muted);
+  padding: 8px 15px 0;
 }
 .extra {
   display: flex;
@@ -243,7 +257,7 @@ main {
   font-size: 12px;
 }
 .extra a {
-  color: var(--fp-muted);
+  color: var(--fp-nav-text);
   text-decoration: none;
 }
 </style>

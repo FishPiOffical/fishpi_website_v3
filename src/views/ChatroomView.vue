@@ -243,9 +243,10 @@ async function showRaw(oId: string) {
   align-items: start;
 }
 .main {
-  background: var(--fp-card);
   border: 1px solid var(--fp-border);
   border-radius: 10px;
+  background: var(--fp-card);
+  box-shadow: var(--fp-card-shadow);
   display: flex;
   flex-direction: column;
   min-height: 70vh;
