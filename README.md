@@ -13,7 +13,7 @@ npm run dev
 VITE_API_TARGET=http://localhost:8080
 ```
 
-本站**只走 JSON API**，不再解析旧站 HTML。现网 `/api/articles/recent*`、`/api/article/{id}`、`/api/top/*` 仍需登录；游客会看到登录引导。关闭 FTL 前请在 Rhythm 放开匿名读接口。
+本站优先请求 Rhythm JSON；匿名列表/详情/搜索/领域/广告若 401 或 404，回退到 `src/api/catalog.mock.json` / `ads.mock.json`（字段与正式接口对齐）。登录后仍走真实 API。
 
 ## 已实现
 

@@ -1,44 +1,45 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { fetchRecentArticles } from '@/api/fishpi'
+import { fetchDomains, type DomainItem } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
-const { apiKey, isLoggedIn } = storeToRefs(auth)
-const tags = ref<string[]>([])
+const { apiKey } = storeToRefs(auth)
+const domains = ref<DomainItem[]>([])
 const error = ref('')
+const loading = ref(true)
+const mocked = ref(false)
 
 onMounted(async () => {
-  if (!apiKey.value) return
   try {
-    const arts = await fetchRecentArticles(apiKey.value, 1, 40)
-    const set = new Set<string>()
-    for (const a of arts) {
-      for (const t of (a.articleTags || '').split(',').map((s) => s.trim()).filter(Boolean)) set.add(t)
-    }
-    tags.value = [...set]
+    const list = await fetchDomains(apiKey.value)
+    domains.value = list
+    mocked.value = list.every((d) => ['programmer', 'life', 'community'].includes(d.uri)) && list.length <= 3
   } catch (e) {
     error.value = e instanceof Error ? e.message : '领域加载失败'
+  } finally {
+    loading.value = false
   }
 })
-
-const emptyLogin = computed(() => !isLoggedIn.value)
 </script>
 
 <template>
   <section class="card">
     <h1>领域</h1>
-    <p v-if="emptyLogin" class="hint">
-      领域目录 API 尚未提供；标签近似也需要登录。
-      <RouterLink to="/login">去登录</RouterLink>
-    </p>
+    <p v-if="loading" class="hint">加载中…</p>
     <p v-else-if="error" class="err">{{ error }}</p>
-    <p v-else class="hint">暂无 `/api/domains`，先用最近帖标签近似。</p>
+    <p v-else-if="mocked" class="hint">
+      <code>GET /api/domains</code> 尚未提供，展示约定字段 mock。正式接口就绪后自动切换。
+    </p>
     <ul>
-      <li v-for="tag in tags" :key="tag">
-        <RouterLink :to="{ path: '/search', query: { q: tag } }">{{ tag }}</RouterLink>
+      <li v-for="item in domains" :key="item.uri">
+        <RouterLink :to="`/domain/${item.uri}`">
+          <strong>{{ item.domainTitle }}</strong>
+          <span>{{ item.domainDescription }}</span>
+          <em>{{ item.domainArticleCount ?? 0 }} 帖</em>
+        </RouterLink>
       </li>
     </ul>
   </section>
@@ -51,26 +52,36 @@ const emptyLogin = computed(() => !isLoggedIn.value)
   border-radius: 12px;
   padding: 18px 20px;
 }
-ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  list-style: none;
-  padding: 0;
-}
-a {
-  color: var(--fp-link);
-  text-decoration: none;
-  border: 1px solid var(--fp-border);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 13px;
-}
 .hint {
   color: var(--fp-muted);
   font-size: 13px;
 }
 .err {
   color: #e07a5f;
+}
+ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+a {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid var(--fp-border);
+  border-radius: 10px;
+  padding: 12px;
+}
+strong {
+  color: var(--fp-link);
+}
+span,
+em {
+  color: var(--fp-muted);
+  font-size: 13px;
+  font-style: normal;
 }
 </style>

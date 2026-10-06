@@ -49,6 +49,7 @@ function logout() {
       <input class="search" placeholder="搜索你感兴趣的内容" @keydown.enter="onSearch" />
       <div class="user">
         <template v-if="isLoggedIn">
+          <RouterLink to="/post">发帖</RouterLink>
           <span>{{ account?.userName }}</span>
           <button type="button" @click="logout">退出</button>
         </template>

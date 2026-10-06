@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { fetchArticle, postComment, type ArticleComment, type ArticleDetail } from '@/api/fishpi'
+import { fetchArticle, postComment, thankArticle, voteArticle, type ArticleComment, type ArticleDetail } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -15,6 +15,8 @@ const error = ref('')
 const draft = ref('')
 const sending = ref(false)
 const sendError = ref('')
+const actionMsg = ref('')
+const replyId = ref('')
 const commentPage = ref(1)
 
 const id = computed(() => String(route.params.id || ''))
@@ -27,11 +29,6 @@ async function load() {
   loading.value = true
   error.value = ''
   article.value = null
-  if (!apiKey.value) {
-    error.value = '帖子详情接口需要登录，本站已不再解析旧站 HTML。'
-    loading.value = false
-    return
-  }
   try {
     article.value = await fetchArticle(id.value, apiKey.value, commentPage.value)
   } catch (e) {
@@ -61,13 +58,36 @@ async function submit() {
   sending.value = true
   sendError.value = ''
   try {
-    await postComment(apiKey.value, id.value, draft.value.trim())
+    await postComment(apiKey.value, id.value, draft.value.trim(), replyId.value)
     draft.value = ''
+    replyId.value = ''
     await load()
   } catch (e) {
     sendError.value = e instanceof Error ? e.message : '评论失败'
   } finally {
     sending.value = false
+  }
+}
+
+async function vote() {
+  if (!apiKey.value) return
+  try {
+    const type = await voteArticle(apiKey.value, id.value)
+    actionMsg.value = type === 0 ? '已取消点赞' : '点赞成功'
+    await load()
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '点赞失败'
+  }
+}
+
+async function thank() {
+  if (!apiKey.value) return
+  try {
+    await thankArticle(apiKey.value, id.value)
+    actionMsg.value = '已感谢作者'
+    await load()
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '感谢失败'
   }
 }
 
@@ -95,6 +115,14 @@ function who(c: ArticleComment) {
         <span>{{ article.articleCommentCount ?? comments.length }} 评</span>
       </p>
       <p v-if="article.articleTags" class="tags">{{ article.articleTags }}</p>
+      <p v-if="String(article.oId).startsWith('mock-')" class="hint">
+        匿名详情接口未开放，当前为 mock 正文。
+      </p>
+      <div v-if="isLoggedIn" class="actions">
+        <button type="button" @click="vote">点赞</button>
+        <button type="button" @click="thank">感谢</button>
+        <span v-if="actionMsg">{{ actionMsg }}</span>
+      </div>
       <div class="body" v-html="article.articleContent || ''" />
     </article>
 
@@ -112,6 +140,7 @@ function who(c: ArticleComment) {
         <header>
           <b>{{ who(c) }}</b>
           <time>{{ c.commentCreateTimeStr || c.timeAgo }}</time>
+          <button v-if="isLoggedIn" type="button" class="ghost" @click="replyId = c.oId">回复</button>
         </header>
         <div class="cmt-body" v-html="c.commentContent || ''" />
       </div>
@@ -121,6 +150,7 @@ function who(c: ArticleComment) {
     <form class="card composer" @submit.prevent="submit">
       <h2>参与讨论</h2>
       <template v-if="isLoggedIn">
+        <p v-if="replyId" class="hint">回复评论 {{ replyId }} <button type="button" class="ghost" @click="replyId = ''">取消</button></p>
         <textarea v-model="draft" rows="4" placeholder="支持 Markdown" />
         <p v-if="sendError" class="err">{{ sendError }}</p>
         <button type="submit" :disabled="sending || !draft.trim()">
@@ -166,6 +196,21 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 12px;
+}
+.actions button,
+.ghost {
+  border: 1px solid var(--fp-border);
+  background: transparent;
+  color: var(--fp-text);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
 }
 .err {
   color: #e07a5f;

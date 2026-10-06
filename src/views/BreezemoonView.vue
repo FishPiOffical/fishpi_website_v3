@@ -1,25 +1,53 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { fetchBreezemoons, type Breezemoon } from '@/api/fishpi'
+import { storeToRefs } from 'pinia'
+import { fetchBreezemoons, postBreezemoon, type Breezemoon } from '@/api/fishpi'
+import { useAuthStore } from '@/stores/auth'
 
+const auth = useAuthStore()
+const { apiKey, isLoggedIn } = storeToRefs(auth)
 const items = ref<Breezemoon[]>([])
 const error = ref('')
 const loading = ref(true)
+const draft = ref('')
+const sending = ref(false)
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
   try {
     items.value = await fetchBreezemoons(1, 30)
+    error.value = ''
   } catch (e) {
     error.value = e instanceof Error ? e.message : '加载失败'
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(() => void load())
+
+async function submit() {
+  if (!apiKey.value || !draft.value.trim()) return
+  sending.value = true
+  try {
+    await postBreezemoon(apiKey.value, draft.value.trim())
+    draft.value = ''
+    await load()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '发布失败'
+  } finally {
+    sending.value = false
+  }
+}
 </script>
 
 <template>
   <section class="card">
     <h1>清风明月</h1>
+    <form v-if="isLoggedIn" class="composer" @submit.prevent="submit">
+      <textarea v-model="draft" rows="2" placeholder="写一条清风明月" />
+      <button type="submit" :disabled="sending || !draft.trim()">发布</button>
+    </form>
     <p v-if="loading" class="hint">加载中…</p>
     <p v-else-if="error" class="err">{{ error }}</p>
     <ol v-else>
@@ -84,5 +112,26 @@ header {
 }
 .body :deep(p) {
   margin: 0;
+}
+.composer {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.composer textarea {
+  flex: 1;
+  background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
+  color: var(--fp-text);
+  border-radius: 8px;
+  padding: 8px;
+}
+.composer button {
+  border: 0;
+  background: var(--fp-primary);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 14px;
+  cursor: pointer;
 }
 </style>

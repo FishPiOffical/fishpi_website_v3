@@ -25,6 +25,7 @@ export async function request<T = unknown>(
 
   const res = await fetch(path, {
     ...init,
+    credentials: init.credentials ?? 'include',
     headers,
   })
 

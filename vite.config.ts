@@ -1,15 +1,20 @@
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
+import type { IncomingMessage } from 'node:http'
 
 const FISHPI_UA =
   'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
+
+function spaGetBypass(req: IncomingMessage) {
+  if (req.method === 'GET' || req.method === 'HEAD') return req.url
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const target = env.VITE_API_TARGET || 'https://fishpi.cn'
 
-  const proxy = {
+  const proxy: ProxyOptions = {
     target,
     changeOrigin: true,
     secure: true,
@@ -30,6 +35,14 @@ export default defineConfig(({ mode }) => {
         '/chat-room-channel': { ...proxy, ws: true },
         '/captcha': proxy,
         '/comment': proxy,
+        '/verify': proxy,
+        '/register2': proxy,
+        '/vote': proxy,
+        '/breezemoon': proxy,
+        '/follow': proxy,
+        '/unfollow': proxy,
+        '/register': { ...proxy, bypass: spaGetBypass },
+        '/article': { ...proxy, bypass: spaGetBypass },
       },
     },
   }

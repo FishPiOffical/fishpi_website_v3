@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
@@ -10,6 +10,7 @@ import {
   type RankUser,
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
+import AdSlot from '@/components/ads/AdSlot.vue'
 
 const auth = useAuthStore()
 const { apiKey, isLoggedIn } = storeToRefs(auth)
@@ -21,6 +22,8 @@ const error = ref('')
 const income = ref(365)
 const loading = ref(false)
 
+const usingMock = computed(() => left.value.some((a) => String(a.oId).startsWith('mock-')))
+
 function splitArticles(articles: ArticleSummary[]) {
   const mid = Math.ceil(articles.length / 2)
   left.value = articles.slice(0, mid)
@@ -28,20 +31,13 @@ function splitArticles(articles: ArticleSummary[]) {
 }
 
 async function load() {
-  left.value = []
-  right.value = []
-  checkin.value = []
-  online.value = []
   error.value = ''
-
-  if (!apiKey.value) return
-
   loading.value = true
   try {
     const [articles, checkinRank, onlineRank] = await Promise.all([
       fetchRecentArticles(apiKey.value, 1, 40),
-      fetchCheckinRank(apiKey.value).catch(() => [] as RankUser[]),
-      fetchOnlineRank(apiKey.value).catch(() => [] as RankUser[]),
+      fetchCheckinRank(apiKey.value),
+      fetchOnlineRank(apiKey.value),
     ])
     splitArticles(articles)
     checkin.value = checkinRank.slice(0, 8)
@@ -62,9 +58,10 @@ function views(a: ArticleSummary) {
 
 <template>
   <div class="home">
-    <p v-if="!isLoggedIn" class="banner">
-      帖子列表与排行榜目前需要登录后通过 JSON API 读取（不再解析旧站 HTML）。
-      <RouterLink to="/login">去登录</RouterLink>
+    <p v-if="usingMock" class="banner">
+      匿名列表接口尚未开放，当前展示与 <code>GET /api/articles/recent</code> 对齐的 mock。
+      <RouterLink v-if="!isLoggedIn" to="/login">登录</RouterLink>
+      后走真实数据。
     </p>
     <p v-else-if="error" class="err">{{ error }}</p>
     <div class="board">
@@ -73,7 +70,6 @@ function views(a: ArticleSummary) {
           <h2>最新</h2>
         </header>
         <p v-if="loading && !left.length" class="hint">加载最新帖子…</p>
-        <p v-else-if="!isLoggedIn" class="hint">登录后显示最新帖子</p>
         <ol>
           <li v-for="item in left" :key="item.oId">
             <span v-if="item.articleStick" class="pin" />
@@ -87,7 +83,6 @@ function views(a: ArticleSummary) {
           <h2>更多</h2>
         </header>
         <p v-if="loading && !right.length" class="hint">加载中…</p>
-        <p v-else-if="!isLoggedIn" class="hint">登录后显示更多帖子</p>
         <ol>
           <li v-for="item in right" :key="item.oId">
             <RouterLink :to="`/article/${item.oId}`">{{ item.articleTitleEmoj || item.articleTitle }}</RouterLink>
@@ -105,11 +100,11 @@ function views(a: ArticleSummary) {
           <span>今日收入</span>
           <b>¥{{ income }}</b>
         </div>
+        <AdSlot slot-key="home.sidebar" />
         <div class="card">
           <header>
             <h3>今日连签排行</h3>
           </header>
-          <p v-if="!isLoggedIn && !checkin.length" class="hint">登录后显示</p>
           <ol class="rank">
             <li v-for="(u, i) in checkin" :key="u.userName">
               <i>{{ i + 1 }}</i>
@@ -122,7 +117,6 @@ function views(a: ArticleSummary) {
           <header>
             <h3>在线时间排行</h3>
           </header>
-          <p v-if="!isLoggedIn && !online.length" class="hint">登录后显示</p>
           <ol class="rank">
             <li v-for="(u, i) in online" :key="u.userName">
               <i>{{ i + 1 }}</i>

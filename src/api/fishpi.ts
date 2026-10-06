@@ -1,5 +1,15 @@
 import { md5 } from 'js-md5'
+import {
+  mockArticle,
+  mockCheckin,
+  mockDomains,
+  mockFeed,
+  mockOnline,
+  type DomainItem,
+} from './catalog'
 import { request, withKey } from './http'
+
+export type { DomainItem }
 
 export interface AccountInfo {
   oId: string
@@ -90,48 +100,109 @@ export async function fetchAccount(apiKey: string) {
   return res.data
 }
 
-/** Rhythm 当前对文章列表/详情挂了 loginCheck，游客无匿名 JSON（勿再抓 HTML）。 */
-async function unwrapArticles(path: string, apiKey?: string | null) {
-  const res = await request<Envelope<{ articles?: ArticleSummary[] } | ArticleSummary[]>>(withKey(path, apiKey))
-  if (res.code !== 0) throw new Error(res.msg || '文章列表失败')
-  const data = res.data
-  if (Array.isArray(data)) return data
-  return data?.articles ?? []
+/** 匿名读未开放或接口 404 时回退 mock，字段与正式 JSON 对齐。 */
+async function unwrapArticles(path: string, apiKey?: string | null, fallback?: () => ArticleSummary[]) {
+  try {
+    const res = await request<Envelope<{ articles?: ArticleSummary[] } | ArticleSummary[]>>(withKey(path, apiKey))
+    if (res.code === 0) {
+      const data = res.data
+      if (Array.isArray(data) && data.length) return data
+      if (data && 'articles' in data && Array.isArray(data.articles) && data.articles.length) return data.articles
+    }
+  } catch {
+    /* 401/404 */
+  }
+  return fallback ? fallback() : []
 }
 
 export async function fetchRecentArticles(apiKey?: string | null, page = 1, size = 40) {
-  return unwrapArticles(`/api/articles/recent?p=${page}&size=${size}`, apiKey)
+  return unwrapArticles(`/api/articles/recent?p=${page}&size=${size}`, apiKey, () =>
+    mockFeed('recent', page, size),
+  )
 }
 
-export type ArticleFeedKind = 'recent' | 'hot' | 'long' | 'good' | 'qna' | 'perfect' | 'search'
+export type ArticleFeedKind = 'recent' | 'hot' | 'long' | 'good' | 'qna' | 'perfect' | 'search' | 'domain'
 
 export async function fetchArticleFeed(
   kind: ArticleFeedKind,
-  apiKey: string,
+  apiKey?: string | null,
   page = 1,
   size = 40,
-  keyword = '',
+  extra = '',
 ): Promise<ArticleSummary[]> {
-  if (kind === 'hot') return unwrapArticles(`/api/articles/recent/hot?p=${page}&size=${size}`, apiKey)
-  if (kind === 'long') return unwrapArticles(`/api/articles/recent/long?p=${page}&size=${size}`, apiKey)
-  if (kind === 'good') return unwrapArticles(`/api/articles/recent/good?p=${page}&size=${size}`, apiKey)
-  const recent = await unwrapArticles(`/api/articles/recent?p=${page}&size=${size}`, apiKey)
-  if (kind === 'qna') return recent.filter((a) => a.articleType === 5)
-  if (kind === 'perfect') return recent.filter((a) => Number(a.articlePerfect) === 1)
-  if (kind === 'search') {
-    const q = keyword.trim().toLowerCase()
-    if (!q) return recent
-    return recent.filter((a) => (a.articleTitleEmoj || a.articleTitle || '').toLowerCase().includes(q))
+  if (kind === 'hot') {
+    return unwrapArticles(`/api/articles/recent/hot?p=${page}&size=${size}`, apiKey, () => mockFeed('hot', page, size))
   }
-  return recent
+  if (kind === 'long') {
+    return unwrapArticles(`/api/articles/recent/long?p=${page}&size=${size}`, apiKey, () => mockFeed('long', page, size))
+  }
+  if (kind === 'good') {
+    return unwrapArticles(`/api/articles/recent/good?p=${page}&size=${size}`, apiKey, () => mockFeed('good', page, size))
+  }
+  if (kind === 'qna') {
+    const fromQna = await unwrapArticles(`/api/articles/recent/qna?p=${page}&size=${size}`, apiKey)
+    if (fromQna.length) return fromQna
+    const fromTag = await unwrapArticles(
+      `/api/articles/tag/${encodeURIComponent('Q&A')}?p=${page}&size=${size}`,
+      apiKey,
+    )
+    if (fromTag.length) return fromTag
+    return mockFeed('qna', page, size)
+  }
+  if (kind === 'perfect') {
+    const fromPerfect = await unwrapArticles(`/api/articles/recent/perfect?p=${page}&size=${size}`, apiKey)
+    if (fromPerfect.length) return fromPerfect
+    return mockFeed('perfect', page, size)
+  }
+  if (kind === 'search') return fetchSearch(extra, apiKey, page, size)
+  if (kind === 'domain') {
+    const fromDomain = await unwrapArticles(
+      `/api/articles/domain/${encodeURIComponent(extra)}?p=${page}&size=${size}`,
+      apiKey,
+    )
+    if (fromDomain.length) return fromDomain
+    return mockFeed('domain', page, size, extra)
+  }
+  return fetchRecentArticles(apiKey, page, size)
 }
 
-export async function fetchArticle(id: string, apiKey: string, page = 1): Promise<ArticleDetail> {
-  const res = await request<Envelope<{ article?: ArticleDetail }>>(
-    withKey(`/api/article/${id}?p=${page}`, apiKey),
-  )
-  if (res.code !== 0 || !res.data?.article) throw new Error(res.msg || '帖子不存在')
-  return res.data.article
+export async function fetchSearch(q: string, apiKey?: string | null, page = 1, size = 40) {
+  const query = q.trim()
+  try {
+    const res = await request<Envelope<{ articles?: ArticleSummary[] }>>(
+      withKey(`/api/search?q=${encodeURIComponent(query)}&p=${page}&size=${size}`, apiKey),
+    )
+    if (res.code === 0 && Array.isArray(res.data?.articles)) return res.data.articles
+  } catch {
+    /* GET /api/search 尚未提供 */
+  }
+  return mockFeed('search', page, size, query)
+}
+
+export async function fetchDomains(apiKey?: string | null): Promise<DomainItem[]> {
+  try {
+    const res = await request<Envelope<{ domains?: DomainItem[] } | DomainItem[]>>(withKey('/api/domains', apiKey))
+    if (res.code === 0) {
+      const data = res.data
+      if (Array.isArray(data) && data.length) return data
+      if (data && 'domains' in data && Array.isArray(data.domains) && data.domains.length) return data.domains
+    }
+  } catch {
+    /* GET /api/domains 尚未提供 */
+  }
+  return mockDomains()
+}
+
+export async function fetchArticle(id: string, apiKey?: string | null, page = 1): Promise<ArticleDetail> {
+  try {
+    const res = await request<Envelope<{ article?: ArticleDetail }>>(withKey(`/api/article/${id}?p=${page}`, apiKey))
+    if (res.code === 0 && res.data?.article) return res.data.article
+  } catch {
+    /* 匿名详情未开放 */
+  }
+  const local = mockArticle(id)
+  if (local) return local
+  throw new Error('帖子不存在或需要登录')
 }
 
 export async function postComment(apiKey: string, articleId: string, content: string, replyId = '') {
@@ -158,22 +229,133 @@ export async function fetchBreezemoons(page = 1, size = 20) {
   return res.breezemoons ?? []
 }
 
+export async function postBreezemoon(apiKey: string, content: string) {
+  const res = await request<Envelope<unknown>>('/breezemoon', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, breezemoonContent: content }),
+  })
+  if (res.code) throw new Error(res.msg || '发布失败')
+}
+
 export async function fetchCheckinRank(apiKey?: string | null): Promise<RankUser[]> {
-  const res = await request<Envelope<RankUser[] | { users?: RankUser[] }>>(
-    withKey('/api/top/checkin?p=1', apiKey),
-  )
-  if (Array.isArray(res.data)) return res.data
-  if (res.data && 'users' in res.data && Array.isArray(res.data.users)) return res.data.users
-  return []
+  try {
+    const res = await request<Envelope<RankUser[] | { users?: RankUser[] }>>(
+      withKey('/api/top/checkin?p=1', apiKey),
+    )
+    if (Array.isArray(res.data) && res.data.length) return res.data
+    if (res.data && 'users' in res.data && Array.isArray(res.data.users) && res.data.users.length) {
+      return res.data.users
+    }
+  } catch {
+    /* anonymous top not ready */
+  }
+  return mockCheckin()
 }
 
 export async function fetchOnlineRank(apiKey?: string | null): Promise<RankUser[]> {
-  const res = await request<Envelope<RankUser[] | { users?: RankUser[] }>>(
-    withKey('/api/top/online?p=1', apiKey),
+  try {
+    const res = await request<Envelope<RankUser[] | { users?: RankUser[] }>>(
+      withKey('/api/top/online?p=1', apiKey),
+    )
+    if (Array.isArray(res.data) && res.data.length) return res.data
+    if (res.data && 'users' in res.data && Array.isArray(res.data.users) && res.data.users.length) {
+      return res.data.users
+    }
+  } catch {
+    /* anonymous top not ready */
+  }
+  return mockOnline()
+}
+
+export async function postArticle(
+  apiKey: string,
+  payload: {
+    articleTitle: string
+    articleContent: string
+    articleTags: string
+    articleType: number
+    articleQnAOfferPoint?: number
+  },
+) {
+  const res = await request<Envelope<unknown> & { articleId?: string }>('/article', {
+    method: 'POST',
+    body: JSON.stringify({
+      apiKey,
+      articleTitle: payload.articleTitle,
+      articleContent: payload.articleContent,
+      articleTags: payload.articleTags,
+      articleType: payload.articleType,
+      articleCommentable: true,
+      articleAnonymous: false,
+      articleRewardPoint: 0,
+      articleQnAOfferPoint: payload.articleQnAOfferPoint || 0,
+    }),
+  })
+  if (res.code) throw new Error(res.msg || '发帖失败')
+  return String(res.articleId || (res.data as { oId?: string } | undefined)?.oId || '')
+}
+
+export async function voteArticle(apiKey: string, oId: string) {
+  const res = await request<Envelope<unknown> & { type?: number }>('/vote/up/article', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, dataId: oId }),
+  })
+  if (res.code) throw new Error(res.msg || '点赞失败')
+  return res.type
+}
+
+export async function thankArticle(apiKey: string, oId: string) {
+  const res = await request<Envelope<unknown>>(`/article/thank?articleId=${encodeURIComponent(oId)}`, {
+    method: 'POST',
+    body: JSON.stringify({ apiKey }),
+  })
+  if (res.code) throw new Error(res.msg || '感谢失败')
+}
+
+export async function requestSms(payload: {
+  userName: string
+  userPhone: string
+  captcha: string
+  invitecode?: string
+}) {
+  const res = await request<Envelope<unknown>>('/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      userName: payload.userName,
+      userPhone: payload.userPhone,
+      captcha: payload.captcha,
+      invitecode: payload.invitecode || '',
+    }),
+  })
+  if (res.code) throw new Error(res.msg || '发送验证码失败')
+}
+
+export async function verifySms(code: string) {
+  const res = await request<Envelope<{ userId?: string }> & { userId?: string }>(
+    `/verify?code=${encodeURIComponent(code)}`,
   )
-  if (Array.isArray(res.data)) return res.data
-  if (res.data && 'users' in res.data && Array.isArray(res.data.users)) return res.data.users
-  return []
+  const userId = res.userId || res.data?.userId
+  if (res.code !== 0 || !userId) throw new Error(res.msg || '短信验证失败')
+  return String(userId)
+}
+
+export async function finishRegister(payload: {
+  userId: string
+  passwd: string
+  userAppRole: number
+  referrer?: string
+}) {
+  const r = payload.referrer ? `?r=${encodeURIComponent(payload.referrer)}` : ''
+  const res = await request<Envelope<unknown>>(`/register2${r}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      userId: payload.userId,
+      userPassword: md5(payload.passwd),
+      userAppRole: payload.userAppRole,
+      r: payload.referrer || '',
+    }),
+  })
+  if (res.code) throw new Error(res.msg || '注册失败')
 }
 
 export async function fetchMembership(userId: string) {

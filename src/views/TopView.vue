@@ -1,23 +1,20 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { fetchCheckinRank, fetchOnlineRank, type RankUser } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
-const { apiKey, isLoggedIn } = storeToRefs(auth)
+const { apiKey } = storeToRefs(auth)
 const checkin = ref<RankUser[]>([])
 const online = ref<RankUser[]>([])
 const error = ref('')
 const loading = ref(false)
 
-async function load() {
-  checkin.value = []
-  online.value = []
-  error.value = ''
-  if (!apiKey.value) return
+const usingMock = computed(() => checkin.value.some((u) => ['csfwff', 'Yui'].includes(u.userName) && checkin.value.length <= 8))
 
+async function load() {
+  error.value = ''
   loading.value = true
   try {
     ;[checkin.value, online.value] = await Promise.all([
@@ -36,12 +33,11 @@ watch(apiKey, () => void load(), { immediate: true })
 
 <template>
   <div class="board">
-    <p v-if="!isLoggedIn" class="banner">
-      排行榜接口需要登录。
-      <RouterLink to="/login">去登录</RouterLink>
-    </p>
-    <p v-else-if="loading" class="banner">加载中…</p>
+    <p v-if="loading" class="banner">加载中…</p>
     <p v-else-if="error" class="err">{{ error }}</p>
+    <p v-else-if="usingMock && !apiKey" class="banner">
+      匿名榜单接口尚未开放，当前为与 <code>/api/top/checkin|online</code> 对齐的 mock。
+    </p>
     <section class="card">
       <h1>今日连签排行</h1>
       <ol>
@@ -75,9 +71,6 @@ watch(apiKey, () => void load(), { immediate: true })
   grid-column: 1 / -1;
   color: var(--fp-muted);
   font-size: 13px;
-}
-.banner a {
-  color: var(--fp-link);
 }
 .card {
   background: var(--fp-card);

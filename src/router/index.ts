@@ -27,6 +27,12 @@ const router = createRouter({
       meta: { title: '优选', list: 'perfect' },
     },
     { path: '/search', component: () => import('@/views/ArticleListView.vue'), meta: { title: '搜索', list: 'search' } },
+    {
+      path: '/domain/:uri',
+      component: () => import('@/views/ArticleListView.vue'),
+      meta: { title: '领域', list: 'domain' },
+    },
+    { path: '/post', name: 'post', component: () => import('@/views/PostView.vue'), meta: { auth: true } },
     { path: '/domains', component: () => import('@/views/DomainView.vue') },
     { path: '/breezemoons', component: () => import('@/views/BreezemoonView.vue') },
     { path: '/top', component: () => import('@/views/TopView.vue') },

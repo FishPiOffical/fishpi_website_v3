@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchArticleFeed, type ArticleFeedKind, type ArticleSummary } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
@@ -8,7 +8,7 @@ import ArticleFeed from '@/components/articles/ArticleFeed.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
-const { apiKey, isLoggedIn } = storeToRefs(auth)
+const { apiKey } = storeToRefs(auth)
 
 const items = ref<ArticleSummary[]>([])
 const loading = ref(false)
@@ -18,32 +18,33 @@ const page = ref(1)
 const kind = computed(() => (route.meta.list as ArticleFeedKind) || 'recent')
 const title = computed(() => (route.meta.title as string) || '帖子')
 const keyword = computed(() => (typeof route.query.q === 'string' ? route.query.q : ''))
-const needsLogin = computed(() => !isLoggedIn.value)
+const domainUri = computed(() => String(route.params.uri || ''))
+const extra = computed(() => (kind.value === 'domain' ? domainUri.value : keyword.value))
+const usingMock = computed(() => items.value.some((a) => String(a.oId).startsWith('mock-')))
+const paged = computed(() => ['hot', 'long', 'recent', 'domain'].includes(kind.value))
 
 async function load() {
-  items.value = []
   error.value = ''
-  if (!apiKey.value) return
-
   loading.value = true
   try {
-    items.value = await fetchArticleFeed(kind.value, apiKey.value, page.value, 40, keyword.value)
+    items.value = await fetchArticleFeed(kind.value, apiKey.value, page.value, 40, extra.value)
   } catch (e) {
     error.value = e instanceof Error ? e.message : '加载失败'
+    items.value = []
   } finally {
     loading.value = false
   }
 }
 
 watch(
-  () => [kind.value, keyword.value],
+  () => [kind.value, extra.value],
   () => {
     page.value = 1
   },
 )
 
 watch(
-  () => [kind.value, keyword.value, apiKey.value, page.value],
+  () => [kind.value, extra.value, apiKey.value, page.value],
   () => {
     void load()
   },
@@ -57,20 +58,16 @@ watch(
       <h1>{{ title }}</h1>
       <p v-if="keyword" class="hint">关键词：{{ keyword }}</p>
     </header>
-    <p v-if="needsLogin" class="hint">
-      列表接口需要登录，本站已不再解析旧站 HTML。
-      <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">去登录</RouterLink>
+    <p v-if="usingMock" class="hint">
+      对应 JSON 接口尚未对游客开放或仍为 404，当前为字段对齐的 mock。
     </p>
     <p v-else-if="kind === 'qna' || kind === 'perfect'" class="hint">
-      当前从最近帖子中筛选；Rhythm 尚未提供独立问答/优选列表接口。
-    </p>
-    <p v-else-if="kind === 'search'" class="hint">
-      暂无正式搜索 API，当前仅在最近帖标题中本地过滤。
+      独立问答/优选列表未就绪时，会尝试标签接口再回退 mock。
     </p>
     <p v-if="loading" class="hint">加载中…</p>
     <p v-else-if="error" class="err">{{ error }}</p>
-    <ArticleFeed v-else-if="!needsLogin" :items="items" />
-    <footer v-if="isLoggedIn && (kind === 'hot' || kind === 'long' || kind === 'recent')" class="pager">
+    <ArticleFeed v-else :items="items" />
+    <footer v-if="paged" class="pager">
       <button type="button" :disabled="page <= 1" @click="page -= 1">上一页</button>
       <span>{{ page }}</span>
       <button type="button" :disabled="items.length < 20" @click="page += 1">下一页</button>
@@ -92,9 +89,6 @@ h1 {
 .hint {
   color: var(--fp-muted);
   font-size: 13px;
-}
-.hint a {
-  color: var(--fp-link);
 }
 .err {
   color: #e07a5f;

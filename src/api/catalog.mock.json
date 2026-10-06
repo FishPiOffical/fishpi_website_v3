@@ -1,0 +1,160 @@
+{
+  "articles": [
+    {
+      "oId": "mock-1001",
+      "articleTitle": "『新人手册』摸鱼派是个什么样的社区",
+      "articleViewCntDisplayFormat": "166.4K",
+      "articleViewCount": 166400,
+      "articleStick": 1,
+      "articleType": 0,
+      "articlePerfect": 1,
+      "articleTags": "FishingPi,摸鱼派,系统公告",
+      "articleCommentCount": 27,
+      "articleAuthorName": "adlered",
+      "articleCreateTimeStr": "2021-11-10 11:55:52",
+      "timeAgo": "很久以前",
+      "domainUri": "community"
+    },
+    {
+      "oId": "mock-1002",
+      "articleTitle": "【织言】互动小说创作大赛",
+      "articleViewCntDisplayFormat": "435",
+      "articleViewCount": 435,
+      "articleType": 0,
+      "articlePerfect": 1,
+      "articleTags": "活动,织言",
+      "articleCommentCount": 18,
+      "articleAuthorName": "imlinhanchao",
+      "timeAgo": "3 天前",
+      "domainUri": "community"
+    },
+    {
+      "oId": "mock-1003",
+      "articleTitle": "在你的梦中醒来",
+      "articleViewCntDisplayFormat": "1.2K",
+      "articleViewCount": 1200,
+      "articleType": 6,
+      "articlePerfect": 0,
+      "articleTags": "专栏,随笔",
+      "articleCommentCount": 9,
+      "articleAuthorName": "Yui",
+      "timeAgo": "1 周前",
+      "domainUri": "life"
+    },
+    {
+      "oId": "mock-1004",
+      "articleTitle": "百度网盘怎么转直链？",
+      "articleViewCntDisplayFormat": "24",
+      "articleViewCount": 24,
+      "articleType": 5,
+      "articlePerfect": 0,
+      "articleTags": "Q&A,网盘",
+      "articleCommentCount": 6,
+      "articleAuthorName": "difficultjob",
+      "timeAgo": "2 天前",
+      "domainUri": "programmer"
+    },
+    {
+      "oId": "mock-1005",
+      "articleTitle": "【人物志】只有午安",
+      "articleViewCntDisplayFormat": "361",
+      "articleViewCount": 361,
+      "articleType": 0,
+      "articlePerfect": 1,
+      "articleTags": "人物志",
+      "articleCommentCount": 12,
+      "articleAuthorName": "xunfeng",
+      "timeAgo": "5 天前",
+      "domainUri": "life"
+    },
+    {
+      "oId": "mock-1006",
+      "articleTitle": "TypeScript 泛型怎么写才不绕？",
+      "articleViewCntDisplayFormat": "88",
+      "articleViewCount": 88,
+      "articleType": 5,
+      "articlePerfect": 0,
+      "articleTags": "Q&A,TypeScript",
+      "articleCommentCount": 4,
+      "articleAuthorName": "iwpz",
+      "timeAgo": "6 小时前",
+      "domainUri": "programmer"
+    },
+    {
+      "oId": "mock-1007",
+      "articleTitle": "今日收入计算器该怎么设计",
+      "articleViewCntDisplayFormat": "210",
+      "articleViewCount": 210,
+      "articleType": 0,
+      "articlePerfect": 0,
+      "articleTags": "产品,前端",
+      "articleCommentCount": 3,
+      "articleAuthorName": "csfwff",
+      "timeAgo": "昨天",
+      "domainUri": "programmer"
+    },
+    {
+      "oId": "mock-1008",
+      "articleTitle": "一次失败的外包经历",
+      "articleViewCntDisplayFormat": "176",
+      "articleViewCount": 176,
+      "articleType": 6,
+      "articlePerfect": 0,
+      "articleTags": "专栏,职场",
+      "articleCommentCount": 21,
+      "articleAuthorName": "moyupi",
+      "timeAgo": "4 天前",
+      "domainUri": "life"
+    }
+  ],
+  "details": {
+    "mock-1001": {
+      "articleContent": "<p>欢迎来到摸鱼派。本条为 <code>/api/article/{id}</code> 匿名读尚未开放时的占位正文，字段与正式接口对齐。</p><p>登录后将优先请求 Rhythm JSON。</p>",
+      "articleComments": [
+        {
+          "oId": "mock-c1",
+          "commentAuthorName": "Yui",
+          "commentContent": "<p>欢迎新人。</p>",
+          "timeAgo": "1 年前"
+        }
+      ]
+    }
+  },
+  "checkin": [
+    { "userName": "csfwff", "userCheckinStreak": 1863 },
+    { "userName": "Yui", "userCheckinStreak": 1783 },
+    { "userName": "iwpz", "userCheckinStreak": 1606 },
+    { "userName": "18", "userCheckinStreak": 1519 },
+    { "userName": "admin", "userCheckinStreak": 294 }
+  ],
+  "online": [
+    { "userName": "KevinPeng", "onlineMinute": 1475372 },
+    { "userName": "moyupi", "onlineMinute": 1165341 },
+    { "userName": "APTX-4869", "onlineMinute": 855284 },
+    { "userName": "wusirg", "onlineMinute": 846755 },
+    { "userName": "baba22222", "onlineMinute": 844863 }
+  ],
+  "domains": [
+    {
+      "uri": "programmer",
+      "domainTitle": "程序员",
+      "domainDescription": "开发、工具与代码",
+      "domainArticleCount": 3,
+      "domainTags": "TypeScript,前端,网盘"
+    },
+    {
+      "uri": "life",
+      "domainTitle": "生活",
+      "domainDescription": "职场、随笔与人物",
+      "domainArticleCount": 3,
+      "domainTags": "随笔,职场,人物志"
+    },
+    {
+      "uri": "community",
+      "domainTitle": "社区",
+      "domainDescription": "公告、活动与手册",
+      "domainArticleCount": 2,
+      "domainTags": "摸鱼派,活动,系统公告"
+    }
+  ]
+}
