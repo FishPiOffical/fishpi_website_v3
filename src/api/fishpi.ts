@@ -154,6 +154,7 @@ export interface ArticleComment {
   commentAuthorId?: string
   reactionSummary?: ReactionSummary[]
   currentUserReaction?: string
+  commentQnAOffered?: number
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -845,6 +846,72 @@ export async function removeComment(apiKey: string, id: string) {
     body: JSON.stringify({ apiKey }),
   })
   if (res.code) throw new Error(res.msg || '删除评论失败')
+}
+
+export async function fetchCommentContent(apiKey: string, id: string) {
+  const res = await request<{ code?: number; msg?: string; commentContent?: string }>(
+    withKey(`/comment/${encodeURIComponent(id)}/content`, apiKey),
+  )
+  if (res.code) throw new Error(res.msg || '无法读取评论原文')
+  return String(res.commentContent || '')
+}
+
+export async function updateComment(apiKey: string, id: string, commentContent: string) {
+  const res = await request<Envelope<unknown> & { commentContent?: string }>(`/comment/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ apiKey, commentContent, commentVisible: false }),
+  })
+  if (res.code) throw new Error(res.msg || '更新评论失败')
+  return res.commentContent
+}
+
+export async function acceptComment(apiKey: string, commentId: string) {
+  const res = await request<Envelope<unknown>>('/comment/accept', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, commentId }),
+  })
+  if (res.code) throw new Error(res.msg || '采纳失败')
+}
+
+export async function queryTags(apiKey: string, title: string) {
+  const res = await request<{ code?: number; tags?: string[] }>(
+    withKey(`/tags/query?title=${encodeURIComponent(title)}`, apiKey),
+  )
+  return res.tags ?? []
+}
+
+export async function fetchRandomArticles(size = 8, apiKey?: string | null) {
+  try {
+    const res = await request<{ articles?: ArticleSummary[] }>(withKey(`/article/random/${size}`, apiKey))
+    return res.articles ?? []
+  } catch {
+    return []
+  }
+}
+
+export async function previewMarkdown(markdownText: string) {
+  const res = await request<Envelope<string> & { html?: string }>('/markdown', {
+    method: 'POST',
+    body: JSON.stringify({ markdownText }),
+  })
+  if (typeof res.data === 'string' && res.data) return res.data
+  return String(res.html || '')
+}
+
+export interface PublicLog {
+  oId?: string
+  key1?: string
+  key2?: string
+  key3?: string
+  data?: string
+}
+
+export async function fetchPublicLogs(apiKey: string, page = 1, pageSize = 20) {
+  const res = await request<Envelope<PublicLog[]>>(
+    withKey(`/logs/more?page=${page}&pageSize=${pageSize}`, apiKey),
+  )
+  if (res.code) throw new Error(res.msg || '日志加载失败')
+  return Array.isArray(res.data) ? res.data : []
 }
 
 export async function searchUserNames(apiKey: string, name: string): Promise<string[]> {

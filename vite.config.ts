@@ -77,6 +77,25 @@ export default defineConfig(({ mode }) => {
         },
         '/upload': proxy,
         '/report': proxy,
+        '/markdown': proxy,
+        '/user-channel': { ...proxy, ws: true },
+        '/logs': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/logs' || path === '/logs/')) {
+              return req.url
+            }
+          },
+        },
+        '/tags': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            if (path === '/tags/query') return
+            if (req.method === 'GET' || req.method === 'HEAD') return req.url
+          },
+        },
         '/register': { ...proxy, bypass: spaGetBypass },
         '/article-channel': { ...proxy, ws: true },
         '/article': {
@@ -84,6 +103,7 @@ export default defineConfig(({ mode }) => {
           bypass(req) {
             const path = (req.url || '').split('?')[0] || ''
             if (path.startsWith('/article-channel')) return
+            if (path.startsWith('/article/random')) return
             return spaGetBypass(req)
           },
         },

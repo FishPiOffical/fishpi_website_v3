@@ -71,6 +71,7 @@ const router = createRouter({
     { path: '/domains', component: () => import('@/views/DomainView.vue') },
     { path: '/breezemoons', component: () => import('@/views/BreezemoonView.vue') },
     { path: '/repeater', component: () => import('@/views/RepeaterView.vue') },
+    { path: '/logs', component: () => import('@/views/LogsView.vue'), meta: { auth: true } },
     { path: '/top', component: () => import('@/views/TopView.vue') },
     { path: '/member/:userName', name: 'member', component: () => import('@/views/MemberView.vue') },
     {

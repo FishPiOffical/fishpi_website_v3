@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import {
   fetchCheckinRank,
   fetchOnlineRank,
+  fetchRandomArticles,
   fetchRecentArticles,
   type ArticleSummary,
   type RankUser,
@@ -19,6 +20,7 @@ const left = ref<ArticleSummary[]>([])
 const right = ref<ArticleSummary[]>([])
 const checkin = ref<RankUser[]>([])
 const online = ref<RankUser[]>([])
+const randoms = ref<ArticleSummary[]>([])
 const error = ref('')
 const loading = ref(false)
 
@@ -34,14 +36,16 @@ async function load() {
   error.value = ''
   loading.value = true
   try {
-    const [articles, checkinRank, onlineRank] = await Promise.all([
+    const [articles, checkinRank, onlineRank, randomList] = await Promise.all([
       fetchRecentArticles(apiKey.value, 1, 40),
       fetchCheckinRank(apiKey.value),
       fetchOnlineRank(apiKey.value),
+      fetchRandomArticles(8, apiKey.value),
     ])
     splitArticles(articles)
     checkin.value = checkinRank.slice(0, 8)
     online.value = onlineRank.slice(0, 8)
+    randoms.value = randomList
   } catch (e) {
     error.value = e instanceof Error ? e.message : '首页加载失败'
   } finally {
@@ -98,6 +102,16 @@ function views(a: ArticleSummary) {
         </div>
         <AdSlot slot-key="home.sidebar" />
         <CheckinPanel />
+        <div v-if="randoms.length" class="card">
+          <header>
+            <h3>随机帖子</h3>
+          </header>
+          <ol>
+            <li v-for="item in randoms" :key="item.oId">
+              <RouterLink :to="`/article/${item.oId}`">{{ item.articleTitleEmoj || item.articleTitle }}</RouterLink>
+            </li>
+          </ol>
+        </div>
         <div class="card">
           <header>
             <h3>今日连签排行</h3>
@@ -182,6 +196,15 @@ ol {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+aside .card a {
+  color: var(--fp-text);
+  text-decoration: none;
+  font-size: 13px;
+}
+aside .card li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--fp-border);
 }
 .col em,
 .rank em {

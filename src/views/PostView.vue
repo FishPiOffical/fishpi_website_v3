@@ -7,6 +7,8 @@ import {
   fetchArticleDrafts,
   fetchArticleMd,
   postArticle,
+  previewMarkdown,
+  queryTags,
   removeArticleDraft,
   saveArticleDraft,
   updateArticle,
@@ -33,6 +35,10 @@ const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const drafts = ref<ArticleDraft[]>([])
 const draftId = ref('')
+const tagHints = ref<string[]>([])
+const previewHtml = ref('')
+const previewing = ref(false)
+let tagTimer = 0
 
 function draftKey(d: ArticleDraft) {
   return String(d.oId || d.articleDraftId || '')
@@ -94,6 +100,42 @@ watch(editId, () => {
   void loadEdit()
   void loadDrafts()
 })
+
+watch(tags, (value) => {
+  window.clearTimeout(tagTimer)
+  const last = value.split(/[,，]/).pop()?.trim() || ''
+  if (!apiKey.value || last.length < 1) {
+    tagHints.value = []
+    return
+  }
+  tagTimer = window.setTimeout(async () => {
+    try {
+      tagHints.value = await queryTags(apiKey.value!, last)
+    } catch {
+      tagHints.value = []
+    }
+  }, 250)
+})
+
+function pickTag(name: string) {
+  const parts = tags.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
+  parts.pop()
+  if (!parts.includes(name)) parts.push(name)
+  tags.value = parts.join(',')
+  tagHints.value = []
+}
+
+async function showPreview() {
+  if (!content.value.trim()) return
+  previewing.value = true
+  try {
+    previewHtml.value = await previewMarkdown(content.value)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '预览失败'
+  } finally {
+    previewing.value = false
+  }
+}
 
 function payload() {
   return {
@@ -197,7 +239,13 @@ async function insertImage(e: Event) {
         </button>
       </section>
       <label>标题<input v-model="title" required /></label>
-      <label>标签（逗号分隔）<input v-model="tags" required placeholder="前端,摸鱼" /></label>
+      <label>
+        标签（逗号分隔）
+        <input v-model="tags" required placeholder="前端,摸鱼" />
+      </label>
+      <div v-if="tagHints.length" class="hints">
+        <button v-for="t in tagHints" :key="t" type="button" class="ghost" @click="pickTag(t)">{{ t }}</button>
+      </div>
       <label>
         类型
         <select v-model.number="type">
@@ -214,7 +262,11 @@ async function insertImage(e: Event) {
         <button type="button" class="ghost" :disabled="uploading" @click="fileInput?.click()">
           {{ uploading ? '上传中…' : '插入图片' }}
         </button>
+        <button type="button" class="ghost" :disabled="previewing || !content.trim()" @click="showPreview">
+          {{ previewing ? '预览中…' : '预览' }}
+        </button>
       </div>
+      <div v-if="previewHtml" class="preview" v-html="previewHtml" />
       <p v-if="error" class="err">{{ error }}</p>
       <div class="tools">
         <button v-if="!editId" type="button" class="ghost" :disabled="savingDraft || !title.trim()" @click="saveDraft">
@@ -295,5 +347,16 @@ button {
 .drafts span {
   margin-left: 8px;
   color: var(--fp-muted);
+}
+.hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.preview {
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--fp-bg);
 }
 </style>

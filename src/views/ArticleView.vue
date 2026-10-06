@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import {
   fetchArticle,
   fetchArticleHeat,
+  fetchCommentContent,
   followArticle,
   postComment,
   removeComment,
@@ -14,6 +15,8 @@ import {
   toggleReaction,
   unfollowArticle,
   unwatchArticle,
+  updateComment,
+  acceptComment,
   voteArticle,
   voteComment,
   watchArticle,
@@ -42,6 +45,9 @@ const actionMsg = ref('')
 const replyId = ref('')
 const commentPage = ref(1)
 const heat = ref(0)
+const editingId = ref('')
+const editDraft = ref('')
+const editSaving = ref(false)
 let heatWs: WebSocket | null = null
 
 const id = computed(() => String(route.params.id || ''))
@@ -59,6 +65,7 @@ const metals = computed(() => article.value?.sysMetal || article.value?.articleA
 const canEdit = computed(
   () => article.value?.isMyArticle || article.value?.articleAuthorName === account.value?.userName,
 )
+const isQnA = computed(() => Number(article.value?.articleType) === 5)
 
 function isOwnComment(c: ArticleComment) {
   return Boolean(account.value && (c.commentAuthorName === account.value.userName || c.commentAuthorId === account.value.oId))
@@ -273,6 +280,41 @@ async function onRemoveComment(c: ArticleComment) {
   }
 }
 
+async function startEdit(c: ArticleComment) {
+  if (!apiKey.value) return
+  try {
+    editDraft.value = await fetchCommentContent(apiKey.value, c.oId)
+    editingId.value = c.oId
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '无法读取评论原文'
+  }
+}
+
+async function saveEdit() {
+  if (!apiKey.value || !editingId.value || !editDraft.value.trim()) return
+  editSaving.value = true
+  try {
+    await updateComment(apiKey.value, editingId.value, editDraft.value.trim())
+    editingId.value = ''
+    editDraft.value = ''
+    await load()
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '更新评论失败'
+  } finally {
+    editSaving.value = false
+  }
+}
+
+async function onAccept(c: ArticleComment) {
+  if (!apiKey.value) return
+  try {
+    await acceptComment(apiKey.value, c.oId)
+    await load()
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '采纳失败'
+  }
+}
+
 function who(c: ArticleComment) {
   return c.commentAuthorName || '匿名'
 }
@@ -378,12 +420,28 @@ async function onReactComment(c: ArticleComment, value: string) {
           <button v-if="isLoggedIn" type="button" class="ghost" :disabled="c.rewarded" @click="onThankComment(c)">
             {{ c.rewarded ? '已感谢' : '感谢' }}
           </button>
+          <button v-if="isLoggedIn && isOwnComment(c)" type="button" class="ghost" @click="startEdit(c)">
+            编辑
+          </button>
           <button v-if="isLoggedIn && isOwnComment(c)" type="button" class="ghost" @click="onRemoveComment(c)">
             删除
           </button>
+          <button
+            v-if="isLoggedIn && canEdit && isQnA && !c.commentQnAOffered && !isOwnComment(c)"
+            type="button"
+            class="ghost"
+            @click="onAccept(c)"
+          >
+            采纳
+          </button>
           <ReportDialog v-if="isLoggedIn && !isOwnComment(c)" :api-key="apiKey" :data-id="c.oId" :data-type="1" />
         </header>
-        <div class="cmt-body" v-html="c.commentContent || ''" />
+        <div v-if="editingId === c.oId" class="edit-box">
+          <textarea v-model="editDraft" rows="3" />
+          <button type="button" :disabled="editSaving || !editDraft.trim()" @click="saveEdit">保存</button>
+          <button type="button" class="ghost" @click="editingId = ''">取消</button>
+        </div>
+        <div v-else class="cmt-body" v-html="c.commentContent || ''" />
         <ReactionBar
           :summary="c.reactionSummary"
           :current="c.currentUserReaction"
@@ -522,6 +580,24 @@ h2 {
 .cmt header a {
   color: inherit;
   text-decoration: none;
+}
+.edit-box textarea {
+  width: 100%;
+  background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
+  color: var(--fp-text);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 6px 0;
+}
+.edit-box button {
+  margin-right: 8px;
+  border: 0;
+  background: var(--fp-primary);
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
 }
 .composer textarea {
   width: 100%;
