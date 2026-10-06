@@ -152,6 +152,8 @@ export interface ArticleComment {
   commentVote?: number
   rewarded?: boolean
   commentAuthorId?: string
+  reactionSummary?: ReactionSummary[]
+  currentUserReaction?: string
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -177,6 +179,55 @@ export interface ArticleDetail extends ArticleSummary {
   articleAuthor?: { sysMetal?: MetalItem[]; userName?: string }
   articleType?: number
   articleHeat?: number
+  reactionSummary?: ReactionSummary[]
+  currentUserReaction?: string
+}
+
+export interface ReactionSummary {
+  value: string
+  emoji?: string
+  count: number
+  selected?: boolean
+  users?: string[]
+}
+
+export const REACTION_EMOJIS: { value: string; emoji: string }[] = [
+  { value: 'thumbsup', emoji: '👍' },
+  { value: 'plus', emoji: '➕1️⃣' },
+  { value: 'thumbsdown', emoji: '👎' },
+  { value: 'check', emoji: '✅' },
+  { value: 'cross', emoji: '❌' },
+  { value: 'star', emoji: '⭐' },
+  { value: 'heart', emoji: '❤️' },
+  { value: 'fire', emoji: '🔥' },
+  { value: 'party', emoji: '🎉' },
+  { value: 'laugh', emoji: '😂' },
+  { value: 'wow', emoji: '😮' },
+  { value: 'clap', emoji: '👏' },
+  { value: 'eyes', emoji: '👀' },
+  { value: 'thinking', emoji: '🤔' },
+  { value: 'cry', emoji: '😢' },
+  { value: 'angry', emoji: '😡' },
+  { value: 'brokenheart', emoji: '💔' },
+  { value: 'heartonfire', emoji: '❤️‍🔥' },
+  { value: 'hundred', emoji: '💯' },
+  { value: 'rocket', emoji: '🚀' },
+  { value: 'salute', emoji: '🖖' },
+  { value: 'handshake', emoji: '🤝' },
+  { value: 'raisedhands', emoji: '🙌' },
+  { value: 'mindblown', emoji: '🤯' },
+  { value: 'pray', emoji: '🙏' },
+  { value: 'skull', emoji: '💀' },
+  { value: 'clown', emoji: '🤡' },
+  { value: 'poop', emoji: '💩' },
+]
+
+export function applyReactionPayload(
+  target: { reactionSummary?: ReactionSummary[]; currentUserReaction?: string },
+  payload: { reactionSummary?: ReactionSummary[]; currentUserReaction?: string; summary?: ReactionSummary[] },
+) {
+  target.reactionSummary = payload.reactionSummary || payload.summary || target.reactionSummary
+  if (payload.currentUserReaction != null) target.currentUserReaction = payload.currentUserReaction
 }
 
 export interface Breezemoon {
@@ -500,6 +551,89 @@ export async function fetchDomains(apiKey?: string | null): Promise<DomainItem[]
     /* GET /api/domains 尚未提供 */
   }
   return mockDomains()
+}
+
+export async function toggleReaction(
+  apiKey: string,
+  kind: 'article' | 'comment' | 'chat',
+  id: string,
+  value: string,
+) {
+  const path =
+    kind === 'article' ? '/article/reaction' : kind === 'comment' ? '/comment/reaction' : '/chat-room/reaction'
+  const body: Record<string, string> = { apiKey, groupType: 'emoji', value }
+  if (kind === 'article') body.articleId = id
+  else if (kind === 'comment') body.commentId = id
+  else body.oId = id
+  const res = await request<
+    Envelope<
+      | ReactionSummary[]
+      | { reactionSummary?: ReactionSummary[]; summary?: ReactionSummary[]; currentUserReaction?: string }
+    >
+  >(path, { method: 'POST', body: JSON.stringify(body) })
+  if (res.code) throw new Error(res.msg || '表情失败')
+  const data = res.data
+  if (Array.isArray(data)) return { reactionSummary: data, currentUserReaction: '' }
+  return {
+    reactionSummary: data?.reactionSummary || data?.summary || [],
+    currentUserReaction: data?.currentUserReaction || '',
+  }
+}
+
+export interface ArticleDraft {
+  oId?: string
+  articleDraftId?: string
+  articleDraftTitle?: string
+  articleDraftSummary?: string
+  articleDraftContent?: string
+  articleDraftTags?: string
+  articleDraftType?: number
+  articleDraftQnAOfferPoint?: number
+  articleDraftUpdatedTime?: number
+  articleTitle?: string
+  articleContent?: string
+  articleTags?: string
+  articleType?: number
+}
+
+export async function fetchArticleDrafts(apiKey: string) {
+  const res = await request<Envelope<{ drafts?: ArticleDraft[] }>>(withKey('/api/article-drafts', apiKey))
+  if (res.code) throw new Error(res.msg || '草稿列表失败')
+  return res.data?.drafts ?? []
+}
+
+export async function fetchArticleDraft(apiKey: string, id: string) {
+  const res = await request<Envelope<{ draft?: ArticleDraft }>>(
+    withKey(`/api/article-drafts/${encodeURIComponent(id)}`, apiKey),
+  )
+  if (res.code || !res.data?.draft) throw new Error(res.msg || '草稿不存在')
+  return res.data.draft
+}
+
+export async function saveArticleDraft(
+  apiKey: string,
+  payload: {
+    articleDraftId?: string
+    articleTitle: string
+    articleContent: string
+    articleTags: string
+    articleType: number
+    articleQnAOfferPoint?: number
+  },
+) {
+  const res = await request<Envelope<{ draft?: ArticleDraft }>>('/api/article-drafts', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, ...payload }),
+  })
+  if (res.code) throw new Error(res.msg || '保存草稿失败')
+  return res.data?.draft
+}
+
+export async function removeArticleDraft(apiKey: string, id: string) {
+  const res = await request<Envelope<unknown>>(withKey(`/api/article-drafts/${encodeURIComponent(id)}`, apiKey), {
+    method: 'DELETE',
+  })
+  if (res.code) throw new Error(res.msg || '删除草稿失败')
 }
 
 export async function fetchArticleHeat(id: string, apiKey?: string | null) {
@@ -1152,6 +1286,8 @@ export interface ChatHistoryItem {
   md?: string
   time?: string
   type?: string
+  reactionSummary?: ReactionSummary[]
+  currentUserReaction?: string
 }
 
 export interface RedPacketContent {

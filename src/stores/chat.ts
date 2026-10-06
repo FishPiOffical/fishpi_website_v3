@@ -7,8 +7,11 @@ import {
   openRedPacket,
   revokeChat,
   sendChat,
+  toggleReaction,
+  applyReactionPayload,
   type ChatHistoryItem,
   type MuteItem,
+  type ReactionSummary,
   type RedPacketContent,
 } from '@/api/fishpi'
 import { useAuthStore } from './auth'
@@ -21,6 +24,8 @@ export interface ChatLine {
   html?: string
   time?: string
   redPacket?: RedPacketContent
+  reactionSummary?: ReactionSummary[]
+  currentUserReaction?: string
 }
 
 export interface OnlineUser {
@@ -67,6 +72,8 @@ function asLine(item: ChatHistoryItem | Record<string, unknown>): ChatLine {
     html: typeof content === 'string' ? content : undefined,
     time: item.time as string | undefined,
     redPacket,
+    reactionSummary: (item as ChatHistoryItem).reactionSummary,
+    currentUserReaction: (item as ChatHistoryItem).currentUserReaction,
   }
 }
 
@@ -171,6 +178,15 @@ export const useChatStore = defineStore('chat', () => {
           pushIncoming({ ...msg, content })
         } else if (msg.type === 'redPacketStatus') {
           lastPacket.value = `${msg.whoGot} 领取了 ${msg.whoGive} 的红包`
+        } else if (msg.type === 'chatReaction') {
+          const line = messages.value.find((m) => m.oId === String(msg.oId || msg.targetId || ''))
+          if (line) {
+            applyReactionPayload(line, {
+              summary: msg.summary as ReactionSummary[] | undefined,
+              reactionSummary: msg.reactionSummary as ReactionSummary[] | undefined,
+              currentUserReaction: String(msg.actorReaction ?? msg.currentUserReaction ?? ''),
+            })
+          }
         }
       } catch {
         /* ignore */
@@ -258,6 +274,18 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = messages.value.filter((m) => m.oId !== oId)
   }
 
+  async function react(oId: string, value: string) {
+    const auth = useAuthStore()
+    if (!auth.apiKey) return
+    const line = messages.value.find((m) => m.oId === oId)
+    try {
+      const data = await toggleReaction(auth.apiKey, 'chat', oId, value)
+      if (line) applyReactionPayload(line, data)
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '表情失败'
+    }
+  }
+
   async function setDiscuss(topic: string) {
     await send(`[setdiscuss]${topic}[/setdiscuss]`)
   }
@@ -286,5 +314,6 @@ export const useChatStore = defineStore('chat', () => {
       packetDetail.value = null
     },
     setDiscuss,
+    react,
   }
 })

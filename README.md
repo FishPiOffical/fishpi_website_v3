@@ -32,6 +32,8 @@ VITE_API_TARGET=http://localhost:8080
 - 帖子热度 `GET /api/article/heat/{id}` 与 `article-channel` 实时在看/新评
 - 举报 `POST /report`（帖子/评论/用户）
 - 复读机 `GET /api/repeater/items`、点赞
+- 表情反应（帖子/评论/聊天室）`POST /article/reaction` 等
+- 发帖草稿 `GET/POST/DELETE /api/article-drafts`
 
 闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。
 

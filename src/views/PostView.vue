@@ -2,7 +2,17 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { fetchArticleMd, postArticle, updateArticle, uploadFiles } from '@/api/fishpi'
+import {
+  fetchArticleDraft,
+  fetchArticleDrafts,
+  fetchArticleMd,
+  postArticle,
+  removeArticleDraft,
+  saveArticleDraft,
+  updateArticle,
+  uploadFiles,
+  type ArticleDraft,
+} from '@/api/fishpi'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -18,12 +28,50 @@ const type = ref(0)
 const offer = ref(0)
 const error = ref('')
 const sending = ref(false)
+const savingDraft = ref(false)
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const drafts = ref<ArticleDraft[]>([])
+const draftId = ref('')
+
+function draftKey(d: ArticleDraft) {
+  return String(d.oId || d.articleDraftId || '')
+}
+
+async function loadDrafts() {
+  if (!apiKey.value || editId.value) {
+    drafts.value = []
+    return
+  }
+  try {
+    drafts.value = await fetchArticleDrafts(apiKey.value)
+  } catch {
+    drafts.value = []
+  }
+}
+
+function applyDraft(d: ArticleDraft) {
+  title.value = d.articleDraftTitle || d.articleTitle || ''
+  tags.value = d.articleDraftTags || d.articleTags || ''
+  content.value = d.articleDraftContent || d.articleContent || ''
+  type.value = Number(d.articleDraftType ?? d.articleType ?? 0)
+  offer.value = Number(d.articleDraftQnAOfferPoint || 0)
+  draftId.value = draftKey(d)
+}
+
+async function loadDraft(id: string) {
+  if (!apiKey.value) return
+  try {
+    applyDraft(await fetchArticleDraft(apiKey.value, id))
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '无法加载草稿'
+  }
+}
 
 async function loadEdit() {
   if (!apiKey.value || !editId.value) return
   error.value = ''
+  draftId.value = ''
   try {
     const md = await fetchArticleMd(apiKey.value, editId.value)
     title.value = md.articleTitle
@@ -36,29 +84,79 @@ async function loadEdit() {
   }
 }
 
-onMounted(() => void loadEdit())
-watch(editId, () => void loadEdit())
+onMounted(async () => {
+  await loadEdit()
+  await loadDrafts()
+  const q = typeof route.query.draft === 'string' ? route.query.draft : ''
+  if (q) await loadDraft(q)
+})
+watch(editId, () => {
+  void loadEdit()
+  void loadDrafts()
+})
+
+function payload() {
+  return {
+    articleTitle: title.value,
+    articleContent: content.value,
+    articleTags: tags.value,
+    articleType: type.value,
+    articleQnAOfferPoint: type.value === 5 ? offer.value : 0,
+  }
+}
 
 async function submit() {
   if (!apiKey.value) return
   error.value = ''
   sending.value = true
   try {
-    const payload = {
-      articleTitle: title.value,
-      articleContent: content.value,
-      articleTags: tags.value,
-      articleType: type.value,
-      articleQnAOfferPoint: type.value === 5 ? offer.value : 0,
-    }
     const id = editId.value
-      ? await updateArticle(apiKey.value, editId.value, payload)
-      : await postArticle(apiKey.value, payload)
+      ? await updateArticle(apiKey.value, editId.value, payload())
+      : await postArticle(apiKey.value, payload())
+    if (draftId.value) {
+      try {
+        await removeArticleDraft(apiKey.value, draftId.value)
+      } catch {
+        /* published anyway */
+      }
+    }
     await router.replace(id ? `/article/${id}` : '/')
   } catch (e) {
     error.value = e instanceof Error ? e.message : editId.value ? '更新失败' : '发帖失败'
   } finally {
     sending.value = false
+  }
+}
+
+async function saveDraft() {
+  if (!apiKey.value) return
+  error.value = ''
+  savingDraft.value = true
+  try {
+    const saved = await saveArticleDraft(apiKey.value, {
+      ...payload(),
+      articleDraftId: draftId.value || undefined,
+    })
+    if (saved) {
+      applyDraft(saved)
+      if (!draftId.value) draftId.value = draftKey(saved)
+    }
+    await loadDrafts()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '保存草稿失败'
+  } finally {
+    savingDraft.value = false
+  }
+}
+
+async function dropDraft(id: string) {
+  if (!apiKey.value) return
+  try {
+    await removeArticleDraft(apiKey.value, id)
+    if (draftId.value === id) draftId.value = ''
+    await loadDrafts()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '删除草稿失败'
   }
 }
 
@@ -85,6 +183,19 @@ async function insertImage(e: Event) {
     <h1>{{ editId ? '编辑帖子' : '发帖' }}</h1>
     <p v-if="!isLoggedIn" class="hint">请先登录。</p>
     <template v-else>
+      <section v-if="!editId && drafts.length" class="drafts">
+        <h2>草稿</h2>
+        <button
+          v-for="d in drafts"
+          :key="draftKey(d)"
+          type="button"
+          class="ghost"
+          @click="loadDraft(draftKey(d))"
+        >
+          {{ d.articleDraftTitle || '无标题' }}
+          <span @click.stop="dropDraft(draftKey(d))">删除</span>
+        </button>
+      </section>
       <label>标题<input v-model="title" required /></label>
       <label>标签（逗号分隔）<input v-model="tags" required placeholder="前端,摸鱼" /></label>
       <label>
@@ -105,9 +216,14 @@ async function insertImage(e: Event) {
         </button>
       </div>
       <p v-if="error" class="err">{{ error }}</p>
-      <button type="submit" :disabled="sending">
-        {{ sending ? (editId ? '保存中…' : '发布中…') : editId ? '保存' : '发布' }}
-      </button>
+      <div class="tools">
+        <button v-if="!editId" type="button" class="ghost" :disabled="savingDraft || !title.trim()" @click="saveDraft">
+          {{ savingDraft ? '保存中…' : '存草稿' }}
+        </button>
+        <button type="submit" :disabled="sending">
+          {{ sending ? (editId ? '保存中…' : '发布中…') : editId ? '保存' : '发布' }}
+        </button>
+      </div>
     </template>
   </form>
 </template>
@@ -164,5 +280,20 @@ button {
 }
 .err {
   color: #e07a5f;
+}
+.drafts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.drafts h2 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fp-muted);
+}
+.drafts span {
+  margin-left: 8px;
+  color: var(--fp-muted);
 }
 </style>

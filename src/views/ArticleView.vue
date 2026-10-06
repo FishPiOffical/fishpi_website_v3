@@ -11,16 +11,20 @@ import {
   rewardArticle,
   thankArticle,
   thankComment,
+  toggleReaction,
   unfollowArticle,
   unwatchArticle,
   voteArticle,
   voteComment,
   watchArticle,
+  applyReactionPayload,
   type ArticleComment,
   type ArticleDetail,
+  type ReactionSummary,
 } from '@/api/fishpi'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import MetalBadges from '@/components/MetalBadges.vue'
+import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -107,6 +111,16 @@ function connectHeat() {
         if (!c || article.value.articleComments?.some((x) => x.oId === c.oId)) return
         article.value.articleComments = [...(article.value.articleComments || []), c]
         article.value.articleCommentCount = Number(article.value.articleCommentCount || 0) + 1
+      } else if ((type === 'articleReaction' || type === 'commentReaction') && article.value) {
+        const summary = (msg.summary || msg.reactionSummary) as ReactionSummary[] | undefined
+        const current = String(msg.actorReaction ?? msg.currentUserReaction ?? '')
+        if (type === 'articleReaction') {
+          applyReactionPayload(article.value, { summary, currentUserReaction: current })
+        } else {
+          const cid = String(msg.targetId || msg.commentId || '')
+          const c = article.value.articleComments?.find((x) => x.oId === cid)
+          if (c) applyReactionPayload(c, { summary, currentUserReaction: current })
+        }
       }
     } catch {
       /* ignore */
@@ -262,6 +276,26 @@ async function onRemoveComment(c: ArticleComment) {
 function who(c: ArticleComment) {
   return c.commentAuthorName || '匿名'
 }
+
+async function onReactArticle(value: string) {
+  if (!apiKey.value || !article.value) return
+  try {
+    const data = await toggleReaction(apiKey.value, 'article', id.value, value)
+    applyReactionPayload(article.value, data)
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '表情失败'
+  }
+}
+
+async function onReactComment(c: ArticleComment, value: string) {
+  if (!apiKey.value) return
+  try {
+    const data = await toggleReaction(apiKey.value, 'comment', c.oId, value)
+    applyReactionPayload(c, data)
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '表情失败'
+  }
+}
 </script>
 
 <template>
@@ -316,6 +350,12 @@ function who(c: ArticleComment) {
         <ReportDialog v-if="isLoggedIn" :api-key="apiKey" :data-id="article.oId" :data-type="0" />
         <span v-if="actionMsg">{{ actionMsg }}</span>
       </div>
+      <ReactionBar
+        :summary="article.reactionSummary"
+        :current="article.currentUserReaction"
+        :disabled="!isLoggedIn"
+        @toggle="onReactArticle"
+      />
       <div class="body" v-html="article.articleContent || ''" />
     </article>
 
@@ -344,6 +384,12 @@ function who(c: ArticleComment) {
           <ReportDialog v-if="isLoggedIn && !isOwnComment(c)" :api-key="apiKey" :data-id="c.oId" :data-type="1" />
         </header>
         <div class="cmt-body" v-html="c.commentContent || ''" />
+        <ReactionBar
+          :summary="c.reactionSummary"
+          :current="c.currentUserReaction"
+          :disabled="!isLoggedIn"
+          @toggle="(v) => onReactComment(c, v)"
+        />
       </div>
       <p v-if="!comments.length" class="hint">还没有评论。</p>
       <footer v-if="commentPages > 1" class="pager">

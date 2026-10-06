@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import MentionSuggest from '@/components/MentionSuggest.vue'
+import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -160,6 +161,12 @@ function packetLabel(type?: string) {
               <button type="button" @click="claim(msg.oId, msg.redPacket.type)">领取</button>
             </div>
             <div v-else class="fp-bubble" v-html="msg.html || ''" />
+            <ReactionBar
+              :summary="msg.reactionSummary"
+              :current="msg.currentUserReaction"
+              :disabled="!auth.apiKey"
+              @toggle="(v) => chat.react(msg.oId, v)"
+            />
           </div>
         </article>
       </div>
