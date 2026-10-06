@@ -244,7 +244,10 @@ export interface RankUser {
   oId?: string
   userName: string
   userAvatarURL?: string
+  userAvatarURL20?: string
+  userAvatarURL48?: string
   userCheckinStreak?: number
+  userCurrentCheckinStreak?: number
   onlineMinute?: number
 }
 

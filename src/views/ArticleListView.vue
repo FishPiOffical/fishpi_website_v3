@@ -57,7 +57,7 @@ watch(
 </script>
 
 <template>
-  <section class="card">
+  <section>
     <header>
       <h1>{{ kind === 'tag' ? `#${extra}` : title }}</h1>
       <p v-if="keyword" class="hint">关键词：{{ keyword }}</p>
@@ -80,15 +80,9 @@ watch(
 </template>
 
 <style scoped>
-.card {
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 12px;
-  padding: 18px 20px 24px;
-}
 h1 {
   margin: 0 0 8px;
-  font-size: 18px;
+  font-size: 16px;
 }
 .hint {
   color: var(--fp-muted);

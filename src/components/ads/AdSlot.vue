@@ -70,18 +70,18 @@ function attrEntries(item: AdItem) {
 
 <style scoped>
 .slot[data-slot='home.top'] {
-  margin: 12px 20% 0;
+  max-width: var(--fp-wrap);
+  margin: 12px auto 0;
+  padding: 0 15px;
 }
 .banner {
   display: flex;
   gap: 12px;
   align-items: center;
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 10px;
   padding: 10px 14px;
   color: inherit;
   text-decoration: none;
+  background: rgba(0, 0, 0, 0.15);
 }
 .banner img {
   width: 72px;

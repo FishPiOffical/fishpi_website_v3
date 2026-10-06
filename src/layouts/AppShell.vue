@@ -12,15 +12,18 @@ const nav = [
   { to: '/', label: '最新' },
   { to: '/recent/long', label: '专栏' },
   { to: '/hot', label: '热门' },
-  { to: '/good', label: '点赞' },
   { to: '/cr', label: '聊天室' },
   { to: '/domains', label: '领域' },
   { to: '/breezemoons', label: '清风明月' },
-  { to: '/repeater', label: '复读机' },
-  { to: '/logs', label: '日志' },
   { to: '/qna', label: '问答' },
   { to: '/perfect', label: '优选' },
   { to: '/top', label: '总榜' },
+]
+
+const extraNav = [
+  { to: '/good', label: '点赞' },
+  { to: '/repeater', label: '复读机' },
+  { to: '/logs', label: '日志' },
 ]
 
 const route = useRoute()
@@ -64,9 +67,8 @@ function logout() {
 <template>
   <div class="shell">
     <header class="nav">
-      <RouterLink to="/" class="logo">
+      <RouterLink to="/" class="logo" aria-label="摸鱼派">
         <img src="/favicon.svg" alt="" />
-        <span>摸鱼派</span>
       </RouterLink>
       <nav>
         <RouterLink v-for="item in nav" :key="item.to" :to="item.to" :class="{ current: route.path === item.to }">
@@ -88,16 +90,21 @@ function logout() {
             <em v-if="unreadTotal" class="badge">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</em>
           </RouterLink>
           <RouterLink :to="memberPath">{{ account?.userName }}</RouterLink>
+          <RouterLink to="/settings">设置</RouterLink>
           <button type="button" @click="logout">退出</button>
         </template>
         <template v-else>
           <RouterLink to="/login">登录</RouterLink>
           <RouterLink to="/register">注册</RouterLink>
         </template>
-        <RouterLink to="/settings">设置</RouterLink>
-        <button type="button" class="ghost" title="切换颜色模式" @click="appearance.toggleTheme()">◐</button>
+        <button type="button" class="theme" title="切换颜色模式" @click="appearance.toggleTheme()">◐</button>
       </div>
     </header>
+    <div class="income" aria-label="今日收入">
+      <span>🎉</span>
+      <div class="count-time">今日收入</div>
+      <b>￥365</b>
+    </div>
     <AdSlot slot-key="home.top" />
     <main>
       <RouterView />
@@ -105,7 +112,9 @@ function logout() {
     <footer class="foot">
       <p>摸鱼好站</p>
       <AdSlot slot-key="footer.sponsors" />
-      <p class="muted">摸鱼派用户站 · 管理后台不在本仓库</p>
+      <p class="extra">
+        <RouterLink v-for="item in extraNav" :key="item.to" :to="item.to">{{ item.label }}</RouterLink>
+      </p>
     </footer>
   </div>
 </template>
@@ -117,58 +126,61 @@ function logout() {
 .nav {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 24px;
-  height: 56px;
+  justify-content: space-around;
+  gap: 8px;
+  padding: 5px 15px;
+  height: var(--fp-nav-h);
   background: var(--fp-nav);
-  border-bottom: 1px solid var(--fp-border);
+  font-weight: 500;
 }
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: inherit;
-  text-decoration: none;
-  font-weight: 700;
+  flex-shrink: 0;
 }
 .logo img {
-  width: 28px;
-  height: 28px;
+  width: 48px;
+  height: 48px;
 }
 nav {
   display: flex;
-  gap: 14px;
+  gap: 18px;
   flex: 1;
+  justify-content: center;
 }
 nav a {
   color: var(--fp-text);
   text-decoration: none;
   font-size: 14px;
-  opacity: 0.85;
+  white-space: nowrap;
 }
 nav a.current,
 nav a:hover {
-  opacity: 1;
   color: var(--fp-link);
 }
 .search {
-  width: 220px;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
+  width: 210px;
+  height: 38px;
+  background: #3a3b3b;
+  border: 0;
   color: var(--fp-text);
-  border-radius: 16px;
-  padding: 6px 12px;
+  border-radius: 3px;
+  padding: 5px 8px;
 }
 .user {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-size: 14px;
+  flex-shrink: 0;
 }
 .user a {
-  color: var(--fp-link);
+  color: var(--fp-text);
   text-decoration: none;
   position: relative;
+}
+.user a:hover {
+  color: var(--fp-link);
 }
 .badge {
   position: absolute;
@@ -183,25 +195,55 @@ nav a:hover {
   font-style: normal;
   text-align: center;
 }
-.user button,
-.ghost {
+.user button {
   border: 0;
   background: transparent;
   color: var(--fp-text);
   cursor: pointer;
 }
-main {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 16px 20px 40px;
+.theme {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--fp-border) !important;
 }
-.foot {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 24px 20px 40px;
+.income {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  z-index: 20;
+  width: 110px;
+  text-align: center;
+  background: rgba(39, 40, 39, 0.85);
+  border-radius: 16px;
+  padding: 8px 0 10px;
+  font-size: 12px;
   color: var(--fp-muted);
 }
-.muted {
+.income b {
+  display: block;
+  color: var(--fp-green);
+  font-size: 22px;
+  margin-top: 2px;
+}
+main {
+  max-width: var(--fp-wrap);
+  margin: 0 auto;
+  padding: 25px 15px 20px;
+}
+.foot {
+  max-width: var(--fp-wrap);
+  margin: 0 auto;
+  padding: 24px 15px 40px;
+  color: var(--fp-muted);
+}
+.extra {
+  display: flex;
+  gap: 16px;
   font-size: 12px;
+}
+.extra a {
+  color: var(--fp-muted);
+  text-decoration: none;
 }
 </style>

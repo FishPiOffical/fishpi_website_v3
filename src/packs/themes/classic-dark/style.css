@@ -1,13 +1,14 @@
 html[data-theme='classic-dark'] {
-  --fp-bg: #1a1b1e;
-  --fp-nav: #222428;
-  --fp-card: #25262b;
-  --fp-text: #e8eaed;
-  --fp-muted: #9aa0a6;
-  --fp-primary: #3d9a8c;
-  --fp-link: #7ec8c0;
-  --fp-border: #3a3d44;
-  --fp-hover: #2c2e34;
+  --fp-bg: #282a2a;
+  --fp-nav: #242525;
+  --fp-card: #282a2a;
+  --fp-text: #cbc5ba;
+  --fp-muted: #aca396;
+  --fp-primary: #69aa69;
+  --fp-link: #d23f31;
+  --fp-border: rgba(255, 255, 255, 0.06);
+  --fp-hover: rgba(255, 255, 255, 0.04);
   --fp-self: #2f5d55;
+  --fp-green: #69aa69;
   color-scheme: dark;
 }

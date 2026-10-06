@@ -1,14 +1,17 @@
 :root {
-  --fp-bg: #1a1b1e;
-  --fp-nav: #222428;
-  --fp-card: #25262b;
-  --fp-text: #e8eaed;
-  --fp-muted: #9aa0a6;
-  --fp-primary: #3d9a8c;
-  --fp-link: #7ec8c0;
-  --fp-border: #3a3d44;
-  --fp-hover: #2c2e34;
+  --fp-bg: #282a2a;
+  --fp-nav: #242525;
+  --fp-card: #282a2a;
+  --fp-text: #cbc5ba;
+  --fp-muted: #aca396;
+  --fp-primary: #69aa69;
+  --fp-link: #d23f31;
+  --fp-border: rgba(255, 255, 255, 0.06);
+  --fp-hover: rgba(255, 255, 255, 0.04);
   --fp-self: #2f5d55;
+  --fp-green: #69aa69;
+  --fp-nav-h: 58px;
+  --fp-wrap: 1300px;
 }
 
 * {
@@ -21,10 +24,13 @@ body {
   min-height: 100%;
   background: var(--fp-bg);
   color: var(--fp-text);
+  font-size: 14px;
   font-family:
+    HarmonyOS,
     'PingFang SC',
-    'Noto Sans SC',
-    system-ui,
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    'Helvetica Neue',
     sans-serif;
 }
 
@@ -38,16 +44,61 @@ textarea {
   font: inherit;
 }
 
+a {
+  color: var(--fp-link);
+}
+
 .fp-avatar-frame {
   position: relative;
   display: inline-flex;
-  border-radius: 50%;
+  border-radius: 3px;
 }
 
 .fp-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: 3px;
   object-fit: cover;
   display: block;
+}
+
+.avatar-small {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  background: var(--fp-hover) center / cover no-repeat;
+  flex-shrink: 0;
+}
+
+.fn-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cb-stick {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 10px 10px 0 0;
+  border-color: #999 transparent transparent transparent;
+}
+
+.cb-stick.gold {
+  border-width: 16px 16px 0 0;
+  border-color: #ffab10 transparent transparent transparent;
+}
+
+.icon-pin-rank {
+  position: absolute;
+  top: -15px;
+  left: 1px;
+  font-size: 10px;
+  color: #fff;
+  line-height: 12px;
+  font-style: normal;
 }

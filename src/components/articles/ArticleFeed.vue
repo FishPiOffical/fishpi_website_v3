@@ -23,12 +23,15 @@ function views(a: ArticleSummary) {
   <ol class="feed">
     <li v-if="!rows.length" class="empty">{{ empty || '暂无帖子' }}</li>
     <li v-for="item in rows" :key="item.oId">
-      <span v-if="item.articleStick" class="pin" />
-      <span v-if="item.articleType === 5" class="tag">问</span>
-      <span v-if="Number(item.articlePerfect) === 1" class="tag perfect">优</span>
-      <RouterLink :to="`/article/${item.oId}`">{{ titleOf(item) }}</RouterLink>
-      <em><RouterLink :to="`/member/${item.articleAuthorName}`">{{ item.articleAuthorName }}</RouterLink></em>
-      <em>{{ views(item) }}</em>
+      <span v-if="item.articleStick" class="cb-stick" />
+      <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+        <span
+          class="avatar-small"
+          :style="item.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` } : undefined"
+        />
+      </RouterLink>
+      <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{ titleOf(item) }}</RouterLink>
+      <span class="count">{{ views(item) }}</span>
     </li>
   </ol>
 </template>
@@ -40,29 +43,21 @@ function views(a: ArticleSummary) {
   padding: 0;
 }
 .feed li {
+  position: relative;
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--fp-border);
+  padding: 10px 15px;
   font-size: 14px;
 }
-.feed li > a {
+.title {
   flex: 1;
   color: var(--fp-text);
   text-decoration: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.feed em {
+.count {
   color: var(--fp-muted);
-  font-style: normal;
   font-size: 12px;
-}
-.feed em a {
-  color: var(--fp-muted);
-  text-decoration: none;
 }
 .empty {
   color: var(--fp-muted);

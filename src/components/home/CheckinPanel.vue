@@ -64,7 +64,7 @@ async function collect() {
 </script>
 
 <template>
-  <div v-if="isLoggedIn" class="card">
+  <div v-if="isLoggedIn" class="panel">
     <header>
       <h3>签到</h3>
     </header>
@@ -81,15 +81,13 @@ async function collect() {
 </template>
 
 <style scoped>
-.card {
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 10px;
-  padding: 12px 14px;
+.panel {
+  padding: 4px 15px 16px;
 }
 h3 {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 700;
 }
 p {
   margin: 4px 0;
@@ -101,9 +99,9 @@ p {
 button {
   margin: 6px 6px 0 0;
   border: 0;
-  background: var(--fp-primary);
+  background: var(--fp-green);
   color: #fff;
-  border-radius: 6px;
+  border-radius: 3px;
   padding: 4px 10px;
   cursor: pointer;
 }

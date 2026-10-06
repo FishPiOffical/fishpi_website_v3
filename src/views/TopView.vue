@@ -70,7 +70,7 @@ watch(apiKey, () => void load(), { immediate: true })
         <li v-for="(u, i) in checkin" :key="u.userName">
           <i>{{ i + 1 }}</i>
           <RouterLink :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
-          <em>{{ u.userCheckinStreak }}</em>
+          <em>{{ u.userCurrentCheckinStreak ?? u.userCheckinStreak }}</em>
         </li>
       </ol>
     </section>
