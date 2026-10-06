@@ -14,6 +14,7 @@ import {
 } from '@/api/fishpi'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
 import MetalBadges from '@/components/MetalBadges.vue'
+import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -129,6 +130,7 @@ async function sendPoints() {
         </button>
         <RouterLink v-if="isLoggedIn && isSelf" class="msg" to="/settings">编辑资料</RouterLink>
         <RouterLink v-if="isLoggedIn && !isSelf" class="msg" :to="`/chat/${profile.userName}`">发私信</RouterLink>
+        <ReportDialog v-if="isLoggedIn && !isSelf" :api-key="apiKey" :data-id="profile.oId" :data-type="2" />
         <form v-if="isLoggedIn && !isSelf" class="xfer" @submit.prevent="sendPoints">
           <input v-model.number="sendAmount" type="number" min="1" />
           <input v-model="sendMemo" placeholder="备注" />

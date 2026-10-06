@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   fetchArticle,
+  fetchArticleHeat,
   followArticle,
   postComment,
   removeComment,
@@ -20,6 +21,7 @@ import {
 } from '@/api/fishpi'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import MetalBadges from '@/components/MetalBadges.vue'
+import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -35,6 +37,8 @@ const sendError = ref('')
 const actionMsg = ref('')
 const replyId = ref('')
 const commentPage = ref(1)
+const heat = ref(0)
+let heatWs: WebSocket | null = null
 
 const id = computed(() => String(route.params.id || ''))
 
@@ -56,6 +60,69 @@ function isOwnComment(c: ArticleComment) {
   return Boolean(account.value && (c.commentAuthorName === account.value.userName || c.commentAuthorId === account.value.oId))
 }
 
+function disconnectHeat() {
+  heatWs?.close()
+  heatWs = null
+}
+
+function commentFromWs(msg: Record<string, unknown>): ArticleComment | null {
+  const oId = String(msg.oId || msg.commentId || '')
+  if (!oId) return null
+  return {
+    oId,
+    commentAuthorName: String(msg.commentAuthorName || ''),
+    commentAuthorThumbnailURL: String(msg.commentAuthorThumbnailURL || ''),
+    commentContent: String(msg.commentContent || ''),
+    commentCreateTimeStr: String(msg.commentCreateTimeStr || ''),
+    timeAgo: String(msg.timeAgo || ''),
+    commentThankCnt: Number(msg.commentThankCnt || 0),
+    commentOriginalCommentId: String(msg.commentOriginalCommentId || ''),
+    commentGoodCnt: Number(msg.commentGoodCnt || 0),
+    commentVote: Number(msg.commentVote ?? -1),
+    rewarded: Boolean(msg.rewarded),
+    commentAuthorId: String(msg.commentAuthorId || ''),
+  }
+}
+
+function connectHeat() {
+  disconnectHeat()
+  if (!id.value || String(id.value).startsWith('mock-')) return
+  const params = new URLSearchParams({
+    articleId: id.value,
+    articleType: String(article.value?.articleType ?? 0),
+  })
+  if (apiKey.value) params.set('apiKey', apiKey.value)
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  heatWs = new WebSocket(`${proto}//${location.host}/article-channel?${params}`)
+  heatWs.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data) as Record<string, unknown>
+      const type = String(msg.type || '')
+      if (type === 'articleHeat') {
+        if (typeof msg.articleHeat === 'number') heat.value = msg.articleHeat
+        else if (msg.operation === '+') heat.value += 1
+        else if (msg.operation === '-' && heat.value > 0) heat.value -= 1
+      } else if (type === 'comment' && article.value) {
+        const c = commentFromWs(msg)
+        if (!c || article.value.articleComments?.some((x) => x.oId === c.oId)) return
+        article.value.articleComments = [...(article.value.articleComments || []), c]
+        article.value.articleCommentCount = Number(article.value.articleCommentCount || 0) + 1
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+async function refreshHeat() {
+  if (!id.value || String(id.value).startsWith('mock-')) return
+  try {
+    heat.value = await fetchArticleHeat(id.value, apiKey.value)
+  } catch {
+    heat.value = Number(article.value?.articleHeat || 0)
+  }
+}
+
 async function load() {
   if (!id.value) return
   loading.value = true
@@ -63,12 +130,18 @@ async function load() {
   article.value = null
   try {
     article.value = await fetchArticle(id.value, apiKey.value, commentPage.value)
+    heat.value = Number(article.value.articleHeat || 0)
+    await refreshHeat()
+    connectHeat()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '帖子加载失败'
+    disconnectHeat()
   } finally {
     loading.value = false
   }
 }
+
+onUnmounted(() => disconnectHeat())
 
 watch(
   () => id.value,
@@ -211,6 +284,7 @@ function who(c: ArticleComment) {
         <span>{{ article.articleCreateTimeStr || article.timeAgo }}</span>
         <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
         <span>{{ article.articleCommentCount ?? comments.length }} 评</span>
+        <span>在看 {{ heat }}</span>
       </p>
       <p v-if="tagList.length" class="tags">
         <RouterLink v-for="t in tagList" :key="t" :to="`/tags/${encodeURIComponent(t)}`">{{ t }}</RouterLink>
@@ -239,6 +313,7 @@ function who(c: ArticleComment) {
           {{ article.rewarded ? '已打赏' : `打赏 ${article.articleRewardPoint}` }}
         </button>
         <RouterLink v-if="canEdit" class="edit" :to="`/post/${article.oId}`">编辑</RouterLink>
+        <ReportDialog v-if="isLoggedIn" :api-key="apiKey" :data-id="article.oId" :data-type="0" />
         <span v-if="actionMsg">{{ actionMsg }}</span>
       </div>
       <div class="body" v-html="article.articleContent || ''" />
@@ -266,6 +341,7 @@ function who(c: ArticleComment) {
           <button v-if="isLoggedIn && isOwnComment(c)" type="button" class="ghost" @click="onRemoveComment(c)">
             删除
           </button>
+          <ReportDialog v-if="isLoggedIn && !isOwnComment(c)" :api-key="apiKey" :data-id="c.oId" :data-type="1" />
         </header>
         <div class="cmt-body" v-html="c.commentContent || ''" />
       </div>

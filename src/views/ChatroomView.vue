@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import MentionSuggest from '@/components/MentionSuggest.vue'
+import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 
@@ -150,6 +151,7 @@ function packetLabel(type?: string) {
               <button v-if="msg.userName === me" type="button" class="ghost tiny" @click="chat.revoke(msg.oId)">
                 撤回
               </button>
+              <ReportDialog v-else-if="auth.apiKey" :api-key="auth.apiKey" :data-id="msg.oId" :data-type="3" />
             </div>
             <div v-if="msg.redPacket" class="fp-bubble packet">
               <strong>{{ packetLabel(msg.redPacket.type) }}</strong>

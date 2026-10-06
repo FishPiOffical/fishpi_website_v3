@@ -29,5 +29,10 @@ VITE_API_TARGET=http://localhost:8080
 - 主题、对话框、头像框：`src/packs` 目录包
 - 广告位 mock：`home.top` `footer.sponsors` `home.sidebar`，`GET /api/ads` 有数据时自动替换
 - 聊天室侧边栏模块化
+- 帖子热度 `GET /api/article/heat/{id}` 与 `article-channel` 实时在看/新评
+- 举报 `POST /report`（帖子/评论/用户）
+- 复读机 `GET /api/repeater/items`、点赞
+
+闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。
 
 新增侧边栏模块：在 `src/chat/sidebar/modules` 加组件，并登记到 `registry.ts`。

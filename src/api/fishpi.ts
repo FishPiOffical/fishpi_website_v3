@@ -175,6 +175,8 @@ export interface ArticleDetail extends ArticleSummary {
   rewardedCnt?: number
   sysMetal?: MetalItem[]
   articleAuthor?: { sysMetal?: MetalItem[]; userName?: string }
+  articleType?: number
+  articleHeat?: number
 }
 
 export interface Breezemoon {
@@ -498,6 +500,52 @@ export async function fetchDomains(apiKey?: string | null): Promise<DomainItem[]
     /* GET /api/domains 尚未提供 */
   }
   return mockDomains()
+}
+
+export async function fetchArticleHeat(id: string, apiKey?: string | null) {
+  const res = await request<{ articleHeat?: number; code?: number; msg?: string }>(
+    withKey(`/api/article/heat/${encodeURIComponent(id)}`, apiKey),
+  )
+  if (res.code) throw new Error(res.msg || '热度失败')
+  return Number(res.articleHeat || 0)
+}
+
+export async function reportContent(
+  apiKey: string,
+  payload: { reportDataId: string; reportDataType: number; reportType: number; reportMemo: string },
+) {
+  const res = await request<Envelope<unknown>>('/report', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, ...payload }),
+  })
+  if (res.code) throw new Error(res.msg || '举报失败')
+}
+
+export interface RepeaterItem {
+  oId: string
+  repeaterContent?: string
+  repeaterContentType?: string
+  repeaterContentTypeLabel?: string
+  repeaterContentAuthorName?: string
+  repeaterContentLikeCount?: number
+  repeaterContentLiked?: boolean
+  repeaterContentCreatedTime?: number
+}
+
+export async function fetchRepeaterItems(apiKey?: string | null, type = '') {
+  const q = type ? `?type=${encodeURIComponent(type)}` : ''
+  const res = await request<Envelope<{ items?: RepeaterItem[] }>>(withKey(`/api/repeater/items${q}`, apiKey))
+  if (res.code) throw new Error(res.msg || '复读机加载失败')
+  return res.data?.items ?? []
+}
+
+export async function likeRepeater(apiKey: string, id: string) {
+  const res = await request<Envelope<{ liked?: boolean; likeCount?: number }>>(
+    `/api/repeater/${encodeURIComponent(id)}/like`,
+    { method: 'POST', body: JSON.stringify({ apiKey }) },
+  )
+  if (res.code) throw new Error(res.msg || '点赞失败')
+  return res.data
 }
 
 export async function fetchArticle(id: string, apiKey?: string | null, page = 1): Promise<ArticleDetail> {

@@ -76,8 +76,17 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/upload': proxy,
+        '/report': proxy,
         '/register': { ...proxy, bypass: spaGetBypass },
-        '/article': { ...proxy, bypass: spaGetBypass },
+        '/article-channel': { ...proxy, ws: true },
+        '/article': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            if (path.startsWith('/article-channel')) return
+            return spaGetBypass(req)
+          },
+        },
       },
     },
   }

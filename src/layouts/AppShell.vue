@@ -16,6 +16,7 @@ const nav = [
   { to: '/cr', label: '聊天室' },
   { to: '/domains', label: '领域' },
   { to: '/breezemoons', label: '清风明月' },
+  { to: '/repeater', label: '复读机' },
   { to: '/qna', label: '问答' },
   { to: '/perfect', label: '优选' },
   { to: '/top', label: '总榜' },
