@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
+  fetchMembership,
   fetchUserArticles,
   fetchUserProfile,
   followUser,
@@ -12,11 +13,12 @@ import {
   type UserProfile,
 } from '@/api/fishpi'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
+import MetalBadges from '@/components/MetalBadges.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const auth = useAuthStore()
-const { apiKey, account, isLoggedIn } = storeToRefs(auth)
+const { apiKey, account, isLoggedIn, isVip } = storeToRefs(auth)
 
 const userName = computed(() => String(route.params.userName || ''))
 const profile = ref<UserProfile | null>(null)
@@ -27,6 +29,7 @@ const actionMsg = ref('')
 const sendAmount = ref(5)
 const sendMemo = ref('请你吃鱼丸')
 const transferring = ref(false)
+const viewedVip = ref(false)
 const usingMock = computed(() => String(profile.value?.oId || '').startsWith('mock-'))
 
 const isSelf = computed(() => Boolean(account.value && account.value.userName === userName.value))
@@ -45,6 +48,14 @@ async function load() {
     if (isSelf.value) p.canFollow = 'hide'
     profile.value = p
     articles.value = list
+    viewedVip.value = false
+    if (p.oId && !String(p.oId).startsWith('mock-')) {
+      try {
+        viewedVip.value = (await fetchMembership(p.oId)).isVip
+      } catch {
+        viewedVip.value = isSelf.value && isVip.value
+      }
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : '用户加载失败'
     profile.value = null
@@ -94,14 +105,19 @@ async function sendPoints() {
       <img v-if="profile.userAvatarURL" class="fp-avatar" :src="profile.userAvatarURL" alt="" />
       <div>
         <h1>{{ profile.userNickname || profile.userName }}</h1>
-        <p class="meta">@{{ profile.userName }} · {{ profile.userAppRole === 1 ? '画家' : '黑客' }}</p>
+        <p class="meta">
+          @{{ profile.userName }} · {{ profile.userAppRole === 1 ? '画家' : '黑客' }}
+          <em v-if="viewedVip">VIP</em>
+        </p>
         <p v-if="profile.userIntro" class="intro">{{ profile.userIntro }}</p>
         <p class="stats">
           <span>{{ profile.userArticleCount ?? articles.length }} 帖</span>
           <span>{{ profile.userCommentCount ?? 0 }} 评</span>
-          <span>{{ profile.followingUserCount ?? 0 }} 关注</span>
+          <RouterLink :to="`/member/${profile.userName}/following`">{{ profile.followingUserCount ?? 0 }} 关注</RouterLink>
+          <RouterLink :to="`/member/${profile.userName}/followers`">{{ profile.followerCount ?? 0 }} 粉丝</RouterLink>
           <span>{{ profile.userPoint ?? 0 }} 积分</span>
         </p>
+        <MetalBadges :items="profile.sysMetal" />
         <p v-if="usingMock" class="hint">匿名用户接口未开放，当前为与 <code>GET /user/:userName</code> 对齐的 mock。</p>
         <p v-if="actionMsg" :class="actionMsg.includes('成功') ? 'ok' : 'err'">{{ actionMsg }}</p>
         <button
@@ -169,7 +185,12 @@ h2 {
 }
 .stats {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
+}
+.stats a {
+  color: var(--fp-link);
+  text-decoration: none;
 }
 .err {
   color: #e07a5f;

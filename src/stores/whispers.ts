@@ -5,6 +5,7 @@ import {
   fetchWhisperMessages,
   fetchWhisperUnread,
   markWhisperRead,
+  revokeWhisper,
   type WhisperMsg,
 } from '@/api/fishpi'
 import { useAuthStore } from './auth'
@@ -38,8 +39,11 @@ export const useWhisperStore = defineStore('whispers', () => {
   const sending = ref(false)
   const error = ref('')
   const usingMock = ref(false)
+  const hasMore = ref(true)
+  const loadingMore = ref(false)
   let ws: WebSocket | null = null
   let peer = ''
+  let page = 1
 
   const unreadTotal = computed(() => unread.value.length)
 
@@ -77,12 +81,15 @@ export const useWhisperStore = defineStore('whispers', () => {
     const auth = useAuthStore()
     if (!auth.apiKey || !userName) return
     peer = userName
+    page = 1
+    hasMore.value = true
     loading.value = true
     error.value = ''
     try {
       const rows = await fetchWhisperMessages(auth.apiKey, userName, 1, 40)
       usingMock.value = rows.some((m) => String(m.oId).startsWith('mock-'))
       messages.value = [...rows].reverse()
+      if (rows.length < 40) hasMore.value = false
       await markWhisperRead(auth.apiKey, userName).catch(() => undefined)
       await refreshUnread()
     } catch (e) {
@@ -92,6 +99,33 @@ export const useWhisperStore = defineStore('whispers', () => {
       loading.value = false
     }
     connectWs(userName, auth.apiKey)
+  }
+
+  async function loadMore() {
+    const auth = useAuthStore()
+    if (!auth.apiKey || !peer || loadingMore.value || !hasMore.value) return
+    loadingMore.value = true
+    page += 1
+    try {
+      const rows = await fetchWhisperMessages(auth.apiKey, peer, page, 40)
+      if (!rows.length) hasMore.value = false
+      else {
+        const known = new Set(messages.value.map((m) => m.oId))
+        messages.value = [...rows.filter((m) => !known.has(m.oId)).reverse(), ...messages.value]
+        if (rows.length < 40) hasMore.value = false
+      }
+    } catch {
+      page -= 1
+    } finally {
+      loadingMore.value = false
+    }
+  }
+
+  async function revoke(oId: string) {
+    const auth = useAuthStore()
+    if (!auth.apiKey) return
+    await revokeWhisper(auth.apiKey, oId)
+    messages.value = messages.value.filter((m) => m.oId !== oId)
   }
 
   function connectWs(userName: string, apiKey: string) {
@@ -189,10 +223,14 @@ export const useWhisperStore = defineStore('whispers', () => {
     sending,
     error,
     usingMock,
+    hasMore,
+    loadingMore,
     peerOf,
     refreshUnread,
     loadList,
     open,
+    loadMore,
+    revoke,
     send,
     disconnect,
     clear,

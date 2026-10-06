@@ -10,7 +10,7 @@ const route = useRoute()
 const auth = useAuthStore()
 const whispers = useWhisperStore()
 const { account } = storeToRefs(auth)
-const { messages, sending, loading, error, connected, usingMock } = storeToRefs(whispers)
+const { messages, sending, loading, error, connected, usingMock, hasMore, loadingMore } = storeToRefs(whispers)
 
 const draft = ref('')
 const scroller = ref<HTMLElement | null>(null)
@@ -51,6 +51,9 @@ async function submit() {
     <p v-if="usingMock" class="hint">GET /chat/get-message 未返回数据时为 mock 会话。</p>
     <p v-if="error" class="err">{{ error }}</p>
     <div ref="scroller" class="msgs">
+      <button v-if="hasMore && messages.length" type="button" class="more" :disabled="loadingMore" @click="whispers.loadMore()">
+        {{ loadingMore ? '加载中…' : '加载更早消息' }}
+      </button>
       <p v-if="loading && !messages.length" class="hint">加载中…</p>
       <p v-else-if="!messages.length" class="hint">还没有消息，打个招呼吧。</p>
       <article
@@ -64,6 +67,9 @@ async function submit() {
           <div class="meta">
             <b>{{ msg.senderUserName }}</b>
             <time>{{ msg.time }}</time>
+            <button v-if="msg.senderUserName === me" type="button" class="ghost" @click="whispers.revoke(msg.oId)">
+              撤回
+            </button>
           </div>
           <div class="fp-bubble" v-html="msg.content || msg.markdown || msg.preview || ''" />
         </div>
@@ -180,13 +186,26 @@ textarea {
   border-radius: 8px;
   padding: 8px;
 }
-button {
+.send-row button {
   border: 0;
   background: var(--fp-primary);
   color: #fff;
   border-radius: 8px;
   padding: 8px 14px;
   cursor: pointer;
+}
+.more,
+.ghost {
+  border: 1px solid var(--fp-border);
+  background: transparent;
+  color: var(--fp-muted);
+  border-radius: 8px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.more {
+  align-self: center;
 }
 button:disabled {
   opacity: 0.55;

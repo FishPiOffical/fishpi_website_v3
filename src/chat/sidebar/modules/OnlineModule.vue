@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import { RouterLink } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 
 const { onlines } = storeToRefs(useChatStore())
@@ -9,10 +10,12 @@ const { onlines } = storeToRefs(useChatStore())
   <p class="count">{{ onlines.length }} 人在线</p>
   <ul>
     <li v-for="user in onlines" :key="user.userName">
+      <RouterLink :to="`/member/${user.userName}`">
       <span class="fp-avatar-frame">
         <img class="fp-avatar" :src="user.userAvatarURL || '/favicon.svg'" :alt="user.userName" />
       </span>
       <span>{{ user.userNickname || user.userName }}</span>
+      </RouterLink>
     </li>
   </ul>
 </template>
@@ -33,11 +36,12 @@ ul {
   max-height: 280px;
   overflow: auto;
 }
-li {
+li a {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  color: inherit;
+  text-decoration: none;
 }
 .fp-avatar {
   width: 28px;

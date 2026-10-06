@@ -1,22 +1,28 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
+import MentionSuggest from '@/components/MentionSuggest.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 
 const auth = useAuthStore()
 const chat = useChatStore()
 const { account } = storeToRefs(auth)
-const { messages, sending, loading, loadingMore, hasMore, error, lastPacket, connected } =
+const { messages, sending, loading, loadingMore, hasMore, error, lastPacket, packetDetail, connected } =
   storeToRefs(chat)
 const draft = ref('')
 const scroller = ref<HTMLElement | null>(null)
 const packetMoney = ref(32)
 const packetCount = ref(2)
 const packetMsg = ref('摸鱼者，人品好！')
+const packetType = ref('random')
+const packetTo = ref('')
+const gesture = ref(0)
 const showPacket = ref(false)
+const pendingGesture = ref<string | null>(null)
 
 const me = computed(() => account.value?.userName)
 
@@ -59,12 +65,30 @@ async function onScroll() {
 async function sendPacket() {
   await chat.sendRedPacket({
     money: packetMoney.value,
-    count: packetCount.value,
+    count: packetType.value === 'specify' ? 1 : packetCount.value,
     msg: packetMsg.value,
+    type: packetType.value,
+    recivers: packetType.value === 'specify' ? packetTo.value.split(/[,，\s]+/).filter(Boolean) : undefined,
+    gesture: packetType.value === 'rockPaperScissors' ? gesture.value : undefined,
   })
   showPacket.value = false
   await nextTick()
   scrollBottom()
+}
+
+async function claim(oId: string, type?: string) {
+  if (type === 'rockPaperScissors') {
+    pendingGesture.value = oId
+    return
+  }
+  await chat.openPacket(oId)
+}
+
+function packetLabel(type?: string) {
+  if (type === 'average') return '平均红包'
+  if (type === 'specify') return '专属红包'
+  if (type === 'rockPaperScissors') return '猜拳红包'
+  return '拼手气红包'
 }
 </script>
 
@@ -77,6 +101,27 @@ async function sendPacket() {
       </header>
       <p v-if="error" class="err">{{ error }}</p>
       <p v-if="lastPacket" class="tip">{{ lastPacket }}</p>
+      <div v-if="packetDetail" class="detail">
+        <p>{{ packetDetail.msg || '领取明细' }}</p>
+        <ul>
+          <li v-for="(r, i) in packetDetail.recivers" :key="i">
+            {{ r.userName }} · {{ r.money }}
+          </li>
+        </ul>
+        <button type="button" class="ghost" @click="chat.closePacketDetail()">关闭</button>
+      </div>
+      <div v-if="pendingGesture" class="packet-form">
+        <span>出拳</span>
+        <select v-model.number="gesture">
+          <option :value="0">石头</option>
+          <option :value="1">剪刀</option>
+          <option :value="2">布</option>
+        </select>
+        <button type="button" @click="chat.openPacket(pendingGesture, gesture).then(() => (pendingGesture = null))">
+          领取
+        </button>
+        <button type="button" class="ghost" @click="pendingGesture = null">取消</button>
+      </div>
       <div ref="scroller" class="msgs" @scroll="onScroll">
         <button
           v-if="hasMore && messages.length"
@@ -100,33 +145,51 @@ async function sendPacket() {
           </span>
           <div>
             <div class="meta">
-              <b>{{ msg.userNickname || msg.userName }}</b>
+              <b><RouterLink :to="`/member/${msg.userName}`">{{ msg.userNickname || msg.userName }}</RouterLink></b>
               <time>{{ msg.time }}</time>
+              <button v-if="msg.userName === me" type="button" class="ghost tiny" @click="chat.revoke(msg.oId)">
+                撤回
+              </button>
             </div>
             <div v-if="msg.redPacket" class="fp-bubble packet">
-              <strong>积分红包</strong>
+              <strong>{{ packetLabel(msg.redPacket.type) }}</strong>
               <p>{{ msg.redPacket.msg || '红包' }}</p>
               <small>{{ msg.redPacket.got || 0 }}/{{ msg.redPacket.count || 0 }}</small>
-              <button type="button" @click="chat.openPacket(msg.oId)">领取</button>
+              <button type="button" @click="claim(msg.oId, msg.redPacket.type)">领取</button>
             </div>
             <div v-else class="fp-bubble" v-html="msg.html || ''" />
           </div>
         </article>
       </div>
       <form v-if="showPacket" class="packet-form" @submit.prevent="sendPacket">
+        <select v-model="packetType">
+          <option value="random">拼手气</option>
+          <option value="average">平均</option>
+          <option value="specify">专属</option>
+          <option value="rockPaperScissors">猜拳</option>
+        </select>
         <label>积分 <input v-model.number="packetMoney" type="number" min="1" /></label>
-        <label>个数 <input v-model.number="packetCount" type="number" min="1" /></label>
+        <label v-if="packetType !== 'specify'">个数 <input v-model.number="packetCount" type="number" min="1" /></label>
+        <input v-if="packetType === 'specify'" v-model="packetTo" placeholder="指定用户名" />
+        <select v-if="packetType === 'rockPaperScissors'" v-model.number="gesture">
+          <option :value="0">石头</option>
+          <option :value="1">剪刀</option>
+          <option :value="2">布</option>
+        </select>
         <input v-model="packetMsg" placeholder="祝福语" />
         <button type="submit" :disabled="sending">发出去</button>
         <button type="button" class="ghost" @click="showPacket = false">取消</button>
       </form>
       <form class="composer" @submit.prevent="submit">
-        <textarea
-          v-model="draft"
-          rows="3"
-          placeholder="说点什么，支持 Markdown。Enter 发送，Shift+Enter 换行"
-          @keydown="onComposerKey"
-        />
+        <div class="compose-wrap">
+          <MentionSuggest v-model="draft" />
+          <textarea
+            v-model="draft"
+            rows="3"
+            placeholder="说点什么，支持 Markdown。Enter 发送，Shift+Enter 换行。@ 可补全用户"
+            @keydown="onComposerKey"
+          />
+        </div>
         <div class="actions">
           <EmojiPicker @insert="(md) => (draft += md)" />
           <button type="button" class="ghost" @click="showPacket = !showPacket">红包</button>
@@ -285,6 +348,32 @@ textarea {
   color: var(--fp-muted);
   padding: 0 14px;
   font-size: 12px;
+}
+.compose-wrap {
+  position: relative;
+  flex: 1;
+}
+.compose-wrap textarea {
+  width: 100%;
+}
+.tiny {
+  padding: 0 6px !important;
+  font-size: 12px;
+}
+.meta a {
+  color: inherit;
+  text-decoration: none;
+}
+.detail {
+  margin: 8px 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.detail ul {
+  margin: 6px 0;
+  padding-left: 18px;
 }
 @media (max-width: 960px) {
   .cr {

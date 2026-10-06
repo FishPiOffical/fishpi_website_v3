@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useAppearanceStore } from '@/stores/appearance'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -32,7 +33,41 @@ const router = createRouter({
       component: () => import('@/views/ArticleListView.vue'),
       meta: { title: '领域', list: 'domain' },
     },
+    {
+      path: '/post/:id',
+      name: 'edit-post',
+      component: () => import('@/views/PostView.vue'),
+      meta: { auth: true },
+    },
     { path: '/post', name: 'post', component: () => import('@/views/PostView.vue'), meta: { auth: true } },
+    { path: '/good', component: () => import('@/views/ArticleListView.vue'), meta: { title: '点赞', list: 'good' } },
+    {
+      path: '/tags/:tag',
+      component: () => import('@/views/ArticleListView.vue'),
+      meta: { title: '标签', list: 'tag' },
+    },
+    {
+      path: '/stars',
+      name: 'stars',
+      component: () => import('@/views/CollectionsView.vue'),
+      meta: { auth: true },
+    },
+    {
+      path: '/points',
+      name: 'points',
+      component: () => import('@/views/PointsView.vue'),
+      meta: { auth: true },
+    },
+    {
+      path: '/member/:userName/following',
+      component: () => import('@/views/PeopleView.vue'),
+      meta: { people: 'following' },
+    },
+    {
+      path: '/member/:userName/followers',
+      component: () => import('@/views/PeopleView.vue'),
+      meta: { people: 'followers' },
+    },
     { path: '/domains', component: () => import('@/views/DomainView.vue') },
     { path: '/breezemoons', component: () => import('@/views/BreezemoonView.vue') },
     { path: '/top', component: () => import('@/views/TopView.vue') },
@@ -61,7 +96,10 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (!auth.account && auth.apiKey) await auth.restore()
+  if (!auth.account && auth.apiKey) {
+    await auth.restore()
+    useAppearanceStore().enforceVip()
+  }
   if (to.meta.auth && !auth.isLoggedIn) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }

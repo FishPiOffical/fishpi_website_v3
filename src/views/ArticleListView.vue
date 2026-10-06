@@ -19,9 +19,13 @@ const kind = computed(() => (route.meta.list as ArticleFeedKind) || 'recent')
 const title = computed(() => (route.meta.title as string) || '帖子')
 const keyword = computed(() => (typeof route.query.q === 'string' ? route.query.q : ''))
 const domainUri = computed(() => String(route.params.uri || ''))
-const extra = computed(() => (kind.value === 'domain' ? domainUri.value : keyword.value))
+const extra = computed(() => {
+  if (kind.value === 'domain') return domainUri.value
+  if (kind.value === 'tag') return String(route.params.tag || '')
+  return keyword.value
+})
 const usingMock = computed(() => items.value.some((a) => String(a.oId).startsWith('mock-')))
-const paged = computed(() => ['hot', 'long', 'recent', 'domain'].includes(kind.value))
+const paged = computed(() => true)
 
 async function load() {
   error.value = ''
@@ -55,7 +59,7 @@ watch(
 <template>
   <section class="card">
     <header>
-      <h1>{{ title }}</h1>
+      <h1>{{ kind === 'tag' ? `#${extra}` : title }}</h1>
       <p v-if="keyword" class="hint">关键词：{{ keyword }}</p>
     </header>
     <p v-if="usingMock" class="hint">

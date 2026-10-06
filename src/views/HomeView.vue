@@ -20,7 +20,6 @@ const right = ref<ArticleSummary[]>([])
 const checkin = ref<RankUser[]>([])
 const online = ref<RankUser[]>([])
 const error = ref('')
-const income = ref(365)
 const loading = ref(false)
 
 const usingMock = computed(() => left.value.some((a) => String(a.oId).startsWith('mock-')))
@@ -96,10 +95,6 @@ function views(a: ArticleSummary) {
           <strong>随时随地摸鱼？</strong>
           <p>下载摸鱼派客户端，想摸就摸！</p>
           <a href="https://fishpi.cn/download" target="_blank" rel="noreferrer">下载</a>
-        </div>
-        <div class="card income">
-          <span>今日收入</span>
-          <b>¥{{ income }}</b>
         </div>
         <AdSlot slot-key="home.sidebar" />
         <CheckinPanel />

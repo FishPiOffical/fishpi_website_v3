@@ -43,6 +43,7 @@ function firstUnread(u: UnreadCount): NoticeType {
 
 const type = ref<NoticeType>(firstUnread(unread.value))
 const items = ref<NoticeItem[]>([])
+const page = ref(1)
 const loading = ref(false)
 const error = ref('')
 const usingMock = computed(() => items.value.some((n) => String(n.commentSharpURL || n.url || '').includes('mock-')))
@@ -52,7 +53,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    items.value = await fetchNotifications(apiKey.value, type.value)
+    items.value = await fetchNotifications(apiKey.value, type.value, page.value)
   } catch (e) {
     error.value = e instanceof Error ? e.message : '通知加载失败'
     items.value = []
@@ -62,7 +63,14 @@ async function load() {
 }
 
 watch(
-  () => [apiKey.value, type.value],
+  () => type.value,
+  () => {
+    page.value = 1
+  },
+)
+
+watch(
+  () => [apiKey.value, type.value, page.value],
   () => void load(),
   { immediate: true },
 )
@@ -137,6 +145,11 @@ async function readAll() {
         <time>{{ n.commentCreateTime || n.createTime }}</time>
       </li>
     </ol>
+    <footer class="pager">
+      <button type="button" :disabled="page <= 1" @click="page -= 1">上一页</button>
+      <span>{{ page }}</span>
+      <button type="button" :disabled="items.length < 10" @click="page += 1">下一页</button>
+    </footer>
   </section>
 </template>
 
@@ -207,5 +220,11 @@ a {
 .body {
   margin: 6px 0;
   font-size: 14px;
+}
+.pager {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  align-items: center;
 }
 </style>

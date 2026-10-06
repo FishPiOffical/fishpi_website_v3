@@ -12,6 +12,7 @@ const nav = [
   { to: '/', label: '最新' },
   { to: '/recent/long', label: '专栏' },
   { to: '/hot', label: '热门' },
+  { to: '/good', label: '点赞' },
   { to: '/cr', label: '聊天室' },
   { to: '/domains', label: '领域' },
   { to: '/breezemoons', label: '清风明月' },
@@ -72,6 +73,8 @@ function logout() {
       <div class="user">
         <template v-if="isLoggedIn">
           <RouterLink to="/post">发帖</RouterLink>
+          <RouterLink to="/stars">收藏</RouterLink>
+          <RouterLink to="/points">积分</RouterLink>
           <RouterLink to="/chat">
             私信
             <em v-if="whisperUnread" class="badge">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</em>

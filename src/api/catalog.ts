@@ -4,6 +4,7 @@ import type {
   NoticeItem,
   NoticeType,
   RankUser,
+  SimpleUser,
   UserProfile,
   WhisperMsg,
 } from '@/api/fishpi'
@@ -41,7 +42,7 @@ export function mockArticles() {
 }
 
 export function mockFeed(
-  kind: 'recent' | 'hot' | 'long' | 'good' | 'qna' | 'perfect' | 'search' | 'domain',
+  kind: 'recent' | 'hot' | 'long' | 'good' | 'qna' | 'perfect' | 'search' | 'domain' | 'tag',
   page = 1,
   size = 40,
   extra = '',
@@ -59,10 +60,31 @@ export function mockFeed(
         `${a.articleTitle} ${a.articleTags || ''} ${a.articleAuthorName || ''}`.toLowerCase().includes(q),
       )
     }
+  } else if (kind === 'tag') {
+    const t = extra.trim().toLowerCase()
+    if (t) {
+      list = list.filter((a) =>
+        String(a.articleTags || '')
+          .split(',')
+          .some((x) => x.trim().toLowerCase() === t),
+      )
+    }
   } else if (kind === 'domain') {
     list = list.filter((a) => a.domainUri === extra)
   }
   return mockPage(list, page, size)
+}
+
+export function mockFollowUsers(userName: string, kind: 'following' | 'followers'): SimpleUser[] {
+  const names = data.articles
+    .map((a) => a.articleAuthorName)
+    .filter((n): n is string => Boolean(n) && n !== userName)
+  const unique = [...new Set(names)].slice(0, 8)
+  return unique.map((n, i) => ({
+    oId: `mock-${kind}-${n}-${i}`,
+    userName: n,
+    userNickname: n,
+  }))
 }
 
 export function mockArticle(id: string): ArticleDetail | null {

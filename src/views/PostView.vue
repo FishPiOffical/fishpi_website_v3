@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { postArticle, uploadFiles } from '@/api/fishpi'
+import { fetchArticleMd, postArticle, updateArticle, uploadFiles } from '@/api/fishpi'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const { apiKey, isLoggedIn } = storeToRefs(auth)
 const router = useRouter()
+const route = useRoute()
+const editId = computed(() => (typeof route.params.id === 'string' ? route.params.id : ''))
 const title = ref('')
 const tags = ref('')
 const content = ref('')
@@ -19,21 +21,42 @@ const sending = ref(false)
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
+async function loadEdit() {
+  if (!apiKey.value || !editId.value) return
+  error.value = ''
+  try {
+    const md = await fetchArticleMd(apiKey.value, editId.value)
+    title.value = md.articleTitle
+    tags.value = md.articleTags
+    content.value = md.articleContent
+    type.value = md.articleType
+    offer.value = md.articleQnAOfferPoint
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '无法加载原文'
+  }
+}
+
+onMounted(() => void loadEdit())
+watch(editId, () => void loadEdit())
+
 async function submit() {
   if (!apiKey.value) return
   error.value = ''
   sending.value = true
   try {
-    const id = await postArticle(apiKey.value, {
+    const payload = {
       articleTitle: title.value,
       articleContent: content.value,
       articleTags: tags.value,
       articleType: type.value,
       articleQnAOfferPoint: type.value === 5 ? offer.value : 0,
-    })
+    }
+    const id = editId.value
+      ? await updateArticle(apiKey.value, editId.value, payload)
+      : await postArticle(apiKey.value, payload)
     await router.replace(id ? `/article/${id}` : '/')
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '发帖失败'
+    error.value = e instanceof Error ? e.message : editId.value ? '更新失败' : '发帖失败'
   } finally {
     sending.value = false
   }
@@ -59,7 +82,7 @@ async function insertImage(e: Event) {
 
 <template>
   <form class="card" @submit.prevent="submit">
-    <h1>发帖</h1>
+    <h1>{{ editId ? '编辑帖子' : '发帖' }}</h1>
     <p v-if="!isLoggedIn" class="hint">请先登录。</p>
     <template v-else>
       <label>标题<input v-model="title" required /></label>
@@ -82,7 +105,9 @@ async function insertImage(e: Event) {
         </button>
       </div>
       <p v-if="error" class="err">{{ error }}</p>
-      <button type="submit" :disabled="sending">{{ sending ? '发布中…' : '发布' }}</button>
+      <button type="submit" :disabled="sending">
+        {{ sending ? (editId ? '保存中…' : '发布中…') : editId ? '保存' : '发布' }}
+      </button>
     </template>
   </form>
 </template>

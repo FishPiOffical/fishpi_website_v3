@@ -5,6 +5,7 @@ import {
   fetchChatNode,
   fetchMutes,
   openRedPacket,
+  revokeChat,
   sendChat,
   type ChatHistoryItem,
   type MuteItem,
@@ -81,6 +82,7 @@ export const useChatStore = defineStore('chat', () => {
   const hasMore = ref(true)
   const error = ref('')
   const lastPacket = ref('')
+  const packetDetail = ref<{ msg?: string; recivers: { userName?: string; money?: number }[] } | null>(null)
   let ws: WebSocket | null = null
   let hb: number | null = null
   let page = 1
@@ -214,31 +216,46 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function sendRedPacket(opts: { money: number; count: number; msg: string }) {
-    const payload = JSON.stringify({
+  async function sendRedPacket(opts: {
+    money: number
+    count: number
+    msg: string
+    type?: string
+    recivers?: string[]
+    gesture?: number
+  }) {
+    const payload: Record<string, unknown> = {
       msgType: 'redPacket',
-      type: 'random',
+      type: opts.type || 'random',
       money: Math.max(1, Number(opts.money) || 1),
       count: Math.max(1, Number(opts.count) || 1),
       msg: opts.msg || '摸鱼者，人品好！',
-    })
-    await send(payload)
+    }
+    if (opts.recivers?.length) payload.recivers = opts.recivers
+    if (opts.type === 'rockPaperScissors' && opts.gesture != null) payload.gesture = opts.gesture
+    await send(JSON.stringify(payload))
   }
 
-  async function openPacket(oId: string) {
+  async function openPacket(oId: string, gesture?: number) {
     const auth = useAuthStore()
     if (!auth.apiKey) return
     try {
-      const res = await openRedPacket(auth.apiKey, oId)
+      const res = await openRedPacket(auth.apiKey, oId, gesture)
       const data = (res.data ?? {}) as Record<string, unknown>
-      const recivers = Array.isArray(data.recivers) ? data.recivers : []
-      const mine = recivers.find(
-        (r) => r && typeof r === 'object' && (r as { userName?: string }).userName === auth.account?.userName,
-      ) as { money?: number } | undefined
+      const recivers = Array.isArray(data.recivers) ? (data.recivers as { userName?: string; money?: number }[]) : []
+      packetDetail.value = { msg: String(data.msg || data.info || ''), recivers }
+      const mine = recivers.find((r) => r && r.userName === auth.account?.userName)
       lastPacket.value = mine?.money != null ? `抢到 ${mine.money} 积分` : '已领取红包'
     } catch (e) {
       lastPacket.value = e instanceof Error ? e.message : '领取失败'
     }
+  }
+
+  async function revoke(oId: string) {
+    const auth = useAuthStore()
+    if (!auth.apiKey) return
+    await revokeChat(auth.apiKey, oId)
+    messages.value = messages.value.filter((m) => m.oId !== oId)
   }
 
   async function setDiscuss(topic: string) {
@@ -257,12 +274,17 @@ export const useChatStore = defineStore('chat', () => {
     hasMore,
     error,
     lastPacket,
+    packetDetail,
     connect,
     disconnect,
     loadMore,
     send,
     sendRedPacket,
     openPacket,
+    revoke,
+    closePacketDetail() {
+      packetDetail.value = null
+    },
     setDiscuss,
   }
 })

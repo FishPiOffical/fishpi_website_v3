@@ -6,6 +6,7 @@ import {
   fetchArticle,
   followArticle,
   postComment,
+  removeComment,
   rewardArticle,
   thankArticle,
   thankComment,
@@ -18,11 +19,12 @@ import {
   type ArticleDetail,
 } from '@/api/fishpi'
 import EmojiPicker from '@/components/EmojiPicker.vue'
+import MetalBadges from '@/components/MetalBadges.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const auth = useAuthStore()
-const { apiKey, isLoggedIn } = storeToRefs(auth)
+const { apiKey, isLoggedIn, account } = storeToRefs(auth)
 
 const article = ref<ArticleDetail | null>(null)
 const loading = ref(true)
@@ -38,6 +40,21 @@ const id = computed(() => String(route.params.id || ''))
 
 const comments = computed<ArticleComment[]>(() => article.value?.articleComments || [])
 const nice = computed(() => article.value?.articleNiceComments || [])
+const commentPages = computed(() => Number(article.value?.pagination?.paginationPageCount || 1))
+const tagList = computed(() =>
+  String(article.value?.articleTags || '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean),
+)
+const metals = computed(() => article.value?.sysMetal || article.value?.articleAuthor?.sysMetal || [])
+const canEdit = computed(
+  () => article.value?.isMyArticle || article.value?.articleAuthorName === account.value?.userName,
+)
+
+function isOwnComment(c: ArticleComment) {
+  return Boolean(account.value && (c.commentAuthorName === account.value.userName || c.commentAuthorId === account.value.oId))
+}
 
 async function load() {
   if (!id.value) return
@@ -159,6 +176,16 @@ async function onVoteComment(c: ArticleComment) {
   }
 }
 
+async function onRemoveComment(c: ArticleComment) {
+  if (!apiKey.value) return
+  try {
+    await removeComment(apiKey.value, c.oId)
+    await load()
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '删除失败'
+  }
+}
+
 function who(c: ArticleComment) {
   return c.commentAuthorName || '匿名'
 }
@@ -185,7 +212,10 @@ function who(c: ArticleComment) {
         <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
         <span>{{ article.articleCommentCount ?? comments.length }} 评</span>
       </p>
-      <p v-if="article.articleTags" class="tags">{{ article.articleTags }}</p>
+      <p v-if="tagList.length" class="tags">
+        <RouterLink v-for="t in tagList" :key="t" :to="`/tags/${encodeURIComponent(t)}`">{{ t }}</RouterLink>
+      </p>
+      <MetalBadges :items="metals" />
       <p v-if="String(article.oId).startsWith('mock-')" class="hint">
         匿名详情接口未开放，当前为 mock 正文。
       </p>
@@ -208,6 +238,7 @@ function who(c: ArticleComment) {
         >
           {{ article.rewarded ? '已打赏' : `打赏 ${article.articleRewardPoint}` }}
         </button>
+        <RouterLink v-if="canEdit" class="edit" :to="`/post/${article.oId}`">编辑</RouterLink>
         <span v-if="actionMsg">{{ actionMsg }}</span>
       </div>
       <div class="body" v-html="article.articleContent || ''" />
@@ -232,10 +263,18 @@ function who(c: ArticleComment) {
           <button v-if="isLoggedIn" type="button" class="ghost" :disabled="c.rewarded" @click="onThankComment(c)">
             {{ c.rewarded ? '已感谢' : '感谢' }}
           </button>
+          <button v-if="isLoggedIn && isOwnComment(c)" type="button" class="ghost" @click="onRemoveComment(c)">
+            删除
+          </button>
         </header>
         <div class="cmt-body" v-html="c.commentContent || ''" />
       </div>
       <p v-if="!comments.length" class="hint">还没有评论。</p>
+      <footer v-if="commentPages > 1" class="pager">
+        <button type="button" :disabled="commentPage <= 1" @click="commentPage -= 1">上一页</button>
+        <span>{{ commentPage }} / {{ commentPages }}</span>
+        <button type="button" :disabled="commentPage >= commentPages" @click="commentPage += 1">下一页</button>
+      </footer>
     </section>
 
     <form class="card composer" @submit.prevent="submit">
@@ -308,8 +347,29 @@ h2 {
   padding: 4px 10px;
   cursor: pointer;
 }
-.err {
-  color: #e07a5f;
+.actions a.edit {
+  color: var(--fp-link);
+  text-decoration: none;
+  font-size: 13px;
+}
+.tags a {
+  color: var(--fp-link);
+  text-decoration: none;
+  margin-right: 8px;
+}
+.pager {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+.pager button {
+  border: 1px solid var(--fp-border);
+  background: transparent;
+  color: var(--fp-text);
+  border-radius: 8px;
+  padding: 4px 12px;
+  cursor: pointer;
 }
 .body :deep(img),
 .cmt-body :deep(img) {

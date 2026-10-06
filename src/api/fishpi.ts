@@ -4,6 +4,7 @@ import {
   mockCheckin,
   mockDomains,
   mockFeed,
+  mockFollowUsers,
   mockNotifications,
   mockOnline,
   mockProfile,
@@ -29,6 +30,12 @@ export interface AccountInfo {
   mbti?: string
 }
 
+export interface MetalItem {
+  name?: string
+  description?: string
+  attr?: string
+}
+
 export interface UserProfile {
   oId: string
   userName: string
@@ -40,11 +47,30 @@ export interface UserProfile {
   userArticleCount?: number
   userCommentCount?: number
   followingUserCount?: number
+  followerCount?: number
   onlineMinute?: number
   userAppRole?: number
   canFollow?: string
   userTags?: string
   userCity?: string
+  sysMetal?: MetalItem[]
+}
+
+export interface SimpleUser {
+  oId: string
+  userName: string
+  userNickname?: string
+  userAvatarURL?: string
+}
+
+export interface PointRecord {
+  oId?: string
+  balance?: number
+  sum?: number
+  type?: string
+  description?: string
+  time?: string
+  createTime?: string
 }
 
 export type NoticeType = 'commented' | 'reply' | 'at' | 'following' | 'point' | 'broadcast' | 'sys-announce'
@@ -125,10 +151,12 @@ export interface ArticleComment {
   commentGoodCnt?: number
   commentVote?: number
   rewarded?: boolean
+  commentAuthorId?: string
 }
 
 export interface ArticleDetail extends ArticleSummary {
   articleContent?: string
+  articleOriginalContent?: string
   articleToC?: string
   articleCommentable?: boolean
   articleComments?: ArticleComment[]
@@ -145,6 +173,8 @@ export interface ArticleDetail extends ArticleSummary {
   articleRewardPoint?: number
   articleRewardContent?: string
   rewardedCnt?: number
+  sysMetal?: MetalItem[]
+  articleAuthor?: { sysMetal?: MetalItem[]; userName?: string }
 }
 
 export interface Breezemoon {
@@ -390,7 +420,7 @@ export async function fetchRecentArticles(apiKey?: string | null, page = 1, size
   )
 }
 
-export type ArticleFeedKind = 'recent' | 'hot' | 'long' | 'good' | 'qna' | 'perfect' | 'search' | 'domain'
+export type ArticleFeedKind = 'recent' | 'hot' | 'long' | 'good' | 'qna' | 'perfect' | 'search' | 'domain' | 'tag'
 
 export async function fetchArticleFeed(
   kind: ArticleFeedKind,
@@ -422,6 +452,14 @@ export async function fetchArticleFeed(
     const fromPerfect = await unwrapArticles(`/api/articles/recent/perfect?p=${page}&size=${size}`, apiKey)
     if (fromPerfect.length) return fromPerfect
     return mockFeed('perfect', page, size)
+  }
+  if (kind === 'tag') {
+    const fromTag = await unwrapArticles(
+      `/api/articles/tag/${encodeURIComponent(extra)}?p=${page}&size=${size}`,
+      apiKey,
+    )
+    if (fromTag.length) return fromTag
+    return mockFeed('tag', page, size, extra)
   }
   if (kind === 'search') return fetchSearch(extra, apiKey, page, size)
   if (kind === 'domain') {
@@ -562,6 +600,89 @@ export async function postArticle(
   })
   if (res.code) throw new Error(res.msg || '发帖失败')
   return String(res.articleId || (res.data as { oId?: string } | undefined)?.oId || '')
+}
+
+export async function fetchArticleMd(apiKey: string, id: string) {
+  const res = await request<
+    Envelope<{
+      articleTitle?: string
+      articleContent?: string
+      articleTags?: string
+      articleType?: number
+      articleQnAOfferPoint?: number
+    }> & {
+      articleTitle?: string
+      articleContent?: string
+      articleTags?: string
+      articleType?: number
+    }
+  >(withKey(`/api/article/md/${encodeURIComponent(id)}`, apiKey))
+  if (res.code) throw new Error(res.msg || '无法读取原文')
+  const data = res.data || res
+  return {
+    articleTitle: String(data.articleTitle || ''),
+    articleContent: String(data.articleContent || ''),
+    articleTags: String(data.articleTags || ''),
+    articleType: Number(data.articleType || 0),
+    articleQnAOfferPoint: Number((data as { articleQnAOfferPoint?: number }).articleQnAOfferPoint || 0),
+  }
+}
+
+export async function updateArticle(
+  apiKey: string,
+  id: string,
+  payload: {
+    articleTitle: string
+    articleContent: string
+    articleTags: string
+    articleType: number
+    articleQnAOfferPoint?: number
+  },
+) {
+  const res = await request<Envelope<unknown> & { articleId?: string }>(`/article/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      apiKey,
+      articleTitle: payload.articleTitle,
+      articleContent: payload.articleContent,
+      articleTags: payload.articleTags,
+      articleType: payload.articleType,
+      articleCommentable: true,
+      articleAnonymous: false,
+      articleRewardPoint: 0,
+      articleQnAOfferPoint: payload.articleQnAOfferPoint || 0,
+    }),
+  })
+  if (res.code) throw new Error(res.msg || '更新失败')
+  return String(res.articleId || id)
+}
+
+export async function removeComment(apiKey: string, id: string) {
+  const res = await request<Envelope<unknown>>(`/comment/${encodeURIComponent(id)}/remove`, {
+    method: 'POST',
+    body: JSON.stringify({ apiKey }),
+  })
+  if (res.code) throw new Error(res.msg || '删除评论失败')
+}
+
+export async function searchUserNames(apiKey: string, name: string): Promise<string[]> {
+  const res = await request<Envelope<string[] | { userNames?: string[] }>>('/users/names', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, name }),
+  })
+  if (res.code) return []
+  const data = res.data
+  if (Array.isArray(data)) return data.map(String)
+  if (data && Array.isArray(data.userNames)) return data.userNames.map(String)
+  return []
+}
+
+export async function revokeChat(apiKey: string, oId: string) {
+  const res = await request<Envelope<unknown>>('/chat-room/revoke', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, oId }),
+  })
+  if (res.code) throw new Error(res.msg || '撤回失败')
 }
 
 export async function voteArticle(apiKey: string, oId: string) {
@@ -705,6 +826,77 @@ export async function fetchUserArticles(userName: string, apiKey?: string | null
   )
   if (fromApi.length) return fromApi
   return mockUserArticles(userName, page, size)
+}
+
+async function unwrapUsers(paths: string[], apiKey?: string | null): Promise<SimpleUser[]> {
+  for (const path of paths) {
+    try {
+      const res = await request<Envelope<SimpleUser[] | { users?: SimpleUser[]; followingUsers?: SimpleUser[] }>>(
+        withKey(path, apiKey),
+      )
+      const data = res.data
+      if (Array.isArray(data) && data.length) return data
+      if (data && !Array.isArray(data) && Array.isArray(data.users) && data.users.length) return data.users
+      if (data && !Array.isArray(data) && Array.isArray(data.followingUsers) && data.followingUsers.length) {
+        return data.followingUsers
+      }
+    } catch {
+      /* try next */
+    }
+  }
+  return []
+}
+
+export async function fetchCollectedArticles(apiKey?: string | null, page = 1, size = 40) {
+  const fromApi = await unwrapArticles(`/api/articles/collected?p=${page}&size=${size}`, apiKey)
+  if (fromApi.length) return fromApi
+  const alt = await unwrapArticles(`/api/user/following/articles?p=${page}&size=${size}`, apiKey)
+  if (alt.length) return alt
+  return mockFeed('good', page, size)
+}
+
+export async function fetchFollowingUsers(userName: string, apiKey?: string | null, page = 1) {
+  const list = await unwrapUsers(
+    [
+      `/api/user/${encodeURIComponent(userName)}/following?p=${page}`,
+      `/follow/users?p=${page}&followingId=${encodeURIComponent(userName)}`,
+    ],
+    apiKey,
+  )
+  if (list.length) return list
+  return mockFollowUsers(userName, 'following')
+}
+
+export async function fetchFollowers(userName: string, apiKey?: string | null, page = 1) {
+  const list = await unwrapUsers(
+    [
+      `/api/user/${encodeURIComponent(userName)}/followers?p=${page}`,
+      `/follow/followers?p=${page}&followingId=${encodeURIComponent(userName)}`,
+    ],
+    apiKey,
+  )
+  if (list.length) return list
+  return mockFollowUsers(userName, 'followers')
+}
+
+export async function fetchPointRecords(apiKey: string, page = 1): Promise<PointRecord[]> {
+  const paths = [`/api/point/records?p=${page}`, `/api/user/points?p=${page}`, `/activity/point?p=${page}`]
+  for (const path of paths) {
+    try {
+      const res = await request<Envelope<PointRecord[] | { records?: PointRecord[] }>>(withKey(path, apiKey))
+      const data = res.data
+      if (Array.isArray(data) && data.length) return data
+      if (data && !Array.isArray(data) && Array.isArray(data.records) && data.records.length) return data.records
+    } catch {
+      /* try next */
+    }
+  }
+  const notices = await fetchNotifications(apiKey, 'point', page)
+  return notices.map((n, i) => ({
+    oId: `notice-${i}`,
+    description: n.description || n.content || '积分变动',
+    time: n.createTime,
+  }))
 }
 
 export async function followUser(apiKey: string, followingId: string) {
@@ -921,6 +1113,7 @@ export interface RedPacketContent {
   got?: number
   msg?: string
   type?: string
+  recivers?: string[]
 }
 
 export interface MuteItem {

@@ -68,7 +68,13 @@ export default defineConfig(({ mode }) => {
             if (req.method === 'GET' || req.method === 'HEAD') return req.url
           },
         },
-        '/point': proxy,
+        '/point': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            if (path === '/points' || path.startsWith('/points/')) return req.url
+          },
+        },
         '/upload': proxy,
         '/register': { ...proxy, bypass: spaGetBypass },
         '/article': { ...proxy, bypass: spaGetBypass },
