@@ -2,7 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import AppearancePicker from '@/components/packs/AppearancePicker.vue'
-import { fetchUserProfile, updateAvatar, updateProfile, uploadFiles } from '@/api/fishpi'
+import { fetchProfessionMe, fetchUserProfile, updateAvatar, updateProfile, uploadFiles, type ProfessionProgress } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -18,6 +18,8 @@ const saving = ref(false)
 const uploading = ref(false)
 const msg = ref('')
 const err = ref('')
+const jobs = ref<ProfessionProgress[]>([])
+const primaryJob = ref('')
 
 function fill() {
   nickname.value = account.value?.userNickname || ''
@@ -42,6 +44,13 @@ onMounted(async () => {
       avatar.value = p.userAvatarURL || avatar.value
     } catch {
       /* keep /api/user fields */
+    }
+    try {
+      const me = await fetchProfessionMe(apiKey.value)
+      jobs.value = me?.progress || []
+      primaryJob.value = me?.primaryProfessionId || ''
+    } catch {
+      jobs.value = []
     }
   }
 })
@@ -113,6 +122,17 @@ async function onAvatar(e: Event) {
         <p v-if="err" class="err">{{ err }}</p>
         <button type="submit" :disabled="saving">{{ saving ? '保存中…' : '保存资料' }}</button>
       </form>
+      <div v-if="jobs.length" class="jobs">
+        <h2>职业成长</h2>
+        <p class="hint">只读 <code>GET /api/profession/me</code>，改职业请稍后在完整职业页操作。</p>
+        <ul>
+          <li v-for="job in jobs" :key="job.professionId || job.displayName">
+            {{ job.displayName || job.shortName }}
+            <em v-if="job.levelName">{{ job.levelName }}</em>
+            <span v-if="job.professionId === primaryJob">主职业</span>
+          </li>
+        </ul>
+      </div>
     </section>
     <section v-else class="card">
       <p class="hint">登录后可编辑昵称、签名和头像。</p>
@@ -206,5 +226,24 @@ button {
 .err {
   color: #e07a5f;
   font-size: 13px;
+}
+h2 {
+  margin: 16px 0 8px;
+  font-size: 16px;
+}
+.jobs ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.jobs li {
+  padding: 6px 0;
+  font-size: 13px;
+}
+.jobs em,
+.jobs span {
+  margin-left: 8px;
+  color: var(--fp-muted);
+  font-style: normal;
 }
 </style>

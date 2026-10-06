@@ -914,6 +914,83 @@ export async function fetchPublicLogs(apiKey: string, page = 1, pageSize = 20) {
   return Array.isArray(res.data) ? res.data : []
 }
 
+export interface ProfessionProgress {
+  professionId?: string
+  displayName?: string
+  shortName?: string
+  levelName?: string
+  totalExperience?: number
+}
+
+export interface PublicProfessionProfile {
+  primaryProfession?: ProfessionProgress | null
+  professions?: ProfessionProgress[]
+}
+
+export async function fetchPublicProfession(userName: string, apiKey?: string | null) {
+  const paths = [
+    `/api/user/${encodeURIComponent(userName)}/profession?position=profile&dark=false`,
+    `/api/user/${encodeURIComponent(userName)}/profession`,
+  ]
+  for (const path of paths) {
+    try {
+      const res = await request<Envelope<PublicProfessionProfile>>(withKey(path, apiKey))
+      if (res.code) continue
+      if (res.data) return res.data
+    } catch {
+      /* try next */
+    }
+  }
+  return null
+}
+
+export async function fetchProfessionMe(apiKey: string) {
+  try {
+    const res = await request<
+      Envelope<{
+        primaryProfessionId?: string
+        progress?: ProfessionProgress[]
+        privacyPreset?: string
+      }>
+    >(withKey('/api/profession/me', apiKey))
+    if (res.code) return null
+    return res.data ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function fetchUserMedals(apiKey: string, userName: string) {
+  try {
+    const res = await request<Envelope<unknown>>('/api/medal/user/list', {
+      method: 'POST',
+      body: JSON.stringify({ apiKey, userName }),
+    })
+    if (res.code) return []
+    const raw = res.data
+    const list = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === 'object' && Array.isArray((raw as { list?: unknown[] }).list)
+        ? (raw as { list: unknown[] }).list
+        : []
+    const medals: MetalItem[] = []
+    for (const item of list) {
+      if (!item || typeof item !== 'object') continue
+      const row = item as Record<string, unknown>
+      const name = String(row.name || row.metalName || row.metal || '')
+      if (!name) continue
+      medals.push({
+        name,
+        description: String(row.description || row.desc || ''),
+        attr: String(row.attr || ''),
+      })
+    }
+    return medals
+  } catch {
+    return []
+  }
+}
+
 export async function searchUserNames(apiKey: string, name: string): Promise<string[]> {
   const res = await request<Envelope<string[] | { userNames?: string[] }>>('/users/names', {
     method: 'POST',
@@ -1308,6 +1385,18 @@ export async function fetchChatHistory(apiKey: string, page = 1) {
     withKey(`/chat-room/more?page=${page}&type=html`, apiKey),
   )
   if (res.code !== 0) throw new Error(res.msg || '聊天记录失败')
+  return res.data ?? []
+}
+
+/** mode: 0 context, 1 before, 2 after */
+export async function fetchChatAround(apiKey: string, oId: string, mode: 0 | 1 | 2 = 0, size = 16) {
+  const res = await request<Envelope<ChatHistoryItem[]>>(
+    withKey(
+      `/chat-room/getMessage?oId=${encodeURIComponent(oId)}&mode=${mode}&size=${size}&type=html`,
+      apiKey,
+    ),
+  )
+  if (res.code !== 0) throw new Error(res.msg || '附近消息失败')
   return res.data ?? []
 }
 

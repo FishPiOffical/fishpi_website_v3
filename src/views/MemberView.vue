@@ -4,12 +4,16 @@ import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   fetchMembership,
+  fetchPublicProfession,
   fetchUserArticles,
+  fetchUserMedals,
   fetchUserProfile,
   followUser,
   transferPoints,
   unfollowUser,
   type ArticleSummary,
+  type MetalItem,
+  type PublicProfessionProfile,
   type UserProfile,
 } from '@/api/fishpi'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
@@ -31,6 +35,8 @@ const sendAmount = ref(5)
 const sendMemo = ref('请你吃鱼丸')
 const transferring = ref(false)
 const viewedVip = ref(false)
+const profession = ref<PublicProfessionProfile | null>(null)
+const extraMedals = ref<MetalItem[]>([])
 const usingMock = computed(() => String(profile.value?.oId || '').startsWith('mock-'))
 
 const isSelf = computed(() => Boolean(account.value && account.value.userName === userName.value))
@@ -50,12 +56,20 @@ async function load() {
     profile.value = p
     articles.value = list
     viewedVip.value = false
+    profession.value = null
+    extraMedals.value = []
     if (p.oId && !String(p.oId).startsWith('mock-')) {
       try {
         viewedVip.value = (await fetchMembership(p.oId)).isVip
       } catch {
         viewedVip.value = isSelf.value && isVip.value
       }
+      profession.value = await fetchPublicProfession(userName.value, apiKey.value)
+      extraMedals.value = apiKey.value
+        ? (await fetchUserMedals(apiKey.value, userName.value)).filter(
+            (m) => m.name && !(p.sysMetal || []).some((s) => s.name === m.name),
+          )
+        : []
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : '用户加载失败'
@@ -119,6 +133,17 @@ async function sendPoints() {
           <span>{{ profile.userPoint ?? 0 }} 积分</span>
         </p>
         <MetalBadges :items="profile.sysMetal" />
+        <MetalBadges v-if="extraMedals.length" :items="extraMedals" />
+        <p v-if="profession?.primaryProfession" class="intro">
+          职业 {{ profession.primaryProfession.displayName || profession.primaryProfession.shortName }}
+          <span v-if="profession.primaryProfession.levelName"> · {{ profession.primaryProfession.levelName }}</span>
+        </p>
+        <ul v-if="profession?.professions?.length" class="jobs">
+          <li v-for="job in profession.professions" :key="job.professionId || job.displayName">
+            {{ job.displayName || job.shortName }}
+            <em v-if="job.levelName">{{ job.levelName }}</em>
+          </li>
+        </ul>
         <p v-if="usingMock" class="hint">匿名用户接口未开放，当前为与 <code>GET /user/:userName</code> 对齐的 mock。</p>
         <p v-if="actionMsg" :class="actionMsg.includes('成功') ? 'ok' : 'err'">{{ actionMsg }}</p>
         <button
@@ -193,6 +218,20 @@ h2 {
 .stats a {
   color: var(--fp-link);
   text-decoration: none;
+}
+.jobs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+.jobs em {
+  margin-left: 4px;
+  font-style: normal;
 }
 .err {
   color: #e07a5f;

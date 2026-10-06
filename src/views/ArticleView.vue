@@ -54,6 +54,25 @@ const id = computed(() => String(route.params.id || ''))
 
 const comments = computed<ArticleComment[]>(() => article.value?.articleComments || [])
 const nice = computed(() => article.value?.articleNiceComments || [])
+const threaded = computed(() => {
+  const list = comments.value
+  const ids = new Set(list.map((c) => c.oId))
+  const byParent = new Map<string, ArticleComment[]>()
+  for (const c of list) {
+    const parent = String(c.commentOriginalCommentId || '')
+    if (parent && ids.has(parent)) {
+      const kids = byParent.get(parent) || []
+      kids.push(c)
+      byParent.set(parent, kids)
+    }
+  }
+  return list
+    .filter((c) => {
+      const parent = String(c.commentOriginalCommentId || '')
+      return !parent || !ids.has(parent)
+    })
+    .flatMap((c) => [{ c, nested: false }, ...(byParent.get(c.oId) || []).map((r) => ({ c: r, nested: true }))])
+})
 const commentPages = computed(() => Number(article.value?.pagination?.paginationPageCount || 1))
 const tagList = computed(() =>
   String(article.value?.articleTags || '')
@@ -319,6 +338,11 @@ function who(c: ArticleComment) {
   return c.commentAuthorName || '匿名'
 }
 
+function parentAuthor(c: ArticleComment) {
+  const parent = comments.value.find((x) => x.oId === c.commentOriginalCommentId)
+  return parent ? who(parent) : ''
+}
+
 async function onReactArticle(value: string) {
   if (!apiKey.value || !article.value) return
   try {
@@ -411,42 +435,43 @@ async function onReactComment(c: ArticleComment, value: string) {
 
     <section class="card">
       <h2>评论 {{ comments.length }}</h2>
-      <div v-for="c in comments" :key="c.oId" class="cmt">
+      <div v-for="row in threaded" :key="row.c.oId" class="cmt" :class="{ nested: row.nested }">
         <header>
-          <b><RouterLink :to="`/member/${who(c)}`">{{ who(c) }}</RouterLink></b>
-          <time>{{ c.commentCreateTimeStr || c.timeAgo }}</time>
-          <button v-if="isLoggedIn" type="button" class="ghost" @click="replyId = c.oId">回复</button>
-          <button v-if="isLoggedIn" type="button" class="ghost" @click="onVoteComment(c)">点赞</button>
-          <button v-if="isLoggedIn" type="button" class="ghost" :disabled="c.rewarded" @click="onThankComment(c)">
-            {{ c.rewarded ? '已感谢' : '感谢' }}
+          <b><RouterLink :to="`/member/${who(row.c)}`">{{ who(row.c) }}</RouterLink></b>
+          <time>{{ row.c.commentCreateTimeStr || row.c.timeAgo }}</time>
+          <em v-if="parentAuthor(row.c)" class="reply-to">回复 {{ parentAuthor(row.c) }}</em>
+          <button v-if="isLoggedIn" type="button" class="ghost" @click="replyId = row.c.oId">回复</button>
+          <button v-if="isLoggedIn" type="button" class="ghost" @click="onVoteComment(row.c)">点赞</button>
+          <button v-if="isLoggedIn" type="button" class="ghost" :disabled="row.c.rewarded" @click="onThankComment(row.c)">
+            {{ row.c.rewarded ? '已感谢' : '感谢' }}
           </button>
-          <button v-if="isLoggedIn && isOwnComment(c)" type="button" class="ghost" @click="startEdit(c)">
+          <button v-if="isLoggedIn && isOwnComment(row.c)" type="button" class="ghost" @click="startEdit(row.c)">
             编辑
           </button>
-          <button v-if="isLoggedIn && isOwnComment(c)" type="button" class="ghost" @click="onRemoveComment(c)">
+          <button v-if="isLoggedIn && isOwnComment(row.c)" type="button" class="ghost" @click="onRemoveComment(row.c)">
             删除
           </button>
           <button
-            v-if="isLoggedIn && canEdit && isQnA && !c.commentQnAOffered && !isOwnComment(c)"
+            v-if="isLoggedIn && canEdit && isQnA && !row.c.commentQnAOffered && !isOwnComment(row.c)"
             type="button"
             class="ghost"
-            @click="onAccept(c)"
+            @click="onAccept(row.c)"
           >
             采纳
           </button>
-          <ReportDialog v-if="isLoggedIn && !isOwnComment(c)" :api-key="apiKey" :data-id="c.oId" :data-type="1" />
+          <ReportDialog v-if="isLoggedIn && !isOwnComment(row.c)" :api-key="apiKey" :data-id="row.c.oId" :data-type="1" />
         </header>
-        <div v-if="editingId === c.oId" class="edit-box">
+        <div v-if="editingId === row.c.oId" class="edit-box">
           <textarea v-model="editDraft" rows="3" />
           <button type="button" :disabled="editSaving || !editDraft.trim()" @click="saveEdit">保存</button>
           <button type="button" class="ghost" @click="editingId = ''">取消</button>
         </div>
-        <div v-else class="cmt-body" v-html="c.commentContent || ''" />
+        <div v-else class="cmt-body" v-html="row.c.commentContent || ''" />
         <ReactionBar
-          :summary="c.reactionSummary"
-          :current="c.currentUserReaction"
+          :summary="row.c.reactionSummary"
+          :current="row.c.currentUserReaction"
           :disabled="!isLoggedIn"
-          @toggle="(v) => onReactComment(c, v)"
+          @toggle="(v) => onReactComment(row.c, v)"
         />
       </div>
       <p v-if="!comments.length" class="hint">还没有评论。</p>
@@ -460,7 +485,10 @@ async function onReactComment(c: ArticleComment, value: string) {
     <form class="card composer" @submit.prevent="submit">
       <h2>参与讨论</h2>
       <template v-if="isLoggedIn">
-        <p v-if="replyId" class="hint">回复评论 {{ replyId }} <button type="button" class="ghost" @click="replyId = ''">取消</button></p>
+        <p v-if="replyId" class="hint">
+          回复 {{ comments.find((c) => c.oId === replyId)?.commentAuthorName || replyId }}
+          <button type="button" class="ghost" @click="replyId = ''">取消</button>
+        </p>
         <textarea v-model="draft" rows="4" placeholder="支持 Markdown" />
         <EmojiPicker @insert="(md) => (draft += md)" />
         <p v-if="sendError" class="err">{{ sendError }}</p>
@@ -569,6 +597,15 @@ h2 {
 .cmt {
   padding: 12px 0;
   border-bottom: 1px solid var(--fp-border);
+}
+.cmt.nested {
+  margin-left: 28px;
+  border-left: 2px solid var(--fp-border);
+  padding-left: 12px;
+}
+.reply-to {
+  font-style: normal;
+  color: var(--fp-link);
 }
 .cmt header {
   display: flex;

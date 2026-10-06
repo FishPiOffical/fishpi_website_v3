@@ -152,7 +152,8 @@ function packetLabel(type?: string) {
               <button v-if="msg.userName === me" type="button" class="ghost tiny" @click="chat.revoke(msg.oId)">
                 撤回
               </button>
-              <ReportDialog v-else-if="auth.apiKey" :api-key="auth.apiKey" :data-id="msg.oId" :data-type="3" />
+              <button type="button" class="ghost tiny" @click="chat.loadAround(msg.oId)">附近</button>
+              <ReportDialog v-if="msg.userName !== me && auth.apiKey" :api-key="auth.apiKey" :data-id="msg.oId" :data-type="3" />
             </div>
             <div v-if="msg.redPacket" class="fp-bubble packet">
               <strong>{{ packetLabel(msg.redPacket.type) }}</strong>

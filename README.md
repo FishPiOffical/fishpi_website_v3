@@ -36,6 +36,7 @@ VITE_API_TARGET=http://localhost:8080
 - 发帖草稿 `GET/POST/DELETE /api/article-drafts`
 - 评论编辑/问答采纳、标签联想、Markdown 预览
 - 首页随机帖 `GET /article/random/{size}`、公开日志、通知 `user-channel`
+- 评论楼中楼、聊天室附近消息、公开职业/勋章列表
 
 闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。
 
