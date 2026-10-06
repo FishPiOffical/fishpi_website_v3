@@ -87,7 +87,7 @@ function logout() {
           <RouterLink to="/login">登录</RouterLink>
           <RouterLink to="/register">注册</RouterLink>
         </template>
-        <RouterLink to="/settings">装扮</RouterLink>
+        <RouterLink to="/settings">设置</RouterLink>
         <button type="button" class="ghost" title="切换颜色模式" @click="appearance.toggleTheme()">◐</button>
       </div>
     </header>

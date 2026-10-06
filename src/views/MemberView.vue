@@ -93,6 +93,7 @@ async function toggleFollow() {
         >
           {{ following ? '取消关注' : '关注' }}
         </button>
+        <RouterLink v-if="isLoggedIn && isSelf" class="msg" to="/settings">编辑资料</RouterLink>
         <RouterLink v-if="isLoggedIn && !isSelf" class="msg" :to="`/chat/${profile.userName}`">发私信</RouterLink>
         <p v-else-if="!isLoggedIn" class="hint">
           <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>

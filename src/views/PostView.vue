@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { postArticle } from '@/api/fishpi'
+import { postArticle, uploadFiles } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -15,6 +15,8 @@ const type = ref(0)
 const offer = ref(0)
 const error = ref('')
 const sending = ref(false)
+const uploading = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
 
 async function submit() {
   if (!apiKey.value) return
@@ -33,6 +35,23 @@ async function submit() {
     error.value = e instanceof Error ? e.message : '发帖失败'
   } finally {
     sending.value = false
+  }
+}
+
+async function insertImage(e: Event) {
+  const files = Array.from((e.target as HTMLInputElement).files || [])
+  if (!apiKey.value || !files.length) return
+  uploading.value = true
+  error.value = ''
+  try {
+    const urls = await uploadFiles(apiKey.value, files)
+    const chunk = urls.map((u, i) => `![${files[i]?.name || 'image'}](${u})`).join('\n')
+    content.value = content.value ? `${content.value}\n${chunk}` : chunk
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '上传失败'
+  } finally {
+    uploading.value = false
+    ;(e.target as HTMLInputElement).value = ''
   }
 }
 </script>
@@ -54,6 +73,10 @@ async function submit() {
       </label>
       <label v-if="type === 5">悬赏积分<input v-model.number="offer" type="number" min="0" /></label>
       <label>正文（Markdown）<textarea v-model="content" rows="12" required /></label>
+      <input ref="fileInput" type="file" accept="image/*" multiple hidden @change="insertImage" />
+      <button type="button" class="ghost" :disabled="uploading" @click="fileInput?.click()">
+        {{ uploading ? '上传中…' : '插入图片' }}
+      </button>
       <p v-if="error" class="err">{{ error }}</p>
       <button type="submit" :disabled="sending">{{ sending ? '发布中…' : '发布' }}</button>
     </template>
@@ -95,6 +118,11 @@ button {
   border-radius: 8px;
   padding: 10px;
   cursor: pointer;
+}
+.ghost {
+  background: transparent;
+  border: 1px solid var(--fp-border);
+  color: var(--fp-text);
 }
 .hint,
 .err {

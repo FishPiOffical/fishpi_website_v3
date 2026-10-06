@@ -60,5 +60,10 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(KEY)
   }
 
-  return { apiKey, account, isVip, loading, error, isLoggedIn, restore, login, logout, refreshMembership }
+  async function reloadAccount() {
+    if (!apiKey.value) return
+    account.value = await fetchAccount(apiKey.value)
+  }
+
+  return { apiKey, account, isVip, loading, error, isLoggedIn, restore, login, logout, refreshMembership, reloadAccount }
 })

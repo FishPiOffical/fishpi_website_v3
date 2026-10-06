@@ -23,6 +23,10 @@ export interface AccountInfo {
   userNickname?: string
   userAvatarURL?: string
   userPoint?: number
+  userIntro?: string
+  userURL?: string
+  userTags?: string
+  mbti?: string
 }
 
 export interface UserProfile {
@@ -167,9 +171,90 @@ export async function login(username: string, passwd: string, mfaCode = '') {
 }
 
 export async function fetchAccount(apiKey: string) {
-  const res = await request<Envelope<AccountInfo>>(withKey('/api/user', apiKey))
+  const res = await request<Envelope<AccountInfo & { userTag?: string; mbti?: string }>>(withKey('/api/user', apiKey))
   if (res.code !== 0 || !res.data) throw new Error(res.msg || '密钥无效')
-  return res.data
+  const data = res.data
+  if (!data.userTags && data.userTag) data.userTags = data.userTag
+  return data
+}
+
+export interface ProfileUpdate {
+  userNickname?: string
+  userURL?: string
+  userIntro?: string
+  userTag?: string
+  mbti?: string
+}
+
+export async function updateProfile(apiKey: string, data: ProfileUpdate) {
+  const res = await request<Envelope<unknown>>('/api/settings/profiles', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, ...data }),
+  })
+  if (res.code) throw new Error(res.msg || '保存资料失败')
+}
+
+export async function updateAvatar(apiKey: string, userAvatarURL: string) {
+  const res = await request<Envelope<unknown>>('/api/settings/avatar', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, userAvatarURL }),
+  })
+  if (res.code) throw new Error(res.msg || '更新头像失败')
+}
+
+function extractUploadUrls(json: unknown): string[] {
+  if (!json || typeof json !== 'object') return []
+  const o = json as Record<string, unknown>
+  if (o.succMap && typeof o.succMap === 'object') {
+    return Object.values(o.succMap as Record<string, string>).filter(Boolean)
+  }
+  const data = o.data
+  if (data && typeof data === 'object') {
+    const d = data as Record<string, unknown>
+    if (d.succMap && typeof d.succMap === 'object') {
+      return Object.values(d.succMap as Record<string, string>).filter(Boolean)
+    }
+    if (Array.isArray(d.files)) {
+      return d.files
+        .map((f) => (typeof f === 'string' ? f : String((f as { url?: string }).url || '')))
+        .filter(Boolean)
+    }
+    if (typeof d.url === 'string') return [d.url]
+  }
+  if (typeof o.url === 'string') return [o.url]
+  return []
+}
+
+export async function uploadFiles(apiKey: string, files: File[]): Promise<string[]> {
+  if (!files.length) return []
+  try {
+    const ticketRes = await request<Envelope<{ ticket?: string; uploadURL?: string }>>(
+      withKey('/api/rhypic/upload-ticket', apiKey),
+      { method: 'POST' },
+    )
+    const ticket = ticketRes.data?.ticket
+    const uploadURL = ticketRes.data?.uploadURL
+    if (ticketRes.code || !ticket || !uploadURL) throw new Error(ticketRes.msg || '无上传票据')
+    const body = new FormData()
+    files.forEach((f) => body.append('file', f))
+    const res = await fetch(`${String(uploadURL).replace(/\/$/, '')}/api/v1/files`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${ticket}` },
+      body,
+    })
+    const json: unknown = await res.json()
+    const urls = extractUploadUrls(json)
+    if (urls.length) return urls
+    throw new Error('图床未返回文件地址')
+  } catch (e) {
+    const body = new FormData()
+    files.forEach((f) => body.append('file[]', f))
+    body.append('apiKey', apiKey)
+    const res = await request<Record<string, unknown>>('/upload', { method: 'POST', body })
+    const urls = extractUploadUrls(res)
+    if (urls.length) return urls
+    throw e instanceof Error ? e : new Error('上传失败')
+  }
 }
 
 /** 匿名读未开放或接口 404 时回退 mock，字段与正式 JSON 对齐。 */
