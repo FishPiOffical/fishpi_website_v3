@@ -122,6 +122,9 @@ export interface ArticleComment {
   timeAgo?: string
   commentThankCnt?: number
   commentOriginalCommentId?: string
+  commentGoodCnt?: number
+  commentVote?: number
+  rewarded?: boolean
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -131,6 +134,17 @@ export interface ArticleDetail extends ArticleSummary {
   articleComments?: ArticleComment[]
   articleNiceComments?: ArticleComment[]
   pagination?: { paginationPageCount?: number; paginationCurrentPageNum?: number }
+  isFollowing?: boolean
+  isWatching?: boolean
+  isMyArticle?: boolean
+  thanked?: boolean
+  rewarded?: boolean
+  articleThankCnt?: number
+  articleCollectCnt?: number
+  articleWatchCnt?: number
+  articleRewardPoint?: number
+  articleRewardContent?: string
+  rewardedCnt?: number
 }
 
 export interface Breezemoon {
@@ -565,6 +579,63 @@ export async function thankArticle(apiKey: string, oId: string) {
     body: JSON.stringify({ apiKey }),
   })
   if (res.code) throw new Error(res.msg || '感谢失败')
+}
+
+export async function followArticle(apiKey: string, followingId: string) {
+  const res = await request<Envelope<unknown>>('/follow/article', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, followingId }),
+  })
+  if (res.code) throw new Error(res.msg || '收藏失败')
+}
+
+export async function unfollowArticle(apiKey: string, followingId: string) {
+  const res = await request<Envelope<unknown>>('/unfollow/article', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, followingId }),
+  })
+  if (res.code) throw new Error(res.msg || '取消收藏失败')
+}
+
+export async function watchArticle(apiKey: string, followingId: string) {
+  const res = await request<Envelope<unknown>>('/follow/article-watch', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, followingId }),
+  })
+  if (res.code) throw new Error(res.msg || '关注帖子失败')
+}
+
+export async function unwatchArticle(apiKey: string, followingId: string) {
+  const res = await request<Envelope<unknown>>('/unfollow/article-watch', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, followingId }),
+  })
+  if (res.code) throw new Error(res.msg || '取消关注失败')
+}
+
+export async function rewardArticle(apiKey: string, oId: string) {
+  const res = await request<Envelope<unknown>>(`/article/reward?articleId=${encodeURIComponent(oId)}`, {
+    method: 'POST',
+    body: JSON.stringify({ apiKey }),
+  })
+  if (res.code) throw new Error(res.msg || '打赏失败')
+}
+
+export async function thankComment(apiKey: string, commentId: string) {
+  const res = await request<Envelope<unknown>>('/comment/thank', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, commentId }),
+  })
+  if (res.code) throw new Error(res.msg || '感谢评论失败')
+}
+
+export async function voteComment(apiKey: string, oId: string) {
+  const res = await request<Envelope<unknown> & { type?: number }>('/vote/up/comment', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, dataId: oId }),
+  })
+  if (res.code) throw new Error(res.msg || '点赞评论失败')
+  return res.type
 }
 
 export async function requestSms(payload: {

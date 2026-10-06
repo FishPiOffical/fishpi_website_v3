@@ -2,7 +2,21 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { fetchArticle, postComment, thankArticle, voteArticle, type ArticleComment, type ArticleDetail } from '@/api/fishpi'
+import {
+  fetchArticle,
+  followArticle,
+  postComment,
+  rewardArticle,
+  thankArticle,
+  thankComment,
+  unfollowArticle,
+  unwatchArticle,
+  voteArticle,
+  voteComment,
+  watchArticle,
+  type ArticleComment,
+  type ArticleDetail,
+} from '@/api/fishpi'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -92,6 +106,59 @@ async function thank() {
   }
 }
 
+async function toggleCollect() {
+  if (!apiKey.value || !article.value) return
+  try {
+    if (article.value.isFollowing) await unfollowArticle(apiKey.value, id.value)
+    else await followArticle(apiKey.value, id.value)
+    await load()
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '收藏失败'
+  }
+}
+
+async function toggleWatch() {
+  if (!apiKey.value || !article.value) return
+  try {
+    if (article.value.isWatching) await unwatchArticle(apiKey.value, id.value)
+    else await watchArticle(apiKey.value, id.value)
+    await load()
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '关注失败'
+  }
+}
+
+async function reward() {
+  if (!apiKey.value) return
+  try {
+    await rewardArticle(apiKey.value, id.value)
+    actionMsg.value = '打赏成功'
+    await load()
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '打赏失败'
+  }
+}
+
+async function onThankComment(c: ArticleComment) {
+  if (!apiKey.value) return
+  try {
+    await thankComment(apiKey.value, c.oId)
+    await load()
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '感谢评论失败'
+  }
+}
+
+async function onVoteComment(c: ArticleComment) {
+  if (!apiKey.value) return
+  try {
+    await voteComment(apiKey.value, c.oId)
+    await load()
+  } catch (e) {
+    actionMsg.value = e instanceof Error ? e.message : '点赞评论失败'
+  }
+}
+
 function who(c: ArticleComment) {
   return c.commentAuthorName || '匿名'
 }
@@ -124,7 +191,23 @@ function who(c: ArticleComment) {
       </p>
       <div v-if="isLoggedIn" class="actions">
         <button type="button" @click="vote">点赞</button>
-        <button type="button" @click="thank">感谢</button>
+        <button type="button" :disabled="article.thanked" @click="thank">
+          {{ article.thanked ? '已感谢' : '感谢' }}
+        </button>
+        <button type="button" @click="toggleCollect">
+          {{ article.isFollowing ? '取消收藏' : '收藏' }}
+        </button>
+        <button type="button" @click="toggleWatch">
+          {{ article.isWatching ? '取消关注' : '关注帖子' }}
+        </button>
+        <button
+          v-if="Number(article.articleRewardPoint) > 0"
+          type="button"
+          :disabled="article.rewarded"
+          @click="reward"
+        >
+          {{ article.rewarded ? '已打赏' : `打赏 ${article.articleRewardPoint}` }}
+        </button>
         <span v-if="actionMsg">{{ actionMsg }}</span>
       </div>
       <div class="body" v-html="article.articleContent || ''" />
@@ -145,6 +228,10 @@ function who(c: ArticleComment) {
           <b><RouterLink :to="`/member/${who(c)}`">{{ who(c) }}</RouterLink></b>
           <time>{{ c.commentCreateTimeStr || c.timeAgo }}</time>
           <button v-if="isLoggedIn" type="button" class="ghost" @click="replyId = c.oId">回复</button>
+          <button v-if="isLoggedIn" type="button" class="ghost" @click="onVoteComment(c)">点赞</button>
+          <button v-if="isLoggedIn" type="button" class="ghost" :disabled="c.rewarded" @click="onThankComment(c)">
+            {{ c.rewarded ? '已感谢' : '感谢' }}
+          </button>
         </header>
         <div class="cmt-body" v-html="c.commentContent || ''" />
       </div>
