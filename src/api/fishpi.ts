@@ -90,7 +90,7 @@ export async function fetchAccount(apiKey: string) {
   return res.data
 }
 
-/** Rhythm 把 `/api/articles/recent*` 挂了 loginCheck，未登录请用 fetchPublicHome。 */
+/** Rhythm 当前对文章列表/详情挂了 loginCheck，游客无匿名 JSON（勿再抓 HTML）。 */
 async function unwrapArticles(path: string, apiKey?: string | null) {
   const res = await request<Envelope<{ articles?: ArticleSummary[] } | ArticleSummary[]>>(withKey(path, apiKey))
   if (res.code !== 0) throw new Error(res.msg || '文章列表失败')

@@ -1,36 +1,47 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchCheckinRank, fetchOnlineRank, type RankUser } from '@/api/fishpi'
-import { fetchPublicHome } from '@/api/publicHome'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
-const { apiKey } = storeToRefs(auth)
+const { apiKey, isLoggedIn } = storeToRefs(auth)
 const checkin = ref<RankUser[]>([])
 const online = ref<RankUser[]>([])
 const error = ref('')
+const loading = ref(false)
 
-onMounted(async () => {
+async function load() {
+  checkin.value = []
+  online.value = []
+  error.value = ''
+  if (!apiKey.value) return
+
+  loading.value = true
   try {
-    if (apiKey.value) {
-      checkin.value = await fetchCheckinRank(apiKey.value)
-      online.value = await fetchOnlineRank(apiKey.value)
-    }
-    if (!checkin.value.length || !online.value.length) {
-      const pub = await fetchPublicHome()
-      if (!checkin.value.length) checkin.value = pub.checkin
-      if (!online.value.length) online.value = pub.online
-    }
+    ;[checkin.value, online.value] = await Promise.all([
+      fetchCheckinRank(apiKey.value),
+      fetchOnlineRank(apiKey.value),
+    ])
   } catch (e) {
     error.value = e instanceof Error ? e.message : '排行榜加载失败'
+  } finally {
+    loading.value = false
   }
-})
+}
+
+watch(apiKey, () => void load(), { immediate: true })
 </script>
 
 <template>
   <div class="board">
-    <p v-if="error" class="err">{{ error }}</p>
+    <p v-if="!isLoggedIn" class="banner">
+      排行榜接口需要登录。
+      <RouterLink to="/login">去登录</RouterLink>
+    </p>
+    <p v-else-if="loading" class="banner">加载中…</p>
+    <p v-else-if="error" class="err">{{ error }}</p>
     <section class="card">
       <h1>今日连签排行</h1>
       <ol>
@@ -59,6 +70,14 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+.banner {
+  grid-column: 1 / -1;
+  color: var(--fp-muted);
+  font-size: 13px;
+}
+.banner a {
+  color: var(--fp-link);
 }
 .card {
   background: var(--fp-card);

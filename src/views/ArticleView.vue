@@ -3,7 +3,6 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchArticle, postComment, type ArticleComment, type ArticleDetail } from '@/api/fishpi'
-import { fetchPublicArticle } from '@/api/publicArticle'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -28,12 +27,13 @@ async function load() {
   loading.value = true
   error.value = ''
   article.value = null
+  if (!apiKey.value) {
+    error.value = '帖子详情接口需要登录，本站已不再解析旧站 HTML。'
+    loading.value = false
+    return
+  }
   try {
-    if (apiKey.value) {
-      article.value = await fetchArticle(id.value, apiKey.value, commentPage.value)
-    } else {
-      article.value = await fetchPublicArticle(id.value)
-    }
+    article.value = await fetchArticle(id.value, apiKey.value, commentPage.value)
   } catch (e) {
     error.value = e instanceof Error ? e.message : '帖子加载失败'
   } finally {

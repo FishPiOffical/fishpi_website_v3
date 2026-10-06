@@ -31,11 +31,11 @@ const emptyLogin = computed(() => !isLoggedIn.value)
   <section class="card">
     <h1>领域</h1>
     <p v-if="emptyLogin" class="hint">
-      领域列表需要登录。
+      领域目录 API 尚未提供；标签近似也需要登录。
       <RouterLink to="/login">去登录</RouterLink>
     </p>
     <p v-else-if="error" class="err">{{ error }}</p>
-    <p v-else class="hint">P1 先用最近帖子标签近似领域，完整领域接口后续再接。</p>
+    <p v-else class="hint">暂无 `/api/domains`，先用最近帖标签近似。</p>
     <ul>
       <li v-for="tag in tags" :key="tag">
         <RouterLink :to="{ path: '/search', query: { q: tag } }">{{ tag }}</RouterLink>
