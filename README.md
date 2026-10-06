@@ -19,7 +19,7 @@ VITE_API_TARGET=http://localhost:8080
 
 - 顶栏 / 首页双栏 / 登录 / 聊天室
 - 帖子列表、详情、评论、发帖、点赞/感谢
-- 用户主页、关注、签到/昨日活跃、通知
+- 用户主页、关注、签到/昨日活跃、通知、私信
 - 清风明月（可匿名）
 - 主题、对话框、头像框：`src/packs` 目录包
 - 广告位 mock：`home.top` `footer.sponsors` `home.sidebar`

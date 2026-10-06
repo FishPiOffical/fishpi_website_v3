@@ -93,6 +93,7 @@ async function toggleFollow() {
         >
           {{ following ? '取消关注' : '关注' }}
         </button>
+        <RouterLink v-if="isLoggedIn && !isSelf" class="msg" :to="`/chat/${profile.userName}`">发私信</RouterLink>
         <p v-else-if="!isLoggedIn" class="hint">
           <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
           后可关注。
@@ -152,11 +153,18 @@ h2 {
 }
 button {
   margin-top: 8px;
+  margin-right: 8px;
   border: 0;
   background: var(--fp-primary);
   color: #fff;
   border-radius: 8px;
   padding: 6px 14px;
   cursor: pointer;
+}
+.msg {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--fp-link);
+  text-decoration: none;
 }
 </style>

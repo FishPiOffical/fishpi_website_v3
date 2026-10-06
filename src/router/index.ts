@@ -43,6 +43,18 @@ const router = createRouter({
       component: () => import('@/views/NotificationsView.vue'),
       meta: { auth: true },
     },
+    {
+      path: '/chat/:userName',
+      name: 'whisper',
+      component: () => import('@/views/WhisperView.vue'),
+      meta: { auth: true },
+    },
+    {
+      path: '/chat',
+      name: 'whispers',
+      component: () => import('@/views/WhisperListView.vue'),
+      meta: { auth: true },
+    },
     { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
   ],
 })

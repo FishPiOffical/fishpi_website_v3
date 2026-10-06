@@ -5,6 +5,7 @@ import { computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useNoticeStore } from '@/stores/notices'
+import { useWhisperStore } from '@/stores/whispers'
 import AdSlot from '@/components/ads/AdSlot.vue'
 
 const nav = [
@@ -24,15 +25,22 @@ const router = useRouter()
 const auth = useAuthStore()
 const appearance = useAppearanceStore()
 const notices = useNoticeStore()
+const whispers = useWhisperStore()
 const { isLoggedIn, account } = storeToRefs(auth)
 const { total: unreadTotal } = storeToRefs(notices)
+const { unreadTotal: whisperUnread } = storeToRefs(whispers)
 const memberPath = computed(() => (account.value?.userName ? `/member/${account.value.userName}` : '/login'))
 
 watch(
   () => auth.apiKey,
   (key) => {
-    if (key) void notices.refresh()
-    else notices.clear()
+    if (key) {
+      void notices.refresh()
+      void whispers.refreshUnread()
+    } else {
+      notices.clear()
+      whispers.clear()
+    }
   },
   { immediate: true },
 )
@@ -64,6 +72,10 @@ function logout() {
       <div class="user">
         <template v-if="isLoggedIn">
           <RouterLink to="/post">发帖</RouterLink>
+          <RouterLink to="/chat">
+            私信
+            <em v-if="whisperUnread" class="badge">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</em>
+          </RouterLink>
           <RouterLink to="/notifications">
             通知
             <em v-if="unreadTotal" class="badge">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</em>

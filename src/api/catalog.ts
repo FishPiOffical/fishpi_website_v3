@@ -5,6 +5,7 @@ import type {
   NoticeType,
   RankUser,
   UserProfile,
+  WhisperMsg,
 } from '@/api/fishpi'
 import catalog from './catalog.mock.json' with { type: 'json' }
 
@@ -24,6 +25,7 @@ interface CatalogFile {
   domains: DomainItem[]
   profiles?: Record<string, Partial<UserProfile> & { userName: string }>
   notifications?: Record<string, NoticeItem[]>
+  whispers?: { list: WhisperMsg[]; messages: Record<string, WhisperMsg[]> }
 }
 
 const data = catalog as CatalogFile
@@ -140,4 +142,14 @@ export function mockUnreadCount() {
       cnt('broadcast') +
       cnt('sys-announce'),
   }
+}
+
+export function mockWhisperList() {
+  return data.whispers?.list || []
+}
+
+export function mockWhisperMessages(userName: string) {
+  return data.whispers?.messages[userName] || data.whispers?.list.filter((m) =>
+    [m.senderUserName, m.receiverUserName].includes(userName),
+  ) || []
 }

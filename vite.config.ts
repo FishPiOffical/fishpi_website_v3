@@ -53,6 +53,18 @@ export default defineConfig(({ mode }) => {
             }
           },
         },
+        '/chat-channel': { ...proxy, ws: true },
+        '/idle-talk': proxy,
+        '/idle-talk-channel': { ...proxy, ws: true },
+        '/chat': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            const isApi = /^\/chat\/(get-list|get-message|mark-as-read|has-unread|revoke|send)(\/|$)/.test(path)
+            if (isApi) return
+            if (req.method === 'GET' || req.method === 'HEAD') return req.url
+          },
+        },
         '/register': { ...proxy, bypass: spaGetBypass },
         '/article': { ...proxy, bypass: spaGetBypass },
       },

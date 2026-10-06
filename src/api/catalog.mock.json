@@ -229,5 +229,41 @@
         "createTime": "Mon Oct 06 00:00:00 CST 2026"
       }
     ]
+  },
+  "whispers": {
+    "list": [
+      {
+        "oId": "mock-w1",
+        "senderUserName": "Yui",
+        "receiverUserName": "fishpi",
+        "senderAvatar": "",
+        "preview": "欢迎来到摸鱼派",
+        "content": "<p>欢迎来到摸鱼派</p>",
+        "markdown": "欢迎来到摸鱼派",
+        "time": "1 天前"
+      }
+    ],
+    "messages": {
+      "Yui": [
+        {
+          "oId": "mock-w1",
+          "senderUserName": "Yui",
+          "receiverUserName": "fishpi",
+          "preview": "欢迎来到摸鱼派",
+          "content": "<p>欢迎来到摸鱼派</p>",
+          "markdown": "欢迎来到摸鱼派",
+          "time": "1 天前"
+        },
+        {
+          "oId": "mock-w2",
+          "senderUserName": "fishpi",
+          "receiverUserName": "Yui",
+          "preview": "谢谢",
+          "content": "<p>谢谢</p>",
+          "markdown": "谢谢",
+          "time": "1 天前"
+        }
+      ]
+    }
   }
 }

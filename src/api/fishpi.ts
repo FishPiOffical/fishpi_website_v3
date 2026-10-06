@@ -9,6 +9,8 @@ import {
   mockProfile,
   mockUnreadCount,
   mockUserArticles,
+  mockWhisperList,
+  mockWhisperMessages,
   type DomainItem,
 } from './catalog'
 import { request, withKey } from './http'
@@ -73,6 +75,20 @@ export interface UnreadCount {
   unreadNewFollowerNotificationCnt?: number
   unreadFollowingNotificationCnt?: number
   unreadCommentedNotificationCnt?: number
+}
+
+export interface WhisperMsg {
+  oId: string
+  toId?: string
+  fromId?: string
+  preview?: string
+  markdown?: string
+  content?: string
+  time?: string
+  senderUserName?: string
+  receiverUserName?: string
+  senderAvatar?: string
+  receiverAvatar?: string
 }
 
 export interface ArticleSummary {
@@ -523,6 +539,62 @@ export async function markNoticeRead(apiKey: string, type: NoticeType) {
 
 export async function markAllNoticesRead(apiKey: string) {
   await request<Envelope<unknown>>(withKey('/notifications/all-read', apiKey))
+}
+
+function chatOk<T>(res: Envelope<T> & { result?: number }) {
+  return !res.code && (res.result === undefined || res.result === 0)
+}
+
+export async function fetchWhisperList(apiKey: string): Promise<WhisperMsg[]> {
+  try {
+    const res = await request<Envelope<WhisperMsg[]>>(withKey('/chat/get-list', apiKey))
+    if (chatOk(res) && Array.isArray(res.data)) return res.data
+  } catch {
+    /* GET /chat/get-list */
+  }
+  return mockWhisperList()
+}
+
+export async function fetchWhisperMessages(apiKey: string, toUser: string, page = 1, size = 20): Promise<WhisperMsg[]> {
+  try {
+    const res = await request<Envelope<WhisperMsg[]>>(
+      withKey(
+        `/chat/get-message?toUser=${encodeURIComponent(toUser)}&page=${page}&pageSize=${size}`,
+        apiKey,
+      ),
+    )
+    if (chatOk(res) && Array.isArray(res.data)) return res.data
+  } catch {
+    /* GET /chat/get-message */
+  }
+  return mockWhisperMessages(toUser)
+}
+
+export async function markWhisperRead(apiKey: string, userName: string) {
+  const q = `apiKey=${encodeURIComponent(apiKey)}`
+  try {
+    await request<Envelope<unknown>>(`/chat/mark-as-read?toUser=${encodeURIComponent(userName)}&${q}`)
+  } catch {
+    await request<Envelope<unknown>>(`/chat/mark-as-read?fromUser=${encodeURIComponent(userName)}&${q}`)
+  }
+}
+
+export async function fetchWhisperUnread(apiKey: string): Promise<WhisperMsg[]> {
+  try {
+    const res = await request<Envelope<WhisperMsg[] | number>>(withKey('/chat/has-unread', apiKey))
+    if (Array.isArray(res.data)) return res.data
+    if (typeof res.data === 'number' && res.data > 0) {
+      return Array.from({ length: res.data }, (_, i) => ({ oId: `unread-${i}` }))
+    }
+  } catch {
+    /* GET /chat/has-unread */
+  }
+  return []
+}
+
+export async function revokeWhisper(apiKey: string, oId: string) {
+  const res = await request<Envelope<unknown>>(withKey(`/chat/revoke?oId=${encodeURIComponent(oId)}`, apiKey))
+  if (res.code) throw new Error(res.msg || '撤回失败')
 }
 
 export async function fetchMembership(userId: string) {
