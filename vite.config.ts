@@ -28,11 +28,14 @@ export default defineConfig(({ mode }) => {
         '/api': proxy,
         '/chat-room': { ...proxy, ws: true },
         '/chat-room-channel': { ...proxy, ws: true },
-        '/top': proxy,
-        '/user': proxy,
-        '/cr': proxy,
         '/captcha': proxy,
-        '/register': proxy,
+        '/__rhythm': {
+          ...proxy,
+          rewrite: (path) => {
+            const rest = path.replace(/^\/__rhythm/, '')
+            return rest.length ? rest : '/'
+          },
+        },
       },
     },
   }

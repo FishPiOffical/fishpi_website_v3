@@ -56,6 +56,7 @@ export async function fetchAccount(apiKey: string) {
   return res.data
 }
 
+/** Rhythm 把 `/api/articles/recent*` 挂了 loginCheck，未登录请用 fetchPublicHome。 */
 export async function fetchRecentArticles(apiKey?: string | null, page = 1, size = 40) {
   const res = await request<Envelope<{ articles?: ArticleSummary[] } | ArticleSummary[]>>(
     withKey(`/api/articles/recent?p=${page}&size=${size}`, apiKey),

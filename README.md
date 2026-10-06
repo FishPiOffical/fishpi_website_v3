@@ -9,6 +9,8 @@ npm run dev
 
 开发代理默认指向 `https://fishpi.cn`。若本地 Rhythm 在 `8080`，在 `.env.development` 设置：
 
+fishpi.js 的 `/api/articles/recent` 需要登录。未登录首页走公开页面 `/`（开发时代理为 `/__rhythm/`）解析帖子和排行，与现网游客可见内容一致。
+
 ```
 VITE_API_TARGET=http://localhost:8080
 ```

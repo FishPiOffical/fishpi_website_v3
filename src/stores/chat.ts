@@ -40,7 +40,15 @@ function toDevWs(url: string) {
 }
 
 function asLine(item: ChatHistoryItem | Record<string, unknown>): ChatLine {
-  const content = item.content
+  let content = item.content as unknown
+  if (typeof content === 'string') {
+    try {
+      const parsed = JSON.parse(content) as RedPacketContent
+      if (parsed?.msgType === 'redPacket') content = parsed
+    } catch {
+      /* html */
+    }
+  }
   const redPacket =
     content && typeof content === 'object' && (content as RedPacketContent).msgType === 'redPacket'
       ? (content as RedPacketContent)
@@ -63,10 +71,14 @@ export const useChatStore = defineStore('chat', () => {
   const mutes = ref<MuteItem[]>([])
   const connected = ref(false)
   const sending = ref(false)
+  const loading = ref(false)
+  const loadingMore = ref(false)
+  const hasMore = ref(true)
   const error = ref('')
   const lastPacket = ref('')
   let ws: WebSocket | null = null
   let hb: number | null = null
+  let page = 1
 
   function prependHistory(list: ChatHistoryItem[]) {
     const mapped = list.map(asLine).reverse()
@@ -85,12 +97,18 @@ export const useChatStore = defineStore('chat', () => {
     const auth = useAuthStore()
     if (!auth.apiKey) return
     error.value = ''
+    loading.value = true
+    page = 1
+    hasMore.value = true
     try {
       const history = await fetchChatHistory(auth.apiKey, 1)
       messages.value = []
       prependHistory(history)
+      hasMore.value = history.length > 0
     } catch (e) {
       error.value = e instanceof Error ? e.message : '加载历史失败'
+    } finally {
+      loading.value = false
     }
     try {
       mutes.value = await fetchMutes()
@@ -154,6 +172,22 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function loadMore() {
+    const auth = useAuthStore()
+    if (!auth.apiKey || loadingMore.value || !hasMore.value) return
+    loadingMore.value = true
+    page += 1
+    try {
+      const history = await fetchChatHistory(auth.apiKey, page)
+      if (!history.length) hasMore.value = false
+      else prependHistory(history)
+    } catch {
+      page -= 1
+    } finally {
+      loadingMore.value = false
+    }
+  }
+
   function disconnect() {
     if (hb) window.clearInterval(hb)
     hb = null
@@ -176,12 +210,28 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function sendRedPacket(opts: { money: number; count: number; msg: string }) {
+    const payload = JSON.stringify({
+      msgType: 'redPacket',
+      type: 'random',
+      money: Math.max(1, Number(opts.money) || 1),
+      count: Math.max(1, Number(opts.count) || 1),
+      msg: opts.msg || '摸鱼者，人品好！',
+    })
+    await send(payload)
+  }
+
   async function openPacket(oId: string) {
     const auth = useAuthStore()
     if (!auth.apiKey) return
     try {
       const res = await openRedPacket(auth.apiKey, oId)
-      lastPacket.value = JSON.stringify(res.data ?? res)
+      const data = (res.data ?? {}) as Record<string, unknown>
+      const recivers = Array.isArray(data.recivers) ? data.recivers : []
+      const mine = recivers.find(
+        (r) => r && typeof r === 'object' && (r as { userName?: string }).userName === auth.account?.userName,
+      ) as { money?: number } | undefined
+      lastPacket.value = mine?.money != null ? `抢到 ${mine.money} 积分` : '已领取红包'
     } catch (e) {
       lastPacket.value = e instanceof Error ? e.message : '领取失败'
     }
@@ -198,11 +248,16 @@ export const useChatStore = defineStore('chat', () => {
     mutes,
     connected,
     sending,
+    loading,
+    loadingMore,
+    hasMore,
     error,
     lastPacket,
     connect,
     disconnect,
+    loadMore,
     send,
+    sendRedPacket,
     openPacket,
     setDiscuss,
   }

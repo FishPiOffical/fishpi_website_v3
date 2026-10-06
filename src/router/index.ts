@@ -20,6 +20,7 @@ const router = createRouter({
     { path: '/qna', component: () => import('@/views/PlaceholderView.vue'), meta: { title: '问答' } },
     { path: '/perfect', component: () => import('@/views/PlaceholderView.vue'), meta: { title: '优选' } },
     { path: '/top', component: () => import('@/views/PlaceholderView.vue'), meta: { title: '总榜' } },
+    { path: '/search', component: () => import('@/views/PlaceholderView.vue'), meta: { title: '搜索' } },
     { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
   ],
 })

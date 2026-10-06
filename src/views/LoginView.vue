@@ -4,7 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 
-const username = ref('')
+const LAST_USER = 'fp.lastUser'
+const username = ref(localStorage.getItem(LAST_USER) || '')
 const passwd = ref('')
 const mfa = ref('')
 const auth = useAuthStore()
@@ -13,10 +14,15 @@ const route = useRoute()
 const appearance = useAppearanceStore()
 
 async function submit() {
-  await auth.login(username.value, passwd.value, mfa.value)
-  appearance.enforceVip()
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-  await router.replace(redirect)
+  try {
+    await auth.login(username.value, passwd.value, mfa.value)
+    localStorage.setItem(LAST_USER, username.value)
+    appearance.enforceVip()
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+    await router.replace(redirect)
+  } catch {
+    /* 错误已写在 auth.error */
+  }
 }
 </script>
 

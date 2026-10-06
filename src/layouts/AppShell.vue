@@ -27,6 +27,11 @@ function onSearch(e: Event) {
   const q = (e.target as HTMLInputElement).value.trim()
   if (q) router.push({ path: '/search', query: { q } })
 }
+
+function logout() {
+  auth.logout()
+  if (route.meta.auth) router.push('/')
+}
 </script>
 
 <template>
@@ -45,7 +50,7 @@ function onSearch(e: Event) {
       <div class="user">
         <template v-if="isLoggedIn">
           <span>{{ account?.userName }}</span>
-          <button type="button" @click="auth.logout()">退出</button>
+          <button type="button" @click="logout">退出</button>
         </template>
         <template v-else>
           <RouterLink to="/login">登录</RouterLink>

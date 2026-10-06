@@ -9,6 +9,7 @@ import {
   type RankUser,
 } from '@/api/fishpi'
 import { MOCK_ARTICLES, MOCK_CHECKIN, MOCK_ONLINE } from '@/api/home.mock'
+import { fetchPublicHome } from '@/api/publicHome'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -19,31 +20,57 @@ const checkin = ref<RankUser[]>([])
 const online = ref<RankUser[]>([])
 const hint = ref('')
 const income = ref(365)
+const loading = ref(true)
+
+function splitArticles(articles: ArticleSummary[]) {
+  const mid = Math.ceil(articles.length / 2)
+  left.value = articles.slice(0, mid)
+  right.value = articles.slice(mid)
+}
 
 onMounted(async () => {
+  hint.value = ''
+  loading.value = true
   try {
-    const articles = await fetchRecentArticles(apiKey.value, 1, 40)
-    const mid = Math.ceil(articles.length / 2)
-    left.value = articles.slice(0, mid)
-    right.value = articles.slice(mid)
-  } catch {
-    hint.value = '公开接口需登录或验证码，当前展示布局示例数据。'
-    const mid = Math.ceil(MOCK_ARTICLES.length / 2)
-    left.value = MOCK_ARTICLES
-    right.value = MOCK_ARTICLES.slice(mid).concat(MOCK_ARTICLES.slice(0, mid))
+    if (apiKey.value) {
+      try {
+        splitArticles(await fetchRecentArticles(apiKey.value, 1, 40))
+      } catch {
+        /* 登录态接口失败时改走公开首页 HTML */
+      }
+      try {
+        checkin.value = (await fetchCheckinRank(apiKey.value)).slice(0, 8)
+      } catch {
+        checkin.value = []
+      }
+      try {
+        online.value = (await fetchOnlineRank(apiKey.value)).slice(0, 8)
+      } catch {
+        online.value = []
+      }
+    }
+
+    if (!left.value.length || !checkin.value.length || !online.value.length) {
+      try {
+        const pub = await fetchPublicHome()
+        if (!left.value.length) splitArticles(pub.articles)
+        if (!checkin.value.length) checkin.value = pub.checkin.slice(0, 8)
+        if (!online.value.length) online.value = pub.online.slice(0, 8)
+      } catch {
+        hint.value = '暂时无法读取公开首页，以下为占位数据。'
+        if (!left.value.length) {
+          const mid = Math.ceil(MOCK_ARTICLES.length / 2)
+          left.value = MOCK_ARTICLES
+          right.value = MOCK_ARTICLES.slice(mid).concat(MOCK_ARTICLES.slice(0, mid))
+        }
+      }
+    }
+
+    if (!checkin.value.length) checkin.value = MOCK_CHECKIN
+    if (!online.value.length) online.value = MOCK_ONLINE
+  } finally {
+    loading.value = false
   }
-  try {
-    checkin.value = (await fetchCheckinRank(apiKey.value)).slice(0, 8)
-  } catch {
-    checkin.value = []
-  }
-  if (!checkin.value.length) checkin.value = MOCK_CHECKIN
-  try {
-    online.value = (await fetchOnlineRank(apiKey.value)).slice(0, 8)
-  } catch {
-    online.value = []
-  }
-  if (!online.value.length) online.value = MOCK_ONLINE
 })
 
 function views(a: ArticleSummary) {
@@ -59,6 +86,7 @@ function views(a: ArticleSummary) {
         <header>
           <h2>最新</h2>
         </header>
+        <p v-if="loading && !left.length" class="hint">加载最新帖子…</p>
         <ol>
           <li v-for="item in left" :key="item.oId">
             <span v-if="item.articleStick" class="pin" />
@@ -73,6 +101,7 @@ function views(a: ArticleSummary) {
         <header>
           <h2>更多</h2>
         </header>
+        <p v-if="loading && !right.length" class="hint">加载中…</p>
         <ol>
           <li v-for="item in right" :key="item.oId">
             <a :href="`https://fishpi.cn/article/${item.oId}`" target="_blank" rel="noreferrer">{{
@@ -112,7 +141,7 @@ function views(a: ArticleSummary) {
             <li v-for="(u, i) in online" :key="u.userName">
               <i>{{ i + 1 }}</i>
               {{ u.userName }}
-              <em>{{ u.onlineMinute }} 分钟</em>
+              <em>{{ Number(u.onlineMinute || 0).toLocaleString() }} 分钟</em>
             </li>
           </ol>
         </div>
