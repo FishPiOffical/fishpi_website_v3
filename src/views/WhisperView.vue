@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useWhisperStore } from '@/stores/whispers'
+import EmojiPicker from '@/components/EmojiPicker.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -70,7 +71,10 @@ async function submit() {
     </div>
     <form class="composer" @submit.prevent="submit">
       <textarea v-model="draft" rows="3" placeholder="支持 Markdown。Enter 发送，Shift+Enter 换行" @keydown.enter.exact.prevent="submit" />
-      <button type="submit" :disabled="sending || !draft.trim() || (!connected && !usingMock)">发送</button>
+      <div class="send-row">
+        <EmojiPicker @insert="(md) => (draft += md)" />
+        <button type="submit" :disabled="sending || !draft.trim() || (!connected && !usingMock)">发送</button>
+      </div>
     </form>
   </section>
 </template>
@@ -157,9 +161,16 @@ span.on {
 }
 .composer {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 12px 16px;
   border-top: 1px solid var(--fp-border);
+}
+.send-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 textarea {
   flex: 1;

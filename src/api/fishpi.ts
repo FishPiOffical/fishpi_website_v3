@@ -202,6 +202,104 @@ export async function updateAvatar(apiKey: string, userAvatarURL: string) {
   if (res.code) throw new Error(res.msg || '更新头像失败')
 }
 
+export interface EmojiItem {
+  name: string
+  url?: string
+  text?: string
+}
+
+function mockEmotions(): EmojiItem[] {
+  return [
+    { name: 'doge', url: 'https://cdn.jsdelivr.net/npm/vditor@3.8.7/dist/images/emoji/doge.png' },
+    { name: 'huaji', url: 'https://cdn.jsdelivr.net/npm/vditor@3.8.7/dist/images/emoji/huaji.gif' },
+    { name: 'smile', text: '😄' },
+    { name: 'thumbsup', text: '👍' },
+  ]
+}
+
+export function emojiToMarkdown(item: EmojiItem) {
+  if (item.url) return `![${item.name}](${item.url})`
+  if (item.text) return item.text
+  return `:${item.name}:`
+}
+
+function parseEmotionValue(name: string, val: unknown): EmojiItem {
+  if (val && typeof val === 'object') {
+    const o = val as { url?: string; name?: string }
+    if (o.url) return { name: o.name || name, url: o.url }
+    return { name, text: `:${name}:` }
+  }
+  const v = String(val ?? '')
+  if (v.startsWith('http')) return { name, url: v }
+  if (v) return { name, text: v }
+  return { name, text: `:${name}:` }
+}
+
+function parseEmotionsPayload(data: unknown): EmojiItem[] {
+  if (Array.isArray(data)) {
+    return data.flatMap((entry) => {
+      if (typeof entry === 'string') {
+        if (entry.startsWith('http')) return [{ name: 'emoji', url: entry }]
+        return [{ name: entry, text: entry.startsWith(':') ? entry : `:${entry}:` }]
+      }
+      if (entry && typeof entry === 'object') {
+        const o = entry as { url?: string; name?: string }
+        if (typeof o.url === 'string' && o.url) {
+          return [{ name: o.name || 'emoji', url: o.url }]
+        }
+        return Object.entries(entry as Record<string, unknown>).map(([n, v]) => parseEmotionValue(n, v))
+      }
+      return []
+    })
+  }
+  if (data && typeof data === 'object') {
+    return Object.entries(data as Record<string, unknown>).map(([n, v]) => parseEmotionValue(n, v))
+  }
+  return []
+}
+
+export async function fetchFrequentEmotions(apiKey: string): Promise<EmojiItem[]> {
+  try {
+    const res = await request<Envelope<unknown>>(withKey('/users/emotions', apiKey))
+    if (res.code) throw new Error(res.msg || '表情失败')
+    const items = parseEmotionsPayload(res.data)
+    if (items.length) return items
+  } catch {
+    /* GET /users/emotions */
+  }
+  return mockEmotions()
+}
+
+export async function fetchEmojiGroups(apiKey: string): Promise<{ oId: string; name?: string }[]> {
+  try {
+    const res = await request<Envelope<{ oId: string; name?: string }[]>>(withKey('/api/emoji/groups', apiKey))
+    if (!res.code && Array.isArray(res.data)) return res.data
+  } catch {
+    /* GET /api/emoji/groups */
+  }
+  return []
+}
+
+export async function fetchGroupEmojis(apiKey: string, groupId: string): Promise<EmojiItem[]> {
+  try {
+    const res = await request<Envelope<unknown>>(
+      withKey(`/api/emoji/group/emojis?groupId=${encodeURIComponent(groupId)}`, apiKey),
+    )
+    if (!res.code) return parseEmotionsPayload(res.data)
+  } catch {
+    /* GET /api/emoji/group/emojis */
+  }
+  return []
+}
+
+export async function transferPoints(apiKey: string, userName: string, amount: number, memo: string) {
+  const res = await request<Envelope<unknown>>('/point/transfer', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, userName, amount, memo }),
+  })
+  if (res.code) throw new Error(res.msg || '转账失败')
+}
+
 function extractUploadUrls(json: unknown): string[] {
   if (!json || typeof json !== 'object') return []
   const o = json as Record<string, unknown>

@@ -29,6 +29,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      host: '127.0.0.1',
+      port: 5173,
+      strictPort: true,
       proxy: {
         '/api': proxy,
         '/chat-room': { ...proxy, ws: true },
@@ -65,6 +68,7 @@ export default defineConfig(({ mode }) => {
             if (req.method === 'GET' || req.method === 'HEAD') return req.url
           },
         },
+        '/point': proxy,
         '/upload': proxy,
         '/register': { ...proxy, bypass: spaGetBypass },
         '/article': { ...proxy, bypass: spaGetBypass },

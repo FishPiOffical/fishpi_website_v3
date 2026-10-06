@@ -7,6 +7,8 @@ npm install
 npm run dev
 ```
 
+开发服务器固定 `http://127.0.0.1:5173`，占用时请先结束旧进程，不会自动换端口。
+
 开发代理默认指向 `https://fishpi.cn`。若本地 Rhythm 在 `8080`，在 `.env.development` 设置：
 
 ```
@@ -21,7 +23,7 @@ VITE_API_TARGET=http://localhost:8080
 - 帖子列表、详情、评论、发帖、点赞/感谢
 - 用户主页、关注、签到/昨日活跃、通知、私信
 - 清风明月（可匿名）
-- 资料编辑、头像/发帖图片上传
+- 资料编辑、头像/发帖图片上传、表情包、积分转账
 - 主题、对话框、头像框：`src/packs` 目录包
 - 广告位 mock：`home.top` `footer.sponsors` `home.sidebar`
 - 聊天室侧边栏模块化

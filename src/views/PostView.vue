@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { postArticle, uploadFiles } from '@/api/fishpi'
+import EmojiPicker from '@/components/EmojiPicker.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -74,9 +75,12 @@ async function insertImage(e: Event) {
       <label v-if="type === 5">悬赏积分<input v-model.number="offer" type="number" min="0" /></label>
       <label>正文（Markdown）<textarea v-model="content" rows="12" required /></label>
       <input ref="fileInput" type="file" accept="image/*" multiple hidden @change="insertImage" />
-      <button type="button" class="ghost" :disabled="uploading" @click="fileInput?.click()">
-        {{ uploading ? '上传中…' : '插入图片' }}
-      </button>
+      <div class="tools">
+        <EmojiPicker @insert="(md) => (content += md)" />
+        <button type="button" class="ghost" :disabled="uploading" @click="fileInput?.click()">
+          {{ uploading ? '上传中…' : '插入图片' }}
+        </button>
+      </div>
       <p v-if="error" class="err">{{ error }}</p>
       <button type="submit" :disabled="sending">{{ sending ? '发布中…' : '发布' }}</button>
     </template>
@@ -123,6 +127,11 @@ button {
   background: transparent;
   border: 1px solid var(--fp-border);
   color: var(--fp-text);
+}
+.tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .hint,
 .err {

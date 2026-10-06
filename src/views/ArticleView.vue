@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchArticle, postComment, thankArticle, voteArticle, type ArticleComment, type ArticleDetail } from '@/api/fishpi'
+import EmojiPicker from '@/components/EmojiPicker.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -155,6 +156,7 @@ function who(c: ArticleComment) {
       <template v-if="isLoggedIn">
         <p v-if="replyId" class="hint">回复评论 {{ replyId }} <button type="button" class="ghost" @click="replyId = ''">取消</button></p>
         <textarea v-model="draft" rows="4" placeholder="支持 Markdown" />
+        <EmojiPicker @insert="(md) => (draft += md)" />
         <p v-if="sendError" class="err">{{ sendError }}</p>
         <button type="submit" :disabled="sending || !draft.trim()">
           {{ sending ? '发送中…' : '发表评论' }}

@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
+import EmojiPicker from '@/components/EmojiPicker.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 
@@ -127,6 +128,7 @@ async function sendPacket() {
           @keydown="onComposerKey"
         />
         <div class="actions">
+          <EmojiPicker @insert="(md) => (draft += md)" />
           <button type="button" class="ghost" @click="showPacket = !showPacket">红包</button>
           <button type="submit" :disabled="sending || !draft.trim()">发送</button>
         </div>
@@ -227,8 +229,10 @@ header span.on {
 }
 .actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
 textarea {
   flex: 1;
