@@ -96,6 +96,14 @@ export default defineConfig(({ mode }) => {
             if (req.method === 'GET' || req.method === 'HEAD') return req.url
           },
         },
+        '/cr': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            if (path.startsWith('/cr/raw/')) return
+            if (req.method === 'GET' || req.method === 'HEAD') return req.url
+          },
+        },
         '/register': { ...proxy, bypass: spaGetBypass },
         '/article-channel': { ...proxy, ws: true },
         '/article': {

@@ -2,6 +2,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import {
+  fetchChatRaw,
+} from '@/api/fishpi'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import MentionSuggest from '@/components/MentionSuggest.vue'
@@ -25,6 +28,8 @@ const packetTo = ref('')
 const gesture = ref(0)
 const showPacket = ref(false)
 const pendingGesture = ref<string | null>(null)
+const rawText = ref('')
+const rawLoading = ref(false)
 
 const me = computed(() => account.value?.userName)
 
@@ -92,6 +97,19 @@ function packetLabel(type?: string) {
   if (type === 'rockPaperScissors') return '猜拳红包'
   return '拼手气红包'
 }
+
+async function showRaw(oId: string) {
+  if (!auth.apiKey) return
+  rawLoading.value = true
+  rawText.value = ''
+  try {
+    rawText.value = await fetchChatRaw(auth.apiKey, oId)
+  } catch (e) {
+    rawText.value = e instanceof Error ? e.message : '无法读取原文'
+  } finally {
+    rawLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -103,6 +121,11 @@ function packetLabel(type?: string) {
       </header>
       <p v-if="error" class="err">{{ error }}</p>
       <p v-if="lastPacket" class="tip">{{ lastPacket }}</p>
+      <div v-if="rawText || rawLoading" class="detail">
+        <p>{{ rawLoading ? '读取原文…' : '消息原文' }}</p>
+        <pre>{{ rawText }}</pre>
+        <button type="button" class="ghost" @click="rawText = ''">关闭</button>
+      </div>
       <div v-if="packetDetail" class="detail">
         <p>{{ packetDetail.msg || '领取明细' }}</p>
         <ul>
@@ -153,6 +176,7 @@ function packetLabel(type?: string) {
                 撤回
               </button>
               <button type="button" class="ghost tiny" @click="chat.loadAround(msg.oId)">附近</button>
+              <button v-if="!msg.redPacket" type="button" class="ghost tiny" @click="showRaw(msg.oId)">原文</button>
               <ReportDialog v-if="msg.userName !== me && auth.apiKey" :api-key="auth.apiKey" :data-id="msg.oId" :data-type="3" />
             </div>
             <div v-if="msg.redPacket" class="fp-bubble packet">
@@ -384,6 +408,13 @@ textarea {
 .detail ul {
   margin: 6px 0;
   padding-left: 18px;
+}
+.detail pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 6px 0;
+  max-height: 160px;
+  overflow: auto;
 }
 @media (max-width: 960px) {
   .cr {

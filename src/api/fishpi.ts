@@ -14,7 +14,7 @@ import {
   mockWhisperMessages,
   type DomainItem,
 } from './catalog'
-import { request, withKey } from './http'
+import { request, requestText, withKey } from './http'
 
 export type { DomainItem }
 
@@ -755,6 +755,61 @@ export async function fetchOnlineRank(apiKey?: string | null): Promise<RankUser[
     /* anonymous top not ready */
   }
   return mockOnline()
+}
+
+export interface LiteUser {
+  oId?: string
+  userName: string
+  userNickname?: string
+  userAvatarURL?: string
+  userAvatarURL48?: string
+}
+
+export async function fetchRecentRegister(apiKey?: string | null) {
+  try {
+    const res = await request<Envelope<LiteUser[]>>(withKey('/api/user/recentReg', apiKey))
+    const list = Array.isArray(res.data) ? res.data : []
+    return list.filter((u) => u?.userName).slice(0, 20)
+  } catch {
+    return []
+  }
+}
+
+export interface ProfessionRankEntry {
+  rank?: number
+  userName?: string
+  userNickname?: string
+  professionId?: string
+  professionName?: string
+  displayName?: string
+  levelName?: string
+  totalExperience?: number
+}
+
+export interface ProfessionRanking {
+  selectedProfession?: { professionId?: string; displayName?: string; professionName?: string }
+  professions?: { professionId?: string; displayName?: string; professionName?: string }[]
+  entries?: ProfessionRankEntry[]
+}
+
+export async function fetchProfessionRanking(apiKey?: string | null, professionId?: string) {
+  const q = new URLSearchParams({ dark: 'false' })
+  if (professionId) q.set('professionId', professionId)
+  const res = await request<Envelope<ProfessionRanking>>(withKey(`/api/profession/ranking?${q}`, apiKey))
+  if (res.code) throw new Error(res.msg || '职业榜加载失败')
+  return res.data ?? { entries: [], professions: [] }
+}
+
+export async function fetchBarrageCost(apiKey?: string | null) {
+  const res = await request<Envelope<string | { cost?: number }>>(withKey('/chat-room/barrager/get', apiKey))
+  if (typeof res.data === 'string' && res.data) return res.data
+  if (res.data && typeof res.data === 'object' && res.data.cost != null) return `${res.data.cost}积分`
+  return String(res.msg || '')
+}
+
+export async function fetchChatRaw(apiKey: string, oId: string) {
+  const text = await requestText(withKey(`/cr/raw/${encodeURIComponent(oId)}`, apiKey))
+  return text.split('<!--')[0].trim()
 }
 
 export async function postArticle(

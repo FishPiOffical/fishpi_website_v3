@@ -7,7 +7,9 @@ import {
   fetchOnlineRank,
   fetchRandomArticles,
   fetchRecentArticles,
+  fetchRecentRegister,
   type ArticleSummary,
+  type LiteUser,
   type RankUser,
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
@@ -21,6 +23,7 @@ const right = ref<ArticleSummary[]>([])
 const checkin = ref<RankUser[]>([])
 const online = ref<RankUser[]>([])
 const randoms = ref<ArticleSummary[]>([])
+const newcomers = ref<LiteUser[]>([])
 const error = ref('')
 const loading = ref(false)
 
@@ -36,16 +39,18 @@ async function load() {
   error.value = ''
   loading.value = true
   try {
-    const [articles, checkinRank, onlineRank, randomList] = await Promise.all([
+    const [articles, checkinRank, onlineRank, randomList, recentUsers] = await Promise.all([
       fetchRecentArticles(apiKey.value, 1, 40),
       fetchCheckinRank(apiKey.value),
       fetchOnlineRank(apiKey.value),
       fetchRandomArticles(8, apiKey.value),
+      fetchRecentRegister(apiKey.value),
     ])
     splitArticles(articles)
     checkin.value = checkinRank.slice(0, 8)
     online.value = onlineRank.slice(0, 8)
     randoms.value = randomList
+    newcomers.value = recentUsers.slice(0, 12)
   } catch (e) {
     error.value = e instanceof Error ? e.message : '首页加载失败'
   } finally {
@@ -109,6 +114,16 @@ function views(a: ArticleSummary) {
           <ol>
             <li v-for="item in randoms" :key="item.oId">
               <RouterLink :to="`/article/${item.oId}`">{{ item.articleTitleEmoj || item.articleTitle }}</RouterLink>
+            </li>
+          </ol>
+        </div>
+        <div v-if="newcomers.length" class="card">
+          <header>
+            <h3>最近注册</h3>
+          </header>
+          <ol>
+            <li v-for="u in newcomers" :key="u.userName">
+              <RouterLink :to="`/member/${u.userName}`">{{ u.userNickname || u.userName }}</RouterLink>
             </li>
           </ol>
         </div>

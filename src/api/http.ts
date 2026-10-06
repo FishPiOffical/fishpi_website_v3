@@ -50,6 +50,19 @@ export async function request<T = unknown>(
   return data
 }
 
+export async function requestText(path: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers)
+  if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
+  const res = await fetch(path, {
+    ...init,
+    credentials: init.credentials ?? 'include',
+    headers,
+  })
+  const text = await res.text()
+  if (!res.ok) throw new ApiError(text.slice(0, 120) || '请求失败', res.status)
+  return text
+}
+
 export function withKey(path: string, apiKey?: string | null) {
   if (!apiKey) return path
   const join = path.includes('?') ? '&' : '?'

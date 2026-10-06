@@ -2,13 +2,23 @@
 import { RouterLink } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { fetchCheckinRank, fetchOnlineRank, type RankUser } from '@/api/fishpi'
+import {
+  fetchCheckinRank,
+  fetchOnlineRank,
+  fetchProfessionRanking,
+  type ProfessionRankEntry,
+  type RankUser,
+} from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const { apiKey } = storeToRefs(auth)
 const checkin = ref<RankUser[]>([])
 const online = ref<RankUser[]>([])
+const jobs = ref<{ professionId?: string; displayName?: string; professionName?: string }[]>([])
+const jobId = ref('')
+const jobEntries = ref<ProfessionRankEntry[]>([])
+const jobError = ref('')
 const error = ref('')
 const loading = ref(false)
 
@@ -26,6 +36,21 @@ async function load() {
     error.value = e instanceof Error ? e.message : '排行榜加载失败'
   } finally {
     loading.value = false
+  }
+  await loadJobs()
+}
+
+async function loadJobs() {
+  jobError.value = ''
+  try {
+    const data = await fetchProfessionRanking(apiKey.value, jobId.value || undefined)
+    jobs.value = data.professions || []
+    jobEntries.value = data.entries || []
+    const selected = data.selectedProfession?.professionId
+    if (!jobId.value && selected) jobId.value = selected
+  } catch (e) {
+    jobError.value = e instanceof Error ? e.message : '职业榜加载失败'
+    jobEntries.value = []
   }
 }
 
@@ -59,6 +84,30 @@ watch(apiKey, () => void load(), { immediate: true })
         </li>
       </ol>
     </section>
+    <section class="card jobs">
+      <h1>职业成长榜</h1>
+      <p v-if="jobError" class="err">{{ jobError }}</p>
+      <div v-if="jobs.length" class="tabs">
+        <button
+          v-for="job in jobs"
+          :key="job.professionId || job.displayName"
+          type="button"
+          :class="{ on: jobId === job.professionId }"
+          @click="jobId = job.professionId || ''; void loadJobs()"
+        >
+          {{ job.displayName || job.professionName }}
+        </button>
+      </div>
+      <ol>
+        <li v-for="(u, i) in jobEntries" :key="(u.userName || '') + i">
+          <i>{{ u.rank || i + 1 }}</i>
+          <RouterLink v-if="u.userName" :to="`/member/${u.userName}`">{{ u.userNickname || u.userName }}</RouterLink>
+          <span v-else>—</span>
+          <em>{{ u.levelName }} {{ u.totalExperience != null ? u.totalExperience : '' }}</em>
+        </li>
+      </ol>
+      <p v-if="!jobError && !jobEntries.length" class="hint">暂无职业榜数据。</p>
+    </section>
   </div>
 </template>
 
@@ -67,6 +116,32 @@ watch(apiKey, () => void load(), { immediate: true })
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+.jobs {
+  grid-column: 1 / -1;
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.tabs button {
+  border: 1px solid var(--fp-border);
+  background: transparent;
+  color: var(--fp-text);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.tabs button.on {
+  background: var(--fp-primary);
+  color: #fff;
+  border-color: transparent;
+}
+.hint {
+  color: var(--fp-muted);
+  font-size: 13px;
 }
 .banner {
   grid-column: 1 / -1;
