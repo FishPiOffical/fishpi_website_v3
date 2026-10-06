@@ -1,0 +1,7 @@
+{
+  "id": "gold",
+  "kind": "frame",
+  "name": "金纹",
+  "vip": true,
+  "preview": "conic-gradient(#f6c85f,#fff3c4,#f6c85f)"
+}

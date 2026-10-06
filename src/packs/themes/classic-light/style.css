@@ -1,0 +1,13 @@
+html[data-theme='classic-light'] {
+  --fp-bg: #eef1f4;
+  --fp-nav: #ffffff;
+  --fp-card: #ffffff;
+  --fp-text: #1f2328;
+  --fp-muted: #6b7280;
+  --fp-primary: #2f8a7b;
+  --fp-link: #1d6b60;
+  --fp-border: #d8dee6;
+  --fp-hover: #f3f5f7;
+  --fp-self: #d7efe9;
+  color-scheme: light;
+}

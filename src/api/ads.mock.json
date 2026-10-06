@@ -1,0 +1,50 @@
+[
+  {
+    "id": "home-top-1",
+    "slotKey": "home.top",
+    "type": "image",
+    "title": "TPanel 企业级 AI 网关",
+    "imageUrl": "https://file.fishpi.cn/logo.png",
+    "linkUrl": "https://fishpi.cn/",
+    "badge": "广告",
+    "enabled": true,
+    "sort": 10
+  },
+  {
+    "id": "footer-1",
+    "slotKey": "footer.sponsors",
+    "type": "link",
+    "title": "油猴中文网",
+    "linkUrl": "https://bbs.tampermonkey.net.cn/",
+    "enabled": true,
+    "sort": 10
+  },
+  {
+    "id": "footer-2",
+    "slotKey": "footer.sponsors",
+    "type": "link",
+    "title": "论道社区",
+    "linkUrl": "https://www.esobole.com/",
+    "enabled": true,
+    "sort": 20
+  },
+  {
+    "id": "footer-3",
+    "slotKey": "footer.sponsors",
+    "type": "link",
+    "title": "NBtab 新标签页",
+    "linkUrl": "https://www.nbtab.cn/",
+    "enabled": true,
+    "sort": 30
+  },
+  {
+    "id": "sidebar-1",
+    "slotKey": "home.sidebar",
+    "type": "html",
+    "title": "下载客户端",
+    "html": "<p>随时随地摸鱼，下载摸鱼派客户端。</p>",
+    "linkUrl": "https://fishpi.cn/download",
+    "enabled": true,
+    "sort": 10
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "id": "classic",
+  "kind": "bubble",
+  "name": "默认气泡",
+  "vip": false,
+  "preview": "linear-gradient(#3a3d44,#2f5d55)"
+}

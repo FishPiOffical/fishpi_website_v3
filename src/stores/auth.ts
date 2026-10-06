@@ -1,0 +1,64 @@
+import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
+import { fetchAccount, fetchMembership, login as loginApi, type AccountInfo } from '@/api/fishpi'
+
+const KEY = 'fp.apiKey'
+
+export const useAuthStore = defineStore('auth', () => {
+  const apiKey = ref<string | null>(localStorage.getItem(KEY))
+  const account = ref<AccountInfo | null>(null)
+  const isVip = ref(false)
+  const loading = ref(false)
+  const error = ref('')
+
+  const isLoggedIn = computed(() => Boolean(apiKey.value && account.value))
+
+  async function restore() {
+    if (!apiKey.value) return
+    try {
+      account.value = await fetchAccount(apiKey.value)
+      await refreshMembership()
+    } catch {
+      logout()
+    }
+  }
+
+  async function refreshMembership() {
+    if (!account.value?.oId) {
+      isVip.value = false
+      return
+    }
+    try {
+      const m = await fetchMembership(account.value.oId)
+      isVip.value = m.isVip
+    } catch {
+      isVip.value = false
+    }
+  }
+
+  async function login(username: string, passwd: string, mfaCode = '') {
+    loading.value = true
+    error.value = ''
+    try {
+      const key = await loginApi(username, passwd, mfaCode)
+      apiKey.value = key
+      localStorage.setItem(KEY, key)
+      account.value = await fetchAccount(key)
+      await refreshMembership()
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '登录失败'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function logout() {
+    apiKey.value = null
+    account.value = null
+    isVip.value = false
+    localStorage.removeItem(KEY)
+  }
+
+  return { apiKey, account, isVip, loading, error, isLoggedIn, restore, login, logout, refreshMembership }
+})

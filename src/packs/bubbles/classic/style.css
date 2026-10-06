@@ -1,0 +1,9 @@
+html[data-bubble='classic'] .fp-bubble {
+  background: var(--fp-hover);
+  border-radius: 12px 12px 12px 4px;
+}
+
+html[data-bubble='classic'] .fp-msg.is-self .fp-bubble {
+  background: var(--fp-self);
+  border-radius: 12px 12px 4px 12px;
+}

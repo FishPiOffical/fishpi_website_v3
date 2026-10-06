@@ -1,0 +1,7 @@
+{
+  "id": "candy",
+  "kind": "bubble",
+  "name": "糖果",
+  "vip": true,
+  "preview": "linear-gradient(#ff9ec7,#ffe6a7)"
+}

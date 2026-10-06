@@ -1,0 +1,12 @@
+html[data-bubble='candy'] .fp-bubble {
+  background: linear-gradient(180deg, #fff3f8, #ffd6e7);
+  color: #5b2742;
+  border-radius: 18px;
+  box-shadow: 0 6px 0 #f3a0bf;
+}
+
+html[data-bubble='candy'] .fp-msg.is-self .fp-bubble {
+  background: linear-gradient(180deg, #fff4d6, #ffd9a0);
+  color: #5a3b12;
+  box-shadow: 0 6px 0 #e8b56a;
+}
