@@ -36,6 +36,13 @@ const router = createRouter({
     { path: '/domains', component: () => import('@/views/DomainView.vue') },
     { path: '/breezemoons', component: () => import('@/views/BreezemoonView.vue') },
     { path: '/top', component: () => import('@/views/TopView.vue') },
+    { path: '/member/:userName', name: 'member', component: () => import('@/views/MemberView.vue') },
+    {
+      path: '/notifications',
+      name: 'notifications',
+      component: () => import('@/views/NotificationsView.vue'),
+      meta: { auth: true },
+    },
     { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
   ],
 })

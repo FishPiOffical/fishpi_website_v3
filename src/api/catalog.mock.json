@@ -156,5 +156,78 @@
       "domainArticleCount": 2,
       "domainTags": "摸鱼派,活动,系统公告"
     }
-  ]
+  ],
+  "profiles": {
+    "adlered": {
+      "oId": "mock-u-adlered",
+      "userName": "adlered",
+      "userNickname": "摸鱼派",
+      "userIntro": "社区创始人（mock 资料，字段对齐 GET /user/{userName}）",
+      "userPoint": 99999,
+      "userArticleCount": 1,
+      "userCommentCount": 88,
+      "followingUserCount": 6,
+      "onlineMinute": 120000,
+      "userAppRole": 0,
+      "canFollow": "yes"
+    },
+    "Yui": {
+      "oId": "mock-u-yui",
+      "userName": "Yui",
+      "userNickname": "Yui",
+      "userIntro": "欢迎新人。",
+      "userPoint": 52000,
+      "userArticleCount": 1,
+      "userCommentCount": 40,
+      "followingUserCount": 12,
+      "onlineMinute": 80000,
+      "canFollow": "yes"
+    }
+  },
+  "notifications": {
+    "commented": [
+      {
+        "hasRead": false,
+        "commentAuthorName": "Yui",
+        "commentArticleTitle": "『新人手册』摸鱼派是个什么样的社区",
+        "commentContent": "<p>欢迎新人。</p>",
+        "commentSharpURL": "/article/mock-1001",
+        "commentCreateTime": "Sun Oct 05 12:00:00 CST 2026"
+      }
+    ],
+    "reply": [],
+    "at": [
+      {
+        "hasRead": false,
+        "userName": "imlinhanchao",
+        "content": "@fishpi 看一下织言比赛",
+        "createTime": "Mon Oct 06 09:00:00 CST 2026"
+      }
+    ],
+    "following": [
+      {
+        "hasRead": true,
+        "articleTitle": "【织言】互动小说创作大赛",
+        "authorName": "imlinhanchao",
+        "url": "/article/mock-1002",
+        "isComment": false,
+        "createTime": "Sat Oct 04 18:00:00 CST 2026"
+      }
+    ],
+    "point": [
+      {
+        "hasRead": true,
+        "description": "<p>签到奖励 50 积分</p>",
+        "createTime": "Tue Oct 06 08:00:00 CST 2026"
+      }
+    ],
+    "broadcast": [],
+    "sys-announce": [
+      {
+        "hasRead": true,
+        "description": "<p>匿名通知接口未开放时的系统公告 mock。</p>",
+        "createTime": "Mon Oct 06 00:00:00 CST 2026"
+      }
+    ]
+  }
 }

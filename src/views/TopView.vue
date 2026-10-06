@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { fetchCheckinRank, fetchOnlineRank, type RankUser } from '@/api/fishpi'
@@ -43,7 +44,7 @@ watch(apiKey, () => void load(), { immediate: true })
       <ol>
         <li v-for="(u, i) in checkin" :key="u.userName">
           <i>{{ i + 1 }}</i>
-          {{ u.userName }}
+          <RouterLink :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
           <em>{{ u.userCheckinStreak }}</em>
         </li>
       </ol>
@@ -53,7 +54,7 @@ watch(apiKey, () => void load(), { immediate: true })
       <ol>
         <li v-for="(u, i) in online" :key="u.userName">
           <i>{{ i + 1 }}</i>
-          {{ u.userName }}
+          <RouterLink :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
           <em>{{ Number(u.onlineMinute || 0).toLocaleString() }} 分钟</em>
         </li>
       </ol>
@@ -92,6 +93,11 @@ li {
   gap: 8px;
   padding: 6px 0;
   font-size: 14px;
+}
+li a {
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
 }
 i,
 em {

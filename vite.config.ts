@@ -41,6 +41,18 @@ export default defineConfig(({ mode }) => {
         '/breezemoon': proxy,
         '/follow': proxy,
         '/unfollow': proxy,
+        '/user': proxy,
+        '/users': proxy,
+        '/activity': proxy,
+        '/notifications': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0]
+            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/notifications' || path === '/notifications/')) {
+              return req.url
+            }
+          },
+        },
         '/register': { ...proxy, bypass: spaGetBypass },
         '/article': { ...proxy, bypass: spaGetBypass },
       },

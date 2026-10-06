@@ -11,6 +11,7 @@ import {
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import AdSlot from '@/components/ads/AdSlot.vue'
+import CheckinPanel from '@/components/home/CheckinPanel.vue'
 
 const auth = useAuthStore()
 const { apiKey, isLoggedIn } = storeToRefs(auth)
@@ -101,6 +102,7 @@ function views(a: ArticleSummary) {
           <b>¥{{ income }}</b>
         </div>
         <AdSlot slot-key="home.sidebar" />
+        <CheckinPanel />
         <div class="card">
           <header>
             <h3>今日连签排行</h3>
@@ -108,7 +110,7 @@ function views(a: ArticleSummary) {
           <ol class="rank">
             <li v-for="(u, i) in checkin" :key="u.userName">
               <i>{{ i + 1 }}</i>
-              {{ u.userName }}
+              <RouterLink :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
               <em>{{ u.userCheckinStreak }}</em>
             </li>
           </ol>
@@ -120,7 +122,7 @@ function views(a: ArticleSummary) {
           <ol class="rank">
             <li v-for="(u, i) in online" :key="u.userName">
               <i>{{ i + 1 }}</i>
-              {{ u.userName }}
+              <RouterLink :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
               <em>{{ Number(u.onlineMinute || 0).toLocaleString() }} 分钟</em>
             </li>
           </ol>
@@ -221,6 +223,11 @@ ol {
   gap: 8px;
   padding: 6px 0;
   font-size: 13px;
+}
+.rank a {
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
 }
 .rank i {
   font-style: normal;

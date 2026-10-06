@@ -109,7 +109,10 @@ function who(c: ArticleComment) {
     <article class="card post">
       <h1>{{ article.articleTitleEmoj || article.articleTitle }}</h1>
       <p class="meta">
-        <span>{{ article.articleAuthorName }}</span>
+        <RouterLink v-if="article.articleAuthorName" :to="`/member/${article.articleAuthorName}`">{{
+          article.articleAuthorName
+        }}</RouterLink>
+        <span v-else>匿名</span>
         <span>{{ article.articleCreateTimeStr || article.timeAgo }}</span>
         <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
         <span>{{ article.articleCommentCount ?? comments.length }} 评</span>
@@ -129,7 +132,7 @@ function who(c: ArticleComment) {
     <section v-if="nice.length" class="card">
       <h2>优质回帖</h2>
       <div v-for="c in nice" :key="'n' + c.oId" class="cmt">
-        <b>{{ who(c) }}</b>
+        <b><RouterLink :to="`/member/${who(c)}`">{{ who(c) }}</RouterLink></b>
         <div class="cmt-body" v-html="c.commentContent || ''" />
       </div>
     </section>
@@ -138,7 +141,7 @@ function who(c: ArticleComment) {
       <h2>评论 {{ comments.length }}</h2>
       <div v-for="c in comments" :key="c.oId" class="cmt">
         <header>
-          <b>{{ who(c) }}</b>
+          <b><RouterLink :to="`/member/${who(c)}`">{{ who(c) }}</RouterLink></b>
           <time>{{ c.commentCreateTimeStr || c.timeAgo }}</time>
           <button v-if="isLoggedIn" type="button" class="ghost" @click="replyId = c.oId">回复</button>
         </header>
@@ -197,6 +200,10 @@ h2 {
   flex-wrap: wrap;
   gap: 12px;
 }
+.meta a {
+  color: var(--fp-link);
+  text-decoration: none;
+}
 .actions {
   display: flex;
   gap: 8px;
@@ -240,6 +247,10 @@ h2 {
   color: var(--fp-muted);
   font-size: 12px;
   margin-bottom: 6px;
+}
+.cmt header a {
+  color: inherit;
+  text-decoration: none;
 }
 .composer textarea {
   width: 100%;

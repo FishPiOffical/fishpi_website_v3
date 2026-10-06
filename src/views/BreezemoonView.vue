@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
 import { onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { fetchBreezemoons, postBreezemoon, type Breezemoon } from '@/api/fishpi'
@@ -55,7 +56,7 @@ async function submit() {
         <img v-if="item.breezemoonAuthorThumbnailURL48" :src="item.breezemoonAuthorThumbnailURL48" alt="" />
         <div>
           <header>
-            <b>{{ item.breezemoonAuthorName }}</b>
+            <b><RouterLink v-if="item.breezemoonAuthorName" :to="`/member/${item.breezemoonAuthorName}`">{{ item.breezemoonAuthorName }}</RouterLink></b>
             <time>{{ item.timeAgo }}</time>
             <span v-if="item.breezemoonCity">{{ item.breezemoonCity }}</span>
           </header>
@@ -109,6 +110,10 @@ header {
   gap: 8px;
   align-items: center;
   margin-bottom: 4px;
+}
+header a {
+  color: inherit;
+  text-decoration: none;
 }
 .body :deep(p) {
   margin: 0;

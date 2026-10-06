@@ -1,4 +1,11 @@
-import type { ArticleDetail, ArticleSummary, RankUser } from '@/api/fishpi'
+import type {
+  ArticleDetail,
+  ArticleSummary,
+  NoticeItem,
+  NoticeType,
+  RankUser,
+  UserProfile,
+} from '@/api/fishpi'
 import catalog from './catalog.mock.json' with { type: 'json' }
 
 export interface DomainItem {
@@ -15,6 +22,8 @@ interface CatalogFile {
   checkin: RankUser[]
   online: RankUser[]
   domains: DomainItem[]
+  profiles?: Record<string, Partial<UserProfile> & { userName: string }>
+  notifications?: Record<string, NoticeItem[]>
 }
 
 const data = catalog as CatalogFile
@@ -78,4 +87,57 @@ export function mockOnline() {
 
 export function mockDomains() {
   return data.domains
+}
+
+export function mockProfile(userName: string): UserProfile {
+  const extra = data.profiles?.[userName]
+  const articles = data.articles.filter((a) => a.articleAuthorName === userName)
+  return {
+    oId: extra?.oId || `mock-u-${userName}`,
+    userName,
+    userNickname: extra?.userNickname || userName,
+    userIntro: extra?.userIntro || `${userName} 的 mock 主页，字段对齐 GET /user/{userName}。`,
+    userPoint: extra?.userPoint ?? 1000,
+    userArticleCount: extra?.userArticleCount ?? articles.length,
+    userCommentCount: extra?.userCommentCount ?? 0,
+    followingUserCount: extra?.followingUserCount ?? 0,
+    onlineMinute: extra?.onlineMinute ?? 0,
+    userAppRole: extra?.userAppRole ?? 0,
+    canFollow: extra?.canFollow || 'yes',
+    userAvatarURL: extra?.userAvatarURL,
+  }
+}
+
+export function mockUserArticles(userName: string, page = 1, size = 40) {
+  return mockPage(
+    data.articles.filter((a) => a.articleAuthorName === userName),
+    page,
+    size,
+  )
+}
+
+export function mockNotifications(type: NoticeType): NoticeItem[] {
+  return data.notifications?.[type] || []
+}
+
+export function mockUnreadCount() {
+  const n = data.notifications || {}
+  const cnt = (t: string) => (n[t] || []).filter((x) => x.hasRead === false).length
+  return {
+    unreadCommentedNotificationCnt: cnt('commented'),
+    unreadReplyNotificationCnt: cnt('reply'),
+    unreadAtNotificationCnt: cnt('at'),
+    unreadFollowingNotificationCnt: cnt('following'),
+    unreadPointNotificationCnt: cnt('point'),
+    unreadBroadcastNotificationCnt: cnt('broadcast'),
+    unreadSysAnnounceNotificationCnt: cnt('sys-announce'),
+    unreadNotificationCnt:
+      cnt('commented') +
+      cnt('reply') +
+      cnt('at') +
+      cnt('following') +
+      cnt('point') +
+      cnt('broadcast') +
+      cnt('sys-announce'),
+  }
 }

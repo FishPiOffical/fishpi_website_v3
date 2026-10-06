@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
+import { useNoticeStore } from '@/stores/notices'
 import AdSlot from '@/components/ads/AdSlot.vue'
 
 const nav = [
@@ -21,7 +23,19 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const appearance = useAppearanceStore()
+const notices = useNoticeStore()
 const { isLoggedIn, account } = storeToRefs(auth)
+const { total: unreadTotal } = storeToRefs(notices)
+const memberPath = computed(() => (account.value?.userName ? `/member/${account.value.userName}` : '/login'))
+
+watch(
+  () => auth.apiKey,
+  (key) => {
+    if (key) void notices.refresh()
+    else notices.clear()
+  },
+  { immediate: true },
+)
 
 function onSearch(e: Event) {
   const q = (e.target as HTMLInputElement).value.trim()
@@ -50,7 +64,11 @@ function logout() {
       <div class="user">
         <template v-if="isLoggedIn">
           <RouterLink to="/post">发帖</RouterLink>
-          <span>{{ account?.userName }}</span>
+          <RouterLink to="/notifications">
+            通知
+            <em v-if="unreadTotal" class="badge">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</em>
+          </RouterLink>
+          <RouterLink :to="memberPath">{{ account?.userName }}</RouterLink>
           <button type="button" @click="logout">退出</button>
         </template>
         <template v-else>
@@ -131,6 +149,20 @@ nav a:hover {
 .user a {
   color: var(--fp-link);
   text-decoration: none;
+  position: relative;
+}
+.badge {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #c45c4a;
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  text-align: center;
 }
 .user button,
 .ghost {

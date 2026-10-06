@@ -27,7 +27,7 @@ function views(a: ArticleSummary) {
       <span v-if="item.articleType === 5" class="tag">问</span>
       <span v-if="Number(item.articlePerfect) === 1" class="tag perfect">优</span>
       <RouterLink :to="`/article/${item.oId}`">{{ titleOf(item) }}</RouterLink>
-      <em>{{ item.articleAuthorName }}</em>
+      <em><RouterLink :to="`/member/${item.articleAuthorName}`">{{ item.articleAuthorName }}</RouterLink></em>
       <em>{{ views(item) }}</em>
     </li>
   </ol>
@@ -47,7 +47,7 @@ function views(a: ArticleSummary) {
   border-bottom: 1px solid var(--fp-border);
   font-size: 14px;
 }
-.feed a {
+.feed li > a {
   flex: 1;
   color: var(--fp-text);
   text-decoration: none;
@@ -59,6 +59,10 @@ function views(a: ArticleSummary) {
   color: var(--fp-muted);
   font-style: normal;
   font-size: 12px;
+}
+.feed em a {
+  color: var(--fp-muted);
+  text-decoration: none;
 }
 .empty {
   color: var(--fp-muted);

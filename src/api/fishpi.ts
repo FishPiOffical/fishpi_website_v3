@@ -4,7 +4,11 @@ import {
   mockCheckin,
   mockDomains,
   mockFeed,
+  mockNotifications,
   mockOnline,
+  mockProfile,
+  mockUnreadCount,
+  mockUserArticles,
   type DomainItem,
 } from './catalog'
 import { request, withKey } from './http'
@@ -17,6 +21,58 @@ export interface AccountInfo {
   userNickname?: string
   userAvatarURL?: string
   userPoint?: number
+}
+
+export interface UserProfile {
+  oId: string
+  userName: string
+  userNickname?: string
+  userAvatarURL?: string
+  userIntro?: string
+  userURL?: string
+  userPoint?: number
+  userArticleCount?: number
+  userCommentCount?: number
+  followingUserCount?: number
+  onlineMinute?: number
+  userAppRole?: number
+  canFollow?: string
+  userTags?: string
+  userCity?: string
+}
+
+export type NoticeType = 'commented' | 'reply' | 'at' | 'following' | 'point' | 'broadcast' | 'sys-announce'
+
+export interface NoticeItem {
+  hasRead?: boolean
+  description?: string
+  createTime?: string
+  commentAuthorName?: string
+  commentAuthorThumbnailURL?: string
+  commentContent?: string
+  commentArticleTitle?: string
+  commentSharpURL?: string
+  commentCreateTime?: string
+  userName?: string
+  userAvatarURL?: string
+  content?: string
+  articleTitle?: string
+  authorName?: string
+  url?: string
+  isComment?: boolean
+  thumbnailURL?: string
+}
+
+export interface UnreadCount {
+  unreadNotificationCnt?: number
+  unreadReplyNotificationCnt?: number
+  unreadPointNotificationCnt?: number
+  unreadAtNotificationCnt?: number
+  unreadBroadcastNotificationCnt?: number
+  unreadSysAnnounceNotificationCnt?: number
+  unreadNewFollowerNotificationCnt?: number
+  unreadFollowingNotificationCnt?: number
+  unreadCommentedNotificationCnt?: number
 }
 
 export interface ArticleSummary {
@@ -356,6 +412,117 @@ export async function finishRegister(payload: {
     }),
   })
   if (res.code) throw new Error(res.msg || '注册失败')
+}
+
+export async function fetchUserProfile(userName: string, apiKey?: string | null): Promise<UserProfile> {
+  const paths = [`/user/${encodeURIComponent(userName)}`, `/api/user/${encodeURIComponent(userName)}`]
+  for (const path of paths) {
+    try {
+      const res = await request<UserProfile & Envelope<UserProfile>>(withKey(path, apiKey))
+      if (res.userName) return res
+      if (res.code === 0 && res.data?.userName) return res.data
+    } catch {
+      /* try next */
+    }
+  }
+  return mockProfile(userName)
+}
+
+export async function fetchUserArticles(userName: string, apiKey?: string | null, page = 1, size = 40) {
+  const fromApi = await unwrapArticles(
+    `/api/user/${encodeURIComponent(userName)}/articles?p=${page}&size=${size}`,
+    apiKey,
+  )
+  if (fromApi.length) return fromApi
+  return mockUserArticles(userName, page, size)
+}
+
+export async function followUser(apiKey: string, followingId: string) {
+  const res = await request<Envelope<unknown>>('/follow/user', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, followingId }),
+  })
+  if (res.code) throw new Error(res.msg || '关注失败')
+}
+
+export async function unfollowUser(apiKey: string, followingId: string) {
+  const res = await request<Envelope<unknown>>('/unfollow/user', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, followingId }),
+  })
+  if (res.code) throw new Error(res.msg || '取消关注失败')
+}
+
+export async function fetchCheckedIn(apiKey: string) {
+  const res = await request<{ checkedIn?: boolean }>(withKey('/user/checkedIn', apiKey))
+  return Boolean(res.checkedIn)
+}
+
+export async function dailyCheckin(apiKey: string) {
+  const paths = ['/activity/daily-checkin-api', '/user/checkin']
+  let last = '签到失败'
+  for (const path of paths) {
+    try {
+      const res = await request<{ code?: number; random?: number; msg?: string }>(withKey(path, apiKey))
+      if (typeof res.random === 'number') return res.random
+      if (res.code && res.code !== 0) {
+        last = res.msg || last
+        continue
+      }
+      return Number(res.random ?? 0)
+    } catch (e) {
+      last = e instanceof Error ? e.message : last
+    }
+  }
+  throw new Error(last.includes('非 JSON') ? '签到领取接口尚未开放（GET /activity/daily-checkin-api）' : last)
+}
+
+export async function fetchLiveness(apiKey: string) {
+  const res = await request<{ liveness?: number }>(withKey('/user/liveness', apiKey))
+  return Number(res.liveness ?? 0)
+}
+
+export async function fetchCollectedLiveness(apiKey: string) {
+  const res = await request<{ isCollectedYesterdayLivenessReward?: boolean }>(
+    withKey('/api/activity/is-collected-liveness', apiKey),
+  )
+  return Boolean(res.isCollectedYesterdayLivenessReward)
+}
+
+export async function rewardLiveness(apiKey: string) {
+  const res = await request<{ sum?: number }>(withKey('/activity/yesterday-liveness-reward-api', apiKey))
+  return Number(res.sum ?? -1)
+}
+
+export async function fetchUnreadCount(apiKey: string): Promise<UnreadCount> {
+  try {
+    const res = await request<UnreadCount & Envelope<UnreadCount>>(withKey('/notifications/unread/count', apiKey))
+    if (typeof res.unreadNotificationCnt === 'number') return res
+    if (res.data && typeof res.data.unreadNotificationCnt === 'number') return res.data
+  } catch {
+    /* unread count unavailable */
+  }
+  return mockUnreadCount()
+}
+
+export async function fetchNotifications(apiKey: string, type: NoticeType, page = 1): Promise<NoticeItem[]> {
+  try {
+    const res = await request<Envelope<NoticeItem[]>>(
+      withKey(`/api/getNotifications?type=${encodeURIComponent(type)}&p=${page}`, apiKey),
+    )
+    if (res.code === 0 && Array.isArray(res.data)) return res.data
+  } catch {
+    /* GET /api/getNotifications 尚未提供 */
+  }
+  return mockNotifications(type)
+}
+
+export async function markNoticeRead(apiKey: string, type: NoticeType) {
+  await request<Envelope<unknown>>(withKey(`/notifications/make-read/${encodeURIComponent(type)}`, apiKey))
+}
+
+export async function markAllNoticesRead(apiKey: string) {
+  await request<Envelope<unknown>>(withKey('/notifications/all-read', apiKey))
 }
 
 export async function fetchMembership(userId: string) {
