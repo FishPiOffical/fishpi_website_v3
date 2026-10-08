@@ -9,6 +9,8 @@ import {
   setProfessionPrimary,
   setProfessionPrivacy,
   updateAvatar,
+  updateGeoStatus,
+  updatePassword,
   updateProfile,
   uploadFiles,
   type ProfessionProgress,
@@ -23,6 +25,7 @@ const intro = ref('')
 const url = ref('')
 const tags = ref('')
 const mbti = ref('')
+const qq = ref('')
 const avatar = ref('')
 const saving = ref(false)
 const uploading = ref(false)
@@ -34,6 +37,15 @@ const primaryJob = ref('')
 const privacy = ref('ALL_PUBLIC')
 const jobBusy = ref(false)
 const jobMsg = ref('')
+const geoPublic = ref(true)
+const geoBusy = ref(false)
+const geoMsg = ref('')
+const oldPwd = ref('')
+const newPwd = ref('')
+const newPwd2 = ref('')
+const pwdBusy = ref(false)
+const pwdMsg = ref('')
+const pwdErr = ref('')
 
 const privacyOptions = [
   { value: 'ALL_PUBLIC', label: '全部公开' },
@@ -49,7 +61,9 @@ function fill() {
   url.value = account.value?.userURL || ''
   tags.value = account.value?.userTags || ''
   mbti.value = account.value?.mbti || ''
+  qq.value = account.value?.userQQ || ''
   avatar.value = account.value?.userAvatarURL || ''
+  geoPublic.value = Number(account.value?.userGeoStatus ?? 0) !== 1
 }
 
 watch(account, fill, { immediate: true })
@@ -127,6 +141,7 @@ async function save() {
       userURL: url.value,
       userTag: tags.value,
       mbti: mbti.value,
+      userQQ: qq.value,
     })
     await auth.reloadAccount()
     msg.value = '资料已保存'
@@ -134,6 +149,47 @@ async function save() {
     err.value = e instanceof Error ? e.message : '保存失败'
   } finally {
     saving.value = false
+  }
+}
+
+async function saveGeo() {
+  if (!apiKey.value) return
+  geoBusy.value = true
+  geoMsg.value = ''
+  try {
+    await updateGeoStatus(apiKey.value, geoPublic.value ? 0 : 1)
+    await auth.reloadAccount()
+    geoMsg.value = '地理位置设置已保存'
+  } catch (e) {
+    geoMsg.value = e instanceof Error ? e.message : '地理位置设置失败'
+  } finally {
+    geoBusy.value = false
+  }
+}
+
+async function savePassword() {
+  if (!apiKey.value) return
+  pwdMsg.value = ''
+  pwdErr.value = ''
+  if (newPwd.value.length < 6) {
+    pwdErr.value = '新密码至少 6 位'
+    return
+  }
+  if (newPwd.value !== newPwd2.value) {
+    pwdErr.value = '两次输入的新密码不一致'
+    return
+  }
+  pwdBusy.value = true
+  try {
+    await updatePassword(apiKey.value, oldPwd.value, newPwd.value)
+    oldPwd.value = ''
+    newPwd.value = ''
+    newPwd2.value = ''
+    pwdMsg.value = '密码已更新'
+  } catch (e) {
+    pwdErr.value = e instanceof Error ? e.message : '修改密码失败'
+  } finally {
+    pwdBusy.value = false
   }
 }
 
@@ -177,11 +233,37 @@ async function onAvatar(e: Event) {
         <label>签名<textarea v-model="intro" rows="3" maxlength="256" /></label>
         <label>个人主页<input v-model="url" placeholder="https://" /></label>
         <label>标签<input v-model="tags" placeholder="逗号分隔" /></label>
+        <label>QQ<input v-model="qq" maxlength="20" /></label>
         <label>MBTI<input v-model="mbti" maxlength="8" /></label>
+        <p v-if="account?.userCity" class="hint">当前城市：{{ account.userCity }}（由定位/城市页更新）</p>
         <p v-if="msg" class="ok">{{ msg }}</p>
         <p v-if="err" class="err">{{ err }}</p>
         <button type="submit" :disabled="saving">{{ saving ? '保存中…' : '保存资料' }}</button>
       </form>
+      <div class="jobs">
+        <h2>地理位置</h2>
+        <p class="hint">POST <code>/settings/geo/status</code>（page-auth CSRF）。</p>
+        <label class="check">
+          <input v-model="geoPublic" type="checkbox" :disabled="geoBusy" />
+          公开我的地理位置
+        </label>
+        <button type="button" :disabled="geoBusy" @click="saveGeo">
+          {{ geoBusy ? '提交中…' : '保存地理位置设置' }}
+        </button>
+        <p v-if="geoMsg" :class="geoMsg.includes('失败') ? 'err' : 'ok'">{{ geoMsg }}</p>
+      </div>
+      <div class="jobs">
+        <h2>修改密码</h2>
+        <p class="hint">POST <code>/settings/password</code>（MD5 + CSRF）。</p>
+        <label>当前密码<input v-model="oldPwd" type="password" autocomplete="current-password" /></label>
+        <label>新密码<input v-model="newPwd" type="password" autocomplete="new-password" minlength="6" /></label>
+        <label>确认新密码<input v-model="newPwd2" type="password" autocomplete="new-password" minlength="6" /></label>
+        <p v-if="pwdMsg" class="ok">{{ pwdMsg }}</p>
+        <p v-if="pwdErr" class="err">{{ pwdErr }}</p>
+        <button type="button" :disabled="pwdBusy || !oldPwd || !newPwd" @click="savePassword">
+          {{ pwdBusy ? '提交中…' : '更新密码' }}
+        </button>
+      </div>
       <div class="jobs">
         <h2>职业成长</h2>
         <p class="hint">读取 <code>GET /api/profession/me</code>，写入主职业/隐私。</p>
@@ -340,5 +422,14 @@ h2 {
   margin-left: 8px;
   color: var(--fp-muted);
   font-style: normal;
+}
+.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.check input {
+  width: auto;
 }
 </style>

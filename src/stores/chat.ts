@@ -111,7 +111,6 @@ export const useChatStore = defineStore('chat', () => {
 
   async function connect() {
     const auth = useAuthStore()
-    if (!auth.apiKey) return
     error.value = ''
     loading.value = true
     page = 1
@@ -150,6 +149,12 @@ export const useChatStore = defineStore('chat', () => {
     if (ws) {
       ws.close()
       ws = null
+    }
+
+    // 游客可浏览历史/在线；实时通道需 apiKey
+    if (!auth.apiKey) {
+      connected.value = false
+      return
     }
 
     let node = resolveWsUrl(`/chat-room-channel?apiKey=${auth.apiKey}`)
@@ -213,7 +218,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function loadAround(oId: string) {
     const auth = useAuthStore()
-    if (!auth.apiKey || !oId) return
+    if (!oId) return
     try {
       const around = await fetchChatAround(auth.apiKey, oId, 0, 16)
       if (!around.length) return
@@ -228,7 +233,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function loadMore() {
     const auth = useAuthStore()
-    if (!auth.apiKey || loadingMore.value || !hasMore.value) return
+    if (loadingMore.value || !hasMore.value) return
     loadingMore.value = true
     page += 1
     try {

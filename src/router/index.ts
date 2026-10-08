@@ -15,7 +15,7 @@ const routes = [
     path: '/cr',
     name: 'chatroom',
     component: () => import('@/views/ChatroomView.vue'),
-    meta: { auth: true, robots: 'noindex' },
+    meta: { robots: 'noindex' },
   },
   { path: '/article/:id', name: 'article', component: () => import('@/views/ArticleView.vue') },
   { path: '/hot', component: () => import('@/views/ArticleListView.vue'), meta: { title: '热门', list: 'hot' } },

@@ -22,6 +22,10 @@ export interface AccountInfo {
   userURL?: string
   userTags?: string
   mbti?: string
+  userCity?: string
+  userQQ?: string
+  /** 0 公开 / 1 私密 */
+  userGeoStatus?: number
 }
 
 export interface MetalItem {
@@ -286,6 +290,7 @@ export interface ProfileUpdate {
   userIntro?: string
   userTag?: string
   mbti?: string
+  userQQ?: string
 }
 
 export async function updateProfile(apiKey: string, data: ProfileUpdate) {
@@ -302,6 +307,33 @@ export async function updateAvatar(apiKey: string, userAvatarURL: string) {
     body: JSON.stringify({ apiKey, userAvatarURL }),
   })
   if (res.code) throw new Error(res.msg || '更新头像失败')
+}
+
+/** 修改密码：页面态 POST /settings/password（MD5 + CSRF）。 */
+export async function updatePassword(apiKey: string, oldPassword: string, newPassword: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/settings/password', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({
+      userPassword: md5(oldPassword),
+      userNewPassword: md5(newPassword),
+    }),
+  })
+  if (res.code) throw new Error(res.msg || '修改密码失败')
+}
+
+/** 地理位置公开状态：0 公开 / 1 私密。 */
+export async function updateGeoStatus(apiKey: string, userGeoStatus: 0 | 1) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/settings/geo/status', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({ userGeoStatus }),
+  })
+  if (res.code) throw new Error(res.msg || '地理位置设置失败')
 }
 
 export interface EmojiItem {
@@ -1675,7 +1707,7 @@ export async function fetchChatOnlineUsers(apiKey?: string | null): Promise<Chat
 }
 
 /** mode: 0 context, 1 before, 2 after */
-export async function fetchChatAround(apiKey: string, oId: string, mode: 0 | 1 | 2 = 0, size = 16) {
+export async function fetchChatAround(apiKey: string | null | undefined, oId: string, mode: 0 | 1 | 2 = 0, size = 16) {
   const res = await request<Envelope<ChatHistoryItem[]>>(
     withKey(
       `/chat-room/getMessage?oId=${encodeURIComponent(oId)}&mode=${mode}&size=${size}&type=html`,

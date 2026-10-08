@@ -117,7 +117,9 @@ async function showRaw(oId: string) {
     <section class="main">
       <header>
         <strong>聊天室</strong>
-        <span :class="{ on: connected }">{{ connected ? '已连接' : '未连接' }}</span>
+        <span :class="{ on: connected }">
+          {{ connected ? '已连接' : auth.isLoggedIn ? '未连接' : '浏览模式' }}
+        </span>
       </header>
       <p v-if="error" class="err">{{ error }}</p>
       <p v-if="lastPacket" class="tip">{{ lastPacket }}</p>
@@ -214,7 +216,7 @@ async function showRaw(oId: string) {
         <button type="submit" :disabled="sending">发出去</button>
         <button type="button" class="ghost" @click="showPacket = false">取消</button>
       </form>
-      <form class="composer" @submit.prevent="submit">
+      <form v-if="auth.isLoggedIn" class="composer" @submit.prevent="submit">
         <div class="compose-wrap">
           <MentionSuggest v-model="draft" />
           <textarea
@@ -230,6 +232,11 @@ async function showRaw(oId: string) {
           <button type="submit" :disabled="sending || !draft.trim()">发送</button>
         </div>
       </form>
+      <p v-else class="guest-bar">
+        游客可浏览历史与在线列表。
+        <RouterLink :to="{ path: '/login', query: { redirect: '/cr' } }">登录</RouterLink>
+        后发言、领红包与实时推送。
+      </p>
     </section>
     <ChatSidebar />
   </div>
@@ -425,6 +432,16 @@ textarea {
   margin: 6px 0;
   max-height: 160px;
   overflow: auto;
+}
+.guest-bar {
+  margin: 0;
+  padding: 12px 15px;
+  border-top: 1px solid var(--fp-border);
+  color: var(--fp-muted);
+  font-size: 13px;
+}
+.guest-bar a {
+  color: var(--fp-link);
 }
 @media (max-width: 960px) {
   .cr {

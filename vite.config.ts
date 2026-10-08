@@ -150,6 +150,23 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/register': { ...proxy, bypass: spaGetBypass },
+        '/settings': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            // SPA：/settings、/settings/point；API：POST /settings/password|function|geo/status
+            if (req.method === 'GET' || req.method === 'HEAD') {
+              if (
+                path === '/settings' ||
+                path === '/settings/' ||
+                path === '/settings/point' ||
+                path.startsWith('/settings/point/')
+              ) {
+                return req.url
+              }
+            }
+          },
+        },
         '/article-channel': { ...proxy, ws: true },
         '/article': {
           ...proxy,
