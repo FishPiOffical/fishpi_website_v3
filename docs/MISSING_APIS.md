@@ -171,6 +171,36 @@ SPA `/vips` 已对接。管理端 VIP 不在本站范围。
 
 ---
 
+## 13. 排行榜匿名读取 — 降级
+
+前端已对接以下路径，但匿名常 401 / 空，失败时部分榜单回退演示数据：
+
+| 接口 | 失败时 |
+|------|--------|
+| `GET /api/top/checkin` | `mockCheckin()` |
+| `GET /api/top/online` | `mockOnline()` |
+| `GET /api/top/donate`（鱼排续命师，含 `totalData.totalAmount/donateMakeDays`） | 内置演示数据 |
+| `GET /api/top/perfect`（优选榜） | 内置演示数据 |
+| `GET /api/top/invite`（邀请榜） | 内置演示数据 |
+| `GET /api/top/{game}`（游戏榜） | 内置演示数据 |
+| `GET /api/top/balance`、`/api/top/consumption` | 空列表（需登录） |
+
+诉求：确认以上榜单的匿名可读性及返回结构（`data[]` / `users[]` 二选一统一），开放后删除 `fishpi.ts` 内演示数据。
+
+---
+
+## 14. 自动签到 — 降级
+
+首页改为「活跃度达标自动签到」，依赖：
+
+- `GET /user/liveness` — 当前活跃度
+- `GET /activity/daily-checkin-api` — 签到领取（现网可能返回非 JSON，失败再试 `/user/checkin`）
+- `GET /api/activity/is-collected-liveness`、`GET /activity/yesterday-liveness-reward-api` — 昨日活跃奖励
+
+诉求：确认 `daily-checkin-api` 返回 JSON（含是否已签到、获得积分），或提供 `GET /api/checkin/status` 返回 `{ checkedIn, liveness, threshold }`，避免前端硬编码达标阈值。
+
+---
+
 ## 前端假数据入口
 
 | 能力 | 代码 |
@@ -179,5 +209,6 @@ SPA `/vips` 已对接。管理端 VIP 不在本站范围。
 | 背包读取 | `src/api/gaps.mock.ts` → `mockUserBag` |
 | 重置密码 meta | `src/api/gaps.mock.ts` → `mockResetPwdMeta` |
 | 匿名列表/详情等 | `src/api/catalog.mock.json`（既有） |
+| 榜单演示数据 | `src/api/fishpi.ts` → `fetchDonateRank` / `fetchPerfectRank` / `fetchInviteRank` / `fetchGameRank` |
 
 服务端仅保留 `POST /__fp/page-auth`（apiKey → `sym-ce` + csrf，供页面态 POST）。**不再**提供 HTML 抓取类 `__fp/*` 接口。
