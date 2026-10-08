@@ -365,6 +365,7 @@ async function load() {
     writeCache(cacheKey, data)
     article.value = data
     heat.value = Number(data.articleHeat || 0)
+    loading.value = false
     void buildToc()
     await refreshHeat()
     connectHeat()
