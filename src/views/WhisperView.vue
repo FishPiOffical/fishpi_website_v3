@@ -5,15 +5,14 @@ import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useWhisperStore } from '@/stores/whispers'
 import type { WhisperMsg } from '@/api/fishpi'
-import EmojiPicker from '@/components/EmojiPicker.vue'
-import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import ChatBubble from '@/components/ChatBubble.vue'
+import ChatComposer from '@/components/ChatComposer.vue'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const whispers = useWhisperStore()
 const { account, apiKey } = storeToRefs(auth)
-const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const { list, listLoading, unreadBy, messages, sending, loading, error, connected, usingMock, hasMore, loadingMore } =
   storeToRefs(whispers)
 
@@ -149,42 +148,32 @@ async function submit() {
         </button>
         <p v-if="loading && !messages.length" class="hint">加载中…</p>
         <p v-else-if="!messages.length" class="hint">还没有消息，打个招呼吧。</p>
-        <article
+        <ChatBubble
           v-for="msg in messages"
           :key="msg.oId"
-          class="fp-msg"
-          :class="{ 'is-self': msg.senderUserName === me }"
+          :user-name="msg.senderUserName || ''"
+          :avatar="msg.senderAvatar"
+          :time="msg.time"
+          :html="msg.content || msg.markdown || msg.preview || ''"
+          :self="msg.senderUserName === me"
         >
-          <img class="fp-avatar" :src="msg.senderAvatar || '/favicon.svg'" alt="" />
-          <div>
-            <div class="meta">
-              <b>{{ msg.senderUserName }}</b>
-              <time>{{ msg.time }}</time>
-              <button v-if="msg.senderUserName === me" type="button" class="ghost" @click="whispers.revoke(msg.oId)">
-                撤回
-              </button>
-            </div>
-            <div class="fp-bubble" v-html="msg.content || msg.markdown || msg.preview || ''" />
-          </div>
-        </article>
+          <template v-if="msg.senderUserName === me" #actions>
+            <button type="button" @click="whispers.revoke(msg.oId)">撤回</button>
+          </template>
+        </ChatBubble>
       </div>
-      <form class="composer" @submit.prevent="submit">
-        <MarkdownEditor
-          :key="userName"
-          ref="editorRef"
-          :cache-id="`whisper-${userName}`"
-          v-model="draft"
-          :api-key="apiKey"
-          :height="150"
-          compact
-          placeholder="说点什么吧，友善第一哦。"
-          @submit="submit"
-        />
-        <div class="send-row">
-          <EmojiPicker @insert="(md) => editorRef?.insert(md)" />
-          <button type="submit" :disabled="sending || !draft.trim() || (!connected && !usingMock)">发送</button>
-        </div>
-      </form>
+      <ChatComposer
+        :key="userName"
+        v-model="draft"
+        class="composer"
+        variant="compact"
+        :api-key="apiKey"
+        :cache-id="`whisper-${userName}`"
+        :sending="sending"
+        :disabled="!connected && !usingMock"
+        placeholder="说点什么吧，友善第一哦。"
+        @submit="submit"
+      />
     </section>
     <section v-else class="chat empty">
       <p>选择左侧的会话，或输入用户名发起私信</p>
@@ -231,8 +220,7 @@ async function submit() {
   padding: 6px 8px;
   font-size: 13px;
 }
-.start button,
-.send-row button {
+.start button {
   border: 0;
   background: var(--fp-primary);
   color: #fff;
@@ -368,63 +356,13 @@ header span.on {
   padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-.fp-msg {
-  display: flex;
   gap: 10px;
-  max-width: 86%;
-}
-.fp-msg.is-self {
-  margin-left: auto;
-  flex-direction: row-reverse;
-}
-.fp-msg .fp-avatar {
-  width: 36px;
-  height: 36px;
-  flex: none;
-}
-.meta {
-  display: flex;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-.is-self .meta {
-  justify-content: flex-end;
-}
-.fp-bubble {
-  background: var(--fp-hover);
-  border-radius: 10px;
-  padding: 8px 10px;
-  overflow-wrap: anywhere;
-}
-.is-self .fp-bubble {
-  background: var(--fp-self);
-}
-.fp-bubble :deep(img) {
-  max-width: 100%;
-  max-height: 320px;
-  border-radius: 6px;
-}
-.fp-bubble :deep(p) {
-  margin: 0;
 }
 .composer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   padding: 10px 16px;
   border-top: 1px solid var(--fp-border);
 }
-.send-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-.more,
-.ghost {
+.more {
   border: 1px solid var(--fp-border);
   background: transparent;
   color: var(--fp-muted);
@@ -432,8 +370,6 @@ header span.on {
   padding: 2px 8px;
   cursor: pointer;
   font-size: 12px;
-}
-.more {
   align-self: center;
 }
 button:disabled {

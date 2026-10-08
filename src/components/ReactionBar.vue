@@ -28,7 +28,7 @@ function pick(value: string) {
 </script>
 
 <template>
-  <div class="rx">
+  <div class="rx" :class="{ empty: !items.length, open }">
     <button
       v-for="s in items"
       :key="s.value"
