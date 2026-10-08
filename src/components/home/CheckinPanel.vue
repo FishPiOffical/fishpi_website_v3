@@ -26,19 +26,20 @@ async function load() {
   if (!apiKey.value) return
   const hit = readCache<Parameters<typeof applyCheckin>[0]>(CHECKIN_KEY)
   if (hit) applyCheckin(hit)
-  try {
-    const [cin, live, col] = await Promise.all([
-      fetchCheckedIn(apiKey.value),
-      fetchLiveness(apiKey.value),
-      fetchCollectedLiveness(apiKey.value),
-    ])
-    const snap = { checkedIn: cin, liveness: live, collected: col }
-    applyCheckin(snap)
-    writeCache(CHECKIN_KEY, snap)
-    msg.value = ''
-  } catch (e) {
-    if (!hit) msg.value = e instanceof Error ? e.message : '签到状态失败'
+  const [cin, live, col] = await Promise.allSettled([
+    fetchCheckedIn(apiKey.value),
+    fetchLiveness(apiKey.value),
+    fetchCollectedLiveness(apiKey.value),
+  ])
+  const snap = {
+    checkedIn: cin.status === 'fulfilled' ? cin.value : checkedIn.value,
+    liveness: live.status === 'fulfilled' ? live.value : liveness.value,
+    collected: col.status === 'fulfilled' ? col.value : collected.value,
   }
+  applyCheckin(snap)
+  writeCache(CHECKIN_KEY, snap)
+  const failed = [cin, live, col].every((r) => r.status === 'rejected')
+  msg.value = failed && !hit ? '签到状态获取失败' : ''
 }
 
 onMounted(() => void load())

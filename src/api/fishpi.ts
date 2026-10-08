@@ -8,7 +8,7 @@ import {
   mockProfile,
   type DomainItem,
 } from './catalog'
-import { request, requestText, withKey } from './http'
+import { ApiError, request, requestText, withKey } from './http'
 
 export type { DomainItem }
 
@@ -1190,6 +1190,7 @@ export async function likeRepeater(apiKey: string, id: string) {
 }
 
 export async function fetchArticle(id: string, apiKey?: string | null, page = 1): Promise<ArticleDetail> {
+  let transient = false
   try {
     const res = await request<Envelope<{
       article?: ArticleDetail
@@ -1200,12 +1201,13 @@ export async function fetchArticle(id: string, apiKey?: string | null, page = 1)
       const { article, pagination, longArticleColumnView } = res.data
       return { ...article, pagination: { ...pagination, paginationCurrentPageNum: page }, longArticleColumnView }
     }
-  } catch {
-    /* 匿名详情未开放 */
+  } catch (e) {
+    /* 匿名详情未开放时为 401/403；网络错误或 5xx 属于临时故障 */
+    transient = !(e instanceof ApiError) || e.status >= 500
   }
   const local = mockArticle(id)
   if (local) return local
-  throw new Error('帖子不存在或需要登录')
+  throw new Error(transient ? '网络异常，帖子加载失败' : '帖子不存在或需要登录')
 }
 
 export interface ArticleRevisionMeta {
@@ -2142,9 +2144,41 @@ export async function dailyCheckin(apiKey: string) {
   throw new Error(last.includes('非 JSON') ? '签到领取接口尚未开放（GET /activity/daily-checkin-api）' : last)
 }
 
+/** Rhythm 对 GET /user/liveness 限流：每用户 9 分钟 1 次，超出直接 500 空响应。 */
+const LIVENESS_TTL = 9 * 60 * 1000
+const LIVENESS_STORE = 'fp.liveness'
+
+function livenessScope(apiKey: string) {
+  let h = 5381
+  for (let i = 0; i < apiKey.length; i++) h = ((h << 5) + h + apiKey.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
+}
+
+function readLiveness(scope: string): { value: number; at: number } | null {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const s = JSON.parse(localStorage.getItem(LIVENESS_STORE) || 'null')
+    return s && s.scope === scope && typeof s.value === 'number' ? s : null
+  } catch {
+    return null
+  }
+}
+
 export async function fetchLiveness(apiKey: string) {
-  const res = await request<{ liveness?: number }>(withKey('/user/liveness', apiKey))
-  return Number(res.liveness ?? 0)
+  const scope = livenessScope(apiKey)
+  const saved = readLiveness(scope)
+  if (saved && Date.now() - saved.at < LIVENESS_TTL) return saved.value
+  try {
+    const res = await request<{ liveness?: number }>(withKey('/user/liveness', apiKey))
+    const value = Number(res.liveness ?? 0)
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LIVENESS_STORE, JSON.stringify({ scope, value, at: Date.now() }))
+    }
+    return value
+  } catch (e) {
+    if (saved) return saved.value
+    throw e
+  }
 }
 
 export async function fetchCollectedLiveness(apiKey: string) {

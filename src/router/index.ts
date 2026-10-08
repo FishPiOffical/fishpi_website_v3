@@ -397,5 +397,14 @@ export function createAppRouter(history?: RouterHistory) {
     return true
   })
 
+  // 弱网下页面 chunk 加载失败后，浏览器会缓存这次失败，后续跳转一直失败；直接整页加载目标地址。
+  router.onError((err, to) => {
+    if (import.meta.env.SSR) return
+    const msg = err instanceof Error ? err.message : String(err)
+    if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(msg)) {
+      window.location.assign(to.fullPath)
+    }
+  })
+
   return router
 }

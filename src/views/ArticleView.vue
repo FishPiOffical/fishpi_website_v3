@@ -566,8 +566,9 @@ async function onReactComment(c: ArticleComment, value: string) {
 
 <template>
   <ArticleSkeleton v-if="loading" />
-  <article v-else-if="error" class="card">
+  <article v-else-if="error" class="card load-error">
     <p class="err">{{ error }}</p>
+    <p class="retry"><button type="button" class="btn" @click="load()">重新加载</button></p>
     <p v-if="!isLoggedIn" class="hint">
       <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
       后可查看需要权限的帖子。
@@ -1475,6 +1476,20 @@ h1 {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.card.load-error {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--fp-muted);
+}
+.load-error .err {
+  color: #e07a5f;
+  font-size: 15px;
+}
+.load-error .retry {
+  margin: 16px 0 10px;
 }
 .err-tip {
   color: #cf222e;
