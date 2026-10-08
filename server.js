@@ -286,26 +286,39 @@ async function createServer() {
       return next()
     }
 
-    try {
+    async function renderPage(pageUrl) {
       let tpl = template
       let renderFn = render
       if (!isProd) {
-        tpl = await vite.transformIndexHtml(url, template)
+        tpl = await vite.transformIndexHtml(pageUrl, template)
         renderFn = (await vite.ssrLoadModule('/src/entry-server.ts')).render
       }
-      const result = await renderFn(url)
+      const result = await renderFn(pageUrl)
       let cssLinks = ''
       if (!isProd && vite) {
         cssLinks = collectDevCssLinks(vite, result.modules)
       } else if (ssrManifest && result.modules) {
         cssLinks = renderProdCssLinks(result.modules, ssrManifest)
       }
-      const html = injectHtml(tpl, { ...result, cssLinks })
-      res.status(200).set({ 'Content-Type': 'text/html' }).end(html)
+      return { html: injectHtml(tpl, { ...result, cssLinks }), status: result.status || 200 }
+    }
+
+    try {
+      const { html, status } = await renderPage(url)
+      res.status(status).set({ 'Content-Type': 'text/html' }).end(html)
     } catch (e) {
       if (!isProd && vite) vite.ssrFixStacktrace(e)
       console.error(e)
-      res.status(500).end(String(e?.stack || e))
+      if (!isProd) {
+        res.status(500).end(String(e?.stack || e))
+        return
+      }
+      try {
+        const { html } = await renderPage('/error/500')
+        res.status(500).set({ 'Content-Type': 'text/html' }).end(html)
+      } catch {
+        res.status(500).end('500 Internal Server Error')
+      }
     }
   })
 

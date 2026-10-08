@@ -370,11 +370,16 @@ const routes = [
     component: () => import('@/views/VipView.vue'),
     meta: { robots: 'noindex' },
   },
+  ...([401, 403, 500] as const).map((errorCode) => ({
+    path: `/error/${errorCode}`,
+    component: () => import('@/views/ErrorView.vue'),
+    meta: { robots: 'noindex', errorCode },
+  })),
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
-    component: () => import('@/views/NotFoundView.vue'),
-    meta: { robots: 'noindex' },
+    component: () => import('@/views/ErrorView.vue'),
+    meta: { robots: 'noindex', errorCode: 404 },
   },
 ]
 

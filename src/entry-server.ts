@@ -160,5 +160,6 @@ export async function render(url: string) {
     headPayload,
     payload: clientPayload,
     modules: ctx.modules || new Set<string>(),
+    status: Number(router.currentRoute.value.meta.errorCode) || 200,
   }
 }
