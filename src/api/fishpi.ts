@@ -24,6 +24,9 @@ export interface AccountInfo {
   mbti?: string
   userCity?: string
   userQQ?: string
+  /** Rhythm 角色，如 adminRole / defaultRole */
+  roleId?: string
+  userRole?: string
   userArticleCount?: number
   userCommentCount?: number
   userPhone?: string
@@ -182,6 +185,7 @@ export interface ArticleSummary {
   articleCreateTimeStr?: string
   timeAgo?: string
   columnTitle?: string
+  columnId?: string
   articleAuthorName?: string
   articleAuthorThumbnailURL48?: string
   articleHeat?: number
@@ -2080,6 +2084,15 @@ export async function removeMfa(apiKey: string) {
   const res = await request<Envelope<unknown>>('/mfa/remove')
   if (res.code) throw new Error(res.msg || '解绑失败')
   return res.msg || '已解绑'
+}
+
+/** 官方 APP 扫码登录：页面会话下 GET /getApiKeyInWeb → QR data `login:{apiKey}` */
+export async function fetchAppLoginQr(apiKey: string): Promise<string> {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown> & { apiKey?: string }>('/getApiKeyInWeb')
+  if (res.code || !res.apiKey) throw new Error(res.msg || '获取 APP 登录码失败')
+  return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`login:${res.apiKey}`)}`
 }
 
 export interface UserBag {

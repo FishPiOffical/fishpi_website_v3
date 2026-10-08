@@ -103,8 +103,27 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/chat-channel': { ...proxy, ws: true },
-        '/idle-talk': proxy,
+        '/idle-talk': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/idle-talk' || path === '/idle-talk/')) {
+              return req.url
+            }
+          },
+        },
         '/idle-talk-channel': { ...proxy, ws: true },
+        '/charge': { ...proxy, bypass: spaGetBypass },
+        '/pay': proxy,
+        '/getApiKeyInWeb': proxy,
+        '/admin': { ...proxy, bypass: spaGetBypass },
+        '/column': {
+          ...proxy,
+          bypass(req) {
+            // SPA /column、/column/:id；无公开 JSON 时勿吃掉页面
+            if (req.method === 'GET' || req.method === 'HEAD') return req.url
+          },
+        },
         '/chat': {
           ...proxy,
           bypass(req) {

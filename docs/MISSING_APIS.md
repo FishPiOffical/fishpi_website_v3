@@ -96,8 +96,8 @@
 
 现网 `GET /column/{id}` 为登录 HTML（常 401）。SPA 首页卡片链到最新章节帖或 `/column` 长篇列表。
 
-| 现状 | 无专栏详情路由；假专栏 id 点进帖子会 404/空，属预期 |
-|------|-----------------------------------------------------|
+| 现状 | SPA `/column/:id`：`fetchHomeColumns` + 长篇列表近似章节；无专用 JSON |
+|------|---------------------------------------------------------------------|
 
 ---
 
@@ -135,9 +135,32 @@
 
 ---
 
-## 9. 闲聊室 — 故意不做
+## 9. 闲聊室 — 占位
 
-现网 `/idle-talk` 404，产品范围外。
+现网 `/idle-talk` 404。SPA 保留 `/idle-talk` 占位页，引导去 `/cr`。
+
+---
+
+## 10. 管理后台 — 缺失 JSON
+
+现网 `/admin/*` 为 FTL SSR（约 70+ 路由），无公开 `/api/admin/*`。
+
+| 建议契约 | 说明 |
+|----------|------|
+| `GET /api/admin/stats` | 仪表盘计数 |
+| `GET /api/admin/users?p=&size=` | 用户列表 |
+| `GET /api/admin/articles?p=&size=` | 帖子列表 |
+| `GET /api/admin/comments?p=&size=` | 评论列表 |
+| `GET /api/admin/reports?p=&size=` | 举报列表 |
+
+| 现状 | Vue `/admin` 壳：优先打上述 JSON，失败回退 `src/api/admin.mock.ts`；写操作仍需 Rhythm FTL |
+|------|----------------------------------------------------------------------------------------|
+
+---
+
+## 11. 捐助页 — 已有支付口
+
+`GET /pay/wechat?total_amount=&note=`（页面会话）返回 `QRcode_url`。SPA `/charge/point` 已对接。
 
 ---
 
@@ -148,6 +171,7 @@
 | 首页专栏 | `src/api/gaps.mock.ts` → `mockHomeColumns` |
 | 背包读取 | `src/api/gaps.mock.ts` → `mockUserBag` |
 | 重置密码 meta | `src/api/gaps.mock.ts` → `mockResetPwdMeta` |
+| 管理后台列表 | `src/api/admin.mock.ts` |
 | 匿名列表/详情等 | `src/api/catalog.mock.json`（既有） |
 
 服务端仅保留 `POST /__fp/page-auth`（apiKey → `sym-ce` + csrf，供页面态 POST）。**不再**提供 HTML 抓取类 `__fp/*` 接口。

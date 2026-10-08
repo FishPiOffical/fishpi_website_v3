@@ -9,6 +9,7 @@ import {
   bindPhone,
   buyInvitecode,
   exportPosts,
+  fetchAppLoginQr,
   fetchMfaEnabled,
   fetchMfaSetup,
   fetchMyMedals,
@@ -204,6 +205,10 @@ const mfaQr = ref('')
 const mfaSecret = ref('')
 const mfaCode = ref('')
 
+const appQr = ref('')
+const appQrLoading = ref(false)
+const appQrErr = ref('')
+
 const bag = ref<UserBag>({})
 const bagLoading = ref(false)
 const bagBusy = ref(false)
@@ -332,7 +337,21 @@ onMounted(async () => {
 })
 
 async function loadAccountExtras() {
-  await Promise.all([loadMfa(), loadBag(), loadMyMedalsList()])
+  await Promise.all([loadMfa(), loadBag(), loadMyMedalsList(), loadAppQr()])
+}
+
+async function loadAppQr() {
+  if (!apiKey.value) return
+  appQrLoading.value = true
+  appQrErr.value = ''
+  try {
+    appQr.value = await fetchAppLoginQr(apiKey.value)
+  } catch (e) {
+    appQrErr.value = e instanceof Error ? e.message : 'APP 扫码加载失败'
+    appQr.value = ''
+  } finally {
+    appQrLoading.value = false
+  }
 }
 
 async function loadBag() {
@@ -1138,6 +1157,13 @@ async function saveI18n() {
           <p v-if="emailMsg" :class="emailMsg.includes('失败') || emailMsg.includes('不合法') ? 'err' : 'ok'">
             {{ emailMsg }}
           </p>
+
+          <h2>官方 APP 扫码登录</h2>
+          <p class="hint">请使用摸鱼派官方 APP 扫码登录。勿将本二维码分享给他人。</p>
+          <p v-if="appQrLoading" class="hint">加载中…</p>
+          <p v-else-if="appQrErr" class="err">{{ appQrErr }}</p>
+          <img v-else-if="appQr" class="mfa-qr" :src="appQr" width="150" height="150" alt="APP 登录二维码" />
+          <button type="button" class="ghost-btn" :disabled="appQrLoading" @click="loadAppQr">刷新二维码</button>
 
           <h2>两步验证</h2>
           <p v-if="mfaLoading" class="hint">加载中…</p>

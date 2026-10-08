@@ -410,14 +410,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             <template v-if="useColumnCards && homeColumnsRecent.length">
               <article v-for="col in homeColumnsRecent" :key="'r-' + col.columnId" class="long-card column">
                 <div class="long-col-head">
-                  <RouterLink
-                    class="long-title"
-                    :to="
-                      col.latestChapter?.articleId
-                        ? `/article/${col.latestChapter.articleId}`
-                        : '/column'
-                    "
-                  >
+                  <RouterLink class="long-title" :to="`/column/${col.columnId}`">
                     {{ col.columnTitle }}
                   </RouterLink>
                   <span class="long-count">{{ col.columnArticleCount }} 章</span>
@@ -426,7 +419,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                   v-for="(ch, i) in col.chapters.slice(0, 2)"
                   :key="ch.articleId || i"
                   class="long-chapter"
-                  :to="ch.articleId ? `/article/${ch.articleId}` : ch.permalink"
+                  :to="ch.articleId ? `/article/${ch.articleId}` : `/column/${col.columnId}`"
                 >
                   <em>{{ ch.chapterNo }}</em>
                   <span>{{ ch.title }}</span>
@@ -468,14 +461,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             <template v-if="useColumnCards && homeColumnsHot.length">
               <article v-for="col in homeColumnsHot" :key="'h-' + col.columnId" class="long-card column hot">
                 <div class="long-col-head">
-                  <RouterLink
-                    class="long-title"
-                    :to="
-                      col.latestChapter?.articleId
-                        ? `/article/${col.latestChapter.articleId}`
-                        : '/column'
-                    "
-                  >
+                  <RouterLink class="long-title" :to="`/column/${col.columnId}`">
                     {{ col.columnTitle }}
                   </RouterLink>
                   <span class="long-count">{{ col.columnArticleCount }} 章</span>
@@ -484,7 +470,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                   v-for="(ch, i) in col.chapters.slice(0, 2)"
                   :key="ch.articleId || i"
                   class="long-chapter"
-                  :to="ch.articleId ? `/article/${ch.articleId}` : ch.permalink"
+                  :to="ch.articleId ? `/article/${ch.articleId}` : `/column/${col.columnId}`"
                 >
                   <em>{{ ch.chapterNo }}</em>
                   <span>{{ ch.title }}</span>

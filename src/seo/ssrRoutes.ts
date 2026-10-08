@@ -31,6 +31,7 @@ export function shouldPrefetchSsr(path: string) {
   }
   if (/^\/domain\/[^/]+$/.test(p)) return true
   if (/^\/tags\/[^/]+$/.test(p)) return true
+  if (/^\/column\/[^/]+$/.test(p)) return true
   return false
 }
 
@@ -52,7 +53,11 @@ export function isNoIndexPath(path: string) {
     p === '/points' ||
     p === '/logs' ||
     p === '/post' ||
-    p.startsWith('/post/')
+    p.startsWith('/post/') ||
+    p === '/charge/point' ||
+    p === '/idle-talk' ||
+    p === '/admin' ||
+    p.startsWith('/admin/')
   ) {
     return true
   }

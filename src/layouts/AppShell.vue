@@ -2,6 +2,7 @@
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { computed, watch } from 'vue'
+import { isAdminAccount } from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useNoticeStore } from '@/stores/notices'
@@ -27,6 +28,7 @@ const extraNav = [
   { to: '/activity', label: '活动' },
   { to: '/repeater', label: '复读机' },
   { to: '/logs', label: '日志' },
+  { to: '/charge/point', label: '捐助' },
   { to: '/download', label: '下载' },
   { to: '/agreement', label: '协议' },
   { to: '/privacy', label: '隐私' },
@@ -42,6 +44,8 @@ const { isLoggedIn, account } = storeToRefs(auth)
 const { total: unreadTotal } = storeToRefs(notices)
 const { unreadTotal: whisperUnread } = storeToRefs(whispers)
 const memberPath = computed(() => (account.value?.userName ? `/member/${account.value.userName}` : '/login'))
+const showAdmin = computed(() => isAdminAccount(account.value))
+const isAdminRoute = computed(() => route.path === '/admin' || route.path.startsWith('/admin/'))
 
 watch(
   () => auth.apiKey,
@@ -84,7 +88,8 @@ function logout() {
           :class="{
             current:
               route.path === item.to ||
-              (item.to === '/column' && route.path === '/recent/long') ||
+              (item.to === '/column' &&
+                (route.path === '/recent/long' || route.path.startsWith('/column/'))) ||
               (item.to === '/top' && route.path.startsWith('/top/')),
           }"
         >
@@ -110,6 +115,7 @@ function logout() {
           </RouterLink>
           <RouterLink :to="memberPath">{{ account?.userName }}</RouterLink>
           <RouterLink to="/settings">设置</RouterLink>
+          <RouterLink v-if="showAdmin" to="/admin">管理</RouterLink>
           <button type="button" @click="logout">退出</button>
         </template>
         <template v-else>
@@ -119,16 +125,18 @@ function logout() {
         <button type="button" class="theme" title="切换颜色模式" @click="appearance.toggleTheme()">◐</button>
       </div>
     </header>
-    <div class="income" aria-label="今日收入">
-      <span>🎉</span>
-      <div class="count-time">今日收入</div>
-      <b>￥365</b>
-    </div>
-    <AdSlot slot-key="home.top" />
-    <main>
+    <template v-if="!isAdminRoute">
+      <div class="income" aria-label="今日收入">
+        <span>🎉</span>
+        <div class="count-time">今日收入</div>
+        <b>￥365</b>
+      </div>
+      <AdSlot slot-key="home.top" />
+    </template>
+    <main :class="{ adminMain: isAdminRoute }">
       <RouterView />
     </main>
-    <footer class="foot">
+    <footer v-if="!isAdminRoute" class="foot">
       <div class="foot-inner">
         <div class="foot-brand">
           <b>摸鱼派</b>
@@ -272,6 +280,10 @@ nav a:hover {
   color: var(--fp-income);
   font-size: 22px;
   margin-top: 2px;
+}
+main.adminMain {
+  max-width: none;
+  padding: 12px 16px 32px;
 }
 main {
   max-width: var(--fp-wrap);
