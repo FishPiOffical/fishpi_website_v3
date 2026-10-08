@@ -11,12 +11,17 @@ import {
   exportPosts,
   fetchMfaEnabled,
   fetchMfaSetup,
+  fetchMyMedals,
   fetchProfessionMe,
+  fetchUserBag,
   fetchUserProfile,
+  medalImageUrl,
   queryInvitecode,
   removeMfa,
+  reorderMyMedal,
   requestEmailBindCode,
   requestPhoneBindCode,
+  setMyMedalDisplay,
   setProfessionPrimary,
   setProfessionPrivacy,
   submitIdentity,
@@ -30,9 +35,15 @@ import {
   updateProfile,
   updateUsername,
   uploadFiles,
+  useBag1dayCheckin,
+  useBag2dayCheckin,
+  useBagNameCard,
+  useBagPatchCheckin,
   verifyMfa,
+  type MyMedal,
   type PrivacySettings,
   type ProfessionProgress,
+  type UserBag,
 } from '@/api/fishpi'
 import { useGeetest4 } from '@/composables/useGeetest4'
 import { useAuthStore } from '@/stores/auth'
@@ -193,6 +204,14 @@ const mfaQr = ref('')
 const mfaSecret = ref('')
 const mfaCode = ref('')
 
+const bag = ref<UserBag>({})
+const bagLoading = ref(false)
+const bagBusy = ref(false)
+const bagMsg = ref('')
+const myMedals = ref<MyMedal[]>([])
+const medalBusy = ref(false)
+const medalMsg = ref('')
+
 const listPageSize = ref(20)
 const commentViewMode = ref(0)
 const avatarViewMode = ref(0)
@@ -290,7 +309,7 @@ watch(
 )
 
 watch(tab, (t) => {
-  if (t === 'account' && apiKey.value) void loadMfa()
+  if (t === 'account' && apiKey.value) void loadAccountExtras()
 })
 
 onMounted(async () => {
@@ -308,8 +327,122 @@ onMounted(async () => {
       /* keep /api/user */
     }
     await loadJobs()
-    if (tab.value === 'account') await loadMfa()
+    if (tab.value === 'account') await loadAccountExtras()
   }
+})
+
+async function loadAccountExtras() {
+  await Promise.all([loadMfa(), loadBag(), loadMyMedalsList()])
+}
+
+async function loadBag() {
+  if (!apiKey.value) return
+  bagLoading.value = true
+  bagMsg.value = ''
+  try {
+    bag.value = await fetchUserBag(apiKey.value)
+  } catch (e) {
+    bagMsg.value = e instanceof Error ? e.message : '背包加载失败'
+    bag.value = {}
+  } finally {
+    bagLoading.value = false
+  }
+}
+
+async function loadMyMedalsList() {
+  if (!apiKey.value) return
+  medalMsg.value = ''
+  try {
+    myMedals.value = await fetchMyMedals(apiKey.value)
+  } catch (e) {
+    medalMsg.value = e instanceof Error ? e.message : '勋章加载失败'
+    myMedals.value = []
+  }
+}
+
+async function runBag(action: () => Promise<string>) {
+  if (!apiKey.value) return
+  bagBusy.value = true
+  bagMsg.value = ''
+  try {
+    bagMsg.value = await action()
+    await loadBag()
+    await auth.reloadAccount()
+  } catch (e) {
+    bagMsg.value = e instanceof Error ? e.message : '使用失败'
+  } finally {
+    bagBusy.value = false
+  }
+}
+
+function use1day() {
+  if (!confirm('使用单日免签卡后，明天签到将由系统自动完成。确定？')) return
+  void runBag(() => useBag1dayCheckin(apiKey.value!))
+}
+
+function use2day() {
+  if (!confirm('使用两天免签卡后，明后两天签到将由系统自动完成。确定？')) return
+  void runBag(() => useBag2dayCheckin(apiKey.value!))
+}
+
+function usePatch() {
+  const tip = bag.value.patchStart
+    ? `补签后签到记录将提前至 ${bag.value.patchStart}。确定？`
+    : '补签卡仅适用于断签一天的情况。确定？'
+  if (!confirm(tip)) return
+  void runBag(() => useBagPatchCheckin(apiKey.value!))
+}
+
+function useRename() {
+  const name = prompt('请输入要修改的用户名', account.value?.userName || '')
+  if (!name) return
+  void runBag(() => useBagNameCard(apiKey.value!, name.trim()))
+}
+
+function formatExpire(ts: number) {
+  if (!ts || ts <= 0) return '永久'
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return String(ts)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+async function toggleMedal(m: MyMedal) {
+  if (!apiKey.value) return
+  medalBusy.value = true
+  medalMsg.value = ''
+  try {
+    await setMyMedalDisplay(apiKey.value, m.medalId, !m.display)
+    await loadMyMedalsList()
+  } catch (e) {
+    medalMsg.value = e instanceof Error ? e.message : '操作失败'
+  } finally {
+    medalBusy.value = false
+  }
+}
+
+async function moveMedal(m: MyMedal, direction: 'up' | 'down') {
+  if (!apiKey.value) return
+  medalBusy.value = true
+  medalMsg.value = ''
+  try {
+    await reorderMyMedal(apiKey.value, m.medalId, direction)
+    await loadMyMedalsList()
+  } catch (e) {
+    medalMsg.value = e instanceof Error ? e.message : '排序失败'
+  } finally {
+    medalBusy.value = false
+  }
+}
+
+const bagEmpty = computed(() => {
+  const b = bag.value
+  return !(
+    Number(b.checkin1day || 0) > 0 ||
+    Number(b.checkin2days || 0) > 0 ||
+    Number(b.nameCard || 0) > 0 ||
+    Number(b.metalTicket || 0) > 0 ||
+    Number(b.patchCheckinCard || 0) > 0
+  )
 })
 
 async function loadMfa() {
@@ -845,6 +978,84 @@ async function saveI18n() {
       <section v-if="tab === 'account'" class="card">
         <h1>账号</h1>
         <template v-if="isLoggedIn">
+          <h2>你的背包</h2>
+          <p v-if="bagLoading" class="hint">加载中…</p>
+          <template v-else>
+            <p v-if="bagEmpty" class="hint">你的背包和钱包一样，是空的。</p>
+            <div v-else class="bag-actions">
+              <button
+                v-if="Number(bag.checkin1day || 0) > 0"
+                type="button"
+                class="primary"
+                :disabled="bagBusy"
+                @click="use1day"
+              >
+                单日免签卡 x{{ bag.checkin1day }}
+              </button>
+              <button
+                v-if="Number(bag.checkin2days || 0) > 0"
+                type="button"
+                class="primary"
+                :disabled="bagBusy"
+                @click="use2day"
+              >
+                两天免签卡 x{{ bag.checkin2days }}
+              </button>
+              <button
+                v-if="Number(bag.nameCard || 0) > 0"
+                type="button"
+                class="primary"
+                :disabled="bagBusy"
+                @click="useRename"
+              >
+                改名卡 x{{ bag.nameCard }}
+              </button>
+              <button
+                v-if="Number(bag.patchCheckinCard || 0) > 0"
+                type="button"
+                class="primary"
+                :disabled="bagBusy"
+                @click="usePatch"
+              >
+                补签卡 x{{ bag.patchCheckinCard }}
+              </button>
+              <button v-if="Number(bag.metalTicket || 0) > 0" type="button" class="ghost-btn" disabled>
+                周年勋章领取券 x{{ bag.metalTicket }}
+              </button>
+            </div>
+            <p v-if="Number(bag.sysCheckinRemain || 0) > 0" class="hint">
+              免签卡生效中，剩余 {{ bag.sysCheckinRemain }} 天
+            </p>
+          </template>
+          <p v-if="bagMsg" :class="bagMsg.includes('失败') ? 'err' : 'ok'">{{ bagMsg }}</p>
+
+          <h2>你的勋章</h2>
+          <p v-if="!myMedals.length && !medalMsg" class="hint">暂无勋章，或尚未加载。</p>
+          <ul v-if="myMedals.length" class="medal-list">
+            <li v-for="m in myMedals" :key="m.medalId">
+              <img :src="medalImageUrl(m.medalId)" :alt="m.name" />
+              <div class="medal-info">
+                <b>{{ m.name }} <small>[{{ m.type }}]</small></b>
+                <span v-if="m.description">{{ m.description }}</span>
+                <span class="hint">到期：{{ formatExpire(m.expireTime) }}</span>
+              </div>
+              <div class="medal-actions">
+                <button type="button" class="ghost-btn" :disabled="medalBusy" @click="moveMedal(m, 'up')">↑</button>
+                <button type="button" class="ghost-btn" :disabled="medalBusy" @click="moveMedal(m, 'down')">↓</button>
+                <button
+                  type="button"
+                  class="primary"
+                  :class="{ danger: m.display }"
+                  :disabled="medalBusy"
+                  @click="toggleMedal(m)"
+                >
+                  {{ m.display ? '卸下' : '佩戴' }}
+                </button>
+              </div>
+            </li>
+          </ul>
+          <p v-if="medalMsg" :class="medalMsg.includes('失败') ? 'err' : 'ok'">{{ medalMsg }}</p>
+
           <h2>用户名</h2>
           <label>当前用户名<input :value="account?.userName" type="text" readonly /></label>
           <label>新用户名<input v-model="newUsername" maxlength="20" placeholder="谨慎修改，有次数限制" /></label>
@@ -953,11 +1164,6 @@ async function saveI18n() {
             </button>
           </template>
           <p v-if="mfaMsg" :class="mfaMsg.includes('失败') ? 'err' : 'ok'">{{ mfaMsg }}</p>
-
-          <p class="hint">
-            背包 / 勋章佩戴请暂用
-            <a href="https://fishpi.cn/settings/account" target="_blank" rel="noopener">现网账号页</a>。
-          </p>
         </template>
       </section>
 
@@ -1383,6 +1589,51 @@ input[readonly] {
   border: 1px solid var(--fp-border);
   border-radius: 8px;
   background: #fff;
+}
+.bag-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.medal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.medal-list li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.medal-list img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
+}
+.medal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  min-width: 0;
+}
+.medal-info b small {
+  font-weight: 400;
+  color: var(--fp-muted);
+  margin-left: 4px;
+}
+.medal-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .code-list {
   list-style: none;

@@ -8,6 +8,7 @@ import {
   fetchChatHistory,
   fetchChatOnlineUsers,
   fetchCheckinRank,
+  fetchHomeColumns,
   fetchOnlineRank,
   fetchRecentArticles,
   fetchRecentRegister,
@@ -18,6 +19,7 @@ import {
   type ArticleSummary,
   type Breezemoon,
   type ChatHistoryItem,
+  type HomeColumnCard,
   type LiteUser,
   type RankUser,
   type RepeaterItem,
@@ -66,13 +68,16 @@ const welcomeUser = computed(() => recentUsers.value[0] || null)
 const topModules = computed(() => layout.modulesIn('top'))
 const longModules = computed(() => layout.modulesIn('long'))
 const midModules = computed(() => layout.modulesIn('middle'))
-/** Live long zone: 最近更新 + 热门专栏 (column JSON 未开放时用长篇/热议帖近似). */
+const homeColumnsRecent = ref<HomeColumnCard[]>([])
+const homeColumnsHot = ref<HomeColumnCard[]>([])
+/** Fallback：无抓取结果时用长篇帖近似. */
 const longRecentShelf = computed(() => longArticles.value.slice(0, 8))
 const longHotShelf = computed(() => {
   const withCol = hot.value.filter((a) => a.columnTitle)
   if (withCol.length) return withCol.slice(0, 8)
   return (hot.value.length ? hot.value : longArticles.value).slice(0, 8)
 })
+const useColumnCards = computed(() => homeColumnsRecent.value.length > 0 || homeColumnsHot.value.length > 0)
 
 usePageSeo(() => ({
   title: SITE_NAME,
@@ -123,22 +128,37 @@ async function load() {
   const needArticles = left.value.length === 0
   if (needArticles) loading.value = true
   try {
-    const [articles, checkinRank, onlineRank, hotList, longList, regs, tagData, breezes, chats, reps, onlineSnap] =
-      await Promise.all([
-        needArticles
-          ? fetchRecentArticles(apiKey.value, 1, 40)
-          : Promise.resolve(left.value.concat(right.value)),
-        safe(fetchCheckinRank(apiKey.value), []),
-        safe(fetchOnlineRank(apiKey.value), []),
-        safe(fetchArticleFeed('hot', apiKey.value, 1, 12), []),
-        safe(fetchArticleFeed('long', apiKey.value, 1, 12), []),
-        safe(fetchRecentRegister(apiKey.value), []),
-        safe(fetchTags(apiKey.value, 1, 24), { tags: [], total: 0 }),
-        safe(fetchBreezemoons(1, 8), []),
-        safe(fetchChatHistory(apiKey.value, 1), []),
-        safe(fetchRepeaterItems(apiKey.value), []),
-        safe(fetchChatOnlineUsers(apiKey.value), {}),
-      ])
+    const [
+      articles,
+      checkinRank,
+      onlineRank,
+      hotList,
+      longList,
+      regs,
+      tagData,
+      breezes,
+      chats,
+      reps,
+      onlineSnap,
+      columns,
+    ] = await Promise.all([
+      needArticles
+        ? fetchRecentArticles(apiKey.value, 1, 40)
+        : Promise.resolve(left.value.concat(right.value)),
+      safe(fetchCheckinRank(apiKey.value), []),
+      safe(fetchOnlineRank(apiKey.value), []),
+      safe(fetchArticleFeed('hot', apiKey.value, 1, 12), []),
+      safe(fetchArticleFeed('long', apiKey.value, 1, 12), []),
+      safe(fetchRecentRegister(apiKey.value), []),
+      safe(fetchTags(apiKey.value, 1, 24), { tags: [], total: 0 }),
+      safe(fetchBreezemoons(1, 8), []),
+      safe(fetchChatHistory(apiKey.value, 1), []),
+      safe(fetchRepeaterItems(apiKey.value), []),
+      safe(fetchChatOnlineUsers(apiKey.value), {}),
+      safe(fetchHomeColumns(), { recent: [], hot: [] }),
+    ])
+    homeColumnsRecent.value = columns.recent || []
+    homeColumnsHot.value = columns.hot || []
     if (needArticles) splitArticles(articles)
     checkin.value = checkinRank.slice(0, 8)
     online.value = onlineRank.slice(0, 8)
@@ -387,19 +407,52 @@ function scrollShelf(id: string, dir: -1 | 1) {
             </div>
           </div>
           <div id="long-recent" class="long-shelf">
-            <article v-for="item in longRecentShelf" :key="item.oId" class="long-card">
-              <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
-                item.articleTitleEmoj || item.articleTitle
-              }}</RouterLink>
-              <div class="long-meta">
-                <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
-                <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                  {{ item.articleAuthorName }}
+            <template v-if="useColumnCards && homeColumnsRecent.length">
+              <article v-for="col in homeColumnsRecent" :key="'r-' + col.columnId" class="long-card column">
+                <div class="long-col-head">
+                  <RouterLink
+                    class="long-title"
+                    :to="
+                      col.latestChapter?.articleId
+                        ? `/article/${col.latestChapter.articleId}`
+                        : '/column'
+                    "
+                  >
+                    {{ col.columnTitle }}
+                  </RouterLink>
+                  <span class="long-count">{{ col.columnArticleCount }} 章</span>
+                </div>
+                <RouterLink
+                  v-for="(ch, i) in col.chapters.slice(0, 2)"
+                  :key="ch.articleId || i"
+                  class="long-chapter"
+                  :to="ch.articleId ? `/article/${ch.articleId}` : ch.permalink"
+                >
+                  <em>{{ ch.chapterNo }}</em>
+                  <span>{{ ch.title }}</span>
                 </RouterLink>
-                <span>{{ views(item) }}</span>
-              </div>
-            </article>
-            <p v-if="!longRecentShelf.length && !loading" class="hint long-empty">暂无长篇</p>
+              </article>
+            </template>
+            <template v-else>
+              <article v-for="item in longRecentShelf" :key="item.oId" class="long-card">
+                <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
+                  item.articleTitleEmoj || item.articleTitle
+                }}</RouterLink>
+                <div class="long-meta">
+                  <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
+                  <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                    {{ item.articleAuthorName }}
+                  </RouterLink>
+                  <span>{{ views(item) }}</span>
+                </div>
+              </article>
+            </template>
+            <p
+              v-if="!(useColumnCards ? homeColumnsRecent.length : longRecentShelf.length) && !loading"
+              class="hint long-empty"
+            >
+              暂无长篇
+            </p>
           </div>
         </div>
 
@@ -412,19 +465,52 @@ function scrollShelf(id: string, dir: -1 | 1) {
             </div>
           </div>
           <div id="long-hot" class="long-shelf">
-            <article v-for="item in longHotShelf" :key="'hot-' + item.oId" class="long-card hot">
-              <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
-                item.articleTitleEmoj || item.articleTitle
-              }}</RouterLink>
-              <div class="long-meta">
-                <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
-                <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                  {{ item.articleAuthorName }}
+            <template v-if="useColumnCards && homeColumnsHot.length">
+              <article v-for="col in homeColumnsHot" :key="'h-' + col.columnId" class="long-card column hot">
+                <div class="long-col-head">
+                  <RouterLink
+                    class="long-title"
+                    :to="
+                      col.latestChapter?.articleId
+                        ? `/article/${col.latestChapter.articleId}`
+                        : '/column'
+                    "
+                  >
+                    {{ col.columnTitle }}
+                  </RouterLink>
+                  <span class="long-count">{{ col.columnArticleCount }} 章</span>
+                </div>
+                <RouterLink
+                  v-for="(ch, i) in col.chapters.slice(0, 2)"
+                  :key="ch.articleId || i"
+                  class="long-chapter"
+                  :to="ch.articleId ? `/article/${ch.articleId}` : ch.permalink"
+                >
+                  <em>{{ ch.chapterNo }}</em>
+                  <span>{{ ch.title }}</span>
                 </RouterLink>
-                <span class="heat">🔥 {{ heat(item) }}</span>
-              </div>
-            </article>
-            <p v-if="!longHotShelf.length && !loading" class="hint long-empty">暂无热门</p>
+              </article>
+            </template>
+            <template v-else>
+              <article v-for="item in longHotShelf" :key="'hot-' + item.oId" class="long-card hot">
+                <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
+                  item.articleTitleEmoj || item.articleTitle
+                }}</RouterLink>
+                <div class="long-meta">
+                  <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
+                  <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                    {{ item.articleAuthorName }}
+                  </RouterLink>
+                  <span class="heat">🔥 {{ heat(item) }}</span>
+                </div>
+              </article>
+            </template>
+            <p
+              v-if="!(useColumnCards ? homeColumnsHot.length : longHotShelf.length) && !loading"
+              class="hint long-empty"
+            >
+              暂无热门
+            </p>
           </div>
         </div>
       </section>
@@ -861,6 +947,39 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .long-card.hot {
   border-color: rgba(210, 63, 49, 0.25);
+}
+.long-card.column {
+  flex-basis: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.long-col-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+.long-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--fp-muted);
+}
+.long-chapter {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fp-text);
+  text-decoration: none;
+  line-height: 1.35;
+}
+.long-chapter em {
+  flex-shrink: 0;
+  font-style: normal;
+  color: var(--fp-muted);
+}
+.long-chapter:hover span {
+  color: var(--fp-primary);
 }
 .long-title {
   display: block;

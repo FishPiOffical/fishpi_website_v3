@@ -2075,6 +2075,159 @@ export async function removeMfa(apiKey: string) {
   return res.msg || '已解绑'
 }
 
+export interface UserBag {
+  checkin1day?: number
+  checkin2days?: number
+  nameCard?: number
+  metalTicket?: number
+  patchCheckinCard?: number
+  patchStart?: string
+  sysCheckinRemain?: number
+  [key: string]: unknown
+}
+
+export async function fetchUserBag(apiKey: string): Promise<UserBag> {
+  const res = await fetch(`/__fp/account-bag?apiKey=${encodeURIComponent(apiKey)}`, {
+    credentials: 'include',
+  })
+  const data = (await res.json()) as { code?: number; msg?: string; data?: UserBag }
+  if (!res.ok || data.code) throw new Error(data.msg || '读取背包失败')
+  return data.data || {}
+}
+
+async function bagGet(apiKey: string, path: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>(path, {
+    method: 'GET',
+    headers: { csrfToken },
+  })
+  if (res.code) throw new Error(res.msg || '使用失败')
+  return res.msg || '已使用'
+}
+
+export async function useBag1dayCheckin(apiKey: string) {
+  return bagGet(apiKey, '/bag/1dayCheckin')
+}
+
+export async function useBag2dayCheckin(apiKey: string) {
+  return bagGet(apiKey, '/bag/2dayCheckin')
+}
+
+export async function useBagPatchCheckin(apiKey: string) {
+  return bagGet(apiKey, '/bag/patchCheckin')
+}
+
+export async function useBagNameCard(apiKey: string, userName: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/bag/nameCard', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({ userName }),
+  })
+  if (res.code) throw new Error(res.msg || '改名失败')
+  return res.msg || '改名成功'
+}
+
+export interface MyMedal {
+  medalId: string
+  name: string
+  description: string
+  type: string
+  display: boolean
+  displayOrder: number
+  expireTime: number
+}
+
+export function medalImageUrl(medalId: string) {
+  if (!medalId) return ''
+  return `/gen?id=${encodeURIComponent(medalId)}`
+}
+
+export async function fetchMyMedals(apiKey: string): Promise<MyMedal[]> {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/api/medal/my/list', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  if (res.code) throw new Error(res.msg || '加载勋章失败')
+  const raw = res.data
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === 'object' && Array.isArray((raw as { list?: unknown[] }).list)
+      ? (raw as { list: unknown[] }).list
+      : []
+  const medals: MyMedal[] = []
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const medalId = String(row.medal_id || row.medalId || '')
+    if (!medalId) continue
+    medals.push({
+      medalId,
+      name: String(row.medal_name || row.name || ''),
+      description: String(row.medal_description || row.description || ''),
+      type: String(row.medal_type || row.type || '普通'),
+      display: typeof row.display === 'boolean' ? row.display : true,
+      displayOrder: typeof row.display_order === 'number' ? row.display_order : Number(row.displayOrder || 0),
+      expireTime: Number(row.expire_time || row.expireTime || 0),
+    })
+  }
+  medals.sort((a, b) => a.displayOrder - b.displayOrder)
+  return medals
+}
+
+export async function setMyMedalDisplay(apiKey: string, medalId: string, display: boolean) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/api/medal/my/display', {
+    method: 'POST',
+    body: JSON.stringify({ medalId, display }),
+  })
+  if (res.code) throw new Error(res.msg || '操作失败')
+}
+
+export async function reorderMyMedal(apiKey: string, medalId: string, direction: 'up' | 'down') {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/api/medal/my/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ medalId, direction }),
+  })
+  if (res.code) throw new Error(res.msg || '排序失败')
+}
+
+export interface HomeColumnChapter {
+  articleId: string
+  permalink: string
+  chapterNo: string
+  title: string
+}
+
+export interface HomeColumnCard {
+  columnId: string
+  columnTitle: string
+  columnArticleCount: number
+  chapters: HomeColumnChapter[]
+  latestChapter?: HomeColumnChapter | null
+}
+
+export async function fetchHomeColumns(): Promise<{ recent: HomeColumnCard[]; hot: HomeColumnCard[] }> {
+  const res = await fetch('/__fp/home-columns', { credentials: 'include' })
+  const data = (await res.json()) as {
+    code?: number
+    msg?: string
+    data?: { recent?: HomeColumnCard[]; hot?: HomeColumnCard[] }
+  }
+  if (!res.ok || data.code) throw new Error(data.msg || '专栏加载失败')
+  return {
+    recent: data.data?.recent || [],
+    hot: data.data?.hot || [],
+  }
+}
+
 export interface ChatHistoryItem {
   oId: string
   userName: string

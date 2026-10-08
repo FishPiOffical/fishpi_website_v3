@@ -155,6 +155,8 @@ export default defineConfig(({ mode }) => {
         '/invitecode': proxy,
         '/export': proxy,
         '/mfa': proxy,
+        '/bag': proxy,
+        '/gen': proxy,
         '/settings': {
           ...proxy,
           bypass(req) {
