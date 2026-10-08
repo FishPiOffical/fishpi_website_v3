@@ -16,6 +16,7 @@ import {
   type ReactionSummary,
   type RedPacketContent,
 } from '@/api/fishpi'
+import { parseChatCard, type ChatCardData } from '@/utils/chatCard'
 import { useAuthStore } from './auth'
 
 export type ChatStyle = 'classic' | 'modern'
@@ -28,6 +29,7 @@ export interface ChatLine {
   html?: string
   time?: string
   redPacket?: RedPacketContent
+  card?: ChatCardData
   reactionSummary?: ReactionSummary[]
   currentUserReaction?: string
 }
@@ -68,14 +70,16 @@ function asLine(item: ChatHistoryItem | Record<string, unknown>): ChatLine {
     content && typeof content === 'object' && (content as RedPacketContent).msgType === 'redPacket'
       ? (content as RedPacketContent)
       : undefined
+  const card = redPacket ? undefined : parseChatCard(content)
   return {
     oId: String(item.oId ?? ''),
     userName: String(item.userName ?? ''),
     userNickname: item.userNickname as string | undefined,
     userAvatarURL: item.userAvatarURL as string | undefined,
-    html: typeof content === 'string' ? content : undefined,
+    html: typeof content === 'string' && !card ? content : undefined,
     time: item.time as string | undefined,
     redPacket,
+    card,
     reactionSummary: (item as ChatHistoryItem).reactionSummary,
     currentUserReaction: (item as ChatHistoryItem).currentUserReaction,
   }

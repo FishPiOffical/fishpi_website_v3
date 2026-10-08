@@ -6,7 +6,9 @@ import { fetchBarrageCost, fetchChatRaw } from '@/api/fishpi'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
 import PaintPanel from '@/components/chat/PaintPanel.vue'
 import ChatBubble from '@/components/ChatBubble.vue'
+import ChatCard from '@/components/ChatCard.vue'
 import ChatComposer from '@/components/ChatComposer.vue'
+import type { ChatCardData } from '@/utils/chatCard'
 import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -61,7 +63,7 @@ const rawText = ref('')
 const rawLoading = ref(false)
 const topicDraft = ref('')
 const editingTopic = ref(false)
-const quote = ref<{ userName: string; messageId: string; content: string; html: string } | null>(null)
+const quote = ref<{ userName: string; messageId: string; content: string; html: string; label: string } | null>(null)
 const quoteBusy = ref('')
 const quoteErr = ref('')
 
@@ -144,13 +146,13 @@ async function submit() {
   }
 }
 
-async function quoteMessage(msg: { oId: string; userName: string; html?: string }) {
+async function quoteMessage(msg: { oId: string; userName: string; html?: string; card?: ChatCardData }) {
   if (!auth.apiKey) return
   quoteBusy.value = msg.oId
   quoteErr.value = ''
   try {
     const content = await fetchChatRaw(auth.apiKey, msg.oId)
-    quote.value = { userName: msg.userName, messageId: msg.oId, content: content.trim(), html: quoteHtml(msg.html || '') }
+    quote.value = { userName: msg.userName, messageId: msg.oId, content: content.trim(), html: msg.card ? '' : msg.html || '', label: msg.card ? cardLabel(msg.card) : '' }
     await nextTick()
     composerRef.value?.reveal()
   } catch (e) {
@@ -160,18 +162,8 @@ async function quoteMessage(msg: { oId: string; userName: string; html?: string 
   }
 }
 
-const CARD_LABELS: Record<string, string> = { music: '🎵', weather: '🌤 天气', redPacket: '🧧 红包' }
-
-function quoteHtml(html: string) {
-  if (!html.trim().startsWith('{')) return html
-  try {
-    const card = JSON.parse(html) as { msgType?: string; title?: string }
-    const label = CARD_LABELS[card.msgType || ''] || '[卡片消息]'
-    const text = `${label}${card.title ? ` ${card.title}` : ''}`
-    return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
-  } catch {
-    return html
-  }
+function cardLabel(card: ChatCardData) {
+  return card.msgType === 'music' ? `🎵 ${card.title || '音乐'}` : `🌤 ${card.t || '天气'}`
 }
 
 function clearQuote() {
@@ -299,7 +291,8 @@ function clearScreen() {
               <div v-if="quote" class="quote-preview-box">
                 <div class="quote-info">
                   <span class="quote-label">引用 @{{ quote.userName }}</span>
-                  <div class="vditor-reset quote-html" v-html="quote.html" />
+                  <div v-if="quote.html" class="vditor-reset quote-html" v-html="quote.html" />
+                  <div v-else class="quote-html">{{ quote.label }}</div>
                 </div>
                 <button type="button" class="quote-cancel" title="取消引用" @click="clearQuote">✕</button>
               </div>
@@ -436,6 +429,7 @@ function clearScreen() {
                   </div>
                 </div>
               </div>
+              <ChatCard v-else-if="msg.card" :card="msg.card" />
               <template #reactions>
                 <ReactionBar
                   :summary="msg.reactionSummary"
@@ -561,6 +555,7 @@ function clearScreen() {
                   </div>
                 </div>
               </div>
+              <ChatCard v-else-if="msg.card" :card="msg.card" />
               <template #reactions>
                 <ReactionBar
                   :summary="msg.reactionSummary"
@@ -604,7 +599,8 @@ function clearScreen() {
               <div v-if="quote" class="quote-preview-box">
                 <div class="quote-info">
                   <span class="quote-label">引用 @{{ quote.userName }}</span>
-                  <div class="vditor-reset quote-html" v-html="quote.html" />
+                  <div v-if="quote.html" class="vditor-reset quote-html" v-html="quote.html" />
+                  <div v-else class="quote-html">{{ quote.label }}</div>
                 </div>
                 <button type="button" class="quote-cancel" title="取消引用" @click="clearQuote">✕</button>
               </div>
