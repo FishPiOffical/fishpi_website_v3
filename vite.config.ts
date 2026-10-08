@@ -94,7 +94,6 @@ export default defineConfig(({ mode }) => {
             if (path === '/points' || path.startsWith('/points/')) return req.url
           },
         },
-        '/upload': proxy,
         '/report': proxy,
         '/markdown': proxy,
         '/user-channel': { ...proxy, ws: true },

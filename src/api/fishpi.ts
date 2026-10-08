@@ -458,36 +458,45 @@ function extractUploadUrls(json: unknown): string[] {
   return []
 }
 
+/** RhyPic：先取一次性票据，再直传图床。不再使用旧版 POST /upload。 */
 export async function uploadFiles(apiKey: string, files: File[]): Promise<string[]> {
   if (!files.length) return []
-  try {
-    const ticketRes = await request<Envelope<{ ticket?: string; uploadURL?: string }>>(
-      withKey('/api/rhypic/upload-ticket', apiKey),
-      { method: 'POST' },
-    )
-    const ticket = ticketRes.data?.ticket
-    const uploadURL = ticketRes.data?.uploadURL
-    if (ticketRes.code || !ticket || !uploadURL) throw new Error(ticketRes.msg || '无上传票据')
-    const body = new FormData()
-    files.forEach((f) => body.append('file', f))
-    const res = await fetch(`${String(uploadURL).replace(/\/$/, '')}/api/v1/files`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${ticket}` },
-      body,
-    })
-    const json: unknown = await res.json()
-    const urls = extractUploadUrls(json)
-    if (urls.length) return urls
-    throw new Error('图床未返回文件地址')
-  } catch (e) {
-    const body = new FormData()
-    files.forEach((f) => body.append('file[]', f))
-    body.append('apiKey', apiKey)
-    const res = await request<Record<string, unknown>>('/upload', { method: 'POST', body })
-    const urls = extractUploadUrls(res)
-    if (urls.length) return urls
-    throw e instanceof Error ? e : new Error('上传失败')
+  const ticketRes = await request<Envelope<{ ticket?: string; uploadURL?: string }>>(
+    withKey('/api/rhypic/upload-ticket', apiKey),
+    { method: 'POST' },
+  )
+  const ticket = ticketRes.data?.ticket
+  const uploadURL = ticketRes.data?.uploadURL
+  if (ticketRes.code || !ticket || !uploadURL) {
+    throw new Error(ticketRes.msg || '获取 RhyPic 上传票据失败')
   }
+  const body = new FormData()
+  files.forEach((f) => body.append('file', f, f.name))
+  const res = await fetch(`${String(uploadURL).replace(/\/$/, '')}/api/v1/files`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ticket}` },
+    body,
+  })
+  let json: unknown
+  try {
+    json = await res.json()
+  } catch {
+    throw new Error(res.ok ? '图床响应无法解析' : `图床上传失败（HTTP ${res.status}）`)
+  }
+  if (!res.ok) {
+    const msg =
+      json && typeof json === 'object' && 'msg' in json
+        ? String((json as { msg?: unknown }).msg || '')
+        : ''
+    throw new Error(msg || `图床上传失败（HTTP ${res.status}）`)
+  }
+  const envelope = json as { code?: number; msg?: string }
+  if (typeof envelope.code === 'number' && envelope.code !== 0) {
+    throw new Error(envelope.msg || '图床上传失败')
+  }
+  const urls = extractUploadUrls(json)
+  if (!urls.length) throw new Error('图床未返回文件地址')
+  return urls
 }
 
 /** 匿名读未开放或接口 404 时可选回退 mock；成功但空列表不再当成失败。 */

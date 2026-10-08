@@ -45,7 +45,7 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - 标签、点赞列表、评论分页/删除、徽章
 - 用户主页、关注/粉丝、签到/昨日活跃、通知分页、私信撤回
 - 清风明月（可匿名）
-- 资料编辑、头像/发帖图片上传、表情包、积分转账与流水
+- 资料编辑、头像/发帖图片上传（RhyPic：`POST /api/rhypic/upload-ticket` → 直传图床）、表情包、积分转账与流水
 - 我的收藏、聊天室多类型红包/领取明细/撤回/@ 补全
 - 主题、对话框、头像框：`src/packs` 目录包
 - 广告位：仅保留 `AdSlot` 入口（`home.top` / `home.sidebar` / `footer.sponsors`），暂不拉取素材
