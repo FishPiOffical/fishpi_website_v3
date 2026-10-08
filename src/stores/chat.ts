@@ -19,6 +19,8 @@ import {
 } from '@/api/fishpi'
 import { useAuthStore } from './auth'
 
+export type ChatStyle = 'classic' | 'modern'
+
 export interface ChatLine {
   oId: string
   userName: string
@@ -81,6 +83,9 @@ function asLine(item: ChatHistoryItem | Record<string, unknown>): ChatLine {
 }
 
 export const useChatStore = defineStore('chat', () => {
+  const chatStyle = ref<ChatStyle>(
+    (typeof localStorage !== 'undefined' && (localStorage.getItem('fp_chat_style') as ChatStyle)) || 'classic'
+  )
   const messages = ref<ChatLine[]>([])
   const onlines = ref<OnlineUser[]>([])
   const discuss = ref('加载中...')
@@ -424,5 +429,19 @@ export const useChatStore = defineStore('chat', () => {
     react,
     switchNode,
     refreshNodes,
+    chatStyle,
+    setChatStyle(style: ChatStyle) {
+      chatStyle.value = style
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('fp_chat_style', style)
+      }
+    },
+    toggleChatStyle() {
+      const next = chatStyle.value === 'classic' ? 'modern' : 'classic'
+      chatStyle.value = next
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('fp_chat_style', next)
+      }
+    },
   }
 })

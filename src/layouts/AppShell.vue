@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useNoticeStore } from '@/stores/notices'
 import { useWhisperStore } from '@/stores/whispers'
+import { useChatStore } from '@/stores/chat'
 import AdSlot from '@/components/ads/AdSlot.vue'
 import LogoMark from '@/components/LogoMark.vue'
 
@@ -94,9 +95,12 @@ const auth = useAuthStore()
 const appearance = useAppearanceStore()
 const notices = useNoticeStore()
 const whispers = useWhisperStore()
+const chat = useChatStore()
 const { isLoggedIn, account, isVip } = storeToRefs(auth)
 const { total: unreadTotal } = storeToRefs(notices)
 const { unreadTotal: whisperUnread } = storeToRefs(whispers)
+
+const isModernChat = computed(() => route.path === '/cr' && chat.chatStyle === 'modern')
 
 const memberPath = computed(() => (account.value?.userName ? `/member/${account.value.userName}` : '/login'))
 const avatarUrl = computed(() => account.value?.userAvatarURL || '')
@@ -254,10 +258,10 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
       <b>￥365</b>
     </div>
     <AdSlot slot-key="home.top" />
-    <main>
+    <main :class="{ 'main--cr-modern': isModernChat }">
       <RouterView />
     </main>
-    <footer class="foot">
+    <footer v-if="!isModernChat" class="foot">
       <div class="foot-inner">
         <p class="slogan">摸鱼派 - 鱼油专属摸鱼社区</p>
         <div class="foot-main">
@@ -597,6 +601,10 @@ main {
   max-width: var(--fp-wrap);
   margin: 0 auto;
   padding: 25px 15px 20px;
+}
+main.main--cr-modern {
+  padding: 8px 15px 0;
+  max-width: 1440px;
 }
 .foot {
   background: var(--fp-footer);

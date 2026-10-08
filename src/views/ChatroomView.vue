@@ -30,6 +30,7 @@ const {
   onlines,
   nodeName,
   nodeOptions,
+  chatStyle,
 } = storeToRefs(chat)
 
 const draft = ref('')
@@ -44,6 +45,7 @@ const showPacket = ref(false)
 const showBarrage = ref(false)
 const showPaint = ref(false)
 const showNodes = ref(false)
+const showClassicOnlines = ref(false)
 const barrageText = ref('')
 const barrageCost = ref('')
 const pendingGesture = ref<string | null>(null)
@@ -57,6 +59,9 @@ const quoteErr = ref('')
 
 const me = computed(() => account.value?.userName)
 
+// 经典版：最新消息排在最上面！
+const classicMessages = computed(() => [...messages.value].reverse())
+
 function scrollToHash() {
   if (typeof location === 'undefined') return
   const id = location.hash.replace(/^#/, '')
@@ -68,7 +73,9 @@ function scrollToHash() {
 onMounted(async () => {
   await chat.connect()
   await nextTick()
-  scrollBottom()
+  if (chatStyle.value === 'modern') {
+    scrollBottom()
+  }
   scrollToHash()
   if (auth.apiKey) {
     try {
@@ -84,15 +91,28 @@ onUnmounted(() => chat.disconnect())
 watch(
   () => messages.value.length,
   async () => {
-    await nextTick()
-    const el = scroller.value
-    if (!el) return
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 120) scrollBottom()
+    if (chatStyle.value === 'modern') {
+      await nextTick()
+      const el = scroller.value
+      if (!el) return
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 150) {
+        scrollBottom()
+      }
+    }
   },
 )
 
+watch(chatStyle, async (newVal) => {
+  if (newVal === 'modern') {
+    await nextTick()
+    scrollBottom()
+  }
+})
+
 function scrollBottom() {
-  if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
+  if (scroller.value) {
+    scroller.value.scrollTop = scroller.value.scrollHeight
+  }
 }
 
 function buildQuoteSuffix() {
@@ -104,12 +124,15 @@ function buildQuoteSuffix() {
 
 async function submit() {
   const text = draft.value
+  if (!text.trim() && !quote.value) return
   const content = `${text}${buildQuoteSuffix()}`
   draft.value = ''
   quote.value = null
   await chat.send(content)
-  await nextTick()
-  scrollBottom()
+  if (chatStyle.value === 'modern') {
+    await nextTick()
+    scrollBottom()
+  }
 }
 
 async function quoteMessage(msg: { oId: string; userName: string }) {
@@ -120,7 +143,7 @@ async function quoteMessage(msg: { oId: string; userName: string }) {
     const content = await fetchChatRaw(auth.apiKey, msg.oId)
     quote.value = { userName: msg.userName, messageId: msg.oId, content: content.trim() }
     await nextTick()
-    document.querySelector<HTMLTextAreaElement>('.compose-wrap textarea')?.focus()
+    document.querySelector<HTMLTextAreaElement>('.compose-field-wrap textarea')?.focus()
   } catch (e) {
     quoteErr.value = e instanceof Error ? e.message : '读取原文失败'
   } finally {
@@ -154,9 +177,9 @@ function onComposerKey(e: KeyboardEvent) {
   }
 }
 
-async function onScroll() {
+async function onModernScroll() {
   const el = scroller.value
-  if (!el || el.scrollTop > 40) return
+  if (!el || el.scrollTop > 50 || loadingMore.value || !hasMore.value) return
   const prev = el.scrollHeight
   await chat.loadMore()
   await nextTick()
@@ -173,16 +196,16 @@ async function sendPacket() {
     gesture: packetType.value === 'rockPaperScissors' ? gesture.value : undefined,
   })
   showPacket.value = false
-  await nextTick()
-  scrollBottom()
+  if (chatStyle.value === 'modern') {
+    await nextTick()
+    scrollBottom()
+  }
 }
 
 async function sendBarrage() {
   await chat.sendBarrage(barrageText.value)
   barrageText.value = ''
   showBarrage.value = false
-  await nextTick()
-  scrollBottom()
 }
 
 async function claim(oId: string, type?: string) {
@@ -193,10 +216,16 @@ async function claim(oId: string, type?: string) {
   await chat.openPacket(oId)
 }
 
+async function playGesture(g: number) {
+  if (!pendingGesture.value) return
+  await chat.openPacket(pendingGesture.value, g)
+  pendingGesture.value = null
+}
+
 function packetLabel(type?: string) {
-  if (type === 'average') return '平均红包'
-  if (type === 'specify') return '专属红包'
-  if (type === 'rockPaperScissors') return '猜拳红包'
+  if (type === 'average') return '普通均分红包'
+  if (type === 'specify') return '专属定向红包'
+  if (type === 'rockPaperScissors') return '猜拳胜利红包'
   return '拼手气红包'
 }
 
@@ -230,11 +259,299 @@ function clearScreen() {
 </script>
 
 <template>
-  <div class="cr-page">
-    <div class="cr-wrapper">
-      <!-- 聊天室主体 -->
-      <section class="cr-main-box">
-        <!-- 顶部操作栏 (对齐现网 Rhythm chat-room__header) -->
+  <div class="cr-page" :class="`theme-${chatStyle}`">
+    <!-- ==================== 版本 A: 经典版本 (Classic) ==================== -->
+    <!-- 输入框在最上方，新消息排在最上面，随内容自然向下延展 -->
+    <div v-if="chatStyle === 'classic'" class="cr-classic-layout">
+      <main class="cr-classic-main">
+        <!-- 顶部输入与控制区域 (对齐现网 chat-room.ftl .reply) -->
+        <section class="cr-classic-composer-card">
+          <!-- 经典版顶部状态栏：左侧标题与连接状态，右侧大区/切换样式/清屏 -->
+          <div class="cr-classic-topbar">
+            <div class="topbar-left">
+              <span class="classic-title-tag">💬 经典模式</span>
+              <span class="cr-status-tag" :class="{ on: connected }">
+                <span class="status-dot" />
+                {{ connected ? '已连接' : isLoggedIn ? '连接中' : '访客浏览' }}
+              </span>
+            </div>
+            <div class="topbar-right">
+              <button
+                v-if="isLoggedIn"
+                type="button"
+                class="classic-action-btn"
+                :title="nodeName || '选择大区'"
+                @click="openNodePicker"
+              >
+                🌐 {{ nodeName ? `大区: ${nodeName}` : '选择大区' }}
+              </button>
+              <!-- 切换样式入口 (登录/未登录均可切换) -->
+              <button
+                type="button"
+                class="classic-action-btn style-toggle-btn"
+                title="切换到简约气泡版本（输入框在最下方）"
+                @click="chat.toggleChatStyle()"
+              >
+                切换样式：简约
+              </button>
+              <button v-if="isLoggedIn" type="button" class="classic-action-btn" @click="clearScreen">
+                清屏
+              </button>
+            </div>
+          </div>
+
+          <!-- 引用预览 -->
+          <div v-if="quote" class="quote-preview-box">
+            <div class="quote-info">
+              <span class="quote-label">引用 @{{ quote.userName }}</span>
+              <p class="quote-text">{{ quote.content.slice(0, 200) }}</p>
+            </div>
+            <button type="button" class="quote-cancel" title="取消引用" @click="clearQuote">✕</button>
+          </div>
+
+          <!-- 输入区 -->
+          <div v-if="isLoggedIn" class="compose-field-wrap">
+            <MentionSuggest v-model="draft" />
+            <textarea
+              v-model="draft"
+              rows="3"
+              placeholder="说点什么吧，支持 Markdown。Enter 发送，Shift+Enter 换行。@ 可快速提及鱼油…"
+              @keydown="onComposerKey"
+            />
+          </div>
+          <div v-else class="comment-login-hint">
+            <RouterLink to="/login" class="login-link">登录</RouterLink>后参与讨论与收发消息
+          </div>
+
+          <!-- 工具栏与操作行 (登录后可用) -->
+          <div v-if="isLoggedIn" class="cr-classic-toolbar">
+            <div class="toolbar-left">
+              <button
+                type="button"
+                class="classic-tool-btn"
+                title="发放红包"
+                @click="showPacket = !showPacket; showBarrage = false; showPaint = false"
+              >
+                🧧 红包
+              </button>
+              <EmojiPicker @insert="(md) => (draft += md)" />
+              <button
+                type="button"
+                class="classic-tool-btn"
+                title="涂鸦画板"
+                @click="showPaint = !showPaint; showPacket = false; showBarrage = false"
+              >
+                🎨 涂鸦
+              </button>
+              <button
+                type="button"
+                class="classic-tool-btn"
+                title="发送弹幕"
+                @click="showBarrage = !showBarrage; showPacket = false; showPaint = false"
+              >
+                💬 弹幕
+              </button>
+
+              <div class="classic-topic-chip" :title="discuss">
+                <span class="topic-label">当前话题：</span>
+                <span class="topic-text"># {{ discuss }} #</span>
+                <button type="button" class="topic-icon-btn" title="引用话题" @click="useTopic">#</button>
+                <button type="button" class="topic-icon-btn" title="编辑话题" @click="editingTopic = !editingTopic">✏️</button>
+              </div>
+            </div>
+
+            <div class="toolbar-right">
+              <button
+                type="button"
+                class="classic-send-btn"
+                :disabled="sending || (!draft.trim() && !quote)"
+                @click="submit"
+              >
+                {{ sending ? '发送中…' : '发 送' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 话题编辑展开表单 -->
+          <form v-if="editingTopic" class="pop-sub-form" @submit.prevent="saveTopic">
+            <input v-model="topicDraft" :placeholder="discuss || '输入新话题…'" />
+            <button type="submit" class="pop-btn green">保存</button>
+            <button type="button" class="pop-btn ghost" @click="editingTopic = false">取消</button>
+          </form>
+
+          <!-- 发红包展开表单 -->
+          <form v-if="showPacket" class="pop-sub-form packet-sub-form" @submit.prevent="sendPacket">
+            <select v-model="packetType">
+              <option value="random">拼手气红包</option>
+              <option value="average">普通均分红包</option>
+              <option value="specify">专属定向红包</option>
+              <option value="rockPaperScissors">猜拳胜利红包</option>
+            </select>
+            <label>积分: <input v-model.number="packetMoney" type="number" min="1" /></label>
+            <label v-if="packetType !== 'specify'">个数: <input v-model.number="packetCount" type="number" min="1" /></label>
+            <input v-if="packetType === 'specify'" v-model="packetTo" placeholder="指定接收用户名" />
+            <select v-if="packetType === 'rockPaperScissors'" v-model.number="gesture">
+              <option :value="0">✊ 石头</option>
+              <option :value="1">✌️ 剪刀</option>
+              <option :value="2">✋ 布</option>
+            </select>
+            <input v-model="packetMsg" placeholder="祝福语 (摸鱼者，人品好！)" />
+            <button type="submit" class="pop-btn green" :disabled="sending">塞积分</button>
+            <button type="button" class="pop-btn ghost" @click="showPacket = false">取消</button>
+          </form>
+
+          <!-- 弹幕展开表单 -->
+          <form v-if="showBarrage" class="pop-sub-form barrage-sub-form" @submit.prevent="sendBarrage">
+            <input v-model="barrageText" maxlength="32" placeholder="友善弹幕，最多32个字" />
+            <button type="submit" class="pop-btn green" :disabled="sending || !barrageText.trim()">发射!</button>
+            <button type="button" class="pop-btn ghost" @click="showBarrage = false">取消</button>
+            <span v-if="barrageCost" class="barrage-cost-hint">花费 {{ barrageCost }}</span>
+          </form>
+
+          <!-- 涂鸦面板 -->
+          <div v-if="showPaint" class="paint-box-wrap">
+            <PaintPanel @submit="insertPaint" @cancel="showPaint = false" />
+          </div>
+
+          <!-- 在线人数条与折叠 -->
+          <div class="classic-status-bar">
+            <div class="online-stat">
+              <span>在线人数: <b>{{ onlines.length }}</b></span>
+              <button
+                type="button"
+                class="online-toggle-btn"
+                @click="showClassicOnlines = !showClassicOnlines"
+              >
+                {{ showClassicOnlines ? '收起在线列表' : '展开在线列表' }}
+              </button>
+            </div>
+            <span v-if="lastPacket" class="top-packet-tip">{{ lastPacket }}</span>
+            <span v-if="error" class="top-error-tip">{{ error }}</span>
+          </div>
+
+          <div v-if="showClassicOnlines" class="classic-online-grid">
+            <RouterLink
+              v-for="u in onlines"
+              :key="u.userName"
+              :to="`/member/${u.userName}`"
+              class="classic-online-user"
+              :title="u.userNickname || u.userName"
+            >
+              <span
+                class="avatar-tiny"
+                :style="u.userAvatarURL ? { backgroundImage: `url('${u.userAvatarURL}')` } : undefined"
+              />
+              <span class="user-name">{{ u.userNickname || u.userName }}</span>
+            </RouterLink>
+          </div>
+        </section>
+
+        <!-- 经典版消息列表 (最新消息插入在最上面，历史在下方向下延展) -->
+        <section class="cr-classic-list">
+          <p v-if="loading && !messages.length" class="empty-hint">正在拉取最新发言…</p>
+          <p v-else-if="!messages.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
+
+          <article
+            v-for="msg in classicMessages"
+            :id="`chatroom${msg.oId}`"
+            :key="msg.oId"
+            class="classic-msg-item"
+          >
+            <!-- 左侧头像 -->
+            <RouterLink :to="`/member/${msg.userName}`" class="classic-avatar-wrap">
+              <span
+                class="classic-avatar"
+                :style="msg.userAvatarURL ? { backgroundImage: `url('${msg.userAvatarURL}')` } : undefined"
+              />
+            </RouterLink>
+
+            <!-- 右侧内容 -->
+            <div class="classic-content-col">
+              <div class="classic-msg-header">
+                <div class="header-left">
+                  <RouterLink :to="`/member/${msg.userName}`" class="classic-name">
+                    {{ msg.userNickname || msg.userName }}
+                  </RouterLink>
+                  <time class="classic-time">{{ msg.time }}</time>
+                </div>
+
+                <div class="header-actions">
+                  <button v-if="msg.userName === me" type="button" class="action-btn" title="撤回" @click="chat.revoke(msg.oId)">
+                    撤回
+                  </button>
+                  <button type="button" class="action-btn" title="查看上下文" @click="chat.loadAround(msg.oId)">
+                    附近
+                  </button>
+                  <button
+                    v-if="!msg.redPacket && auth.apiKey"
+                    type="button"
+                    class="action-btn"
+                    :disabled="quoteBusy === msg.oId"
+                    title="引用消息"
+                    @click="quoteMessage(msg)"
+                  >
+                    {{ quoteBusy === msg.oId ? '…' : '引用' }}
+                  </button>
+                  <button v-if="!msg.redPacket && auth.apiKey" type="button" class="action-btn" title="查看原文" @click="showRaw(msg.oId)">
+                    原文
+                  </button>
+                  <ReportDialog v-if="msg.userName !== me && auth.apiKey" :api-key="auth.apiKey" :data-id="msg.oId" :data-type="3" />
+                </div>
+              </div>
+
+              <!-- 红包卡片 / 正常文本正文 -->
+              <div v-if="msg.redPacket" class="chat-bubble packet-bubble">
+                <div class="packet-top">
+                  <span class="packet-icon">🧧</span>
+                  <strong>{{ packetLabel(msg.redPacket.type) }}</strong>
+                </div>
+                <p class="packet-desc">{{ msg.redPacket.msg || '大吉大利，摸鱼派！' }}</p>
+                <div class="packet-footer">
+                  <small>已领 {{ msg.redPacket.got || 0 }} / {{ msg.redPacket.count || 0 }} 个</small>
+                  <button v-if="isLoggedIn" type="button" class="claim-btn" @click="claim(msg.oId, msg.redPacket.type)">
+                    领取红包
+                  </button>
+                </div>
+              </div>
+              <div v-else class="classic-text-body" v-html="msg.html || ''" />
+
+              <!-- 表情反应条 -->
+              <ReactionBar
+                :summary="msg.reactionSummary"
+                :current="msg.currentUserReaction"
+                :disabled="!auth.apiKey"
+                @toggle="(v) => chat.react(msg.oId, v)"
+              />
+            </div>
+          </article>
+
+          <!-- 底部加载更早历史消息 (经典版历史消息在下方) -->
+          <div class="classic-footer-load">
+            <button
+              v-if="hasMore && messages.length"
+              type="button"
+              class="classic-more-btn"
+              :disabled="loadingMore"
+              @click="chat.loadMore"
+            >
+              {{ loadingMore ? '加载历史消息…' : '查看更早记录' }}
+            </button>
+            <span v-else-if="messages.length" class="no-more-tip">已加载全部历史消息</span>
+          </div>
+        </section>
+      </main>
+
+      <!-- 经典版右侧边栏 (自然向下排布) -->
+      <aside class="cr-sidebar-col classic-sidebar">
+        <ChatSidebar />
+      </aside>
+    </div>
+
+    <!-- ==================== 版本 B: 现代气泡版本 (Modern) ==================== -->
+    <!-- 顶部操作栏，中间滚动列表，底部吸底输入框，右侧独立滚动，决不溢出视口 -->
+    <div v-else class="cr-modern-layout">
+      <section class="cr-modern-main">
+        <!-- 顶部操作栏 (对齐现网 chat-room-2.ftl .chat-room__header) -->
         <header class="cr-header">
           <div class="cr-header-left">
             <button
@@ -244,7 +561,7 @@ function clearScreen() {
               :title="nodeName || '选择大区'"
               @click="openNodePicker"
             >
-              <span class="icon-server">🌐</span> {{ nodeName ? `大区: ${nodeName}` : '选择大区' }}
+              🌐 {{ nodeName ? `大区: ${nodeName}` : '选择大区' }}
             </button>
             <span class="cr-status-tag" :class="{ on: connected }">
               <span class="status-dot" />
@@ -255,42 +572,30 @@ function clearScreen() {
           <div class="cr-header-right">
             <span v-if="error" class="top-error-tip">{{ error }}</span>
             <span v-if="lastPacket" class="top-packet-tip">{{ lastPacket }}</span>
+            <!-- 切换样式入口 -->
+            <button
+              type="button"
+              class="cr-top-btn style-toggle-btn"
+              title="切换到经典版本（输入框在顶部，新消息在最上）"
+              @click="chat.toggleChatStyle()"
+            >
+              切换样式：经典
+            </button>
             <button v-if="isLoggedIn" type="button" class="cr-top-btn" @click="clearScreen">
-              清屏并置底
+              清屏置底
             </button>
             <span class="online-indicator">在线 <b>{{ onlines.length }}</b></span>
           </div>
         </header>
 
-        <!-- 大区节点选择弹层 -->
-        <div v-if="showNodes && isLoggedIn" class="node-panel">
-          <div class="node-panel-head">
-            <span class="muted">切换聊天室大区节点（人数供参考）</span>
-            <button type="button" class="close-btn" @click="showNodes = false">✕</button>
-          </div>
-          <div class="node-grid">
-            <button
-              v-for="opt in nodeOptions"
-              :key="opt.node + opt.name"
-              type="button"
-              class="node-opt"
-              :class="{ current: opt.name === nodeName }"
-              @click="pickNode(opt)"
-            >
-              <span class="opt-name">{{ opt.name }}</span>
-              <em v-if="opt.online != null">{{ opt.online }} 人</em>
-            </button>
-          </div>
-        </div>
-
-        <!-- 聊天消息列表展示区 (置于上方，高度自适应滚动) -->
-        <div ref="scroller" class="chat-messages-scroll" @scroll="onScroll">
+        <!-- 现代消息列表滚动展示区 (向上滚动加载更早记录，最新在最下) -->
+        <div ref="scroller" class="chat-messages-scroll" @scroll="onModernScroll">
           <button
             v-if="hasMore && messages.length"
             type="button"
             class="more-btn"
             :disabled="loadingMore"
-            @click="onScroll"
+            @click="onModernScroll"
           >
             {{ loadingMore ? '加载历史消息…' : '查看更早记录' }}
           </button>
@@ -375,29 +680,7 @@ function clearScreen() {
           </p>
         </div>
 
-        <!-- 弹窗/抽屉详情 (红包明细/原文) -->
-        <div v-if="rawText || rawLoading" class="overlay-card">
-          <div class="card-head">
-            <strong>{{ rawLoading ? '正在读取消息原文…' : 'Markdown 原文' }}</strong>
-            <button type="button" class="close-btn" @click="rawText = ''">✕</button>
-          </div>
-          <pre class="raw-pre">{{ rawText }}</pre>
-        </div>
-
-        <div v-if="packetDetail" class="overlay-card">
-          <div class="card-head">
-            <strong>{{ packetDetail.msg || '红包领取明细' }}</strong>
-            <button type="button" class="close-btn" @click="chat.closePacketDetail()">✕</button>
-          </div>
-          <ul class="packet-detail-list">
-            <li v-for="(r, i) in packetDetail.recivers" :key="i">
-              <span class="user">{{ r.userName }}</span>
-              <span class="money">{{ r.money }} 积分</span>
-            </li>
-          </ul>
-        </div>
-
-        <!-- 底部吸底输入与工具区 (对齐现网 Rhythm chat-room__input) -->
+        <!-- 底部吸底输入与工具区 (对齐现网 chat-room-2.ftl .chat-room__input) -->
         <div class="cr-composer-panel">
           <div v-if="isLoggedIn" class="composer-inner">
             <!-- 引用预览条 -->
@@ -499,54 +782,457 @@ function clearScreen() {
             </form>
 
             <!-- 弹幕表单 -->
-            <form v-if="showBarrage" class="pop-sub-form" @submit.prevent="sendBarrage">
-              <input v-model="barrageText" maxlength="32" placeholder="发一条高亮弹幕（最多 32 字）" />
-              <button type="submit" class="pop-btn green" :disabled="sending || !barrageText.trim()">发射</button>
+            <form v-if="showBarrage" class="pop-sub-form barrage-sub-form" @submit.prevent="sendBarrage">
+              <input v-model="barrageText" maxlength="32" placeholder="友善弹幕，最多32个字" />
+              <button type="submit" class="pop-btn green" :disabled="sending || !barrageText.trim()">发射!</button>
               <button type="button" class="pop-btn ghost" @click="showBarrage = false">取消</button>
-              <span v-if="barrageCost" class="barrage-cost-hint">消耗约 {{ barrageCost }}</span>
+              <span v-if="barrageCost" class="barrage-cost-hint">花费 {{ barrageCost }}</span>
             </form>
 
             <!-- 涂鸦面板 -->
-            <PaintPanel v-if="showPaint" @insert="insertPaint" @close="showPaint = false" />
+            <div v-if="showPaint" class="paint-box-wrap">
+              <PaintPanel @submit="insertPaint" @cancel="showPaint = false" />
+            </div>
           </div>
 
-          <!-- 未登录提示 -->
           <div v-else class="guest-bottom-bar">
-            <span>您当前处于访客浏览模式，</span>
-            <RouterLink :to="{ path: '/login', query: { redirect: '/cr' } }" class="login-link">
-              立即登录
-            </RouterLink>
-            <span>即可实时发言、领红包与参与社区互动。</span>
+            <span>登录后即可参与发言、抢红包与互动。</span>
+            <RouterLink to="/login" class="login-link">立即登录</RouterLink>
           </div>
         </div>
       </section>
 
-      <!-- 聊天室右侧侧栏挂件 -->
-      <ChatSidebar />
+      <!-- 现代版右侧侧边栏 (内部自适应滚动，限制在视口高度内) -->
+      <aside class="cr-sidebar-col modern-sidebar">
+        <ChatSidebar />
+      </aside>
+    </div>
+
+    <!-- ==================== 公共浮层/弹窗 ==================== -->
+    <!-- 大区节点选择弹层 -->
+    <div v-if="showNodes && isLoggedIn" class="node-panel-dialog">
+      <div class="node-panel-card">
+        <div class="node-panel-head">
+          <strong>切换聊天室大区节点</strong>
+          <button type="button" class="close-btn" @click="showNodes = false">✕</button>
+        </div>
+        <div class="node-grid">
+          <button
+            v-for="opt in nodeOptions"
+            :key="opt.node + opt.name"
+            type="button"
+            class="node-opt"
+            :class="{ current: opt.name === nodeName }"
+            @click="pickNode(opt)"
+          >
+            <span class="opt-name">{{ opt.name }}</span>
+            <em v-if="opt.online != null">{{ opt.online }} 人</em>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Markdown 原文弹窗 -->
+    <div v-if="rawText || rawLoading" class="overlay-card">
+      <div class="card-head">
+        <strong>{{ rawLoading ? '正在读取消息原文…' : 'Markdown 原文' }}</strong>
+        <button type="button" class="close-btn" @click="rawText = ''">✕</button>
+      </div>
+      <pre class="raw-pre">{{ rawText }}</pre>
+    </div>
+
+    <!-- 红包明细弹窗 -->
+    <div v-if="packetDetail" class="overlay-card">
+      <div class="card-head">
+        <strong>{{ packetDetail.msg || '红包领取明细' }}</strong>
+        <button type="button" class="close-btn" @click="chat.closePacketDetail()">✕</button>
+      </div>
+      <ul class="packet-detail-list">
+        <li v-for="(r, i) in packetDetail.recivers" :key="i">
+          <span class="user">{{ r.userName }}</span>
+          <span class="money">{{ r.money }} 积分</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- 猜拳参与弹窗 -->
+    <div v-if="pendingGesture" class="overlay-card gesture-card">
+      <div class="card-head">
+        <strong>参与猜拳抢红包</strong>
+        <button type="button" class="close-btn" @click="pendingGesture = null">✕</button>
+      </div>
+      <p class="gesture-tip">请选择出拳手势（赢者瓜分积分）：</p>
+      <div class="gesture-choices">
+        <button type="button" class="gesture-btn" @click="playGesture(0)">✊ 石头</button>
+        <button type="button" class="gesture-btn" @click="playGesture(1)">✌️ 剪刀</button>
+        <button type="button" class="gesture-btn" @click="playGesture(2)">✋ 布</button>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .cr-page {
-  width: 92%;
+  width: 94%;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 16px 0 20px;
 }
 
-.cr-wrapper {
+/* =========================================================
+   版本 A：经典版 (Classic) 样式
+   ========================================================= */
+.cr-classic-layout {
   display: flex;
-  gap: 16px;
-  align-items: stretch;
-  height: calc(100vh - var(--fp-nav-h) - 40px);
-  min-height: 580px;
+  gap: 20px;
+  align-items: flex-start;
+  padding: 10px 0 30px;
 }
 
-/* 聊天室主容器 (高度固定，内部上滚下吸) */
-.cr-main-box {
+.cr-classic-main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cr-classic-composer-card {
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: var(--fp-card-shadow);
+}
+
+.cr-classic-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--fp-border);
+}
+
+.topbar-left,
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.classic-title-tag {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fp-title);
+}
+
+.cr-classic-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--fp-border);
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.classic-tool-btn,
+.classic-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
+  color: var(--fp-title);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.classic-tool-btn:hover,
+.classic-action-btn:hover {
+  background: var(--fp-hover);
+  border-color: var(--fp-accent);
+  color: var(--fp-accent);
+}
+
+.style-toggle-btn {
+  background: var(--fp-hover);
+  border-color: var(--fp-accent);
+  color: var(--fp-accent);
+  font-weight: 600;
+}
+
+.classic-send-btn {
+  border: 0;
+  background: var(--fp-accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.classic-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.classic-topic-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--fp-hover);
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  max-width: 280px;
+}
+
+.classic-topic-chip .topic-label {
+  color: var(--fp-muted);
+}
+
+.classic-topic-chip .topic-text {
+  color: var(--fp-accent);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: normal;
+}
+
+.topic-icon-btn {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+.classic-status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--fp-border);
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+
+.online-stat b {
+  color: var(--fp-accent);
+}
+
+.online-toggle-btn {
+  background: transparent;
+  border: 0;
+  color: var(--fp-link);
+  cursor: pointer;
+  margin-left: 8px;
+  font-size: 12px;
+}
+
+.classic-online-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--fp-bg);
+  border-radius: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.classic-online-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  font-size: 12px;
+  color: var(--fp-title);
+  text-decoration: none;
+}
+
+.avatar-tiny {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--fp-border);
+}
+
+/* 经典版列表 (新在最前，向下延展) */
+.cr-classic-list {
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: var(--fp-card-shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.classic-msg-item {
+  display: flex;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--fp-border);
+}
+
+.classic-msg-item:last-child {
+  border-bottom: 0;
+}
+
+.classic-avatar-wrap {
+  flex-shrink: 0;
+}
+
+.classic-avatar {
+  display: block;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--fp-border);
+  border: 1px solid var(--fp-border);
+}
+
+.classic-content-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.classic-msg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.classic-name {
+  font-weight: 600;
+  color: var(--fp-title);
+  text-decoration: none;
+}
+
+.classic-name:hover {
+  color: var(--fp-accent);
+}
+
+.classic-time {
+  color: var(--fp-muted);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-btn {
+  border: 0;
+  background: transparent;
+  color: var(--fp-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.action-btn:hover {
+  background: var(--fp-hover);
+  color: var(--fp-accent);
+}
+
+.classic-text-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--fp-text);
+  word-break: break-word;
+}
+
+.classic-footer-load {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 20px;
+  margin-top: 10px;
+  border-top: 1px solid var(--fp-border);
+}
+
+.classic-more-btn {
+  padding: 6px 20px;
+  font-size: 13px;
+  background: var(--fp-hover);
+  border: 1px solid var(--fp-border);
+  color: var(--fp-title);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.classic-more-btn:hover {
+  border-color: var(--fp-accent);
+  color: var(--fp-accent);
+}
+
+.no-more-tip {
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+
+.classic-sidebar {
+  flex: 0 0 280px;
+  width: 280px;
+}
+
+/* =========================================================
+   版本 B：现代气泡版 (Modern) 样式
+   ========================================================= */
+.cr-modern-layout {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - var(--fp-nav-h) - 24px);
+  min-height: 520px;
+  overflow: hidden;
+  padding-bottom: 8px;
+}
+
+.cr-modern-main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--fp-card);
@@ -557,7 +1243,27 @@ function clearScreen() {
   position: relative;
 }
 
-/* 1. 顶部操作栏 */
+.modern-sidebar {
+  flex: 0 0 280px;
+  width: 280px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--fp-border) transparent;
+}
+
+.modern-sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.modern-sidebar::-webkit-scrollbar-thumb {
+  background: var(--fp-border);
+  border-radius: 3px;
+}
+
+/* 顶部操作栏 */
 .cr-header {
   display: flex;
   justify-content: space-between;
@@ -639,57 +1345,7 @@ function clearScreen() {
   color: var(--fp-accent);
 }
 
-/* 节点面板 */
-.node-panel {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--fp-border);
-  background: var(--fp-hover);
-  flex-shrink: 0;
-}
-
-.node-panel-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.node-panel-head .muted {
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-
-.node-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px;
-}
-
-.node-opt {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 10px;
-  border: 1px solid var(--fp-border);
-  background: var(--fp-card);
-  color: var(--fp-title);
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.node-opt.current {
-  border-color: var(--fp-accent);
-  color: var(--fp-accent);
-  font-weight: 600;
-}
-
-.node-opt em {
-  font-style: normal;
-  color: var(--fp-muted);
-}
-
-/* 2. 消息列表自适应滚动区 */
+/* 消息滚动区 */
 .chat-messages-scroll {
   flex: 1;
   min-height: 0;
@@ -729,7 +1385,7 @@ function clearScreen() {
   gap: 16px;
 }
 
-/* 消息行排版 (对齐现代聊天室双列气泡) */
+/* 双列气泡 */
 .chat-bubble-row {
   display: flex;
   gap: 12px;
@@ -784,80 +1440,65 @@ function clearScreen() {
   text-decoration: none;
 }
 
+.meta-name:hover {
+  color: var(--fp-accent);
+}
+
 .meta-time {
   color: var(--fp-muted);
   font-size: 11px;
 }
 
 .meta-actions {
-  opacity: 0;
   display: flex;
-  align-items: center;
   gap: 4px;
-  transition: opacity 0.15s ease;
+  opacity: 0.7;
 }
 
-.chat-bubble-row:hover .meta-actions {
+.meta-actions:hover {
   opacity: 1;
 }
 
-.action-btn {
-  background: transparent;
-  border: 0;
-  color: var(--fp-muted);
-  cursor: pointer;
-  padding: 0 4px;
-  font-size: 11px;
-}
-
-.action-btn:hover {
-  color: var(--fp-accent);
-}
-
-/* 气泡正文样式 */
 .chat-bubble {
   position: relative;
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 14px;
   line-height: 1.55;
-  word-break: break-all;
-  overflow-wrap: anywhere;
-}
-
-.text-bubble {
+  word-break: break-word;
   background: var(--fp-hover);
   color: var(--fp-text);
   border: 1px solid var(--fp-border);
 }
 
 .chat-bubble-row.is-self .text-bubble {
-  background: #e8f4fd;
-  border-color: #b9dcf7;
-  color: #1a4f78;
+  background: var(--fp-accent-light, #e8f5e9);
+  border-color: var(--fp-accent);
+  color: var(--fp-title);
 }
 
 /* 红包气泡 */
 .packet-bubble {
-  background: linear-gradient(135deg, #e74c3c, #c0392b);
-  color: #fff;
-  min-width: 200px;
-  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.25);
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  min-width: 220px;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.35);
 }
 
 .packet-top {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 6px;
 }
 
-.packet-top strong {
-  font-size: 14px;
+.packet-icon {
+  font-size: 18px;
 }
 
 .packet-desc {
-  margin: 0 0 8px;
+  margin: 4px 0 10px;
   font-size: 13px;
   opacity: 0.95;
 }
@@ -868,103 +1509,47 @@ function clearScreen() {
   align-items: center;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
   padding-top: 6px;
-}
-
-.packet-footer small {
   font-size: 11px;
-  opacity: 0.8;
 }
 
 .claim-btn {
-  border: 0;
+  border: none;
   background: #f1c40f;
-  color: #7f5200;
-  font-weight: 600;
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 4px;
+  color: #c0392b;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
   cursor: pointer;
+  transition: transform 0.15s ease;
 }
 
 .claim-btn:hover {
-  background: #f39c12;
+  transform: scale(1.05);
 }
 
 .guest-tip-bottom {
   text-align: center;
-  margin-top: 16px;
   color: var(--fp-muted);
   font-size: 12px;
+  margin-top: 16px;
 }
 
-/* 抽屉浮层 */
-.overlay-card {
-  position: absolute;
-  top: 50px;
-  left: 20px;
-  right: 20px;
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  padding: 12px 16px;
-  z-index: 100;
-  max-height: 70%;
-  overflow-y: auto;
-}
-
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.close-btn {
-  background: transparent;
-  border: 0;
-  color: var(--fp-muted);
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.raw-pre {
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-size: 13px;
-  background: var(--fp-hover);
-  padding: 10px;
-  border-radius: 6px;
-  color: var(--fp-text);
-}
-
-.packet-detail-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.packet-detail-list li {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
-  border-bottom: 1px dashed var(--fp-border);
-  font-size: 13px;
-}
-
-.packet-detail-list .money {
-  color: #e74c3c;
-  font-weight: 600;
-}
-
-/* 3. 底部吸底输入与工具面板 (对齐现网 Rhythm PC) */
+/* 现代版底部吸底输入栏 */
 .cr-composer-panel {
-  flex-shrink: 0;
   border-top: 1px solid var(--fp-border);
   background: var(--fp-card);
-  padding: 10px 16px 14px;
+  padding: 12px 16px;
+  flex-shrink: 0;
 }
 
+.composer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 引用预览 */
 .quote-preview-box {
   display: flex;
   justify-content: space-between;
@@ -973,19 +1558,17 @@ function clearScreen() {
   border-left: 3px solid var(--fp-accent);
   padding: 6px 10px;
   border-radius: 4px;
-  margin-bottom: 8px;
+  font-size: 12px;
 }
 
 .quote-label {
-  font-size: 11px;
-  color: var(--fp-muted);
-  display: block;
+  font-weight: 600;
+  color: var(--fp-accent);
 }
 
 .quote-text {
   margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--fp-text);
+  color: var(--fp-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -993,13 +1576,18 @@ function clearScreen() {
 }
 
 .quote-cancel {
-  background: transparent;
   border: 0;
+  background: transparent;
   color: var(--fp-muted);
-  cursor: pointer;
   font-size: 14px;
+  cursor: pointer;
 }
 
+.quote-cancel:hover {
+  color: #e74c3c;
+}
+
+/* 输入框 */
 .compose-field-wrap {
   position: relative;
 }
@@ -1007,17 +1595,14 @@ function clearScreen() {
 .compose-field-wrap textarea {
   width: 100%;
   box-sizing: border-box;
-  resize: vertical;
-  min-height: 64px;
-  max-height: 180px;
-  padding: 8px 10px;
-  border: 1px solid var(--fp-border);
   background: var(--fp-bg);
-  color: var(--fp-text);
+  border: 1px solid var(--fp-border);
   border-radius: 6px;
-  font-family: inherit;
+  padding: 8px 12px;
   font-size: 13px;
-  line-height: 1.5;
+  color: var(--fp-text);
+  resize: vertical;
+  min-height: 60px;
   outline: none;
   transition: border-color 0.15s ease;
 }
@@ -1026,14 +1611,22 @@ function clearScreen() {
   border-color: var(--fp-accent);
 }
 
-/* 工具栏 */
+.comment-login-hint {
+  text-align: center;
+  padding: 18px 0;
+  color: var(--fp-muted);
+  font-size: 13px;
+  background: var(--fp-bg);
+  border-radius: 6px;
+}
+
+/* 现代版输入框工具栏 */
 .cr-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 8px;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
 .tool-actions {
@@ -1045,8 +1638,7 @@ function clearScreen() {
 .tool-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: transparent;
+  background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-title);
   border-radius: 4px;
@@ -1166,6 +1758,10 @@ function clearScreen() {
   color: var(--fp-muted);
 }
 
+.paint-box-wrap {
+  margin-top: 10px;
+}
+
 .guest-bottom-bar {
   text-align: center;
   padding: 12px 0;
@@ -1180,16 +1776,191 @@ function clearScreen() {
   margin: 0 4px;
 }
 
+/* =========================================================
+   弹窗与浮层
+   ========================================================= */
+.node-panel-dialog {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.node-panel-card {
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: 10px;
+  padding: 18px 22px;
+  width: 90%;
+  max-width: 520px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.node-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 14px;
+  color: var(--fp-title);
+}
+
+.node-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.node-opt {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--fp-border);
+  background: var(--fp-bg);
+  color: var(--fp-title);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.node-opt:hover {
+  border-color: var(--fp-accent);
+}
+
+.node-opt.current {
+  border-color: var(--fp-accent);
+  background: var(--fp-hover);
+  color: var(--fp-accent);
+  font-weight: 600;
+}
+
+.node-opt em {
+  font-style: normal;
+  color: var(--fp-muted);
+}
+
+.overlay-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  padding: 18px;
+  z-index: 1001;
+  width: 90%;
+  max-width: 480px;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  color: var(--fp-title);
+}
+
+.close-btn {
+  border: 0;
+  background: transparent;
+  color: var(--fp-muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.close-btn:hover {
+  color: #e74c3c;
+}
+
+.raw-pre {
+  background: var(--fp-bg);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  max-height: 260px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.packet-detail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.packet-detail-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--fp-border);
+  font-size: 13px;
+}
+
+.packet-detail-list .money {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.gesture-choices {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.gesture-btn {
+  padding: 10px 18px;
+  font-size: 15px;
+  background: var(--fp-hover);
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.gesture-btn:hover {
+  border-color: var(--fp-accent);
+  transform: scale(1.05);
+}
+
+/* 响应式适配 */
 @media (max-width: 960px) {
   .cr-page {
     width: 96%;
   }
-  .cr-wrapper {
+
+  .cr-classic-layout {
+    flex-direction: column;
+  }
+
+  .classic-sidebar {
+    width: 100%;
+    flex: auto;
+  }
+
+  .cr-modern-layout {
     flex-direction: column;
     height: auto;
   }
-  .cr-main-box {
-    height: calc(100vh - var(--fp-nav-h) - 30px);
+
+  .cr-modern-main {
+    height: calc(100vh - var(--fp-nav-h) - 20px);
+  }
+
+  .modern-sidebar {
+    width: 100%;
+    flex: auto;
+    height: auto;
   }
 }
 </style>
