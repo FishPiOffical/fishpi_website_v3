@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { fetchArticleFeed, type ArticleFeedKind, type ArticleSummary } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
+import SideBar from '@/components/SideBar.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeFeedPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC } from '@/seo/site'
@@ -45,7 +46,7 @@ async function load() {
   loading.value = true
   try {
     const cached = page.value === 1 ? consumeFeedPayload(kind.value) : null
-    items.value = cached || (await fetchArticleFeed(kind.value, apiKey.value, page.value, 40, extra.value))
+    items.value = cached || (await fetchArticleFeed(kind.value, apiKey.value, page.value, 30, extra.value))
   } catch (e) {
     error.value = e instanceof Error ? e.message : '加载失败'
     items.value = []
@@ -68,59 +69,158 @@ watch(
   },
   { immediate: true },
 )
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function prevPage() {
+  if (page.value > 1) {
+    page.value -= 1
+    scrollToTop()
+  }
+}
+
+function nextPage() {
+  page.value += 1
+  scrollToTop()
+}
 </script>
 
 <template>
-  <section class="board">
-    <header>
-      <h1>{{ kind === 'tag' ? `#${extra}` : title }}</h1>
-      <p v-if="keyword" class="hint">关键词：{{ keyword }}</p>
-    </header>
-    <p v-if="usingMock" class="hint">
-      对应 JSON 接口尚未对游客开放或仍为 404，当前为字段对齐的 mock。
-    </p>
-    <p v-if="loading" class="hint">加载中…</p>
-    <p v-else-if="error" class="err">{{ error }}</p>
-    <ArticleFeed v-else :items="items" />
-    <footer v-if="paged" class="pager">
-      <button type="button" :disabled="page <= 1" @click="page -= 1">上一页</button>
-      <span>{{ page }}</span>
-      <button type="button" :disabled="items.length < 20" @click="page += 1">下一页</button>
-    </footer>
-  </section>
+  <div class="wrapper list-page-wrap">
+    <div class="content">
+      <div class="module">
+        <div class="module-header list-page-head">
+          <div class="head-left">
+            <h2>{{ kind === 'tag' ? `#${extra}` : title }}</h2>
+            <span v-if="keyword" class="search-tag">关键词：{{ keyword }}</span>
+          </div>
+          <div class="head-right">
+            <span class="total-count">第 {{ page }} 页</span>
+          </div>
+        </div>
+
+        <p v-if="usingMock" class="mock-hint">
+          对应 JSON 接口尚未对游客开放，当前为字段对齐的社区帖子展示。
+        </p>
+        <p v-if="loading" class="hint">正在加载精彩帖子…</p>
+        <p v-else-if="error" class="err">{{ error }}</p>
+
+        <ArticleFeed v-else :items="items" empty="该分类下暂无内容" />
+
+        <!-- 现网分页控件 -->
+        <div v-if="paged && (items.length > 0 || page > 1)" class="pagination-bar">
+          <button
+            type="button"
+            class="btn page-btn"
+            :disabled="page <= 1"
+            @click="prevPage"
+          >
+            ‹ 上一页
+          </button>
+          <span class="current-page-num">{{ page }}</span>
+          <button
+            type="button"
+            class="btn page-btn"
+            :disabled="items.length < 20"
+            @click="nextPage"
+          >
+            下一页 ›
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 侧边栏：结合本地登录态与现网社区模块 -->
+    <div class="side">
+      <SideBar />
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.board {
-  background: var(--fp-card);
-  box-shadow: var(--fp-card-shadow);
-  border-radius: 10px;
-  padding: 15px 0 20px;
+.list-page-wrap {
+  padding-top: 4px;
 }
-h1 {
-  margin: 0 15px 8px;
-  font-size: 16px;
-  color: var(--fp-head);
+
+.list-page-head {
+  padding: 12px 18px;
 }
-.hint {
-  color: var(--fp-muted);
-  font-size: 13px;
-}
-.err {
-  color: #e07a5f;
-}
-.pager {
+
+.head-left {
   display: flex;
-  gap: 12px;
   align-items: center;
-  margin-top: 16px;
+  gap: 10px;
 }
-.pager button {
-  border: 1px solid var(--fp-border);
-  background: transparent;
-  color: var(--fp-text);
-  border-radius: 8px;
-  padding: 4px 12px;
-  cursor: pointer;
+
+.head-left h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fp-title);
+}
+
+.search-tag {
+  font-size: 12px;
+  color: var(--fp-accent);
+  background: var(--fp-hover);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.total-count {
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+
+.mock-hint {
+  padding: 10px 18px;
+  margin: 0;
+  background: var(--fp-hover);
+  color: var(--fp-accent);
+  font-size: 12px;
+  border-bottom: 1px solid var(--fp-border);
+}
+
+.hint {
+  padding: 30px 18px;
+  text-align: center;
+  color: var(--fp-muted);
+  font-size: 14px;
+}
+
+.err {
+  padding: 30px 18px;
+  text-align: center;
+  color: #e07a5f;
+  font-size: 14px;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 18px 0;
+  border-top: 1px solid var(--fp-border);
+}
+
+.page-btn {
+  min-width: 80px;
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.current-page-num {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fp-title);
+  min-width: 24px;
+  text-align: center;
 }
 </style>

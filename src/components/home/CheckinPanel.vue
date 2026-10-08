@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { dailyCheckin, fetchCheckedIn, fetchCollectedLiveness, fetchLiveness, rewardLiveness } from '@/api/fishpi'
+import { fetchCheckedIn, fetchCollectedLiveness, fetchLiveness, rewardLiveness } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -32,21 +32,6 @@ async function load() {
 onMounted(() => void load())
 watch(apiKey, () => void load())
 
-async function checkin() {
-  if (!apiKey.value) return
-  busy.value = true
-  msg.value = ''
-  try {
-    const n = await dailyCheckin(apiKey.value)
-    checkedIn.value = true
-    msg.value = n > 0 ? `签到成功，随机积分 ${n}` : '今日已签到'
-  } catch (e) {
-    msg.value = e instanceof Error ? e.message : '签到失败'
-  } finally {
-    busy.value = false
-  }
-}
-
 async function collect() {
   if (!apiKey.value) return
   busy.value = true
@@ -64,49 +49,159 @@ async function collect() {
 </script>
 
 <template>
-  <div v-if="isLoggedIn" class="panel">
-    <header>
-      <h3>签到</h3>
-    </header>
-    <p>活跃度 {{ liveness.toFixed(1) }}</p>
-    <p>{{ checkedIn ? '今日已签到' : '今日尚未签到' }}</p>
-    <button type="button" :disabled="busy || checkedIn" @click="checkin">
-      {{ checkedIn ? '已签到' : '签到' }}
-    </button>
-    <button type="button" :disabled="busy || collected" @click="collect">
-      {{ collected ? '已领昨日奖励' : '领昨日活跃奖励' }}
-    </button>
-    <p v-if="msg" class="hint">{{ msg }}</p>
+  <div v-if="isLoggedIn" class="checkin-card">
+    <div class="checkin-head">
+      <span class="title">今日活跃 &amp; 签到</span>
+      <span class="liveness-badge" :class="{ done: liveness >= 100 || checkedIn }">
+        活跃度 {{ Math.round(liveness) }}%
+      </span>
+    </div>
+
+    <!-- 活跃度水波进度槽 -->
+    <div class="progress-bar">
+      <div
+        class="progress-fill"
+        :class="{ full: liveness >= 100 || checkedIn }"
+        :style="{ width: `${Math.min(100, Math.max(0, liveness))}%` }"
+      />
+    </div>
+
+    <div class="checkin-footer">
+      <div class="auto-status" :class="{ ok: checkedIn }">
+        <span class="status-dot" />
+        <span v-if="checkedIn">活跃达标，已自动签到</span>
+        <span v-else>活跃度达标后将自动签到</span>
+      </div>
+
+      <button
+        v-if="!collected"
+        type="button"
+        class="btn orange collect-btn"
+        :disabled="busy"
+        title="领取昨日活跃度奖励积分"
+        @click="collect"
+      >
+        领昨日活跃
+      </button>
+      <span v-else class="collected-label">✓ 昨日活跃已领</span>
+    </div>
+
+    <p v-if="msg" class="checkin-msg" :class="{ ok: msg.includes('成功') || msg.includes('获得') }">
+      {{ msg }}
+    </p>
   </div>
 </template>
 
 <style scoped>
-.panel {
-  padding: 4px 15px 16px;
+.checkin-card {
+  padding: 12px 14px;
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  margin-bottom: 14px;
 }
-h3 {
-  margin: 0 0 8px;
+
+.checkin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.title {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
+  color: var(--fp-title);
 }
-p {
-  margin: 4px 0;
-  font-size: 13px;
-}
-.hint {
+
+.liveness-badge {
+  font-size: 11px;
   color: var(--fp-muted);
+  background: var(--fp-hover);
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 500;
 }
-button {
-  margin: 6px 6px 0 0;
-  border: 0;
-  background: var(--fp-green);
-  color: #fff;
+
+.liveness-badge.done {
+  color: #27ae60;
+  background: rgba(39, 174, 96, 0.1);
+}
+
+.progress-bar {
+  height: 6px;
+  background: var(--fp-border);
   border-radius: 3px;
-  padding: 4px 10px;
-  cursor: pointer;
+  overflow: hidden;
+  margin-bottom: 10px;
 }
-button:disabled {
-  opacity: 0.55;
-  cursor: default;
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #60b044, #e59230);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-fill.full {
+  background: linear-gradient(90deg, #60b044, #27ae60);
+}
+
+.checkin-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.auto-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fp-muted);
+  font-size: 11px;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f39c12;
+  flex-shrink: 0;
+}
+
+.auto-status.ok {
+  color: #27ae60;
+  font-weight: 500;
+}
+
+.auto-status.ok .status-dot {
+  background: #27ae60;
+}
+
+.collect-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.collected-label {
+  font-size: 11px;
+  color: var(--fp-muted);
+  white-space: nowrap;
+}
+
+.checkin-msg {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--fp-muted);
+  text-align: center;
+}
+
+.checkin-msg.ok {
+  color: #27ae60;
+  font-weight: 500;
 }
 </style>

@@ -186,9 +186,8 @@ async function createServer() {
   /** @type {Record<string, string[]> | null} */
   let ssrManifest = null
 
-  app.use(express.json({ limit: '32kb' }))
-
-  app.post('/__fp/page-auth', async (req, res) => {
+  // 仅 page-auth 解析 JSON。全局 express.json 会吃掉 body，导致 Vite 代理 POST（勋章/发帖等）一直挂起。
+  app.post('/__fp/page-auth', express.json({ limit: '32kb' }), async (req, res) => {
     try {
       const apiKey = String(req.body?.apiKey || '')
       if (!apiKey) {

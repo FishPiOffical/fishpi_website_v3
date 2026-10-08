@@ -31,23 +31,49 @@ const auth = useAuthStore()
 const { apiKey, account, isLoggedIn, isVip } = storeToRefs(auth)
 
 const userName = computed(() => String(route.params.userName || ''))
-const profile = ref<UserProfile | null>(null)
+
+// SSR / 客户端首屏：先吃掉 prefetch，避免一直停在「加载用户」
+const bootProfile = consumeMemberPayload(String(route.params.userName || ''))
+const profile = ref<UserProfile | null>(bootProfile)
 const articles = ref<ArticleSummary[]>([])
 const breezemoons = ref<Breezemoon[]>([])
 const articlesMock = ref(false)
-const loading = ref(true)
+const loading = ref(!bootProfile)
 const error = ref('')
 const actionMsg = ref('')
-const sendAmount = ref(5)
+const sendAmount = ref(10)
 const sendMemo = ref('请你吃鱼丸')
 const transferring = ref(false)
+const showTransfer = ref(false)
 const viewedVip = ref(false)
 const profession = ref<PublicProfessionProfile | null>(null)
 const extraMedals = ref<MetalItem[]>([])
-const usingMock = computed(() => String(profile.value?.oId || '').startsWith('mock-'))
+const activeTab = ref<'articles' | 'moons' | 'medals' | 'profession'>('articles')
 
+const usingMock = computed(() => String(profile.value?.oId || '').startsWith('mock-'))
 const isSelf = computed(() => Boolean(account.value && account.value.userName === userName.value))
 const following = computed(() => profile.value?.canFollow === 'no')
+
+const allMedals = computed(() => {
+  const sys = profile.value?.sysMetal || []
+  const extra = extraMedals.value || []
+  return [...sys, ...extra]
+})
+
+const roleBadgeSrc = computed(() => {
+  const role = profile.value?.userRole || ''
+  if (role.includes('admin') || role === '管理员') return 'https://file.fishpi.cn/adminRole.png'
+  if (role.includes('op') || role === 'OP') return 'https://file.fishpi.cn/opRole.png'
+  if (role.includes('police') || role === '纪律委员') return 'https://file.fishpi.cn/policeRole.png'
+  if (viewedVip.value) return 'https://file.fishpi.cn/svipRole.png'
+  if (role.includes('vip') || role === '成员') return 'https://file.fishpi.cn/vipRole.png'
+  return 'https://file.fishpi.cn/newRole.png'
+})
+
+const pointHex = computed(() => {
+  const pts = profile.value?.userPoint ?? 0
+  return pts.toString(16).toUpperCase()
+})
 
 usePageSeo(() => {
   const p = profile.value
@@ -61,19 +87,41 @@ usePageSeo(() => {
   }
 })
 
+async function loadExtras(p: UserProfile) {
+  if (import.meta.env.SSR || !p.oId || String(p.oId).startsWith('mock-')) return
+  try {
+    viewedVip.value = (await fetchMembership(p.oId)).isVip
+  } catch {
+    viewedVip.value = isSelf.value && isVip.value
+  }
+  try {
+    profession.value = await fetchPublicProfession(userName.value, apiKey.value)
+  } catch {
+    profession.value = null
+  }
+  if (!apiKey.value) {
+    extraMedals.value = []
+    return
+  }
+  try {
+    extraMedals.value = (await fetchUserMedals(apiKey.value, userName.value)).filter(
+      (m) => m.name && !(p.sysMetal || []).some((s) => s.name === m.name),
+    )
+  } catch {
+    extraMedals.value = []
+  }
+}
+
 async function load() {
   if (!userName.value) return
-  const cached = consumeMemberPayload(userName.value)
-  loading.value = true
+  const cached =
+    profile.value?.userName === userName.value ? profile.value : consumeMemberPayload(userName.value)
+  if (!cached) loading.value = true
   error.value = ''
   actionMsg.value = ''
   try {
-    if (cached) {
-      profile.value = cached
-      if (isSelf.value) profile.value.canFollow = 'hide'
-    }
     const [p, list, moons] = await Promise.all([
-      cached ? Promise.resolve(cached) : fetchUserProfile(userName.value, apiKey.value),
+      cached || fetchUserProfile(userName.value, apiKey.value),
       import.meta.env.SSR ? Promise.resolve([] as ArticleSummary[]) : fetchUserArticles(userName.value, apiKey.value),
       import.meta.env.SSR
         ? Promise.resolve([] as Breezemoon[])
@@ -84,26 +132,11 @@ async function load() {
     articles.value = list
     articlesMock.value = list.some((a) => String(a.oId).startsWith('mock-'))
     breezemoons.value = moons
-    viewedVip.value = false
-    profession.value = null
-    extraMedals.value = []
-    if (!import.meta.env.SSR && p.oId && !String(p.oId).startsWith('mock-')) {
-      try {
-        viewedVip.value = (await fetchMembership(p.oId)).isVip
-      } catch {
-        viewedVip.value = isSelf.value && isVip.value
-      }
-      profession.value = await fetchPublicProfession(userName.value, apiKey.value)
-      extraMedals.value = apiKey.value
-        ? (await fetchUserMedals(apiKey.value, userName.value)).filter(
-            (m) => m.name && !(p.sysMetal || []).some((s) => s.name === m.name),
-          )
-        : []
-    }
+    loading.value = false
+    void loadExtras(p)
   } catch (e) {
     error.value = e instanceof Error ? e.message : '用户加载失败'
-    profile.value = null
-  } finally {
+    if (!cached) profile.value = null
     loading.value = false
   }
 }
@@ -133,6 +166,7 @@ async function sendPoints() {
   try {
     await transferPoints(apiKey.value, profile.value.userName, Number(sendAmount.value), sendMemo.value)
     actionMsg.value = '转账成功'
+    showTransfer.value = false
   } catch (e) {
     actionMsg.value = e instanceof Error ? e.message : '转账失败'
   } finally {
@@ -142,211 +176,679 @@ async function sendPoints() {
 </script>
 
 <template>
-  <p v-if="loading" class="hint">加载用户…</p>
-  <p v-else-if="error" class="err">{{ error }}</p>
-  <div v-else-if="profile" class="member">
-    <section class="card hero">
-      <img v-if="profile.userAvatarURL" class="fp-avatar" :src="profile.userAvatarURL" alt="" />
-      <div>
-        <h1>{{ profile.userNickname || profile.userName }}</h1>
-        <p class="meta">
-          @{{ profile.userName }} · {{ profile.userAppRole === 1 ? '画家' : '黑客' }}
-          <em v-if="viewedVip">VIP</em>
-          <RouterLink
-            v-if="profile.userCity"
-            class="city"
-            :to="`/city/${encodeURIComponent(profile.userCity)}`"
+  <div class="wrapper member-wrap">
+    <!-- 主体左侧内容区 (对齐现网 Rhythm home/home.ftl) -->
+    <div class="content">
+      <p v-if="loading" class="hint">正在加载用户信息…</p>
+      <p v-else-if="error" class="err">{{ error }}</p>
+
+      <div v-else-if="profile" class="module">
+        <p v-if="usingMock" class="mock-tip">⚠️ 接口未返回，当前展示演示数据</p>
+        <!-- 二级导航标签页 -->
+        <nav class="tabs-sub">
+          <a
+            :class="{ current: activeTab === 'articles' }"
+            @click="activeTab = 'articles'"
           >
-            {{ profile.userCity }}
-          </RouterLink>
-        </p>
-        <p v-if="profile.userIntro" class="intro">{{ profile.userIntro }}</p>
-        <p class="stats">
-          <span>{{ profile.userArticleCount ?? articles.length }} 帖</span>
-          <span>{{ profile.userCommentCount ?? 0 }} 评</span>
-          <RouterLink :to="`/member/${profile.userName}/following`">{{ profile.followingUserCount ?? 0 }} 关注</RouterLink>
-          <RouterLink :to="`/member/${profile.userName}/followers`">{{ profile.followerCount ?? 0 }} 粉丝</RouterLink>
-          <span>{{ profile.userPoint ?? 0 }} 积分</span>
-        </p>
-        <MetalBadges :items="profile.sysMetal" />
-        <MetalBadges v-if="extraMedals.length" :items="extraMedals" />
-        <p class="hint">
-          <RouterLink :to="`/member/${profile.userName}/medals`">查看全部徽章</RouterLink>
-        </p>
-        <p v-if="profession?.primaryProfession" class="intro">
-          职业 {{ profession.primaryProfession.displayName || profession.primaryProfession.shortName }}
-          <span v-if="profession.primaryProfession.levelName"> · {{ profession.primaryProfession.levelName }}</span>
-        </p>
-        <ul v-if="profession?.professions?.length" class="jobs">
-          <li v-for="job in profession.professions" :key="job.professionId || job.displayName">
-            {{ job.displayName || job.shortName }}
-            <em v-if="job.levelName">{{ job.levelName }}</em>
-          </li>
-        </ul>
-        <p v-if="usingMock" class="hint">匿名用户接口未开放，当前为与 <code>GET /user/:userName</code> 对齐的 mock。</p>
-        <p v-if="actionMsg" :class="actionMsg.includes('成功') ? 'ok' : 'err'">{{ actionMsg }}</p>
-        <button
-          v-if="isLoggedIn && !isSelf && profile.canFollow !== 'hide'"
-          type="button"
-          @click="toggleFollow"
-        >
-          {{ following ? '取消关注' : '关注' }}
-        </button>
-        <RouterLink v-if="isLoggedIn && isSelf" class="msg" to="/settings">编辑资料</RouterLink>
-        <RouterLink v-if="isLoggedIn && !isSelf" class="msg" :to="`/chat/${profile.userName}`">发私信</RouterLink>
-        <ReportDialog v-if="isLoggedIn && !isSelf" :api-key="apiKey" :data-id="profile.oId" :data-type="2" />
-        <form v-if="isLoggedIn && !isSelf" class="xfer" @submit.prevent="sendPoints">
-          <input v-model.number="sendAmount" type="number" min="1" />
-          <input v-model="sendMemo" placeholder="备注" />
-          <button type="submit" :disabled="transferring">{{ transferring ? '转账中…' : '转账' }}</button>
-          <RouterLink class="msg" :to="`/settings/point?to=${encodeURIComponent(profile.userName)}`">转账页</RouterLink>
-        </form>
-        <p v-else-if="!isLoggedIn" class="hint">
-          <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
-          后可关注。
-        </p>
+            文章 <span class="count">{{ profile.userArticleCount ?? articles.length }}</span>
+          </a>
+          <a
+            :class="{ current: activeTab === 'moons' }"
+            @click="activeTab = 'moons'"
+          >
+            清风明月 <span class="count">{{ breezemoons.length }}</span>
+          </a>
+          <a
+            :class="{ current: activeTab === 'medals' }"
+            @click="activeTab = 'medals'"
+          >
+            徽章 <span class="count">{{ allMedals.length }}</span>
+          </a>
+          <a
+            v-if="profession?.primaryProfession"
+            :class="{ current: activeTab === 'profession' }"
+            @click="activeTab = 'profession'"
+          >
+            职业资料
+          </a>
+        </nav>
+
+        <!-- 文章列表 -->
+        <div v-if="activeTab === 'articles'" class="tab-panel">
+          <p v-if="!isLoggedIn && !articles.length" class="hint-auth">
+            用户发帖列表需登录查看。
+            <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">前往登录</RouterLink>
+          </p>
+          <p v-else-if="articlesMock" class="hint-auth">当前为社区帖子展示。</p>
+          <ArticleFeed :items="articles" empty="该用户还没有公开发布过帖子" />
+        </div>
+
+        <!-- 清风明月动态 -->
+        <div v-else-if="activeTab === 'moons'" class="tab-panel">
+          <ul v-if="breezemoons.length" class="breeze-timeline">
+            <li v-for="m in breezemoons" :key="m.oId" class="breeze-timeline-item">
+              <div class="breeze-header">
+                <span class="avatar-small" :style="{ backgroundImage: `url('${profile.userAvatarURL}')` }" />
+                <span class="breeze-author">{{ profile.userNickname || profile.userName }}</span>
+                <span class="breeze-time">{{ m.timeAgo }}</span>
+              </div>
+              <div class="breeze-body" v-html="m.breezemoonContent || ''" />
+            </li>
+          </ul>
+          <p v-else class="empty-panel">暂无清风明月动态</p>
+        </div>
+
+        <!-- 徽章与勋章 -->
+        <div v-else-if="activeTab === 'medals'" class="tab-panel medals-panel">
+          <div v-if="allMedals.length" class="medals-grid">
+            <div
+              v-for="item in allMedals"
+              :key="item.name"
+              class="medal-card"
+              :style="{ borderColor: item.backcolor || 'var(--fp-border)' }"
+            >
+              <img v-if="item.url" class="medal-icon" :src="item.url" :alt="item.name" />
+              <div class="medal-info">
+                <b class="medal-name" :style="{ color: item.fontcolor || 'inherit' }">{{ item.name }}</b>
+                <span v-if="item.description" class="medal-desc">{{ item.description }}</span>
+              </div>
+            </div>
+          </div>
+          <p v-else class="empty-panel">暂未佩戴徽章</p>
+        </div>
+
+        <!-- 职业资料卡片 (对齐现网 Rhythm profession.css) -->
+        <div v-else-if="activeTab === 'profession' && profession" class="tab-panel profession-panel">
+          <div class="profession-detail__summary">
+            <h3 class="profession-detail__title">
+              {{ profession.primaryProfession?.displayName || profession.primaryProfession?.shortName }}
+              <span v-if="profession.primaryProfession?.levelName" class="prof-level">
+                · {{ profession.primaryProfession.levelName }}
+              </span>
+            </h3>
+            <p v-if="profession.primaryProfession?.description">
+              {{ profession.primaryProfession.description }}
+            </p>
+            <div v-if="profession.professions?.length" class="professions-list">
+              <div
+                v-for="job in profession.professions"
+                :key="job.professionId || job.displayName"
+                class="job-chip"
+              >
+                <b>{{ job.displayName || job.shortName }}</b>
+                <span v-if="job.levelName">{{ job.levelName }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </section>
-    <section class="card">
-      <h2>帖子</h2>
-      <p v-if="!isLoggedIn && !articles.length" class="hint">
-        用户发帖列表需登录（<code>GET /api/user/:name/articles</code>）。
-        <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">去登录</RouterLink>
-      </p>
-      <p v-else-if="articlesMock" class="hint">列表接口异常，暂无真实帖子数据。</p>
-      <ArticleFeed :items="articles" empty="还没有公开帖子" />
-    </section>
-    <section v-if="breezemoons.length" class="card">
-      <h2>清风明月</h2>
-      <ul class="moons">
-        <li v-for="m in breezemoons" :key="m.oId">
-          <div class="cmt-body" v-html="m.breezemoonContent || ''" />
-          <time>{{ m.timeAgo || '' }}</time>
-        </li>
-      </ul>
-    </section>
+    </div>
+
+    <!-- 主体右侧用户卡片 (对齐现网 Rhythm home/home-side.ftl) -->
+    <div class="side">
+      <div v-if="profile" class="module profile-module">
+        <!-- 封面图背景 -->
+        <div
+          class="user-background"
+          :style="
+            profile.cardBg
+              ? { backgroundImage: `url('${profile.cardBg}')` }
+              : { background: 'linear-gradient(135deg, #74ebd5 0%, #9face6 100%)' }
+          "
+        />
+
+        <!-- 外突居中圆形大头像 -->
+        <div class="avatar-wrap">
+          <img
+            v-if="profile.userAvatarURL"
+            class="user-card-avatar"
+            :src="profile.userAvatarURL"
+            :alt="profile.userName"
+          />
+          <div v-else class="user-card-avatar fallback">{{ profile.userName.slice(0, 1) }}</div>
+        </div>
+
+        <!-- 名字与徽章区 -->
+        <div class="user-name-section">
+          <h2 class="user-nickname">{{ profile.userNickname || profile.userName }}</h2>
+          <div class="user-handle">@{{ profile.userName }}</div>
+
+          <!-- 勋章小图标 -->
+          <div v-if="profile.sysMetal?.length" class="side-metals">
+            <MetalBadges :items="profile.sysMetal" />
+          </div>
+
+          <!-- 身份徽章与在线标识 -->
+          <div class="badges-row">
+            <img class="role-badge-img" :src="roleBadgeSrc" alt="身份徽章" />
+            <span
+              class="status-pill"
+              :class="profile.userOnlineFlag ? 'online' : 'offline'"
+            >
+              {{ profile.userOnlineFlag ? '在线' : '离线' }}
+            </span>
+            <span v-if="profile.mbti" class="mbti-pill">
+              {{ profile.mbti }}
+            </span>
+            <span v-if="viewedVip" class="vip-pill">VIP</span>
+          </div>
+
+          <!-- 交互操作按钮 -->
+          <div class="action-buttons">
+            <button
+              v-if="isLoggedIn && !isSelf && profile.canFollow !== 'hide'"
+              type="button"
+              class="btn green follow-btn"
+              @click="toggleFollow"
+            >
+              {{ following ? '取消关注' : '+ 关注' }}
+            </button>
+            <RouterLink
+              v-if="isLoggedIn && isSelf"
+              class="btn green follow-btn"
+              to="/settings"
+            >
+              编辑资料
+            </RouterLink>
+            <RouterLink
+              v-if="isLoggedIn && !isSelf"
+              class="btn small"
+              :to="`/chat?toUser=${profile.userName}`"
+            >
+              发私信
+            </RouterLink>
+            <button
+              v-if="isLoggedIn && !isSelf"
+              type="button"
+              class="btn small"
+              @click="showTransfer = !showTransfer"
+            >
+              转账
+            </button>
+            <ReportDialog
+              v-if="isLoggedIn && !isSelf"
+              :api-key="apiKey"
+              :data-id="profile.oId"
+              :data-type="2"
+            />
+          </div>
+
+          <p v-if="actionMsg" class="action-alert" :class="actionMsg.includes('成功') ? 'ok' : 'err'">
+            {{ actionMsg }}
+          </p>
+
+          <!-- 快捷转账面板 -->
+          <form v-if="showTransfer && isLoggedIn && !isSelf" class="transfer-form" @submit.prevent="sendPoints">
+            <div class="transfer-inputs">
+              <input v-model.number="sendAmount" type="number" min="1" placeholder="积分数" />
+              <input v-model="sendMemo" placeholder="备注信息" />
+            </div>
+            <button type="submit" class="btn green small" :disabled="transferring">
+              {{ transferring ? '转账中…' : '确认转账' }}
+            </button>
+          </form>
+        </div>
+
+        <!-- 详细个人资料列表 -->
+        <div class="user-details-list">
+          <div v-if="profile.userIntro" class="user-intro-text">
+            {{ profile.userIntro }}
+          </div>
+          <div class="detail-row">
+            <span class="label">会员：</span>
+            <span>摸鱼派第 {{ profile.userNo || '—' }} 号会员 · {{ profile.userAppRole === 1 ? '🎨 画家' : '💻 黑客' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">积分：</span>
+            <span class="points-val">
+              <b>{{ profile.userPoint ?? 0 }}</b> (0x{{ pointHex }})
+            </span>
+          </div>
+          <div v-if="profile.userCity" class="detail-row">
+            <span class="label">位置：</span>
+            <RouterLink :to="`/city/${encodeURIComponent(profile.userCity)}`" class="city-link">
+              {{ profile.userCity }}
+            </RouterLink>
+          </div>
+          <div v-if="profile.userURL" class="detail-row">
+            <span class="label">主页：</span>
+            <a :href="profile.userURL" target="_blank" rel="noopener" class="home-url">
+              {{ profile.userURL }}
+            </a>
+          </div>
+          <div v-if="profile.onlineMinute" class="detail-row">
+            <span class="label">在线时长：</span>
+            <span>{{ profile.onlineMinute }} 分钟</span>
+          </div>
+        </div>
+
+        <!-- 5项统计计数槽 (对齐 Rhythm status fn-flex) -->
+        <div class="profile-stats-grid">
+          <div class="stat-unit">
+            <strong>{{ profile.userArticleCount ?? articles.length }}</strong>
+            <span>文章</span>
+          </div>
+          <div class="stat-unit">
+            <strong>{{ profile.userCommentCount ?? 0 }}</strong>
+            <span>回帖</span>
+          </div>
+          <div class="stat-unit">
+            <strong>{{ profile.followingUserCount ?? 0 }}</strong>
+            <span>关注</span>
+          </div>
+          <div class="stat-unit">
+            <strong>{{ profile.followerCount ?? 0 }}</strong>
+            <span>粉丝</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.member {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.member-wrap {
+  padding-top: 4px;
 }
-.card {
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 12px;
-  padding: 18px 20px;
+
+/* 主内容区 */
+.tab-panel {
+  min-height: 200px;
 }
-.hero {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-.hero .fp-avatar {
-  width: 72px;
-  height: 72px;
-}
-h1 {
-  margin: 0 0 4px;
-  font-size: 20px;
-}
-h2 {
-  margin: 0 0 10px;
-  font-size: 15px;
-}
-.meta,
-.intro,
-.hint,
-.stats {
-  color: var(--fp-muted);
-  font-size: 13px;
-}
-.meta a,
-.hint a,
-.stats a {
-  color: var(--fp-link);
-  text-decoration: none;
-}
-.meta .city {
-  margin-left: 8px;
-}
-.stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.jobs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-.jobs em {
-  margin-left: 4px;
-  font-style: normal;
-}
-.moons {
-  list-style: none;
+
+.hint-auth {
+  padding: 12px 18px;
   margin: 0;
-  padding: 0;
-}
-.moons li {
-  padding: 10px 0;
+  font-size: 13px;
+  color: var(--fp-muted);
+  background: var(--fp-hover);
   border-bottom: 1px solid var(--fp-border);
 }
-.moons time {
-  display: block;
-  margin-top: 4px;
+
+.empty-panel {
+  padding: 40px 18px;
+  text-align: center;
   color: var(--fp-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
-.moons :deep(p) {
+
+/* 清风明月时间线 */
+.breeze-timeline {
+  list-style: none;
   margin: 0;
+  padding: 14px 18px;
 }
-.err {
-  color: #e07a5f;
+
+.breeze-timeline-item {
+  padding: 12px 0;
+  border-bottom: 1px dashed var(--fp-border);
+}
+
+.breeze-timeline-item:last-child {
+  border-bottom: none;
+}
+
+.breeze-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
   font-size: 13px;
 }
-.ok {
+
+.breeze-author {
+  font-weight: 500;
+  color: var(--fp-title);
+}
+
+.breeze-time {
+  color: var(--fp-muted);
+  font-size: 11px;
+}
+
+.breeze-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--fp-text);
+  padding-left: 28px;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.breeze-body :deep(a) {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.breeze-body :deep(p) {
+  margin: 0;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+/* 徽章网格 */
+.medals-panel {
+  padding: 16px 18px;
+}
+
+.medals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.medal-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--fp-hover);
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+}
+
+.medal-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.medal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.medal-name {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.medal-desc {
+  font-size: 11px;
+  color: var(--fp-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 职业资料面板 */
+.profession-panel {
+  padding: 16px 18px;
+}
+
+.profession-detail__summary {
+  background: var(--fp-hover);
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid var(--fp-border);
+}
+
+.profession-detail__title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: var(--fp-title);
+}
+
+.prof-level {
+  font-size: 14px;
   color: var(--fp-primary);
-  font-size: 13px;
+  font-weight: normal;
 }
-.xfer {
+
+.professions-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
-  align-items: center;
+  margin-top: 12px;
 }
-.xfer input {
-  background: var(--fp-bg);
+
+.job-chip {
+  display: flex;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  color: var(--fp-text);
-  border-radius: 8px;
-  padding: 6px 8px;
-  width: 120px;
+  border-radius: 6px;
+  font-size: 12px;
 }
-button {
+
+/* 右侧用户卡片 */
+.profile-module {
+  overflow: hidden;
+  text-align: center;
+}
+
+.user-background {
+  height: 90px;
+  background-size: cover;
+  background-position: center;
+}
+
+.avatar-wrap {
+  position: relative;
+  margin-top: -46px;
+  display: flex;
+  justify-content: center;
+}
+
+.user-card-avatar {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  border: 4px solid var(--fp-card);
+  background: var(--fp-card);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  object-fit: cover;
+}
+
+.user-card-avatar.fallback {
+  display: grid;
+  place-items: center;
+  background: var(--fp-hover);
+  color: var(--fp-title);
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.user-name-section {
+  padding: 10px 16px 14px;
+}
+
+.user-nickname {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fp-title);
+}
+
+.user-handle {
+  color: var(--fp-muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.side-metals {
+  display: flex;
+  justify-content: center;
   margin-top: 8px;
-  margin-right: 8px;
-  border: 0;
-  background: var(--fp-primary);
+}
+
+.badges-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.role-badge-img {
+  height: 24px;
+  object-fit: contain;
+}
+
+.status-pill {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
   color: #fff;
-  border-radius: 8px;
-  padding: 6px 14px;
-  cursor: pointer;
+  font-weight: 500;
 }
-.msg {
-  display: inline-block;
-  margin-top: 8px;
+
+.status-pill.online {
+  background-color: var(--fp-primary);
+}
+
+.status-pill.offline {
+  background-color: #787777;
+}
+
+.mbti-pill {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background-color: #b2b1ff;
+  color: #fff;
+  font-weight: 500;
+}
+
+.vip-pill {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background-color: var(--fp-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.follow-btn {
+  width: 100%;
+}
+
+.action-alert {
+  margin: 8px 0 0;
+  font-size: 12px;
+  text-align: center;
+}
+
+.action-alert.ok {
+  color: var(--fp-primary);
+}
+
+.action-alert.err {
+  color: #e07a5f;
+}
+
+.transfer-form {
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--fp-hover);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transfer-inputs {
+  display: flex;
+  gap: 6px;
+}
+
+.transfer-inputs input {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid var(--fp-border);
+  border-radius: 4px;
+  background: var(--fp-card);
+  color: var(--fp-text);
+  outline: none;
+}
+
+/* 详细档案列表 */
+.user-details-list {
+  padding: 12px 16px;
+  border-top: 1px solid var(--fp-border);
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.user-intro-text {
+  color: var(--fp-text);
+  margin-bottom: 8px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.detail-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--fp-text);
+}
+
+.detail-row .label {
+  color: var(--fp-muted);
+  flex-shrink: 0;
+}
+
+.points-val b {
+  color: var(--fp-accent);
+}
+
+.city-link,
+.home-url {
   color: var(--fp-link);
   text-decoration: none;
+}
+
+.city-link:hover,
+.home-url:hover {
+  text-decoration: underline;
+}
+
+/* 5项统计计数槽 */
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--fp-border);
+  text-align: center;
+  background: var(--fp-hover);
+}
+
+.stat-unit {
+  padding: 10px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1px solid var(--fp-border);
+}
+
+.stat-unit:last-child {
+  border-right: none;
+}
+
+.stat-unit strong {
+  font-size: 14px;
+  color: var(--fp-title);
+}
+
+.stat-unit span {
+  font-size: 11px;
+  color: var(--fp-muted);
 }
 </style>

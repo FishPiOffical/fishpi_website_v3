@@ -120,8 +120,21 @@ header a {
   color: inherit;
   text-decoration: none;
 }
+.body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--fp-text);
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+.body :deep(a) {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
 .body :deep(p) {
   margin: 0;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 .composer {
   display: flex;

@@ -27,6 +27,7 @@ export interface AccountInfo {
   /** Rhythm 角色，如 adminRole / defaultRole */
   roleId?: string
   userRole?: string
+  userAppRole?: number
   userArticleCount?: number
   userCommentCount?: number
   userPhone?: string
@@ -82,6 +83,52 @@ export interface MetalItem {
   name?: string
   description?: string
   attr?: string
+  /** 解析自 attr，如 url=...&backcolor=...&fontcolor=... */
+  url?: string
+  backcolor?: string
+  fontcolor?: string
+}
+
+/** Rhythm 常把 sysMetal 写成 JSON 字符串 `{"list":[...]}`，勿直接当数组遍历。 */
+export function normalizeMetals(raw: unknown): MetalItem[] {
+  let list: unknown = raw
+  if (typeof raw === 'string') {
+    const text = raw.trim()
+    if (!text) return []
+    try {
+      list = JSON.parse(text)
+    } catch {
+      return []
+    }
+  }
+  if (list && typeof list === 'object' && !Array.isArray(list) && Array.isArray((list as { list?: unknown[] }).list)) {
+    list = (list as { list: unknown[] }).list
+  }
+  if (!Array.isArray(list)) return []
+  const out: MetalItem[] = []
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const name = String(row.name || row.metalName || '').trim()
+    if (!name) continue
+    const attr = String(row.attr || '')
+    const parsed: MetalItem = {
+      name,
+      description: String(row.description || row.desc || ''),
+      attr,
+    }
+    for (const part of attr.split('&')) {
+      const i = part.indexOf('=')
+      if (i <= 0) continue
+      const k = part.slice(0, i)
+      const v = decodeURIComponent(part.slice(i + 1))
+      if (k === 'url') parsed.url = v
+      if (k === 'backcolor') parsed.backcolor = v.startsWith('#') ? v : `#${v}`
+      if (k === 'fontcolor') parsed.fontcolor = v.startsWith('#') ? v : `#${v}`
+    }
+    out.push(parsed)
+  }
+  return out
 }
 
 export interface UserProfile {
@@ -89,6 +136,9 @@ export interface UserProfile {
   userName: string
   userNickname?: string
   userAvatarURL?: string
+  userAvatarURL210?: string
+  userAvatarURL48?: string
+  userAvatarURL20?: string
   userIntro?: string
   userURL?: string
   userPoint?: number
@@ -101,6 +151,11 @@ export interface UserProfile {
   canFollow?: string
   userTags?: string
   userCity?: string
+  cardBg?: string
+  userNo?: number | string
+  userRole?: string
+  mbti?: string
+  userOnlineFlag?: boolean
   sysMetal?: MetalItem[]
 }
 
@@ -188,6 +243,12 @@ export interface ArticleSummary {
   columnId?: string
   articleAuthorName?: string
   articleAuthorThumbnailURL48?: string
+  articleAuthorThumbnailURL20?: string
+  articleAuthorIntro?: string
+  articleLatestCmterName?: string
+  articleLatestCmtTimeAgo?: string
+  articlePreviewContent?: string
+  articleTagObjs?: { tagTitle: string; tagURI: string }[]
   articleHeat?: number
 }
 
@@ -222,6 +283,8 @@ export interface ArticleDetail extends ArticleSummary {
   isMyArticle?: boolean
   thanked?: boolean
   rewarded?: boolean
+  articleCity?: string
+  articleGoodCnt?: number
   articleThankCnt?: number
   articleCollectCnt?: number
   articleWatchCnt?: number
@@ -295,16 +358,23 @@ export interface Breezemoon {
 export interface RankUser {
   oId?: string
   userName: string
+  userNickname?: string
   userAvatarURL?: string
   userAvatarURL20?: string
   userAvatarURL48?: string
+  userAvatarURL210?: string
   userCheckinStreak?: number
   userCurrentCheckinStreak?: number
+  userLongestCheckinStreak?: number
   onlineMinute?: number
   userPoint?: number
   /** 消费榜常见字段 */
   userUsedPoint?: number
   point?: number
+  userNo?: number | string
+  userIntro?: string
+  userURL?: string
+  userAppRole?: number
 }
 
 interface Envelope<T> {
@@ -1215,6 +1285,140 @@ export async function fetchConsumptionRank(apiKey?: string | null) {
   return unwrapTopRank('/api/top/consumption?p=1', apiKey)
 }
 
+export interface DonateRankEntry {
+  userId?: string
+  total: number
+  totalCount: number
+  profile: RankUser
+}
+
+export interface DonateRankData {
+  totalAmount: number
+  donateMakeDays: number
+  data: DonateRankEntry[]
+}
+
+export interface CountRankEntry {
+  userId?: string
+  toId?: string
+  count?: number
+  c?: number
+  profile: RankUser
+}
+
+export interface GameRankEntry {
+  uname?: string
+  userName?: string
+  userNickname?: string
+  userAvatarURL?: string
+  userIntro?: string
+  userNo?: number
+  score?: number | string
+  rank?: number
+  ancestry?: string
+  gongfa?: string
+}
+
+export async function fetchDonateRank(apiKey?: string | null): Promise<DonateRankData> {
+  try {
+    const res = await request<Envelope<{ data?: DonateRankEntry[]; totalData?: { totalAmount?: number; donateMakeDays?: number } }>>(
+      withKey('/api/top/donate?p=1', apiKey),
+    )
+    if (res.data && Array.isArray(res.data.data) && res.data.data.length) {
+      return {
+        totalAmount: Number(res.data.totalData?.totalAmount || 0),
+        donateMakeDays: Number(res.data.totalData?.donateMakeDays || 0),
+        data: res.data.data,
+      }
+    }
+  } catch {
+    /* fallback mock */
+  }
+  return {
+    totalAmount: 18888,
+    donateMakeDays: 3777,
+    data: [
+      {
+        total: 2333,
+        totalCount: 16,
+        profile: { userName: 'Vanessa', userNickname: 'Vanessa', userNo: 2, userAppRole: 1, userIntro: '开源与社区建设者' },
+      },
+      {
+        total: 1888,
+        totalCount: 12,
+        profile: { userName: 'D', userNickname: 'D', userNo: 1, userAppRole: 0, userIntro: '摸鱼派发起人' },
+      },
+      {
+        total: 1280,
+        totalCount: 9,
+        profile: { userName: 'csfwff', userNickname: 'csfwff', userNo: 168, userAppRole: 0, userIntro: '全栈摸鱼老哥' },
+      },
+      {
+        total: 999,
+        totalCount: 6,
+        profile: { userName: 'Yui', userNickname: 'Yui', userNo: 66, userAppRole: 1, userIntro: '机器人维护者' },
+      },
+      {
+        total: 666,
+        totalCount: 4,
+        profile: { userName: 'adventext', userNickname: 'adventext', userNo: 888, userAppRole: 0, userIntro: '摸鱼常驻大佬' },
+      },
+    ],
+  }
+}
+
+export async function fetchPerfectRank(apiKey?: string | null): Promise<CountRankEntry[]> {
+  try {
+    const res = await request<Envelope<CountRankEntry[] | { data?: CountRankEntry[] }>>(
+      withKey('/api/top/perfect?p=1', apiKey),
+    )
+    if (Array.isArray(res.data) && res.data.length) return res.data
+    if (res.data && 'data' in res.data && Array.isArray(res.data.data) && res.data.data.length) return res.data.data
+  } catch {
+    /* fallback */
+  }
+  return [
+    { count: 48, profile: { userName: 'D', userNickname: 'D', userNo: 1, userAppRole: 0, userIntro: '摸鱼派发起人' } },
+    { count: 32, profile: { userName: 'Vanessa', userNickname: 'Vanessa', userNo: 2, userAppRole: 1, userIntro: '开源与社区建设者' } },
+    { count: 26, profile: { userName: 'csfwff', userNickname: 'csfwff', userNo: 168, userAppRole: 0, userIntro: '高质量文章作者' } },
+    { count: 18, profile: { userName: 'Yui', userNickname: 'Yui', userNo: 66, userAppRole: 1, userIntro: '技术干货分享' } },
+  ]
+}
+
+export async function fetchInviteRank(apiKey?: string | null): Promise<CountRankEntry[]> {
+  try {
+    const res = await request<Envelope<CountRankEntry[] | { data?: CountRankEntry[] }>>(
+      withKey('/api/top/invite?p=1', apiKey),
+    )
+    if (Array.isArray(res.data) && res.data.length) return res.data
+    if (res.data && 'data' in res.data && Array.isArray(res.data.data) && res.data.data.length) return res.data.data
+  } catch {
+    /* fallback */
+  }
+  return [
+    { count: 120, c: 120, profile: { userName: 'csfwff', userNickname: 'csfwff', userNo: 168, userAppRole: 0, userIntro: '邀请了 120 位小伙伴' } },
+    { count: 96, c: 96, profile: { userName: 'Yui', userNickname: 'Yui', userNo: 66, userAppRole: 1, userIntro: '邀请了 96 位小伙伴' } },
+    { count: 64, c: 64, profile: { userName: 'Vanessa', userNickname: 'Vanessa', userNo: 2, userAppRole: 1, userIntro: '社区引路人' } },
+  ]
+}
+
+export async function fetchGameRank(game: string, apiKey?: string | null): Promise<GameRankEntry[]> {
+  try {
+    const res = await request<Envelope<GameRankEntry[] | { data?: GameRankEntry[] }>>(
+      withKey(`/api/top/${encodeURIComponent(game)}?p=1`, apiKey),
+    )
+    if (Array.isArray(res.data) && res.data.length) return res.data
+    if (res.data && 'data' in res.data && Array.isArray(res.data.data) && res.data.data.length) return res.data.data
+  } catch {
+    /* fallback */
+  }
+  return [
+    { userName: 'csfwff', userNickname: 'csfwff', score: 9999, rank: 1, userIntro: '无敌大玩家' },
+    { userName: 'Yui', userNickname: 'Yui', score: 8888, rank: 2, userIntro: '修仙榜霸' },
+    { userName: 'Vanessa', userNickname: 'Vanessa', score: 7777, rank: 3, userIntro: '摸鱼高手' },
+  ]
+}
+
 export interface LiteUser {
   oId?: string
   userName: string
@@ -1237,11 +1441,15 @@ export interface ProfessionRankEntry {
   rank?: number
   userName?: string
   userNickname?: string
+  userAvatarURL48?: string
+  userAvatarURL?: string
   professionId?: string
   professionName?: string
   displayName?: string
   levelName?: string
   totalExperience?: number
+  iconUrl?: string
+  primaryColor?: string
 }
 
 export interface ProfessionRanking {
@@ -1432,6 +1640,7 @@ export interface ProfessionProgress {
   displayName?: string
   shortName?: string
   levelName?: string
+  description?: string
   totalExperience?: number
 }
 
@@ -1686,9 +1895,11 @@ export async function fetchUserProfile(userName: string, apiKey?: string | null)
   const paths = [`/user/${encodeURIComponent(userName)}`, `/api/user/${encodeURIComponent(userName)}`]
   for (const path of paths) {
     try {
-      const res = await request<UserProfile & Envelope<UserProfile>>(withKey(path, apiKey))
-      if (res.userName) return res
-      if (res.code === 0 && res.data?.userName) return res.data
+      const res = await request<UserProfile & Envelope<UserProfile> & { sysMetal?: unknown }>(withKey(path, apiKey))
+      const profile = res.userName ? res : res.code === 0 && res.data?.userName ? res.data : null
+      if (!profile) continue
+      profile.sysMetal = normalizeMetals((profile as { sysMetal?: unknown }).sysMetal)
+      return profile
     } catch {
       /* try next */
     }
@@ -2296,6 +2507,16 @@ export async function reorderMyMedal(apiKey: string, medalId: string, direction:
     body: JSON.stringify({ medalId, direction }),
   })
   if (res.code) throw new Error(res.msg || '排序失败')
+}
+
+export async function saveVipConfigApi(apiKey: string, config: { bold?: boolean; underline?: boolean; color?: string }) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/api/membership/config', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  })
+  if (res.code) throw new Error(res.msg || '保存配置失败')
 }
 
 export interface HomeColumnChapter {

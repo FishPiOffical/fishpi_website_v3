@@ -20,6 +20,10 @@ export function shouldPrefetchSsr(path: string) {
     p === '/top/online' ||
     p === '/top/balance' ||
     p === '/top/consumption' ||
+    p === '/top/profession' ||
+    p === '/top/donate' ||
+    p === '/top/perfect' ||
+    p === '/top/invite' ||
     p === '/repeater' ||
     p === '/download' ||
     p === '/activity' ||

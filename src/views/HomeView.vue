@@ -164,7 +164,7 @@ async function load() {
     online.value = onlineRank.slice(0, 8)
     hot.value = hotList.slice(0, 12)
     longArticles.value = longList.slice(0, 12)
-    recentUsers.value = regs.slice(0, 12)
+    recentUsers.value = regs.slice(0, 20)
     tags.value = tagData.tags.slice(0, 24)
     moons.value = breezes.slice(0, 8)
     chatLines.value = chats.slice(0, 10)
@@ -588,18 +588,21 @@ function scrollShelf(id: string, dir: -1 | 1) {
               欢迎新人 <b>{{ welcomeUser.userNickname || welcomeUser.userName }}</b>
             </RouterLink>
           </div>
-          <ul class="people">
-            <li v-for="u in recentUsers" :key="u.oId || u.userName">
-              <RouterLink :to="`/member/${u.userName}`">
-                <span
-                  class="avatar-mid"
-                  :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
-                />
-                <em>{{ u.userNickname || u.userName }}</em>
-              </RouterLink>
-            </li>
-            <li v-if="!recentUsers.length && !loading" class="hint-li">暂无</li>
-          </ul>
+          <div class="recent-reg-avatars">
+            <RouterLink
+              v-for="u in recentUsers"
+              :key="u.oId || u.userName"
+              :to="`/member/${u.userName}`"
+              class="reg-avatar-link"
+              :title="u.userNickname ? `${u.userNickname} (@${u.userName})` : u.userName"
+            >
+              <span
+                class="avatar-tile"
+                :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
+              />
+            </RouterLink>
+            <span v-if="!recentUsers.length && !loading" class="hint">暂无最新注册</span>
+          </div>
 
           <div class="index-head spaced">
             <b>标签</b>
@@ -664,18 +667,23 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 .board {
   display: flex;
   background: var(--fp-card);
   box-shadow: var(--fp-card-shadow);
-  padding: 15px 0 20px;
-  border-radius: 10px;
+  border: 1px solid var(--fp-border);
+  padding: 16px 14px 20px;
+  border-radius: 8px;
 }
 .col {
   flex: 1;
   min-width: 0;
+  padding: 0 10px;
+}
+.col:not(:last-child) {
+  border-right: 1px solid var(--fp-border);
 }
 .col.side {
   flex: 0.95;
@@ -683,34 +691,42 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .index-head {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  border-bottom: 1px solid var(--fp-border);
+  padding: 4px 6px 8px;
+  margin-bottom: 8px;
   font-size: 13px;
-  margin: 5px 10px 10px;
   color: var(--fp-head);
   gap: 8px;
 }
 .index-head.spaced {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 .index-head.spaced-sm {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 .index-head b {
-  font-weight: 700;
-  color: var(--fp-head);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fp-title);
 }
 .index-head a {
   color: var(--fp-link);
+  font-size: 12px;
   text-decoration: none;
   flex-shrink: 0;
 }
+.index-head a:hover {
+  color: var(--fp-accent);
+}
 .online {
-  font-weight: 500;
+  font-weight: normal;
+  font-size: 12px;
   color: var(--fp-muted);
-  margin-left: 2px;
+  margin-left: 4px;
 }
 .discuss {
-  margin: 0 15px 8px;
+  margin: 0 8px 10px;
   font-size: 12px;
   color: var(--fp-muted);
 }
@@ -726,7 +742,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .hot-switch button {
   border: 0;
@@ -734,68 +750,81 @@ function scrollShelf(id: string, dir: -1 | 1) {
   color: var(--fp-muted);
   cursor: pointer;
   padding: 0;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
+  transition: color 0.15s ease;
 }
 .hot-switch button.on {
-  color: var(--fp-head);
+  color: var(--fp-title);
 }
 .hot-switch .sep {
   color: var(--fp-border);
+  font-weight: normal;
 }
 .module-list,
-.people,
 .moons {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 .module-list li,
-.people li,
 .moons li {
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 15px;
-  min-height: 40px;
+  padding: 7px 8px;
+  min-height: 36px;
   font-size: 14px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+.module-list li:hover,
+.moons li:hover {
+  background-color: var(--fp-hover);
 }
 .module-list.rank li {
-  padding-left: 22px;
+  padding-left: 20px;
 }
 .hint-li {
   color: var(--fp-muted);
   font-size: 13px;
+  padding: 12px 8px;
 }
 .title {
   flex: 1;
   color: var(--fp-title);
   text-decoration: none;
   min-width: 0;
+  font-size: 14px;
 }
 .title:hover {
   color: var(--fp-link);
 }
 .count {
-  color: var(--fp-head);
+  color: var(--fp-muted);
   font-size: 12px;
   margin-left: auto;
   flex-shrink: 0;
+  background: var(--fp-hover);
+  padding: 1px 6px;
+  border-radius: 9px;
 }
 .count.heat {
   color: var(--fp-accent);
+  background: transparent;
 }
 .download {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 7px 15px 20px;
-  padding: 10px;
+  gap: 10px;
+  margin: 4px 6px 14px;
+  padding: 10px 12px;
   font-size: 13px;
-  color: var(--fp-head);
-  background: var(--fp-card);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  color: var(--fp-title);
+  background: var(--fp-hover);
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
 }
 .download img {
   width: 35px;
@@ -821,17 +850,35 @@ function scrollShelf(id: string, dir: -1 | 1) {
   opacity: 0.55;
   cursor: not-allowed;
 }
-.people li a {
+.recent-reg-avatars {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  color: var(--fp-title);
-  text-decoration: none;
+  padding: 4px 15px 12px;
 }
-.people em {
-  font-style: normal;
-  font-size: 13px;
+
+.reg-avatar-link {
+  display: inline-block;
+  line-height: 0;
+  transition: transform 0.15s ease;
 }
+
+.reg-avatar-link:hover {
+  transform: scale(1.12);
+}
+
+.avatar-tile {
+  display: block;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--fp-border);
+  border: 1px solid var(--fp-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
 .tags {
   display: flex;
   flex-wrap: wrap;
@@ -852,6 +899,12 @@ function scrollShelf(id: string, dir: -1 | 1) {
   gap: 4px;
   font-size: 13px;
   color: var(--fp-muted);
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+.moons li span {
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 .moons .who {
   color: var(--fp-link);
@@ -1081,6 +1134,21 @@ function scrollShelf(id: string, dir: -1 | 1) {
 @media (max-width: 960px) {
   .board {
     flex-direction: column;
+    padding: 12px 10px;
+    gap: 12px;
+  }
+  .col {
+    padding: 0;
+  }
+  .col:not(:last-child) {
+    border-right: none;
+    border-bottom: 1px solid var(--fp-border);
+    padding-bottom: 14px;
+    margin-bottom: 8px;
+  }
+  .col.side {
+    border-left: none;
+    padding-left: 0;
   }
   .long-card {
     flex-basis: 180px;

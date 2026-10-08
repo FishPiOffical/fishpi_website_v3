@@ -506,59 +506,90 @@ async function onReactComment(c: ArticleComment, value: string) {
       >{{ item.text }}</a>
     </aside>
     <article class="card post">
-      <h1>{{ article.articleTitleEmoj || article.articleTitle }}</h1>
-      <p class="meta">
-        <RouterLink v-if="article.articleAuthorName" :to="`/member/${article.articleAuthorName}`">{{
-          article.articleAuthorName
-        }}</RouterLink>
-        <span v-else>匿名</span>
-        <span>{{ article.articleCreateTimeStr || article.timeAgo }}</span>
+      <div class="article-title-row">
+        <span v-if="article.articlePerfect" class="icon-perfect" title="优选">🌟</span>
+        <h1>{{ article.articleTitleEmoj || article.articleTitle }}</h1>
+      </div>
+
+      <div class="meta">
+        <RouterLink
+          v-if="article.articleAuthorName"
+          :to="`/member/${article.articleAuthorName}`"
+          class="meta-author"
+        >
+          <span
+            class="avatar-small"
+            :style="article.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${article.articleAuthorThumbnailURL48}')` } : undefined"
+          />
+          <b>{{ article.articleAuthorName }}</b>
+        </RouterLink>
+        <span v-else class="meta-author">匿名用户</span>
+        <span>•</span>
+        <time>{{ article.articleCreateTimeStr || article.timeAgo }}</time>
+        <span>•</span>
         <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
-        <span>{{ article.articleCommentCount ?? comments.length }} 评</span>
-        <span>在看 {{ heat }}</span>
-      </p>
-      <p v-if="tagList.length" class="tags">
-        <RouterLink v-for="t in tagList" :key="t" :to="`/tags/${encodeURIComponent(t)}`">{{ t }}</RouterLink>
-      </p>
-      <MetalBadges :items="metals" />
+        <span>•</span>
+        <span>{{ article.articleCommentCount ?? comments.length }} 评论</span>
+        <span v-if="heat">（{{ heat }} 在看）</span>
+      </div>
+
+      <div v-if="tagList.length" class="tags">
+        <RouterLink v-for="t in tagList" :key="t" :to="`/tags/${encodeURIComponent(t)}`" class="tag-pill">
+          # {{ t }}
+        </RouterLink>
+      </div>
+
+      <div v-if="metals.length" class="article-metals">
+        <MetalBadges :items="metals" />
+      </div>
+
       <p v-if="String(article.oId).startsWith('mock-')" class="hint">
         匿名详情接口未开放，当前为 mock 正文。
       </p>
-      <div v-if="isLoggedIn" class="actions">
-        <button type="button" @click="vote">点赞</button>
-        <button type="button" :disabled="article.thanked" @click="thank">
-          {{ article.thanked ? '已感谢' : '感谢' }}
-        </button>
-        <button type="button" @click="toggleCollect">
-          {{ article.isFollowing ? '取消收藏' : '收藏' }}
-        </button>
-        <button type="button" @click="toggleWatch">
-          {{ article.isWatching ? '取消关注' : '关注帖子' }}
-        </button>
-        <button
-          v-if="Number(article.articleRewardPoint) > 0"
-          type="button"
-          :disabled="article.rewarded"
-          @click="reward"
-        >
-          {{ article.rewarded ? '已打赏' : `打赏 ${article.articleRewardPoint}` }}
-        </button>
-        <RouterLink v-if="canEdit" class="edit" :to="`/post/${article.oId}`">编辑</RouterLink>
-        <button v-if="isLoggedIn" type="button" @click="toggleRevisions">
-          {{ showRevisions ? '收起历史' : '修订历史' }}
-        </button>
-        <ReportDialog v-if="isLoggedIn" :api-key="apiKey" :data-id="article.oId" :data-type="0" />
-        <span v-if="actionMsg">{{ actionMsg }}</span>
+
+      <div ref="bodyEl" class="body" v-html="article.articleContent || ''" />
+
+      <!-- 文章底部互动操作栏 -->
+      <div class="article-tail-bar">
+        <div v-if="isLoggedIn" class="actions">
+          <button type="button" class="btn small" @click="vote">👍 点赞</button>
+          <button type="button" class="btn small" :disabled="article.thanked" @click="thank">
+            {{ article.thanked ? '❤️ 已感谢' : '❤️ 感谢' }}
+          </button>
+          <button type="button" class="btn small" @click="toggleCollect">
+            {{ article.isFollowing ? '★ 取消收藏' : '☆ 收藏' }}
+          </button>
+          <button type="button" class="btn small" @click="toggleWatch">
+            {{ article.isWatching ? '取消关注' : '+ 关注帖子' }}
+          </button>
+          <button
+            v-if="Number(article.articleRewardPoint) > 0"
+            type="button"
+            class="btn orange small"
+            :disabled="article.rewarded"
+            @click="reward"
+          >
+            {{ article.rewarded ? '已打赏' : `打赏 ${article.articleRewardPoint} 积分` }}
+          </button>
+          <RouterLink v-if="canEdit" class="btn small edit-btn" :to="`/post/${article.oId}`">编辑</RouterLink>
+          <button type="button" class="btn small" @click="toggleRevisions">
+            {{ showRevisions ? '收起历史' : '修订历史' }}
+          </button>
+          <ReportDialog :api-key="apiKey" :data-id="article.oId" :data-type="0" />
+        </div>
+        <p v-if="actionMsg" class="action-alert">{{ actionMsg }}</p>
       </div>
+
+      <!-- 修订历史展开卡片 -->
       <section v-if="showRevisions" class="revisions">
-        <h2>修订历史</h2>
+        <h3>修订历史</h3>
         <p v-if="revisionLoading" class="hint">加载修订列表…</p>
         <p v-else-if="revisionError" class="err">{{ revisionError }}</p>
         <ol v-else class="rev-list">
           <li v-for="rev in revisions" :key="rev.revisionId">
             <button
               type="button"
-              class="ghost"
+              class="btn small"
               :class="{ on: activeRevisionId === rev.revisionId }"
               :disabled="revisionBusy"
               @click="openRevision(rev.revisionId)"
@@ -570,95 +601,195 @@ async function onReactComment(c: ArticleComment, value: string) {
           </li>
         </ol>
         <div v-if="activeRevisionId" class="rev-preview">
-          <h3>{{ revisionTitle || '修订预览' }}</h3>
+          <h4>{{ revisionTitle || '修订预览' }}</h4>
           <p v-if="revisionBusy" class="hint">渲染中…</p>
           <div v-else class="body" v-html="revisionHtml" />
         </div>
       </section>
-      <ReactionBar
-        :summary="article.reactionSummary"
-        :current="article.currentUserReaction"
-        :disabled="!isLoggedIn"
-        @toggle="onReactArticle"
-      />
-      <div ref="bodyEl" class="body" v-html="article.articleContent || ''" />
+
+      <!-- 表情回应栏 -->
+      <div class="reaction-wrap">
+        <ReactionBar
+          :summary="article.reactionSummary"
+          :current="article.currentUserReaction"
+          :disabled="!isLoggedIn"
+          @toggle="onReactArticle"
+        />
+      </div>
+
+      <!-- 作者信息卡片 (对齐现网 Rhythm .article__meta) -->
+      <div v-if="article.articleAuthorName" class="author-summary-card">
+        <RouterLink :to="`/member/${article.articleAuthorName}`" class="summary-avatar-link">
+          <span
+            class="summary-avatar"
+            :style="article.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${article.articleAuthorThumbnailURL48}')` } : undefined"
+          />
+        </RouterLink>
+        <div class="summary-meta">
+          <div class="summary-name-row">
+            <RouterLink :to="`/member/${article.articleAuthorName}`" class="summary-name">
+              {{ article.articleAuthorName }}
+            </RouterLink>
+            <span v-if="article.articleCity" class="summary-city">
+              📍 {{ article.articleCity }}
+            </span>
+          </div>
+          <div class="summary-counts">
+            <span>获赞 {{ article.articleGoodCnt ?? 0 }}</span>
+            <span>•</span>
+            <span>被收藏 {{ article.articleCollectCnt ?? 0 }}</span>
+            <span>•</span>
+            <span>回帖 {{ article.articleCommentCount ?? comments.length }}</span>
+          </div>
+        </div>
+      </div>
     </article>
 
-    <section v-if="nice.length" class="card">
-      <h2>优质回帖</h2>
-      <div v-for="c in nice" :key="'n' + c.oId" class="cmt">
-        <b><RouterLink :to="`/member/${who(c)}`">{{ who(c) }}</RouterLink></b>
-        <div class="cmt-body" v-html="c.commentContent || ''" />
+    <section v-if="nice.length" class="card nice-comments-card">
+      <div class="module-header">
+        <span><b>✨ 优质回帖</b></span>
+      </div>
+      <div class="comments-list">
+        <div v-for="c in nice" :key="'n' + c.oId" class="cmt-row">
+          <div class="cmt-avatar-col">
+            <RouterLink :to="`/member/${who(c)}`" class="cmt-avatar-wrap">
+              <span
+                class="avatar-cmt"
+                :style="c.commentAuthorThumbnailURL ? { backgroundImage: `url('${c.commentAuthorThumbnailURL}')` } : undefined"
+              />
+            </RouterLink>
+          </div>
+          <div class="cmt-main-col">
+            <header class="cmt-header">
+              <RouterLink :to="`/member/${who(c)}`" class="cmt-author-name">{{ who(c) }}</RouterLink>
+              <time class="cmt-time">{{ c.commentCreateTimeStr || c.timeAgo }}</time>
+            </header>
+            <div class="cmt-body" v-html="c.commentContent || ''" />
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="card">
-      <h2>评论 {{ comments.length }}</h2>
-      <div v-for="row in threaded" :key="row.c.oId" class="cmt" :class="{ nested: row.nested }">
-        <header>
-          <b><RouterLink :to="`/member/${who(row.c)}`">{{ who(row.c) }}</RouterLink></b>
-          <time>{{ row.c.commentCreateTimeStr || row.c.timeAgo }}</time>
-          <em v-if="parentAuthor(row.c)" class="reply-to">回复 {{ parentAuthor(row.c) }}</em>
-          <button v-if="isLoggedIn" type="button" class="ghost" @click="replyId = row.c.oId">回复</button>
-          <button v-if="isLoggedIn" type="button" class="ghost" @click="onVoteComment(row.c)">点赞</button>
-          <button v-if="isLoggedIn" type="button" class="ghost" :disabled="row.c.rewarded" @click="onThankComment(row.c)">
-            {{ row.c.rewarded ? '已感谢' : '感谢' }}
-          </button>
-          <button v-if="isLoggedIn && isOwnComment(row.c)" type="button" class="ghost" @click="startEdit(row.c)">
-            编辑
-          </button>
-          <button v-if="isLoggedIn && isOwnComment(row.c)" type="button" class="ghost" @click="onRemoveComment(row.c)">
-            删除
-          </button>
-          <button
-            v-if="isLoggedIn && canEdit && isQnA && !row.c.commentQnAOffered && !isOwnComment(row.c)"
-            type="button"
-            class="ghost"
-            @click="onAccept(row.c)"
-          >
-            采纳
-          </button>
-          <ReportDialog v-if="isLoggedIn && !isOwnComment(row.c)" :api-key="apiKey" :data-id="row.c.oId" :data-type="1" />
-        </header>
-        <div v-if="editingId === row.c.oId" class="edit-box">
-          <textarea v-model="editDraft" rows="3" />
-          <button type="button" :disabled="editSaving || !editDraft.trim()" @click="saveEdit">保存</button>
-          <button type="button" class="ghost" @click="editingId = ''">取消</button>
-        </div>
-        <div v-else class="cmt-body" v-html="row.c.commentContent || ''" />
-        <ReactionBar
-          :summary="row.c.reactionSummary"
-          :current="row.c.currentUserReaction"
-          :disabled="!isLoggedIn"
-          @toggle="(v) => onReactComment(row.c, v)"
-        />
+    <section id="articleCommentsPanel" class="card comments-card">
+      <div class="module-header comments-header">
+        <span><b>💬 全部回帖 ({{ comments.length }})</b></span>
       </div>
-      <p v-if="!comments.length" class="hint">还没有评论。</p>
+
+      <div class="comments-list">
+        <div
+          v-for="row in threaded"
+          :key="row.c.oId"
+          class="cmt-row"
+          :class="{ nested: row.nested }"
+        >
+          <div class="cmt-avatar-col">
+            <RouterLink :to="`/member/${who(row.c)}`" class="cmt-avatar-wrap">
+              <span
+                class="avatar-cmt"
+                :style="row.c.commentAuthorThumbnailURL ? { backgroundImage: `url('${row.c.commentAuthorThumbnailURL}')` } : undefined"
+              />
+            </RouterLink>
+          </div>
+          <div class="cmt-main-col">
+            <header class="cmt-header">
+              <div class="cmt-meta-left">
+                <RouterLink :to="`/member/${who(row.c)}`" class="cmt-author-name">
+                  {{ who(row.c) }}
+                </RouterLink>
+                <time class="cmt-time">{{ row.c.commentCreateTimeStr || row.c.timeAgo }}</time>
+                <em v-if="parentAuthor(row.c)" class="reply-to">回复 @{{ parentAuthor(row.c) }}</em>
+              </div>
+              <div class="cmt-actions-right">
+                <button v-if="isLoggedIn" type="button" class="btn-text" @click="replyId = row.c.oId">回复</button>
+                <button v-if="isLoggedIn" type="button" class="btn-text" @click="onVoteComment(row.c)">
+                  👍 {{ row.c.commentGoodCnt ? row.c.commentGoodCnt : '赞' }}
+                </button>
+                <button
+                  v-if="isLoggedIn"
+                  type="button"
+                  class="btn-text"
+                  :disabled="row.c.rewarded"
+                  @click="onThankComment(row.c)"
+                >
+                  {{ row.c.rewarded ? '❤️ 已感谢' : '❤️ 感谢' }}
+                </button>
+                <button v-if="isLoggedIn && isOwnComment(row.c)" type="button" class="btn-text" @click="startEdit(row.c)">
+                  编辑
+                </button>
+                <button v-if="isLoggedIn && isOwnComment(row.c)" type="button" class="btn-text danger" @click="onRemoveComment(row.c)">
+                  删除
+                </button>
+                <button
+                  v-if="isLoggedIn && canEdit && isQnA && !row.c.commentQnAOffered && !isOwnComment(row.c)"
+                  type="button"
+                  class="btn-text accept"
+                  @click="onAccept(row.c)"
+                >
+                  采纳
+                </button>
+                <ReportDialog v-if="isLoggedIn && !isOwnComment(row.c)" :api-key="apiKey" :data-id="row.c.oId" :data-type="1" />
+              </div>
+            </header>
+            <div v-if="editingId === row.c.oId" class="edit-box">
+              <textarea v-model="editDraft" rows="3" />
+              <div class="edit-box-btns">
+                <button type="button" class="btn small" :disabled="editSaving || !editDraft.trim()" @click="saveEdit">保存</button>
+                <button type="button" class="btn small ghost" @click="editingId = ''">取消</button>
+              </div>
+            </div>
+            <div v-else class="cmt-body" v-html="row.c.commentContent || ''" />
+            <div class="cmt-reaction-bar">
+              <ReactionBar
+                :summary="row.c.reactionSummary"
+                :current="row.c.currentUserReaction"
+                :disabled="!isLoggedIn"
+                @toggle="(v) => onReactComment(row.c, v)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p v-if="!comments.length" class="empty-hint">暂无回帖，快来抢沙发吧～</p>
       <footer v-if="commentPages > 1" class="pager">
-        <button type="button" :disabled="commentPage <= 1" @click="commentPage -= 1">上一页</button>
-        <span>{{ commentPage }} / {{ commentPages }}</span>
-        <button type="button" :disabled="commentPage >= commentPages" @click="commentPage += 1">下一页</button>
+        <button type="button" class="btn small" :disabled="commentPage <= 1" @click="commentPage -= 1">上一页</button>
+        <span class="pager-info">{{ commentPage }} / {{ commentPages }}</span>
+        <button type="button" class="btn small" :disabled="commentPage >= commentPages" @click="commentPage += 1">下一页</button>
       </footer>
     </section>
 
-    <form class="card composer" @submit.prevent="submit">
-      <h2>参与讨论</h2>
-      <template v-if="isLoggedIn">
-        <p v-if="replyId" class="hint">
-          回复 {{ comments.find((c) => c.oId === replyId)?.commentAuthorName || replyId }}
-          <button type="button" class="ghost" @click="replyId = ''">取消</button>
+    <!-- 底部发表回帖区域 -->
+    <form class="card composer-card" @submit.prevent="submit">
+      <div class="module-header">
+        <span><b>参与讨论</b></span>
+      </div>
+      <div class="composer-inner">
+        <template v-if="isLoggedIn">
+          <p v-if="replyId" class="reply-target-tip">
+            回复 <b>@{{ comments.find((c) => c.oId === replyId)?.commentAuthorName || replyId }}</b>
+            <button type="button" class="btn-text cancel-reply" @click="replyId = ''">取消回复</button>
+          </p>
+          <textarea
+            v-model="draft"
+            rows="4"
+            class="composer-textarea"
+            placeholder="请友善发言，支持 Markdown 语法与表情快捷键…"
+          />
+          <div class="composer-toolbar">
+            <EmojiPicker @insert="(md) => (draft += md)" />
+            <div class="composer-submit-wrap">
+              <span v-if="sendError" class="err-tip">{{ sendError }}</span>
+              <button type="submit" class="btn small" :disabled="sending || !draft.trim()">
+                {{ sending ? '发送中…' : '发表评论' }}
+              </button>
+            </div>
+          </div>
+        </template>
+        <p v-else class="hint-login">
+          <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }" class="login-link">登录</RouterLink>
+          后即可参与讨论。
         </p>
-        <textarea v-model="draft" rows="4" placeholder="支持 Markdown" />
-        <EmojiPicker @insert="(md) => (draft += md)" />
-        <p v-if="sendError" class="err">{{ sendError }}</p>
-        <button type="submit" :disabled="sending || !draft.trim()">
-          {{ sending ? '发送中…' : '发表评论' }}
-        </button>
-      </template>
-      <p v-else class="hint">
-        <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
-        后可以评论。
-      </p>
+      </div>
     </form>
   </div>
 </template>
@@ -668,36 +799,42 @@ async function onReactComment(c: ArticleComment, value: string) {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 1300px;
+  margin: 0 auto;
 }
 .toc {
   position: sticky;
-  top: calc(var(--fp-nav-h) + 12px);
+  top: calc(var(--fp-nav-h) + 16px);
   z-index: 5;
   align-self: flex-start;
-  max-height: 40vh;
-  overflow: auto;
+  max-height: calc(100vh - var(--fp-nav-h) - 40px);
+  overflow-y: auto;
   background: var(--fp-card);
   box-shadow: var(--fp-card-shadow);
-  border-radius: 10px;
-  padding: 12px 14px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 .toc b {
   font-size: 13px;
   color: var(--fp-head);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--fp-border);
 }
 .toc a {
-  color: var(--fp-title);
+  color: var(--fp-muted);
   text-decoration: none;
   font-size: 13px;
-  line-height: 1.4;
-  padding: 2px 0;
+  line-height: 1.5;
+  padding: 3px 0;
+  transition: color 0.15s ease;
 }
 .toc a:hover {
-  color: var(--fp-link);
+  color: var(--fp-accent);
 }
 .toc a.lv2 {
   padding-left: 10px;
@@ -705,24 +842,28 @@ async function onReactComment(c: ArticleComment, value: string) {
 .toc a.lv3 {
   padding-left: 20px;
   font-size: 12px;
-  color: var(--fp-muted);
 }
+
 .card {
   background: var(--fp-card);
   box-shadow: var(--fp-card-shadow);
+  border: 1px solid var(--fp-border);
   border-radius: 8px;
-  padding: 15px;
+  overflow: hidden;
 }
+.card.post {
+  padding: 24px 28px;
+}
+
 @media (min-width: 1100px) {
   .wrap {
     display: grid;
-    grid-template-columns: 180px minmax(0, 1fr);
-    gap: 16px;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 20px;
     align-items: start;
   }
   .toc {
     grid-row: 1 / span 20;
-    max-height: calc(100vh - var(--fp-nav-h) - 40px);
   }
   .card.post {
     grid-column: 2;
@@ -732,61 +873,186 @@ async function onReactComment(c: ArticleComment, value: string) {
     grid-column: 2;
   }
 }
+
+.article-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.icon-perfect {
+  font-size: 24px;
+  line-height: 1.3;
+}
 h1 {
-  margin: 0 0 8px;
-  font-size: 20px;
+  margin: 0;
+  font-size: 22px;
   line-height: 1.4;
   color: var(--fp-title);
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
-h2 {
-  margin: 0 0 12px;
-  font-size: 14px;
-  color: var(--fp-head);
-  font-weight: 600;
-}
-.meta,
-.tags,
-.hint {
-  color: var(--fp-muted);
-  font-size: 13px;
-}
+
 .meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 8px;
+  color: var(--fp-muted);
+  font-size: 13px;
+  margin-bottom: 12px;
 }
-.meta a {
-  color: var(--fp-link);
+.meta-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fp-title);
   text-decoration: none;
+  font-weight: 500;
+}
+.meta-author:hover {
+  color: var(--fp-accent);
+}
+.avatar-small {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--fp-border);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tag-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--fp-muted);
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+.tag-pill:hover {
+  background: rgba(229, 146, 48, 0.1);
+  border-color: var(--fp-accent);
+  color: var(--fp-accent);
+}
+
+.article-metals {
+  margin-bottom: 14px;
+}
+
+.body {
+  margin-top: 20px;
+  margin-bottom: 24px;
+  line-height: 1.8;
+  font-size: 15px;
+  color: var(--fp-text);
+  word-break: break-word;
+}
+.body :deep(h1),
+.body :deep(h2),
+.body :deep(h3) {
+  margin: 1.5em 0 0.8em;
+  color: var(--fp-title);
+  scroll-margin-top: calc(var(--fp-nav-h) + 16px);
+  font-weight: 600;
+}
+.body :deep(h1) { font-size: 20px; border-bottom: 1px solid var(--fp-border); padding-bottom: 6px; }
+.body :deep(h2) { font-size: 18px; }
+.body :deep(h3) { font-size: 16px; }
+.body :deep(p) {
+  margin: 0 0 1.2em;
+}
+.body :deep(blockquote) {
+  margin: 1.2em 0;
+  padding: 10px 16px;
+  border-left: 4px solid var(--fp-accent);
+  background: var(--fp-bg);
+  color: var(--fp-muted);
+  border-radius: 0 4px 4px 0;
+}
+.body :deep(img),
+.cmt-body :deep(img) {
+  max-width: 100%;
+  border-radius: 4px;
+}
+.body :deep(pre),
+.cmt-body :deep(pre) {
+  overflow-x: auto;
+  background: var(--fp-bg);
+  padding: 14px;
+  border-radius: 6px;
+  border: 1px solid var(--fp-border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.body :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2em 0;
+  font-size: 14px;
+}
+.body :deep(th),
+.body :deep(td) {
+  border: 1px solid var(--fp-border);
+  padding: 8px 12px;
+  text-align: left;
+}
+.body :deep(th) {
+  background: var(--fp-bg);
+  font-weight: 500;
+}
+.body :deep(a),
+.cmt-body :deep(a) {
+  color: var(--fp-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.body :deep(a:hover),
+.cmt-body :deep(a:hover) {
+  color: var(--fp-accent);
+}
+
+.article-tail-bar {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--fp-border);
 }
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin: 10px 0 12px;
 }
-.actions button,
-.ghost {
-  border: 1px solid var(--fp-border);
-  background: var(--fp-card);
-  color: var(--fp-text);
-  border-radius: 3px;
-  padding: 4px 10px;
-  cursor: pointer;
+.actions a.edit-btn {
+  text-decoration: none;
+}
+.action-alert {
   font-size: 13px;
-}
-.actions button:hover,
-.ghost:hover {
   color: var(--fp-accent);
-  border-color: var(--fp-accent);
+  margin-top: 8px;
 }
+
 .revisions {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--fp-border);
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
+}
+.revisions h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--fp-head);
 }
 .rev-list {
   list-style: none;
@@ -796,153 +1062,286 @@ h2 {
   flex-wrap: wrap;
   gap: 6px;
   max-height: 160px;
-  overflow: auto;
+  overflow-y: auto;
 }
-.rev-list .ghost.on {
-  color: var(--fp-accent);
+.rev-list .btn.on {
   border-color: var(--fp-accent);
+  color: var(--fp-accent);
 }
 .rev-list em {
   font-style: normal;
   margin-left: 4px;
   color: var(--fp-green);
-  font-size: 12px;
+  font-size: 11px;
 }
 .rev-preview {
   border-top: 1px dashed var(--fp-border);
   padding-top: 10px;
 }
-.rev-preview h3 {
+.rev-preview h4 {
   margin: 0 0 8px;
-  font-size: 15px;
-  color: var(--fp-title);
-}
-.actions a.edit {
-  color: var(--fp-link);
-  text-decoration: none;
-  font-size: 13px;
-}
-.tags a {
-  color: var(--fp-link);
-  text-decoration: none;
-  margin-right: 8px;
-}
-.pager {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-top: 12px;
-}
-.pager button {
-  border: 1px solid var(--fp-border);
-  background: transparent;
-  color: var(--fp-text);
-  border-radius: 8px;
-  padding: 4px 12px;
-  cursor: pointer;
-}
-.body {
-  margin-top: 12px;
-  line-height: 1.7;
-  font-size: 15px;
-  color: var(--fp-text);
-  word-break: break-word;
-}
-.body :deep(h1),
-.body :deep(h2),
-.body :deep(h3) {
-  margin: 1.2em 0 0.6em;
-  color: var(--fp-title);
-  scroll-margin-top: calc(var(--fp-nav-h) + 12px);
-}
-.body :deep(p) {
-  margin: 0 0 1em;
-}
-.body :deep(img),
-.cmt-body :deep(img) {
-  max-width: 100%;
-}
-.body :deep(pre),
-.cmt-body :deep(pre) {
-  overflow: auto;
-  background: var(--fp-bg);
-  padding: 12px;
-  border-radius: 3px;
-  border: 1px solid var(--fp-border);
-}
-.body :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0 0 1em;
   font-size: 14px;
+  color: var(--fp-title);
 }
-.body :deep(th),
-.body :deep(td) {
+
+.reaction-wrap {
+  margin-top: 16px;
+}
+
+.author-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 24px;
+  padding: 14px 18px;
+  background: var(--fp-bg);
   border: 1px solid var(--fp-border);
-  padding: 6px 10px;
-  text-align: left;
+  border-radius: 8px;
 }
-.body :deep(a),
-.cmt-body :deep(a) {
-  color: var(--fp-link);
+.summary-avatar-link {
+  flex-shrink: 0;
 }
-.cmt {
-  padding: 12px 0;
+.summary-avatar {
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--fp-border);
+}
+.summary-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.summary-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.summary-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fp-title);
+  text-decoration: none;
+}
+.summary-name:hover {
+  color: var(--fp-accent);
+}
+.summary-city {
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+.summary-counts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+
+.module-header {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--fp-border);
+  font-size: 14px;
+  color: var(--fp-head);
+  background: var(--fp-card);
+}
+
+.comments-list {
+  padding: 0 18px;
+}
+.cmt-row {
+  display: flex;
+  gap: 14px;
+  padding: 16px 0;
   border-bottom: 1px solid var(--fp-border);
 }
-.cmt.nested {
-  margin-left: 28px;
+.cmt-row:last-child {
+  border-bottom: none;
+}
+.cmt-row.nested {
+  margin-left: 48px;
   border-left: 2px solid var(--fp-border);
-  padding-left: 12px;
+  padding-left: 14px;
+}
+.cmt-avatar-col {
+  flex-shrink: 0;
+}
+.cmt-avatar-wrap {
+  display: block;
+}
+.avatar-cmt {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--fp-border);
+}
+
+.cmt-main-col {
+  flex: 1;
+  min-width: 0;
+}
+.cmt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.cmt-meta-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cmt-author-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fp-title);
+  text-decoration: none;
+}
+.cmt-author-name:hover {
+  color: var(--fp-accent);
+}
+.cmt-time {
+  font-size: 12px;
+  color: var(--fp-muted);
 }
 .reply-to {
   font-style: normal;
-  color: var(--fp-link);
-}
-.cmt header {
-  display: flex;
-  gap: 8px;
-  color: var(--fp-muted);
   font-size: 12px;
-  margin-bottom: 6px;
+  color: var(--fp-accent);
 }
-.cmt header a {
-  color: inherit;
-  text-decoration: none;
+.cmt-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.btn-text {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--fp-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.btn-text:hover {
+  color: var(--fp-accent);
+}
+.btn-text.danger:hover {
+  color: #cf222e;
+}
+.btn-text.accept {
+  color: var(--fp-green);
+  font-weight: 500;
+}
+
+.cmt-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--fp-text);
+  word-break: break-word;
+}
+.cmt-reaction-bar {
+  margin-top: 8px;
+}
+
 .edit-box textarea {
   width: 100%;
+  box-sizing: border-box;
   background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-text);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
   margin: 6px 0;
 }
-.edit-box button {
-  margin-right: 8px;
-  border: 0;
-  background: var(--fp-primary);
-  color: #fff;
-  border-radius: 6px;
-  padding: 4px 10px;
-  cursor: pointer;
+.edit-box-btns {
+  display: flex;
+  gap: 8px;
 }
-.composer textarea {
+
+.empty-hint {
+  padding: 32px 18px;
+  text-align: center;
+  color: var(--fp-muted);
+  font-size: 14px;
+}
+
+.pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--fp-border);
+}
+.pager-info {
+  font-size: 13px;
+  color: var(--fp-muted);
+}
+
+.composer-inner {
+  padding: 18px;
+}
+.reply-target-tip {
+  font-size: 13px;
+  color: var(--fp-muted);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cancel-reply {
+  color: var(--fp-accent);
+}
+.composer-textarea {
   width: 100%;
+  box-sizing: border-box;
   background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-text);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
 }
-.composer button {
-  margin-top: 8px;
-  border: 0;
-  background: var(--fp-primary);
-  color: #fff;
-  border-radius: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
+.composer-textarea:focus {
+  outline: none;
+  border-color: var(--fp-accent);
+}
+.composer-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+.composer-submit-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.err-tip {
+  color: #cf222e;
+  font-size: 13px;
+}
+.hint-login {
+  color: var(--fp-muted);
+  font-size: 14px;
+}
+.login-link {
+  color: var(--fp-accent);
+  font-weight: 500;
+  text-decoration: underline;
 }
 </style>

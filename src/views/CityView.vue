@@ -123,6 +123,17 @@ time {
 .body {
   font-size: 14px;
   line-height: 1.5;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+.body :deep(a) {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+.body :deep(p) {
+  margin: 0;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 a {
   color: var(--fp-link);

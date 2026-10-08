@@ -54,6 +54,61 @@ const routes = [
     component: () => import('@/views/TopView.vue'),
     meta: { title: '消费榜' },
   },
+  {
+    path: '/top/profession',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '职业榜' },
+  },
+  {
+    path: '/top/donate',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '鱼排续命师' },
+  },
+  {
+    path: '/top/perfect',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '优选排行' },
+  },
+  {
+    path: '/top/invite',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '邀请排行' },
+  },
+  {
+    path: '/top/xiaoice',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '小冰游戏排行' },
+  },
+  {
+    path: '/top/evolve',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '进化排行榜' },
+  },
+  {
+    path: '/top/adr',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: 'ADR 游戏总分排行' },
+  },
+  {
+    path: '/top/mofish',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '摸鱼大闯关排行' },
+  },
+  {
+    path: '/top/smallmofish',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '摸鱼小闯关排行' },
+  },
+  {
+    path: '/top/lifeRestart',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '人生重开模拟器排行' },
+  },
+  {
+    path: '/top/emoji',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: 'Emoji 真假小黄脸排行' },
+  },
   { path: '/qna', component: () => import('@/views/ArticleListView.vue'), meta: { title: '问答', list: 'qna' } },
   {
     path: '/perfect',

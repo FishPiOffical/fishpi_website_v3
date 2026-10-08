@@ -90,7 +90,8 @@ async function prefetch(url: string): Promise<SsrPayload> {
       path === '/top/checkin' ||
       path === '/top/online' ||
       path === '/top/balance' ||
-      path === '/top/consumption'
+      path === '/top/consumption' ||
+      path === '/top/profession'
     ) {
       const [checkinRank, onlineRank] = await Promise.all([fetchCheckinRank(null), fetchOnlineRank(null)])
       return { checkinRank, onlineRank }
