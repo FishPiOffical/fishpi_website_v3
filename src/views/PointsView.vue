@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchPointRecords, type PointRecord } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
@@ -36,6 +37,11 @@ watch(
 <template>
   <section class="card">
     <h1>积分流水</h1>
+    <p class="hint">
+      <RouterLink to="/settings/point">积分转账</RouterLink>
+      ·
+      <RouterLink to="/activity">活动签到</RouterLink>
+    </p>
     <p v-if="fromNotice" class="hint">独立流水接口未开放时，回退到积分通知列表。</p>
     <p v-if="loading" class="hint">加载中…</p>
     <p v-else-if="error" class="err">{{ error }}</p>
@@ -69,6 +75,9 @@ h1 {
 .hint {
   color: var(--fp-muted);
   font-size: 13px;
+}
+.hint a {
+  color: var(--fp-link);
 }
 .err {
   color: #e07a5f;

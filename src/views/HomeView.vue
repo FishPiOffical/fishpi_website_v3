@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   fetchCheckinRank,
@@ -17,6 +17,7 @@ import { consumeFeedPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
 
 const auth = useAuthStore()
+const router = useRouter()
 const { apiKey, isLoggedIn } = storeToRefs(auth)
 const left = ref<ArticleSummary[]>([])
 const right = ref<ArticleSummary[]>([])
@@ -74,9 +75,7 @@ function streakOf(u: RankUser) {
 }
 
 function goDownload() {
-  if (typeof window !== 'undefined') {
-    window.open('https://fishpi.cn/download', '_blank', 'noreferrer')
-  }
+  void router.push('/download')
 }
 </script>
 

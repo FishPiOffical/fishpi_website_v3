@@ -66,6 +66,46 @@ const routes = [
     meta: { auth: true, robots: 'noindex' },
   },
   {
+    path: '/settings/point',
+    name: 'transfer',
+    component: () => import('@/views/TransferView.vue'),
+    meta: { auth: true, robots: 'noindex' },
+  },
+  {
+    path: '/following',
+    name: 'following-feed',
+    component: () => import('@/views/FollowingView.vue'),
+    meta: { auth: true, robots: 'noindex' },
+  },
+  {
+    path: '/activity',
+    name: 'activity',
+    component: () => import('@/views/ActivityView.vue'),
+  },
+  {
+    path: '/download',
+    name: 'download',
+    component: () => import('@/views/DownloadView.vue'),
+  },
+  {
+    path: '/agreement',
+    name: 'agreement',
+    component: () => import('@/views/LegalView.vue'),
+    meta: { legal: 'agreement' },
+  },
+  {
+    path: '/privacy',
+    name: 'privacy',
+    component: () => import('@/views/LegalView.vue'),
+    meta: { legal: 'privacy' },
+  },
+  {
+    path: '/city/:cityName',
+    name: 'city',
+    component: () => import('@/views/CityView.vue'),
+    meta: { robots: 'noindex' },
+  },
+  {
     path: '/member/:userName/following',
     component: () => import('@/views/PeopleView.vue'),
     meta: { people: 'following' },
@@ -74,6 +114,11 @@ const routes = [
     path: '/member/:userName/followers',
     component: () => import('@/views/PeopleView.vue'),
     meta: { people: 'followers' },
+  },
+  {
+    path: '/member/:userName/medals',
+    name: 'medals',
+    component: () => import('@/views/MedalsView.vue'),
   },
   { path: '/domains', component: () => import('@/views/DomainView.vue') },
   { path: '/tags', component: () => import('@/views/TagsView.vue') },

@@ -152,6 +152,13 @@ async function sendPoints() {
         <p class="meta">
           @{{ profile.userName }} · {{ profile.userAppRole === 1 ? '画家' : '黑客' }}
           <em v-if="viewedVip">VIP</em>
+          <RouterLink
+            v-if="profile.userCity"
+            class="city"
+            :to="`/city/${encodeURIComponent(profile.userCity)}`"
+          >
+            {{ profile.userCity }}
+          </RouterLink>
         </p>
         <p v-if="profile.userIntro" class="intro">{{ profile.userIntro }}</p>
         <p class="stats">
@@ -163,6 +170,9 @@ async function sendPoints() {
         </p>
         <MetalBadges :items="profile.sysMetal" />
         <MetalBadges v-if="extraMedals.length" :items="extraMedals" />
+        <p class="hint">
+          <RouterLink :to="`/member/${profile.userName}/medals`">查看全部徽章</RouterLink>
+        </p>
         <p v-if="profession?.primaryProfession" class="intro">
           职业 {{ profession.primaryProfession.displayName || profession.primaryProfession.shortName }}
           <span v-if="profession.primaryProfession.levelName"> · {{ profession.primaryProfession.levelName }}</span>
@@ -189,6 +199,7 @@ async function sendPoints() {
           <input v-model.number="sendAmount" type="number" min="1" />
           <input v-model="sendMemo" placeholder="备注" />
           <button type="submit" :disabled="transferring">{{ transferring ? '转账中…' : '转账' }}</button>
+          <RouterLink class="msg" :to="`/settings/point?to=${encodeURIComponent(profile.userName)}`">转账页</RouterLink>
         </form>
         <p v-else-if="!isLoggedIn" class="hint">
           <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
@@ -253,14 +264,19 @@ h2 {
   color: var(--fp-muted);
   font-size: 13px;
 }
+.meta a,
+.hint a,
+.stats a {
+  color: var(--fp-link);
+  text-decoration: none;
+}
+.meta .city {
+  margin-left: 8px;
+}
 .stats {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-}
-.stats a {
-  color: var(--fp-link);
-  text-decoration: none;
 }
 .jobs {
   display: flex;

@@ -1361,8 +1361,11 @@ async function unwrapUsers(paths: string[], apiKey?: string | null): Promise<Sim
 
 export async function fetchCollectedArticles(apiKey?: string | null, page = 1, size = 40) {
   if (!apiKey) return []
-  const fromApi = await unwrapArticles(`/api/articles/collected?p=${page}&size=${size}`, apiKey)
-  if (fromApi.length) return fromApi
+  return unwrapArticles(`/api/articles/collected?p=${page}&size=${size}`, apiKey)
+}
+
+export async function fetchFollowingArticles(apiKey?: string | null, page = 1, size = 40) {
+  if (!apiKey) return []
   return unwrapArticles(`/api/user/following/articles?p=${page}&size=${size}`, apiKey)
 }
 

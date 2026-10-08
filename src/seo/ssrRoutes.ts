@@ -14,7 +14,11 @@ export function shouldPrefetchSsr(path: string) {
     p === '/tags' ||
     p === '/breezemoons' ||
     p === '/top' ||
-    p === '/repeater'
+    p === '/repeater' ||
+    p === '/download' ||
+    p === '/activity' ||
+    p === '/agreement' ||
+    p === '/privacy'
   ) {
     return true
   }

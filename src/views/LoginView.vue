@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 
 const LAST_USER = 'fp.lastUser'
-const username = ref(localStorage.getItem(LAST_USER) || '')
+const username = ref(typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_USER) || '' : '')
 const passwd = ref('')
 const mfa = ref('')
 const auth = useAuthStore()
@@ -34,6 +34,11 @@ async function submit() {
     <label>两步验证（可选）<input v-model="mfa" /></label>
     <p v-if="auth.error" class="err">{{ auth.error }}</p>
     <button type="submit" :disabled="auth.loading">{{ auth.loading ? '登录中…' : '登录' }}</button>
+    <p class="links">
+      <RouterLink to="/register">注册</RouterLink>
+      <RouterLink to="/agreement">用户协议</RouterLink>
+      <RouterLink to="/download">客户端</RouterLink>
+    </p>
   </form>
 </template>
 
@@ -74,5 +79,14 @@ button {
 .err {
   color: #e07a5f;
   margin: 0;
+}
+.links {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  font-size: 13px;
+}
+.links a {
+  color: var(--fp-link);
 }
 </style>

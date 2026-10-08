@@ -23,8 +23,13 @@ const nav = [
 const extraNav = [
   { to: '/tags', label: '标签' },
   { to: '/good', label: '点赞' },
+  { to: '/following', label: '关注' },
+  { to: '/activity', label: '活动' },
   { to: '/repeater', label: '复读机' },
   { to: '/logs', label: '日志' },
+  { to: '/download', label: '下载' },
+  { to: '/agreement', label: '协议' },
+  { to: '/privacy', label: '隐私' },
 ]
 
 const route = useRoute()
