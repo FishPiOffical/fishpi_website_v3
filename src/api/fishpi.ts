@@ -26,6 +26,18 @@ export interface AccountInfo {
   userQQ?: string
   /** 0 公开 / 1 私密 */
   userGeoStatus?: number
+  userListPageSize?: number
+  userCommentViewMode?: number
+  userAvatarViewMode?: number
+  userListViewMode?: number
+  userIndexRedirectURL?: string
+  /** 0 开启 / 1 关闭（与现网一致） */
+  userNotifyStatus?: number
+  userSubMailStatus?: number
+  userKeyboardShortcutsStatus?: number
+  userReplyWatchArticleStatus?: number
+  userForwardPageStatus?: number
+  chatRoomPictureStatus?: number
 }
 
 export interface MetalItem {
@@ -334,6 +346,32 @@ export async function updateGeoStatus(apiKey: string, userGeoStatus: 0 | 1) {
     body: JSON.stringify({ userGeoStatus }),
   })
   if (res.code) throw new Error(res.msg || '地理位置设置失败')
+}
+
+export interface FunctionSettings {
+  userListPageSize: number
+  userCommentViewMode: number
+  userAvatarViewMode: number
+  userListViewMode: number
+  userIndexRedirectURL: string
+  userNotifyStatus: boolean
+  userSubMailStatus: boolean
+  userKeyboardShortcutsStatus: boolean
+  userReplyWatchArticleStatus: boolean
+  userForwardPageStatus: boolean
+  chatRoomPictureStatus: boolean
+}
+
+/** 功能偏好：页面态 POST /settings/function。 */
+export async function updateFunctionSettings(apiKey: string, data: FunctionSettings) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/settings/function', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify(data),
+  })
+  if (res.code) throw new Error(res.msg || '功能设置失败')
 }
 
 export interface EmojiItem {

@@ -154,16 +154,13 @@ export default defineConfig(({ mode }) => {
           ...proxy,
           bypass(req) {
             const path = (req.url || '').split('?')[0] || ''
-            // SPA：/settings、/settings/point；API：POST /settings/password|function|geo/status
+            // SPA 设置子页；API：POST /settings/password|function|geo/status|privacy
             if (req.method === 'GET' || req.method === 'HEAD') {
-              if (
+              const spa =
                 path === '/settings' ||
                 path === '/settings/' ||
-                path === '/settings/point' ||
-                path.startsWith('/settings/point/')
-              ) {
-                return req.url
-              }
+                /^\/settings\/(point|account|function|system|profession|privacy|avatar)(\/|$)/.test(path)
+              if (spa) return req.url
             }
           },
         },

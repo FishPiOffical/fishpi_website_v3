@@ -327,6 +327,19 @@ export const useChatStore = defineStore('chat', () => {
     await send(`[setdiscuss]${topic}[/setdiscuss]`)
   }
 
+  async function sendBarrage(text: string, color = 'rgba(255,255,255,1)') {
+    const content = text.trim().slice(0, 32)
+    if (!content) return
+    const payload = `[barrager]${JSON.stringify({ color, content })}[/barrager]`
+    await send(payload)
+  }
+
+  function clearScreen() {
+    messages.value = []
+    hasMore.value = true
+    page = 1
+  }
+
   return {
     messages,
     onlines,
@@ -346,12 +359,14 @@ export const useChatStore = defineStore('chat', () => {
     loadAround,
     send,
     sendRedPacket,
+    sendBarrage,
     openPacket,
     revoke,
     closePacketDetail() {
       packetDetail.value = null
     },
     setDiscuss,
+    clearScreen,
     react,
   }
 })

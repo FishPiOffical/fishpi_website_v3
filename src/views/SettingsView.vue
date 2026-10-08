@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppearancePicker from '@/components/packs/AppearancePicker.vue'
 import EmojiPacks from '@/components/EmojiPacks.vue'
@@ -9,6 +10,7 @@ import {
   setProfessionPrimary,
   setProfessionPrivacy,
   updateAvatar,
+  updateFunctionSettings,
   updateGeoStatus,
   updatePassword,
   updateProfile,
@@ -17,8 +19,22 @@ import {
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 
+const route = useRoute()
 const auth = useAuthStore()
 const { apiKey, account, isLoggedIn } = storeToRefs(auth)
+
+const tabs = [
+  { id: 'profile', to: '/settings', label: '资料' },
+  { id: 'system', to: '/settings/system', label: '个性化' },
+  { id: 'avatar', to: '/settings/avatar', label: '头像' },
+  { id: 'account', to: '/settings/account', label: '账号' },
+  { id: 'function', to: '/settings/function', label: '功能' },
+  { id: 'point', to: '/settings/point', label: '积分' },
+  { id: 'privacy', to: '/settings/privacy', label: '隐私' },
+  { id: 'profession', to: '/settings/profession', label: '职业' },
+] as const
+
+const tab = computed(() => String(route.meta.settingsTab || 'profile'))
 
 const nickname = ref('')
 const intro = ref('')
@@ -31,21 +47,13 @@ const saving = ref(false)
 const uploading = ref(false)
 const msg = ref('')
 const err = ref('')
+
 const jobs = ref<ProfessionProgress[]>([])
 const availableJobs = ref<ProfessionProgress[]>([])
 const primaryJob = ref('')
 const privacy = ref('ALL_PUBLIC')
 const jobBusy = ref(false)
 const jobMsg = ref('')
-const geoPublic = ref(true)
-const geoBusy = ref(false)
-const geoMsg = ref('')
-const oldPwd = ref('')
-const newPwd = ref('')
-const newPwd2 = ref('')
-const pwdBusy = ref(false)
-const pwdMsg = ref('')
-const pwdErr = ref('')
 
 const privacyOptions = [
   { value: 'ALL_PUBLIC', label: '全部公开' },
@@ -54,6 +62,35 @@ const privacyOptions = [
   { value: 'SELF_ONLY', label: '仅自己可见' },
   { value: 'FULLY_HIDDEN', label: '完全隐藏' },
 ]
+
+const geoPublic = ref(true)
+const geoBusy = ref(false)
+const geoMsg = ref('')
+
+const oldPwd = ref('')
+const newPwd = ref('')
+const newPwd2 = ref('')
+const pwdBusy = ref(false)
+const pwdMsg = ref('')
+const pwdErr = ref('')
+
+const listPageSize = ref(20)
+const commentViewMode = ref(0)
+const avatarViewMode = ref(0)
+const listViewMode = ref(1)
+const indexRedirect = ref('')
+const notifyOn = ref(true)
+const subMailOn = ref(true)
+const keyboardOn = ref(true)
+const replyWatchOn = ref(true)
+const forwardPageOn = ref(true)
+const chatPicOn = ref(true)
+const fnBusy = ref(false)
+const fnMsg = ref('')
+
+function enabled(status?: number) {
+  return Number(status ?? 0) === 0
+}
 
 function fill() {
   nickname.value = account.value?.userNickname || ''
@@ -64,9 +101,21 @@ function fill() {
   qq.value = account.value?.userQQ || ''
   avatar.value = account.value?.userAvatarURL || ''
   geoPublic.value = Number(account.value?.userGeoStatus ?? 0) !== 1
+  listPageSize.value = Number(account.value?.userListPageSize || 20)
+  commentViewMode.value = Number(account.value?.userCommentViewMode || 0)
+  avatarViewMode.value = Number(account.value?.userAvatarViewMode || 0)
+  listViewMode.value = Number(account.value?.userListViewMode ?? 1)
+  indexRedirect.value = account.value?.userIndexRedirectURL || ''
+  notifyOn.value = enabled(account.value?.userNotifyStatus)
+  subMailOn.value = enabled(account.value?.userSubMailStatus)
+  keyboardOn.value = enabled(account.value?.userKeyboardShortcutsStatus)
+  replyWatchOn.value = enabled(account.value?.userReplyWatchArticleStatus)
+  forwardPageOn.value = enabled(account.value?.userForwardPageStatus)
+  chatPicOn.value = enabled(account.value?.chatRoomPictureStatus)
 }
 
 watch(account, fill, { immediate: true })
+
 onMounted(async () => {
   if (apiKey.value && !account.value) await auth.restore()
   const name = account.value?.userName
@@ -79,7 +128,7 @@ onMounted(async () => {
       tags.value = p.userTags || tags.value
       avatar.value = p.userAvatarURL || avatar.value
     } catch {
-      /* keep /api/user fields */
+      /* keep /api/user */
     }
     await loadJobs()
   }
@@ -114,7 +163,7 @@ async function savePrimary() {
   }
 }
 
-async function savePrivacy() {
+async function saveJobPrivacy() {
   if (!apiKey.value) return
   jobBusy.value = true
   jobMsg.value = ''
@@ -149,6 +198,28 @@ async function save() {
     err.value = e instanceof Error ? e.message : '保存失败'
   } finally {
     saving.value = false
+  }
+}
+
+async function onAvatar(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file || !apiKey.value) return
+  uploading.value = true
+  err.value = ''
+  msg.value = ''
+  try {
+    const urls = await uploadFiles(apiKey.value, [file])
+    const next = urls[0]
+    if (!next) throw new Error('未返回头像地址')
+    await updateAvatar(apiKey.value, next)
+    avatar.value = next
+    await auth.reloadAccount()
+    msg.value = '头像已更新'
+  } catch (e) {
+    err.value = e instanceof Error ? e.message : '上传失败'
+  } finally {
+    uploading.value = false
+    ;(e.target as HTMLInputElement).value = ''
   }
 }
 
@@ -193,175 +264,299 @@ async function savePassword() {
   }
 }
 
-async function onAvatar(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file || !apiKey.value) return
-  uploading.value = true
-  err.value = ''
-  msg.value = ''
+async function saveFunction() {
+  if (!apiKey.value) return
+  fnBusy.value = true
+  fnMsg.value = ''
   try {
-    const urls = await uploadFiles(apiKey.value, [file])
-    const next = urls[0]
-    if (!next) throw new Error('未返回头像地址')
-    await updateAvatar(apiKey.value, next)
-    avatar.value = next
+    await updateFunctionSettings(apiKey.value, {
+      userListPageSize: listPageSize.value,
+      userCommentViewMode: commentViewMode.value,
+      userAvatarViewMode: avatarViewMode.value,
+      userListViewMode: listViewMode.value,
+      userIndexRedirectURL: indexRedirect.value.trim(),
+      userNotifyStatus: notifyOn.value,
+      userSubMailStatus: subMailOn.value,
+      userKeyboardShortcutsStatus: keyboardOn.value,
+      userReplyWatchArticleStatus: replyWatchOn.value,
+      userForwardPageStatus: forwardPageOn.value,
+      chatRoomPictureStatus: chatPicOn.value,
+    })
     await auth.reloadAccount()
-    msg.value = '头像已更新'
+    fnMsg.value = '功能设置已保存'
   } catch (e) {
-    err.value = e instanceof Error ? e.message : '上传失败'
+    fnMsg.value = e instanceof Error ? e.message : '功能设置失败'
   } finally {
-    uploading.value = false
-    ;(e.target as HTMLInputElement).value = ''
+    fnBusy.value = false
   }
 }
 </script>
 
 <template>
   <div class="page">
-    <section v-if="isLoggedIn" class="card">
-      <h1>资料</h1>
-      <p class="hint">保存走 <code>POST /api/settings/profiles</code>，头像走图床票据后 <code>/api/settings/avatar</code>。</p>
-      <div class="avatar-row">
-        <img class="fp-avatar" :src="avatar || '/favicon.svg'" alt="" />
-        <label class="file">
-          {{ uploading ? '上传中…' : '更换头像' }}
-          <input type="file" accept="image/*" :disabled="uploading" @change="onAvatar" />
-        </label>
-      </div>
-      <form @submit.prevent="save">
-        <label>昵称<input v-model="nickname" maxlength="32" /></label>
-        <label>签名<textarea v-model="intro" rows="3" maxlength="256" /></label>
-        <label>个人主页<input v-model="url" placeholder="https://" /></label>
-        <label>标签<input v-model="tags" placeholder="逗号分隔" /></label>
-        <label>QQ<input v-model="qq" maxlength="20" /></label>
-        <label>MBTI<input v-model="mbti" maxlength="8" /></label>
-        <p v-if="account?.userCity" class="hint">当前城市：{{ account.userCity }}（由定位/城市页更新）</p>
-        <p v-if="msg" class="ok">{{ msg }}</p>
-        <p v-if="err" class="err">{{ err }}</p>
-        <button type="submit" :disabled="saving">{{ saving ? '保存中…' : '保存资料' }}</button>
-      </form>
-      <div class="jobs">
-        <h2>地理位置</h2>
-        <p class="hint">POST <code>/settings/geo/status</code>（page-auth CSRF）。</p>
-        <label class="check">
-          <input v-model="geoPublic" type="checkbox" :disabled="geoBusy" />
-          公开我的地理位置
-        </label>
-        <button type="button" :disabled="geoBusy" @click="saveGeo">
-          {{ geoBusy ? '提交中…' : '保存地理位置设置' }}
-        </button>
-        <p v-if="geoMsg" :class="geoMsg.includes('失败') ? 'err' : 'ok'">{{ geoMsg }}</p>
-      </div>
-      <div class="jobs">
-        <h2>修改密码</h2>
-        <p class="hint">POST <code>/settings/password</code>（MD5 + CSRF）。</p>
-        <label>当前密码<input v-model="oldPwd" type="password" autocomplete="current-password" /></label>
-        <label>新密码<input v-model="newPwd" type="password" autocomplete="new-password" minlength="6" /></label>
-        <label>确认新密码<input v-model="newPwd2" type="password" autocomplete="new-password" minlength="6" /></label>
-        <p v-if="pwdMsg" class="ok">{{ pwdMsg }}</p>
-        <p v-if="pwdErr" class="err">{{ pwdErr }}</p>
-        <button type="button" :disabled="pwdBusy || !oldPwd || !newPwd" @click="savePassword">
-          {{ pwdBusy ? '提交中…' : '更新密码' }}
-        </button>
-      </div>
-      <div class="jobs">
-        <h2>职业成长</h2>
-        <p class="hint">读取 <code>GET /api/profession/me</code>，写入主职业/隐私。</p>
-        <ul v-if="jobs.length">
-          <li v-for="job in jobs" :key="job.professionId || job.displayName">
-            {{ job.displayName || job.shortName }}
-            <em v-if="job.levelName">{{ job.levelName }}</em>
-            <span v-if="job.professionId === primaryJob">主职业</span>
-          </li>
-        </ul>
-        <p v-else class="hint">暂无职业进度。</p>
-        <label>
-          主职业
-          <select v-model="primaryJob" :disabled="jobBusy">
-            <option disabled value="">选择职业</option>
-            <option
-              v-for="job in availableJobs"
-              :key="job.professionId || job.displayName"
-              :value="job.professionId"
-            >
-              {{ job.displayName || job.shortName || job.professionId }}
-            </option>
-          </select>
-        </label>
-        <button type="button" :disabled="jobBusy || !primaryJob" @click="savePrimary">
-          {{ jobBusy ? '提交中…' : '保存主职业' }}
-        </button>
-        <label>
-          隐私
-          <select v-model="privacy" :disabled="jobBusy">
-            <option v-for="opt in privacyOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
-        </label>
-        <button type="button" :disabled="jobBusy" @click="savePrivacy">
-          {{ jobBusy ? '提交中…' : '保存隐私' }}
-        </button>
-        <p v-if="jobMsg" :class="jobMsg.includes('失败') ? 'err' : 'ok'">{{ jobMsg }}</p>
-      </div>
-    </section>
-    <section v-else class="card">
-      <p class="hint">登录后可编辑昵称、签名和头像。</p>
-    </section>
-    <EmojiPacks v-if="isLoggedIn" />
-    <section class="card">
-      <h1>外观</h1>
-      <p class="hint">主题免费。对话框和头像框的进阶样式后期仅 VIP 可用。</p>
-      <AppearancePicker />
-    </section>
+    <aside class="side">
+      <nav class="menu">
+        <RouterLink
+          v-for="item in tabs"
+          :key="item.id"
+          :to="item.to"
+          :class="{ current: tab === item.id || (item.id === 'profile' && tab === 'profile') }"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </nav>
+    </aside>
+
+    <div class="main">
+      <p v-if="!isLoggedIn" class="card hint">
+        <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
+        后可修改设置。游客仍可调整本机主题外观。
+      </p>
+
+      <section v-if="tab === 'profile'" class="card">
+        <header class="mod-head">
+          <RouterLink v-if="account?.userName" :to="`/member/${account.userName}`">{{ account.userName }}</RouterLink>
+          <h1>资料</h1>
+        </header>
+        <form v-if="isLoggedIn" class="form" @submit.prevent="save">
+          <label>昵称<input v-model="nickname" maxlength="32" /></label>
+          <label>标签<input v-model="tags" placeholder="逗号分隔" /></label>
+          <label>URL<input v-model="url" placeholder="https://" /></label>
+          <label>简介<textarea v-model="intro" rows="3" maxlength="256" /></label>
+          <label>QQ<input v-model="qq" maxlength="20" /></label>
+          <label>MBTI<input v-model="mbti" maxlength="16" placeholder="如 ENTP / ENFP-A" /></label>
+          <p v-if="account?.userCity" class="hint">当前城市：{{ account.userCity }}</p>
+          <p v-if="msg" class="ok">{{ msg }}</p>
+          <p v-if="err" class="err">{{ err }}</p>
+          <button type="submit" class="primary" :disabled="saving">{{ saving ? '保存中…' : '保存' }}</button>
+        </form>
+      </section>
+
+      <section v-if="tab === 'system'" class="card">
+        <h1>个性化</h1>
+        <p class="hint">主题免费。对话框和头像框的进阶样式后期仅 VIP 可用。</p>
+        <AppearancePicker />
+      </section>
+
+      <section v-if="tab === 'avatar'" class="card">
+        <h1>头像</h1>
+        <template v-if="isLoggedIn">
+          <div class="avatar-row">
+            <img class="fp-avatar" :src="avatar || '/favicon.svg'" alt="" />
+            <label class="file">
+              {{ uploading ? '上传中…' : '更换头像' }}
+              <input type="file" accept="image/*" :disabled="uploading" @change="onAvatar" />
+            </label>
+          </div>
+          <p class="hint">经 RhyPic 上传后写入 <code>/api/settings/avatar</code>。</p>
+          <p v-if="msg" class="ok">{{ msg }}</p>
+          <p v-if="err" class="err">{{ err }}</p>
+        </template>
+      </section>
+
+      <section v-if="tab === 'account'" class="card">
+        <h1>账号</h1>
+        <template v-if="isLoggedIn">
+          <label>当前用户名<input :value="account?.userName" type="text" readonly /></label>
+          <h2>修改密码</h2>
+          <p class="hint">POST <code>/settings/password</code>（MD5 + CSRF）</p>
+          <label>当前密码<input v-model="oldPwd" type="password" autocomplete="current-password" /></label>
+          <label>新密码<input v-model="newPwd" type="password" autocomplete="new-password" minlength="6" /></label>
+          <label>确认新密码<input v-model="newPwd2" type="password" autocomplete="new-password" minlength="6" /></label>
+          <p v-if="pwdMsg" class="ok">{{ pwdMsg }}</p>
+          <p v-if="pwdErr" class="err">{{ pwdErr }}</p>
+          <button type="button" class="primary" :disabled="pwdBusy || !oldPwd || !newPwd" @click="savePassword">
+            {{ pwdBusy ? '提交中…' : '更新密码' }}
+          </button>
+          <p class="hint">
+            绑定手机 / 邮箱 / 两步验证请暂用
+            <a href="https://fishpi.cn/settings/account" target="_blank" rel="noopener">现网账号页</a>
+            （需 GeeTest）。
+          </p>
+        </template>
+      </section>
+
+      <section v-if="tab === 'function'" class="card">
+        <h1>功能</h1>
+        <template v-if="isLoggedIn">
+          <p class="hint">POST <code>/settings/function</code></p>
+          <label>每页帖子数<input v-model.number="listPageSize" type="number" min="10" max="96" /></label>
+          <label>
+            评论展示
+            <select v-model.number="commentViewMode">
+              <option :value="0">传统</option>
+              <option :value="1">实时</option>
+            </select>
+          </label>
+          <label>
+            头像显示
+            <select v-model.number="avatarViewMode">
+              <option :value="0">原图</option>
+              <option :value="1">静态图</option>
+            </select>
+          </label>
+          <label>
+            列表模式
+            <select v-model.number="listViewMode">
+              <option :value="0">仅标题</option>
+              <option :value="1">标题与摘要</option>
+            </select>
+          </label>
+          <label>首页跳转 URL<input v-model="indexRedirect" placeholder="站内路径，可选" /></label>
+          <div class="checks">
+            <label class="check"><input v-model="notifyOn" type="checkbox" />启用通知</label>
+            <label class="check"><input v-model="subMailOn" type="checkbox" />邮件订阅</label>
+            <label class="check"><input v-model="keyboardOn" type="checkbox" />键盘快捷键</label>
+            <label class="check"><input v-model="replyWatchOn" type="checkbox" />回复时关注帖</label>
+            <label class="check"><input v-model="forwardPageOn" type="checkbox" />使用跳转页</label>
+            <label class="check"><input v-model="chatPicOn" type="checkbox" />聊天室显示图片</label>
+          </div>
+          <p v-if="fnMsg" :class="fnMsg.includes('失败') ? 'err' : 'ok'">{{ fnMsg }}</p>
+          <button type="button" class="primary" :disabled="fnBusy" @click="saveFunction">
+            {{ fnBusy ? '保存中…' : '保存功能设置' }}
+          </button>
+          <h2>表情包</h2>
+          <EmojiPacks />
+        </template>
+      </section>
+
+      <section v-if="tab === 'privacy'" class="card">
+        <h1>隐私</h1>
+        <template v-if="isLoggedIn">
+          <h2>地理位置</h2>
+          <label class="check">
+            <input v-model="geoPublic" type="checkbox" :disabled="geoBusy" />
+            公开我的地理位置
+          </label>
+          <button type="button" class="primary" :disabled="geoBusy" @click="saveGeo">
+            {{ geoBusy ? '提交中…' : '保存' }}
+          </button>
+          <p v-if="geoMsg" :class="geoMsg.includes('失败') ? 'err' : 'ok'">{{ geoMsg }}</p>
+          <p class="hint">
+            发帖/评论/关注等细项隐私请暂用
+            <a href="https://fishpi.cn/settings/privacy" target="_blank" rel="noopener">现网隐私页</a>。
+          </p>
+        </template>
+      </section>
+
+      <section v-if="tab === 'profession'" class="card">
+        <h1>职业成长</h1>
+        <template v-if="isLoggedIn">
+          <p class="hint">读取 <code>GET /api/profession/me</code>，写入主职业/隐私。</p>
+          <ul v-if="jobs.length" class="jobs">
+            <li v-for="job in jobs" :key="job.professionId || job.displayName">
+              {{ job.displayName || job.shortName }}
+              <em v-if="job.levelName">{{ job.levelName }}</em>
+              <span v-if="job.professionId === primaryJob">主职业</span>
+            </li>
+          </ul>
+          <p v-else class="hint">暂无职业进度。</p>
+          <label>
+            主职业
+            <select v-model="primaryJob" :disabled="jobBusy">
+              <option disabled value="">选择职业</option>
+              <option
+                v-for="job in availableJobs"
+                :key="job.professionId || job.displayName"
+                :value="job.professionId"
+              >
+                {{ job.displayName || job.shortName || job.professionId }}
+              </option>
+            </select>
+          </label>
+          <button type="button" class="primary" :disabled="jobBusy || !primaryJob" @click="savePrimary">
+            {{ jobBusy ? '提交中…' : '保存主职业' }}
+          </button>
+          <label>
+            隐私
+            <select v-model="privacy" :disabled="jobBusy">
+              <option v-for="opt in privacyOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+          </label>
+          <button type="button" class="primary" :disabled="jobBusy" @click="saveJobPrivacy">
+            {{ jobBusy ? '提交中…' : '保存隐私' }}
+          </button>
+          <p v-if="jobMsg" :class="jobMsg.includes('失败') ? 'err' : 'ok'">{{ jobMsg }}</p>
+        </template>
+      </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .page {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  max-width: 960px;
+}
+.side {
+  position: sticky;
+  top: calc(var(--fp-nav-h) + 12px);
+}
+.menu {
+  display: flex;
+  flex-direction: column;
+  background: var(--fp-card);
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.menu a {
+  padding: 10px 14px;
+  color: var(--fp-text);
+  text-decoration: none;
+  font-size: 14px;
+  border-left: 3px solid transparent;
+}
+.menu a:hover {
+  background: var(--fp-hover);
+}
+.menu a.current {
+  color: var(--fp-primary);
+  border-left-color: var(--fp-primary);
+  font-weight: 600;
+  background: var(--fp-hover);
+}
+.main {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 720px;
+  min-width: 0;
 }
 .card {
   background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 12px;
-  padding: 24px;
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 8px;
+  padding: 18px 20px;
+}
+.mod-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.mod-head a {
+  color: var(--fp-link);
+  text-decoration: none;
 }
 h1 {
-  margin: 0 0 8px;
+  margin: 0 0 12px;
   font-size: 18px;
+  color: var(--fp-head);
+}
+h2 {
+  margin: 18px 0 8px;
+  font-size: 15px;
+  color: var(--fp-head);
 }
 .hint {
   color: var(--fp-muted);
   font-size: 13px;
 }
-.avatar-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 12px 0;
-}
-.fp-avatar {
-  width: 64px;
-  height: 64px;
-}
-.file {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--fp-border);
-  border-radius: 8px;
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 13px;
-}
-.file input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-form {
+.form,
+.card {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -379,21 +574,56 @@ select {
   background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-text);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 8px 10px;
 }
-.jobs label {
-  margin-top: 10px;
+input[readonly] {
+  opacity: 0.75;
 }
-.jobs button {
-  margin-top: 8px;
+.checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
-button {
+.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.check input {
+  width: auto;
+}
+.avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fp-avatar {
+  width: 72px;
+  height: 72px;
+}
+.file {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.file input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.primary {
+  align-self: flex-end;
   border: 0;
   background: var(--fp-primary);
   color: #fff;
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 6px;
+  padding: 8px 16px;
   cursor: pointer;
 }
 .ok {
@@ -404,13 +634,9 @@ button {
   color: #e07a5f;
   font-size: 13px;
 }
-h2 {
-  margin: 16px 0 8px;
-  font-size: 16px;
-}
-.jobs ul {
+.jobs {
   list-style: none;
-  margin: 8px 0 0;
+  margin: 0;
   padding: 0;
 }
 .jobs li {
@@ -423,13 +649,26 @@ h2 {
   color: var(--fp-muted);
   font-style: normal;
 }
-.check {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0;
-}
-.check input {
-  width: auto;
+@media (max-width: 800px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+  .side {
+    position: static;
+  }
+  .menu {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .menu a {
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+  }
+  .menu a.current {
+    border-bottom-color: var(--fp-primary);
+  }
+  .checks {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

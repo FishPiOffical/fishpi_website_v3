@@ -175,7 +175,42 @@ const routes = [
     component: () => import('@/views/WhisperListView.vue'),
     meta: { auth: true, robots: 'noindex' },
   },
-  { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { robots: 'noindex' } },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'profile' },
+  },
+  {
+    path: '/settings/account',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'account' },
+  },
+  {
+    path: '/settings/function',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'function' },
+  },
+  {
+    path: '/settings/system',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'system' },
+  },
+  {
+    path: '/settings/avatar',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'avatar' },
+  },
+  {
+    path: '/settings/profession',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'profession' },
+  },
+  {
+    path: '/settings/privacy',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'privacy' },
+  },
 ]
 
 export function createAppRouter(history?: RouterHistory) {

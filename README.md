@@ -70,8 +70,8 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - 首页长篇双货架（最近更新 / 热门专栏）与社区清风明月发布（`POST /breezemoon` + page-auth CSRF）
 - 搜索对齐现网 `GET /api/search?key=`；路由别名 `/column`、`/recent`、`/top/checkin|online|balance|consumption`
 - 开发代理 SPA bypass：`/activity`、`/following`、`/breezemoons`、`/settings` 页面不再被 API 前缀吃掉
-- 设置页：修改密码 `POST /settings/password`、地理位置公开 `POST /settings/geo/status`（page-auth CSRF）
-- 聊天室游客可浏览历史/在线（发言与实时通道仍需登录）
+- 设置页侧栏对齐现网（资料/个性化/头像/账号/功能/积分/隐私/职业）；密码、地理位置、功能偏好走 page-auth CSRF
+- 聊天室 UI：上方输入区（话题/红包/弹幕/清屏）+ 下方消息流；游客可浏览历史/在线
 
 闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。
 用户发帖列表 / 收藏 / 关注粉丝 / 通知 / 私信：接口失败时返回空列表（不再塞 mock）。
