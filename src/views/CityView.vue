@@ -6,6 +6,7 @@ import { fetchBreezemoons, type Breezemoon } from '@/api/fishpi'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader } from '@/utils/swr'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -28,25 +29,21 @@ usePageSeo(() => ({
 const items = ref<Breezemoon[]>([])
 const loading = ref(false)
 const error = ref('')
+const swr = createSwrLoader({ loading, error })
 
 async function load() {
   if (!cityName.value || !apiKey.value) {
     items.value = []
     return
   }
-  loading.value = true
-  error.value = ''
-  try {
-    // 现网 /city/:name 为登录 HTML；JSON 城市场景暂用清风明月按城市过滤近似。
-    const all = await fetchBreezemoons(1, 50)
-    const key = cityName.value.trim()
-    items.value = all.filter((m) => String(m.breezemoonCity || '').includes(key))
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '同城加载失败'
-    items.value = []
-  } finally {
-    loading.value = false
-  }
+  const city = cityName.value.trim()
+  // 现网 /city/:name 为登录 HTML；JSON 城市场景暂用清风明月按城市过滤近似。
+  await swr(
+    `city:${city}`,
+    async () => (await fetchBreezemoons(1, 50)).filter((m) => String(m.breezemoonCity || '').includes(city)),
+    (data) => (items.value = data),
+    '同城加载失败',
+  )
 }
 
 watch(

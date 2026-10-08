@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ApiError } from '@/api/http'
+import { clearCache } from '@/utils/swr'
 import { fetchAccount, fetchMembership, login as loginApi, type AccountInfo } from '@/api/fishpi'
 
 const KEY = 'fp.apiKey'
@@ -36,6 +37,8 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref('')
 
   const isLoggedIn = computed(() => Boolean(apiKey.value && account.value))
+
+  watch(apiKey, () => clearCache())
 
   async function restore() {
     if (import.meta.env.SSR || !apiKey.value) return

@@ -29,6 +29,7 @@ import { consumeMemberPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC } from '@/seo/site'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import { readCache, writeCache } from '@/utils/swr'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -42,6 +43,7 @@ const profile = ref<UserProfile | null>(bootProfile)
 const articles = ref<ArticleSummary[]>([])
 const breezemoons = ref<Breezemoon[]>([])
 const articlesMock = ref(false)
+let bootConsumed = false
 const loading = ref(!bootProfile)
 const error = ref('')
 const actionMsg = ref('')
@@ -212,32 +214,52 @@ async function loadExtras(p: UserProfile) {
   }
 }
 
+interface MemberSnapshot {
+  profile: UserProfile
+  articles: ArticleSummary[]
+  breezemoons: Breezemoon[]
+}
+
+function applyMember(s: MemberSnapshot) {
+  profile.value = s.profile
+  articles.value = s.articles
+  articlesMock.value = s.articles.some((a) => String(a.oId).startsWith('mock-'))
+  breezemoons.value = s.breezemoons
+}
+
 async function load() {
   if (!userName.value) return
-  const cached =
-    profile.value?.userName === userName.value ? profile.value : consumeMemberPayload(userName.value)
+  const name = userName.value
+  const snap = readCache<MemberSnapshot>(`member:${name}`)
+  if (snap && profile.value?.userName !== name) applyMember(snap)
+  const boot = bootProfile?.userName === name && !bootConsumed ? bootProfile : consumeMemberPayload(name)
+  bootConsumed = true
+  const cached = boot || (profile.value?.userName === name ? profile.value : null)
   if (!cached) loading.value = true
   error.value = ''
   actionMsg.value = ''
   try {
     const [p, list, moons] = await Promise.all([
-      cached || fetchUserProfile(userName.value, apiKey.value),
+      boot || fetchUserProfile(name, apiKey.value),
       import.meta.env.SSR ? Promise.resolve([] as ArticleSummary[]) : fetchUserArticles(userName.value, apiKey.value),
       import.meta.env.SSR
         ? Promise.resolve([] as Breezemoon[])
         : fetchUserBreezemoons(userName.value, apiKey.value, 1, 30),
     ])
+    if (name !== userName.value) return
     if (isSelf.value) p.canFollow = 'hide'
-    profile.value = p
-    articles.value = list
-    articlesMock.value = list.some((a) => String(a.oId).startsWith('mock-'))
-    breezemoons.value = moons
+    const next = { profile: p, articles: list, breezemoons: moons }
+    applyMember(next)
+    if (!import.meta.env.SSR) writeCache(`member:${name}`, next)
     loading.value = false
     void loadExtras(p)
     void focusMoon()
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '用户加载失败'
-    if (!cached) profile.value = null
+    if (name !== userName.value) return
+    if (!cached) {
+      error.value = e instanceof Error ? e.message : '用户加载失败'
+      profile.value = null
+    }
     loading.value = false
   }
 }

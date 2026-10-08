@@ -23,6 +23,7 @@ import { consumeRanksPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
 import SideBar from '@/components/SideBar.vue'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader, readCache, writeCache } from '@/utils/swr'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -124,36 +125,50 @@ function formatOnline(min?: number) {
   return `${m} 分钟`
 }
 
+interface TopSnapshot {
+  checkin: RankUser[]
+  online: RankUser[]
+  balance: RankUser[]
+  consumption: RankUser[]
+  donate: DonateRankData
+  perfect: CountRankEntry[]
+  invite: CountRankEntry[]
+}
+
+function applyTop(s: TopSnapshot) {
+  checkin.value = s.checkin
+  online.value = s.online
+  balance.value = s.balance
+  consumption.value = s.consumption
+  donateData.value = s.donate
+  perfectList.value = s.perfect
+  inviteList.value = s.invite
+  wealthHint.value =
+    !s.balance.length && !s.consumption.length && !apiKey.value ? '财富榜与消费榜需登录后查看完整排名。' : ''
+}
+
+const swr = createSwrLoader({ loading, error })
+
 async function load() {
-  error.value = ''
-  wealthHint.value = ''
-  loading.value = true
-  try {
-    const cached = consumeRanksPayload()
-    if (cached) {
-      checkin.value = cached.checkin
-      online.value = cached.online
-    } else {
-      ;[checkin.value, online.value] = await Promise.all([
-        fetchCheckinRank(apiKey.value),
-        fetchOnlineRank(apiKey.value),
+  await swr(
+    'top',
+    async (): Promise<TopSnapshot> => {
+      const boot = consumeRanksPayload()
+      const [ci, on] = boot
+        ? [boot.checkin, boot.online]
+        : await Promise.all([fetchCheckinRank(apiKey.value), fetchOnlineRank(apiKey.value)])
+      const [bal, con, don, per, inv] = await Promise.all([
+        fetchBalanceRank(apiKey.value),
+        fetchConsumptionRank(apiKey.value),
+        fetchDonateRank(apiKey.value),
+        fetchPerfectRank(apiKey.value),
+        fetchInviteRank(apiKey.value),
       ])
-    }
-    ;[balance.value, consumption.value, donateData.value, perfectList.value, inviteList.value] = await Promise.all([
-      fetchBalanceRank(apiKey.value),
-      fetchConsumptionRank(apiKey.value),
-      fetchDonateRank(apiKey.value),
-      fetchPerfectRank(apiKey.value),
-      fetchInviteRank(apiKey.value),
-    ])
-    if (!balance.value.length && !consumption.value.length && !apiKey.value) {
-      wealthHint.value = '财富榜与消费榜需登录后查看完整排名。'
-    }
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '排行榜加载失败'
-  } finally {
-    loading.value = false
-  }
+      return { checkin: ci, online: on, balance: bal, consumption: con, donate: don, perfect: per, invite: inv }
+    },
+    applyTop,
+    '排行榜加载失败',
+  )
   if (!import.meta.env.SSR) {
     await loadJobs()
     if (currentTab.value === 'game') await loadGameRank()
@@ -163,21 +178,34 @@ async function load() {
 async function loadGameRank() {
   const g = route.path.replace('/top/', '')
   if (g) {
-    gameList.value = await fetchGameRank(g, apiKey.value)
+    const key = `top:game:${g}`
+    gameList.value = readCache<GameRankEntry[]>(key) || []
+    const data = await fetchGameRank(g, apiKey.value)
+    writeCache(key, data)
+    if (route.path === `/top/${g}`) gameList.value = data
   }
 }
 
 async function loadJobs() {
   jobError.value = ''
+  const key = `top:jobs:${jobId.value}`
+  const hit = readCache<{ professions?: typeof jobs.value; entries?: ProfessionRankEntry[] }>(key)
+  if (hit) {
+    jobs.value = hit.professions || []
+    jobEntries.value = hit.entries || []
+  }
   try {
     const data = await fetchProfessionRanking(apiKey.value, jobId.value || undefined)
+    writeCache(key, data)
     jobs.value = data.professions || []
     jobEntries.value = data.entries || []
     const selected = data.selectedProfession?.professionId
     if (!jobId.value && selected) jobId.value = selected
   } catch (e) {
-    jobError.value = e instanceof Error ? e.message : '职业榜加载失败'
-    jobEntries.value = []
+    if (!hit) {
+      jobError.value = e instanceof Error ? e.message : '职业榜加载失败'
+      jobEntries.value = []
+    }
   }
 }
 

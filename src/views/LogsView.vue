@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { fetchPublicLogs, type PublicLog } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader } from '@/utils/swr'
 
 const auth = useAuthStore()
 const { apiKey } = storeToRefs(auth)
@@ -11,22 +12,19 @@ const items = ref<PublicLog[]>([])
 const page = ref(1)
 const loading = ref(true)
 const error = ref('')
+const swr = createSwrLoader({ loading, error })
 
 async function load() {
   if (!apiKey.value) {
     loading.value = false
     return
   }
-  loading.value = true
-  error.value = ''
-  try {
-    items.value = await fetchPublicLogs(apiKey.value, page.value, 20)
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '加载失败'
-    items.value = []
-  } finally {
-    loading.value = false
-  }
+  const key = apiKey.value
+  await swr(
+    `logs:${page.value}`,
+    () => fetchPublicLogs(key, page.value, 20),
+    (data) => (items.value = data),
+  )
 }
 
 onMounted(() => void load())

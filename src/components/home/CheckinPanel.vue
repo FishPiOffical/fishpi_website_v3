@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { fetchCheckedIn, fetchCollectedLiveness, fetchLiveness, rewardLiveness } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
+import { readCache, writeCache } from '@/utils/swr'
 
 const auth = useAuthStore()
 const { apiKey, isLoggedIn } = storeToRefs(auth)
@@ -13,19 +14,30 @@ const collected = ref(false)
 const msg = ref('')
 const busy = ref(false)
 
+const CHECKIN_KEY = 'checkin'
+
+function applyCheckin(s: { checkedIn: boolean; liveness: number; collected: boolean }) {
+  checkedIn.value = s.checkedIn
+  liveness.value = s.liveness
+  collected.value = s.collected
+}
+
 async function load() {
   if (!apiKey.value) return
+  const hit = readCache<Parameters<typeof applyCheckin>[0]>(CHECKIN_KEY)
+  if (hit) applyCheckin(hit)
   try {
     const [cin, live, col] = await Promise.all([
       fetchCheckedIn(apiKey.value),
       fetchLiveness(apiKey.value),
       fetchCollectedLiveness(apiKey.value),
     ])
-    checkedIn.value = cin
-    liveness.value = live
-    collected.value = col
+    const snap = { checkedIn: cin, liveness: live, collected: col }
+    applyCheckin(snap)
+    writeCache(CHECKIN_KEY, snap)
+    msg.value = ''
   } catch (e) {
-    msg.value = e instanceof Error ? e.message : '签到状态失败'
+    if (!hit) msg.value = e instanceof Error ? e.message : '签到状态失败'
   }
 }
 
@@ -39,6 +51,7 @@ async function collect() {
   try {
     const sum = await rewardLiveness(apiKey.value)
     collected.value = true
+    writeCache(CHECKIN_KEY, { checkedIn: checkedIn.value, liveness: liveness.value, collected: true })
     msg.value = sum < 0 ? '昨日奖励已领取' : `领取昨日活跃奖励 ${sum} 积分`
   } catch (e) {
     msg.value = e instanceof Error ? e.message : '领取失败'

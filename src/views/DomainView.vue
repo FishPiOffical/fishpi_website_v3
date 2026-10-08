@@ -7,6 +7,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeDomainsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader } from '@/utils/swr'
 
 usePageSeo(() => ({ title: '领域', path: '/domains', description: '摸鱼派领域列表' }))
 
@@ -16,18 +17,18 @@ const domains = ref<DomainItem[]>([])
 const error = ref('')
 const loading = ref(true)
 
+const swr = createSwrLoader({ loading, error })
+
 async function load() {
-  loading.value = true
-  try {
-    const cached = consumeDomainsPayload()
-    domains.value = cached || (await fetchDomains(apiKey.value))
-    if (!domains.value.length) error.value = '暂无领域'
-    else error.value = ''
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '领域加载失败'
-  } finally {
-    loading.value = false
-  }
+  await swr(
+    'domains',
+    async () => consumeDomainsPayload() || fetchDomains(apiKey.value),
+    (data) => {
+      domains.value = data
+      error.value = data.length ? '' : '暂无领域'
+    },
+    '领域加载失败',
+  )
 }
 
 watch(apiKey, () => void load(), { immediate: true })

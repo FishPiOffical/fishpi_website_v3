@@ -12,6 +12,7 @@ import {
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader } from '@/utils/swr'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -32,46 +33,44 @@ usePageSeo(() => ({
   description: `${title.value} · 摸鱼派长篇专栏`,
 }))
 
-async function load() {
-  if (!columnId.value) return
-  loading.value = true
-  err.value = ''
-  usingMock.value = false
-  try {
-    const cols = await fetchHomeColumns()
-    const all = [...cols.recent, ...cols.hot]
-    meta.value = all.find((c) => c.columnId === columnId.value) || {
-      columnId: columnId.value,
-      columnTitle: `专栏 ${columnId.value}`,
-      columnArticleCount: 0,
-      chapters: [],
-      latestChapter: null,
-    }
-    usingMock.value = String(meta.value.columnId).startsWith('mock-') || meta.value.columnTitle.includes('假数据')
+const swr = createSwrLoader({ loading, error: err })
 
-    const longList = await fetchArticleFeed('long', apiKey.value, 1, 50)
-    const matched = longList.filter(
-      (a) => String(a.columnId || '') === columnId.value || a.columnTitle === meta.value?.columnTitle,
-    )
-    chapters.value = matched.length
-      ? matched
-      : (meta.value.chapters || []).map((ch, i) => ({
-          oId: ch.articleId || `mock-ch-${i}`,
-          articleTitle: ch.title,
-          articleTitleEmoj: ch.title,
-          columnTitle: meta.value?.columnTitle,
-          columnId: columnId.value,
-          articleCreateTimeStr: ch.chapterNo,
-        }))
-    if (meta.value && !meta.value.columnArticleCount) {
-      meta.value = { ...meta.value, columnArticleCount: chapters.value.length }
-    }
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : '加载失败'
-    chapters.value = []
-  } finally {
-    loading.value = false
-  }
+async function load() {
+  const id = columnId.value
+  if (!id) return
+  await swr(
+    `column:${id}`,
+    async () => {
+      const cols = await fetchHomeColumns()
+      const all = [...cols.recent, ...cols.hot]
+      let m: HomeColumnCard = all.find((c) => c.columnId === id) || {
+        columnId: id,
+        columnTitle: `专栏 ${id}`,
+        columnArticleCount: 0,
+        chapters: [],
+        latestChapter: null,
+      }
+      const longList = await fetchArticleFeed('long', apiKey.value, 1, 50)
+      const matched = longList.filter((a) => String(a.columnId || '') === id || a.columnTitle === m.columnTitle)
+      const list: ArticleSummary[] = matched.length
+        ? matched
+        : (m.chapters || []).map((ch, i) => ({
+            oId: ch.articleId || `mock-ch-${i}`,
+            articleTitle: ch.title,
+            articleTitleEmoj: ch.title,
+            columnTitle: m.columnTitle,
+            columnId: id,
+            articleCreateTimeStr: ch.chapterNo,
+          }))
+      if (!m.columnArticleCount) m = { ...m, columnArticleCount: list.length }
+      return { meta: m, chapters: list }
+    },
+    (data) => {
+      meta.value = data.meta
+      chapters.value = data.chapters
+      usingMock.value = String(data.meta.columnId).startsWith('mock-') || data.meta.columnTitle.includes('假数据')
+    },
+  )
 }
 
 watch(columnId, () => void load(), { immediate: true })

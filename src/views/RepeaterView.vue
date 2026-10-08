@@ -7,6 +7,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeRepeaterPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader } from '@/utils/swr'
 
 usePageSeo(() => ({ title: '复读机', path: '/repeater', description: '摸鱼派复读机精选' }))
 
@@ -25,18 +26,14 @@ const kinds = [
   { value: 'fish', label: '鱼类科普' },
 ]
 
+const swr = createSwrLoader({ loading, error })
+
 async function load() {
-  loading.value = true
-  error.value = ''
-  try {
-    const cached = !kind.value ? consumeRepeaterPayload() : null
-    items.value = cached || (await fetchRepeaterItems(apiKey.value, kind.value))
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '加载失败'
-    items.value = []
-  } finally {
-    loading.value = false
-  }
+  await swr(
+    `repeater:${kind.value}`,
+    async () => (!kind.value && consumeRepeaterPayload()) || fetchRepeaterItems(apiKey.value, kind.value),
+    (data) => (items.value = data),
+  )
 }
 
 watch([apiKey, kind], () => void load(), { immediate: true })

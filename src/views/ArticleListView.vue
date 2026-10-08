@@ -10,6 +10,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeFeedPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC } from '@/seo/site'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader, writeCache } from '@/utils/swr'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -49,18 +50,21 @@ usePageSeo(() => ({
   robots: String(route.meta.robots || 'index,follow'),
 }))
 
+const swr = createSwrLoader({ loading, error })
+
 async function load() {
-  error.value = ''
-  loading.value = true
-  try {
-    const cached = page.value === 1 ? consumeFeedPayload(kind.value) : null
-    items.value = cached || (await fetchArticleFeed(kind.value, apiKey.value, page.value, 30, extra.value))
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '加载失败'
-    items.value = []
-  } finally {
-    loading.value = false
+  const key = `feed:${kind.value}:${extra.value}:${page.value}`
+  const boot = page.value === 1 ? consumeFeedPayload(kind.value) : null
+  if (boot) {
+    items.value = boot
+    writeCache(key, boot)
+    return
   }
+  await swr(
+    key,
+    () => fetchArticleFeed(kind.value, apiKey.value, page.value, 30, extra.value),
+    (data) => (items.value = data),
+  )
 }
 
 watch(

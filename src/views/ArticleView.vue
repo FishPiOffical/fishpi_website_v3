@@ -42,6 +42,8 @@ import { consumeArticlePayload } from '@/seo/payload'
 import { absoluteUrl, SITE_DEFAULT_DESC, stripHtml } from '@/seo/site'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import ArticleSkeleton from '@/components/ArticleSkeleton.vue'
+import { readCache, writeCache } from '@/utils/swr'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -331,6 +333,7 @@ async function load() {
   if (!id.value) return
   const cached = commentPage.value === 1 ? consumeArticlePayload(id.value) : null
   if (cached) {
+    writeCache(`article:${id.value}:1`, cached)
     article.value = cached
     loading.value = false
     error.value = ''
@@ -342,24 +345,36 @@ async function load() {
     void buildToc()
     return
   }
-  const paging = article.value?.oId === id.value
-  if (!paging) {
+  const reqId = id.value
+  const cacheKey = `article:${reqId}:${commentPage.value}`
+  const paging = article.value?.oId === reqId
+  const hit = readCache<ArticleDetail>(cacheKey)
+  if (hit) {
+    article.value = hit
+    heat.value = Number(hit.articleHeat || 0)
+    loading.value = false
+    void buildToc()
+  } else if (!paging) {
     loading.value = true
     article.value = null
   }
   error.value = ''
   try {
-    article.value = await fetchArticle(id.value, apiKey.value, commentPage.value)
-    heat.value = Number(article.value.articleHeat || 0)
+    const data = await fetchArticle(reqId, apiKey.value, commentPage.value)
+    if (reqId !== id.value) return
+    writeCache(cacheKey, data)
+    article.value = data
+    heat.value = Number(data.articleHeat || 0)
+    void buildToc()
     await refreshHeat()
     connectHeat()
   } catch (e) {
+    if (reqId !== id.value || hit) return
     error.value = e instanceof Error ? e.message : '帖子加载失败'
     disconnectHeat()
     toc.value = []
   } finally {
-    loading.value = false
-    if (article.value) void buildToc()
+    if (reqId === id.value) loading.value = false
   }
 }
 
@@ -549,7 +564,7 @@ async function onReactComment(c: ArticleComment, value: string) {
 </script>
 
 <template>
-  <article v-if="loading" class="card"><FpLoading :rows="6" /></article>
+  <ArticleSkeleton v-if="loading" />
   <article v-else-if="error" class="card">
     <p class="err">{{ error }}</p>
     <p v-if="!isLoggedIn" class="hint">

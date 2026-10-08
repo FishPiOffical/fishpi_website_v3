@@ -6,6 +6,7 @@ import { fetchUserMedals, fetchUserProfile, type MetalItem, type UserProfile } f
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader } from '@/utils/swr'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -30,26 +31,29 @@ function metalSrc(m: MetalItem) {
   return `https://fishpi.cn/gen?id=${encodeURIComponent(attr)}`
 }
 
+const swr = createSwrLoader({ loading, error })
+
 async function load() {
-  if (!userName.value) return
-  loading.value = true
-  error.value = ''
-  try {
-    profile.value = await fetchUserProfile(userName.value, apiKey.value)
-    const fromProfile = profile.value.sysMetal || []
-    const extra = apiKey.value ? await fetchUserMedals(apiKey.value, userName.value) : []
-    const map = new Map<string, MetalItem>()
-    for (const m of [...fromProfile, ...extra]) {
-      const key = `${m.name || ''}|${m.attr || ''}`
-      if (!map.has(key)) map.set(key, m)
-    }
-    medals.value = [...map.values()]
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '徽章加载失败'
-    medals.value = []
-  } finally {
-    loading.value = false
-  }
+  const name = userName.value
+  if (!name) return
+  await swr(
+    `medals:${name}`,
+    async () => {
+      const p = await fetchUserProfile(name, apiKey.value)
+      const extra = apiKey.value ? await fetchUserMedals(apiKey.value, name) : []
+      const map = new Map<string, MetalItem>()
+      for (const m of [...(p.sysMetal || []), ...extra]) {
+        const key = `${m.name || ''}|${m.attr || ''}`
+        if (!map.has(key)) map.set(key, m)
+      }
+      return { profile: p, medals: [...map.values()] }
+    },
+    (data) => {
+      profile.value = data.profile
+      medals.value = data.medals
+    },
+    '徽章加载失败',
+  )
 }
 
 watch(

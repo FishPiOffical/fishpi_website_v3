@@ -7,6 +7,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeTagsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader } from '@/utils/swr'
 
 usePageSeo(() => ({ title: '标签', path: '/tags', description: '摸鱼派标签墙' }))
 
@@ -18,21 +19,19 @@ const page = ref(1)
 const loading = ref(false)
 const error = ref('')
 
+const swr = createSwrLoader({ loading, error })
+
 async function load() {
-  loading.value = true
-  error.value = ''
-  try {
-    const cached = page.value === 1 ? consumeTagsPayload() : null
-    const data = cached || (await fetchTags(apiKey.value, page.value, 50))
-    tags.value = data.tags
-    total.value = data.total
-    if (!data.tags.length) error.value = '暂无标签数据'
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '标签加载失败'
-    tags.value = []
-  } finally {
-    loading.value = false
-  }
+  await swr(
+    `tags:${page.value}`,
+    async () => (page.value === 1 && consumeTagsPayload()) || fetchTags(apiKey.value, page.value, 50),
+    (data) => {
+      tags.value = data.tags
+      total.value = data.total
+      error.value = data.tags.length ? '' : '暂无标签数据'
+    },
+    '标签加载失败',
+  )
 }
 
 watch([apiKey, page], () => void load(), { immediate: true })

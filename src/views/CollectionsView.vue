@@ -5,6 +5,7 @@ import { fetchCollectedArticles, type ArticleSummary } from '@/api/fishpi'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader } from '@/utils/swr'
 
 const auth = useAuthStore()
 const { apiKey } = storeToRefs(auth)
@@ -14,18 +15,17 @@ const loading = ref(false)
 const error = ref('')
 const usingMock = computed(() => items.value.some((a) => String(a.oId).startsWith('mock-')))
 
+const swr = createSwrLoader({ loading, error })
+
 async function load() {
-  if (!apiKey.value) return
-  loading.value = true
-  error.value = ''
-  try {
-    items.value = await fetchCollectedArticles(apiKey.value, page.value)
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '收藏加载失败'
-    items.value = []
-  } finally {
-    loading.value = false
-  }
+  const key = apiKey.value
+  if (!key) return
+  await swr(
+    `collections:${page.value}`,
+    () => fetchCollectedArticles(key, page.value),
+    (data) => (items.value = data),
+    '收藏加载失败',
+  )
 }
 
 watch(

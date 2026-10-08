@@ -5,21 +5,33 @@ import { storeToRefs } from 'pinia'
 import { fetchBreezemoons, postBreezemoon, type Breezemoon } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
+import FpLoading from '@/components/FpLoading.vue'
+import { readCache, writeCache } from '@/utils/swr'
 
 const auth = useAuthStore()
 const router = useRouter()
 const { account, isLoggedIn, apiKey } = storeToRefs(auth)
 
+const MOONS_KEY = 'sidebar:moons'
 const moons = ref<Breezemoon[]>([])
+const moonsLoaded = ref(false)
 const moonDraft = ref('')
 const moonBusy = ref(false)
 const moonMsg = ref('')
 
 async function loadMoons() {
+  const hit = readCache<Breezemoon[]>(MOONS_KEY)
+  if (hit) {
+    moons.value = hit
+    moonsLoaded.value = true
+  }
   try {
     moons.value = (await fetchBreezemoons(1, 6)).slice(0, 6)
+    writeCache(MOONS_KEY, moons.value)
   } catch {
-    moons.value = []
+    if (!hit) moons.value = []
+  } finally {
+    moonsLoaded.value = true
   }
 }
 
@@ -167,7 +179,8 @@ function goDownload() {
               <div class="moon-time">{{ item.timeAgo }}</div>
             </div>
           </li>
-          <li v-if="!moons.length" class="empty-moon">暂无动态</li>
+          <li v-if="!moons.length && !moonsLoaded"><FpLoading small /></li>
+          <li v-else-if="!moons.length" class="empty-moon">暂无动态</li>
         </ul>
       </div>
     </div>

@@ -13,6 +13,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { useNoticeStore } from '@/stores/notices'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader } from '@/utils/swr'
 
 const tabs: { id: NoticeType; label: string }[] = [
   { id: 'commented', label: '回帖' },
@@ -49,18 +50,17 @@ const loading = ref(false)
 const error = ref('')
 const usingMock = computed(() => items.value.some((n) => String(n.commentSharpURL || n.url || '').includes('mock-')))
 
+const swr = createSwrLoader({ loading, error })
+
 async function load() {
-  if (!apiKey.value) return
-  loading.value = true
-  error.value = ''
-  try {
-    items.value = await fetchNotifications(apiKey.value, type.value, page.value)
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '通知加载失败'
-    items.value = []
-  } finally {
-    loading.value = false
-  }
+  const key = apiKey.value
+  if (!key) return
+  await swr(
+    `notices:${type.value}:${page.value}`,
+    () => fetchNotifications(key, type.value, page.value),
+    (data) => (items.value = data),
+    '通知加载失败',
+  )
 }
 
 watch(

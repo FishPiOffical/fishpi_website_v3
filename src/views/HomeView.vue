@@ -36,6 +36,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeFeedPayload, consumeHomeExtrasPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
 import FpLoading from '@/components/FpLoading.vue'
+import { readCache, writeCache } from '@/utils/swr'
 
 const auth = useAuthStore()
 const layout = useHomeLayoutStore()
@@ -125,10 +126,51 @@ async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
   }
 }
 
+interface HomeSnapshot {
+  articles: ArticleSummary[]
+  checkin: RankUser[]
+  online: RankUser[]
+  hot: ArticleSummary[]
+  long: ArticleSummary[]
+  recentUsers: LiteUser[]
+  tags: TagItem[]
+  moons: Breezemoon[]
+  chatLines: ChatHistoryItem[]
+  repeater: RepeaterItem[]
+  onlineChatCnt: number | null
+  discussing: string
+  columnsRecent: HomeColumnCard[]
+  columnsHot: HomeColumnCard[]
+}
+const HOME_CACHE_KEY = 'home'
+
+function applySnapshot(s: HomeSnapshot) {
+  splitArticles(s.articles)
+  checkin.value = s.checkin
+  online.value = s.online
+  hot.value = s.hot
+  longArticles.value = s.long
+  recentUsers.value = s.recentUsers
+  tags.value = s.tags
+  moons.value = s.moons
+  chatLines.value = s.chatLines
+  repeaterItems.value = s.repeater
+  onlineChatCnt.value = s.onlineChatCnt
+  discussing.value = s.discussing
+  homeColumnsRecent.value = s.columnsRecent
+  homeColumnsHot.value = s.columnsHot
+}
+
+const homeCached = !bootFeed?.length ? readCache<HomeSnapshot>(HOME_CACHE_KEY) : undefined
+if (homeCached) {
+  applySnapshot(homeCached)
+  loading.value = false
+}
+
 async function load() {
   error.value = ''
-  const needArticles = left.value.length === 0
-  if (needArticles) loading.value = true
+  const needArticles = left.value.length === 0 || Boolean(homeCached)
+  if (left.value.length === 0) loading.value = true
   try {
     const [
       articles,
@@ -159,22 +201,26 @@ async function load() {
       safe(fetchChatOnlineUsers(apiKey.value), {}),
       safe(fetchHomeColumns(), { recent: [], hot: [] }),
     ])
-    homeColumnsRecent.value = columns.recent || []
-    homeColumnsHot.value = columns.hot || []
-    if (needArticles) splitArticles(articles)
-    checkin.value = checkinRank.slice(0, 8)
-    online.value = onlineRank.slice(0, 8)
-    hot.value = hotList.slice(0, 12)
-    longArticles.value = longList.slice(0, 12)
-    recentUsers.value = regs.slice(0, 20)
-    tags.value = tagData.tags.slice(0, 24)
-    moons.value = breezes.slice(0, 8)
-    chatLines.value = chats.slice(0, 10)
-    repeaterItems.value = reps
-    onlineChatCnt.value = typeof onlineSnap.onlineChatCnt === 'number' ? onlineSnap.onlineChatCnt : null
-    discussing.value = onlineSnap.discussing || ''
+    const snap: HomeSnapshot = {
+      articles,
+      checkin: checkinRank.slice(0, 8),
+      online: onlineRank.slice(0, 8),
+      hot: hotList.slice(0, 12),
+      long: longList.slice(0, 12),
+      recentUsers: regs.slice(0, 20),
+      tags: tagData.tags.slice(0, 24),
+      moons: breezes.slice(0, 8),
+      chatLines: chats.slice(0, 10),
+      repeater: reps,
+      onlineChatCnt: typeof onlineSnap.onlineChatCnt === 'number' ? onlineSnap.onlineChatCnt : null,
+      discussing: onlineSnap.discussing || '',
+      columnsRecent: columns.recent || [],
+      columnsHot: columns.hot || [],
+    }
+    applySnapshot(snap)
+    writeCache(HOME_CACHE_KEY, snap)
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '首页加载失败'
+    if (!left.value.length) error.value = e instanceof Error ? e.message : '首页加载失败'
   } finally {
     loading.value = false
   }

@@ -7,6 +7,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeBreezemoonsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader, writeCache } from '@/utils/swr'
 
 usePageSeo(() => ({ title: '清风明月', path: '/breezemoons', description: '摸鱼派清风明月' }))
 
@@ -21,17 +22,14 @@ const loading = ref(true)
 const draft = ref('')
 const sending = ref(false)
 
+const swr = createSwrLoader({ loading, error })
+
 async function load() {
-  loading.value = true
-  try {
-    const cached = page.value === 1 ? consumeBreezemoonsPayload() : null
-    items.value = cached || (await fetchBreezemoons(page.value, PAGE_SIZE))
-    error.value = ''
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '加载失败'
-  } finally {
-    loading.value = false
-  }
+  await swr(
+    `breezemoons:${page.value}`,
+    async () => (page.value === 1 && consumeBreezemoonsPayload()) || fetchBreezemoons(page.value, PAGE_SIZE),
+    (data) => (items.value = data),
+  )
 }
 
 watch([apiKey, page], () => void load(), { immediate: true })
@@ -43,6 +41,7 @@ async function remove(item: Breezemoon) {
   try {
     await removeBreezemoon(apiKey.value, item.oId)
     items.value = items.value.filter((x) => x.oId !== item.oId)
+    writeCache(`breezemoons:${page.value}`, items.value)
   } catch (e) {
     error.value = e instanceof Error ? e.message : '删除失败'
   } finally {

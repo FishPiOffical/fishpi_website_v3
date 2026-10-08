@@ -6,6 +6,7 @@ import { fetchPointRecords, fetchUserPoint, type PointRecord } from '@/api/fishp
 import { useAuthStore } from '@/stores/auth'
 import { usePageSeo } from '@/composables/usePageSeo'
 import FpLoading from '@/components/FpLoading.vue'
+import { createSwrLoader } from '@/utils/swr'
 
 const auth = useAuthStore()
 const { apiKey, account, isLoggedIn } = storeToRefs(auth)
@@ -19,23 +20,24 @@ usePageSeo(() => ({ title: '积分流水', path: '/points', robots: 'noindex' })
 
 const userName = computed(() => account.value?.userName || '')
 
+const swr = createSwrLoader({ loading, error })
+
 async function load() {
-  if (!apiKey.value || !userName.value) return
-  loading.value = true
-  error.value = ''
-  try {
-    const [records, point] = await Promise.all([
-      fetchPointRecords(apiKey.value, page.value),
-      fetchUserPoint(userName.value, apiKey.value),
-    ])
-    items.value = records
-    balance.value = point ? point.userPoint : (account.value?.userPoint ?? null)
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '积分流水失败'
-    items.value = []
-  } finally {
-    loading.value = false
-  }
+  const key = apiKey.value
+  const name = userName.value
+  if (!key || !name) return
+  await swr(
+    `points:${page.value}`,
+    async () => {
+      const [records, point] = await Promise.all([fetchPointRecords(key, page.value), fetchUserPoint(name, key)])
+      return { records, point: point ? point.userPoint : (account.value?.userPoint ?? null) }
+    },
+    (data) => {
+      items.value = data.records
+      balance.value = data.point
+    },
+    '积分流水失败',
+  )
 }
 
 watch(
