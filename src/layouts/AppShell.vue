@@ -74,7 +74,7 @@ function logout() {
   <div class="shell">
     <header class="nav">
       <RouterLink to="/" class="logo" aria-label="摸鱼派">
-        <img src="/favicon.svg" alt="" />
+        <img src="/logo.png" width="48" height="48" alt="摸鱼派" />
       </RouterLink>
       <nav>
         <RouterLink v-for="item in nav" :key="item.to" :to="item.to" :class="{ current: route.path === item.to }">
@@ -153,6 +153,8 @@ function logout() {
 .logo img {
   width: 48px;
   height: 48px;
+  display: block;
+  object-fit: contain;
 }
 nav {
   display: flex;

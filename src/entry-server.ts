@@ -9,6 +9,7 @@ import {
   fetchDomains,
   fetchOnlineRank,
   fetchRecentArticles,
+  fetchRecentRegister,
   fetchRepeaterItems,
   fetchTags,
   fetchUserProfile,
@@ -35,7 +36,31 @@ async function prefetch(url: string): Promise<SsrPayload> {
     }
 
     if (path === '/') {
-      return { feed: await fetchRecentArticles(null, 1, 40), feedKind: 'recent' }
+      const settled = await Promise.allSettled([
+        fetchRecentArticles(null, 1, 40),
+        fetchArticleFeed('hot', null, 1, 12),
+        fetchArticleFeed('long', null, 1, 8),
+        fetchCheckinRank(null),
+        fetchOnlineRank(null),
+        fetchRecentRegister(null),
+        fetchTags(null, 1, 24),
+        fetchBreezemoons(1, 8),
+      ])
+      const val = <T>(i: number, fallback: T): T =>
+        settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
+      const tagData = val(6, { tags: [], total: 0 })
+      return {
+        feed: val(0, []),
+        feedKind: 'recent',
+        hotFeed: val(1, []),
+        longFeed: val(2, []),
+        checkinRank: val(3, []),
+        onlineRank: val(4, []),
+        recentUsers: val(5, []),
+        tags: tagData.tags,
+        tagsTotal: tagData.total,
+        breezemoons: val(7, []),
+      }
     }
 
     if (path === '/domains') {

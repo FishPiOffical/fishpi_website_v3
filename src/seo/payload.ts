@@ -3,6 +3,7 @@ import type {
   ArticleSummary,
   Breezemoon,
   DomainItem,
+  LiteUser,
   RankUser,
   RepeaterItem,
   TagItem,
@@ -14,12 +15,15 @@ export interface SsrPayload {
   member?: UserProfile | null
   feed?: ArticleSummary[]
   feedKind?: string
+  hotFeed?: ArticleSummary[]
+  longFeed?: ArticleSummary[]
   domains?: DomainItem[]
   tags?: TagItem[]
   tagsTotal?: number
   breezemoons?: Breezemoon[]
   checkinRank?: RankUser[]
   onlineRank?: RankUser[]
+  recentUsers?: LiteUser[]
   repeater?: RepeaterItem[]
 }
 
@@ -117,4 +121,42 @@ export function consumeRanksPayload(): { checkin: RankUser[]; online: RankUser[]
 export function consumeRepeaterPayload(): RepeaterItem[] | null {
   const v = takeField('repeater')
   return Array.isArray(v) ? v : null
+}
+
+export function consumeHomeExtrasPayload(): {
+  hot?: ArticleSummary[]
+  long?: ArticleSummary[]
+  checkin?: RankUser[]
+  online?: RankUser[]
+  recentUsers?: LiteUser[]
+  tags?: TagItem[]
+  breezemoons?: Breezemoon[]
+} | null {
+  const hot = takeField('hotFeed')
+  const long = takeField('longFeed')
+  const checkin = takeField('checkinRank')
+  const online = takeField('onlineRank')
+  const recentUsers = takeField('recentUsers')
+  const tags = takeField('tags')
+  const breezemoons = takeField('breezemoons')
+  if (
+    !Array.isArray(hot) &&
+    !Array.isArray(long) &&
+    !Array.isArray(checkin) &&
+    !Array.isArray(online) &&
+    !Array.isArray(recentUsers) &&
+    !Array.isArray(tags) &&
+    !Array.isArray(breezemoons)
+  ) {
+    return null
+  }
+  return {
+    hot: Array.isArray(hot) ? hot : undefined,
+    long: Array.isArray(long) ? long : undefined,
+    checkin: Array.isArray(checkin) ? checkin : undefined,
+    online: Array.isArray(online) ? online : undefined,
+    recentUsers: Array.isArray(recentUsers) ? recentUsers : undefined,
+    tags: Array.isArray(tags) ? tags : undefined,
+    breezemoons: Array.isArray(breezemoons) ? breezemoons : undefined,
+  }
 }
