@@ -61,7 +61,7 @@ const rawText = ref('')
 const rawLoading = ref(false)
 const topicDraft = ref('')
 const editingTopic = ref(false)
-const quote = ref<{ userName: string; messageId: string; content: string } | null>(null)
+const quote = ref<{ userName: string; messageId: string; content: string; html: string } | null>(null)
 const quoteBusy = ref('')
 const quoteErr = ref('')
 
@@ -144,19 +144,33 @@ async function submit() {
   }
 }
 
-async function quoteMessage(msg: { oId: string; userName: string }) {
+async function quoteMessage(msg: { oId: string; userName: string; html?: string }) {
   if (!auth.apiKey) return
   quoteBusy.value = msg.oId
   quoteErr.value = ''
   try {
     const content = await fetchChatRaw(auth.apiKey, msg.oId)
-    quote.value = { userName: msg.userName, messageId: msg.oId, content: content.trim() }
+    quote.value = { userName: msg.userName, messageId: msg.oId, content: content.trim(), html: quoteHtml(msg.html || '') }
     await nextTick()
-    composerRef.value?.focus()
+    composerRef.value?.reveal()
   } catch (e) {
     quoteErr.value = e instanceof Error ? e.message : '读取原文失败'
   } finally {
     quoteBusy.value = ''
+  }
+}
+
+const CARD_LABELS: Record<string, string> = { music: '🎵', weather: '🌤 天气', redPacket: '🧧 红包' }
+
+function quoteHtml(html: string) {
+  if (!html.trim().startsWith('{')) return html
+  try {
+    const card = JSON.parse(html) as { msgType?: string; title?: string }
+    const label = CARD_LABELS[card.msgType || ''] || '[卡片消息]'
+    const text = `${label}${card.title ? ` ${card.title}` : ''}`
+    return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)
+  } catch {
+    return html
   }
 }
 
@@ -285,7 +299,7 @@ function clearScreen() {
               <div v-if="quote" class="quote-preview-box">
                 <div class="quote-info">
                   <span class="quote-label">引用 @{{ quote.userName }}</span>
-                  <p class="quote-text">{{ quote.content.slice(0, 200) }}</p>
+                  <div class="vditor-reset quote-html" v-html="quote.html" />
                 </div>
                 <button type="button" class="quote-cancel" title="取消引用" @click="clearQuote">✕</button>
               </div>
@@ -432,7 +446,6 @@ function clearScreen() {
               </template>
               <template #actions>
                 <button v-if="msg.userName === me" type="button" title="撤回发言" @click="chat.revoke(msg.oId)">撤回</button>
-                <button type="button" title="查看上下文" @click="chat.loadAround(msg.oId)">附近</button>
                 <template v-if="!msg.redPacket && auth.apiKey">
                   <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
                     {{ quoteBusy === msg.oId ? '…' : '引用' }}
@@ -558,7 +571,6 @@ function clearScreen() {
               </template>
               <template #actions>
                 <button v-if="msg.userName === me" type="button" title="撤回发言" @click="chat.revoke(msg.oId)">撤回</button>
-                <button type="button" title="查看上下文" @click="chat.loadAround(msg.oId)">附近</button>
                 <template v-if="!msg.redPacket && auth.apiKey">
                   <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
                     {{ quoteBusy === msg.oId ? '…' : '引用' }}
@@ -592,7 +604,7 @@ function clearScreen() {
               <div v-if="quote" class="quote-preview-box">
                 <div class="quote-info">
                   <span class="quote-label">引用 @{{ quote.userName }}</span>
-                  <p class="quote-text">{{ quote.content.slice(0, 200) }}</p>
+                  <div class="vditor-reset quote-html" v-html="quote.html" />
                 </div>
                 <button type="button" class="quote-cancel" title="取消引用" @click="clearQuote">✕</button>
               </div>
@@ -1298,13 +1310,40 @@ function clearScreen() {
   color: var(--fp-accent);
 }
 
-.quote-text {
-  margin: 2px 0 0;
-  color: var(--fp-muted);
-  white-space: nowrap;
+.quote-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.quote-html {
+  margin-top: 2px;
+  max-height: 64px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 500px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fp-muted);
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent);
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+}
+
+.quote-html :deep(p) {
+  margin: 0;
+}
+
+.quote-html :deep(img:not(.emoji)) {
+  max-height: 48px;
+  max-width: 120px;
+  vertical-align: middle;
+}
+
+.quote-html :deep(img.emoji) {
+  width: 18px;
+  height: 18px;
+}
+
+.quote-html :deep(blockquote),
+.quote-html :deep(h5) {
+  display: none;
 }
 
 .quote-cancel {

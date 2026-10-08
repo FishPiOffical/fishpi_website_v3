@@ -30,6 +30,7 @@ const props = withDefaults(
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
 
+const root = ref<HTMLElement | null>(null)
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const canSend = computed(
   () => !props.sending && !props.disabled && (props.allowEmpty || Boolean(props.modelValue.trim())),
@@ -39,14 +40,20 @@ function submit() {
   if (canSend.value) emit('submit')
 }
 
+function reveal() {
+  editor.value?.focus()
+  root.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
 defineExpose({
   focus: () => editor.value?.focus(),
+  reveal,
   insert: (text: string) => editor.value?.insert(text),
 })
 </script>
 
 <template>
-  <div class="composer">
+  <div ref="root" class="composer">
     <slot name="top" />
     <MarkdownEditor
       ref="editor"

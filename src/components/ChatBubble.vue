@@ -112,6 +112,16 @@ withDefaults(
   padding: 2px 8px;
   font-size: 12px;
 }
+.body :deep(h5) {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--fp-muted);
+}
+.body :deep(blockquote img:not(.emoji)) {
+  max-width: 80px;
+  max-height: 80px;
+}
 .body :deep(pre) {
   max-height: 240px;
   overflow: auto;
@@ -131,8 +141,7 @@ withDefaults(
   align-items: center;
   gap: 2px;
 }
-.actions > :deep(button),
-.actions :deep(.report > .ghost) {
+.actions > :deep(button) {
   border: 0;
   background: transparent;
   color: var(--fp-muted);
@@ -141,8 +150,7 @@ withDefaults(
   padding: 0 4px;
   border-radius: 3px;
 }
-.actions > :deep(button:hover),
-.actions :deep(.report > .ghost:hover) {
+.actions > :deep(button:hover) {
   color: var(--fp-link);
 }
 .fp-bubble :deep(.rx) {

@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import {
-  fetchChatAround,
   fetchChatHistory,
   fetchChatNodeBundle,
   fetchChatOnlineUsers,
@@ -273,21 +272,6 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function loadAround(oId: string) {
-    const auth = useAuthStore()
-    if (!oId) return
-    try {
-      const around = await fetchChatAround(auth.apiKey, oId, 0, 16)
-      if (!around.length) return
-      const known = new Set(messages.value.map((m) => m.oId))
-      const extra = around.map(asLine).filter((m) => m.oId && !known.has(m.oId))
-      if (!extra.length) return
-      messages.value = [...messages.value, ...extra].sort((a, b) => a.oId.localeCompare(b.oId))
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : '附近消息失败'
-    }
-  }
-
   async function loadMore() {
     const auth = useAuthStore()
     if (loadingMore.value || !hasMore.value) return
@@ -415,7 +399,6 @@ export const useChatStore = defineStore('chat', () => {
     connect,
     disconnect,
     loadMore,
-    loadAround,
     send,
     sendRedPacket,
     sendBarrage,
