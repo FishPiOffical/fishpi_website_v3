@@ -361,7 +361,7 @@ function clearScreen() {
 
             <!-- 涂鸦面板 -->
             <div v-if="showPaint" class="paint-box-wrap">
-              <PaintPanel @submit="insertPaint" @cancel="showPaint = false" />
+              <PaintPanel @insert="insertPaint" @close="showPaint = false" />
             </div>
 
             <!-- 在线人数条与折叠面板 -->
@@ -658,7 +658,7 @@ function clearScreen() {
 
             <!-- 涂鸦面板 -->
             <div v-if="showPaint" class="paint-box-wrap">
-              <PaintPanel @submit="insertPaint" @cancel="showPaint = false" />
+              <PaintPanel @insert="insertPaint" @close="showPaint = false" />
             </div>
           </div>
 
@@ -849,7 +849,6 @@ function clearScreen() {
   border: 1px solid var(--fp-border);
   border-radius: 8px;
   box-shadow: var(--fp-card-shadow);
-  overflow: hidden;
 }
 
 /* 输入区域 */
