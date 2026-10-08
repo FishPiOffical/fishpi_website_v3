@@ -1,4 +1,6 @@
 import fs from 'node:fs'
+import http from 'node:http'
+import https from 'node:https'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
@@ -15,6 +17,42 @@ process.env.VITE_API_TARGET = apiTarget
 
 const FISHPI_UA =
   'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
+
+/**
+ * Vite middlewareMode 没有 httpServer，server.proxy 的 ws: true 不生效；
+ * 开发时由这里把 /*-channel 的 WebSocket 升级请求隧道到 Rhythm（生产由 nginx 处理）。
+ */
+function proxyWsUpgrade(req, socket, head) {
+  const target = new URL(req.url, apiTarget)
+  const secure = target.protocol === 'https:'
+  const upstream = (secure ? https : http).request({
+    hostname: target.hostname,
+    port: target.port || (secure ? 443 : 80),
+    path: target.pathname + target.search,
+    method: 'GET',
+    headers: {
+      ...req.headers,
+      host: target.host,
+      origin: apiTarget,
+      'user-agent': FISHPI_UA,
+    },
+  })
+  upstream.on('upgrade', (res, upstreamSocket, upstreamHead) => {
+    const lines = [`HTTP/1.1 ${res.statusCode} ${res.statusMessage}`]
+    for (let i = 0; i < res.rawHeaders.length; i += 2) lines.push(`${res.rawHeaders[i]}: ${res.rawHeaders[i + 1]}`)
+    socket.write(`${lines.join('\r\n')}\r\n\r\n`)
+    if (upstreamHead?.length) socket.write(upstreamHead)
+    if (head?.length) upstreamSocket.write(head)
+    upstreamSocket.on('error', () => socket.destroy())
+    upstreamSocket.pipe(socket).pipe(upstreamSocket)
+  })
+  upstream.on('response', (res) => {
+    socket.end(`HTTP/1.1 ${res.statusCode} ${res.statusMessage}\r\n\r\n`)
+  })
+  upstream.on('error', () => socket.destroy())
+  socket.on('error', () => upstream.destroy())
+  upstream.end()
+}
 
 function extractCsrfToken(html) {
   const m = String(html).match(/csrfToken\s*:\s*['"]([^'"]+)['"]/)
@@ -271,9 +309,14 @@ async function createServer() {
     }
   })
 
-  app.listen(port, '127.0.0.1', () => {
+  const server = app.listen(port, '127.0.0.1', () => {
     console.log(`FishPi SSR http://127.0.0.1:${port} (api → ${apiTarget})`)
   })
+  if (!isProd) {
+    server.on('upgrade', (req, socket, head) => {
+      if (/^\/[\w-]+-channel(\?|$)/.test(req.url || '')) proxyWsUpgrade(req, socket, head)
+    })
+  }
 }
 
 createServer()

@@ -5,11 +5,13 @@ import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useWhisperStore } from '@/stores/whispers'
 import EmojiPicker from '@/components/EmojiPicker.vue'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
 const whispers = useWhisperStore()
-const { account } = storeToRefs(auth)
+const { account, apiKey } = storeToRefs(auth)
+const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const { messages, sending, loading, error, connected, usingMock, hasMore, loadingMore } = storeToRefs(whispers)
 
 const draft = ref('')
@@ -32,6 +34,7 @@ watch(
 
 async function submit() {
   const text = draft.value
+  if (!text.trim() || sending.value) return
   draft.value = ''
   await whispers.send(text)
 }
@@ -76,9 +79,17 @@ async function submit() {
       </article>
     </div>
     <form class="composer" @submit.prevent="submit">
-      <textarea v-model="draft" rows="3" placeholder="支持 Markdown。Enter 发送，Shift+Enter 换行" @keydown.enter.exact.prevent="submit" />
+      <MarkdownEditor
+        ref="editorRef"
+        v-model="draft"
+        :api-key="apiKey"
+        :height="150"
+        compact
+        placeholder="说点什么吧，友善第一哦。Ctrl+Enter 发送，可粘贴或拖拽图片"
+        @submit="submit"
+      />
       <div class="send-row">
-        <EmojiPicker @insert="(md) => (draft += md)" />
+        <EmojiPicker @insert="(md) => editorRef?.insert(md)" />
         <button type="submit" :disabled="sending || !draft.trim() || (!connected && !usingMock)">发送</button>
       </div>
     </form>
@@ -178,13 +189,10 @@ span.on {
   align-items: center;
   gap: 8px;
 }
-textarea {
-  flex: 1;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  color: var(--fp-text);
-  border-radius: 8px;
-  padding: 8px;
+.fp-bubble :deep(img) {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 6px;
 }
 .send-row button {
   border: 0;

@@ -149,9 +149,15 @@ export const useWhisperStore = defineStore('whispers', () => {
           messages.value = messages.value.filter((m) => m.oId !== id)
           return
         }
+        if ((raw as { code?: number }).code === -1) {
+          error.value = (raw as { msg?: string }).msg || '发送失败'
+          return
+        }
         const msg = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as WhisperMsg
         if (!msg.oId && !msg.content && !msg.markdown) return
         if (msg.oId && messages.value.some((m) => m.oId === msg.oId)) return
+        error.value = ''
+        if (msg.senderUserName === userName) void markWhisperRead(apiKey, userName).catch(() => undefined)
         messages.value.push({
           oId: msg.oId || `local-${Date.now()}`,
           content: msg.content,

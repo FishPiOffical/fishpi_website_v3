@@ -10,10 +10,12 @@ const props = withDefaults(
     height?: number
     placeholder?: string
     outline?: boolean
+    /** 精简模式：只留表情/链接/上传/编辑模式，仅编辑区不分屏预览（对齐现网私信） */
+    compact?: boolean
   }>(),
-  { apiKey: null, height: 500, placeholder: '', outline: false },
+  { apiKey: null, height: 500, placeholder: '', outline: false, compact: false },
 )
-const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
 
 const VDITOR_CDN = 'https://file.fishpi.cn/vditor/latest/dist'
 
@@ -88,8 +90,20 @@ onMounted(async () => {
     theme: dark.value ? 'dark' : 'classic',
     outline: { enable: props.outline, position: 'left' },
     resize: { enable: true, position: 'bottom' },
-    preview: { delay: 500, mode: 'both', url: '/markdown' },
-    counter: { enable: true },
+    preview: { delay: 500, mode: props.compact ? 'editor' : 'both', url: '/markdown' },
+    counter: { enable: !props.compact },
+    ...(props.compact
+      ? {
+          toolbar: [
+            'emoji',
+            'link',
+            'upload',
+            'edit-mode',
+            { name: 'more', toolbar: ['insert-after', 'fullscreen', 'preview', 'info', 'help'] },
+          ],
+        }
+      : {}),
+    ctrlEnter: () => emit('submit'),
     upload: {
       accept: 'image/*,.zip,.rar,.7z,.mp3,.mp4,.webm,.mov',
       handler: async (files: File[]) => {

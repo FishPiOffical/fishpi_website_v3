@@ -2179,13 +2179,8 @@ export async function fetchWhisperMessages(apiKey: string, toUser: string, page 
   return []
 }
 
-export async function markWhisperRead(apiKey: string, userName: string) {
-  const q = `apiKey=${encodeURIComponent(apiKey)}`
-  try {
-    await request<Envelope<unknown>>(`/chat/mark-as-read?toUser=${encodeURIComponent(userName)}&${q}`)
-  } catch {
-    await request<Envelope<unknown>>(`/chat/mark-as-read?fromUser=${encodeURIComponent(userName)}&${q}`)
-  }
+export async function markWhisperRead(apiKey: string, fromUser: string) {
+  await request<Envelope<unknown>>(withKey(`/chat/mark-as-read?fromUser=${encodeURIComponent(fromUser)}`, apiKey))
 }
 
 export async function fetchWhisperUnread(apiKey: string): Promise<WhisperMsg[]> {

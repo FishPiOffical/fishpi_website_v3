@@ -864,7 +864,8 @@ async function onReactComment(c: ArticleComment, value: string) {
             v-model="draft"
             :api-key="apiKey"
             :height="200"
-            placeholder="请友善发言，支持 Markdown、@用户、拖拽上传图片…"
+            placeholder="请友善发言，支持 Markdown、@用户、拖拽上传图片…Ctrl+Enter 发送"
+            @submit="submit"
           />
           <div class="composer-toolbar">
             <EmojiPicker @insert="(md) => composerRef?.insert(md)" />
