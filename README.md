@@ -12,6 +12,15 @@ npm run sitemap      # 生成 public/sitemap.xml
 
 开发服务器固定 `http://127.0.0.1:5173`，占用时请先结束旧进程，不会自动换端口。
 
+浏览器登录后 apiKey 存 `localStorage.fp.apiKey`，刷新只调 `/api/user` 恢复，不再走 `/api/getKey`。脚本请复用缓存，勿反复密码登录：
+
+```bash
+# 把有效 apiKey 写入（或设 FP_API_KEY）
+mkdir -p .fp-cache && echo '你的apiKey' > .fp-cache/api-key
+npm run auth:check          # 只校验缓存，不调用 getKey
+# FP_USER=x FP_PASS=y npm run auth:login   # 仅缓存失效时才密码登录一次
+```
+
 开发代理默认指向 `https://fishpi.cn`。若本地 Rhythm 在 `8080`，在 `.env.development` 设置：
 
 ```

@@ -10,7 +10,9 @@
     "build:client": "vite build --outDir dist/client",
     "build:server": "vite build --ssr src/entry-server.ts --outDir dist/server",
     "preview": "NODE_ENV=production node server.js",
-    "sitemap": "node scripts/generate-sitemap.mjs"
+    "sitemap": "node scripts/generate-sitemap.mjs",
+    "auth:check": "node scripts/dev-auth.mjs",
+    "auth:login": "node scripts/dev-auth.mjs --login"
   },
   "dependencies": {
     "@unhead/ssr": "^3.4.2",

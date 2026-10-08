@@ -36,8 +36,37 @@ function parseSetCookie(res) {
   return out
 }
 
+function parseRequestCookie(header) {
+  const out = {}
+  for (const part of String(header || '').split(';')) {
+    const i = part.indexOf('=')
+    if (i <= 0) continue
+    out[part.slice(0, i).trim()] = part.slice(i + 1).trim()
+  }
+  return out
+}
+
+async function csrfFromSymCe(symCe) {
+  const settingsRes = await fetch(`${apiTarget}/settings`, {
+    headers: {
+      'User-Agent': FISHPI_UA,
+      Referer: `${apiTarget}/`,
+      Cookie: `sym-ce=${symCe}`,
+    },
+  })
+  if (!settingsRes.ok) return ''
+  const html = await settingsRes.text()
+  return extractCsrfToken(html)
+}
+
 /** apiKey → sym-ce cookie + csrfToken (Rhythm page POSTs, e.g. profession). */
-async function exchangePageAuth(apiKey) {
+async function exchangePageAuth(apiKey, existingSymCe = '') {
+  // Reuse browser cookie when still valid — avoids loginWebInApiKey roundtrip.
+  if (existingSymCe) {
+    const csrfToken = await csrfFromSymCe(existingSymCe)
+    if (csrfToken) return { csrfToken, symCe: existingSymCe, reused: true }
+  }
+
   const loginRes = await fetch(`${apiTarget}/loginWebInApiKey?apiKey=${encodeURIComponent(apiKey)}`, {
     method: 'GET',
     redirect: 'manual',
@@ -51,22 +80,11 @@ async function exchangePageAuth(apiKey) {
   if (!symCe) {
     throw new Error('无法换取页面会话，请检查 apiKey')
   }
-  const settingsRes = await fetch(`${apiTarget}/settings`, {
-    headers: {
-      'User-Agent': FISHPI_UA,
-      Referer: `${apiTarget}/`,
-      Cookie: `sym-ce=${symCe}`,
-    },
-  })
-  if (!settingsRes.ok) {
-    throw new Error('读取设置页失败')
-  }
-  const html = await settingsRes.text()
-  const csrfToken = extractCsrfToken(html)
+  const csrfToken = await csrfFromSymCe(symCe)
   if (!csrfToken) {
     throw new Error('设置页未返回 csrfToken')
   }
-  return { csrfToken, symCe }
+  return { csrfToken, symCe, reused: false }
 }
 
 function injectHtml(template, { appHtml, headPayload, payload, cssLinks }) {
@@ -177,13 +195,16 @@ async function createServer() {
         res.status(400).json({ code: -1, msg: '缺少 apiKey' })
         return
       }
-      const { csrfToken, symCe } = await exchangePageAuth(apiKey)
+      const existingSymCe = parseRequestCookie(req.headers.cookie)['sym-ce'] || ''
+      const { csrfToken, symCe, reused } = await exchangePageAuth(apiKey, existingSymCe)
       // Same cookie name as Rhythm so Vite/nginx proxy forwards it upstream.
-      res.setHeader(
-        'Set-Cookie',
-        `sym-ce=${symCe}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`,
-      )
-      res.status(200).json({ code: 0, csrfToken })
+      if (!reused || symCe !== existingSymCe) {
+        res.setHeader(
+          'Set-Cookie',
+          `sym-ce=${symCe}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`,
+        )
+      }
+      res.status(200).json({ code: 0, csrfToken, reused: Boolean(reused) })
     } catch (e) {
       res.status(502).json({ code: -1, msg: e instanceof Error ? e.message : 'page-auth 失败' })
     }

@@ -1,13 +1,44 @@
 /** Exchange apiKey → page session cookie (via server) + csrfToken for Rhythm page POSTs. */
 
-let cache: { apiKey: string; csrfToken: string; at: number } | null = null
+const SS_KEY = 'fp.pageAuth'
+let memory: { apiKey: string; csrfToken: string; at: number } | null = null
 const TTL_MS = 30 * 60 * 1000
+
+function readSession(apiKey: string): string {
+  if (typeof sessionStorage === 'undefined') return ''
+  try {
+    const raw = sessionStorage.getItem(SS_KEY)
+    if (!raw) return ''
+    const parsed = JSON.parse(raw) as { apiKey?: string; csrfToken?: string; at?: number }
+    if (parsed.apiKey !== apiKey || !parsed.csrfToken) return ''
+    if (Date.now() - Number(parsed.at || 0) > TTL_MS) return ''
+    return parsed.csrfToken
+  } catch {
+    return ''
+  }
+}
+
+function writeSession(apiKey: string, csrfToken: string) {
+  memory = { apiKey, csrfToken, at: Date.now() }
+  if (typeof sessionStorage === 'undefined') return
+  try {
+    sessionStorage.setItem(SS_KEY, JSON.stringify(memory))
+  } catch {
+    /* ignore */
+  }
+}
 
 export async function ensureCsrfToken(apiKey: string): Promise<string> {
   if (!apiKey) throw new Error('需要登录')
-  if (cache && cache.apiKey === apiKey && Date.now() - cache.at < TTL_MS && cache.csrfToken) {
-    return cache.csrfToken
+  if (memory && memory.apiKey === apiKey && Date.now() - memory.at < TTL_MS && memory.csrfToken) {
+    return memory.csrfToken
   }
+  const fromSs = readSession(apiKey)
+  if (fromSs) {
+    memory = { apiKey, csrfToken: fromSs, at: Date.now() }
+    return fromSs
+  }
+
   const res = await fetch('/__fp/page-auth', {
     method: 'POST',
     credentials: 'include',
@@ -24,10 +55,17 @@ export async function ensureCsrfToken(apiKey: string): Promise<string> {
   if (!res.ok || !data.csrfToken) {
     throw new Error(data.msg || '无法获取 CSRF，请重新登录后再试')
   }
-  cache = { apiKey, csrfToken: data.csrfToken, at: Date.now() }
+  writeSession(apiKey, data.csrfToken)
   return data.csrfToken
 }
 
 export function clearPageAuthCache() {
-  cache = null
+  memory = null
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      sessionStorage.removeItem(SS_KEY)
+    } catch {
+      /* ignore */
+    }
+  }
 }
