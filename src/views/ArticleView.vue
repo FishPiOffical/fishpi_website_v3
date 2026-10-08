@@ -72,6 +72,10 @@ const revisionBusy = ref(false)
 let heatWs: WebSocket | null = null
 
 const id = computed(() => String(route.params.id || ''))
+const tocReady = ref(false)
+const hasToc = computed(() =>
+  tocReady.value ? toc.value.length > 0 : /<h[1-3][\s>]/i.test(article.value?.articleContent || ''),
+)
 
 async function buildToc() {
   await nextTick()
@@ -89,6 +93,7 @@ async function buildToc() {
       level: Number(el.tagName.slice(1)) || 2,
     }
   }).filter((item) => item.text)
+  tocReady.value = true
 }
 
 function jumpToc(anchor: string) {
@@ -551,7 +556,7 @@ async function onReactComment(c: ArticleComment, value: string) {
       后可查看需要权限的帖子。
     </p>
   </article>
-  <div v-else-if="article" class="wrap">
+  <div v-else-if="article" class="wrap" :class="{ 'has-toc': hasToc }">
     <aside v-if="toc.length" class="toc">
       <b>目录</b>
       <a
@@ -980,7 +985,10 @@ async function onReactComment(c: ArticleComment, value: string) {
 }
 
 @media (min-width: 1100px) {
-  .wrap {
+  .wrap:not(.has-toc) {
+    max-width: 1060px;
+  }
+  .wrap.has-toc {
     display: grid;
     grid-template-columns: 220px minmax(0, 1fr);
     gap: 20px;
