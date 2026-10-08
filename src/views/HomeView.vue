@@ -13,6 +13,7 @@ import {
   fetchRecentRegister,
   fetchRepeaterItems,
   fetchTags,
+  postBreezemoon,
   sendChat,
   type ArticleSummary,
   type Breezemoon,
@@ -52,6 +53,9 @@ const discussing = ref('')
 const chatDraft = ref('')
 const chatBusy = ref(false)
 const chatMsg = ref('')
+const moonDraft = ref('')
+const moonBusy = ref(false)
+const moonMsg = ref('')
 const hotMode = ref<'hot' | 'column'>('hot')
 const error = ref('')
 const loading = ref(true)
@@ -62,6 +66,13 @@ const welcomeUser = computed(() => recentUsers.value[0] || null)
 const topModules = computed(() => layout.modulesIn('top'))
 const longModules = computed(() => layout.modulesIn('long'))
 const midModules = computed(() => layout.modulesIn('middle'))
+/** Live long zone: 最近更新 + 热门专栏 (column JSON 未开放时用长篇/热议帖近似). */
+const longRecentShelf = computed(() => longArticles.value.slice(0, 8))
+const longHotShelf = computed(() => {
+  const withCol = hot.value.filter((a) => a.columnTitle)
+  if (withCol.length) return withCol.slice(0, 8)
+  return (hot.value.length ? hot.value : longArticles.value).slice(0, 8)
+})
 
 usePageSeo(() => ({
   title: SITE_NAME,
@@ -219,6 +230,29 @@ async function postChat() {
     chatBusy.value = false
   }
 }
+
+async function postMoon() {
+  const content = moonDraft.value.trim()
+  if (!content || !apiKey.value || moonBusy.value) return
+  moonBusy.value = true
+  moonMsg.value = ''
+  try {
+    await postBreezemoon(apiKey.value, content)
+    moonDraft.value = ''
+    moons.value = (await safe(fetchBreezemoons(1, 8), [])).slice(0, 8)
+    moonMsg.value = '已发布'
+  } catch (e) {
+    moonMsg.value = e instanceof Error ? e.message : '发布失败'
+  } finally {
+    moonBusy.value = false
+  }
+}
+
+function scrollShelf(id: string, dir: -1 | 1) {
+  const el = document.getElementById(id)
+  if (!el) return
+  el.scrollBy({ left: dir * 240, behavior: 'smooth' })
+}
 </script>
 
 <template>
@@ -343,20 +377,55 @@ async function postChat() {
           <b>长篇专区</b>
           <RouterLink to="/recent/long">更多</RouterLink>
         </div>
-        <div class="long-shelf">
-          <article v-for="item in longArticles" :key="item.oId" class="long-card">
-            <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
-              item.articleTitleEmoj || item.articleTitle
-            }}</RouterLink>
-            <div class="long-meta">
-              <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                {{ item.articleAuthorName }}
-              </RouterLink>
-              <span>{{ views(item) }}</span>
+
+        <div class="long-row">
+          <div class="long-row-head">
+            <span class="badge">最近更新</span>
+            <div class="long-nav">
+              <button type="button" aria-label="向左滚动" @click="scrollShelf('long-recent', -1)">‹</button>
+              <button type="button" aria-label="向右滚动" @click="scrollShelf('long-recent', 1)">›</button>
             </div>
-            <p v-if="item.columnTitle" class="long-preview">{{ item.columnTitle }}</p>
-          </article>
-          <p v-if="!longArticles.length && !loading" class="hint long-empty">暂无长篇</p>
+          </div>
+          <div id="long-recent" class="long-shelf">
+            <article v-for="item in longRecentShelf" :key="item.oId" class="long-card">
+              <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
+                item.articleTitleEmoj || item.articleTitle
+              }}</RouterLink>
+              <div class="long-meta">
+                <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
+                <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                  {{ item.articleAuthorName }}
+                </RouterLink>
+                <span>{{ views(item) }}</span>
+              </div>
+            </article>
+            <p v-if="!longRecentShelf.length && !loading" class="hint long-empty">暂无长篇</p>
+          </div>
+        </div>
+
+        <div class="long-row">
+          <div class="long-row-head">
+            <span class="badge hot">热门专栏</span>
+            <div class="long-nav">
+              <button type="button" aria-label="向左滚动" @click="scrollShelf('long-hot', -1)">‹</button>
+              <button type="button" aria-label="向右滚动" @click="scrollShelf('long-hot', 1)">›</button>
+            </div>
+          </div>
+          <div id="long-hot" class="long-shelf">
+            <article v-for="item in longHotShelf" :key="'hot-' + item.oId" class="long-card hot">
+              <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
+                item.articleTitleEmoj || item.articleTitle
+              }}</RouterLink>
+              <div class="long-meta">
+                <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
+                <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                  {{ item.articleAuthorName }}
+                </RouterLink>
+                <span class="heat">🔥 {{ heat(item) }}</span>
+              </div>
+            </article>
+            <p v-if="!longHotShelf.length && !loading" class="hint long-empty">暂无热门</p>
+          </div>
         </div>
       </section>
     </template>
@@ -471,19 +540,34 @@ async function postChat() {
             <span v-if="!tags.length && !loading" class="hint">暂无标签</span>
           </div>
 
-          <div class="index-head spaced">
-            <b>清风明月</b>
-            <RouterLink to="/breezemoons">更多</RouterLink>
-          </div>
-          <ul class="moons">
-            <li v-for="m in moons" :key="m.oId">
-              <RouterLink v-if="m.breezemoonAuthorName" class="who" :to="`/member/${m.breezemoonAuthorName}`">
-                {{ m.breezemoonAuthorName }}
-              </RouterLink>
-              <span>{{ stripHtml(m.breezemoonContent || '') }}</span>
-            </li>
-            <li v-if="!moons.length && !loading" class="hint-li">暂无动态</li>
-          </ul>
+        <div class="index-head spaced">
+          <b>清风明月</b>
+          <RouterLink to="/breezemoons" title="清风明月是什么？">更多</RouterLink>
+        </div>
+        <div class="moon-form">
+          <input
+            v-model="moonDraft"
+            type="text"
+            maxlength="128"
+            :placeholder="isLoggedIn ? '清风明月' : '登录后发布清风明月'"
+            :disabled="!isLoggedIn || moonBusy"
+            @keydown.enter.prevent="postMoon"
+          />
+          <button v-if="isLoggedIn" type="button" class="green" :disabled="moonBusy || !moonDraft.trim()" @click="postMoon">
+            发布
+          </button>
+          <RouterLink v-else class="green-link" to="/login">登录</RouterLink>
+        </div>
+        <p v-if="moonMsg" class="hint moon-msg">{{ moonMsg }}</p>
+        <ul class="moons">
+          <li v-for="m in moons" :key="m.oId">
+            <RouterLink v-if="m.breezemoonAuthorName" class="who" :to="`/member/${m.breezemoonAuthorName}`">
+              {{ m.breezemoonAuthorName }}
+            </RouterLink>
+            <span>{{ stripHtml(m.breezemoonContent || '') }}</span>
+          </li>
+          <li v-if="!moons.length && !loading" class="hint-li">暂无动态</li>
+        </ul>
         </aside>
 
       </template>
@@ -712,7 +796,7 @@ async function postChat() {
 .long-head {
   display: flex;
   justify-content: space-between;
-  margin: 5px 16px 12px;
+  margin: 5px 16px 8px;
   font-size: 13px;
   color: var(--fp-head);
 }
@@ -723,12 +807,49 @@ async function postChat() {
   color: var(--fp-link);
   text-decoration: none;
 }
+.long-row {
+  margin-top: 8px;
+}
+.long-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 16px 8px;
+}
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fp-head);
+  background: var(--fp-hover);
+  border: 1px solid var(--fp-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.badge.hot {
+  color: var(--fp-accent);
+}
+.long-nav {
+  display: flex;
+  gap: 4px;
+}
+.long-nav button {
+  width: 28px;
+  height: 24px;
+  border: 1px solid var(--fp-border);
+  background: var(--fp-hover);
+  color: var(--fp-text);
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+}
 .long-shelf {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding: 0 16px;
+  padding: 0 16px 4px;
   scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
 }
 .long-card {
   flex: 0 0 220px;
@@ -737,6 +858,9 @@ async function postChat() {
   border-radius: 8px;
   padding: 12px;
   background: var(--fp-hover);
+}
+.long-card.hot {
+  border-color: rgba(210, 63, 49, 0.25);
 }
 .long-title {
   display: block;
@@ -763,14 +887,33 @@ async function postChat() {
   color: var(--fp-link);
   text-decoration: none;
 }
-.long-preview {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: var(--fp-muted);
-  line-height: 1.45;
+.long-meta .heat {
+  color: var(--fp-accent);
 }
 .long-empty {
   padding: 8px 0;
+}
+.moon-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 15px 6px;
+}
+.moon-form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--fp-border);
+  background: var(--fp-search-bg);
+  color: var(--fp-text);
+  border-radius: 4px;
+  padding: 6px 10px;
+  height: 32px;
+}
+.moon-form .green {
+  margin-left: 0;
+}
+.moon-msg {
+  margin: 0 15px 6px;
 }
 
 .chat-form {

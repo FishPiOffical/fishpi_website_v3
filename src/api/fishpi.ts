@@ -826,8 +826,12 @@ export async function fetchBreezemoons(page = 1, size = 20) {
 }
 
 export async function postBreezemoon(apiKey: string, content: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
   const res = await request<Envelope<unknown>>('/breezemoon', {
     method: 'POST',
+    headers: { csrfToken },
+    // Page session cookie carries auth; apiKey kept as fallback for some Rhythm builds.
     body: JSON.stringify({ apiKey, breezemoonContent: content }),
   })
   if (res.code) throw new Error(res.msg || '发布失败')
