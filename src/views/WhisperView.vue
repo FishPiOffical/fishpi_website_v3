@@ -105,6 +105,7 @@ async function submit() {
   flex-direction: column;
   min-height: 70vh;
   max-width: 800px;
+  margin-inline: auto;
 }
 header {
   display: flex;

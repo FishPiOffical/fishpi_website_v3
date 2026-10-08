@@ -87,6 +87,7 @@ function goMember() {
 <style scoped>
 .card {
   max-width: 420px;
+  margin-inline: auto;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
   border-radius: 12px;

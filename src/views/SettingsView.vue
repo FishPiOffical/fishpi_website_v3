@@ -1461,6 +1461,7 @@ async function saveI18n() {
   gap: 16px;
   align-items: start;
   max-width: 960px;
+  margin: 0 auto;
 }
 .set-side {
   position: sticky;

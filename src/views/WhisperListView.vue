@@ -58,6 +58,7 @@ function go() {
   border-radius: 12px;
   padding: 18px 20px;
   max-width: 720px;
+  margin-inline: auto;
 }
 h1 {
   margin: 0 0 12px;
