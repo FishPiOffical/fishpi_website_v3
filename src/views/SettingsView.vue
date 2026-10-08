@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppearancePicker from '@/components/packs/AppearancePicker.vue'
 import EmojiPacks from '@/components/EmojiPacks.vue'
 import {
+  bindEmail,
+  bindPhone,
   buyInvitecode,
   exportPosts,
   fetchProfessionMe,
   fetchUserProfile,
   queryInvitecode,
+  requestEmailBindCode,
+  requestPhoneBindCode,
   setProfessionPrimary,
   setProfessionPrivacy,
   submitIdentity,
@@ -19,10 +23,14 @@ import {
   updateGeoStatus,
   updateI18nSettings,
   updatePassword,
+  updatePrivacySettings,
   updateProfile,
+  updateUsername,
   uploadFiles,
+  type PrivacySettings,
   type ProfessionProgress,
 } from '@/api/fishpi'
+import { useGeetest4 } from '@/composables/useGeetest4'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -95,9 +103,41 @@ const privacyOptions = [
   { value: 'FULLY_HIDDEN', label: '完全隐藏' },
 ]
 
-const geoPublic = ref(true)
+const geoStatus = ref<0 | 1>(0)
 const geoBusy = ref(false)
 const geoMsg = ref('')
+const privacyBusy = ref(false)
+const privacyMsg = ref('')
+const privacyFlags = ref<PrivacySettings>({
+  userArticleStatus: true,
+  userCommentStatus: true,
+  userFollowingUserStatus: true,
+  userFollowingTagStatus: true,
+  userFollowingArticleStatus: true,
+  userWatchingArticleStatus: true,
+  userFollowerStatus: true,
+  userBreezemoonStatus: true,
+  userPointStatus: true,
+  userOnlineStatus: true,
+  userJoinPointRank: true,
+  userJoinUsedPointRank: true,
+  userUAStatus: true,
+})
+const privacyItems: { key: keyof PrivacySettings; label: string }[] = [
+  { key: 'userArticleStatus', label: '公开帖子列表' },
+  { key: 'userCommentStatus', label: '公开回帖列表' },
+  { key: 'userFollowingUserStatus', label: '公开关注用户列表' },
+  { key: 'userFollowingTagStatus', label: '公开关注标签列表' },
+  { key: 'userFollowingArticleStatus', label: '公开收藏帖子列表' },
+  { key: 'userWatchingArticleStatus', label: '公开关注帖子列表' },
+  { key: 'userFollowerStatus', label: '公开关注者列表' },
+  { key: 'userPointStatus', label: '公开积分列表' },
+  { key: 'userUAStatus', label: '公开 UA 信息' },
+  { key: 'userOnlineStatus', label: '公开在线状态' },
+  { key: 'userBreezemoonStatus', label: '公开清风明月列表' },
+  { key: 'userJoinPointRank', label: '参与财富排行' },
+  { key: 'userJoinUsedPointRank', label: '参与消费排行' },
+]
 
 const oldPwd = ref('')
 const newPwd = ref('')
@@ -105,6 +145,41 @@ const newPwd2 = ref('')
 const pwdBusy = ref(false)
 const pwdMsg = ref('')
 const pwdErr = ref('')
+
+const newUsername = ref('')
+const nameBusy = ref(false)
+const nameMsg = ref('')
+
+const displayPhone = computed(() => account.value?.userPhone || '')
+const displayEmail = computed(() => {
+  const e = account.value?.userEmail || ''
+  if (!e || e.endsWith('@sym.b3log.org')) return ''
+  return e
+})
+const phoneInput = ref('')
+const phoneCode = ref('')
+const phoneBindOpen = ref(false)
+const phoneCodeReady = ref(false)
+const phoneBusy = ref(false)
+const phoneMsg = ref('')
+const phoneCaptchaEl = ref<HTMLElement | null>(null)
+
+const emailInput = ref('')
+const emailCode = ref('')
+const emailBindOpen = ref(false)
+const emailCodeReady = ref(false)
+const emailBusy = ref(false)
+const emailMsg = ref('')
+const emailCaptchaEl = ref<HTMLElement | null>(null)
+
+const { error: phoneGtError, mount: mountPhoneGt, destroy: destroyPhoneGt } = useGeetest4(
+  phoneCaptchaEl,
+  (v) => void onPhoneCaptcha(v),
+)
+const { error: emailGtError, mount: mountEmailGt, destroy: destroyEmailGt } = useGeetest4(
+  emailCaptchaEl,
+  (v) => void onEmailCaptcha(v),
+)
 
 const listPageSize = ref(20)
 const commentViewMode = ref(0)
@@ -161,7 +236,24 @@ function fill() {
   mbti.value = account.value?.mbti || ''
   qq.value = account.value?.userQQ || ''
   avatar.value = account.value?.userAvatarURL || ''
-  geoPublic.value = Number(account.value?.userGeoStatus ?? 0) !== 1
+  geoStatus.value = Number(account.value?.userGeoStatus ?? 0) === 1 ? 1 : 0
+  privacyFlags.value = {
+    userArticleStatus: enabled(account.value?.userArticleStatus),
+    userCommentStatus: enabled(account.value?.userCommentStatus),
+    userFollowingUserStatus: enabled(account.value?.userFollowingUserStatus),
+    userFollowingTagStatus: enabled(account.value?.userFollowingTagStatus),
+    userFollowingArticleStatus: enabled(account.value?.userFollowingArticleStatus),
+    userWatchingArticleStatus: enabled(account.value?.userWatchingArticleStatus),
+    userFollowerStatus: enabled(account.value?.userFollowerStatus),
+    userBreezemoonStatus: enabled(account.value?.userBreezemoonStatus),
+    userPointStatus: enabled(account.value?.userPointStatus),
+    userOnlineStatus: enabled(account.value?.userOnlineStatus),
+    userJoinPointRank: enabled(account.value?.userJoinPointRank),
+    userJoinUsedPointRank: enabled(account.value?.userJoinUsedPointRank),
+    userUAStatus: enabled(account.value?.userUAStatus),
+  }
+  if (!phoneBindOpen.value) phoneInput.value = displayPhone.value
+  if (!emailBindOpen.value) emailInput.value = displayEmail.value
   listPageSize.value = Number(account.value?.userListPageSize || 20)
   commentViewMode.value = Number(account.value?.userCommentViewMode || 0)
   avatarViewMode.value = Number(account.value?.userAvatarViewMode || 0)
@@ -297,13 +389,138 @@ async function saveGeo() {
   geoBusy.value = true
   geoMsg.value = ''
   try {
-    await updateGeoStatus(apiKey.value, geoPublic.value ? 0 : 1)
+    await updateGeoStatus(apiKey.value, geoStatus.value)
     await auth.reloadAccount()
     geoMsg.value = '地理位置设置已保存'
   } catch (e) {
     geoMsg.value = e instanceof Error ? e.message : '地理位置设置失败'
   } finally {
     geoBusy.value = false
+  }
+}
+
+async function savePrivacy() {
+  if (!apiKey.value) return
+  privacyBusy.value = true
+  privacyMsg.value = ''
+  try {
+    await updatePrivacySettings(apiKey.value, { ...privacyFlags.value })
+    await auth.reloadAccount()
+    privacyMsg.value = '隐私设置已保存'
+  } catch (e) {
+    privacyMsg.value = e instanceof Error ? e.message : '隐私设置失败'
+  } finally {
+    privacyBusy.value = false
+  }
+}
+
+async function saveUsername() {
+  if (!apiKey.value || !newUsername.value.trim()) return
+  nameBusy.value = true
+  nameMsg.value = ''
+  try {
+    await updateUsername(apiKey.value, newUsername.value.trim())
+    await auth.reloadAccount()
+    nameMsg.value = '用户名已更新'
+    newUsername.value = ''
+  } catch (e) {
+    nameMsg.value = e instanceof Error ? e.message : '修改用户名失败'
+  } finally {
+    nameBusy.value = false
+  }
+}
+
+async function openPhoneBind() {
+  phoneBindOpen.value = true
+  phoneCodeReady.value = false
+  phoneCode.value = ''
+  phoneMsg.value = ''
+  phoneInput.value = displayPhone.value
+  await nextTick()
+  destroyPhoneGt()
+  await mountPhoneGt()
+}
+
+async function onPhoneCaptcha(captcha: unknown) {
+  if (!apiKey.value) return
+  const p = phoneInput.value.trim()
+  if (!/^1\d{10}$/.test(p)) {
+    phoneMsg.value = '手机号码不合法'
+    return
+  }
+  phoneBusy.value = true
+  phoneMsg.value = ''
+  try {
+    phoneMsg.value = await requestPhoneBindCode(apiKey.value, p, captcha)
+    phoneCodeReady.value = true
+  } catch (e) {
+    phoneMsg.value = e instanceof Error ? e.message : '发送失败'
+  } finally {
+    phoneBusy.value = false
+  }
+}
+
+async function submitPhoneBind() {
+  if (!apiKey.value || !phoneCode.value.trim()) return
+  phoneBusy.value = true
+  phoneMsg.value = ''
+  try {
+    phoneMsg.value = await bindPhone(apiKey.value, phoneInput.value.trim(), phoneCode.value.trim())
+    phoneBindOpen.value = false
+    phoneCodeReady.value = false
+    destroyPhoneGt()
+    await auth.reloadAccount()
+  } catch (e) {
+    phoneMsg.value = e instanceof Error ? e.message : '绑定失败'
+  } finally {
+    phoneBusy.value = false
+  }
+}
+
+async function openEmailBind() {
+  emailBindOpen.value = true
+  emailCodeReady.value = false
+  emailCode.value = ''
+  emailMsg.value = ''
+  emailInput.value = displayEmail.value
+  await nextTick()
+  destroyEmailGt()
+  await mountEmailGt()
+}
+
+async function onEmailCaptcha(captcha: unknown) {
+  if (!apiKey.value) return
+  const e = emailInput.value.trim()
+  if (!e.includes('@')) {
+    emailMsg.value = '邮箱不合法'
+    return
+  }
+  emailBusy.value = true
+  emailMsg.value = ''
+  try {
+    emailMsg.value = await requestEmailBindCode(apiKey.value, e, captcha)
+    emailCodeReady.value = true
+  } catch (err) {
+    emailMsg.value = err instanceof Error ? err.message : '发送失败'
+  } finally {
+    emailBusy.value = false
+  }
+}
+
+async function submitEmailBind() {
+  if (!apiKey.value || !emailCode.value.trim()) return
+  emailBusy.value = true
+  emailMsg.value = ''
+  try {
+    emailMsg.value = await bindEmail(apiKey.value, emailInput.value.trim(), emailCode.value.trim())
+    emailBindOpen.value = false
+    emailCodeReady.value = false
+    destroyEmailGt()
+    await auth.reloadAccount()
+  } catch (e) {
+    emailMsg.value = e instanceof Error ? e.message : '绑定失败'
+  } finally {
+    emailBusy.value = false
   }
 }
 
@@ -561,9 +778,15 @@ async function saveI18n() {
       <section v-if="tab === 'account'" class="card">
         <h1>账号</h1>
         <template v-if="isLoggedIn">
+          <h2>用户名</h2>
           <label>当前用户名<input :value="account?.userName" type="text" readonly /></label>
+          <label>新用户名<input v-model="newUsername" maxlength="20" placeholder="谨慎修改，有次数限制" /></label>
+          <p v-if="nameMsg" :class="nameMsg.includes('失败') ? 'err' : 'ok'">{{ nameMsg }}</p>
+          <button type="button" class="primary" :disabled="nameBusy || !newUsername.trim()" @click="saveUsername">
+            {{ nameBusy ? '提交中…' : '保存用户名' }}
+          </button>
+
           <h2>修改密码</h2>
-          <p class="hint">POST <code>/settings/password</code>（MD5 + CSRF）</p>
           <label>当前密码<input v-model="oldPwd" type="password" autocomplete="current-password" /></label>
           <label>新密码<input v-model="newPwd" type="password" autocomplete="new-password" minlength="6" /></label>
           <label>确认新密码<input v-model="newPwd2" type="password" autocomplete="new-password" minlength="6" /></label>
@@ -572,10 +795,75 @@ async function saveI18n() {
           <button type="button" class="primary" :disabled="pwdBusy || !oldPwd || !newPwd" @click="savePassword">
             {{ pwdBusy ? '提交中…' : '更新密码' }}
           </button>
+
+          <h2>绑定手机</h2>
+          <label>
+            手机号
+            <input v-model="phoneInput" type="tel" maxlength="11" :readonly="!phoneBindOpen || phoneCodeReady" />
+          </label>
+          <button v-if="!phoneBindOpen" type="button" class="primary" @click="openPhoneBind">
+            {{ displayPhone ? '修改绑定手机' : '绑定手机' }}
+          </button>
+          <template v-else>
+            <div v-show="!phoneCodeReady" ref="phoneCaptchaEl" class="captcha" />
+            <p v-if="phoneGtError" class="err">{{ phoneGtError }}</p>
+            <label v-if="phoneCodeReady">
+              短信验证码
+              <input v-model="phoneCode" maxlength="16" autocomplete="one-time-code" />
+            </label>
+            <button
+              v-if="phoneCodeReady"
+              type="button"
+              class="primary"
+              :disabled="phoneBusy || !phoneCode.trim()"
+              @click="submitPhoneBind"
+            >
+              {{ phoneBusy ? '提交中…' : '确认绑定' }}
+            </button>
+            <button type="button" class="ghost-btn" @click="phoneBindOpen = false; destroyPhoneGt()">取消</button>
+          </template>
+          <p v-if="phoneMsg" :class="phoneMsg.includes('失败') || phoneMsg.includes('不合法') ? 'err' : 'ok'">
+            {{ phoneMsg }}
+          </p>
+
+          <h2>绑定邮箱</h2>
+          <label>
+            邮箱
+            <input
+              v-model="emailInput"
+              type="email"
+              :readonly="!emailBindOpen || emailCodeReady"
+              placeholder="未绑定"
+            />
+          </label>
+          <button v-if="!emailBindOpen" type="button" class="primary" @click="openEmailBind">
+            {{ displayEmail ? '修改绑定邮箱' : '绑定邮箱' }}
+          </button>
+          <template v-else>
+            <div v-show="!emailCodeReady" ref="emailCaptchaEl" class="captcha" />
+            <p v-if="emailGtError" class="err">{{ emailGtError }}</p>
+            <label v-if="emailCodeReady">
+              邮箱验证码
+              <input v-model="emailCode" maxlength="16" autocomplete="one-time-code" />
+            </label>
+            <button
+              v-if="emailCodeReady"
+              type="button"
+              class="primary"
+              :disabled="emailBusy || !emailCode.trim()"
+              @click="submitEmailBind"
+            >
+              {{ emailBusy ? '提交中…' : '确认绑定' }}
+            </button>
+            <button type="button" class="ghost-btn" @click="emailBindOpen = false; destroyEmailGt()">取消</button>
+          </template>
+          <p v-if="emailMsg" :class="emailMsg.includes('失败') || emailMsg.includes('不合法') ? 'err' : 'ok'">
+            {{ emailMsg }}
+          </p>
+
           <p class="hint">
-            绑定手机 / 邮箱 / 两步验证请暂用
-            <a href="https://fishpi.cn/settings/account" target="_blank" rel="noopener">现网账号页</a>
-            （需 GeeTest）。
+            两步验证 / 背包 / 勋章佩戴请暂用
+            <a href="https://fishpi.cn/settings/account" target="_blank" rel="noopener">现网账号页</a>。
           </p>
         </template>
       </section>
@@ -627,19 +915,35 @@ async function saveI18n() {
       <section v-if="tab === 'privacy'" class="card">
         <h1>隐私</h1>
         <template v-if="isLoggedIn">
+          <p class="hint">我们会尊重和保护你的隐私。勾选表示对该项公开。</p>
+          <div class="checks">
+            <label v-for="item in privacyItems" :key="item.key" class="check">
+              <input v-model="privacyFlags[item.key]" type="checkbox" />
+              {{ item.label }}
+            </label>
+          </div>
+          <p v-if="privacyMsg" :class="privacyMsg.includes('失败') ? 'err' : 'ok'">{{ privacyMsg }}</p>
+          <button type="button" class="primary" :disabled="privacyBusy" @click="savePrivacy">
+            {{ privacyBusy ? '保存中…' : '保存隐私设置' }}
+          </button>
+
           <h2>地理位置</h2>
-          <label class="check">
-            <input v-model="geoPublic" type="checkbox" :disabled="geoBusy" />
-            公开我的地理位置
+          <p class="hint">地理位置信息会根据当前 IP 进行自动定位。</p>
+          <label>
+            当前城市
+            <input :value="account?.userCity || '未知'" type="text" readonly />
+          </label>
+          <label>
+            可见性
+            <select v-model.number="geoStatus" :disabled="geoBusy">
+              <option :value="0">公开</option>
+              <option :value="1">私密</option>
+            </select>
           </label>
           <button type="button" class="primary" :disabled="geoBusy" @click="saveGeo">
-            {{ geoBusy ? '提交中…' : '保存' }}
+            {{ geoBusy ? '提交中…' : '保存地理位置' }}
           </button>
           <p v-if="geoMsg" :class="geoMsg.includes('失败') ? 'err' : 'ok'">{{ geoMsg }}</p>
-          <p class="hint">
-            发帖/评论/关注等细项隐私请暂用
-            <a href="https://fishpi.cn/settings/privacy" target="_blank" rel="noopener">现网隐私页</a>。
-          </p>
         </template>
       </section>
 
@@ -966,6 +1270,18 @@ input[readonly] {
 }
 .primary.danger {
   background: #c45c4a;
+}
+.ghost-btn {
+  align-self: flex-end;
+  border: 1px solid var(--fp-border);
+  background: transparent;
+  color: var(--fp-muted);
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.captcha {
+  min-height: 44px;
 }
 .code-list {
   list-style: none;

@@ -26,8 +26,24 @@ export interface AccountInfo {
   userQQ?: string
   userArticleCount?: number
   userCommentCount?: number
+  userPhone?: string
+  userEmail?: string
   /** 0 公开 / 1 私密 */
   userGeoStatus?: number
+  /** 隐私开关：0 公开 / 1 私密（与现网一致） */
+  userArticleStatus?: number
+  userCommentStatus?: number
+  userFollowingUserStatus?: number
+  userFollowingTagStatus?: number
+  userFollowingArticleStatus?: number
+  userWatchingArticleStatus?: number
+  userFollowerStatus?: number
+  userBreezemoonStatus?: number
+  userPointStatus?: number
+  userOnlineStatus?: number
+  userJoinPointRank?: number
+  userJoinUsedPointRank?: number
+  userUAStatus?: number
   userListPageSize?: number
   userCommentViewMode?: number
   userAvatarViewMode?: number
@@ -40,6 +56,23 @@ export interface AccountInfo {
   userReplyWatchArticleStatus?: number
   userForwardPageStatus?: number
   chatRoomPictureStatus?: number
+}
+
+/** 隐私可见性：checkbox checked = 公开（对应 status === 0）。 */
+export interface PrivacySettings {
+  userArticleStatus: boolean
+  userCommentStatus: boolean
+  userFollowingUserStatus: boolean
+  userFollowingTagStatus: boolean
+  userFollowingArticleStatus: boolean
+  userWatchingArticleStatus: boolean
+  userFollowerStatus: boolean
+  userBreezemoonStatus: boolean
+  userPointStatus: boolean
+  userOnlineStatus: boolean
+  userJoinPointRank: boolean
+  userJoinUsedPointRank: boolean
+  userUAStatus: boolean
 }
 
 export interface MetalItem {
@@ -374,6 +407,82 @@ export async function updateFunctionSettings(apiKey: string, data: FunctionSetti
     body: JSON.stringify(data),
   })
   if (res.code) throw new Error(res.msg || '功能设置失败')
+}
+
+/** 隐私可见性：页面态 POST /settings/privacy（boolean = 是否公开）。 */
+export async function updatePrivacySettings(apiKey: string, data: PrivacySettings) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/settings/privacy', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify(data),
+  })
+  if (res.code) throw new Error(res.msg || '隐私设置失败')
+}
+
+/** 修改用户名：POST /settings/username。 */
+export async function updateUsername(apiKey: string, userName: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/settings/username', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({ userName }),
+  })
+  if (res.code) throw new Error(res.msg || '修改用户名失败')
+}
+
+/** 发送绑定手机短信：GeeTest 结果作 captcha。 */
+export async function requestPhoneBindCode(apiKey: string, userPhone: string, captcha: unknown) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/settings/phone/vc', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({ userPhone, captcha }),
+  })
+  if (res.code) throw new Error(res.msg || '发送短信失败')
+  return res.msg || '验证码已发送'
+}
+
+/** 提交绑定手机：captcha 为短信验证码。 */
+export async function bindPhone(apiKey: string, userPhone: string, captcha: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/settings/phone', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({ userPhone, captcha }),
+  })
+  if (res.code) throw new Error(res.msg || '绑定手机失败')
+  return res.msg || '绑定成功'
+}
+
+/** 发送绑定邮箱验证码：GeeTest 结果作 captcha。 */
+export async function requestEmailBindCode(apiKey: string, userEmail: string, captcha: unknown) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/settings/email/vc', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({ userEmail, captcha }),
+  })
+  if (res.code) throw new Error(res.msg || '发送邮件失败')
+  return res.msg || '验证码已发送'
+}
+
+/** 提交绑定邮箱：captcha 为邮件验证码。 */
+export async function bindEmail(apiKey: string, userEmail: string, captcha: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/settings/email', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({ userEmail, captcha }),
+  })
+  if (res.code) throw new Error(res.msg || '绑定邮箱失败')
+  return res.msg || '绑定成功'
 }
 
 /** 国际化：页面态 POST /settings/i18n。 */

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { requestForgetPwd } from '@/api/fishpi'
+import { useGeetest4 } from '@/composables/useGeetest4'
 import { usePageSeo } from '@/composables/usePageSeo'
 
 usePageSeo(() => ({
@@ -9,8 +10,6 @@ usePageSeo(() => ({
   path: '/forget-pwd',
   robots: 'noindex',
 }))
-
-const GEETEST_ID = '6d886bcaec3f86fcfd6f61bff5af2cb4'
 
 const router = useRouter()
 const phone = ref('')
@@ -21,43 +20,9 @@ const err = ref('')
 const busy = ref(false)
 const captchaEl = ref<HTMLElement | null>(null)
 
-type GtInstance = {
-  appendTo: (el: string | HTMLElement) => GtInstance
-  onSuccess: (cb: () => void) => GtInstance
-  getValidate: () => unknown
-  reset: () => void
-  destroy?: () => void
-}
-
-let gt: GtInstance | null = null
-
-function loadGeetest(): Promise<void> {
-  const w = window as Window & { initGeetest4?: (cfg: object, cb: (g: GtInstance) => void) => void }
-  if (w.initGeetest4) return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = 'https://static.geetest.com/v4/gt4.js'
-    s.async = true
-    s.onload = () => resolve()
-    s.onerror = () => reject(new Error('GeeTest 脚本加载失败'))
-    document.head.appendChild(s)
-  })
-}
-
-async function mountCaptcha() {
-  if (!captchaEl.value || step.value !== 'phone') return
-  await loadGeetest()
-  const w = window as Window & { initGeetest4?: (cfg: object, cb: (g: GtInstance) => void) => void }
-  if (!w.initGeetest4) throw new Error('GeeTest 不可用')
-  captchaEl.value.innerHTML = ''
-  w.initGeetest4({ captchaId: GEETEST_ID, product: 'float' }, (instance) => {
-    gt = instance
-    instance.appendTo(captchaEl.value!).onSuccess(() => {
-      void onCaptchaSuccess(instance.getValidate())
-      setTimeout(() => instance.reset(), 3000)
-    })
-  })
-}
+const { error: gtError, mount: mountGt, destroy: destroyGt } = useGeetest4(captchaEl, (validate) => {
+  void onCaptchaSuccess(validate)
+})
 
 async function onCaptchaSuccess(captcha: unknown) {
   const p = phone.value.trim()
@@ -71,6 +36,7 @@ async function onCaptchaSuccess(captcha: unknown) {
   try {
     tip.value = await requestForgetPwd(p, captcha)
     step.value = 'sms'
+    destroyGt()
   } catch (e) {
     err.value = e instanceof Error ? e.message : '发送失败'
   } finally {
@@ -88,18 +54,9 @@ function goReset() {
 }
 
 onMounted(() => {
-  void mountCaptcha().catch((e) => {
+  void mountGt().catch((e) => {
     err.value = e instanceof Error ? e.message : '验证码加载失败'
   })
-})
-
-onUnmounted(() => {
-  try {
-    gt?.destroy?.()
-  } catch {
-    /* ignore */
-  }
-  gt = null
 })
 </script>
 
@@ -114,6 +71,7 @@ onUnmounted(() => {
         <input v-model="phone" type="tel" maxlength="11" placeholder="手机号码" autocomplete="tel" autofocus />
       </label>
       <div ref="captchaEl" class="captcha" />
+      <p v-if="gtError" class="err">{{ gtError }}</p>
       <p v-if="busy" class="hint">发送中…</p>
     </template>
 

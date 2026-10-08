@@ -45,13 +45,25 @@ const rawText = ref('')
 const rawLoading = ref(false)
 const topicDraft = ref('')
 const editingTopic = ref(false)
+const quote = ref<{ userName: string; messageId: string; content: string } | null>(null)
+const quoteBusy = ref('')
+const quoteErr = ref('')
 
 const me = computed(() => account.value?.userName)
+
+function scrollToHash() {
+  if (typeof location === 'undefined') return
+  const id = location.hash.replace(/^#/, '')
+  if (!id.startsWith('chatroom')) return
+  const el = document.getElementById(id)
+  el?.scrollIntoView({ block: 'center' })
+}
 
 onMounted(async () => {
   await chat.connect()
   await nextTick()
   scrollBottom()
+  scrollToHash()
   if (auth.apiKey) {
     try {
       barrageCost.value = await fetchBarrageCost(auth.apiKey)
@@ -77,12 +89,41 @@ function scrollBottom() {
   if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
 }
 
+function buildQuoteSuffix() {
+  const q = quote.value
+  if (!q?.userName || !q.content) return ''
+  const quoteMd = q.content.replace(/\n/g, '\n> ')
+  return `\n\n##### 引用 @${q.userName} [↩](/cr#chatroom${q.messageId} "跳转至原消息")  \n> ${quoteMd}\n`
+}
+
 async function submit() {
   const text = draft.value
+  const content = `${text}${buildQuoteSuffix()}`
   draft.value = ''
-  await chat.send(text)
+  quote.value = null
+  await chat.send(content)
   await nextTick()
   scrollBottom()
+}
+
+async function quoteMessage(msg: { oId: string; userName: string }) {
+  if (!auth.apiKey) return
+  quoteBusy.value = msg.oId
+  quoteErr.value = ''
+  try {
+    const content = await fetchChatRaw(auth.apiKey, msg.oId)
+    quote.value = { userName: msg.userName, messageId: msg.oId, content: content.trim() }
+    await nextTick()
+    document.querySelector<HTMLTextAreaElement>('.compose-wrap textarea')?.focus()
+  } catch (e) {
+    quoteErr.value = e instanceof Error ? e.message : '读取原文失败'
+  } finally {
+    quoteBusy.value = ''
+  }
+}
+
+function clearQuote() {
+  quote.value = null
 }
 
 function onComposerKey(e: KeyboardEvent) {
@@ -181,6 +222,14 @@ function clearScreen() {
       </header>
 
       <div v-if="isLoggedIn" class="reply">
+        <p v-if="quoteErr" class="err">{{ quoteErr }}</p>
+        <div v-if="quote" class="quote-bar">
+          <div class="quote-meta">
+            引用 <b>@{{ quote.userName }}</b>
+            <button type="button" class="linkish" @click="clearQuote">取消</button>
+          </div>
+          <pre class="quote-preview">{{ quote.content.slice(0, 280) }}{{ quote.content.length > 280 ? '…' : '' }}</pre>
+        </div>
         <div class="compose-wrap">
           <MentionSuggest v-model="draft" />
           <textarea
@@ -206,9 +255,11 @@ function clearScreen() {
             <span class="muted">当前话题：</span>
             <em># {{ discuss }} #</em>
             <button type="button" class="linkish" title="编辑话题" @click="editingTopic = !editingTopic">编辑</button>
-            <button type="button" class="linkish" title="引用话题" @click="useTopic">引用</button>
+            <button type="button" class="linkish" title="插入话题标签" @click="useTopic">话题</button>
           </div>
-          <button type="button" class="green" :disabled="sending || !draft.trim()" @click="submit">发送</button>
+          <button type="button" class="green" :disabled="sending || (!draft.trim() && !quote)" @click="submit">
+            发送
+          </button>
         </div>
 
         <form v-if="editingTopic" class="inline-form" @submit.prevent="saveTopic">
@@ -292,6 +343,7 @@ function clearScreen() {
         <p v-else-if="!messages.length" class="tip">还没有消息，来说一句吧。</p>
         <article
           v-for="msg in messages"
+          :id="`chatroom${msg.oId}`"
           :key="msg.oId"
           class="fp-msg"
           :class="{ 'is-self': msg.userName === me }"
@@ -307,6 +359,15 @@ function clearScreen() {
                 撤回
               </button>
               <button type="button" class="ghost tiny" @click="chat.loadAround(msg.oId)">附近</button>
+              <button
+                v-if="!msg.redPacket && auth.apiKey"
+                type="button"
+                class="ghost tiny"
+                :disabled="quoteBusy === msg.oId"
+                @click="quoteMessage(msg)"
+              >
+                {{ quoteBusy === msg.oId ? '…' : '引用' }}
+              </button>
               <button v-if="!msg.redPacket && auth.apiKey" type="button" class="ghost tiny" @click="showRaw(msg.oId)">
                 原文
               </button>
@@ -376,6 +437,30 @@ function clearScreen() {
 .reply {
   padding: 12px 15px 10px;
   border-bottom: 1px solid var(--fp-border);
+}
+.quote-bar {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
+  background: var(--fp-bg);
+}
+.quote-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fp-muted);
+  margin-bottom: 4px;
+}
+.quote-preview {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  color: var(--fp-text);
+  max-height: 72px;
+  overflow: auto;
 }
 .compose-wrap {
   position: relative;
