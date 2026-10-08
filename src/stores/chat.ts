@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import {
   fetchChatAround,
   fetchChatHistory,
-  fetchChatNode,
+  fetchChatNodeBundle,
   fetchChatOnlineUsers,
   fetchMutes,
   openRedPacket,
@@ -12,6 +12,7 @@ import {
   toggleReaction,
   applyReactionPayload,
   type ChatHistoryItem,
+  type ChatNodeOption,
   type MuteItem,
   type ReactionSummary,
   type RedPacketContent,
@@ -92,9 +93,13 @@ export const useChatStore = defineStore('chat', () => {
   const error = ref('')
   const lastPacket = ref('')
   const packetDetail = ref<{ msg?: string; recivers: { userName?: string; money?: number }[] } | null>(null)
+  const nodeName = ref('')
+  const nodeOptions = ref<ChatNodeOption[]>([])
+  const nodeKey = ref('')
   let ws: WebSocket | null = null
   let hb: number | null = null
   let page = 1
+  let preferredWs = ''
 
   function prependHistory(list: ChatHistoryItem[]) {
     const mapped = list.map(asLine).reverse()
@@ -115,6 +120,7 @@ export const useChatStore = defineStore('chat', () => {
     loading.value = true
     page = 1
     hasMore.value = true
+    preferredWs = ''
     try {
       const history = await fetchChatHistory(auth.apiKey, 1)
       messages.value = []
@@ -157,17 +163,39 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
-    let node = resolveWsUrl(`/chat-room-channel?apiKey=${auth.apiKey}`)
-    try {
-      const remote = await fetchChatNode(auth.apiKey)
-      node = resolveWsUrl(remote.includes('apiKey=') ? remote : `${remote}?apiKey=${auth.apiKey}`)
-    } catch {
-      node = resolveWsUrl(`/chat-room-channel?apiKey=${auth.apiKey}`)
+    await openSocket(auth.apiKey)
+  }
+
+  async function openSocket(apiKey: string) {
+    let node = preferredWs || resolveWsUrl(`/chat-room-channel?apiKey=${apiKey}`)
+    if (!preferredWs) {
+      try {
+        const bundle = await fetchChatNodeBundle(apiKey)
+        nodeName.value = bundle.msg || '默认节点'
+        nodeKey.value = bundle.apiKey
+        nodeOptions.value = bundle.avaliable
+        node = resolveWsUrl(bundle.data.includes('apiKey=') ? bundle.data : `${bundle.data}?apiKey=${apiKey}`)
+      } catch {
+        nodeName.value = '本机代理'
+        nodeOptions.value = []
+        nodeKey.value = ''
+        node = resolveWsUrl(`/chat-room-channel?apiKey=${apiKey}`)
+      }
+    }
+
+    if (ws) {
+      ws.close()
+      ws = null
+    }
+    if (hb) {
+      window.clearInterval(hb)
+      hb = null
     }
 
     ws = new WebSocket(node)
     ws.onopen = () => {
       connected.value = true
+      error.value = ''
       if (hb) window.clearInterval(hb)
       hb = window.setInterval(() => ws?.send('-hb-'), 1000 * 60 * 3)
     }
@@ -213,6 +241,30 @@ export const useChatStore = defineStore('chat', () => {
       } catch {
         /* ignore */
       }
+    }
+  }
+
+  async function switchNode(option: ChatNodeOption) {
+    const auth = useAuthStore()
+    if (!auth.apiKey) return
+    const key = nodeKey.value
+    const base = option.node
+    preferredWs = resolveWsUrl(key ? `${base}${base.includes('?') ? '&' : '?'}apiKey=${key}` : base)
+    nodeName.value = option.name || '节点'
+    await openSocket(auth.apiKey)
+  }
+
+  async function refreshNodes() {
+    const auth = useAuthStore()
+    if (!auth.apiKey) return
+    preferredWs = ''
+    try {
+      const bundle = await fetchChatNodeBundle(auth.apiKey)
+      nodeName.value = bundle.msg || nodeName.value
+      nodeKey.value = bundle.apiKey
+      nodeOptions.value = bundle.avaliable
+    } catch {
+      /* keep */
     }
   }
 
@@ -353,6 +405,8 @@ export const useChatStore = defineStore('chat', () => {
     error,
     lastPacket,
     packetDetail,
+    nodeName,
+    nodeOptions,
     connect,
     disconnect,
     loadMore,
@@ -368,5 +422,7 @@ export const useChatStore = defineStore('chat', () => {
     setDiscuss,
     clearScreen,
     react,
+    switchNode,
+    refreshNodes,
   }
 })

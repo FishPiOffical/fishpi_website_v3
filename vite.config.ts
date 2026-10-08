@@ -154,6 +154,7 @@ export default defineConfig(({ mode }) => {
         '/reset-pwd': { ...proxy, bypass: spaGetBypass },
         '/invitecode': proxy,
         '/export': proxy,
+        '/mfa': proxy,
         '/settings': {
           ...proxy,
           bypass(req) {

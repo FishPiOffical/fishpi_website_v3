@@ -2003,10 +2003,76 @@ export async function fetchMutes() {
   return res.data ?? []
 }
 
-export async function fetchChatNode(apiKey: string) {
-  const res = await request<{ code: number; msg?: string; data?: string }>('/chat-room/node/get?apiKey=' + apiKey)
+export interface ChatNodeOption {
+  node: string
+  name: string
+  online?: number
+  weight?: number
+}
+
+export interface ChatNodeBundle {
+  /** 推荐连接的完整 WS URL（已含加密 apiKey） */
+  data: string
+  /** 当前推荐节点显示名 */
+  msg: string
+  /** 节点切换用的加密 key（拼到 node 后） */
+  apiKey: string
+  avaliable: ChatNodeOption[]
+}
+
+/** 聊天室节点：推荐 WS + 可选列表。 */
+export async function fetchChatNodeBundle(apiKey: string): Promise<ChatNodeBundle> {
+  const res = await request<{
+    code: number
+    msg?: string
+    data?: string
+    apiKey?: string
+    avaliable?: ChatNodeOption[]
+  }>('/chat-room/node/get?apiKey=' + encodeURIComponent(apiKey))
   if (res.code !== 0 || !res.data) throw new Error(res.msg || '获取节点失败')
-  return res.data
+  return {
+    data: res.data,
+    msg: res.msg || '默认节点',
+    apiKey: res.apiKey || '',
+    avaliable: Array.isArray(res.avaliable) ? res.avaliable : [],
+  }
+}
+
+/** @deprecated 使用 fetchChatNodeBundle；保留兼容旧调用。 */
+export async function fetchChatNode(apiKey: string) {
+  const bundle = await fetchChatNodeBundle(apiKey)
+  return bundle.data
+}
+
+export async function fetchMfaEnabled(apiKey: string): Promise<boolean> {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/mfa/enabled')
+  return res.code === 0
+}
+
+export async function fetchMfaSetup(apiKey: string): Promise<{ qrCodeLink: string; secret: string }> {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown> & { qrCodeLink?: string; secret?: string }>('/mfa')
+  if (res.code || !res.qrCodeLink) throw new Error(res.msg || '获取两步验证信息失败')
+  return { qrCodeLink: res.qrCodeLink, secret: res.secret || '' }
+}
+
+export async function verifyMfa(apiKey: string, code: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>(`/mfa/verify?code=${encodeURIComponent(code)}`)
+  if (res.code) throw new Error(res.msg || '验证失败')
+  return res.msg || '绑定成功'
+}
+
+export async function removeMfa(apiKey: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/mfa/remove')
+  if (res.code) throw new Error(res.msg || '解绑失败')
+  return res.msg || '已解绑'
 }
 
 export interface ChatHistoryItem {

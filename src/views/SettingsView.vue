@@ -9,9 +9,12 @@ import {
   bindPhone,
   buyInvitecode,
   exportPosts,
+  fetchMfaEnabled,
+  fetchMfaSetup,
   fetchProfessionMe,
   fetchUserProfile,
   queryInvitecode,
+  removeMfa,
   requestEmailBindCode,
   requestPhoneBindCode,
   setProfessionPrimary,
@@ -27,6 +30,7 @@ import {
   updateProfile,
   updateUsername,
   uploadFiles,
+  verifyMfa,
   type PrivacySettings,
   type ProfessionProgress,
 } from '@/api/fishpi'
@@ -181,6 +185,14 @@ const { error: emailGtError, mount: mountEmailGt, destroy: destroyEmailGt } = us
   (v) => void onEmailCaptcha(v),
 )
 
+const mfaEnabled = ref(false)
+const mfaLoading = ref(false)
+const mfaBusy = ref(false)
+const mfaMsg = ref('')
+const mfaQr = ref('')
+const mfaSecret = ref('')
+const mfaCode = ref('')
+
 const listPageSize = ref(20)
 const commentViewMode = ref(0)
 const avatarViewMode = ref(0)
@@ -277,6 +289,10 @@ watch(
   { immediate: true },
 )
 
+watch(tab, (t) => {
+  if (t === 'account' && apiKey.value) void loadMfa()
+})
+
 onMounted(async () => {
   if (apiKey.value && !account.value) await auth.restore()
   const name = account.value?.userName
@@ -292,8 +308,59 @@ onMounted(async () => {
       /* keep /api/user */
     }
     await loadJobs()
+    if (tab.value === 'account') await loadMfa()
   }
 })
+
+async function loadMfa() {
+  if (!apiKey.value) return
+  mfaLoading.value = true
+  mfaMsg.value = ''
+  mfaQr.value = ''
+  mfaSecret.value = ''
+  mfaCode.value = ''
+  try {
+    mfaEnabled.value = await fetchMfaEnabled(apiKey.value)
+    if (!mfaEnabled.value) {
+      const setup = await fetchMfaSetup(apiKey.value)
+      mfaQr.value = setup.qrCodeLink
+      mfaSecret.value = setup.secret
+    }
+  } catch (e) {
+    mfaMsg.value = e instanceof Error ? e.message : '两步验证加载失败'
+  } finally {
+    mfaLoading.value = false
+  }
+}
+
+async function bindMfa() {
+  if (!apiKey.value || !mfaCode.value.trim()) return
+  mfaBusy.value = true
+  mfaMsg.value = ''
+  try {
+    mfaMsg.value = await verifyMfa(apiKey.value, mfaCode.value.trim())
+    await loadMfa()
+  } catch (e) {
+    mfaMsg.value = e instanceof Error ? e.message : '绑定失败'
+  } finally {
+    mfaBusy.value = false
+  }
+}
+
+async function unbindMfa() {
+  if (!apiKey.value) return
+  if (!confirm('确定解绑两步验证？')) return
+  mfaBusy.value = true
+  mfaMsg.value = ''
+  try {
+    mfaMsg.value = await removeMfa(apiKey.value)
+    await loadMfa()
+  } catch (e) {
+    mfaMsg.value = e instanceof Error ? e.message : '解绑失败'
+  } finally {
+    mfaBusy.value = false
+  }
+}
 
 async function loadJobs() {
   if (!apiKey.value) return
@@ -861,8 +928,34 @@ async function saveI18n() {
             {{ emailMsg }}
           </p>
 
+          <h2>两步验证</h2>
+          <p v-if="mfaLoading" class="hint">加载中…</p>
+          <template v-else-if="mfaEnabled">
+            <p class="ok">验证器已启用，账户受保护。</p>
+            <p class="hint">如需更换设备，请解绑后重新绑定。</p>
+            <button type="button" class="primary danger" :disabled="mfaBusy" @click="unbindMfa">
+              {{ mfaBusy ? '处理中…' : '解绑' }}
+            </button>
+          </template>
+          <template v-else>
+            <p class="hint">
+              两步验证可增强账户安全。建议备份下方手动密钥。使用指南见
+              <a href="https://fishpi.cn/article/1650648000379" target="_blank" rel="noopener">文章</a>。
+            </p>
+            <img v-if="mfaQr" class="mfa-qr" :src="mfaQr" alt="MFA QR" />
+            <p v-if="mfaSecret" class="hint">或手动输入：<code>{{ mfaSecret }}</code></p>
+            <label>
+              一次性密码
+              <input v-model="mfaCode" maxlength="8" placeholder="验证器 6 位码" autocomplete="one-time-code" />
+            </label>
+            <button type="button" class="primary" :disabled="mfaBusy || !mfaCode.trim()" @click="bindMfa">
+              {{ mfaBusy ? '验证中…' : '绑定' }}
+            </button>
+          </template>
+          <p v-if="mfaMsg" :class="mfaMsg.includes('失败') ? 'err' : 'ok'">{{ mfaMsg }}</p>
+
           <p class="hint">
-            两步验证 / 背包 / 勋章佩戴请暂用
+            背包 / 勋章佩戴请暂用
             <a href="https://fishpi.cn/settings/account" target="_blank" rel="noopener">现网账号页</a>。
           </p>
         </template>
@@ -1282,6 +1375,14 @@ input[readonly] {
 }
 .captcha {
   min-height: 44px;
+}
+.mfa-qr {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  background: #fff;
 }
 .code-list {
   list-style: none;

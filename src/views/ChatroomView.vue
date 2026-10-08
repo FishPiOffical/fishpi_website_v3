@@ -4,12 +4,14 @@ import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchBarrageCost, fetchChatRaw } from '@/api/fishpi'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
+import PaintPanel from '@/components/chat/PaintPanel.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import MentionSuggest from '@/components/MentionSuggest.vue'
 import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
+import type { ChatNodeOption } from '@/api/fishpi'
 
 const auth = useAuthStore()
 const chat = useChatStore()
@@ -26,6 +28,8 @@ const {
   connected,
   discuss,
   onlines,
+  nodeName,
+  nodeOptions,
 } = storeToRefs(chat)
 
 const draft = ref('')
@@ -38,6 +42,8 @@ const packetTo = ref('')
 const gesture = ref(0)
 const showPacket = ref(false)
 const showBarrage = ref(false)
+const showPaint = ref(false)
+const showNodes = ref(false)
 const barrageText = ref('')
 const barrageCost = ref('')
 const pendingGesture = ref<string | null>(null)
@@ -124,6 +130,21 @@ async function quoteMessage(msg: { oId: string; userName: string }) {
 
 function clearQuote() {
   quote.value = null
+}
+
+function insertPaint(md: string) {
+  draft.value += (draft.value && !draft.value.endsWith('\n') ? '\n' : '') + md
+  showPaint.value = false
+}
+
+async function pickNode(opt: ChatNodeOption) {
+  showNodes.value = false
+  await chat.switchNode(opt)
+}
+
+async function openNodePicker() {
+  showNodes.value = !showNodes.value
+  if (showNodes.value) await chat.refreshNodes()
 }
 
 function onComposerKey(e: KeyboardEvent) {
@@ -217,9 +238,34 @@ function clearScreen() {
           <span class="status" :class="{ on: connected }">
             {{ connected ? '已连接' : isLoggedIn ? '未连接' : '浏览模式' }}
           </span>
+          <button
+            v-if="isLoggedIn"
+            type="button"
+            class="node-btn"
+            :title="nodeName || '切换节点'"
+            @click="openNodePicker"
+          >
+            {{ nodeName || '节点' }}
+          </button>
         </div>
         <span class="online">在线 {{ onlines.length }}</span>
       </header>
+      <div v-if="showNodes && isLoggedIn" class="node-panel">
+        <p class="muted">选择聊天室节点（在线人数供参考）</p>
+        <button
+          v-for="opt in nodeOptions"
+          :key="opt.node + opt.name"
+          type="button"
+          class="node-opt"
+          :class="{ current: opt.name === nodeName }"
+          @click="pickNode(opt)"
+        >
+          <span>{{ opt.name }}</span>
+          <em v-if="opt.online != null">{{ opt.online }} 人</em>
+        </button>
+        <p v-if="!nodeOptions.length" class="muted">暂无可用节点列表，将使用推荐连接。</p>
+        <button type="button" class="ghost" @click="showNodes = false">关闭</button>
+      </div>
 
       <div v-if="isLoggedIn" class="reply">
         <p v-if="quoteErr" class="err">{{ quoteErr }}</p>
@@ -243,10 +289,28 @@ function clearScreen() {
         <div class="toolbar">
           <div class="tools">
             <EmojiPicker @insert="(md) => (draft += md)" />
-            <button type="button" class="ghost" title="红包" @click="showPacket = !showPacket; showBarrage = false">
+            <button
+              type="button"
+              class="ghost"
+              title="涂鸦"
+              @click="showPaint = !showPaint; showPacket = false; showBarrage = false"
+            >
+              涂鸦
+            </button>
+            <button
+              type="button"
+              class="ghost"
+              title="红包"
+              @click="showPacket = !showPacket; showBarrage = false; showPaint = false"
+            >
               红包
             </button>
-            <button type="button" class="ghost" title="弹幕" @click="showBarrage = !showBarrage; showPacket = false">
+            <button
+              type="button"
+              class="ghost"
+              title="弹幕"
+              @click="showBarrage = !showBarrage; showPacket = false; showPaint = false"
+            >
               弹幕
             </button>
             <button type="button" class="ghost" @click="clearScreen">清屏</button>
@@ -294,6 +358,8 @@ function clearScreen() {
           <button type="button" class="ghost" @click="showBarrage = false">取消</button>
           <span v-if="barrageCost" class="muted">约消耗 {{ barrageCost }}</span>
         </form>
+
+        <PaintPanel v-if="showPaint" @insert="insertPaint" @close="showPaint = false" />
       </div>
 
       <p v-else class="guest-bar">
@@ -432,6 +498,48 @@ function clearScreen() {
 }
 .online {
   font-size: 13px;
+  color: var(--fp-muted);
+}
+.node-btn {
+  margin-left: 8px;
+  border: 1px solid var(--fp-border);
+  background: transparent;
+  color: var(--fp-muted);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.node-panel {
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--fp-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.node-opt {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid var(--fp-border);
+  background: var(--fp-bg);
+  color: var(--fp-text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.node-opt.current {
+  border-color: var(--fp-primary);
+  color: var(--fp-primary);
+}
+.node-opt em {
+  font-style: normal;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+.muted {
+  margin: 0;
+  font-size: 12px;
   color: var(--fp-muted);
 }
 .reply {
