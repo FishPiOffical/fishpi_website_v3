@@ -368,10 +368,8 @@ export function createAppRouter(history?: RouterHistory) {
   })
 
   router.beforeEach(async (to) => {
-    if (import.meta.env.SSR) {
-      if (to.meta.auth) return { path: '/login', query: { redirect: to.fullPath } }
-      return true
-    }
+    // SSR 不知道登录态：需登录页由 AppShell 输出空占位，客户端再决定渲染或跳登录。
+    if (import.meta.env.SSR) return true
     const auth = useAuthStore()
     if (!auth.account && auth.apiKey) {
       await auth.restore()

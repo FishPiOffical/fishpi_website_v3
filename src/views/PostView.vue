@@ -227,10 +227,8 @@ async function saveDraft() {
       ...payload(),
       articleDraftId: draftId.value || undefined,
     })
-    if (saved) {
-      applyDraft(saved)
-      if (!draftId.value) draftId.value = draftKey(saved)
-    }
+    // 保存接口返回的草稿不含正文/打赏内容，回填会清空编辑器，只记下 ID。
+    if (saved && !draftId.value) draftId.value = draftKey(saved)
     await loadDrafts()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '保存草稿失败'
@@ -351,7 +349,9 @@ async function dropDraft(id: string) {
 
 <style scoped>
 .card {
+  width: 100%;
   max-width: 960px;
+  box-sizing: border-box;
   margin: 0 auto;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);

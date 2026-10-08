@@ -90,6 +90,8 @@ const legalLinks = [
 ]
 
 const route = useRoute()
+/** 需登录页服务端只出空壳，避免 hydration 复用错页面 DOM（含 scoped 样式标记）。 */
+const ssrAuthShell = computed(() => import.meta.env.SSR && Boolean(route.meta.auth))
 const router = useRouter()
 const auth = useAuthStore()
 const appearance = useAppearanceStore()
@@ -259,7 +261,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
     </div>
     <AdSlot slot-key="home.top" />
     <main :class="{ 'main--cr-modern': isModernChat }">
-      <RouterView />
+      <div v-if="ssrAuthShell" class="auth-shell" />
+      <RouterView v-else />
     </main>
     <footer v-if="!isModernChat" class="foot">
       <div class="foot-inner">
