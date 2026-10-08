@@ -290,6 +290,10 @@ export interface ArticleDetail extends ArticleSummary {
   articleWatchCnt?: number
   articleRewardPoint?: number
   articleRewardContent?: string
+  articleQnAOfferPoint?: number
+  articleAnonymous?: number
+  articleShowInList?: number
+  articleStatement?: number
   rewardedCnt?: number
   sysMetal?: MetalItem[]
   articleAuthor?: { sysMetal?: MetalItem[]; userName?: string }
@@ -1053,6 +1057,13 @@ export interface ArticleDraft {
   articleDraftTags?: string
   articleDraftType?: number
   articleDraftQnAOfferPoint?: number
+  articleDraftRewardContent?: string
+  articleDraftRewardPoint?: number
+  articleDraftAnonymous?: boolean
+  articleDraftCommentable?: boolean
+  articleDraftNotifyFollowers?: boolean
+  articleDraftShowInList?: number
+  articleDraftStatement?: number
   articleDraftUpdatedTime?: number
   articleTitle?: string
   articleContent?: string
@@ -1074,17 +1085,7 @@ export async function fetchArticleDraft(apiKey: string, id: string) {
   return res.data.draft
 }
 
-export async function saveArticleDraft(
-  apiKey: string,
-  payload: {
-    articleDraftId?: string
-    articleTitle: string
-    articleContent: string
-    articleTags: string
-    articleType: number
-    articleQnAOfferPoint?: number
-  },
-) {
+export async function saveArticleDraft(apiKey: string, payload: ArticlePayload & { articleDraftId?: string }) {
   const res = await request<Envelope<{ draft?: ArticleDraft }>>('/api/article-drafts', {
     method: 'POST',
     body: JSON.stringify({ apiKey, ...payload }),
@@ -1478,84 +1479,80 @@ export async function fetchChatRaw(apiKey: string, oId: string) {
   return text.split('<!--')[0].trim()
 }
 
-export async function postArticle(
-  apiKey: string,
-  payload: {
-    articleTitle: string
-    articleContent: string
-    articleTags: string
-    articleType: number
-    articleQnAOfferPoint?: number
-  },
-) {
+/** 0 帖子 / 1 机要 / 2 同城广播 / 5 问答 / 6 长文章 */
+export interface ArticlePayload {
+  articleTitle: string
+  articleContent: string
+  articleTags: string
+  articleType: number
+  articleQnAOfferPoint?: number
+  articleRewardContent?: string
+  articleRewardPoint?: number
+  articleAnonymous?: boolean
+  articleCommentable?: boolean
+  articleNotifyFollowers?: boolean
+  articleShowInList?: boolean
+  /** 0 无 / 1 AI 辅助 / 2 剧透 / 3 虚构 */
+  articleStatement?: number
+}
+
+/** 字段取舍对齐现网 add-article.js：问答只带悬赏，其他类型带打赏与匿名。 */
+function articleBody(apiKey: string, p: ArticlePayload) {
+  const body: Record<string, unknown> = {
+    apiKey,
+    articleTitle: p.articleTitle,
+    articleContent: p.articleContent,
+    articleTags: p.articleTags,
+    articleType: p.articleType,
+    articleCommentable: p.articleCommentable ?? true,
+    articleNotifyFollowers: p.articleNotifyFollowers ?? false,
+    articleShowInList: p.articleShowInList === false ? 0 : 1,
+    articleStatement: p.articleStatement ?? 0,
+  }
+  if (p.articleType === 5) {
+    body.articleQnAOfferPoint = p.articleQnAOfferPoint || 0
+  } else {
+    body.articleRewardContent = p.articleRewardContent || ''
+    body.articleRewardPoint = p.articleRewardContent?.trim() ? p.articleRewardPoint || 0 : 0
+    body.articleAnonymous = p.articleAnonymous ?? false
+  }
+  return body
+}
+
+export async function postArticle(apiKey: string, payload: ArticlePayload) {
   const res = await request<Envelope<unknown> & { articleId?: string }>('/article', {
     method: 'POST',
-    body: JSON.stringify({
-      apiKey,
-      articleTitle: payload.articleTitle,
-      articleContent: payload.articleContent,
-      articleTags: payload.articleTags,
-      articleType: payload.articleType,
-      articleCommentable: true,
-      articleAnonymous: false,
-      articleRewardPoint: 0,
-      articleQnAOfferPoint: payload.articleQnAOfferPoint || 0,
-    }),
+    body: JSON.stringify(articleBody(apiKey, payload)),
   })
   if (res.code) throw new Error(res.msg || '发帖失败')
   return String(res.articleId || (res.data as { oId?: string } | undefined)?.oId || '')
 }
 
-export async function fetchArticleMd(apiKey: string, id: string) {
-  const res = await request<
-    Envelope<{
-      articleTitle?: string
-      articleContent?: string
-      articleTags?: string
-      articleType?: number
-      articleQnAOfferPoint?: number
-    }> & {
-      articleTitle?: string
-      articleContent?: string
-      articleTags?: string
-      articleType?: number
-    }
-  >(withKey(`/api/article/md/${encodeURIComponent(id)}`, apiKey))
-  if (res.code) throw new Error(res.msg || '无法读取原文')
-  const data = res.data || res
+/** 编辑用：`/api/article/md/{id}` 现网返回 Markdown 纯文本，元数据取自帖子详情。 */
+export async function fetchArticleMd(apiKey: string, id: string): Promise<ArticlePayload> {
+  const [md, detail] = await Promise.all([
+    requestText(withKey(`/api/article/md/${encodeURIComponent(id)}`, apiKey)),
+    fetchArticle(id, apiKey),
+  ])
   return {
-    articleTitle: String(data.articleTitle || ''),
-    articleContent: String(data.articleContent || ''),
-    articleTags: String(data.articleTags || ''),
-    articleType: Number(data.articleType || 0),
-    articleQnAOfferPoint: Number((data as { articleQnAOfferPoint?: number }).articleQnAOfferPoint || 0),
+    articleTitle: String(detail.articleTitle || ''),
+    articleContent: md || String(detail.articleOriginalContent || ''),
+    articleTags: String(detail.articleTags || ''),
+    articleType: Number(detail.articleType || 0),
+    articleQnAOfferPoint: Number(detail.articleQnAOfferPoint || 0),
+    articleRewardContent: String(detail.articleRewardContent || ''),
+    articleRewardPoint: Number(detail.articleRewardPoint || 0),
+    articleAnonymous: Number(detail.articleAnonymous || 0) === 1,
+    articleCommentable: detail.articleCommentable !== false,
+    articleShowInList: Number(detail.articleShowInList ?? 1) !== 0,
+    articleStatement: Number(detail.articleStatement || 0),
   }
 }
 
-export async function updateArticle(
-  apiKey: string,
-  id: string,
-  payload: {
-    articleTitle: string
-    articleContent: string
-    articleTags: string
-    articleType: number
-    articleQnAOfferPoint?: number
-  },
-) {
+export async function updateArticle(apiKey: string, id: string, payload: ArticlePayload) {
   const res = await request<Envelope<unknown> & { articleId?: string }>(`/article/${encodeURIComponent(id)}`, {
     method: 'PUT',
-    body: JSON.stringify({
-      apiKey,
-      articleTitle: payload.articleTitle,
-      articleContent: payload.articleContent,
-      articleTags: payload.articleTags,
-      articleType: payload.articleType,
-      articleCommentable: true,
-      articleAnonymous: false,
-      articleRewardPoint: 0,
-      articleQnAOfferPoint: payload.articleQnAOfferPoint || 0,
-    }),
+    body: JSON.stringify(articleBody(apiKey, payload)),
   })
   if (res.code) throw new Error(res.msg || '更新失败')
   return String(res.articleId || id)

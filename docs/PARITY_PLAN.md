@@ -81,13 +81,16 @@
 
 ## 三、开发计划
 
-### 第 1 期（P0，约 1.5 周）：补齐断点和高频路径
+### 第 1 期（P0）：补齐断点和高频路径 — 已完成
 
-1. 路由别名：`/recent/hot`、`/recent/good` → 现有列表。
-2. 新增 `/forward`、`/breezemoon/:id`、`/cr/raw/:id` 页面；正文外链统一走 `/forward`。
-3. 确认游戏和活动路径的部署代理方案（nginx / SSR 转发到 Rhythm）。
-4. `MemberView` 重构为子路由：评论、关注的人 / 标签 / 帖子、关注中的帖子、清风明月。
-5. `PostView` 接入 Vditor，并补齐打赏、匿名、通知关注者、列表显示、允许评论、声明等字段。
+1. ✅ 路由别名：`/recent/hot`、`/recent/good`。
+2. ⛔ `/forward`：现网 `Router.java` 已注释停用，不做。
+   ✅ 单条清风明月：现网路径为 `/member/{u}/breezemoons/{id}`，并入个人主页（定位并高亮）。
+   ✅ `/cr/raw/{id}`：现网即 Rhythm 页面，开发代理已转发，生产见 `docs/nginx.example.conf`。
+3. ✅ 部署代理方案：`docs/nginx.example.conf`（游戏、活动、原文、WebSocket 等）。
+4. ✅ `MemberView` 改为路由驱动，按现网分「发布 / 关注 / 积分」三组共 12 个子页；无 JSON 的子页显示待开放提示，接口需求见 `BACKEND_API_REQUESTS.md` 第 11 节。旧 `/member/{u}/following` 重定向到 `/following/users`，删除 `PeopleView`。
+5. ✅ `PostView` 接入 Vditor（与现网同 CDN，失败回退 textarea），补齐类型（帖子/机要/同城广播/问答）、打赏内容与积分、匿名、在列表展示、允许回帖、通知关注者、创作声明。
+   顺带修复：编辑帖子时 `/api/article/md` 实为纯文本导致加载失败；更新帖子会把回帖/匿名/打赏设置重置为默认值。
 
 ### 第 2 期（P1，约 2 周）：详情页和互动体验
 

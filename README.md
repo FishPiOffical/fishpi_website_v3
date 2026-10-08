@@ -37,7 +37,7 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - `public/robots.txt` 屏蔽登录态路由；`npm run sitemap` 拉近期帖生成站点地图
 - 生产：`npm run build` 产出 `dist/client` + `dist/server`，`npm run preview` 走 Node SSR
 - 公开内容路由（首页、帖子、用户主页、列表等）服务端 prefetch JSON 后 `renderToString`；聊天/设置等仅 CSR shell
-- nginx：HTML 反代到 Node；`/api`、`/chat-room` 等仍指 Rhythm
+- nginx：HTML 反代到 Node；`/api`、`/chat-room`、`/games/*`、`/activity/*`、`/cr/raw/*` 等仍指 Rhythm，完整规则见 [docs/nginx.example.conf](docs/nginx.example.conf)
 
 ## 已实现
 

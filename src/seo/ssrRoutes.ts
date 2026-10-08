@@ -8,6 +8,8 @@ export function shouldPrefetchSsr(path: string) {
     p === '/hot' ||
     p === '/recent' ||
     p === '/recent/long' ||
+    p === '/recent/hot' ||
+    p === '/recent/good' ||
     p === '/column' ||
     p === '/qna' ||
     p === '/perfect' ||

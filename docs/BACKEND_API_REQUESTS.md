@@ -19,6 +19,7 @@
 | 8 | P2 | 新增 | `GET /api/user/points` | 积分流水 |
 | 9 | P2 | 新增 | `GET /api/city/{cityName}` | 同城列表 |
 | 10 | P2 | 调整 | `GET /api/articles/*`、`GET /api/article/{id}`、`GET /api/domains` | 游客匿名可读 |
+| 11 | P1 | 新增 | `GET /api/user/{userName}/comments` 等 9 个 | 个人主页子页列表（现网仅 FTL） |
 
 ---
 
@@ -250,6 +251,29 @@ GET /api/city/{cityName}?p=1&size=20
 - `GET /api/article/{id}`
 - `GET /api/domains`
 - `GET /user/{userName}`
+
+---
+
+## 11. 个人主页子页列表（P1，新增）
+
+前端已按现网补齐 `/member/{userName}/...` 子路由，以下列表现网只有 FTL 页面（`UserProcessor.showHome*`），没有 JSON。页面目前显示「等待后端开放」。
+
+| 现网页面 | 建议接口 | 返回 |
+|----------|----------|------|
+| `/member/{u}/comments` | `GET /api/user/{u}/comments?p=&size=` | 回帖列表：`commentContent`、`commentCreateTime`、所属帖子 `articleId/articleTitle` |
+| `/member/{u}/comments/anonymous` | `GET /api/user/{u}/comments/anonymous?p=&size=` | 同上（仅本人可见） |
+| `/member/{u}/articles/anonymous` | `GET /api/user/{u}/articles/anonymous?p=&size=` | 同 `/api/user/{u}/articles`（仅本人可见） |
+| `/member/{u}/long` | `GET /api/user/{u}/long?p=&size=` | 同 `/api/user/{u}/articles`，仅长文章 |
+| `/member/{u}/watching/articles` | `GET /api/user/{u}/watching/articles?p=&size=` | 帖子列表 |
+| `/member/{u}/following/articles` | `GET /api/user/{u}/following/articles?p=&size=` | 帖子列表（收藏） |
+| `/member/{u}/following/tags` | `GET /api/user/{u}/following/tags?p=&size=` | `tagTitle`、`tagURI`、`tagIconPath`、`tagReferenceCount` |
+| `/member/{u}/following/users` | `GET /api/user/{u}/following/users?p=&size=` | `userName`、`userNickname`、`userAvatarURL`、`userIntro` |
+| `/member/{u}/followers` | `GET /api/user/{u}/followers?p=&size=` | 同上 |
+| `/member/{u}/points` | `GET /api/user/{u}/points?p=&size=` | 同第 8 节积分流水 |
+
+分页统一返回 `pagination: { paginationPageCount, paginationRecordCount }`；隐私设置不允许查看时返回 `code != 0` 及原因。
+
+前端接入点：`src/views/MemberView.vue` 的 `PENDING_API`，以及 `fetchFollowingUsers` / `fetchFollowers`（当前调用的 `/api/user/{u}/following`、`/follow/users` 在现网均不存在）。
 
 ---
 

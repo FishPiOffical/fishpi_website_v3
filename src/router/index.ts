@@ -1,4 +1,10 @@
-import { createMemoryHistory, createRouter, createWebHistory, type RouterHistory } from 'vue-router'
+import {
+  createMemoryHistory,
+  createRouter,
+  createWebHistory,
+  type RouteLocation,
+  type RouterHistory,
+} from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 
@@ -23,6 +29,16 @@ const routes = [
     path: '/recent',
     component: () => import('@/views/ArticleListView.vue'),
     meta: { title: '最新', list: 'recent' },
+  },
+  {
+    path: '/recent/hot',
+    component: () => import('@/views/ArticleListView.vue'),
+    meta: { title: '热门', list: 'hot' },
+  },
+  {
+    path: '/recent/good',
+    component: () => import('@/views/ArticleListView.vue'),
+    meta: { title: '点赞', list: 'good' },
   },
   {
     path: '/recent/long',
@@ -196,16 +212,28 @@ const routes = [
     component: () => import('@/views/CityView.vue'),
     meta: { robots: 'noindex' },
   },
-  {
-    path: '/member/:userName/following',
-    component: () => import('@/views/PeopleView.vue'),
-    meta: { people: 'following' },
-  },
-  {
-    path: '/member/:userName/followers',
-    component: () => import('@/views/PeopleView.vue'),
-    meta: { people: 'followers' },
-  },
+  { path: '/member/:userName/following', redirect: (to: RouteLocation) => `/member/${String(to.params.userName)}/following/users` },
+  ...(
+    [
+      ['long', 'long'],
+      ['comments', 'comments'],
+      ['articles/anonymous', 'articlesAnonymous'],
+      ['comments/anonymous', 'commentsAnonymous'],
+      ['watching/articles', 'watchingArticles'],
+      ['following/users', 'followingUsers'],
+      ['following/tags', 'followingTags'],
+      ['following/articles', 'followingArticles'],
+      ['followers', 'followers'],
+      ['breezemoons', 'breezemoons'],
+      ['breezemoons/:breezemoonId', 'breezemoons'],
+      ['points', 'points'],
+      ['profession', 'profession'],
+    ] as const
+  ).map(([sub, memberTab]) => ({
+    path: `/member/:userName/${sub}`,
+    component: () => import('@/views/MemberView.vue'),
+    meta: { memberTab },
+  })),
   {
     path: '/member/:userName/medals',
     name: 'medals',

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
+  fetchFollowers,
+  fetchFollowingUsers,
   fetchMembership,
   fetchPublicProfession,
   fetchUserArticles,
@@ -16,6 +18,7 @@ import {
   type Breezemoon,
   type MetalItem,
   type PublicProfessionProfile,
+  type SimpleUser,
   type UserProfile,
 } from '@/api/fishpi'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
@@ -48,7 +51,103 @@ const showTransfer = ref(false)
 const viewedVip = ref(false)
 const profession = ref<PublicProfessionProfile | null>(null)
 const extraMedals = ref<MetalItem[]>([])
-const activeTab = ref<'articles' | 'moons' | 'medals' | 'profession'>('articles')
+type MemberTab =
+  | 'home'
+  | 'long'
+  | 'comments'
+  | 'articlesAnonymous'
+  | 'commentsAnonymous'
+  | 'watchingArticles'
+  | 'followingUsers'
+  | 'followingTags'
+  | 'followingArticles'
+  | 'followers'
+  | 'breezemoons'
+  | 'points'
+  | 'medals'
+  | 'profession'
+type MemberGroup = 'post' | 'follow' | 'points' | 'profile'
+
+const TAB_GROUP: Record<MemberTab, MemberGroup> = {
+  home: 'post',
+  long: 'post',
+  comments: 'post',
+  articlesAnonymous: 'post',
+  commentsAnonymous: 'post',
+  watchingArticles: 'follow',
+  followingUsers: 'follow',
+  followingTags: 'follow',
+  followingArticles: 'follow',
+  followers: 'follow',
+  breezemoons: 'follow',
+  points: 'points',
+  medals: 'profile',
+  profession: 'profile',
+}
+
+/** 现网仅 FTL 渲染、无 JSON 的标签页；契约见 docs/BACKEND_API_REQUESTS.md。 */
+const PENDING_API: Partial<Record<MemberTab, string>> = {
+  long: 'GET /api/user/{userName}/long',
+  comments: 'GET /api/user/{userName}/comments',
+  articlesAnonymous: 'GET /api/user/{userName}/articles/anonymous',
+  commentsAnonymous: 'GET /api/user/{userName}/comments/anonymous',
+  watchingArticles: 'GET /api/user/{userName}/watching/articles',
+  followingTags: 'GET /api/user/{userName}/following/tags',
+  followingArticles: 'GET /api/user/{userName}/following/articles',
+  points: 'GET /api/user/{userName}/points',
+}
+
+const localTab = ref<'medals' | null>(null)
+const routeTab = computed(() => (route.meta.memberTab as MemberTab | undefined) || 'home')
+const activeTab = computed<MemberTab>(() => localTab.value || routeTab.value)
+const activeGroup = computed(() => TAB_GROUP[activeTab.value])
+const pendingApi = computed(() => PENDING_API[activeTab.value] || '')
+const base = computed(() => `/member/${encodeURIComponent(userName.value)}`)
+const highlightMoonId = computed(() => String(route.params.breezemoonId || ''))
+
+const people = ref<SimpleUser[]>([])
+const peopleLoading = ref(false)
+
+watch(
+  () => route.fullPath,
+  () => {
+    localTab.value = null
+  },
+)
+
+async function loadPeople() {
+  const tab = activeTab.value
+  if (import.meta.env.SSR || (tab !== 'followingUsers' && tab !== 'followers')) return
+  peopleLoading.value = true
+  try {
+    people.value =
+      tab === 'followers'
+        ? await fetchFollowers(userName.value, apiKey.value)
+        : await fetchFollowingUsers(userName.value, apiKey.value)
+  } catch {
+    people.value = []
+  } finally {
+    peopleLoading.value = false
+  }
+}
+
+watch(
+  () => [activeTab.value, userName.value, apiKey.value],
+  () => void loadPeople(),
+  { immediate: true },
+)
+
+async function focusMoon() {
+  if (import.meta.env.SSR || !highlightMoonId.value) return
+  await nextTick()
+  document.getElementById(`moon-${highlightMoonId.value}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
+watch(highlightMoonId, () => void focusMoon())
+
+const moonFound = computed(
+  () => !highlightMoonId.value || breezemoons.value.some((m) => String(m.oId) === highlightMoonId.value),
+)
 
 const usingMock = computed(() => String(profile.value?.oId || '').startsWith('mock-'))
 const isSelf = computed(() => Boolean(account.value && account.value.userName === userName.value))
@@ -81,7 +180,7 @@ usePageSeo(() => {
   return {
     title: name ? `${name} 的主页` : '用户主页',
     description: p?.userIntro || (name ? `${name} 在摸鱼派的个人主页` : SITE_DEFAULT_DESC),
-    path: `/member/${userName.value}`,
+    path: route.path,
     image: p?.userAvatarURL,
     type: 'profile',
   }
@@ -125,7 +224,7 @@ async function load() {
       import.meta.env.SSR ? Promise.resolve([] as ArticleSummary[]) : fetchUserArticles(userName.value, apiKey.value),
       import.meta.env.SSR
         ? Promise.resolve([] as Breezemoon[])
-        : fetchUserBreezemoons(userName.value, apiKey.value, 1, 12),
+        : fetchUserBreezemoons(userName.value, apiKey.value, 1, 30),
     ])
     if (isSelf.value) p.canFollow = 'hide'
     profile.value = p
@@ -134,6 +233,7 @@ async function load() {
     breezemoons.value = moons
     loading.value = false
     void loadExtras(p)
+    void focusMoon()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '用户加载失败'
     if (!cached) profile.value = null
@@ -184,37 +284,93 @@ async function sendPoints() {
 
       <div v-else-if="profile" class="module">
         <p v-if="usingMock" class="mock-tip">⚠️ 接口未返回，当前展示演示数据</p>
-        <!-- 二级导航标签页 -->
-        <nav class="tabs-sub">
-          <a
-            :class="{ current: activeTab === 'articles' }"
-            @click="activeTab = 'articles'"
-          >
-            文章 <span class="count">{{ profile.userArticleCount ?? articles.length }}</span>
-          </a>
-          <a
-            :class="{ current: activeTab === 'moons' }"
-            @click="activeTab = 'moons'"
-          >
-            清风明月 <span class="count">{{ breezemoons.length }}</span>
-          </a>
-          <a
-            :class="{ current: activeTab === 'medals' }"
-            @click="activeTab = 'medals'"
-          >
-            徽章 <span class="count">{{ allMedals.length }}</span>
-          </a>
-          <a
-            v-if="profession?.primaryProfession"
-            :class="{ current: activeTab === 'profession' }"
-            @click="activeTab = 'profession'"
-          >
-            职业资料
-          </a>
+        <!-- 一级分组（对齐现网 home/macro-home.ftl：发布 / 关注 / 积分） -->
+        <nav class="home-groups">
+          <RouterLink :to="base" :class="{ current: activeGroup === 'post' }">发布</RouterLink>
+          <RouterLink :to="`${base}/watching/articles`" :class="{ current: activeGroup === 'follow' }">关注</RouterLink>
+          <RouterLink :to="`${base}/points`" :class="{ current: activeGroup === 'points' }">积分</RouterLink>
+          <a :class="{ current: activeGroup === 'profile' }" @click="localTab = 'medals'">资料</a>
         </nav>
 
+        <!-- 二级标签（对齐现网 home.ftl / watching-articles.ftl） -->
+        <nav v-if="activeGroup === 'post'" class="tabs-sub">
+          <RouterLink :to="base" :class="{ current: activeTab === 'home' }">
+            帖子 <span class="count">{{ profile.userArticleCount ?? articles.length }}</span>
+          </RouterLink>
+          <RouterLink :to="`${base}/long`" :class="{ current: activeTab === 'long' }">长文章</RouterLink>
+          <RouterLink :to="`${base}/comments`" :class="{ current: activeTab === 'comments' }">
+            回帖 <span class="count">{{ profile.userCommentCount ?? 0 }}</span>
+          </RouterLink>
+          <RouterLink :to="`${base}/articles/anonymous`" :class="{ current: activeTab === 'articlesAnonymous' }">
+            匿贴
+          </RouterLink>
+          <RouterLink :to="`${base}/comments/anonymous`" :class="{ current: activeTab === 'commentsAnonymous' }">
+            匿回
+          </RouterLink>
+        </nav>
+        <nav v-else-if="activeGroup === 'follow'" class="tabs-sub">
+          <RouterLink :to="`${base}/watching/articles`" :class="{ current: activeTab === 'watchingArticles' }">
+            关注帖子
+          </RouterLink>
+          <RouterLink :to="`${base}/following/users`" :class="{ current: activeTab === 'followingUsers' }">
+            关注用户 <span class="count">{{ profile.followingUserCount ?? 0 }}</span>
+          </RouterLink>
+          <RouterLink :to="`${base}/following/tags`" :class="{ current: activeTab === 'followingTags' }">
+            关注标签
+          </RouterLink>
+          <RouterLink :to="`${base}/following/articles`" :class="{ current: activeTab === 'followingArticles' }">
+            收藏帖子
+          </RouterLink>
+          <RouterLink :to="`${base}/followers`" :class="{ current: activeTab === 'followers' }">
+            关注者 <span class="count">{{ profile.followerCount ?? 0 }}</span>
+          </RouterLink>
+          <RouterLink :to="`${base}/breezemoons`" :class="{ current: activeTab === 'breezemoons' }">
+            清风明月 <span class="count">{{ breezemoons.length }}</span>
+          </RouterLink>
+        </nav>
+        <nav v-else-if="activeGroup === 'profile'" class="tabs-sub">
+          <a :class="{ current: activeTab === 'medals' }" @click="localTab = 'medals'">
+            徽章 <span class="count">{{ allMedals.length }}</span>
+          </a>
+          <RouterLink
+            v-if="profession?.primaryProfession"
+            :to="`${base}/profession`"
+            :class="{ current: activeTab === 'profession' }"
+            @click="localTab = null"
+          >
+            职业资料
+          </RouterLink>
+        </nav>
+
+        <!-- 现网无 JSON 的标签页 -->
+        <div v-if="pendingApi" class="tab-panel">
+          <p v-if="activeTab === 'points' && isSelf" class="hint-auth">
+            可在 <RouterLink to="/points">我的积分</RouterLink> 查看自己的积分流水。
+          </p>
+          <div class="empty-panel pending-panel">
+            <p>该列表现网只有服务端渲染页面，暂无 JSON 接口，等待后端开放。</p>
+            <code>{{ pendingApi }}</code>
+          </div>
+        </div>
+
+        <!-- 关注用户 / 关注者 -->
+        <div v-else-if="activeTab === 'followingUsers' || activeTab === 'followers'" class="tab-panel">
+          <p v-if="peopleLoading" class="empty-panel">加载中…</p>
+          <ul v-else-if="people.length" class="people-list">
+            <li v-for="u in people" :key="u.oId || u.userName">
+              <img v-if="u.userAvatarURL" class="people-avatar" :src="u.userAvatarURL" alt="" />
+              <RouterLink :to="`/member/${u.userName}`">{{ u.userNickname || u.userName }}</RouterLink>
+              <span v-if="u.userNickname" class="people-handle">@{{ u.userName }}</span>
+            </li>
+          </ul>
+          <div v-else class="empty-panel pending-panel">
+            <p>该列表现网只有服务端渲染页面，暂无 JSON 接口，等待后端开放。</p>
+            <code>GET /api/user/{userName}/{{ activeTab === 'followers' ? 'followers' : 'following/users' }}</code>
+          </div>
+        </div>
+
         <!-- 文章列表 -->
-        <div v-if="activeTab === 'articles'" class="tab-panel">
+        <div v-else-if="activeTab === 'home'" class="tab-panel">
           <p v-if="!isLoggedIn && !articles.length" class="hint-auth">
             用户发帖列表需登录查看。
             <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">前往登录</RouterLink>
@@ -224,13 +380,24 @@ async function sendPoints() {
         </div>
 
         <!-- 清风明月动态 -->
-        <div v-else-if="activeTab === 'moons'" class="tab-panel">
+        <div v-else-if="activeTab === 'breezemoons'" class="tab-panel">
+          <p v-if="!isLoggedIn" class="hint-auth">
+            清风明月列表需登录查看。
+            <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">前往登录</RouterLink>
+          </p>
+          <p v-else-if="!moonFound" class="hint-auth">这条清风明月不在最近 30 条中，可能已被删除。</p>
           <ul v-if="breezemoons.length" class="breeze-timeline">
-            <li v-for="m in breezemoons" :key="m.oId" class="breeze-timeline-item">
+            <li
+              v-for="m in breezemoons"
+              :id="`moon-${m.oId}`"
+              :key="m.oId"
+              class="breeze-timeline-item"
+              :class="{ highlighted: String(m.oId) === highlightMoonId }"
+            >
               <div class="breeze-header">
                 <span class="avatar-small" :style="{ backgroundImage: `url('${profile.userAvatarURL}')` }" />
                 <span class="breeze-author">{{ profile.userNickname || profile.userName }}</span>
-                <span class="breeze-time">{{ m.timeAgo }}</span>
+                <RouterLink class="breeze-time" :to="`${base}/breezemoons/${m.oId}`">{{ m.timeAgo }}</RouterLink>
               </div>
               <div class="breeze-body" v-html="m.breezemoonContent || ''" />
             </li>
@@ -488,6 +655,77 @@ async function sendPoints() {
   border-bottom: none;
 }
 
+.breeze-timeline-item.highlighted {
+  margin: 0 -10px;
+  padding: 12px 10px;
+  border-radius: 8px;
+  background: var(--fp-hover);
+  box-shadow: inset 3px 0 0 var(--fp-primary);
+}
+
+.home-groups {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid var(--fp-border);
+}
+
+.home-groups a {
+  padding: 8px 14px;
+  font-size: 14px;
+  color: var(--fp-muted);
+  text-decoration: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.home-groups a.current {
+  color: var(--fp-title);
+  font-weight: 600;
+  border-bottom-color: var(--fp-primary);
+}
+
+.pending-panel code {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  background: var(--fp-hover);
+}
+
+.people-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 18px;
+}
+
+.people-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--fp-border);
+}
+
+.people-list a {
+  color: var(--fp-title);
+  text-decoration: none;
+}
+
+.people-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.people-handle {
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+
 .breeze-header {
   display: flex;
   align-items: center;
@@ -504,6 +742,7 @@ async function sendPoints() {
 .breeze-time {
   color: var(--fp-muted);
   font-size: 11px;
+  text-decoration: none;
 }
 
 .breeze-body {

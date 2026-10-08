@@ -105,6 +105,8 @@ async function prefetch(url: string): Promise<SsrPayload> {
       '/hot': 'hot',
       '/recent': 'recent',
       '/recent/long': 'long',
+      '/recent/hot': 'hot',
+      '/recent/good': 'good',
       '/column': 'long',
       '/qna': 'qna',
       '/perfect': 'perfect',
