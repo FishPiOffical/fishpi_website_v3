@@ -143,7 +143,8 @@ async function quoteMessage(msg: { oId: string; userName: string }) {
     const content = await fetchChatRaw(auth.apiKey, msg.oId)
     quote.value = { userName: msg.userName, messageId: msg.oId, content: content.trim() }
     await nextTick()
-    document.querySelector<HTMLTextAreaElement>('.compose-field-wrap textarea')?.focus()
+    const ta = document.querySelector<HTMLTextAreaElement>('textarea.composer-input')
+    ta?.focus()
   } catch (e) {
     quoteErr.value = e instanceof Error ? e.message : '读取原文失败'
   } finally {
@@ -260,223 +261,241 @@ function clearScreen() {
 
 <template>
   <div class="cr-page" :class="`theme-${chatStyle}`">
-    <!-- ==================== 版本 A: 经典版本 (Classic) ==================== -->
-    <!-- 输入框在最上方，新消息排在最上面，随内容自然向下延展 -->
+    <!-- ==================== 版本 A: 经典版本 (Classic，对齐现网 chat-room.ftl) ==================== -->
     <div v-if="chatStyle === 'classic'" class="cr-classic-layout">
       <main class="cr-classic-main">
-        <!-- 顶部输入与控制区域 (对齐现网 chat-room.ftl .reply) -->
-        <section class="cr-classic-composer-card">
-          <!-- 经典版顶部状态栏：左侧标题与连接状态，右侧大区/切换样式/清屏 -->
-          <div class="cr-classic-topbar">
-            <div class="topbar-left">
-              <span class="classic-title-tag">💬 经典模式</span>
-              <span class="cr-status-tag" :class="{ on: connected }">
-                <span class="status-dot" />
-                {{ connected ? '已连接' : isLoggedIn ? '连接中' : '访客浏览' }}
-              </span>
+        <!-- 整合在一个白色大卡片内，输入框在上，消息在下 -->
+        <div class="cr-classic-card">
+          <!-- 1. 顶部输入与控制区域 -->
+          <section class="cr-classic-reply">
+            <!-- 引用预览条 -->
+            <div v-if="quote" class="quote-preview-box">
+              <div class="quote-info">
+                <span class="quote-label">引用 @{{ quote.userName }}</span>
+                <p class="quote-text">{{ quote.content.slice(0, 200) }}</p>
+              </div>
+              <button type="button" class="quote-cancel" title="取消引用" @click="clearQuote">✕</button>
             </div>
-            <div class="topbar-right">
-              <button
-                v-if="isLoggedIn"
-                type="button"
-                class="classic-action-btn"
-                :title="nodeName || '选择大区'"
-                @click="openNodePicker"
-              >
-                🌐 {{ nodeName ? `大区: ${nodeName}` : '选择大区' }}
-              </button>
-              <!-- 切换样式入口 (登录/未登录均可切换) -->
-              <button
-                type="button"
-                class="classic-action-btn style-toggle-btn"
-                title="切换到简约气泡版本（输入框在最下方）"
-                @click="chat.toggleChatStyle()"
-              >
-                切换样式：简约
-              </button>
-              <button v-if="isLoggedIn" type="button" class="classic-action-btn" @click="clearScreen">
-                清屏
-              </button>
+
+            <!-- 输入框主体：100% 占满卡片宽度 -->
+            <div v-if="isLoggedIn" class="reply-input-wrap">
+              <MentionSuggest v-model="draft" />
+              <textarea
+                v-model="draft"
+                class="composer-input classic-textarea"
+                rows="3"
+                placeholder="说点什么吧，支持 Markdown。Enter 发送，Shift+Enter 换行。@ 可快速提及鱼油…"
+                @keydown="onComposerKey"
+              />
             </div>
-          </div>
-
-          <!-- 引用预览 -->
-          <div v-if="quote" class="quote-preview-box">
-            <div class="quote-info">
-              <span class="quote-label">引用 @{{ quote.userName }}</span>
-              <p class="quote-text">{{ quote.content.slice(0, 200) }}</p>
+            <div v-else class="comment-login-hint">
+              <RouterLink to="/login" class="login-link">登录</RouterLink>后参与讨论与收发消息
             </div>
-            <button type="button" class="quote-cancel" title="取消引用" @click="clearQuote">✕</button>
-          </div>
 
-          <!-- 输入区 -->
-          <div v-if="isLoggedIn" class="compose-field-wrap">
-            <MentionSuggest v-model="draft" />
-            <textarea
-              v-model="draft"
-              rows="3"
-              placeholder="说点什么吧，支持 Markdown。Enter 发送，Shift+Enter 换行。@ 可快速提及鱼油…"
-              @keydown="onComposerKey"
-            />
-          </div>
-          <div v-else class="comment-login-hint">
-            <RouterLink to="/login" class="login-link">登录</RouterLink>后参与讨论与收发消息
-          </div>
+            <!-- 工具栏与操作行（对齐现网经典版：左侧工具+话题，右侧大区+切换样式+清屏+发送） -->
+            <div class="reply-toolbar">
+              <div class="toolbar-tools">
+                <template v-if="isLoggedIn">
+                  <button
+                    type="button"
+                    class="classic-tool-btn"
+                    title="发放红包"
+                    @click="showPacket = !showPacket; showBarrage = false; showPaint = false"
+                  >
+                    🧧 红包
+                  </button>
+                  <EmojiPicker @insert="(md) => (draft += md)" />
+                  <button
+                    type="button"
+                    class="classic-tool-btn"
+                    title="涂鸦画板"
+                    @click="showPaint = !showPaint; showPacket = false; showBarrage = false"
+                  >
+                    🎨 涂鸦
+                  </button>
+                  <button
+                    type="button"
+                    class="classic-tool-btn"
+                    title="发送弹幕"
+                    @click="showBarrage = !showBarrage; showPacket = false; showPaint = false"
+                  >
+                    💬 弹幕
+                  </button>
+                </template>
 
-          <!-- 工具栏与操作行 (登录后可用) -->
-          <div v-if="isLoggedIn" class="cr-classic-toolbar">
-            <div class="toolbar-left">
-              <button
-                type="button"
-                class="classic-tool-btn"
-                title="发放红包"
-                @click="showPacket = !showPacket; showBarrage = false; showPaint = false"
-              >
-                🧧 红包
-              </button>
-              <EmojiPicker @insert="(md) => (draft += md)" />
-              <button
-                type="button"
-                class="classic-tool-btn"
-                title="涂鸦画板"
-                @click="showPaint = !showPaint; showPacket = false; showBarrage = false"
-              >
-                🎨 涂鸦
-              </button>
-              <button
-                type="button"
-                class="classic-tool-btn"
-                title="发送弹幕"
-                @click="showBarrage = !showBarrage; showPacket = false; showPaint = false"
-              >
-                💬 弹幕
-              </button>
+                <!-- 当前话题胶囊 -->
+                <div class="classic-topic-pill" :title="discuss">
+                  <span class="topic-label">当前话题：</span>
+                  <span class="topic-text"># {{ discuss }} #</span>
+                  <button v-if="isLoggedIn" type="button" class="topic-action-btn" title="引用话题" @click="useTopic">#</button>
+                  <button v-if="isLoggedIn" type="button" class="topic-action-btn" title="编辑话题" @click="editingTopic = !editingTopic">✏️</button>
+                </div>
+              </div>
 
-              <div class="classic-topic-chip" :title="discuss">
-                <span class="topic-label">当前话题：</span>
-                <span class="topic-text"># {{ discuss }} #</span>
-                <button type="button" class="topic-icon-btn" title="引用话题" @click="useTopic">#</button>
-                <button type="button" class="topic-icon-btn" title="编辑话题" @click="editingTopic = !editingTopic">✏️</button>
+              <div class="toolbar-actions">
+                <button
+                  v-if="isLoggedIn"
+                  type="button"
+                  class="classic-btn"
+                  :title="nodeName || '选择大区'"
+                  @click="openNodePicker"
+                >
+                  🌐 {{ nodeName ? `大区: ${nodeName}` : '选择大区' }}
+                </button>
+                <button
+                  type="button"
+                  class="classic-btn style-toggle"
+                  title="切换到简约气泡版本（输入框吸底）"
+                  @click="chat.toggleChatStyle()"
+                >
+                  切换样式：简约
+                </button>
+                <button v-if="isLoggedIn" type="button" class="classic-btn" @click="clearScreen">
+                  清屏
+                </button>
+                <button
+                  v-if="isLoggedIn"
+                  type="button"
+                  class="classic-send-btn"
+                  :disabled="sending || (!draft.trim() && !quote)"
+                  @click="submit"
+                >
+                  {{ sending ? '发送中…' : '发 送' }}
+                </button>
               </div>
             </div>
 
-            <div class="toolbar-right">
-              <button
-                type="button"
-                class="classic-send-btn"
-                :disabled="sending || (!draft.trim() && !quote)"
-                @click="submit"
-              >
-                {{ sending ? '发送中…' : '发 送' }}
-              </button>
+            <!-- 话题编辑展开表单 -->
+            <form v-if="editingTopic" class="pop-sub-form" @submit.prevent="saveTopic">
+              <input v-model="topicDraft" :placeholder="discuss || '输入新话题…'" />
+              <button type="submit" class="pop-btn green">保存</button>
+              <button type="button" class="pop-btn ghost" @click="editingTopic = false">取消</button>
+            </form>
+
+            <!-- 发红包展开表单 -->
+            <form v-if="showPacket" class="pop-sub-form packet-sub-form" @submit.prevent="sendPacket">
+              <select v-model="packetType">
+                <option value="random">拼手气红包</option>
+                <option value="average">普通均分红包</option>
+                <option value="specify">专属定向红包</option>
+                <option value="rockPaperScissors">猜拳胜利红包</option>
+              </select>
+              <label>积分: <input v-model.number="packetMoney" type="number" min="1" /></label>
+              <label v-if="packetType !== 'specify'">个数: <input v-model.number="packetCount" type="number" min="1" /></label>
+              <input v-if="packetType === 'specify'" v-model="packetTo" placeholder="指定接收用户名" />
+              <select v-if="packetType === 'rockPaperScissors'" v-model.number="gesture">
+                <option :value="0">✊ 石头</option>
+                <option :value="1">✌️ 剪刀</option>
+                <option :value="2">✋ 布</option>
+              </select>
+              <input v-model="packetMsg" placeholder="祝福语 (摸鱼者，人品好！)" />
+              <button type="submit" class="pop-btn green" :disabled="sending">塞积分</button>
+              <button type="button" class="pop-btn ghost" @click="showPacket = false">取消</button>
+            </form>
+
+            <!-- 弹幕展开表单 -->
+            <form v-if="showBarrage" class="pop-sub-form barrage-sub-form" @submit.prevent="sendBarrage">
+              <input v-model="barrageText" maxlength="32" placeholder="友善弹幕，最多32个字" />
+              <button type="submit" class="pop-btn green" :disabled="sending || !barrageText.trim()">发射!</button>
+              <button type="button" class="pop-btn ghost" @click="showBarrage = false">取消</button>
+              <span v-if="barrageCost" class="barrage-cost-hint">花费 {{ barrageCost }}</span>
+            </form>
+
+            <!-- 涂鸦面板 -->
+            <div v-if="showPaint" class="paint-box-wrap">
+              <PaintPanel @submit="insertPaint" @cancel="showPaint = false" />
             </div>
-          </div>
 
-          <!-- 话题编辑展开表单 -->
-          <form v-if="editingTopic" class="pop-sub-form" @submit.prevent="saveTopic">
-            <input v-model="topicDraft" :placeholder="discuss || '输入新话题…'" />
-            <button type="submit" class="pop-btn green">保存</button>
-            <button type="button" class="pop-btn ghost" @click="editingTopic = false">取消</button>
-          </form>
-
-          <!-- 发红包展开表单 -->
-          <form v-if="showPacket" class="pop-sub-form packet-sub-form" @submit.prevent="sendPacket">
-            <select v-model="packetType">
-              <option value="random">拼手气红包</option>
-              <option value="average">普通均分红包</option>
-              <option value="specify">专属定向红包</option>
-              <option value="rockPaperScissors">猜拳胜利红包</option>
-            </select>
-            <label>积分: <input v-model.number="packetMoney" type="number" min="1" /></label>
-            <label v-if="packetType !== 'specify'">个数: <input v-model.number="packetCount" type="number" min="1" /></label>
-            <input v-if="packetType === 'specify'" v-model="packetTo" placeholder="指定接收用户名" />
-            <select v-if="packetType === 'rockPaperScissors'" v-model.number="gesture">
-              <option :value="0">✊ 石头</option>
-              <option :value="1">✌️ 剪刀</option>
-              <option :value="2">✋ 布</option>
-            </select>
-            <input v-model="packetMsg" placeholder="祝福语 (摸鱼者，人品好！)" />
-            <button type="submit" class="pop-btn green" :disabled="sending">塞积分</button>
-            <button type="button" class="pop-btn ghost" @click="showPacket = false">取消</button>
-          </form>
-
-          <!-- 弹幕展开表单 -->
-          <form v-if="showBarrage" class="pop-sub-form barrage-sub-form" @submit.prevent="sendBarrage">
-            <input v-model="barrageText" maxlength="32" placeholder="友善弹幕，最多32个字" />
-            <button type="submit" class="pop-btn green" :disabled="sending || !barrageText.trim()">发射!</button>
-            <button type="button" class="pop-btn ghost" @click="showBarrage = false">取消</button>
-            <span v-if="barrageCost" class="barrage-cost-hint">花费 {{ barrageCost }}</span>
-          </form>
-
-          <!-- 涂鸦面板 -->
-          <div v-if="showPaint" class="paint-box-wrap">
-            <PaintPanel @submit="insertPaint" @cancel="showPaint = false" />
-          </div>
-
-          <!-- 在线人数条与折叠 -->
-          <div class="classic-status-bar">
-            <div class="online-stat">
-              <span>在线人数: <b>{{ onlines.length }}</b></span>
-              <button
-                type="button"
-                class="online-toggle-btn"
-                @click="showClassicOnlines = !showClassicOnlines"
-              >
-                {{ showClassicOnlines ? '收起在线列表' : '展开在线列表' }}
-              </button>
+            <!-- 在线人数条与折叠面板 -->
+            <div class="classic-online-bar">
+              <div class="online-stat">
+                <span>在线人数: <b>{{ onlines.length }}</b></span>
+                <button
+                  type="button"
+                  class="online-toggle-btn"
+                  @click="showClassicOnlines = !showClassicOnlines"
+                >
+                  {{ showClassicOnlines ? '收起在线列表 ▲' : '展开在线列表 ▼' }}
+                </button>
+              </div>
+              <span v-if="lastPacket" class="top-packet-tip">{{ lastPacket }}</span>
+              <span v-if="error" class="top-error-tip">{{ error }}</span>
             </div>
-            <span v-if="lastPacket" class="top-packet-tip">{{ lastPacket }}</span>
-            <span v-if="error" class="top-error-tip">{{ error }}</span>
-          </div>
 
-          <div v-if="showClassicOnlines" class="classic-online-grid">
-            <RouterLink
-              v-for="u in onlines"
-              :key="u.userName"
-              :to="`/member/${u.userName}`"
-              class="classic-online-user"
-              :title="u.userNickname || u.userName"
+            <div v-if="showClassicOnlines" class="classic-online-grid">
+              <RouterLink
+                v-for="u in onlines"
+                :key="u.userName"
+                :to="`/member/${u.userName}`"
+                class="classic-online-user"
+                :title="u.userNickname || u.userName"
+              >
+                <span
+                  class="avatar-tiny"
+                  :style="u.userAvatarURL ? { backgroundImage: `url('${u.userAvatarURL}')` } : undefined"
+                />
+                <span class="user-name">{{ u.userNickname || u.userName }}</span>
+              </RouterLink>
+            </div>
+          </section>
+
+          <!-- 2. 下方消息列表：与输入区在同一个卡片中，自上而下阅读，最新在最上方 -->
+          <section class="cr-classic-list">
+            <p v-if="loading && !messages.length" class="empty-hint">正在拉取最新发言…</p>
+            <p v-else-if="!messages.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
+
+            <article
+              v-for="msg in classicMessages"
+              :id="`chatroom${msg.oId}`"
+              :key="msg.oId"
+              class="chats__item"
+              :class="{ 'chats__item--me': msg.userName === me }"
             >
-              <span
-                class="avatar-tiny"
-                :style="u.userAvatarURL ? { backgroundImage: `url('${u.userAvatarURL}')` } : undefined"
-              />
-              <span class="user-name">{{ u.userNickname || u.userName }}</span>
-            </RouterLink>
-          </div>
-        </section>
+              <!-- 头像 -->
+              <RouterLink :to="`/member/${msg.userName}`" class="chats__avatar-wrap" :title="msg.userName">
+                <span
+                  class="chats__avatar"
+                  :style="msg.userAvatarURL ? { backgroundImage: `url('${msg.userAvatarURL}')` } : undefined"
+                />
+              </RouterLink>
 
-        <!-- 经典版消息列表 (最新消息插入在最上面，历史在下方向下延展) -->
-        <section class="cr-classic-list">
-          <p v-if="loading && !messages.length" class="empty-hint">正在拉取最新发言…</p>
-          <p v-else-if="!messages.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
+              <!-- 气泡内容框（对齐现网 .chats__content） -->
+              <div class="chats__content">
+                <div class="chats__arrow" />
 
-          <article
-            v-for="msg in classicMessages"
-            :id="`chatroom${msg.oId}`"
-            :key="msg.oId"
-            class="classic-msg-item"
-          >
-            <!-- 左侧头像 -->
-            <RouterLink :to="`/member/${msg.userName}`" class="classic-avatar-wrap">
-              <span
-                class="classic-avatar"
-                :style="msg.userAvatarURL ? { backgroundImage: `url('${msg.userAvatarURL}')` } : undefined"
-              />
-            </RouterLink>
-
-            <!-- 右侧内容 -->
-            <div class="classic-content-col">
-              <div class="classic-msg-header">
-                <div class="header-left">
-                  <RouterLink :to="`/member/${msg.userName}`" class="classic-name">
+                <!-- 顶部用户名与时间 -->
+                <div class="chats__header">
+                  <RouterLink :to="`/member/${msg.userName}`" class="chats__name">
                     {{ msg.userNickname || msg.userName }}
                   </RouterLink>
-                  <time class="classic-time">{{ msg.time }}</time>
+                  <time class="chats__time">{{ msg.time }}</time>
                 </div>
 
-                <div class="header-actions">
-                  <button v-if="msg.userName === me" type="button" class="action-btn" title="撤回" @click="chat.revoke(msg.oId)">
+                <!-- 消息主体：精致紧凑的红包卡片 或 Markdown 富文本 -->
+                <div v-if="msg.redPacket" class="hongbao-card" :class="{ 'is-empty': Number(msg.redPacket.count) === Number(msg.redPacket.got) }" @click="claim(msg.oId, msg.redPacket.type)">
+                  <span class="hongbao-icon">🧧</span>
+                  <div class="hongbao-info">
+                    <div class="hongbao-msg">{{ msg.redPacket.msg || '大吉大利，摸鱼派！' }}</div>
+                    <div class="hongbao-badge">{{ packetLabel(msg.redPacket.type) }}</div>
+                    <div class="hongbao-tip">
+                      <span v-if="Number(msg.redPacket.count) === Number(msg.redPacket.got)">已经被抢光啦</span>
+                      <span v-else>已领 {{ msg.redPacket.got || 0 }}/{{ msg.redPacket.count || 0 }} 个 · 点击领取</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="vditor-reset msg-body" v-html="msg.html || ''" />
+
+                <!-- 表情反应条 -->
+                <ReactionBar
+                  :summary="msg.reactionSummary"
+                  :current="msg.currentUserReaction"
+                  :disabled="!auth.apiKey"
+                  @toggle="(v) => chat.react(msg.oId, v)"
+                />
+
+                <!-- 底部操作条 -->
+                <div class="chats__footer">
+                  <button v-if="msg.userName === me" type="button" class="action-btn" title="撤回发言" @click="chat.revoke(msg.oId)">
                     撤回
                   </button>
                   <button type="button" class="action-btn" title="查看上下文" @click="chat.loadAround(msg.oId)">
@@ -498,60 +517,35 @@ function clearScreen() {
                   <ReportDialog v-if="msg.userName !== me && auth.apiKey" :api-key="auth.apiKey" :data-id="msg.oId" :data-type="3" />
                 </div>
               </div>
+            </article>
 
-              <!-- 红包卡片 / 正常文本正文 -->
-              <div v-if="msg.redPacket" class="chat-bubble packet-bubble">
-                <div class="packet-top">
-                  <span class="packet-icon">🧧</span>
-                  <strong>{{ packetLabel(msg.redPacket.type) }}</strong>
-                </div>
-                <p class="packet-desc">{{ msg.redPacket.msg || '大吉大利，摸鱼派！' }}</p>
-                <div class="packet-footer">
-                  <small>已领 {{ msg.redPacket.got || 0 }} / {{ msg.redPacket.count || 0 }} 个</small>
-                  <button v-if="isLoggedIn" type="button" class="claim-btn" @click="claim(msg.oId, msg.redPacket.type)">
-                    领取红包
-                  </button>
-                </div>
-              </div>
-              <div v-else class="classic-text-body" v-html="msg.html || ''" />
-
-              <!-- 表情反应条 -->
-              <ReactionBar
-                :summary="msg.reactionSummary"
-                :current="msg.currentUserReaction"
-                :disabled="!auth.apiKey"
-                @toggle="(v) => chat.react(msg.oId, v)"
-              />
+            <!-- 底部查看更早记录 -->
+            <div class="classic-load-bottom">
+              <button
+                v-if="hasMore && messages.length"
+                type="button"
+                class="classic-more-btn"
+                :disabled="loadingMore"
+                @click="chat.loadMore"
+              >
+                {{ loadingMore ? '加载历史消息…' : '查看更早记录' }}
+              </button>
+              <span v-else-if="messages.length" class="no-more-tip">已加载全部历史消息</span>
             </div>
-          </article>
-
-          <!-- 底部加载更早历史消息 (经典版历史消息在下方) -->
-          <div class="classic-footer-load">
-            <button
-              v-if="hasMore && messages.length"
-              type="button"
-              class="classic-more-btn"
-              :disabled="loadingMore"
-              @click="chat.loadMore"
-            >
-              {{ loadingMore ? '加载历史消息…' : '查看更早记录' }}
-            </button>
-            <span v-else-if="messages.length" class="no-more-tip">已加载全部历史消息</span>
-          </div>
-        </section>
+          </section>
+        </div>
       </main>
 
-      <!-- 经典版右侧边栏 (自然向下排布) -->
+      <!-- 经典版右侧边栏（自然流式排布） -->
       <aside class="cr-sidebar-col classic-sidebar">
         <ChatSidebar />
       </aside>
     </div>
 
-    <!-- ==================== 版本 B: 现代气泡版本 (Modern) ==================== -->
-    <!-- 顶部操作栏，中间滚动列表，底部吸底输入框，右侧独立滚动，决不溢出视口 -->
+    <!-- ==================== 版本 B: 现代气泡版本 (Modern，对齐现网 chat-room-2.ftl) ==================== -->
     <div v-else class="cr-modern-layout">
       <section class="cr-modern-main">
-        <!-- 顶部操作栏 (对齐现网 chat-room-2.ftl .chat-room__header) -->
+        <!-- 顶部操作栏 -->
         <header class="cr-header">
           <div class="cr-header-left">
             <button
@@ -572,10 +566,9 @@ function clearScreen() {
           <div class="cr-header-right">
             <span v-if="error" class="top-error-tip">{{ error }}</span>
             <span v-if="lastPacket" class="top-packet-tip">{{ lastPacket }}</span>
-            <!-- 切换样式入口 -->
             <button
               type="button"
-              class="cr-top-btn style-toggle-btn"
+              class="cr-top-btn style-toggle"
               title="切换到经典版本（输入框在顶部，新消息在最上）"
               @click="chat.toggleChatStyle()"
             >
@@ -588,7 +581,7 @@ function clearScreen() {
           </div>
         </header>
 
-        <!-- 现代消息列表滚动展示区 (向上滚动加载更早记录，最新在最下) -->
+        <!-- 现代消息滚动展示区 -->
         <div ref="scroller" class="chat-messages-scroll" @scroll="onModernScroll">
           <button
             v-if="hasMore && messages.length"
@@ -608,69 +601,70 @@ function clearScreen() {
               v-for="msg in messages"
               :id="`chatroom${msg.oId}`"
               :key="msg.oId"
-              class="chat-bubble-row"
-              :class="{ 'is-self': msg.userName === me }"
+              class="chats__item"
+              :class="{ 'chats__item--me': msg.userName === me }"
             >
-              <RouterLink :to="`/member/${msg.userName}`" class="chat-avatar-link">
+              <RouterLink :to="`/member/${msg.userName}`" class="chats__avatar-wrap" :title="msg.userName">
                 <span
-                  class="chat-avatar-img"
+                  class="chats__avatar"
                   :style="msg.userAvatarURL ? { backgroundImage: `url('${msg.userAvatarURL}')` } : undefined"
                 />
               </RouterLink>
 
-              <div class="bubble-content-wrap">
-                <div class="chat-meta">
-                  <RouterLink :to="`/member/${msg.userName}`" class="meta-name">
+              <div class="chats__content">
+                <div class="chats__arrow" />
+                <div class="chats__header">
+                  <RouterLink :to="`/member/${msg.userName}`" class="chats__name">
                     {{ msg.userNickname || msg.userName }}
                   </RouterLink>
-                  <time class="meta-time">{{ msg.time }}</time>
-                  <div class="meta-actions">
-                    <button v-if="msg.userName === me" type="button" class="action-btn" title="撤回" @click="chat.revoke(msg.oId)">
-                      撤回
-                    </button>
-                    <button type="button" class="action-btn" title="查看上下文" @click="chat.loadAround(msg.oId)">
-                      附近
-                    </button>
-                    <button
-                      v-if="!msg.redPacket && auth.apiKey"
-                      type="button"
-                      class="action-btn"
-                      :disabled="quoteBusy === msg.oId"
-                      title="引用消息"
-                      @click="quoteMessage(msg)"
-                    >
-                      {{ quoteBusy === msg.oId ? '…' : '引用' }}
-                    </button>
-                    <button v-if="!msg.redPacket && auth.apiKey" type="button" class="action-btn" title="消息原文" @click="showRaw(msg.oId)">
-                      原文
-                    </button>
-                    <ReportDialog v-if="msg.userName !== me && auth.apiKey" :api-key="auth.apiKey" :data-id="msg.oId" :data-type="3" />
-                  </div>
+                  <time class="chats__time">{{ msg.time }}</time>
                 </div>
 
-                <!-- 消息气泡正文 -->
-                <div v-if="msg.redPacket" class="chat-bubble packet-bubble">
-                  <div class="packet-top">
-                    <span class="packet-icon">🧧</span>
-                    <strong>{{ packetLabel(msg.redPacket.type) }}</strong>
-                  </div>
-                  <p class="packet-desc">{{ msg.redPacket.msg || '大吉大利，摸鱼派！' }}</p>
-                  <div class="packet-footer">
-                    <small>已领 {{ msg.redPacket.got || 0 }} / {{ msg.redPacket.count || 0 }} 个</small>
-                    <button v-if="isLoggedIn" type="button" class="claim-btn" @click="claim(msg.oId, msg.redPacket.type)">
-                      领取红包
-                    </button>
+                <!-- 消息主体 -->
+                <div v-if="msg.redPacket" class="hongbao-card" :class="{ 'is-empty': Number(msg.redPacket.count) === Number(msg.redPacket.got) }" @click="claim(msg.oId, msg.redPacket.type)">
+                  <span class="hongbao-icon">🧧</span>
+                  <div class="hongbao-info">
+                    <div class="hongbao-msg">{{ msg.redPacket.msg || '大吉大利，摸鱼派！' }}</div>
+                    <div class="hongbao-badge">{{ packetLabel(msg.redPacket.type) }}</div>
+                    <div class="hongbao-tip">
+                      <span v-if="Number(msg.redPacket.count) === Number(msg.redPacket.got)">已经被抢光啦</span>
+                      <span v-else>已领 {{ msg.redPacket.got || 0 }}/{{ msg.redPacket.count || 0 }} 个 · 点击领取</span>
+                    </div>
                   </div>
                 </div>
-                <div v-else class="chat-bubble text-bubble" v-html="msg.html || ''" />
+                <div v-else class="vditor-reset msg-body" v-html="msg.html || ''" />
 
-                <!-- 动态表情反应条 -->
+                <!-- 表情反应条 -->
                 <ReactionBar
                   :summary="msg.reactionSummary"
                   :current="msg.currentUserReaction"
                   :disabled="!auth.apiKey"
                   @toggle="(v) => chat.react(msg.oId, v)"
                 />
+
+                <!-- 操作按钮 -->
+                <div class="chats__footer">
+                  <button v-if="msg.userName === me" type="button" class="action-btn" title="撤回发言" @click="chat.revoke(msg.oId)">
+                    撤回
+                  </button>
+                  <button type="button" class="action-btn" title="查看上下文" @click="chat.loadAround(msg.oId)">
+                    附近
+                  </button>
+                  <button
+                    v-if="!msg.redPacket && auth.apiKey"
+                    type="button"
+                    class="action-btn"
+                    :disabled="quoteBusy === msg.oId"
+                    title="引用消息"
+                    @click="quoteMessage(msg)"
+                  >
+                    {{ quoteBusy === msg.oId ? '…' : '引用' }}
+                  </button>
+                  <button v-if="!msg.redPacket && auth.apiKey" type="button" class="action-btn" title="消息原文" @click="showRaw(msg.oId)">
+                    原文
+                  </button>
+                  <ReportDialog v-if="msg.userName !== me && auth.apiKey" :api-key="auth.apiKey" :data-id="msg.oId" :data-type="3" />
+                </div>
               </div>
             </article>
           </div>
@@ -680,7 +674,7 @@ function clearScreen() {
           </p>
         </div>
 
-        <!-- 底部吸底输入与工具区 (对齐现网 chat-room-2.ftl .chat-room__input) -->
+        <!-- 底部吸底输入与工具区 -->
         <div class="cr-composer-panel">
           <div v-if="isLoggedIn" class="composer-inner">
             <!-- 引用预览条 -->
@@ -693,10 +687,11 @@ function clearScreen() {
             </div>
 
             <!-- 输入框主体 -->
-            <div class="compose-field-wrap">
+            <div class="reply-input-wrap">
               <MentionSuggest v-model="draft" />
               <textarea
                 v-model="draft"
+                class="composer-input modern-textarea"
                 rows="3"
                 placeholder="说点什么吧，支持 Markdown。Enter 发送，Shift+Enter 换行。@ 可快速提及鱼油…"
                 @keydown="onComposerKey"
@@ -735,16 +730,16 @@ function clearScreen() {
 
               <!-- 话题与发送 -->
               <div class="composer-right">
-                <div class="topic-chip" :title="discuss">
-                  <span class="topic-prefix">话题:</span>
-                  <em class="topic-text"># {{ discuss }} #</em>
-                  <button type="button" class="topic-btn" @click="useTopic">插入</button>
-                  <button type="button" class="topic-btn" @click="editingTopic = !editingTopic">改</button>
+                <div class="classic-topic-pill" :title="discuss">
+                  <span class="topic-label">话题:</span>
+                  <span class="topic-text"># {{ discuss }} #</span>
+                  <button type="button" class="topic-action-btn" title="插入" @click="useTopic">#</button>
+                  <button type="button" class="topic-action-btn" title="修改" @click="editingTopic = !editingTopic">✏️</button>
                 </div>
 
                 <button
                   type="button"
-                  class="send-btn"
+                  class="classic-send-btn"
                   :disabled="sending || (!draft.trim() && !quote)"
                   @click="submit"
                 >
@@ -802,13 +797,13 @@ function clearScreen() {
         </div>
       </section>
 
-      <!-- 现代版右侧侧边栏 (内部自适应滚动，限制在视口高度内) -->
+      <!-- 现代版右侧侧边栏（内部滚动） -->
       <aside class="cr-sidebar-col modern-sidebar">
         <ChatSidebar />
       </aside>
     </div>
 
-    <!-- ==================== 公共浮层/弹窗 ==================== -->
+    <!-- ==================== 浮层与弹窗 ==================== -->
     <!-- 大区节点选择弹层 -->
     <div v-if="showNodes && isLoggedIn" class="node-panel-dialog">
       <div class="node-panel-card">
@@ -873,13 +868,126 @@ function clearScreen() {
 
 <style scoped>
 .cr-page {
-  width: 94%;
+  width: 95%;
   max-width: 1400px;
   margin: 0 auto;
 }
 
 /* =========================================================
-   版本 A：经典版 (Classic) 样式
+   富文本正文中的图片、视频、附件等最大宽度限制（核心修复）
+   ========================================================= */
+:deep(.vditor-reset img:not(.emoji)),
+:deep(.msg-body img:not(.emoji)) {
+  max-width: 220px !important;
+  max-height: 280px !important;
+  width: auto !important;
+  height: auto !important;
+  border-radius: 6px;
+  object-fit: contain;
+  vertical-align: middle;
+  display: inline-block;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  margin: 4px 0;
+  transition: transform 0.15s ease;
+}
+
+:deep(.vditor-reset img:not(.emoji):hover),
+:deep(.msg-body img:not(.emoji):hover) {
+  transform: scale(1.02);
+}
+
+:deep(img.emoji) {
+  width: 22px !important;
+  height: 22px !important;
+  vertical-align: -3px;
+  display: inline-block;
+  margin: 0 2px;
+}
+
+:deep(video),
+:deep(iframe) {
+  max-width: 320px !important;
+  max-height: 200px !important;
+  border-radius: 6px;
+}
+
+:deep(pre) {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: var(--fp-bg);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* =========================================================
+   红包精致卡片（自适应紧凑尺寸，绝不撑满整行）
+   ========================================================= */
+.hongbao-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 14px;
+  max-width: 290px;
+  min-width: 190px;
+  box-shadow: 0 3px 8px rgba(231, 76, 60, 0.3);
+  cursor: pointer;
+  user-select: none;
+  margin: 4px 0;
+  box-sizing: border-box;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hongbao-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgba(231, 76, 60, 0.4);
+}
+
+.hongbao-card.is-empty {
+  opacity: 0.65;
+}
+
+.hongbao-icon {
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.hongbao-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hongbao-msg {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.hongbao-badge {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+.hongbao-tip {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* =========================================================
+   版本 A：经典版本（Classic，对齐现网 chat-room.ftl）
    ========================================================= */
 .cr-classic-layout {
   display: flex;
@@ -891,123 +999,171 @@ function clearScreen() {
 .cr-classic-main {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
-.cr-classic-composer-card {
+/* 统一的外层卡片（.module） */
+.cr-classic-card {
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 10px;
-  padding: 16px;
+  border-radius: 8px;
   box-shadow: var(--fp-card-shadow);
+  overflow: hidden;
 }
 
-.cr-classic-topbar {
+/* 输入区域 */
+.cr-classic-reply {
+  padding: 16px 20px 12px;
+}
+
+.reply-header-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--fp-border);
 }
 
-.topbar-left,
-.topbar-right {
+.bar-left,
+.bar-right {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.classic-title-tag {
+.classic-mode-badge {
   font-weight: 600;
   font-size: 13px;
   color: var(--fp-title);
 }
 
-.cr-classic-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--fp-border);
-}
-
-.toolbar-left,
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.classic-tool-btn,
-.classic-action-btn {
+.classic-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-title);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.classic-btn:hover {
+  background: var(--fp-hover);
+  border-color: var(--fp-accent);
+  color: var(--fp-accent);
+}
+
+.classic-btn.style-toggle {
+  background: var(--fp-hover);
+  border-color: var(--fp-accent);
+  color: var(--fp-accent);
+  font-weight: 600;
+}
+
+/* 输入框容器与文本域：100% 占满宽度 */
+.reply-input-wrap {
+  width: 100%;
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.composer-input {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
   border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fp-text);
+  resize: vertical;
+  min-height: 72px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.composer-input:focus {
+  border-color: var(--fp-accent);
+}
+
+.comment-login-hint {
+  text-align: center;
+  padding: 20px 0;
+  color: var(--fp-muted);
+  font-size: 13px;
+  background: var(--fp-bg);
+  border-radius: 6px;
+}
+
+.login-link {
+  color: var(--fp-accent);
+  font-weight: 600;
+  text-decoration: underline;
+  margin: 0 4px;
+}
+
+/* 工具栏与操作行（经典版） */
+.reply-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.toolbar-tools,
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.classic-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
+  color: var(--fp-title);
+  border-radius: 4px;
   padding: 5px 10px;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.classic-tool-btn:hover,
-.classic-action-btn:hover {
+.classic-tool-btn:hover {
   background: var(--fp-hover);
   border-color: var(--fp-accent);
   color: var(--fp-accent);
 }
 
-.style-toggle-btn {
-  background: var(--fp-hover);
-  border-color: var(--fp-accent);
-  color: var(--fp-accent);
-  font-weight: 600;
-}
-
-.classic-send-btn {
-  border: 0;
-  background: var(--fp-accent);
-  color: #fff;
-  font-weight: 600;
-  font-size: 13px;
-  padding: 6px 18px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
-}
-
-.classic-send-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.classic-topic-chip {
-  display: flex;
+.classic-topic-pill {
+  display: inline-flex;
   align-items: center;
   gap: 4px;
   background: var(--fp-hover);
   border: 1px solid var(--fp-border);
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 3px 8px;
   font-size: 12px;
-  max-width: 280px;
+  max-width: 300px;
 }
 
-.classic-topic-chip .topic-label {
+.classic-topic-pill .topic-label {
   color: var(--fp-muted);
 }
 
-.classic-topic-chip .topic-text {
+.classic-topic-pill .topic-text {
   color: var(--fp-accent);
   font-weight: 600;
   white-space: nowrap;
@@ -1016,20 +1172,43 @@ function clearScreen() {
   font-style: normal;
 }
 
-.topic-icon-btn {
+.topic-action-btn {
   background: transparent;
   border: 0;
   cursor: pointer;
   font-size: 12px;
   padding: 0 2px;
+  color: var(--fp-link);
 }
 
-.classic-status-bar {
+.classic-send-btn {
+  border: 0;
+  background: #27ae60;
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.classic-send-btn:hover {
+  background: #219653;
+}
+
+.classic-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 在线人数条 */
+.classic-online-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 12px;
-  padding-top: 8px;
+  margin-top: 14px;
+  padding-top: 10px;
   border-top: 1px dashed var(--fp-border);
   font-size: 12px;
   color: var(--fp-muted);
@@ -1082,82 +1261,138 @@ function clearScreen() {
   background-color: var(--fp-border);
 }
 
-/* 经典版列表 (新在最前，向下延展) */
+/* 下方消息列表 */
 .cr-classic-list {
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 10px;
-  padding: 16px 20px;
-  box-shadow: var(--fp-card-shadow);
+  border-top: 1px solid var(--fp-border);
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 
-.classic-msg-item {
+/* =========================================================
+   单条消息排版（对齐现网 .chats__item 与 .chats__content）
+   ========================================================= */
+.chats__item {
   display: flex;
-  gap: 14px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--fp-border);
+  gap: 12px;
+  align-items: flex-start;
 }
 
-.classic-msg-item:last-child {
-  border-bottom: 0;
+.chats__item--me {
+  flex-direction: row-reverse;
 }
 
-.classic-avatar-wrap {
+.chats__avatar-wrap {
   flex-shrink: 0;
 }
 
-.classic-avatar {
+.chats__avatar {
   display: block;
-  width: 40px;
-  height: 40px;
-  border-radius: 6px;
+  width: 38px;
+  height: 38px;
+  border-radius: 4px;
   background-size: cover;
   background-position: center;
   background-color: var(--fp-border);
   border: 1px solid var(--fp-border);
 }
 
-.classic-content-col {
-  flex: 1;
-  min-width: 0;
+/* 消息气泡框 */
+.chats__content {
+  position: relative;
+  background-color: var(--fp-hover);
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
+  padding: 8px 14px;
+  max-width: 82%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
-.classic-msg-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
+.chats__item--me .chats__content {
+  background-color: var(--fp-accent-light, #eef7ee);
+  border-color: rgba(39, 174, 96, 0.25);
 }
 
-.header-left {
+/* 气泡尖角 */
+.chats__arrow {
+  position: absolute;
+  top: 12px;
+  left: -6px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid var(--fp-border);
+}
+
+.chats__arrow::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 1px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 5px solid var(--fp-hover);
+}
+
+.chats__item--me .chats__arrow {
+  left: auto;
+  right: -6px;
+  border-right: none;
+  border-left: 6px solid rgba(39, 174, 96, 0.25);
+}
+
+.chats__item--me .chats__arrow::after {
+  left: auto;
+  right: 1px;
+  border-right: none;
+  border-left: 5px solid var(--fp-accent-light, #eef7ee);
+}
+
+.chats__header {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding-bottom: 3px;
+  margin-bottom: 2px;
 }
 
-.classic-name {
+.chats__name {
   font-weight: 600;
   color: var(--fp-title);
   text-decoration: none;
 }
 
-.classic-name:hover {
+.chats__name:hover {
   color: var(--fp-accent);
 }
 
-.classic-time {
+.chats__time {
   color: var(--fp-muted);
+  font-size: 11px;
 }
 
-.header-actions {
+.msg-body {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--fp-text);
+  word-break: break-word;
+}
+
+.chats__footer {
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   gap: 6px;
+  margin-top: 4px;
 }
 
 .action-btn {
@@ -1171,29 +1406,22 @@ function clearScreen() {
 }
 
 .action-btn:hover {
-  background: var(--fp-hover);
+  background: var(--fp-card);
   color: var(--fp-accent);
 }
 
-.classic-text-body {
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--fp-text);
-  word-break: break-word;
-}
-
-.classic-footer-load {
+/* 经典版底部加载更多 */
+.classic-load-bottom {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding-top: 20px;
-  margin-top: 10px;
-  border-top: 1px solid var(--fp-border);
+  padding-top: 16px;
+  border-top: 1px dashed var(--fp-border);
 }
 
 .classic-more-btn {
   padding: 6px 20px;
-  font-size: 13px;
+  font-size: 12px;
   background: var(--fp-hover);
   border: 1px solid var(--fp-border);
   color: var(--fp-title);
@@ -1218,7 +1446,7 @@ function clearScreen() {
 }
 
 /* =========================================================
-   版本 B：现代气泡版 (Modern) 样式
+   版本 B：现代气泡版本 (Modern，对齐现网 chat-room-2.ftl)
    ========================================================= */
 .cr-modern-layout {
   display: flex;
@@ -1237,7 +1465,7 @@ function clearScreen() {
   flex-direction: column;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 10px;
+  border-radius: 8px;
   box-shadow: var(--fp-card-shadow);
   overflow: hidden;
   position: relative;
@@ -1263,7 +1491,6 @@ function clearScreen() {
   border-radius: 3px;
 }
 
-/* 顶部操作栏 */
 .cr-header {
   display: flex;
   justify-content: space-between;
@@ -1281,16 +1508,6 @@ function clearScreen() {
   gap: 10px;
 }
 
-.top-error-tip {
-  color: #e74c3c;
-  font-size: 12px;
-}
-
-.top-packet-tip {
-  color: #e59230;
-  font-size: 12px;
-}
-
 .cr-top-btn {
   display: inline-flex;
   align-items: center;
@@ -1298,9 +1515,9 @@ function clearScreen() {
   background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-title);
-  border-radius: 6px;
-  padding: 5px 12px;
-  font-size: 13px;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1310,6 +1527,13 @@ function clearScreen() {
   background: var(--fp-hover);
   border-color: var(--fp-accent);
   color: var(--fp-accent);
+}
+
+.cr-top-btn.style-toggle {
+  background: var(--fp-hover);
+  border-color: var(--fp-accent);
+  color: var(--fp-accent);
+  font-weight: 600;
 }
 
 .cr-status-tag {
@@ -1345,7 +1569,17 @@ function clearScreen() {
   color: var(--fp-accent);
 }
 
-/* 消息滚动区 */
+.top-error-tip {
+  color: #e74c3c;
+  font-size: 12px;
+}
+
+.top-packet-tip {
+  color: #e59230;
+  font-size: 12px;
+}
+
+/* 现代消息滚动区域 */
 .chat-messages-scroll {
   flex: 1;
   min-height: 0;
@@ -1382,150 +1616,7 @@ function clearScreen() {
 .messages-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-/* 双列气泡 */
-.chat-bubble-row {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.chat-bubble-row.is-self {
-  flex-direction: row-reverse;
-}
-
-.chat-avatar-link {
-  flex-shrink: 0;
-}
-
-.chat-avatar-img {
-  display: block;
-  width: 40px;
-  height: 40px;
-  border-radius: 6px;
-  background-size: cover;
-  background-position: center;
-  background-color: var(--fp-border);
-  border: 1px solid var(--fp-border);
-}
-
-.bubble-content-wrap {
-  max-width: 75%;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.chat-bubble-row.is-self .bubble-content-wrap {
-  align-items: flex-end;
-}
-
-.chat-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-  font-size: 12px;
-}
-
-.chat-bubble-row.is-self .chat-meta {
-  flex-direction: row-reverse;
-}
-
-.meta-name {
-  font-weight: 600;
-  color: var(--fp-title);
-  text-decoration: none;
-}
-
-.meta-name:hover {
-  color: var(--fp-accent);
-}
-
-.meta-time {
-  color: var(--fp-muted);
-  font-size: 11px;
-}
-
-.meta-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0.7;
-}
-
-.meta-actions:hover {
-  opacity: 1;
-}
-
-.chat-bubble {
-  position: relative;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 14px;
-  line-height: 1.55;
-  word-break: break-word;
-  background: var(--fp-hover);
-  color: var(--fp-text);
-  border: 1px solid var(--fp-border);
-}
-
-.chat-bubble-row.is-self .text-bubble {
-  background: var(--fp-accent-light, #e8f5e9);
-  border-color: var(--fp-accent);
-  color: var(--fp-title);
-}
-
-/* 红包气泡 */
-.packet-bubble {
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%) !important;
-  color: #fff !important;
-  border: none !important;
-  min-width: 220px;
-  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.35);
-}
-
-.packet-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.packet-icon {
-  font-size: 18px;
-}
-
-.packet-desc {
-  margin: 4px 0 10px;
-  font-size: 13px;
-  opacity: 0.95;
-}
-
-.packet-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-  padding-top: 6px;
-  font-size: 11px;
-}
-
-.claim-btn {
-  border: none;
-  background: #f1c40f;
-  color: #c0392b;
-  font-weight: 700;
-  font-size: 11px;
-  padding: 3px 10px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-
-.claim-btn:hover {
-  transform: scale(1.05);
+  gap: 14px;
 }
 
 .guest-tip-bottom {
@@ -1535,7 +1626,7 @@ function clearScreen() {
   margin-top: 16px;
 }
 
-/* 现代版底部吸底输入栏 */
+/* 现代版吸底输入区域 */
 .cr-composer-panel {
   border-top: 1px solid var(--fp-border);
   background: var(--fp-card);
@@ -1549,78 +1640,6 @@ function clearScreen() {
   gap: 8px;
 }
 
-/* 引用预览 */
-.quote-preview-box {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--fp-hover);
-  border-left: 3px solid var(--fp-accent);
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.quote-label {
-  font-weight: 600;
-  color: var(--fp-accent);
-}
-
-.quote-text {
-  margin: 2px 0 0;
-  color: var(--fp-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 500px;
-}
-
-.quote-cancel {
-  border: 0;
-  background: transparent;
-  color: var(--fp-muted);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.quote-cancel:hover {
-  color: #e74c3c;
-}
-
-/* 输入框 */
-.compose-field-wrap {
-  position: relative;
-}
-
-.compose-field-wrap textarea {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--fp-text);
-  resize: vertical;
-  min-height: 60px;
-  outline: none;
-  transition: border-color 0.15s ease;
-}
-
-.compose-field-wrap textarea:focus {
-  border-color: var(--fp-accent);
-}
-
-.comment-login-hint {
-  text-align: center;
-  padding: 18px 0;
-  color: var(--fp-muted);
-  font-size: 13px;
-  background: var(--fp-bg);
-  border-radius: 6px;
-}
-
-/* 现代版输入框工具栏 */
 .cr-toolbar {
   display: flex;
   justify-content: space-between;
@@ -1660,58 +1679,53 @@ function clearScreen() {
   gap: 12px;
 }
 
-.topic-chip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  background: var(--fp-hover);
-  padding: 3px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--fp-border);
-  max-width: 320px;
-}
-
-.topic-prefix {
+.guest-bottom-bar {
+  text-align: center;
+  padding: 12px 0;
+  font-size: 13px;
   color: var(--fp-muted);
 }
 
-.topic-text {
-  font-style: normal;
+/* 引用预览 */
+.quote-preview-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--fp-hover);
+  border-left: 3px solid var(--fp-accent);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.quote-label {
+  font-weight: 600;
   color: var(--fp-accent);
-  font-weight: 500;
+}
+
+.quote-text {
+  margin: 2px 0 0;
+  color: var(--fp-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 500px;
 }
 
-.topic-btn {
+.quote-cancel {
+  border: 0;
   background: transparent;
-  border: 0;
-  color: var(--fp-link);
+  color: var(--fp-muted);
+  font-size: 14px;
   cursor: pointer;
-  font-size: 11px;
-  padding: 0 2px;
 }
 
-.send-btn {
-  border: 0;
-  background: var(--fp-accent);
-  color: #fff;
-  font-weight: 600;
-  font-size: 13px;
-  padding: 6px 18px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
+.quote-cancel:hover {
+  color: #e74c3c;
 }
 
-.send-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 浮动辅助表单 */
+/* 辅助表单与画板 */
 .pop-sub-form {
   display: flex;
   align-items: center;
@@ -1760,20 +1774,6 @@ function clearScreen() {
 
 .paint-box-wrap {
   margin-top: 10px;
-}
-
-.guest-bottom-bar {
-  text-align: center;
-  padding: 12px 0;
-  font-size: 13px;
-  color: var(--fp-muted);
-}
-
-.login-link {
-  color: var(--fp-accent);
-  font-weight: 600;
-  text-decoration: underline;
-  margin: 0 4px;
 }
 
 /* =========================================================
