@@ -3,7 +3,16 @@ import { onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import AppearancePicker from '@/components/packs/AppearancePicker.vue'
 import EmojiPacks from '@/components/EmojiPacks.vue'
-import { fetchProfessionMe, fetchUserProfile, updateAvatar, updateProfile, uploadFiles, type ProfessionProgress } from '@/api/fishpi'
+import {
+  fetchProfessionMe,
+  fetchUserProfile,
+  setProfessionPrimary,
+  setProfessionPrivacy,
+  updateAvatar,
+  updateProfile,
+  uploadFiles,
+  type ProfessionProgress,
+} from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -20,7 +29,19 @@ const uploading = ref(false)
 const msg = ref('')
 const err = ref('')
 const jobs = ref<ProfessionProgress[]>([])
+const availableJobs = ref<ProfessionProgress[]>([])
 const primaryJob = ref('')
+const privacy = ref('ALL_PUBLIC')
+const jobBusy = ref(false)
+const jobMsg = ref('')
+
+const privacyOptions = [
+  { value: 'ALL_PUBLIC', label: '全部公开' },
+  { value: 'LEVEL_ONLY', label: '仅等级' },
+  { value: 'PRIMARY_ONLY', label: '仅主职业' },
+  { value: 'SELF_ONLY', label: '仅自己可见' },
+  { value: 'FULLY_HIDDEN', label: '完全隐藏' },
+]
 
 function fill() {
   nickname.value = account.value?.userNickname || ''
@@ -46,15 +67,53 @@ onMounted(async () => {
     } catch {
       /* keep /api/user fields */
     }
-    try {
-      const me = await fetchProfessionMe(apiKey.value)
-      jobs.value = me?.progress || []
-      primaryJob.value = me?.primaryProfessionId || ''
-    } catch {
-      jobs.value = []
-    }
+    await loadJobs()
   }
 })
+
+async function loadJobs() {
+  if (!apiKey.value) return
+  try {
+    const me = await fetchProfessionMe(apiKey.value)
+    jobs.value = me?.progress || []
+    availableJobs.value = me?.availableProfessions || me?.progress || []
+    primaryJob.value = me?.primaryProfessionId || ''
+    privacy.value = me?.privacyPreset || 'ALL_PUBLIC'
+  } catch {
+    jobs.value = []
+    availableJobs.value = []
+  }
+}
+
+async function savePrimary() {
+  if (!apiKey.value || !primaryJob.value) return
+  jobBusy.value = true
+  jobMsg.value = ''
+  try {
+    await setProfessionPrimary(apiKey.value, primaryJob.value)
+    await loadJobs()
+    jobMsg.value = '主职业已更新'
+  } catch (e) {
+    jobMsg.value = e instanceof Error ? e.message : '主职业设置失败'
+  } finally {
+    jobBusy.value = false
+  }
+}
+
+async function savePrivacy() {
+  if (!apiKey.value) return
+  jobBusy.value = true
+  jobMsg.value = ''
+  try {
+    await setProfessionPrivacy(apiKey.value, privacy.value)
+    await loadJobs()
+    jobMsg.value = '职业隐私已更新'
+  } catch (e) {
+    jobMsg.value = e instanceof Error ? e.message : '隐私设置失败'
+  } finally {
+    jobBusy.value = false
+  }
+}
 
 async function save() {
   if (!apiKey.value) return
@@ -123,16 +182,43 @@ async function onAvatar(e: Event) {
         <p v-if="err" class="err">{{ err }}</p>
         <button type="submit" :disabled="saving">{{ saving ? '保存中…' : '保存资料' }}</button>
       </form>
-      <div v-if="jobs.length" class="jobs">
+      <div class="jobs">
         <h2>职业成长</h2>
-        <p class="hint">只读 <code>GET /api/profession/me</code>，改职业请稍后在完整职业页操作。</p>
-        <ul>
+        <p class="hint">读取 <code>GET /api/profession/me</code>，写入主职业/隐私。</p>
+        <ul v-if="jobs.length">
           <li v-for="job in jobs" :key="job.professionId || job.displayName">
             {{ job.displayName || job.shortName }}
             <em v-if="job.levelName">{{ job.levelName }}</em>
             <span v-if="job.professionId === primaryJob">主职业</span>
           </li>
         </ul>
+        <p v-else class="hint">暂无职业进度。</p>
+        <label>
+          主职业
+          <select v-model="primaryJob" :disabled="jobBusy">
+            <option disabled value="">选择职业</option>
+            <option
+              v-for="job in availableJobs"
+              :key="job.professionId || job.displayName"
+              :value="job.professionId"
+            >
+              {{ job.displayName || job.shortName || job.professionId }}
+            </option>
+          </select>
+        </label>
+        <button type="button" :disabled="jobBusy || !primaryJob" @click="savePrimary">
+          {{ jobBusy ? '提交中…' : '保存主职业' }}
+        </button>
+        <label>
+          隐私
+          <select v-model="privacy" :disabled="jobBusy">
+            <option v-for="opt in privacyOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+        </label>
+        <button type="button" :disabled="jobBusy" @click="savePrivacy">
+          {{ jobBusy ? '提交中…' : '保存隐私' }}
+        </button>
+        <p v-if="jobMsg" :class="jobMsg.includes('失败') ? 'err' : 'ok'">{{ jobMsg }}</p>
       </div>
     </section>
     <section v-else class="card">
@@ -206,12 +292,19 @@ label {
   font-size: 13px;
 }
 input,
-textarea {
+textarea,
+select {
   background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-text);
   border-radius: 8px;
   padding: 8px 10px;
+}
+.jobs label {
+  margin-top: 10px;
+}
+.jobs button {
+  margin-top: 8px;
 }
 button {
   border: 0;

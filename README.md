@@ -41,8 +41,11 @@ VITE_API_TARGET=http://localhost:8080
 - 设置页表情分组（GET 列表，增删走现网 JSON，验证时不提交）
 - 匿名可读：帖子列表/详情/搜索/领域/标签墙/问答 `GET /api/articles/qna`、优选 `GET /api/articles/perfect`
 - 帖子正文目录（从正文 h1–h3 生成）
+- 帖子修订历史 `GET /article/{id}/revisions/list|/{revisionId}`（需登录）
+- 设置页职业主职/隐私 UI → `POST /api/profession/me/primary|privacy`（读 `GET /api/profession/me`；现网纯 apiKey POST 可能被 CSRF 拦下）
+- 用户主页清风明月 `GET /api/user/{name}/breezemoons`（需登录）
 
 闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。
-帖子修订历史、用户发帖列表等仍需登录（匿名 401）。
+用户发帖列表匿名 401，登录后走真实数据。
 
 新增侧边栏模块：在 `src/chat/sidebar/modules` 加组件，并登记到 `registry.ts`。

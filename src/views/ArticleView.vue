@@ -5,9 +5,12 @@ import { storeToRefs } from 'pinia'
 import {
   fetchArticle,
   fetchArticleHeat,
+  fetchArticleRevision,
+  fetchArticleRevisions,
   fetchCommentContent,
   followArticle,
   postComment,
+  previewMarkdown,
   removeComment,
   rewardArticle,
   thankArticle,
@@ -23,6 +26,7 @@ import {
   applyReactionPayload,
   type ArticleComment,
   type ArticleDetail,
+  type ArticleRevisionMeta,
   type ReactionSummary,
 } from '@/api/fishpi'
 import EmojiPicker from '@/components/EmojiPicker.vue'
@@ -50,6 +54,14 @@ const editDraft = ref('')
 const editSaving = ref(false)
 const bodyEl = ref<HTMLElement | null>(null)
 const toc = ref<{ id: string; text: string; level: number }[]>([])
+const showRevisions = ref(false)
+const revisions = ref<ArticleRevisionMeta[]>([])
+const revisionLoading = ref(false)
+const revisionError = ref('')
+const activeRevisionId = ref('')
+const revisionTitle = ref('')
+const revisionHtml = ref('')
+const revisionBusy = ref(false)
 let heatWs: WebSocket | null = null
 
 const id = computed(() => String(route.params.id || ''))
@@ -74,6 +86,39 @@ async function buildToc() {
 
 function jumpToc(anchor: string) {
   document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+async function toggleRevisions() {
+  showRevisions.value = !showRevisions.value
+  if (!showRevisions.value || !apiKey.value || !id.value) return
+  if (revisions.value.length) return
+  revisionLoading.value = true
+  revisionError.value = ''
+  try {
+    revisions.value = await fetchArticleRevisions(apiKey.value, id.value)
+  } catch (e) {
+    revisionError.value = e instanceof Error ? e.message : '修订历史加载失败'
+  } finally {
+    revisionLoading.value = false
+  }
+}
+
+async function openRevision(revisionId: string) {
+  if (!apiKey.value || !id.value) return
+  revisionBusy.value = true
+  revisionError.value = ''
+  activeRevisionId.value = revisionId
+  try {
+    const rev = await fetchArticleRevision(apiKey.value, id.value, revisionId)
+    revisionTitle.value = rev.revisionData?.articleTitle || ''
+    const md = rev.revisionData?.articleContent || ''
+    revisionHtml.value = md ? await previewMarkdown(md) : '<p>（无正文）</p>'
+  } catch (e) {
+    revisionError.value = e instanceof Error ? e.message : '修订内容加载失败'
+    revisionHtml.value = ''
+  } finally {
+    revisionBusy.value = false
+  }
 }
 
 const comments = computed<ArticleComment[]>(() => article.value?.articleComments || [])
@@ -449,9 +494,37 @@ async function onReactComment(c: ArticleComment, value: string) {
           {{ article.rewarded ? '已打赏' : `打赏 ${article.articleRewardPoint}` }}
         </button>
         <RouterLink v-if="canEdit" class="edit" :to="`/post/${article.oId}`">编辑</RouterLink>
+        <button v-if="isLoggedIn" type="button" @click="toggleRevisions">
+          {{ showRevisions ? '收起历史' : '修订历史' }}
+        </button>
         <ReportDialog v-if="isLoggedIn" :api-key="apiKey" :data-id="article.oId" :data-type="0" />
         <span v-if="actionMsg">{{ actionMsg }}</span>
       </div>
+      <section v-if="showRevisions" class="revisions">
+        <h2>修订历史</h2>
+        <p v-if="revisionLoading" class="hint">加载修订列表…</p>
+        <p v-else-if="revisionError" class="err">{{ revisionError }}</p>
+        <ol v-else class="rev-list">
+          <li v-for="rev in revisions" :key="rev.revisionId">
+            <button
+              type="button"
+              class="ghost"
+              :class="{ on: activeRevisionId === rev.revisionId }"
+              :disabled="revisionBusy"
+              @click="openRevision(rev.revisionId)"
+            >
+              #{{ rev.revisionIndex ?? '' }}
+              {{ rev.revisionTimeStr || rev.revisionId }}
+              <em v-if="rev.current">当前</em>
+            </button>
+          </li>
+        </ol>
+        <div v-if="activeRevisionId" class="rev-preview">
+          <h3>{{ revisionTitle || '修订预览' }}</h3>
+          <p v-if="revisionBusy" class="hint">渲染中…</p>
+          <div v-else class="body" v-html="revisionHtml" />
+        </div>
+      </section>
       <ReactionBar
         :summary="article.reactionSummary"
         :current="article.currentUserReaction"
@@ -659,6 +732,40 @@ h2 {
 .ghost:hover {
   color: var(--fp-accent);
   border-color: var(--fp-accent);
+}
+.revisions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--fp-border);
+}
+.rev-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 160px;
+  overflow: auto;
+}
+.rev-list .ghost.on {
+  color: var(--fp-accent);
+  border-color: var(--fp-accent);
+}
+.rev-list em {
+  font-style: normal;
+  margin-left: 4px;
+  color: var(--fp-green);
+  font-size: 12px;
+}
+.rev-preview {
+  border-top: 1px dashed var(--fp-border);
+  padding-top: 10px;
+}
+.rev-preview h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--fp-title);
 }
 .actions a.edit {
   color: var(--fp-link);

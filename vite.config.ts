@@ -112,6 +112,8 @@ export default defineConfig(({ mode }) => {
             const path = (req.url || '').split('?')[0] || ''
             if (path.startsWith('/article-channel')) return
             if (path.startsWith('/article/random')) return
+            // 修订历史 JSON：/article/:id/revisions/list|/:revisionId
+            if (/^\/article\/[^/]+\/revisions(\/|$)/.test(path)) return
             return spaGetBypass(req)
           },
         },

@@ -771,6 +771,38 @@ export async function fetchArticle(id: string, apiKey?: string | null, page = 1)
   throw new Error('帖子不存在或需要登录')
 }
 
+export interface ArticleRevisionMeta {
+  revisionId: string
+  revisionTimeStr?: string
+  revisionTime?: number
+  revisionIndex?: number
+  revisionAuthorId?: string
+  current?: boolean
+}
+
+export interface ArticleRevisionDetail extends ArticleRevisionMeta {
+  revisionData?: {
+    articleTitle?: string
+    articleContent?: string
+  }
+}
+
+export async function fetchArticleRevisions(apiKey: string, id: string): Promise<ArticleRevisionMeta[]> {
+  const res = await request<{ code?: number; msg?: string; revisions?: ArticleRevisionMeta[] }>(
+    withKey(`/article/${encodeURIComponent(id)}/revisions/list`, apiKey),
+  )
+  if (res.code) throw new Error(res.msg || '修订历史加载失败')
+  return res.revisions ?? []
+}
+
+export async function fetchArticleRevision(apiKey: string, id: string, revisionId: string) {
+  const res = await request<{ code?: number; msg?: string; revision?: ArticleRevisionDetail }>(
+    withKey(`/article/${encodeURIComponent(id)}/revisions/${encodeURIComponent(revisionId)}`, apiKey),
+  )
+  if (res.code || !res.revision) throw new Error(res.msg || '修订内容加载失败')
+  return res.revision
+}
+
 export async function postComment(apiKey: string, articleId: string, content: string, replyId = '') {
   const body: Record<string, unknown> = {
     apiKey,
@@ -1075,20 +1107,52 @@ export async function fetchPublicProfession(userName: string, apiKey?: string | 
   return null
 }
 
-export async function fetchProfessionMe(apiKey: string) {
+export interface ProfessionMe {
+  primaryProfessionId?: string
+  progress?: ProfessionProgress[]
+  privacyPreset?: string
+  availableProfessions?: ProfessionProgress[]
+  onboardingState?: string
+}
+
+export async function fetchProfessionMe(apiKey: string): Promise<ProfessionMe | null> {
   try {
-    const res = await request<
-      Envelope<{
-        primaryProfessionId?: string
-        progress?: ProfessionProgress[]
-        privacyPreset?: string
-      }>
-    >(withKey('/api/profession/me', apiKey))
+    const res = await request<Envelope<ProfessionMe>>(withKey('/api/profession/me', apiKey))
     if (res.code) return null
     return res.data ?? null
   } catch {
     return null
   }
+}
+
+export async function setProfessionPrimary(apiKey: string, professionId: string) {
+  const res = await request<Envelope<ProfessionMe>>('/api/profession/me/primary', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, professionId }),
+  })
+  if (res.code) throw new Error(res.msg || '设置主职业失败')
+  return res.data ?? null
+}
+
+export async function setProfessionPrivacy(apiKey: string, preset: string) {
+  const res = await request<Envelope<ProfessionMe>>('/api/profession/me/privacy', {
+    method: 'POST',
+    body: JSON.stringify({ apiKey, preset }),
+  })
+  if (res.code) throw new Error(res.msg || '设置职业隐私失败')
+  return res.data ?? null
+}
+
+export async function fetchUserBreezemoons(userName: string, apiKey?: string | null, page = 1, size = 20) {
+  try {
+    const res = await request<Envelope<{ breezemoons?: Breezemoon[] }>>(
+      withKey(`/api/user/${encodeURIComponent(userName)}/breezemoons?p=${page}&size=${size}`, apiKey),
+    )
+    if (res.code === 0 && Array.isArray(res.data?.breezemoons)) return res.data.breezemoons
+  } catch {
+    /* login required */
+  }
+  return []
 }
 
 export async function fetchUserMedals(apiKey: string, userName: string) {

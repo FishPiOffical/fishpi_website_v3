@@ -6,12 +6,14 @@ import {
   fetchMembership,
   fetchPublicProfession,
   fetchUserArticles,
+  fetchUserBreezemoons,
   fetchUserMedals,
   fetchUserProfile,
   followUser,
   transferPoints,
   unfollowUser,
   type ArticleSummary,
+  type Breezemoon,
   type MetalItem,
   type PublicProfessionProfile,
   type UserProfile,
@@ -28,6 +30,8 @@ const { apiKey, account, isLoggedIn, isVip } = storeToRefs(auth)
 const userName = computed(() => String(route.params.userName || ''))
 const profile = ref<UserProfile | null>(null)
 const articles = ref<ArticleSummary[]>([])
+const breezemoons = ref<Breezemoon[]>([])
+const articlesMock = ref(false)
 const loading = ref(true)
 const error = ref('')
 const actionMsg = ref('')
@@ -48,13 +52,16 @@ async function load() {
   error.value = ''
   actionMsg.value = ''
   try {
-    const [p, list] = await Promise.all([
+    const [p, list, moons] = await Promise.all([
       fetchUserProfile(userName.value, apiKey.value),
       fetchUserArticles(userName.value, apiKey.value),
+      fetchUserBreezemoons(userName.value, apiKey.value, 1, 12),
     ])
     if (isSelf.value) p.canFollow = 'hide'
     profile.value = p
     articles.value = list
+    articlesMock.value = list.some((a) => String(a.oId).startsWith('mock-'))
+    breezemoons.value = moons
     viewedVip.value = false
     profession.value = null
     extraMedals.value = []
@@ -169,7 +176,20 @@ async function sendPoints() {
     </section>
     <section class="card">
       <h2>帖子</h2>
+      <p v-if="articlesMock" class="hint">
+        用户发帖列表需登录（<code>GET /api/user/:name/articles</code>），当前为字段对齐 mock。
+        <RouterLink v-if="!isLoggedIn" :to="{ path: '/login', query: { redirect: route.fullPath } }">去登录</RouterLink>
+      </p>
       <ArticleFeed :items="articles" empty="还没有公开帖子" />
+    </section>
+    <section v-if="breezemoons.length" class="card">
+      <h2>清风明月</h2>
+      <ul class="moons">
+        <li v-for="m in breezemoons" :key="m.oId">
+          <div class="cmt-body" v-html="m.breezemoonContent || ''" />
+          <time>{{ m.timeAgo || '' }}</time>
+        </li>
+      </ul>
     </section>
   </div>
 </template>
@@ -232,6 +252,24 @@ h2 {
 .jobs em {
   margin-left: 4px;
   font-style: normal;
+}
+.moons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.moons li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--fp-border);
+}
+.moons time {
+  display: block;
+  margin-top: 4px;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+.moons :deep(p) {
+  margin: 0;
 }
 .err {
   color: #e07a5f;
