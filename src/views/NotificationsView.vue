@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   fetchNotifications,
@@ -75,16 +75,60 @@ watch(
   { immediate: true },
 )
 
+const router = useRouter()
+const SITE = /^https?:\/\/fishpi\.cn(?=\/|$)/
+
+function localize(url: string) {
+  return url.replace(SITE, '') || '/'
+}
+
 function noticeHref(n: NoticeItem) {
-  return (n.commentSharpURL || n.url || '').replace('https://fishpi.cn', '')
+  const url = n.commentSharpURL || n.url || ''
+  return url ? localize(url) : ''
 }
 
 function noticeTitle(n: NoticeItem) {
-  return n.commentArticleTitle || n.articleTitle || n.userName || '通知'
+  return n.commentArticleTitle || n.articleTitle || ''
+}
+
+function noticeAuthor(n: NoticeItem) {
+  return n.commentAuthorName || n.authorName || n.userName || ''
+}
+
+function noticeAvatar(n: NoticeItem) {
+  return n.commentAuthorThumbnailURL || n.thumbnailURL || n.userAvatarURL || ''
+}
+
+/** 聊天室 @（dataType 38）的 content 是原始 Markdown，其余为服务端渲染好的 HTML。 */
+function isPlain(n: NoticeItem) {
+  return !n.commentContent && !n.description && Boolean(n.content)
+}
+
+function plainText(n: NoticeItem) {
+  return (n.content || '').replace(/<[^>]*>/g, '').trim()
 }
 
 function noticeHtml(n: NoticeItem) {
-  return n.commentContent || n.content || n.description || ''
+  const html = n.commentContent || n.description || n.content || ''
+  return html.replace(/href="https?:\/\/fishpi\.cn(?=[/"])/g, 'href="')
+}
+
+function onBodyClick(e: MouseEvent) {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return
+  const a = (e.target as HTMLElement).closest('a')
+  const href = a?.getAttribute('href') || ''
+  if (!href.startsWith('/') || href.startsWith('//') || a?.target === '_blank') return
+  e.preventDefault()
+  void router.push(href)
+}
+
+function noticeTime(n: NoticeItem) {
+  const raw = n.commentCreateTime || n.createTime || ''
+  const m = raw.match(/^\w{3} (\w{3}) (\d{2}) (\d{2}:\d{2}):\d{2} \w+ (\d{4})$/)
+  if (!m) return raw
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const mm = String(months.indexOf(m[1]!) + 1).padStart(2, '0')
+  return `${m[4]}-${mm}-${m[2]} ${m[3]}`
 }
 
 async function readType() {
@@ -135,14 +179,24 @@ async function readAll() {
     <p v-else-if="error" class="err">{{ error }}</p>
     <ol v-else>
       <li v-if="!items.length" class="hint">暂无通知</li>
-      <li v-for="(n, i) in items" :key="i" :class="{ unread: n.hasRead === false }">
-        <RouterLink v-if="n.commentAuthorName" :to="`/member/${n.commentAuthorName}`">{{ n.commentAuthorName }}</RouterLink>
-        <RouterLink v-else-if="n.authorName" :to="`/member/${n.authorName}`">{{ n.authorName }}</RouterLink>
-        <RouterLink v-else-if="n.userName" :to="`/member/${n.userName}`">{{ n.userName }}</RouterLink>
-        <RouterLink v-if="noticeHref(n)" :to="noticeHref(n)">{{ noticeTitle(n) }}</RouterLink>
-        <span v-if="!noticeHref(n)">{{ noticeTitle(n) }}</span>
-        <div class="body" v-html="noticeHtml(n)" />
-        <time>{{ n.commentCreateTime || n.createTime }}</time>
+      <li v-for="(n, i) in items" :key="n.oId || i" :class="{ unread: n.hasRead === false }">
+        <RouterLink v-if="noticeAuthor(n)" :to="`/member/${noticeAuthor(n)}`" class="avatar">
+          <img v-if="noticeAvatar(n)" :src="noticeAvatar(n)" alt="" loading="lazy" />
+        </RouterLink>
+        <div class="col">
+          <div class="meta">
+            <RouterLink v-if="noticeAuthor(n) && !n.description" :to="`/member/${noticeAuthor(n)}`">{{
+              noticeAuthor(n)
+            }}</RouterLink>
+            <RouterLink v-if="noticeHref(n) && noticeTitle(n)" :to="noticeHref(n)" class="title">{{
+              noticeTitle(n)
+            }}</RouterLink>
+            <RouterLink v-else-if="String(n.dataType) === '38'" to="/cr" class="title">聊天室</RouterLink>
+            <time>{{ noticeTime(n) }}</time>
+          </div>
+          <div v-if="isPlain(n)" class="body plain">{{ plainText(n) }}</div>
+          <div v-else class="body" @click="onBodyClick" v-html="noticeHtml(n)" />
+        </div>
       </li>
     </ol>
     <footer class="pager">
@@ -203,8 +257,36 @@ ol {
   padding: 0;
 }
 li {
+  display: flex;
+  gap: 10px;
   padding: 10px 0;
   border-bottom: 1px solid var(--fp-border);
+}
+.avatar {
+  flex: none;
+  margin: 0;
+}
+.avatar img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.col {
+  flex: 1;
+  min-width: 0;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.meta a {
+  margin: 0;
+}
+.meta time {
+  margin-left: auto;
 }
 li.unread {
   background: var(--fp-hover);
@@ -218,8 +300,24 @@ a {
   margin-right: 8px;
 }
 .body {
-  margin: 6px 0;
+  margin: 4px 0 0;
   font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.body.plain {
+  white-space: pre-wrap;
+}
+.body :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+.body :deep(a) {
+  color: var(--fp-link);
+  text-decoration: none;
+}
+.body :deep(p) {
+  margin: 0;
 }
 .pager {
   display: flex;

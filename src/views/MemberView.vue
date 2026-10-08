@@ -617,6 +617,12 @@ async function sendPoints() {
 .member-wrap {
   padding-top: 4px;
 }
+@media (max-width: 900px) {
+  .member-wrap > .side {
+    order: -1;
+    margin-bottom: 16px;
+  }
+}
 
 /* 主内容区 */
 .tab-panel {

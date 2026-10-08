@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { articleTitle } from '@/utils/text'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -221,7 +222,7 @@ usePageSeo(() => {
   }
   const author = a.articleAuthorName || a.articleAuthor?.userName || ''
   return {
-    title: a.articleTitle,
+    title: articleTitle(a),
     description: articleDesc.value,
     path: `/article/${a.oId}`,
     image: a.articleAuthorThumbnailURL48,
@@ -229,7 +230,7 @@ usePageSeo(() => {
     jsonLd: {
       '@context': 'https://schema.org',
       '@type': 'Article',
-      headline: a.articleTitle,
+      headline: articleTitle(a),
       description: articleDesc.value,
       author: author
         ? { '@type': 'Person', name: author, url: absoluteUrl(`/member/${author}`) }
@@ -564,7 +565,7 @@ async function onReactComment(c: ArticleComment, value: string) {
     <article class="card post">
       <div class="article-title-row">
         <span v-if="article.articlePerfect" class="icon-perfect" title="优选">🌟</span>
-        <h1>{{ article.articleTitleEmoj || article.articleTitle }}</h1>
+        <h1>{{ articleTitle(article) }}</h1>
       </div>
 
       <div v-if="typeBadge || Number(article.articleStickRemains) > 0 || column" class="badges">
@@ -624,11 +625,11 @@ async function onReactComment(c: ArticleComment, value: string) {
 
       <nav v-if="column && (column.previous || column.next)" class="chapter-nav">
         <RouterLink v-if="column.previous" :to="column.previous.articlePermalink" class="chapter-link">
-          ← 第 {{ column.previous.chapterNo }} 章 {{ column.previous.articleTitleEmoj || column.previous.articleTitle }}
+          ← 第 {{ column.previous.chapterNo }} 章 {{ articleTitle(column.previous) }}
         </RouterLink>
         <span v-else />
         <RouterLink v-if="column.next" :to="column.next.articlePermalink" class="chapter-link next">
-          第 {{ column.next.chapterNo }} 章 {{ column.next.articleTitleEmoj || column.next.articleTitle }} →
+          第 {{ column.next.chapterNo }} 章 {{ articleTitle(column.next) }} →
         </RouterLink>
       </nav>
 
@@ -895,7 +896,7 @@ async function onReactComment(c: ArticleComment, value: string) {
             class="avatar-mini"
             :style="a.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${a.articleAuthorThumbnailURL48}')` } : undefined"
           />
-          <RouterLink :to="`/article/${a.oId}`">{{ a.articleTitleEmoj || a.articleTitle }}</RouterLink>
+          <RouterLink :to="`/article/${a.oId}`">{{ articleTitle(a) }}</RouterLink>
         </li>
       </ul>
     </section>
@@ -961,6 +962,21 @@ async function onReactComment(c: ArticleComment, value: string) {
 }
 .card.post {
   padding: 24px 28px;
+}
+
+@media (max-width: 1099px) {
+  .toc {
+    position: static;
+    align-self: stretch;
+  }
+}
+@media (max-width: 768px) {
+  .toc {
+    display: none;
+  }
+  .card.post {
+    padding: 16px;
+  }
 }
 
 @media (min-width: 1100px) {
@@ -1301,6 +1317,14 @@ h1 {
   margin-bottom: 8px;
   gap: 8px;
 }
+@media (max-width: 768px) {
+  .cmt-header {
+    flex-wrap: wrap;
+  }
+  .cmt-actions-right {
+    justify-content: flex-start;
+  }
+}
 .cmt-meta-left {
   display: flex;
   align-items: center;
@@ -1328,7 +1352,12 @@ h1 {
 .cmt-actions-right {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
+}
+.cmt-actions-right > * {
+  white-space: nowrap;
 }
 .btn-text {
   background: none;

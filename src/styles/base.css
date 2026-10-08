@@ -24,6 +24,11 @@
   --fp-nav-h: 58px;
   --fp-wrap: 1300px;
 }
+@media (max-width: 768px) {
+  :root {
+    --fp-nav-h: 88px;
+  }
+}
 
 * {
   box-sizing: border-box;

@@ -25,6 +25,9 @@
 | 14 | P1 | 调整 | `POST /article/stick` | 置顶支持 apiKey（现网只认 Cookie 会话） |
 | 15 | P2 | 调整 | `GET /api/article/{id}` | 补相关帖子、上一贴/下一贴 |
 | 16 | P2 | 调整 | `GET /api/article/{id}` | 评论排序参数（现网固定正序） |
+| 17 | P2 | 新增 | `GET /api/milestones`、`GET /api/statistic` | 大事记、数据统计（现网仅 FTL，前端暂交给 Rhythm 渲染） |
+| 18 | P2 | 调整 | `GET /api/user` | 返回 `userGuideStep`，以便新用户跳 `/guide` |
+| 19 | P2 | 调整 | `GET /api/breezemoons` | 返回原始 Markdown，支持编辑清风明月 |
 
 ---
 
@@ -317,6 +320,22 @@ GET /api/city/{cityName}?p=1&size=20
 ## 16. 评论排序参数（P2，调整）
 
 `showArticleApi` 里 `cmtViewMode` 写死为 `0`（传统正序）。请支持 `?m=0|1`（正序/实时倒序），与网页端用户设置 `userCommentViewMode` 一致。另外 `pagination` 在 `data` 层而不在 `article` 里，前端已适配，无需调整。
+
+## 17. 大事记与数据统计 JSON（P2，新增）
+
+`/milestones`、`/milestones/submit`、`/statistic`、`/guide` 现网都只有 FTL，且 `loginCheck` 只认 Cookie 会话。前端目前的做法：点击时先用 apiKey 换页面会话（`/__fp/page-auth`），再整页跳到 Rhythm 渲染的页面；部署时这些路径要转发到 Rhythm（见 `docs/nginx.example.conf`）。如需做成 SPA 页面，请提供：
+
+- `GET /api/milestones?p=&size=`：`[{ oId, milestoneTitle, milestoneContent, milestoneDate, milestoneImage, milestoneLink }]`
+- `POST /api/milestones`：提交大事记（现网 `submitMilestone` 用 `Sessions.getUser()`，apiKey 拿不到用户）
+- `GET /api/statistic`：`statistic.ftl` 用到的按日/按月注册、发帖、回帖序列
+
+## 18. 新人引导状态（P2，调整）
+
+现网列表页对 `!UserExt.finishedGuide(user)` 的用户重定向到 `/guide`。`GET /api/user` 没有 `userGuideStep`，SPA 无法判断。请在返回里加 `userGuideStep`；`POST /guide/next` 同样需要支持 apiKey。
+
+## 19. 清风明月原文（P2，调整）
+
+`GET /api/breezemoons` 只返回渲染后的 `breezemoonContent`（HTML），编辑时无法还原 Markdown。请增加 `breezemoonContentRaw`（或 `?raw=1`）。前端目前只提供删除，不提供编辑。
 
 ---
 

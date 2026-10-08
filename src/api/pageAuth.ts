@@ -69,3 +69,15 @@ export function clearPageAuthCache() {
     }
   }
 }
+
+/** 跳到 Rhythm 渲染的页面（游戏、里程碑、统计等）：先换好页面会话，失败也照常跳转，由现网决定是否要求登录。 */
+export async function openRhythmPage(href: string, apiKey?: string | null) {
+  if (apiKey) {
+    try {
+      await ensureCsrfToken(apiKey)
+    } catch {
+      /* 现网会自行跳登录 */
+    }
+  }
+  window.location.href = href
+}

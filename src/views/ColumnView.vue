@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { articleTitle } from '@/utils/text'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -95,7 +96,7 @@ watch(columnId, () => void load(), { immediate: true })
       <li v-if="!chapters.length" class="hint">暂无章节</li>
       <li v-for="item in chapters" :key="item.oId">
         <RouterLink :to="`/article/${item.oId}`">
-          {{ item.articleTitleEmoj || item.articleTitle }}
+          {{ articleTitle(item) }}
         </RouterLink>
         <span>{{ item.articleCreateTimeStr || item.timeAgo || '' }}</span>
       </li>

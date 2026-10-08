@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { articleTitle } from '@/utils/text'
 import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -57,7 +58,7 @@ watch(apiKey, () => void loadExtra())
       <ul v-else class="feed">
         <li v-if="!randoms.length" class="hint">暂无推荐</li>
         <li v-for="a in randoms" :key="a.oId">
-          <RouterLink :to="`/article/${a.oId}`">{{ a.articleTitleEmoj || a.articleTitle }}</RouterLink>
+          <RouterLink :to="`/article/${a.oId}`">{{ articleTitle(a) }}</RouterLink>
           <span v-if="a.articleAuthorName">
             ·
             <RouterLink :to="`/member/${a.articleAuthorName}`">{{ a.articleAuthorName }}</RouterLink>

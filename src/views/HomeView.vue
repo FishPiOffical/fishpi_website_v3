@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { articleTitle } from '@/utils/text'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -307,7 +308,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                 />
               </RouterLink>
               <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
-                item.articleTitleEmoj || item.articleTitle
+                articleTitle(item)
               }}</RouterLink>
               <span class="count">{{ views(item) }}</span>
             </li>
@@ -334,7 +335,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                 />
               </RouterLink>
               <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
-                item.articleTitleEmoj || item.articleTitle
+                articleTitle(item)
               }}</RouterLink>
               <span class="count">{{ views(item) }}</span>
             </li>
@@ -429,7 +430,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             <template v-else>
               <article v-for="item in longRecentShelf" :key="item.oId" class="long-card">
                 <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
-                  item.articleTitleEmoj || item.articleTitle
+                  articleTitle(item)
                 }}</RouterLink>
                 <div class="long-meta">
                   <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
@@ -480,7 +481,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             <template v-else>
               <article v-for="item in longHotShelf" :key="'hot-' + item.oId" class="long-card hot">
                 <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
-                  item.articleTitleEmoj || item.articleTitle
+                  articleTitle(item)
                 }}</RouterLink>
                 <div class="long-meta">
                   <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
@@ -571,7 +572,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                 />
               </RouterLink>
               <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
-                item.articleTitleEmoj || item.articleTitle
+                articleTitle(item)
               }}</RouterLink>
               <span class="count heat">🔥 {{ heat(item) }}</span>
             </li>

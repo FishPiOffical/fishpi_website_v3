@@ -198,6 +198,7 @@ export interface NoticeItem {
   isComment?: boolean
   thumbnailURL?: string
   dataId?: string
+  dataType?: string | number
 }
 
 export interface UnreadCount {
@@ -1279,6 +1280,16 @@ export async function postBreezemoon(apiKey: string, content: string) {
     body: JSON.stringify({ apiKey, breezemoonContent: content }),
   })
   if (res.code) throw new Error(res.msg || '发布失败')
+}
+
+export async function removeBreezemoon(apiKey: string, id: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>(`/breezemoon/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { csrfToken },
+  })
+  if (res.code) throw new Error(res.msg || '删除失败')
 }
 
 export async function fetchCheckinRank(apiKey?: string | null): Promise<RankUser[]> {

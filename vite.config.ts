@@ -121,6 +121,9 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/activities': proxy,
+        '/milestones': proxy,
+        '/statistic': proxy,
+        '/guide': proxy,
         '/column': {
           ...proxy,
           bypass(req) {

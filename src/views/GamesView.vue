@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { ensureCsrfToken } from '@/api/pageAuth'
+import { openRhythmPage } from '@/api/pageAuth'
 import { submitFishGame } from '@/api/fishpi'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
@@ -41,15 +41,8 @@ const busy = ref(false)
 const msg = ref('')
 const err = ref('')
 
-async function openGame(href: string) {
-  if (apiKey.value) {
-    try {
-      await ensureCsrfToken(apiKey.value)
-    } catch {
-      /* 仍尝试打开，现网可能要求页面会话 */
-    }
-  }
-  window.location.href = href
+function openGame(href: string) {
+  return openRhythmPage(href, apiKey.value)
 }
 
 async function submit() {
@@ -89,7 +82,7 @@ async function submit() {
     <section class="card">
       <h1>游戏 / 鱼游</h1>
       <p class="hint">
-        官方小游戏在 Rhythm 页面中运行；点击后会换取页面会话并跳转。鱼游为社区投稿，现网暂无公开列表 JSON，可在此投稿。
+        官方小游戏在 Rhythm 页面中运行；点击后会换取页面会话并跳转。鱼游为社区投稿，可在下方投稿。
       </p>
     </section>
 
@@ -125,7 +118,9 @@ async function submit() {
     <section class="card">
       <h2>鱼游投稿</h2>
       <p class="hint">
-        审核通过后的鱼游在现网 <code>/activities</code> 展示；公开列表接口见 docs/MISSING_APIS.md。
+        审核通过的鱼游暂无公开 JSON，列表、点赞和评论在
+        <a href="/activities" @click.prevent="openGame('/activities')">鱼游广场</a>
+        （由现网渲染）。
       </p>
       <p v-if="!isLoggedIn" class="hint">
         <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>

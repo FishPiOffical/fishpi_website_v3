@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { fetchBreezemoons, postBreezemoon, type Breezemoon } from '@/api/fishpi'
+import { fetchBreezemoons, postBreezemoon, removeBreezemoon, type Breezemoon } from '@/api/fishpi'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeBreezemoonsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
@@ -10,7 +10,10 @@ import { useAuthStore } from '@/stores/auth'
 usePageSeo(() => ({ title: '清风明月', path: '/breezemoons', description: '摸鱼派清风明月' }))
 
 const auth = useAuthStore()
-const { apiKey, isLoggedIn } = storeToRefs(auth)
+const { apiKey, isLoggedIn, account } = storeToRefs(auth)
+const PAGE_SIZE = 30
+const page = ref(1)
+const myName = computed(() => account.value?.userName || '')
 const items = ref<Breezemoon[]>([])
 const error = ref('')
 const loading = ref(true)
@@ -20,8 +23,8 @@ const sending = ref(false)
 async function load() {
   loading.value = true
   try {
-    const cached = consumeBreezemoonsPayload()
-    items.value = cached || (await fetchBreezemoons(1, 30))
+    const cached = page.value === 1 ? consumeBreezemoonsPayload() : null
+    items.value = cached || (await fetchBreezemoons(page.value, PAGE_SIZE))
     error.value = ''
   } catch (e) {
     error.value = e instanceof Error ? e.message : '加载失败'
@@ -30,7 +33,21 @@ async function load() {
   }
 }
 
-watch(apiKey, () => void load(), { immediate: true })
+watch([apiKey, page], () => void load(), { immediate: true })
+
+const removing = ref('')
+async function remove(item: Breezemoon) {
+  if (!apiKey.value || !window.confirm('确定删除这条清风明月？')) return
+  removing.value = item.oId
+  try {
+    await removeBreezemoon(apiKey.value, item.oId)
+    items.value = items.value.filter((x) => x.oId !== item.oId)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '删除失败'
+  } finally {
+    removing.value = ''
+  }
+}
 
 async function submit() {
   if (!apiKey.value || !draft.value.trim()) return
@@ -38,7 +55,8 @@ async function submit() {
   try {
     await postBreezemoon(apiKey.value, draft.value.trim())
     draft.value = ''
-    await load()
+    if (page.value === 1) await load()
+    else page.value = 1
   } catch (e) {
     error.value = e instanceof Error ? e.message : '发布失败'
   } finally {
@@ -64,11 +82,25 @@ async function submit() {
             <b><RouterLink v-if="item.breezemoonAuthorName" :to="`/member/${item.breezemoonAuthorName}`">{{ item.breezemoonAuthorName }}</RouterLink></b>
             <time>{{ item.timeAgo }}</time>
             <span v-if="item.breezemoonCity">{{ item.breezemoonCity }}</span>
+            <button
+              v-if="myName && item.breezemoonAuthorName === myName"
+              type="button"
+              class="del"
+              :disabled="removing === item.oId"
+              @click="remove(item)"
+            >
+              删除
+            </button>
           </header>
           <div class="body" v-html="item.breezemoonContent || ''" />
         </div>
       </li>
     </ol>
+    <footer v-if="!loading && (page > 1 || items.length >= PAGE_SIZE)" class="pager">
+      <button type="button" :disabled="page <= 1" @click="page -= 1">上一页</button>
+      <span>{{ page }}</span>
+      <button type="button" :disabled="items.length < PAGE_SIZE" @click="page += 1">下一页</button>
+    </footer>
   </section>
 </template>
 
@@ -135,6 +167,31 @@ header a {
   margin: 0;
   word-break: break-all;
   overflow-wrap: anywhere;
+}
+.del {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--fp-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.del:hover {
+  color: #e07a5f;
+}
+.pager {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  align-items: center;
+}
+.pager button {
+  border: 1px solid var(--fp-border);
+  background: transparent;
+  color: var(--fp-text);
+  border-radius: 8px;
+  padding: 4px 12px;
+  cursor: pointer;
 }
 .composer {
   display: flex;

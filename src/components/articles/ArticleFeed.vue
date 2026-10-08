@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { articleTitle } from '@/utils/text'
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { ArticleSummary } from '@/api/fishpi'
@@ -18,7 +19,7 @@ const props = withDefaults(
 const rows = computed(() => props.items)
 
 function titleOf(a: ArticleSummary) {
-  return a.articleTitleEmoj || a.articleTitle || '无标题'
+  return articleTitle(a) || '无标题'
 }
 
 function views(a: ArticleSummary) {

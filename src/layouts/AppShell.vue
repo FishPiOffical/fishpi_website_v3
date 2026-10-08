@@ -9,6 +9,7 @@ import { useWhisperStore } from '@/stores/whispers'
 import { useChatStore } from '@/stores/chat'
 import AdSlot from '@/components/ads/AdSlot.vue'
 import LogoMark from '@/components/LogoMark.vue'
+import { openRhythmPage } from '@/api/pageAuth'
 
 const nav = [
   { to: '/', label: '最新' },
@@ -60,7 +61,7 @@ const goodSites = [
 const exploreLinks = [
   { href: 'https://github.com/orgs/FishPiOffical/repositories', label: '摸鱼派开源项目组', external: true },
   { href: 'https://github.com/FishPiOffical/rhythm', label: 'Rhythm社区引擎', external: true },
-  { href: 'https://fishpi.cn/milestones', label: '大事记', external: true },
+  { href: '/milestones', label: '大事记', external: false, rhythm: true },
   { href: '/domains', label: '领域', external: false },
   { href: '/tags', label: '标签', external: false },
   { href: 'https://cloudy.iwpz.cn', label: 'Cloudy 词云', external: true },
@@ -81,7 +82,7 @@ const clientLinks = [
 const legalLinks = [
   { href: '/article/1630569106133', label: '关于', external: false },
   { href: '/tags/announcement', label: '系统公告', external: false },
-  { href: 'https://fishpi.cn/statistic', label: '数据统计', external: true },
+  { href: '/statistic', label: '数据统计', external: false, rhythm: true },
   { href: '/agreement', label: '用户协议', external: false },
   { href: '/privacy', label: '隐私政策', external: false },
   { href: '/logs', label: '日志公开', external: false },
@@ -90,6 +91,7 @@ const legalLinks = [
 ]
 
 const route = useRoute()
+const openRhythm = (href: string) => openRhythmPage(href, auth.apiKey)
 /** 需登录页服务端只出空壳，避免 hydration 复用错页面 DOM（含 scoped 样式标记）。 */
 const ssrAuthShell = computed(() => import.meta.env.SSR && Boolean(route.meta.auth))
 const router = useRouter()
@@ -199,6 +201,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
       <div class="user">
         <template v-if="isLoggedIn">
           <RouterLink to="/pre-post" class="bar-link">发帖</RouterLink>
+          <RouterLink to="/games" class="bar-link" title="活动">游戏</RouterLink>
           <RouterLink to="/chat" class="bar-link icon-link" title="私信">
             私信
             <em v-if="whisperUnread" class="badge">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</em>
@@ -302,6 +305,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
               <template v-for="(s, i) in exploreLinks" :key="s.href">
                 <span v-if="i">｜</span>
                 <a v-if="s.external" :href="s.href" target="_blank" rel="noopener">{{ s.label }}</a>
+                <a v-else-if="'rhythm' in s" :href="s.href" @click.prevent="openRhythm(s.href)">{{ s.label }}</a>
                 <RouterLink v-else :to="s.href">{{ s.label }}</RouterLink>
               </template>
             </p>
@@ -339,6 +343,9 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
             <p class="legal-links">
               <template v-for="item in legalLinks" :key="item.href">
                 <a v-if="item.external" :href="item.href" target="_blank" rel="noopener">{{ item.label }}</a>
+                <a v-else-if="'rhythm' in item" :href="item.href" @click.prevent="openRhythm(item.href)">{{
+                  item.label
+                }}</a>
                 <RouterLink v-else :to="item.href">{{ item.label }}</RouterLink>
               </template>
             </p>
@@ -751,6 +758,36 @@ main.main--cr-modern {
   }
   .slogan {
     flex: none;
+  }
+}
+@media (max-width: 768px) {
+  .nav {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    height: auto;
+    row-gap: 2px;
+    padding: 5px 10px 0;
+  }
+  nav {
+    order: 3;
+    flex: 0 0 100%;
+    justify-content: flex-start;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  nav::-webkit-scrollbar {
+    display: none;
+  }
+  nav a {
+    padding: 4px 8px;
+  }
+  .search {
+    display: none;
+  }
+  .user {
+    gap: 10px;
   }
 }
 </style>
