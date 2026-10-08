@@ -2,23 +2,33 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { fetchPointRecords, type PointRecord } from '@/api/fishpi'
+import { fetchPointRecords, fetchUserPoint, type PointRecord } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
+import { usePageSeo } from '@/composables/usePageSeo'
 
 const auth = useAuthStore()
-const { apiKey } = storeToRefs(auth)
+const { apiKey, account, isLoggedIn } = storeToRefs(auth)
 const items = ref<PointRecord[]>([])
+const balance = ref<number | null>(null)
 const page = ref(1)
 const loading = ref(false)
 const error = ref('')
-const fromNotice = computed(() => items.value.some((r) => String(r.oId || '').startsWith('notice-')))
+
+usePageSeo(() => ({ title: '积分流水', path: '/points', robots: 'noindex' }))
+
+const userName = computed(() => account.value?.userName || '')
 
 async function load() {
-  if (!apiKey.value) return
+  if (!apiKey.value || !userName.value) return
   loading.value = true
   error.value = ''
   try {
-    items.value = await fetchPointRecords(apiKey.value, page.value)
+    const [records, point] = await Promise.all([
+      fetchPointRecords(apiKey.value, page.value),
+      fetchUserPoint(userName.value, apiKey.value),
+    ])
+    items.value = records
+    balance.value = point ? point.userPoint : (account.value?.userPoint ?? null)
   } catch (e) {
     error.value = e instanceof Error ? e.message : '积分流水失败'
     items.value = []
@@ -28,36 +38,64 @@ async function load() {
 }
 
 watch(
-  () => [apiKey.value, page.value],
+  () => [apiKey.value, userName.value, page.value],
   () => void load(),
   { immediate: true },
 )
+
+function sumClass(r: PointRecord) {
+  if (r.type === '-') return 'out'
+  if (r.type === '+') return 'in'
+  return ''
+}
+
+function sumText(r: PointRecord) {
+  if (r.sum == null) return ''
+  const n = Number(r.sum)
+  if (r.type === '-') return `-${n}`
+  if (r.type === '+') return `+${n}`
+  return String(n)
+}
 </script>
 
 <template>
   <section class="card">
     <h1>积分流水</h1>
-    <p class="hint">
-      <RouterLink to="/settings/point">积分转账</RouterLink>
-      ·
-      <RouterLink to="/activity">活动签到</RouterLink>
+    <p v-if="!isLoggedIn" class="hint">
+      <RouterLink to="/login">登录</RouterLink>
+      后查看积分余额与变动。
     </p>
-    <p v-if="fromNotice" class="hint">独立流水接口未开放时，回退到积分通知列表。</p>
-    <p v-if="loading" class="hint">加载中…</p>
-    <p v-else-if="error" class="err">{{ error }}</p>
-    <ol v-else>
-      <li v-if="!items.length" class="hint">暂无记录</li>
-      <li v-for="(r, i) in items" :key="r.oId || i">
-        <div v-html="r.description || r.type || '积分变动'" />
-        <span>{{ r.time || r.createTime }}</span>
-        <em v-if="r.sum != null">{{ r.sum }}</em>
-      </li>
-    </ol>
-    <footer class="pager">
-      <button type="button" :disabled="page <= 1" @click="page -= 1">上一页</button>
-      <span>{{ page }}</span>
-      <button type="button" :disabled="items.length < 10" @click="page += 1">下一页</button>
-    </footer>
+    <template v-else>
+      <p v-if="balance != null" class="balance">
+        当前积分 <b>{{ balance.toLocaleString() }}</b>
+      </p>
+      <p class="hint">
+        <RouterLink to="/settings/point">积分转账</RouterLink>
+        ·
+        <RouterLink to="/activity">活动签到</RouterLink>
+      </p>
+      <p class="hint">
+        流水来自 <code>GET /api/getNotifications?type=point</code>；余额来自
+        <code>GET /user/:name/point</code>。
+      </p>
+      <p v-if="loading" class="hint">加载中…</p>
+      <p v-else-if="error" class="err">{{ error }}</p>
+      <ol v-else>
+        <li v-if="!items.length" class="hint">暂无记录</li>
+        <li v-for="(r, i) in items" :key="r.oId || i">
+          <div class="row">
+            <div class="desc" v-html="r.description || r.type || '积分变动'" />
+            <em v-if="r.sum != null" :class="sumClass(r)">{{ sumText(r) }}</em>
+          </div>
+          <span>{{ r.time || r.createTime }}</span>
+        </li>
+      </ol>
+      <footer class="pager">
+        <button type="button" :disabled="page <= 1" @click="page -= 1">上一页</button>
+        <span>{{ page }}</span>
+        <button type="button" :disabled="items.length < 10" @click="page += 1">下一页</button>
+      </footer>
+    </template>
   </section>
 </template>
 
@@ -72,12 +110,25 @@ h1 {
   margin: 0 0 12px;
   font-size: 18px;
 }
+.balance {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--fp-head);
+}
+.balance b {
+  color: var(--fp-green);
+  font-size: 20px;
+  margin-left: 6px;
+}
 .hint {
   color: var(--fp-muted);
   font-size: 13px;
 }
 .hint a {
   color: var(--fp-link);
+}
+.hint code {
+  font-size: 12px;
 }
 .err {
   color: #e07a5f;
@@ -92,12 +143,31 @@ li {
   border-bottom: 1px solid var(--fp-border);
   font-size: 14px;
 }
-span,
-em {
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.desc {
+  min-width: 0;
+  flex: 1;
+}
+span {
   color: var(--fp-muted);
   font-size: 12px;
+}
+em {
   font-style: normal;
-  margin-right: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+em.in {
+  color: var(--fp-income);
+}
+em.out {
+  color: var(--fp-accent);
 }
 .pager {
   display: flex;

@@ -13,6 +13,62 @@ const env = loadEnv(isProd ? 'production' : 'development', root, '')
 const apiTarget = process.env.VITE_API_TARGET || env.VITE_API_TARGET || 'https://fishpi.cn'
 process.env.VITE_API_TARGET = apiTarget
 
+const FISHPI_UA =
+  'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
+
+function extractCsrfToken(html) {
+  const m = String(html).match(/csrfToken\s*:\s*['"]([^'"]+)['"]/)
+  return m?.[1]?.trim() || ''
+}
+
+function parseSetCookie(res) {
+  const raw =
+    typeof res.headers.getSetCookie === 'function'
+      ? res.headers.getSetCookie()
+      : res.headers.get('set-cookie')
+        ? [res.headers.get('set-cookie')]
+        : []
+  const out = {}
+  for (const line of raw || []) {
+    const m = String(line).match(/^([^=]+)=([^;]+)/)
+    if (m) out[m[1]] = m[2]
+  }
+  return out
+}
+
+/** apiKey → sym-ce cookie + csrfToken (Rhythm page POSTs, e.g. profession). */
+async function exchangePageAuth(apiKey) {
+  const loginRes = await fetch(`${apiTarget}/loginWebInApiKey?apiKey=${encodeURIComponent(apiKey)}`, {
+    method: 'GET',
+    redirect: 'manual',
+    headers: {
+      'User-Agent': FISHPI_UA,
+      Referer: `${apiTarget}/login`,
+    },
+  })
+  const cookies = parseSetCookie(loginRes)
+  const symCe = cookies['sym-ce']
+  if (!symCe) {
+    throw new Error('无法换取页面会话，请检查 apiKey')
+  }
+  const settingsRes = await fetch(`${apiTarget}/settings`, {
+    headers: {
+      'User-Agent': FISHPI_UA,
+      Referer: `${apiTarget}/`,
+      Cookie: `sym-ce=${symCe}`,
+    },
+  })
+  if (!settingsRes.ok) {
+    throw new Error('读取设置页失败')
+  }
+  const html = await settingsRes.text()
+  const csrfToken = extractCsrfToken(html)
+  if (!csrfToken) {
+    throw new Error('设置页未返回 csrfToken')
+  }
+  return { csrfToken, symCe }
+}
+
 function injectHtml(template, { appHtml, headPayload, payload, cssLinks }) {
   const head = [cssLinks || '', headPayload.headTags || '', headPayload.bodyTagsOpen || '']
     .filter(Boolean)
@@ -112,6 +168,27 @@ async function createServer() {
   /** @type {Record<string, string[]> | null} */
   let ssrManifest = null
 
+  app.use(express.json({ limit: '32kb' }))
+
+  app.post('/__fp/page-auth', async (req, res) => {
+    try {
+      const apiKey = String(req.body?.apiKey || '')
+      if (!apiKey) {
+        res.status(400).json({ code: -1, msg: '缺少 apiKey' })
+        return
+      }
+      const { csrfToken, symCe } = await exchangePageAuth(apiKey)
+      // Same cookie name as Rhythm so Vite/nginx proxy forwards it upstream.
+      res.setHeader(
+        'Set-Cookie',
+        `sym-ce=${symCe}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`,
+      )
+      res.status(200).json({ code: 0, csrfToken })
+    } catch (e) {
+      res.status(502).json({ code: -1, msg: e instanceof Error ? e.message : 'page-auth 失败' })
+    }
+  })
+
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite')
     vite = await createViteServer({
@@ -139,6 +216,7 @@ async function createServer() {
     const url = req.originalUrl
     // Let Vite / static handle assets and API proxies (dev proxies are on vite.middlewares).
     if (
+      url.startsWith('/__fp/') ||
       url.startsWith('/src/') ||
       url.startsWith('/@') ||
       url.startsWith('/node_modules/') ||

@@ -54,7 +54,9 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - 匿名可读：帖子列表/详情/搜索/领域/标签墙/问答 `GET /api/articles/qna`、优选 `GET /api/articles/perfect`
 - 帖子正文目录（从正文 h1–h3 生成）
 - 帖子修订历史 `GET /article/{id}/revisions/list|/{revisionId}`（需登录）
-- 设置页职业主职/隐私 UI → `POST /api/profession/me/primary|privacy`（读 `GET /api/profession/me`；现网纯 apiKey POST 可能被 CSRF 拦下）
+- 设置页职业主职/隐私 UI → `POST /api/profession/me/primary|privacy`（读 `GET /api/profession/me`；写操作经 `POST /__fp/page-auth` 换取 `sym-ce` + `csrfToken`）
+- 积分余额 `GET /user/:name/point`；流水走 `GET /api/getNotifications?type=point`（现网无 apiKey 独立流水 JSON，OpenID 除外）
+- 聊天室进房前预拉 `GET /chat-room/online-users`（在线列表/话题）
 - 用户主页清风明月 `GET /api/user/{name}/breezemoons`（需登录）
 
 闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。

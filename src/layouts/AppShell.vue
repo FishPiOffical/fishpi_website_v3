@@ -86,7 +86,10 @@ function logout() {
         <template v-if="isLoggedIn">
           <RouterLink to="/post">发帖</RouterLink>
           <RouterLink to="/stars">收藏</RouterLink>
-          <RouterLink to="/points">积分</RouterLink>
+          <RouterLink to="/points" class="points-link">
+            积分
+            <em v-if="account?.userPoint != null" class="pts">{{ Number(account.userPoint).toLocaleString() }}</em>
+          </RouterLink>
           <RouterLink to="/chat">
             私信
             <em v-if="whisperUnread" class="badge">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</em>
@@ -221,6 +224,12 @@ nav a:hover {
   font-size: 10px;
   font-style: normal;
   text-align: center;
+}
+.points-link .pts {
+  margin-left: 4px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--fp-green);
 }
 .user button {
   border: 0;

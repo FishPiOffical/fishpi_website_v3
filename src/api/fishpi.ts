@@ -70,6 +70,7 @@ export interface PointRecord {
 export type NoticeType = 'commented' | 'reply' | 'at' | 'following' | 'point' | 'broadcast' | 'sys-announce'
 
 export interface NoticeItem {
+  oId?: string
   hasRead?: boolean
   description?: string
   createTime?: string
@@ -87,6 +88,7 @@ export interface NoticeItem {
   url?: string
   isComment?: boolean
   thumbnailURL?: string
+  dataId?: string
 }
 
 export interface UnreadCount {
@@ -1122,18 +1124,24 @@ export async function fetchProfessionMe(apiKey: string): Promise<ProfessionMe | 
 }
 
 export async function setProfessionPrimary(apiKey: string, professionId: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
   const res = await request<Envelope<ProfessionMe>>('/api/profession/me/primary', {
     method: 'POST',
-    body: JSON.stringify({ apiKey, professionId }),
+    headers: { csrfToken },
+    body: JSON.stringify({ professionId }),
   })
   if (res.code) throw new Error(res.msg || '设置主职业失败')
   return res.data ?? null
 }
 
 export async function setProfessionPrivacy(apiKey: string, preset: string) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
   const res = await request<Envelope<ProfessionMe>>('/api/profession/me/privacy', {
     method: 'POST',
-    body: JSON.stringify({ apiKey, preset }),
+    headers: { csrfToken },
+    body: JSON.stringify({ preset }),
   })
   if (res.code) throw new Error(res.msg || '设置职业隐私失败')
   return res.data ?? null
@@ -1390,24 +1398,50 @@ export async function fetchFollowers(userName: string, apiKey?: string | null, p
   )
 }
 
-export async function fetchPointRecords(apiKey: string, page = 1): Promise<PointRecord[]> {
-  const paths = [`/api/point/records?p=${page}`, `/api/user/points?p=${page}`, `/activity/point?p=${page}`]
-  for (const path of paths) {
-    try {
-      const res = await request<Envelope<PointRecord[] | { records?: PointRecord[] }>>(withKey(path, apiKey))
-      const data = res.data
-      if (Array.isArray(data) && data.length) return data
-      if (data && !Array.isArray(data) && Array.isArray(data.records) && data.records.length) return data.records
-    } catch {
-      /* try next */
+export async function fetchUserPoint(userName: string, apiKey?: string | null) {
+  try {
+    const res = await request<Envelope<{ userPoint?: number; userName?: string }>>(
+      withKey(`/user/${encodeURIComponent(userName)}/point`, apiKey),
+    )
+    if (res.code === 0 && res.data) {
+      return {
+        userName: res.data.userName || userName,
+        userPoint: Number(res.data.userPoint || 0),
+      }
     }
+  } catch {
+    /* optional */
   }
+  return null
+}
+
+function parsePointNotice(description: string): { sum?: number; operation?: '+' | '-' } {
+  const text = description.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const m = text.match(/(-?\d+)\s*积分/)
+  if (!m) return {}
+  const n = Number(m[1])
+  if (!Number.isFinite(n)) return {}
+  if (text.includes('扣除') || text.includes('支付') || text.includes('转出') || n < 0) {
+    return { sum: Math.abs(n), operation: '-' }
+  }
+  return { sum: Math.abs(n), operation: '+' }
+}
+
+export async function fetchPointRecords(apiKey: string, page = 1): Promise<PointRecord[]> {
+  // Rhythm 暂无 apiKey 版独立积分流水 JSON；OpenID `/openid/user/points` 需 OAuth。
+  // apiKey 路径：积分通知列表（与现网客户端一致的可读流水来源）。
   const notices = await fetchNotifications(apiKey, 'point', page)
-  return notices.map((n, i) => ({
-    oId: `notice-${i}`,
-    description: n.description || n.content || '积分变动',
-    time: n.createTime,
-  }))
+  return notices.map((n, i) => {
+    const description = n.description || n.content || '积分变动'
+    const parsed = parsePointNotice(description)
+    return {
+      oId: n.oId || `notice-${i}`,
+      description,
+      time: n.createTime,
+      sum: parsed.sum,
+      type: parsed.operation,
+    }
+  })
 }
 
 export async function followUser(apiKey: string, followingId: string) {

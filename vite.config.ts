@@ -19,6 +19,16 @@ export default defineConfig(({ mode }) => {
     changeOrigin: true,
     secure: true,
     headers: { 'User-Agent': FISHPI_UA, Referer: `${target}/` },
+    // Forward page-session cookie + Rhythm CSRF header for profession POSTs.
+    cookieDomainRewrite: '',
+    configure(proxyServer) {
+      proxyServer.on('proxyReq', (proxyReq, req) => {
+        const csrf = req.headers.csrftoken || req.headers.csrfToken
+        if (csrf && !proxyReq.getHeader('csrfToken')) {
+          proxyReq.setHeader('csrfToken', Array.isArray(csrf) ? csrf[0] : csrf)
+        }
+      })
+    },
   }
 
   return {
@@ -41,6 +51,8 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/api': proxy,
+        // apiKey → web session (sym-ce); used by server page-auth and direct clients.
+        '/loginWebInApiKey': proxy,
         '/chat-room': { ...proxy, ws: true },
         '/chat-room-channel': { ...proxy, ws: true },
         '/captcha': proxy,

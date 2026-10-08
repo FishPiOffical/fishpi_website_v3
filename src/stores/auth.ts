@@ -63,6 +63,7 @@ export const useAuthStore = defineStore('auth', () => {
     account.value = null
     isVip.value = false
     if (typeof localStorage !== 'undefined') localStorage.removeItem(KEY)
+    void import('@/api/pageAuth').then((m) => m.clearPageAuthCache()).catch(() => {})
   }
 
   async function reloadAccount() {

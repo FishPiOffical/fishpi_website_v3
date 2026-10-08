@@ -4,6 +4,7 @@ import {
   fetchChatAround,
   fetchChatHistory,
   fetchChatNode,
+  fetchChatOnlineUsers,
   fetchMutes,
   openRedPacket,
   revokeChat,
@@ -124,6 +125,21 @@ export const useChatStore = defineStore('chat', () => {
       error.value = e instanceof Error ? e.message : '加载历史失败'
     } finally {
       loading.value = false
+    }
+    try {
+      const snap = await fetchChatOnlineUsers(auth.apiKey)
+      if (Array.isArray(snap.users)) {
+        onlines.value = snap.users
+          .filter((u) => u?.userName)
+          .map((u) => ({
+            userName: String(u.userName),
+            userNickname: u.userNickname,
+            userAvatarURL: u.userAvatarURL,
+          }))
+      }
+      if (snap.discussing) discuss.value = snap.discussing
+    } catch {
+      /* WS online event will fill later */
     }
     try {
       mutes.value = await fetchMutes()
