@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { searchUserNames, uploadFiles } from '@/api/fishpi'
+import { useAppearanceStore } from '@/stores/appearance'
 
 const props = withDefaults(
   defineProps<{
@@ -20,6 +21,7 @@ interface VditorInstance {
   getValue(): string
   setValue(value: string, clearStack?: boolean): void
   insertValue(value: string, render?: boolean): void
+  setTheme(theme: 'classic' | 'dark', contentTheme?: string, codeTheme?: string, contentThemePath?: string): void
   destroy(): void
 }
 type VditorCtor = new (el: HTMLElement, options: Record<string, unknown>) => VditorInstance
@@ -55,6 +57,15 @@ const ready = ref(false)
 let editor: VditorInstance | null = null
 let lastEmitted = props.modelValue
 
+const appearance = useAppearanceStore()
+const dark = computed(() => appearance.state.theme.includes('dark'))
+const CONTENT_THEME_PATH = `${VDITOR_CDN}/css/content-theme`
+
+function applyTheme() {
+  if (!editor || !ready.value) return
+  editor.setTheme(dark.value ? 'dark' : 'classic', dark.value ? 'dark' : 'light', dark.value ? 'native' : 'github', CONTENT_THEME_PATH)
+}
+
 function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 }
@@ -74,6 +85,7 @@ onMounted(async () => {
     placeholder: props.placeholder,
     cache: { enable: false },
     lang: 'zh_CN',
+    theme: dark.value ? 'dark' : 'classic',
     outline: { enable: props.outline, position: 'left' },
     resize: { enable: true, position: 'bottom' },
     preview: { delay: 500, mode: 'both', url: '/markdown' },
@@ -121,9 +133,12 @@ onMounted(async () => {
     after: () => {
       ready.value = true
       if (props.modelValue !== lastEmitted) editor?.setValue(props.modelValue, true)
+      if (dark.value) applyTheme()
     },
   })
 })
+
+watch(dark, applyTheme)
 
 watch(
   () => props.modelValue,

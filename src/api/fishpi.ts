@@ -299,8 +299,33 @@ export interface ArticleDetail extends ArticleSummary {
   articleAuthor?: { sysMetal?: MetalItem[]; userName?: string }
   articleType?: number
   articleHeat?: number
+  articleAudioURL?: string
+  articleStick?: number
+  /** 置顶剩余分钟数 */
+  articleStickRemains?: number
+  articleRevisionCount?: number
+  offered?: boolean
   reactionSummary?: ReactionSummary[]
   currentUserReaction?: string
+  /** 长文章所属专栏（接口 data 层字段，前端合并进来） */
+  longArticleColumnView?: LongArticleColumnView
+}
+
+export interface LongArticleChapter {
+  articleId: string
+  articleTitle: string
+  articleTitleEmoj?: string
+  articlePermalink: string
+  chapterNo: number
+  articlePreviewContent?: string
+}
+
+export interface LongArticleColumnView {
+  column: { oId: string; columnTitle: string; columnArticleCount?: number; columnCoverURL?: string }
+  chapters: LongArticleChapter[]
+  chapterNo?: number
+  previous?: LongArticleChapter
+  next?: LongArticleChapter
 }
 
 export interface ReactionSummary {
@@ -1149,8 +1174,15 @@ export async function likeRepeater(apiKey: string, id: string) {
 
 export async function fetchArticle(id: string, apiKey?: string | null, page = 1): Promise<ArticleDetail> {
   try {
-    const res = await request<Envelope<{ article?: ArticleDetail }>>(withKey(`/api/article/${id}?p=${page}`, apiKey))
-    if (res.code === 0 && res.data?.article) return res.data.article
+    const res = await request<Envelope<{
+      article?: ArticleDetail
+      pagination?: ArticleDetail['pagination']
+      longArticleColumnView?: LongArticleColumnView
+    }>>(withKey(`/api/article/${id}?p=${page}`, apiKey))
+    if (res.code === 0 && res.data?.article) {
+      const { article, pagination, longArticleColumnView } = res.data
+      return { ...article, pagination: { ...pagination, paginationCurrentPageNum: page }, longArticleColumnView }
+    }
   } catch {
     /* 匿名详情未开放 */
   }

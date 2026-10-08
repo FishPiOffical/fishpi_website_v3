@@ -8,6 +8,7 @@ import {
   fetchArticleRevision,
   fetchArticleRevisions,
   fetchCommentContent,
+  fetchRandomArticles,
   followArticle,
   postComment,
   previewMarkdown,
@@ -27,9 +28,11 @@ import {
   type ArticleComment,
   type ArticleDetail,
   type ArticleRevisionMeta,
+  type ArticleSummary,
   type ReactionSummary,
 } from '@/api/fishpi'
 import EmojiPicker from '@/components/EmojiPicker.vue'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MetalBadges from '@/components/MetalBadges.vue'
 import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -157,6 +160,54 @@ const canEdit = computed(
   () => article.value?.isMyArticle || article.value?.articleAuthorName === account.value?.userName,
 )
 const isQnA = computed(() => Number(article.value?.articleType) === 5)
+const isLong = computed(() => Number(article.value?.articleType) === 6)
+const column = computed(() => article.value?.longArticleColumnView || null)
+const commentTotal = computed(() => Number(article.value?.articleCommentCount ?? comments.value.length))
+
+const TYPE_BADGES: Record<number, string> = { 1: '🔒 机要', 2: '📢 同城广播', 3: '💭 思绪', 5: '❓ 问答', 6: '📖 长文章' }
+const STATEMENT_LABELS: Record<number, string> = {
+  1: '包含 AI 辅助创作',
+  2: '包含剧透',
+  3: '虚构演绎，仅供娱乐',
+}
+const typeBadge = computed(() => TYPE_BADGES[Number(article.value?.articleType)] || '')
+const statementLabel = computed(() => STATEMENT_LABELS[Number(article.value?.articleStatement)] || '')
+
+const randomArticles = ref<ArticleSummary[]>([])
+const composerRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
+const shareCopied = ref(false)
+const shareUrl = computed(() => {
+  const base = absoluteUrl(`/article/${id.value}`)
+  return account.value?.userName ? `${base}?r=${encodeURIComponent(account.value.userName)}` : base
+})
+const weiboShareUrl = computed(
+  () =>
+    `https://service.weibo.com/share/share.php?title=${encodeURIComponent(article.value?.articleTitle || '')}&url=${encodeURIComponent(shareUrl.value)}`,
+)
+const twitterShareUrl = computed(
+  () =>
+    `https://twitter.com/intent/tweet?text=${encodeURIComponent(article.value?.articleTitle || '')}&url=${encodeURIComponent(shareUrl.value)}`,
+)
+
+async function copyShare() {
+  try {
+    await navigator.clipboard.writeText(shareUrl.value)
+    shareCopied.value = true
+    setTimeout(() => (shareCopied.value = false), 2000)
+  } catch {
+    actionMsg.value = '复制失败，请手动复制地址栏链接'
+  }
+}
+
+function gotoCommentPage(page: number) {
+  commentPage.value = page
+  document.getElementById('articleCommentsPanel')?.scrollIntoView({ block: 'start' })
+}
+
+async function loadRandom() {
+  if (import.meta.env.SSR) return
+  randomArticles.value = (await fetchRandomArticles(10, apiKey.value)).filter((a) => a.oId !== id.value)
+}
 
 const articleDesc = computed(() => {
   const raw = article.value?.articleContent || article.value?.articleOriginalContent || ''
@@ -284,9 +335,12 @@ async function load() {
     void buildToc()
     return
   }
-  loading.value = true
+  const paging = article.value?.oId === id.value
+  if (!paging) {
+    loading.value = true
+    article.value = null
+  }
   error.value = ''
-  article.value = null
   try {
     article.value = await fetchArticle(id.value, apiKey.value, commentPage.value)
     heat.value = Number(article.value.articleHeat || 0)
@@ -308,7 +362,9 @@ watch(
   () => id.value,
   () => {
     commentPage.value = 1
+    void loadRandom()
   },
+  { immediate: true },
 )
 
 watch(
@@ -511,6 +567,19 @@ async function onReactComment(c: ArticleComment, value: string) {
         <h1>{{ article.articleTitleEmoj || article.articleTitle }}</h1>
       </div>
 
+      <div v-if="typeBadge || Number(article.articleStickRemains) > 0 || column" class="badges">
+        <span v-if="typeBadge" class="badge">{{ typeBadge }}</span>
+        <span v-if="isQnA && Number(article.articleQnAOfferPoint) > 0" class="badge offer">
+          {{ article.offered ? '已采纳' : `悬赏 ${article.articleQnAOfferPoint} 积分` }}
+        </span>
+        <span v-if="Number(article.articleStickRemains) > 0" class="badge stick">
+          📌 置顶中 · 剩余 {{ article.articleStickRemains }} 分钟
+        </span>
+        <RouterLink v-if="column" :to="`/column/${column.column.oId}`" class="badge column-link">
+          《{{ column.column.columnTitle }}》第 {{ column.chapterNo }} 章 / 共 {{ column.chapters.length }} 章
+        </RouterLink>
+      </div>
+
       <div class="meta">
         <RouterLink
           v-if="article.articleAuthorName"
@@ -529,7 +598,7 @@ async function onReactComment(c: ArticleComment, value: string) {
         <span>•</span>
         <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
         <span>•</span>
-        <span>{{ article.articleCommentCount ?? comments.length }} 评论</span>
+        <span>{{ commentTotal }} 评论</span>
         <span v-if="heat">（{{ heat }} 在看）</span>
       </div>
 
@@ -547,7 +616,21 @@ async function onReactComment(c: ArticleComment, value: string) {
         匿名详情接口未开放，当前为 mock 正文。
       </p>
 
+      <p v-if="statementLabel" class="statement">创作声明：{{ statementLabel }}</p>
+
+      <audio v-if="article.articleAudioURL" class="article-audio" :src="article.articleAudioURL" controls preload="none" />
+
       <div ref="bodyEl" class="body" v-html="article.articleContent || ''" />
+
+      <nav v-if="column && (column.previous || column.next)" class="chapter-nav">
+        <RouterLink v-if="column.previous" :to="column.previous.articlePermalink" class="chapter-link">
+          ← 第 {{ column.previous.chapterNo }} 章 {{ column.previous.articleTitleEmoj || column.previous.articleTitle }}
+        </RouterLink>
+        <span v-else />
+        <RouterLink v-if="column.next" :to="column.next.articlePermalink" class="chapter-link next">
+          第 {{ column.next.chapterNo }} 章 {{ column.next.articleTitleEmoj || column.next.articleTitle }} →
+        </RouterLink>
+      </nav>
 
       <!-- 文章底部互动操作栏 -->
       <div class="article-tail-bar">
@@ -572,10 +655,16 @@ async function onReactComment(c: ArticleComment, value: string) {
             {{ article.rewarded ? '已打赏' : `打赏 ${article.articleRewardPoint} 积分` }}
           </button>
           <RouterLink v-if="canEdit" class="btn small edit-btn" :to="`/post/${article.oId}`">编辑</RouterLink>
-          <button type="button" class="btn small" @click="toggleRevisions">
+          <button v-if="Number(article.articleRevisionCount ?? 2) > 1" type="button" class="btn small" @click="toggleRevisions">
             {{ showRevisions ? '收起历史' : '修订历史' }}
           </button>
           <ReportDialog :api-key="apiKey" :data-id="article.oId" :data-type="0" />
+        </div>
+        <div class="share-row">
+          <span class="share-label">分享</span>
+          <button type="button" class="btn-text" @click="copyShare">{{ shareCopied ? '✅ 已复制' : '🔗 复制链接' }}</button>
+          <a class="btn-text" :href="weiboShareUrl" target="_blank" rel="noopener noreferrer">微博</a>
+          <a class="btn-text" :href="twitterShareUrl" target="_blank" rel="noopener noreferrer">Twitter</a>
         </div>
         <p v-if="actionMsg" class="action-alert">{{ actionMsg }}</p>
       </div>
@@ -639,7 +728,7 @@ async function onReactComment(c: ArticleComment, value: string) {
             <span>•</span>
             <span>被收藏 {{ article.articleCollectCnt ?? 0 }}</span>
             <span>•</span>
-            <span>回帖 {{ article.articleCommentCount ?? comments.length }}</span>
+            <span>回帖 {{ commentTotal }}</span>
           </div>
         </div>
       </div>
@@ -672,7 +761,7 @@ async function onReactComment(c: ArticleComment, value: string) {
 
     <section id="articleCommentsPanel" class="card comments-card">
       <div class="module-header comments-header">
-        <span><b>💬 全部回帖 ({{ comments.length }})</b></span>
+        <span><b>💬 全部回帖 ({{ commentTotal }})</b></span>
       </div>
 
       <div class="comments-list">
@@ -752,9 +841,9 @@ async function onReactComment(c: ArticleComment, value: string) {
 
       <p v-if="!comments.length" class="empty-hint">暂无回帖，快来抢沙发吧～</p>
       <footer v-if="commentPages > 1" class="pager">
-        <button type="button" class="btn small" :disabled="commentPage <= 1" @click="commentPage -= 1">上一页</button>
+        <button type="button" class="btn small" :disabled="commentPage <= 1" @click="gotoCommentPage(commentPage - 1)">上一页</button>
         <span class="pager-info">{{ commentPage }} / {{ commentPages }}</span>
-        <button type="button" class="btn small" :disabled="commentPage >= commentPages" @click="commentPage += 1">下一页</button>
+        <button type="button" class="btn small" :disabled="commentPage >= commentPages" @click="gotoCommentPage(commentPage + 1)">下一页</button>
       </footer>
     </section>
 
@@ -764,19 +853,21 @@ async function onReactComment(c: ArticleComment, value: string) {
         <span><b>参与讨论</b></span>
       </div>
       <div class="composer-inner">
-        <template v-if="isLoggedIn">
+        <p v-if="article.articleCommentable === false" class="hint-login">作者已关闭回帖。</p>
+        <template v-else-if="isLoggedIn">
           <p v-if="replyId" class="reply-target-tip">
             回复 <b>@{{ comments.find((c) => c.oId === replyId)?.commentAuthorName || replyId }}</b>
             <button type="button" class="btn-text cancel-reply" @click="replyId = ''">取消回复</button>
           </p>
-          <textarea
+          <MarkdownEditor
+            ref="composerRef"
             v-model="draft"
-            rows="4"
-            class="composer-textarea"
-            placeholder="请友善发言，支持 Markdown 语法与表情快捷键…"
+            :api-key="apiKey"
+            :height="200"
+            placeholder="请友善发言，支持 Markdown、@用户、拖拽上传图片…"
           />
           <div class="composer-toolbar">
-            <EmojiPicker @insert="(md) => (draft += md)" />
+            <EmojiPicker @insert="(md) => composerRef?.insert(md)" />
             <div class="composer-submit-wrap">
               <span v-if="sendError" class="err-tip">{{ sendError }}</span>
               <button type="submit" class="btn small" :disabled="sending || !draft.trim()">
@@ -791,6 +882,22 @@ async function onReactComment(c: ArticleComment, value: string) {
         </p>
       </div>
     </form>
+
+    <section v-if="!isLong && randomArticles.length" class="card random-card">
+      <div class="module-header">
+        <span><b>随便看看</b></span>
+        <button type="button" class="btn-text" @click="loadRandom">换一批</button>
+      </div>
+      <ul class="random-list">
+        <li v-for="a in randomArticles" :key="a.oId">
+          <span
+            class="avatar-mini"
+            :style="a.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${a.articleAuthorThumbnailURL48}')` } : undefined"
+          />
+          <RouterLink :to="`/article/${a.oId}`">{{ a.articleTitleEmoj || a.articleTitle }}</RouterLink>
+        </li>
+      </ul>
+    </section>
   </div>
 </template>
 
@@ -1303,23 +1410,6 @@ h1 {
 .cancel-reply {
   color: var(--fp-accent);
 }
-.composer-textarea {
-  width: 100%;
-  box-sizing: border-box;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  color: var(--fp-text);
-  border-radius: 6px;
-  padding: 10px 12px;
-  font-size: 14px;
-  font-family: inherit;
-  resize: vertical;
-  min-height: 80px;
-}
-.composer-textarea:focus {
-  outline: none;
-  border-color: var(--fp-accent);
-}
 .composer-toolbar {
   display: flex;
   justify-content: space-between;
@@ -1343,5 +1433,105 @@ h1 {
   color: var(--fp-accent);
   font-weight: 500;
   text-decoration: underline;
+}
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+.badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
+  color: var(--fp-muted);
+}
+.badge.offer {
+  color: #d4380d;
+  border-color: #ffbb96;
+}
+.badge.stick {
+  color: var(--fp-accent);
+  border-color: var(--fp-accent);
+}
+.column-link {
+  color: var(--fp-accent);
+}
+.statement {
+  margin: 12px auto;
+  width: fit-content;
+  padding: 4px 14px;
+  font-size: 13px;
+  color: var(--fp-muted);
+  background: var(--fp-bg);
+  border-radius: 4px;
+}
+.article-audio {
+  display: block;
+  width: 100%;
+  margin: 12px 0;
+}
+.chapter-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 24px 0 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--fp-border);
+}
+.chapter-link {
+  color: var(--fp-accent);
+  font-size: 14px;
+}
+.chapter-link.next {
+  text-align: right;
+}
+.share-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.share-label {
+  color: var(--fp-muted);
+}
+#articleCommentsPanel {
+  scroll-margin-top: calc(var(--fp-nav-h) + 12px);
+}
+.random-card .module-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.random-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 16px 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px 24px;
+}
+.random-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.random-list a {
+  color: var(--fp-text);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.avatar-mini {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--fp-border) center / cover;
 }
 </style>
