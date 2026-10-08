@@ -68,9 +68,9 @@ const welcomeUser = computed(() => recentUsers.value[0] || null)
 const topModules = computed(() => layout.modulesIn('top'))
 const longModules = computed(() => layout.modulesIn('long'))
 const midModules = computed(() => layout.modulesIn('middle'))
+/** 专栏货架：优先 /api/columns/*，否则 gaps.mock；再否则长篇帖近似. */
 const homeColumnsRecent = ref<HomeColumnCard[]>([])
 const homeColumnsHot = ref<HomeColumnCard[]>([])
-/** Fallback：无抓取结果时用长篇帖近似. */
 const longRecentShelf = computed(() => longArticles.value.slice(0, 8))
 const longHotShelf = computed(() => {
   const withCol = hot.value.filter((a) => a.columnTitle)

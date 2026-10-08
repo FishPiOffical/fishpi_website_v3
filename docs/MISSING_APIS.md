@@ -1,0 +1,153 @@
+# 缺失 / 未开放 JSON 接口清单
+
+本站优先走 Rhythm 真实 JSON；下列能力在现网**没有可用的公开 JSON**（或仅 HTML 页注入），前端用 `src/api/gaps.mock.ts` / `catalog.mock.json` 假数据或降级方案。  
+**禁止**再用 HTML 抓取现网补数据。后端补齐后，删掉对应 mock 并改 `src/api/fishpi.ts` 调用。
+
+| 状态 | 含义 |
+|------|------|
+| 缺失 | 无对应 JSON，SPA 用假数据 |
+| 降级 | 有近似接口/页面态，但缺少专用 JSON |
+| 故意不做 | 产品范围外或暂不接 |
+
+---
+
+## 1. 首页长篇专栏货架 — 缺失
+
+| 建议契约 | 说明 |
+|----------|------|
+| `GET /api/columns/latest?size=12` | 首页「最近更新」专栏卡片 |
+| `GET /api/columns/hot?size=12` | 首页「热门专栏」卡片 |
+
+建议每条字段（与现网 FTL `hotLongColumns` / `latestLongColumns` 对齐）：
+
+```json
+{
+  "columnId": "string",
+  "columnTitle": "string",
+  "columnArticleCount": 0,
+  "latestChapter": {
+    "articleId": "string",
+    "articlePermalink": "/article/...",
+    "chapterNo": 19,
+    "articleTitle": "string"
+  },
+  "secondLatestChapter": { "...": "optional" }
+}
+```
+
+| 现状 | `fetchHomeColumns()` → `gaps.mock.ts` 假数据 |
+|------|-----------------------------------------------|
+
+---
+
+## 2. 用户背包 — 缺失
+
+| 建议契约 | 说明 |
+|----------|------|
+| `GET /api/user/bag` 或 `GET /api/bag/me`（需 apiKey） | 返回 `sysBag` |
+
+建议字段：
+
+```json
+{
+  "checkin1day": 0,
+  "checkin2days": 0,
+  "nameCard": 0,
+  "metalTicket": 0,
+  "patchCheckinCard": 0,
+  "patchStart": "YYYY-MM-DD",
+  "sysCheckinRemain": 0
+}
+```
+
+写入已有页面态（需 CSRF，可继续用）：
+
+- `GET /bag/1dayCheckin`
+- `GET /bag/2dayCheckin`
+- `GET /bag/patchCheckin`
+- `POST /bag/nameCard` `{ userName }`
+
+| 现状 | 读：`fetchUserBag()` 假数据；写：仍打真实 `/bag/*` |
+|------|-----------------------------------------------------|
+
+---
+
+## 3. 重置密码校验元数据 — 缺失
+
+忘记密码短信成功后，现网靠 `GET /reset-pwd?code=` **HTML** 注入 `userId`。SPA 需要 JSON：
+
+| 建议契约 | 说明 |
+|----------|------|
+| `GET /api/reset-pwd/meta?code=` | `{ userId, code }`，无效码非 0 |
+
+已有写入：`POST /forget-pwd`、`POST /reset-pwd`（MD5 密码）。
+
+| 现状 | `fetchResetPwdMeta()` 返回假 `userId`（仅通 UI；提交现网会失败） |
+|------|------------------------------------------------------------------|
+
+---
+
+## 4. 专栏详情页 — 缺失 / 降级
+
+| 建议契约 | 说明 |
+|----------|------|
+| `GET /api/columns/{columnId}` | 专栏信息 + 章节列表分页 |
+| `GET /api/columns/{columnId}/articles?p=&size=` | 章节文章列表 |
+
+现网 `GET /column/{id}` 为登录 HTML（常 401）。SPA 首页卡片链到最新章节帖或 `/column` 长篇列表。
+
+| 现状 | 无专栏详情路由；假专栏 id 点进帖子会 404/空，属预期 |
+|------|-----------------------------------------------------|
+
+---
+
+## 5. 同城页 — 缺失
+
+| 建议契约 | 说明 |
+|----------|------|
+| `GET /api/city/{cityName}?p=&size=` | 同城帖/动态列表 |
+
+| 现状 | `CityView` 用清风明月按城市字段过滤近似 |
+|------|------------------------------------------|
+
+---
+
+## 6. 积分流水专用接口 — 降级
+
+| 建议契约 | 说明 |
+|----------|------|
+| `GET /api/user/points?p=&size=`（apiKey） | 积分流水 |
+
+| 现状 | `GET /api/getNotifications?type=point` 近似 |
+|------|---------------------------------------------|
+
+---
+
+## 7. 聊天室节点列表 — 已有（勿当缺失）
+
+`GET /chat-room/node/get?apiKey=` 已返回 `data` / `msg` / `avaliable[]` / `apiKey`。SPA 已对接，无需假数据。
+
+---
+
+## 8. 广告素材 — 故意不做
+
+广告仅 `AdSlot` 入口；不拉现网/假素材。若以后要做：`GET /api/ads?slot=`。
+
+---
+
+## 9. 闲聊室 — 故意不做
+
+现网 `/idle-talk` 404，产品范围外。
+
+---
+
+## 前端假数据入口
+
+| 能力 | 代码 |
+|------|------|
+| 首页专栏 | `src/api/gaps.mock.ts` → `mockHomeColumns` |
+| 背包读取 | `src/api/gaps.mock.ts` → `mockUserBag` |
+| 重置密码 meta | `src/api/gaps.mock.ts` → `mockResetPwdMeta` |
+| 匿名列表/详情等 | `src/api/catalog.mock.json`（既有） |
+
+服务端仅保留 `POST /__fp/page-auth`（apiKey → `sym-ce` + csrf，供页面态 POST）。**不再**提供 HTML 抓取类 `__fp/*` 接口。

@@ -73,6 +73,9 @@ async function submit() {
   <section class="card">
     <h1>重置密码</h1>
     <p v-if="loading" class="hint">校验短信验证码…</p>
+    <p v-else-if="userId === 'mock-reset-user-id'" class="hint">
+      重置元数据接口未开放，当前为假数据（见 docs/MISSING_APIS.md），提交现网会失败。
+    </p>
     <form v-else-if="userId" class="form" @submit.prevent="submit">
       <label>
         新密码

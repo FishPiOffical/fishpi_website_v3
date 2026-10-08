@@ -510,16 +510,23 @@ export async function requestForgetPwd(userPhone: string, captcha: unknown) {
   return res.msg || '验证码已发送'
 }
 
-/** 从上游重置页解析 userId（短信验证码）。 */
+/**
+ * 重置密码元数据。现网无 JSON（见 docs/MISSING_APIS.md），使用假数据通 UI。
+ * 建议后端：GET /api/reset-pwd/meta?code=
+ */
 export async function fetchResetPwdMeta(code: string): Promise<{ userId: string; code: string }> {
-  const res = await fetch(`/__fp/reset-pwd-meta?code=${encodeURIComponent(code)}`, {
-    credentials: 'include',
-  })
-  const data = (await res.json()) as { code?: number; msg?: string; userId?: string; resetCode?: string }
-  if (!res.ok || data.code || !data.userId) {
-    throw new Error(data.msg || '验证码无效或已过期')
+  try {
+    const res = await request<Envelope<{ userId?: string; code?: string }>>(
+      `/api/reset-pwd/meta?code=${encodeURIComponent(code)}`,
+    )
+    if (!res.code && res.data?.userId) {
+      return { userId: res.data.userId, code: res.data.code || code }
+    }
+  } catch {
+    /* 接口未开放 */
   }
-  return { userId: data.userId, code: data.resetCode || code }
+  const { mockResetPwdMeta } = await import('./gaps.mock')
+  return mockResetPwdMeta(code)
 }
 
 /** 重置密码：POST /reset-pwd（MD5）。 */
@@ -2086,13 +2093,20 @@ export interface UserBag {
   [key: string]: unknown
 }
 
+/**
+ * 用户背包。现网无读 JSON（见 docs/MISSING_APIS.md），使用假数据。
+ * 建议后端：GET /api/user/bag?apiKey=
+ */
 export async function fetchUserBag(apiKey: string): Promise<UserBag> {
-  const res = await fetch(`/__fp/account-bag?apiKey=${encodeURIComponent(apiKey)}`, {
-    credentials: 'include',
-  })
-  const data = (await res.json()) as { code?: number; msg?: string; data?: UserBag }
-  if (!res.ok || data.code) throw new Error(data.msg || '读取背包失败')
-  return data.data || {}
+  if (!apiKey) return {}
+  try {
+    const res = await request<Envelope<UserBag>>(withKey('/api/user/bag', apiKey))
+    if (!res.code && res.data && typeof res.data === 'object') return res.data
+  } catch {
+    /* 接口未开放 */
+  }
+  const { mockUserBag } = await import('./gaps.mock')
+  return { ...mockUserBag }
 }
 
 async function bagGet(apiKey: string, path: string) {
@@ -2214,17 +2228,26 @@ export interface HomeColumnCard {
   latestChapter?: HomeColumnChapter | null
 }
 
+/**
+ * 首页专栏货架。现网无 JSON（见 docs/MISSING_APIS.md），使用假数据。
+ * 建议后端：GET /api/columns/latest|hot?size=
+ */
 export async function fetchHomeColumns(): Promise<{ recent: HomeColumnCard[]; hot: HomeColumnCard[] }> {
-  const res = await fetch('/__fp/home-columns', { credentials: 'include' })
-  const data = (await res.json()) as {
-    code?: number
-    msg?: string
-    data?: { recent?: HomeColumnCard[]; hot?: HomeColumnCard[] }
+  try {
+    const [latest, hot] = await Promise.all([
+      request<Envelope<HomeColumnCard[]>>('/api/columns/latest?size=12'),
+      request<Envelope<HomeColumnCard[]>>('/api/columns/hot?size=12'),
+    ])
+    if (!latest.code && !hot.code && Array.isArray(latest.data) && Array.isArray(hot.data)) {
+      return { recent: latest.data, hot: hot.data }
+    }
+  } catch {
+    /* 接口未开放 */
   }
-  if (!res.ok || data.code) throw new Error(data.msg || '专栏加载失败')
+  const { mockHomeColumns } = await import('./gaps.mock')
   return {
-    recent: data.data?.recent || [],
-    hot: data.data?.hot || [],
+    recent: mockHomeColumns.recent.map((c) => ({ ...c, chapters: [...c.chapters] })),
+    hot: mockHomeColumns.hot.map((c) => ({ ...c, chapters: [...c.chapters] })),
   }
 }
 
