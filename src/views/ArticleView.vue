@@ -587,13 +587,14 @@ async function onReactComment(c: ArticleComment, value: string) {
 .card {
   background: var(--fp-card);
   box-shadow: var(--fp-card-shadow);
-  border-radius: 10px;
-  padding: 20px;
+  border-radius: 8px;
+  padding: 15px;
 }
 @media (min-width: 1100px) {
   .wrap {
     display: grid;
-    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 16px;
     align-items: start;
   }
   .toc {
@@ -610,12 +611,16 @@ async function onReactComment(c: ArticleComment, value: string) {
 }
 h1 {
   margin: 0 0 8px;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.4;
+  color: var(--fp-title);
+  font-weight: 600;
 }
 h2 {
   margin: 0 0 12px;
-  font-size: 15px;
+  font-size: 14px;
+  color: var(--fp-head);
+  font-weight: 600;
 }
 .meta,
 .tags,
@@ -627,6 +632,7 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  margin-bottom: 8px;
 }
 .meta a {
   color: var(--fp-link);
@@ -634,18 +640,25 @@ h2 {
 }
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin: 8px 0 12px;
+  margin: 10px 0 12px;
 }
 .actions button,
 .ghost {
   border: 1px solid var(--fp-border);
-  background: transparent;
+  background: var(--fp-card);
   color: var(--fp-text);
-  border-radius: 6px;
+  border-radius: 3px;
   padding: 4px 10px;
   cursor: pointer;
+  font-size: 13px;
+}
+.actions button:hover,
+.ghost:hover {
+  color: var(--fp-accent);
+  border-color: var(--fp-accent);
 }
 .actions a.edit {
   color: var(--fp-link);
@@ -671,6 +684,23 @@ h2 {
   padding: 4px 12px;
   cursor: pointer;
 }
+.body {
+  margin-top: 12px;
+  line-height: 1.7;
+  font-size: 15px;
+  color: var(--fp-text);
+  word-break: break-word;
+}
+.body :deep(h1),
+.body :deep(h2),
+.body :deep(h3) {
+  margin: 1.2em 0 0.6em;
+  color: var(--fp-title);
+  scroll-margin-top: calc(var(--fp-nav-h) + 12px);
+}
+.body :deep(p) {
+  margin: 0 0 1em;
+}
 .body :deep(img),
 .cmt-body :deep(img) {
   max-width: 100%;
@@ -680,7 +710,20 @@ h2 {
   overflow: auto;
   background: var(--fp-bg);
   padding: 12px;
-  border-radius: 8px;
+  border-radius: 3px;
+  border: 1px solid var(--fp-border);
+}
+.body :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1em;
+  font-size: 14px;
+}
+.body :deep(th),
+.body :deep(td) {
+  border: 1px solid var(--fp-border);
+  padding: 6px 10px;
+  text-align: left;
 }
 .body :deep(a),
 .cmt-body :deep(a) {

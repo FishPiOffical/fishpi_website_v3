@@ -240,11 +240,11 @@ async function showRaw(oId: string) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  min-height: calc(100vh - var(--fp-nav-h) - 70px);
 }
 .main {
-  border: 1px solid var(--fp-border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--fp-card);
   box-shadow: var(--fp-card-shadow);
   display: flex;
@@ -254,24 +254,30 @@ async function showRaw(oId: string) {
 header {
   display: flex;
   justify-content: space-between;
-  padding: 12px 14px;
+  align-items: center;
+  padding: 10px 15px;
   border-bottom: 1px solid var(--fp-border);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fp-head);
 }
 header span {
   font-size: 12px;
+  font-weight: 400;
   color: var(--fp-muted);
 }
 header span.on {
-  color: var(--fp-primary);
+  color: var(--fp-green);
 }
 .msgs {
   flex: 1;
   overflow: auto;
-  padding: 12px;
+  padding: 12px 15px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 58vh;
+  gap: 14px;
+  min-height: 320px;
+  max-height: none;
 }
 .more {
   align-self: center;
@@ -321,9 +327,11 @@ header span.on {
 }
 .composer {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  padding: 10px;
+  padding: 10px 15px 12px;
   border-top: 1px solid var(--fp-border);
+  background: var(--fp-card);
 }
 .actions {
   display: flex;
@@ -338,17 +346,18 @@ textarea {
   background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-text);
-  border-radius: 8px;
+  border-radius: 3px;
   padding: 8px;
+  min-height: 64px;
 }
 .composer button,
 .packet button,
 .packet-form button {
   border: 0;
-  background: var(--fp-primary);
+  background: var(--fp-green);
   color: #fff;
-  border-radius: 8px;
-  padding: 8px 16px;
+  border-radius: 3px;
+  padding: 6px 14px;
   cursor: pointer;
 }
 .ghost {
@@ -400,10 +409,10 @@ textarea {
   text-decoration: none;
 }
 .detail {
-  margin: 8px 14px;
+  margin: 8px 15px;
   padding: 8px 10px;
-  border: 1px solid var(--fp-border);
-  border-radius: 8px;
+  background: var(--fp-hover);
+  border-radius: 6px;
   font-size: 13px;
 }
 .detail ul {

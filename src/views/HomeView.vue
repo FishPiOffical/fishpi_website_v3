@@ -10,6 +10,7 @@ import {
   type RankUser,
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
+import AdSlot from '@/components/ads/AdSlot.vue'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
 
 const auth = useAuthStore()
@@ -124,6 +125,7 @@ function goDownload() {
           </div>
           <button type="button" class="green" @click="goDownload">下载</button>
         </div>
+        <AdSlot slot-key="home.sidebar" />
         <CheckinPanel />
         <div class="index-head">
           <b>今日连签排行</b>

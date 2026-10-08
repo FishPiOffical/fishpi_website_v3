@@ -59,9 +59,11 @@ function attrEntries(item: AdItem) {
       >
         {{ item.title }}
       </a>
-      <div v-else-if="item.type === 'html'" class="html">
-        <a v-if="item.linkUrl" :href="item.linkUrl" target="_blank" rel="sponsored noopener">{{ item.title }}</a>
-        <div v-if="item.html" v-html="item.html" />
+      <div v-else-if="item.type === 'html'" class="html" :class="{ live: !item.title && item.html }">
+        <a v-if="item.linkUrl && item.title" :href="item.linkUrl" target="_blank" rel="sponsored noopener">{{
+          item.title
+        }}</a>
+        <div v-if="item.html" class="html-body" v-html="item.html" />
       </div>
       <div v-else-if="item.type === 'script'" class="script" v-bind="Object.fromEntries(attrEntries(item))" />
     </template>
@@ -71,8 +73,13 @@ function attrEntries(item: AdItem) {
 <style scoped>
 .slot[data-slot='home.top'] {
   max-width: var(--fp-wrap);
-  margin: 12px auto 0;
+  margin: 10px auto 0;
   padding: 0 15px;
+}
+.slot[data-slot='home.top'] .html.live :deep(.wwads-cn) {
+  margin: 0 auto !important;
+  max-width: 100% !important;
+  background: var(--fp-card) !important;
 }
 .banner {
   display: flex;
@@ -107,6 +114,10 @@ function attrEntries(item: AdItem) {
   flex-wrap: wrap;
   gap: 8px 16px;
 }
+.slot[data-slot='home.sidebar'] .html.live :deep(.wwads-cn) {
+  margin: 8px 0 !important;
+  max-width: 100% !important;
+}
 .link {
   color: var(--fp-link);
   text-decoration: none;
@@ -114,5 +125,8 @@ function attrEntries(item: AdItem) {
 .html {
   font-size: 13px;
   color: var(--fp-muted);
+}
+.html-body {
+  min-height: 0;
 }
 </style>

@@ -27,7 +27,7 @@ VITE_API_TARGET=http://localhost:8080
 - 资料编辑、头像/发帖图片上传、表情包、积分转账与流水
 - 我的收藏、聊天室多类型红包/领取明细/撤回/@ 补全
 - 主题、对话框、头像框：`src/packs` 目录包
-- 广告位 mock：`home.top` `footer.sponsors` `home.sidebar`，`GET /api/ads` 有数据时自动替换
+- 广告位：`GET /api/ads` 映射现网 `headerBanner`→`home.top`、`sideFull`→`home.sidebar`（wwads），页脚赞助链仍用 mock
 - 聊天室侧边栏模块化
 - 帖子热度 `GET /api/article/heat/{id}` 与 `article-channel` 实时在看/新评
 - 举报 `POST /report`（帖子/评论/用户）

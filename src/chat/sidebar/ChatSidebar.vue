@@ -51,19 +51,24 @@ const { visibleModules, configuring } = storeToRefs(store)
   align-items: center;
   gap: 8px;
 }
+.toolbar strong {
+  font-size: 13px;
+  color: var(--fp-head);
+}
 .toolbar button,
 .config button {
   border: 1px solid var(--fp-border);
-  background: var(--fp-hover);
+  background: var(--fp-card);
   color: var(--fp-text);
-  border-radius: 6px;
+  border-radius: 3px;
   padding: 4px 8px;
   cursor: pointer;
+  font-size: 12px;
 }
 .config {
   background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 10px;
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 8px;
   padding: 10px;
   font-size: 12px;
   color: var(--fp-muted);
@@ -75,13 +80,15 @@ const { visibleModules, configuring } = storeToRefs(store)
 }
 .card {
   background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 10px;
-  padding: 12px;
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 8px;
+  padding: 12px 15px;
 }
 .card h3 {
   margin: 0 0 10px;
-  font-size: 14px;
+  font-size: 13px;
+  color: var(--fp-head);
+  font-weight: 700;
 }
 .ghost {
   width: 100%;
