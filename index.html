@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="classic-light" data-bubble="classic" data-frame="none">
+<html lang="zh-CN" data-theme="classic-dark" data-bubble="classic" data-frame="none">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
@@ -11,6 +11,27 @@
     />
     <meta property="og:site_name" content="摸鱼派" />
     <meta property="og:type" content="website" />
+    <script>
+      ;(function () {
+        try {
+          var raw = localStorage.getItem('fp.appearance')
+          var s = raw ? JSON.parse(raw) : {}
+          document.documentElement.dataset.theme = s.theme || 'classic-dark'
+          document.documentElement.dataset.bubble = s.bubble || 'classic'
+          document.documentElement.dataset.frame = s.frame || 'none'
+        } catch (e) {
+          document.documentElement.dataset.theme = 'classic-dark'
+        }
+      })()
+    </script>
+    <!-- Blocking CSS so SSR/first paint is not bare HTML (FOUC). -->
+    <link rel="stylesheet" href="/src/styles/base.css" />
+    <link rel="stylesheet" href="/src/packs/themes/classic-dark/style.css" />
+    <link rel="stylesheet" href="/src/packs/themes/classic-light/style.css" />
+    <link rel="stylesheet" href="/src/packs/bubbles/classic/style.css" />
+    <link rel="stylesheet" href="/src/packs/bubbles/candy/style.css" />
+    <link rel="stylesheet" href="/src/packs/frames/none/style.css" />
+    <link rel="stylesheet" href="/src/packs/frames/gold/style.css" />
     <!--app-head-->
   </head>
   <body>

@@ -5,6 +5,7 @@ import {
   fetchArticle,
   fetchArticleFeed,
   fetchBreezemoons,
+  fetchChatHistory,
   fetchCheckinRank,
   fetchDomains,
   fetchOnlineRank,
@@ -39,12 +40,14 @@ async function prefetch(url: string): Promise<SsrPayload> {
       const settled = await Promise.allSettled([
         fetchRecentArticles(null, 1, 40),
         fetchArticleFeed('hot', null, 1, 12),
-        fetchArticleFeed('long', null, 1, 8),
+        fetchArticleFeed('long', null, 1, 12),
         fetchCheckinRank(null),
         fetchOnlineRank(null),
         fetchRecentRegister(null),
         fetchTags(null, 1, 24),
         fetchBreezemoons(1, 8),
+        fetchChatHistory(null, 1),
+        fetchRepeaterItems(null),
       ])
       const val = <T>(i: number, fallback: T): T =>
         settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
@@ -60,6 +63,8 @@ async function prefetch(url: string): Promise<SsrPayload> {
         tags: tagData.tags,
         tagsTotal: tagData.total,
         breezemoons: val(7, []),
+        chatFeed: val(8, []).slice(0, 12),
+        repeater: val(9, []),
       }
     }
 
@@ -129,10 +134,15 @@ export async function render(url: string) {
   await router.push(url)
   await router.isReady()
 
-  const ctx = {}
+  const ctx: { modules?: Set<string> } = {}
   const appHtml = await renderToString(app, ctx)
   const headPayload = await renderSSRHead(head)
 
   clearSsrPayload()
-  return { appHtml, headPayload, payload: clientPayload }
+  return {
+    appHtml,
+    headPayload,
+    payload: clientPayload,
+    modules: ctx.modules || new Set<string>(),
+  }
 }

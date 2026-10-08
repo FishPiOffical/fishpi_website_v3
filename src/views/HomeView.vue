@@ -5,15 +5,19 @@ import { storeToRefs } from 'pinia'
 import {
   fetchArticleFeed,
   fetchBreezemoons,
+  fetchChatHistory,
   fetchCheckinRank,
   fetchOnlineRank,
   fetchRecentArticles,
   fetchRecentRegister,
+  fetchRepeaterItems,
   fetchTags,
   type ArticleSummary,
   type Breezemoon,
+  type ChatHistoryItem,
   type LiteUser,
   type RankUser,
+  type RepeaterItem,
   type TagItem,
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
@@ -35,10 +39,15 @@ const online = ref<RankUser[]>([])
 const recentUsers = ref<LiteUser[]>([])
 const tags = ref<TagItem[]>([])
 const moons = ref<Breezemoon[]>([])
+const chatLines = ref<ChatHistoryItem[]>([])
+const repeater = ref<RepeaterItem | null>(null)
+const hotMode = ref<'hot' | 'column'>('hot')
 const error = ref('')
 const loading = ref(true)
 
 const usingMock = computed(() => left.value.some((a) => String(a.oId).startsWith('mock-')))
+const hotPanel = computed(() => (hotMode.value === 'hot' ? hot.value : longArticles.value))
+const welcomeUser = computed(() => recentUsers.value[0] || null)
 
 usePageSeo(() => ({
   title: SITE_NAME,
@@ -61,12 +70,14 @@ if (bootFeed?.length) {
 const bootExtra = consumeHomeExtrasPayload()
 if (bootExtra) {
   if (bootExtra.hot?.length) hot.value = bootExtra.hot.slice(0, 12)
-  if (bootExtra.long?.length) longArticles.value = bootExtra.long.slice(0, 8)
+  if (bootExtra.long?.length) longArticles.value = bootExtra.long.slice(0, 12)
   if (bootExtra.checkin?.length) checkin.value = bootExtra.checkin.slice(0, 8)
   if (bootExtra.online?.length) online.value = bootExtra.online.slice(0, 8)
   if (bootExtra.recentUsers?.length) recentUsers.value = bootExtra.recentUsers.slice(0, 12)
   if (bootExtra.tags?.length) tags.value = bootExtra.tags.slice(0, 24)
   if (bootExtra.breezemoons?.length) moons.value = bootExtra.breezemoons.slice(0, 8)
+  if (bootExtra.chatFeed?.length) chatLines.value = bootExtra.chatFeed.slice(0, 10)
+  if (bootExtra.repeater?.length) repeater.value = bootExtra.repeater[0] || null
 }
 
 async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
@@ -82,26 +93,31 @@ async function load() {
   const needArticles = left.value.length === 0
   if (needArticles) loading.value = true
   try {
-    const [articles, checkinRank, onlineRank, hotList, longList, regs, tagData, breezes] = await Promise.all([
-      needArticles
-        ? fetchRecentArticles(apiKey.value, 1, 40)
-        : Promise.resolve(left.value.concat(right.value)),
-      safe(fetchCheckinRank(apiKey.value), []),
-      safe(fetchOnlineRank(apiKey.value), []),
-      safe(fetchArticleFeed('hot', apiKey.value, 1, 12), []),
-      safe(fetchArticleFeed('long', apiKey.value, 1, 8), []),
-      safe(fetchRecentRegister(apiKey.value), []),
-      safe(fetchTags(apiKey.value, 1, 24), { tags: [], total: 0 }),
-      safe(fetchBreezemoons(1, 8), []),
-    ])
+    const [articles, checkinRank, onlineRank, hotList, longList, regs, tagData, breezes, chats, reps] =
+      await Promise.all([
+        needArticles
+          ? fetchRecentArticles(apiKey.value, 1, 40)
+          : Promise.resolve(left.value.concat(right.value)),
+        safe(fetchCheckinRank(apiKey.value), []),
+        safe(fetchOnlineRank(apiKey.value), []),
+        safe(fetchArticleFeed('hot', apiKey.value, 1, 12), []),
+        safe(fetchArticleFeed('long', apiKey.value, 1, 12), []),
+        safe(fetchRecentRegister(apiKey.value), []),
+        safe(fetchTags(apiKey.value, 1, 24), { tags: [], total: 0 }),
+        safe(fetchBreezemoons(1, 8), []),
+        safe(fetchChatHistory(apiKey.value, 1), []),
+        safe(fetchRepeaterItems(apiKey.value), []),
+      ])
     if (needArticles) splitArticles(articles)
     checkin.value = checkinRank.slice(0, 8)
     online.value = onlineRank.slice(0, 8)
     hot.value = hotList.slice(0, 12)
-    longArticles.value = longList.slice(0, 8)
+    longArticles.value = longList.slice(0, 12)
     recentUsers.value = regs.slice(0, 12)
     tags.value = tagData.tags.slice(0, 24)
     moons.value = breezes.slice(0, 8)
+    chatLines.value = chats.slice(0, 10)
+    repeater.value = reps[0] || null
   } catch (e) {
     error.value = e instanceof Error ? e.message : '首页加载失败'
   } finally {
@@ -145,6 +161,16 @@ function stripHtml(html: string, max = 60) {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
+
+function chatPreview(item: ChatHistoryItem) {
+  if (typeof item.content === 'string') return stripHtml(item.content, 80)
+  if (item.content && typeof item.content === 'object') return '[红包]'
+  return ''
+}
+
+function chatAvatar(item: ChatHistoryItem) {
+  return item.userAvatarURL || ''
+}
 </script>
 
 <template>
@@ -156,8 +182,9 @@ function stripHtml(html: string, max = 60) {
     </p>
     <p v-else-if="error" class="err">{{ error }}</p>
 
-    <div class="board">
-      <section class="col">
+    <!-- Zone top: recentA + recentB + rank -->
+    <div class="board zone-top" data-home-zone="top">
+      <section class="col" data-home-module="recentA">
         <div class="index-head">
           <b>最新</b>
         </div>
@@ -168,7 +195,11 @@ function stripHtml(html: string, max = 60) {
             <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
               <span
                 class="avatar-small"
-                :style="item.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` } : undefined"
+                :style="
+                  item.articleAuthorThumbnailURL48
+                    ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
+                    : undefined
+                "
                 :aria-label="item.articleAuthorName"
               />
             </RouterLink>
@@ -180,7 +211,7 @@ function stripHtml(html: string, max = 60) {
         </ol>
       </section>
 
-      <section class="col">
+      <section class="col" data-home-module="recentB">
         <div class="index-head">
           <b>&nbsp;</b>
           <RouterLink to="/">更多</RouterLink>
@@ -191,7 +222,11 @@ function stripHtml(html: string, max = 60) {
             <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
               <span
                 class="avatar-small"
-                :style="item.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` } : undefined"
+                :style="
+                  item.articleAuthorThumbnailURL48
+                    ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
+                    : undefined
+                "
                 :aria-label="item.articleAuthorName"
               />
             </RouterLink>
@@ -203,7 +238,7 @@ function stripHtml(html: string, max = 60) {
         </ol>
       </section>
 
-      <aside class="col side">
+      <aside class="col side" data-home-module="rank">
         <div class="download">
           <img src="https://file.fishpi.cn/logo_app.png" width="35" height="35" alt="" />
           <div>
@@ -251,18 +286,75 @@ function stripHtml(html: string, max = 60) {
       </aside>
     </div>
 
-    <div class="board row">
-      <section class="col">
+    <!-- Full-width long zone -->
+    <section class="long-zone" data-home-module="long">
+      <div class="long-head">
+        <b>长篇专区</b>
+        <RouterLink to="/recent/long">更多</RouterLink>
+      </div>
+      <div class="long-shelf">
+        <article v-for="item in longArticles" :key="item.oId" class="long-card">
+          <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
+            item.articleTitleEmoj || item.articleTitle
+          }}</RouterLink>
+          <div class="long-meta">
+            <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+              {{ item.articleAuthorName }}
+            </RouterLink>
+            <span>{{ views(item) }}</span>
+          </div>
+          <p v-if="item.columnTitle" class="long-preview">{{ item.columnTitle }}</p>
+        </article>
+        <p v-if="!longArticles.length && !loading" class="hint long-empty">暂无长篇</p>
+      </div>
+    </section>
+
+    <!-- Zone middle: chat + hotQna + community -->
+    <div class="board zone-mid" data-home-zone="middle">
+      <section class="col" data-home-module="chat">
         <div class="index-head">
-          <b>热议</b>
-          <RouterLink to="/hot">更多</RouterLink>
+          <b>聊天室</b>
+          <RouterLink to="/cr">进入完整版聊天室</RouterLink>
+        </div>
+        <ol class="module-list chat-list">
+          <li v-for="m in chatLines" :key="m.oId" class="chat-item">
+            <RouterLink v-if="m.userName" :to="`/member/${m.userName}`">
+              <span
+                class="avatar-mid"
+                :style="chatAvatar(m) ? { backgroundImage: `url('${chatAvatar(m)}')` } : undefined"
+                :aria-label="m.userName"
+              />
+            </RouterLink>
+            <div class="chat-body">
+              <RouterLink v-if="m.userName" class="chat-who" :to="`/member/${m.userName}`">
+                {{ m.userNickname || m.userName }}
+              </RouterLink>
+              <div class="chat-text">{{ chatPreview(m) }}</div>
+            </div>
+          </li>
+          <li v-if="!chatLines.length && !loading" class="hint-li">暂无消息，去聊天室看看</li>
+        </ol>
+      </section>
+
+      <section class="col" data-home-module="hotQna">
+        <div class="index-head">
+          <b class="hot-switch">
+            <button type="button" :class="{ on: hotMode === 'hot' }" @click="hotMode = 'hot'">热议</button>
+            <span class="sep">|</span>
+            <button type="button" :class="{ on: hotMode === 'column' }" @click="hotMode = 'column'">专栏</button>
+          </b>
+          <RouterLink :to="hotMode === 'hot' ? '/hot' : '/recent/long'">更多</RouterLink>
         </div>
         <ol class="module-list">
-          <li v-for="item in hot" :key="item.oId">
+          <li v-for="item in hotPanel" :key="item.oId">
             <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
               <span
                 class="avatar-small"
-                :style="item.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` } : undefined"
+                :style="
+                  item.articleAuthorThumbnailURL48
+                    ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
+                    : undefined
+                "
               />
             </RouterLink>
             <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
@@ -270,27 +362,33 @@ function stripHtml(html: string, max = 60) {
             }}</RouterLink>
             <span class="count">{{ views(item) }}</span>
           </li>
-          <li v-if="!hot.length && !loading" class="hint-li">暂无热议</li>
+          <li v-if="!hotPanel.length && !loading" class="hint-li">暂无内容</li>
         </ol>
       </section>
-      <section class="col">
-        <div class="index-head">
-          <b>长篇专区</b>
-          <RouterLink to="/recent/long">更多</RouterLink>
+
+      <aside class="col side" data-home-module="community">
+        <div v-if="repeater" class="repeater-box">
+          <div class="index-head tight">
+            <b>复读机转录站</b>
+            <RouterLink to="/repeater">更多</RouterLink>
+          </div>
+          <p class="repeater-quote">{{ stripHtml(repeater.repeaterContent || '', 100) }}</p>
+          <div class="repeater-meta">
+            <span>{{ repeater.repeaterContentTypeLabel || repeater.repeaterContentType || '段子' }}</span>
+            <RouterLink
+              v-if="repeater.repeaterContentAuthorName"
+              :to="`/member/${repeater.repeaterContentAuthorName}`"
+            >
+              {{ repeater.repeaterContentAuthorName }}
+            </RouterLink>
+          </div>
         </div>
-        <ol class="module-list">
-          <li v-for="item in longArticles" :key="item.oId">
-            <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
-              item.articleTitleEmoj || item.articleTitle
-            }}</RouterLink>
-            <span class="count">{{ item.articleAuthorName }}</span>
-          </li>
-          <li v-if="!longArticles.length && !loading" class="hint-li">暂无长篇</li>
-        </ol>
-      </section>
-      <aside class="col side">
-        <div class="index-head">
+
+        <div class="index-head" :class="{ spaced: !!repeater }">
           <b>最新注册</b>
+          <RouterLink v-if="welcomeUser" :to="`/member/${welcomeUser.userName}`" class="welcome">
+            欢迎新人 <b>{{ welcomeUser.userNickname || welcomeUser.userName }}</b>
+          </RouterLink>
         </div>
         <ul class="people">
           <li v-for="u in recentUsers" :key="u.oId || u.userName">
@@ -304,6 +402,7 @@ function stripHtml(html: string, max = 60) {
           </li>
           <li v-if="!recentUsers.length && !loading" class="hint-li">暂无</li>
         </ul>
+
         <div class="index-head spaced">
           <b>标签</b>
           <RouterLink to="/tags">更多</RouterLink>
@@ -314,6 +413,7 @@ function stripHtml(html: string, max = 60) {
           </RouterLink>
           <span v-if="!tags.length && !loading" class="hint">暂无标签</span>
         </div>
+
         <div class="index-head spaced">
           <b>清风明月</b>
           <RouterLink to="/breezemoons">更多</RouterLink>
@@ -327,10 +427,6 @@ function stripHtml(html: string, max = 60) {
           </li>
           <li v-if="!moons.length && !loading" class="hint-li">暂无动态</li>
         </ul>
-        <div class="chat-teaser">
-          <b>聊天室</b>
-          <RouterLink class="green-link" to="/cr">进入完整版聊天室</RouterLink>
-        </div>
       </aside>
     </div>
   </div>
@@ -362,9 +458,6 @@ function stripHtml(html: string, max = 60) {
   padding: 15px 0 20px;
   border-radius: 10px;
 }
-.board.row {
-  margin-top: 0;
-}
 .col {
   flex: 1;
   min-width: 0;
@@ -375,12 +468,17 @@ function stripHtml(html: string, max = 60) {
 .index-head {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   font-size: 13px;
   margin: 5px 10px 10px;
   color: var(--fp-head);
+  gap: 8px;
 }
 .index-head.spaced {
   margin-top: 18px;
+}
+.index-head.tight {
+  margin-bottom: 6px;
 }
 .index-head b {
   font-weight: 700;
@@ -389,6 +487,35 @@ function stripHtml(html: string, max = 60) {
 .index-head a {
   color: var(--fp-link);
   text-decoration: none;
+  flex-shrink: 0;
+}
+.welcome {
+  font-size: 12px;
+  color: var(--fp-muted) !important;
+}
+.welcome b {
+  color: var(--fp-title);
+  font-weight: 600;
+}
+.hot-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+.hot-switch button {
+  border: 0;
+  background: transparent;
+  color: var(--fp-muted);
+  cursor: pointer;
+  padding: 0;
+  font-weight: 700;
+}
+.hot-switch button.on {
+  color: var(--fp-head);
+}
+.hot-switch .sep {
+  color: var(--fp-border);
 }
 .module-list,
 .people,
@@ -499,24 +626,135 @@ function stripHtml(html: string, max = 60) {
   text-decoration: none;
   font-size: 12px;
 }
-.chat-teaser {
+
+.long-zone {
+  background: var(--fp-card);
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 10px;
+  padding: 12px 0 16px;
+}
+.long-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin: 16px 15px 0;
-  padding: 10px 12px;
-  border: 1px solid var(--fp-border);
-  border-radius: 6px;
+  margin: 5px 16px 12px;
   font-size: 13px;
+  color: var(--fp-head);
 }
-.green-link {
-  color: var(--fp-green);
+.long-head b {
+  font-weight: 700;
+}
+.long-head a {
+  color: var(--fp-link);
+  text-decoration: none;
+}
+.long-shelf {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 0 16px;
+  scroll-snap-type: x mandatory;
+}
+.long-card {
+  flex: 0 0 220px;
+  scroll-snap-align: start;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--fp-hover);
+}
+.long-title {
+  display: block;
+  color: var(--fp-title);
   text-decoration: none;
   font-weight: 600;
+  font-size: 14px;
+  line-height: 1.4;
+  max-height: 2.8em;
+  overflow: hidden;
 }
+.long-title:hover {
+  color: var(--fp-link);
+}
+.long-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+.long-meta a {
+  color: var(--fp-link);
+  text-decoration: none;
+}
+.long-preview {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--fp-muted);
+  line-height: 1.45;
+}
+.long-empty {
+  padding: 8px 0;
+}
+
+.chat-list .chat-item {
+  align-items: flex-start;
+}
+.avatar-mid {
+  display: inline-block;
+  width: 36px;
+  height: 36px;
+  border-radius: 3px;
+  background: var(--fp-border) center/cover no-repeat;
+  flex-shrink: 0;
+}
+.chat-body {
+  min-width: 0;
+  flex: 1;
+}
+.chat-who {
+  font-size: 12px;
+  color: var(--fp-muted);
+  text-decoration: none;
+}
+.chat-text {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--fp-title);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.repeater-box {
+  margin: 0 10px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+}
+.repeater-quote {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fp-title);
+  line-height: 1.45;
+}
+.repeater-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+.repeater-meta a {
+  color: var(--fp-link);
+  text-decoration: none;
+}
+
 @media (max-width: 960px) {
   .board {
     flex-direction: column;
+  }
+  .long-card {
+    flex-basis: 180px;
   }
 }
 </style>

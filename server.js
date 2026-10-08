@@ -13,11 +13,8 @@ const env = loadEnv(isProd ? 'production' : 'development', root, '')
 const apiTarget = process.env.VITE_API_TARGET || env.VITE_API_TARGET || 'https://fishpi.cn'
 process.env.VITE_API_TARGET = apiTarget
 
-function injectHtml(template, { appHtml, headPayload, payload }) {
-  const head = [
-    headPayload.headTags || '',
-    headPayload.bodyTagsOpen || '',
-  ]
+function injectHtml(template, { appHtml, headPayload, payload, cssLinks }) {
+  const head = [cssLinks || '', headPayload.headTags || '', headPayload.bodyTagsOpen || '']
     .filter(Boolean)
     .join('\n')
   let html = template.replace('<!--app-head-->', head)
@@ -32,11 +29,88 @@ function injectHtml(template, { appHtml, headPayload, payload }) {
   return html
 }
 
+/** @param {import('vite').ViteDevServer} vite */
+function collectDevCssLinks(vite, modules) {
+  const urls = new Set()
+  const seen = new Set()
+
+  function visit(mod) {
+    if (!mod || seen.has(mod.id)) return
+    seen.add(mod.id)
+    const id = mod.id || ''
+    const isCss =
+      id.includes('.css') ||
+      id.includes('type=style') ||
+      id.includes('.scss') ||
+      id.includes('.sass') ||
+      id.includes('.less')
+    if (isCss) {
+      const url = mod.url || id.split('?')[0]
+      if (url && !url.includes('\0')) {
+        const href = url.startsWith('/') ? url : `/${url}`
+        // Prefer the full virtual id for Vue SFC styles so Vite can resolve them.
+        const linkHref = id.includes('type=style') ? (mod.url || id) : href
+        const normalized = linkHref.startsWith('/') ? linkHref : `/${linkHref}`
+        urls.add(normalized)
+      }
+    }
+    for (const child of mod.importedModules || []) visit(child)
+    for (const child of mod.ssrImportedModules || []) visit(child)
+  }
+
+  for (const id of modules || []) {
+    const mod = vite.moduleGraph.getModuleById(id)
+    if (mod) visit(mod)
+  }
+
+  // Walk entry graph so global CSS is covered even if ctx.modules is sparse.
+  for (const [id, mod] of vite.moduleGraph.idToModuleMap) {
+    if (id.includes('entry-server') || id.includes('/src/app.ts') || id.endsWith('/src/app.ts')) {
+      visit(mod)
+    }
+  }
+
+  // Skip URLs already present as blocking links in index.html.
+  const skip = new Set([
+    '/src/styles/base.css',
+    '/src/packs/themes/classic-dark/style.css',
+    '/src/packs/themes/classic-light/style.css',
+    '/src/packs/bubbles/classic/style.css',
+    '/src/packs/bubbles/candy/style.css',
+    '/src/packs/frames/none/style.css',
+    '/src/packs/frames/gold/style.css',
+  ])
+  return [...urls]
+    .filter((href) => !skip.has(href.split('?')[0]))
+    .map((href) => `<link rel="stylesheet" href="${href}">`)
+    .join('\n')
+}
+
+function renderProdCssLinks(modules, manifest) {
+  if (!manifest || !modules?.size) return ''
+  const seen = new Set()
+  let links = ''
+  for (const id of modules) {
+    const files = manifest[id]
+    if (!files) continue
+    for (const file of files) {
+      if (seen.has(file)) continue
+      seen.add(file)
+      if (file.endsWith('.css')) {
+        links += `<link rel="stylesheet" href="/${file.replace(/^\//, '')}">\n`
+      }
+    }
+  }
+  return links
+}
+
 async function createServer() {
   const app = express()
   let vite
   let template
   let render
+  /** @type {Record<string, string[]> | null} */
+  let ssrManifest = null
 
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite')
@@ -54,6 +128,10 @@ async function createServer() {
     app.use(sirv(path.resolve(root, 'dist/client'), { extensions: [] }))
     template = fs.readFileSync(path.resolve(root, 'dist/client/index.html'), 'utf-8')
     render = (await import('./dist/server/entry-server.js')).render
+    const manifestPath = path.resolve(root, 'dist/client/.vite/ssr-manifest.json')
+    if (fs.existsSync(manifestPath)) {
+      ssrManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
+    }
   }
 
   app.use(async (req, res, next) => {
@@ -78,7 +156,13 @@ async function createServer() {
         renderFn = (await vite.ssrLoadModule('/src/entry-server.ts')).render
       }
       const result = await renderFn(url)
-      const html = injectHtml(tpl, result)
+      let cssLinks = ''
+      if (!isProd && vite) {
+        cssLinks = collectDevCssLinks(vite, result.modules)
+      } else if (ssrManifest && result.modules) {
+        cssLinks = renderProdCssLinks(result.modules, ssrManifest)
+      }
+      const html = injectHtml(tpl, { ...result, cssLinks })
       res.status(200).set({ 'Content-Type': 'text/html' }).end(html)
     } catch (e) {
       if (!isProd && vite) vite.ssrFixStacktrace(e)

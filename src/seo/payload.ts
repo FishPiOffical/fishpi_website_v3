@@ -2,6 +2,7 @@ import type {
   ArticleDetail,
   ArticleSummary,
   Breezemoon,
+  ChatHistoryItem,
   DomainItem,
   LiteUser,
   RankUser,
@@ -25,6 +26,7 @@ export interface SsrPayload {
   onlineRank?: RankUser[]
   recentUsers?: LiteUser[]
   repeater?: RepeaterItem[]
+  chatFeed?: ChatHistoryItem[]
 }
 
 const g = globalThis as typeof globalThis & { __FP_SSR_PAYLOAD__?: SsrPayload }
@@ -131,6 +133,8 @@ export function consumeHomeExtrasPayload(): {
   recentUsers?: LiteUser[]
   tags?: TagItem[]
   breezemoons?: Breezemoon[]
+  chatFeed?: ChatHistoryItem[]
+  repeater?: RepeaterItem[]
 } | null {
   const hot = takeField('hotFeed')
   const long = takeField('longFeed')
@@ -139,6 +143,8 @@ export function consumeHomeExtrasPayload(): {
   const recentUsers = takeField('recentUsers')
   const tags = takeField('tags')
   const breezemoons = takeField('breezemoons')
+  const chatFeed = takeField('chatFeed')
+  const repeater = takeField('repeater')
   if (
     !Array.isArray(hot) &&
     !Array.isArray(long) &&
@@ -146,7 +152,9 @@ export function consumeHomeExtrasPayload(): {
     !Array.isArray(online) &&
     !Array.isArray(recentUsers) &&
     !Array.isArray(tags) &&
-    !Array.isArray(breezemoons)
+    !Array.isArray(breezemoons) &&
+    !Array.isArray(chatFeed) &&
+    !Array.isArray(repeater)
   ) {
     return null
   }
@@ -158,5 +166,7 @@ export function consumeHomeExtrasPayload(): {
     recentUsers: Array.isArray(recentUsers) ? recentUsers : undefined,
     tags: Array.isArray(tags) ? tags : undefined,
     breezemoons: Array.isArray(breezemoons) ? breezemoons : undefined,
+    chatFeed: Array.isArray(chatFeed) ? chatFeed : undefined,
+    repeater: Array.isArray(repeater) ? repeater : undefined,
   }
 }

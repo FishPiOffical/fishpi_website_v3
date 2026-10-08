@@ -28,6 +28,10 @@ export default defineConfig(({ mode }) => {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
+    build: {
+      // Client build emits .vite/ssr-manifest.json for SSR CSS link injection.
+      ssrManifest: true,
+    },
     ssr: {
       noExternal: ['@unhead/vue', '@unhead/ssr', 'unhead'],
     },

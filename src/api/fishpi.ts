@@ -1564,7 +1564,7 @@ export async function fetchMembership(userId: string) {
   return { isVip, expiresAt }
 }
 
-export async function fetchChatHistory(apiKey: string, page = 1) {
+export async function fetchChatHistory(apiKey?: string | null, page = 1) {
   const res = await request<Envelope<ChatHistoryItem[]>>(
     withKey(`/chat-room/more?page=${page}&type=html`, apiKey),
   )
