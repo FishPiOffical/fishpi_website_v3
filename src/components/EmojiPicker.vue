@@ -9,6 +9,7 @@ import {
   type EmojiItem,
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 const emit = defineEmits<{ insert: [markdown: string] }>()
 
@@ -72,7 +73,7 @@ function pick(item: EmojiItem) {
           {{ g.name || '分组' }}
         </button>
       </div>
-      <p v-if="loading" class="hint">加载表情…</p>
+      <FpLoading v-if="loading" small />
       <div v-else class="grid">
         <button v-for="item in items" :key="item.name + (item.url || '')" type="button" :title="item.name" @click="pick(item)">
           <img v-if="item.url" :src="item.url" :alt="item.name" />

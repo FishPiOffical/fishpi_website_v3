@@ -11,6 +11,7 @@ import {
 } from '@/api/fishpi'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -90,7 +91,7 @@ watch(columnId, () => void load(), { immediate: true })
     <p v-if="usingMock" class="hint">
       专栏详情 JSON 未开放，当前为假数据/长篇列表近似（见 docs/MISSING_APIS.md）。
     </p>
-    <p v-if="loading" class="hint">加载中…</p>
+    <FpLoading v-if="loading" />
     <p v-else-if="err" class="err">{{ err }}</p>
     <ol v-else class="chapters">
       <li v-if="!chapters.length" class="hint">暂无章节</li>

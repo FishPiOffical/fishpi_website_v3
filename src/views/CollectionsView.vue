@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { fetchCollectedArticles, type ArticleSummary } from '@/api/fishpi'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 const auth = useAuthStore()
 const { apiKey } = storeToRefs(auth)
@@ -38,7 +39,7 @@ watch(
   <section class="card">
     <h1>我的收藏</h1>
     <p v-if="usingMock" class="hint">收藏列表接口返回异常数据，请稍后重试。</p>
-    <p v-if="loading" class="hint">加载中…</p>
+    <FpLoading v-if="loading" />
     <p v-else-if="error" class="err">{{ error }}</p>
     <ArticleFeed v-else :items="items" empty="还没有收藏" />
     <footer class="pager">

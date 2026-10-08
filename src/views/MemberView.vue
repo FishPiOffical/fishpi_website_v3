@@ -28,6 +28,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeMemberPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC } from '@/seo/site'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -279,7 +280,7 @@ async function sendPoints() {
   <div class="wrapper member-wrap">
     <!-- 主体左侧内容区 (对齐现网 Rhythm home/home.ftl) -->
     <div class="content">
-      <p v-if="loading" class="hint">正在加载用户信息…</p>
+      <FpLoading v-if="loading" />
       <p v-else-if="error" class="err">{{ error }}</p>
 
       <div v-else-if="profile" class="module">
@@ -355,7 +356,7 @@ async function sendPoints() {
 
         <!-- 关注用户 / 关注者 -->
         <div v-else-if="activeTab === 'followingUsers' || activeTab === 'followers'" class="tab-panel">
-          <p v-if="peopleLoading" class="empty-panel">加载中…</p>
+          <FpLoading v-if="peopleLoading" />
           <ul v-else-if="people.length" class="people-list">
             <li v-for="u in people" :key="u.oId || u.userName">
               <img v-if="u.userAvatarURL" class="people-avatar" :src="u.userAvatarURL" alt="" />

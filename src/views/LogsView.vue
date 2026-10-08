@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { fetchPublicLogs, type PublicLog } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 const auth = useAuthStore()
 const { apiKey } = storeToRefs(auth)
@@ -36,7 +37,7 @@ watch([apiKey, page], () => void load())
   <section class="card">
     <h1>公开日志</h1>
     <p class="hint">来自 <code>GET /logs/more</code> 的公开操作记录。</p>
-    <p v-if="loading" class="hint">加载中…</p>
+    <FpLoading v-if="loading" />
     <p v-else-if="error" class="err">{{ error }}</p>
     <ol v-else>
       <li v-for="(item, i) in items" :key="item.oId || i">

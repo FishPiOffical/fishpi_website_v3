@@ -7,6 +7,7 @@ import { useWhisperStore } from '@/stores/whispers'
 import type { WhisperMsg } from '@/api/fishpi'
 import ChatBubble from '@/components/ChatBubble.vue'
 import ChatComposer from '@/components/ChatComposer.vue'
+import FpLoading from '@/components/FpLoading.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -107,7 +108,7 @@ async function submit() {
         <input v-model="toUser" placeholder="输入用户名发起私信" />
         <button type="submit" :disabled="!toUser.trim()">发起</button>
       </form>
-      <p v-if="listLoading && !list.length" class="hint">加载中…</p>
+      <FpLoading v-if="listLoading && !list.length" />
       <p v-else-if="!list.length" class="hint">还没有私信</p>
       <ol v-else>
         <li v-for="item in list" :key="peer(item)">
@@ -146,7 +147,7 @@ async function submit() {
         >
           {{ loadingMore ? '加载中…' : '加载更早消息' }}
         </button>
-        <p v-if="loading && !messages.length" class="hint">加载中…</p>
+        <FpLoading v-if="loading && !messages.length" />
         <p v-else-if="!messages.length" class="hint">还没有消息，打个招呼吧。</p>
         <ChatBubble
           v-for="msg in messages"

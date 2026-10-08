@@ -9,6 +9,7 @@ import SideBar from '@/components/SideBar.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeFeedPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC } from '@/seo/site'
+import FpLoading from '@/components/FpLoading.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -116,7 +117,7 @@ function nextPage() {
         <p v-if="usingMock" class="mock-hint">
           对应 JSON 接口尚未对游客开放，当前为字段对齐的社区帖子展示。
         </p>
-        <p v-if="loading" class="hint">正在加载精彩帖子…</p>
+        <FpLoading v-if="loading" :rows="8" />
         <p v-else-if="error" class="err">{{ error }}</p>
 
         <ArticleFeed v-else :items="items" empty="该分类下暂无内容" />

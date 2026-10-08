@@ -35,6 +35,7 @@ import HomeRepeaterStation from '@/components/home/HomeRepeaterStation.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeFeedPayload, consumeHomeExtrasPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
+import FpLoading from '@/components/FpLoading.vue'
 
 const auth = useAuthStore()
 const layout = useHomeLayoutStore()
@@ -292,7 +293,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
           <div class="index-head">
             <b>最新</b>
           </div>
-          <p v-if="loading && !left.length" class="hint">加载最新帖子…</p>
+          <FpLoading v-if="loading && !left.length" :rows="6" />
           <ol class="module-list">
             <li v-for="item in left" :key="item.oId">
               <span v-if="item.articleStick" class="cb-stick" title="置顶" />
@@ -320,7 +321,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             <b>&nbsp;</b>
             <RouterLink to="/recent">更多</RouterLink>
           </div>
-          <p v-if="loading && !right.length" class="hint">加载中…</p>
+          <FpLoading v-if="loading && !right.length" :rows="6" />
           <ol class="module-list">
             <li v-for="item in right" :key="item.oId">
               <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">

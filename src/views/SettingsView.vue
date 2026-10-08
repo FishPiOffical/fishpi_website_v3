@@ -48,6 +48,7 @@ import {
 } from '@/api/fishpi'
 import { useGeetest4 } from '@/composables/useGeetest4'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -1002,7 +1003,7 @@ async function saveI18n() {
         <h1>账号</h1>
         <template v-if="isLoggedIn">
           <h2>你的背包</h2>
-          <p v-if="bagLoading" class="hint">加载中…</p>
+          <FpLoading v-if="bagLoading" />
           <template v-else>
             <p v-if="bagEmpty" class="hint">你的背包和钱包一样，是空的。</p>
             <div v-else class="bag-actions">
@@ -1164,13 +1165,13 @@ async function saveI18n() {
 
           <h2>官方 APP 扫码登录</h2>
           <p class="hint">请使用摸鱼派官方 APP 扫码登录。勿将本二维码分享给他人。</p>
-          <p v-if="appQrLoading" class="hint">加载中…</p>
+          <FpLoading v-if="appQrLoading" />
           <p v-else-if="appQrErr" class="err">{{ appQrErr }}</p>
           <img v-else-if="appQr" class="mfa-qr" :src="appQr" width="150" height="150" alt="APP 登录二维码" />
           <button type="button" class="ghost-btn" :disabled="appQrLoading" @click="loadAppQr">刷新二维码</button>
 
           <h2>两步验证</h2>
-          <p v-if="mfaLoading" class="hint">加载中…</p>
+          <FpLoading v-if="mfaLoading" />
           <template v-else-if="mfaEnabled">
             <p class="ok">验证器已启用，账户受保护。</p>
             <p class="hint">如需更换设备，请解绑后重新绑定。</p>

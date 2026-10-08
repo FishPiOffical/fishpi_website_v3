@@ -91,7 +91,7 @@ export const useChatStore = defineStore('chat', () => {
   )
   const messages = ref<ChatLine[]>([])
   const onlines = ref<OnlineUser[]>([])
-  const discuss = ref('加载中...')
+  const discuss = ref('加载中…')
   const mutes = ref<MuteItem[]>([])
   const connected = ref(false)
   const sending = ref(false)

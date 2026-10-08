@@ -6,6 +6,7 @@ import { fetchDomains, type DomainItem } from '@/api/fishpi'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeDomainsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 usePageSeo(() => ({ title: '领域', path: '/domains', description: '摸鱼派领域列表' }))
 
@@ -35,7 +36,7 @@ watch(apiKey, () => void load(), { immediate: true })
 <template>
   <section class="board">
     <h1>领域</h1>
-    <p v-if="loading" class="hint">加载中…</p>
+    <FpLoading v-if="loading" />
     <p v-else-if="error" class="err">{{ error }}</p>
     <ul v-else>
       <li v-for="item in domains" :key="item.uri">

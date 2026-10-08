@@ -6,6 +6,7 @@ import { fetchTags, type TagItem } from '@/api/fishpi'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeTagsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 usePageSeo(() => ({ title: '标签', path: '/tags', description: '摸鱼派标签墙' }))
 
@@ -52,7 +53,7 @@ function tagPath(tag: TagItem) {
       <h1>标签</h1>
       <span v-if="total" class="hint">共 {{ total }} 个</span>
     </header>
-    <p v-if="loading" class="hint">加载中…</p>
+    <FpLoading v-if="loading" />
     <p v-else-if="error" class="err">{{ error }}</p>
     <ul v-else>
       <li v-for="tag in tags" :key="tag.tagURI || tag.tagTitle">

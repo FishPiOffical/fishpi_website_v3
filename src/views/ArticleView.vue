@@ -41,6 +41,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeArticlePayload } from '@/seo/payload'
 import { absoluteUrl, SITE_DEFAULT_DESC, stripHtml } from '@/seo/site'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -548,7 +549,7 @@ async function onReactComment(c: ArticleComment, value: string) {
 </script>
 
 <template>
-  <article v-if="loading" class="card hint">加载帖子…</article>
+  <article v-if="loading" class="card"><FpLoading :rows="6" /></article>
   <article v-else-if="error" class="card">
     <p class="err">{{ error }}</p>
     <p v-if="!isLoggedIn" class="hint">
@@ -678,7 +679,7 @@ async function onReactComment(c: ArticleComment, value: string) {
       <!-- 修订历史展开卡片 -->
       <section v-if="showRevisions" class="revisions">
         <h3>修订历史</h3>
-        <p v-if="revisionLoading" class="hint">加载修订列表…</p>
+        <FpLoading v-if="revisionLoading" />
         <p v-else-if="revisionError" class="err">{{ revisionError }}</p>
         <ol v-else class="rev-list">
           <li v-for="rev in revisions" :key="rev.revisionId">

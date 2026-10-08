@@ -14,6 +14,7 @@ import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import type { ChatNodeOption } from '@/api/fishpi'
+import FpLoading from '@/components/FpLoading.vue'
 
 const auth = useAuthStore()
 const chat = useChatStore()
@@ -399,7 +400,7 @@ function clearScreen() {
 
           <!-- 2. 下方消息列表：与输入区在同一个卡片中，自上而下阅读，最新在最上方 -->
           <section class="cr-classic-list">
-            <p v-if="loading && !messages.length" class="empty-hint">正在拉取最新发言…</p>
+            <FpLoading v-if="loading && !messages.length" />
             <p v-else-if="!messages.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
 
             <ChatBubble
@@ -459,7 +460,7 @@ function clearScreen() {
                 :disabled="loadingMore"
                 @click="chat.loadMore"
               >
-                {{ loadingMore ? '加载历史消息…' : '查看更早记录' }}
+                {{ loadingMore ? '加载中…' : '查看更早记录' }}
               </button>
               <span v-else-if="messages.length" class="no-more-tip">已加载全部历史消息</span>
             </div>
@@ -521,10 +522,10 @@ function clearScreen() {
             :disabled="loadingMore"
             @click="onModernScroll"
           >
-            {{ loadingMore ? '加载历史消息…' : '查看更早记录' }}
+            {{ loadingMore ? '加载中…' : '查看更早记录' }}
           </button>
 
-          <p v-if="loading && !messages.length" class="empty-hint">正在连接聊天室并拉取消息…</p>
+          <FpLoading v-if="loading && !messages.length" />
           <p v-else-if="!messages.length" class="empty-hint">暂无新消息，快来打破宁静吧！</p>
 
           <div class="messages-container">
@@ -702,10 +703,11 @@ function clearScreen() {
     <!-- Markdown 原文弹窗 -->
     <div v-if="rawText || rawLoading" class="overlay-card">
       <div class="card-head">
-        <strong>{{ rawLoading ? '正在读取消息原文…' : 'Markdown 原文' }}</strong>
+        <strong>Markdown 原文</strong>
         <button type="button" class="close-btn" @click="rawText = ''">✕</button>
       </div>
-      <pre class="raw-pre">{{ rawText }}</pre>
+      <FpLoading v-if="rawLoading" small />
+      <pre v-else class="raw-pre">{{ rawText }}</pre>
     </div>
 
     <!-- 红包明细弹窗 -->

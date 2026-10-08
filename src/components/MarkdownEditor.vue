@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { fetchVditorEmoji, searchUsers, uploadFiles } from '@/api/fishpi'
 import { useAppearanceStore } from '@/stores/appearance'
+import FpLoading from '@/components/FpLoading.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -248,7 +249,7 @@ defineExpose({
   />
   <div v-else class="md-editor">
     <div ref="host" />
-    <p v-if="!ready" class="md-loading">编辑器加载中…</p>
+    <div v-if="!ready" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
   </div>
 </template>
 
@@ -257,10 +258,13 @@ defineExpose({
   position: relative;
 }
 .md-loading {
-  margin: 0;
-  padding: 12px;
-  font-size: 13px;
-  color: var(--fp-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
+  background: var(--fp-bg);
 }
 .md-fallback {
   width: 100%;

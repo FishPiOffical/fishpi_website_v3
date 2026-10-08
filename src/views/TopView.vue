@@ -22,6 +22,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeRanksPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
 import SideBar from '@/components/SideBar.vue'
+import FpLoading from '@/components/FpLoading.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -352,7 +353,7 @@ const topCatalog = [
         </nav>
 
         <!-- 状态提示 -->
-        <div v-if="loading" class="hint-bar">正在加载排行榜数据…</div>
+        <FpLoading v-if="loading" :rows="8" />
         <div v-else-if="error" class="err-bar">{{ error }}</div>
         <div v-else-if="wealthHint" class="warn-bar">
           {{ wealthHint }}

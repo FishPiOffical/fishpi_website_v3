@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { fetchPointRecords, fetchUserPoint, type PointRecord } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import { usePageSeo } from '@/composables/usePageSeo'
+import FpLoading from '@/components/FpLoading.vue'
 
 const auth = useAuthStore()
 const { apiKey, account, isLoggedIn } = storeToRefs(auth)
@@ -78,7 +79,7 @@ function sumText(r: PointRecord) {
         流水来自 <code>GET /api/getNotifications?type=point</code>；余额来自
         <code>GET /user/:name/point</code>。
       </p>
-      <p v-if="loading" class="hint">加载中…</p>
+      <FpLoading v-if="loading" />
       <p v-else-if="error" class="err">{{ error }}</p>
       <ol v-else>
         <li v-if="!items.length" class="hint">暂无记录</li>

@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { fetchUserMedals, fetchUserProfile, type MetalItem, type UserProfile } from '@/api/fishpi'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -64,7 +65,7 @@ watch(
       <RouterLink :to="`/member/${userName}`">{{ profile?.userNickname || userName }}</RouterLink>
       的徽章
     </h1>
-    <p v-if="loading" class="hint">加载中…</p>
+    <FpLoading v-if="loading" />
     <p v-else-if="error" class="err">{{ error }}</p>
     <ul v-else class="grid">
       <li v-if="!medals.length" class="hint">还没有徽章</li>

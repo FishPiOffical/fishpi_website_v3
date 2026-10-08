@@ -12,6 +12,7 @@ import {
   type EmojiItem,
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 const auth = useAuthStore()
 const { apiKey } = storeToRefs(auth)
@@ -126,7 +127,7 @@ async function onRemove(item: EmojiItem) {
     <h1>表情分组</h1>
     <p class="hint">列表来自 <code>GET /api/emoji/groups</code>。增删会写到现网，请只改自己的分组。</p>
     <p v-if="error" class="err">{{ error }}</p>
-    <p v-if="loading" class="hint">加载中…</p>
+    <FpLoading v-if="loading" small />
     <div v-if="groups.length" class="tabs">
       <button
         v-for="g in groups"

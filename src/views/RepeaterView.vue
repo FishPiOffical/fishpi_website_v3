@@ -6,6 +6,7 @@ import { fetchRepeaterItems, likeRepeater, type RepeaterItem } from '@/api/fishp
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeRepeaterPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 usePageSeo(() => ({ title: '复读机', path: '/repeater', description: '摸鱼派复读机精选' }))
 
@@ -71,7 +72,7 @@ async function like(item: RepeaterItem) {
       </button>
     </div>
     <p v-if="actionMsg" class="err">{{ actionMsg }}</p>
-    <p v-if="loading" class="hint">加载中…</p>
+    <FpLoading v-if="loading" />
     <p v-else-if="error" class="err">{{ error }}</p>
     <ol v-else>
       <li v-for="item in items" :key="item.oId">

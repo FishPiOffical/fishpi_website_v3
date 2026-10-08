@@ -6,6 +6,7 @@ import { fetchBreezemoons, postBreezemoon, removeBreezemoon, type Breezemoon } f
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeBreezemoonsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 usePageSeo(() => ({ title: '清风明月', path: '/breezemoons', description: '摸鱼派清风明月' }))
 
@@ -72,7 +73,7 @@ async function submit() {
       <textarea v-model="draft" rows="2" placeholder="写一条清风明月" />
       <button type="submit" :disabled="sending || !draft.trim()">发布</button>
     </form>
-    <p v-if="loading" class="hint">加载中…</p>
+    <FpLoading v-if="loading" />
     <p v-else-if="error" class="err">{{ error }}</p>
     <ol v-else>
       <li v-for="item in items" :key="item.oId">

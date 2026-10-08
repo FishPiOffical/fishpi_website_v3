@@ -12,6 +12,7 @@ import {
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import { useNoticeStore } from '@/stores/notices'
+import FpLoading from '@/components/FpLoading.vue'
 
 const tabs: { id: NoticeType; label: string }[] = [
   { id: 'commented', label: '回帖' },
@@ -175,7 +176,7 @@ async function readAll() {
         {{ tab.label }}
       </button>
     </nav>
-    <p v-if="loading" class="hint">加载中…</p>
+    <FpLoading v-if="loading" :rows="6" />
     <p v-else-if="error" class="err">{{ error }}</p>
     <ol v-else>
       <li v-if="!items.length" class="hint">暂无通知</li>

@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { fetchBreezemoons, type Breezemoon } from '@/api/fishpi'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
+import FpLoading from '@/components/FpLoading.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -65,7 +66,7 @@ watch(
       <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
       后可查看。
     </p>
-    <p v-else-if="loading" class="hint">加载中…</p>
+    <FpLoading v-else-if="loading" />
     <p v-else-if="error" class="err">{{ error }}</p>
     <ul v-else class="list">
       <li v-if="!items.length" class="hint">暂无来自「{{ cityName }}」的清风明月</li>
