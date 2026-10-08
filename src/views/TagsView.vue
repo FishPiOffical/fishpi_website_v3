@@ -1,0 +1,152 @@
+<script setup lang="ts">
+import { ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { fetchTags, type TagItem } from '@/api/fishpi'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+const { apiKey } = storeToRefs(auth)
+const tags = ref<TagItem[]>([])
+const total = ref(0)
+const page = ref(1)
+const loading = ref(false)
+const error = ref('')
+
+async function load() {
+  loading.value = true
+  error.value = ''
+  try {
+    const data = await fetchTags(apiKey.value, page.value, 50)
+    tags.value = data.tags
+    total.value = data.total
+    if (!data.tags.length) error.value = '暂无标签数据'
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '标签加载失败'
+    tags.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+watch([apiKey, page], () => void load(), { immediate: true })
+
+function tagPath(tag: TagItem) {
+  const uri = tag.tagURI || tag.tagTitle
+  try {
+    return `/tags/${encodeURIComponent(decodeURIComponent(uri))}`
+  } catch {
+    return `/tags/${encodeURIComponent(uri)}`
+  }
+}
+</script>
+
+<template>
+  <section class="board">
+    <header>
+      <h1>标签</h1>
+      <span v-if="total" class="hint">共 {{ total }} 个</span>
+    </header>
+    <p v-if="loading" class="hint">加载中…</p>
+    <p v-else-if="error" class="err">{{ error }}</p>
+    <ul v-else>
+      <li v-for="tag in tags" :key="tag.tagURI || tag.tagTitle">
+        <RouterLink :to="tagPath(tag)">
+          <img v-if="tag.tagIconPath" :src="tag.tagIconPath" alt="" />
+          <strong>{{ tag.tagTitle }}</strong>
+          <em>{{ tag.tagReferenceCount ?? 0 }}</em>
+        </RouterLink>
+      </li>
+    </ul>
+    <footer class="pager">
+      <button type="button" :disabled="page <= 1 || loading" @click="page -= 1">上一页</button>
+      <span>{{ page }}</span>
+      <button type="button" :disabled="tags.length < 50 || loading" @click="page += 1">下一页</button>
+    </footer>
+  </section>
+</template>
+
+<style scoped>
+.board {
+  background: var(--fp-card);
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 10px;
+  padding: 15px;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+h1 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--fp-head);
+}
+.hint {
+  color: var(--fp-muted);
+  font-size: 13px;
+}
+.err {
+  color: #e07a5f;
+}
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--fp-title);
+  text-decoration: none;
+  border-radius: 6px;
+  background: var(--fp-hover);
+}
+a:hover {
+  color: var(--fp-link);
+}
+img {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  object-fit: cover;
+}
+strong {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+em {
+  font-style: normal;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+.pager {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+}
+.pager button {
+  border: 1px solid var(--fp-border);
+  background: transparent;
+  color: var(--fp-text);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.pager button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+</style>

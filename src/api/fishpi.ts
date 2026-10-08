@@ -533,17 +533,14 @@ export async function fetchArticleFeed(
     return unwrapArticles(`/api/articles/recent/good?p=${page}&size=${size}`, apiKey, () => mockFeed('good', page, size))
   }
   if (kind === 'qna') {
-    const fromQna = await unwrapArticles(`/api/articles/recent/qna?p=${page}&size=${size}`, apiKey)
+    const fromQna = await unwrapArticles(`/api/articles/qna?p=${page}&size=${size}`, apiKey)
     if (fromQna.length) return fromQna
-    const fromTag = await unwrapArticles(
-      `/api/articles/tag/${encodeURIComponent('Q&A')}?p=${page}&size=${size}`,
-      apiKey,
-    )
+    const fromTag = await unwrapArticles(`/api/articles/tag/${encodeURIComponent('q&a')}?p=${page}&size=${size}`, apiKey)
     if (fromTag.length) return fromTag
     return mockFeed('qna', page, size)
   }
   if (kind === 'perfect') {
-    const fromPerfect = await unwrapArticles(`/api/articles/recent/perfect?p=${page}&size=${size}`, apiKey)
+    const fromPerfect = await unwrapArticles(`/api/articles/perfect?p=${page}&size=${size}`, apiKey)
     if (fromPerfect.length) return fromPerfect
     return mockFeed('perfect', page, size)
   }
@@ -580,18 +577,57 @@ export async function fetchSearch(q: string, apiKey?: string | null, page = 1, s
   return mockFeed('search', page, size, query)
 }
 
+function normalizeDomain(raw: DomainItem): DomainItem | null {
+  const uri = String(raw.uri || raw.domainURI || '').trim()
+  if (!uri) return null
+  return {
+    ...raw,
+    uri,
+    domainTitle: raw.domainTitle || uri,
+    domainArticleCount: raw.domainArticleCount ?? raw.articleCnt ?? 0,
+    domainIconPath: raw.domainIconPath,
+  }
+}
+
 export async function fetchDomains(apiKey?: string | null): Promise<DomainItem[]> {
   try {
     const res = await request<Envelope<{ domains?: DomainItem[] } | DomainItem[]>>(withKey('/api/domains', apiKey))
     if (res.code === 0) {
       const data = res.data
-      if (Array.isArray(data) && data.length) return data
-      if (data && 'domains' in data && Array.isArray(data.domains) && data.domains.length) return data.domains
+      const list = Array.isArray(data)
+        ? data
+        : data && 'domains' in data && Array.isArray(data.domains)
+          ? data.domains
+          : []
+      const normalized = list.map(normalizeDomain).filter((d): d is DomainItem => Boolean(d))
+      if (normalized.length) return normalized
     }
   } catch {
     /* GET /api/domains 尚未提供 */
   }
   return mockDomains()
+}
+
+export interface TagItem {
+  tagTitle: string
+  tagURI: string
+  tagIconPath?: string
+  tagReferenceCount?: number
+  tagDescription?: string
+}
+
+export async function fetchTags(apiKey?: string | null, page = 1, size = 50): Promise<{ tags: TagItem[]; total: number }> {
+  try {
+    const res = await request<Envelope<{ tags?: TagItem[]; total?: number }>>(
+      withKey(`/api/tags?p=${page}&size=${size}`, apiKey),
+    )
+    if (res.code === 0 && Array.isArray(res.data?.tags)) {
+      return { tags: res.data.tags, total: Number(res.data.total || res.data.tags.length) }
+    }
+  } catch {
+    /* tags wall unavailable */
+  }
+  return { tags: [], total: 0 }
 }
 
 export async function toggleReaction(

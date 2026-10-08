@@ -39,7 +39,10 @@ VITE_API_TARGET=http://localhost:8080
 - 评论楼中楼、聊天室附近消息、公开职业/勋章列表
 - 职业成长榜、最近注册、弹幕花费、聊天室消息原文
 - 设置页表情分组（GET 列表，增删走现网 JSON，验证时不提交）
+- 匿名可读：帖子列表/详情/搜索/领域/标签墙/问答 `GET /api/articles/qna`、优选 `GET /api/articles/perfect`
+- 帖子正文目录（从正文 h1–h3 生成）
 
 闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。
+帖子修订历史、用户发帖列表等仍需登录（匿名 401）。
 
 新增侧边栏模块：在 `src/chat/sidebar/modules` 加组件，并登记到 `registry.ts`。

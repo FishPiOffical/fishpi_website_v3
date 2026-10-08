@@ -10,13 +10,11 @@ const { apiKey } = storeToRefs(auth)
 const domains = ref<DomainItem[]>([])
 const error = ref('')
 const loading = ref(true)
-const mocked = ref(false)
 
 onMounted(async () => {
   try {
-    const list = await fetchDomains(apiKey.value)
-    domains.value = list
-    mocked.value = list.every((d) => ['programmer', 'life', 'community'].includes(d.uri)) && list.length <= 3
+    domains.value = await fetchDomains(apiKey.value)
+    if (!domains.value.length) error.value = '暂无领域'
   } catch (e) {
     error.value = e instanceof Error ? e.message : '领域加载失败'
   } finally {
@@ -26,18 +24,18 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="card">
+  <section class="board">
     <h1>领域</h1>
     <p v-if="loading" class="hint">加载中…</p>
     <p v-else-if="error" class="err">{{ error }}</p>
-    <p v-else-if="mocked" class="hint">
-      <code>GET /api/domains</code> 尚未提供，展示约定字段 mock。正式接口就绪后自动切换。
-    </p>
-    <ul>
+    <ul v-else>
       <li v-for="item in domains" :key="item.uri">
         <RouterLink :to="`/domain/${item.uri}`">
-          <strong>{{ item.domainTitle }}</strong>
-          <span>{{ item.domainDescription }}</span>
+          <img v-if="item.domainIconPath" :src="item.domainIconPath" alt="" />
+          <div>
+            <strong>{{ item.domainTitle }}</strong>
+            <span>{{ item.domainDescription }}</span>
+          </div>
           <em>{{ item.domainArticleCount ?? 0 }} 帖</em>
         </RouterLink>
       </li>
@@ -46,11 +44,16 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.card {
+.board {
   background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 12px;
-  padding: 18px 20px;
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 10px;
+  padding: 15px;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: var(--fp-head);
 }
 .hint {
   color: var(--fp-muted);
@@ -62,18 +65,33 @@ onMounted(async () => {
 ul {
   list-style: none;
   padding: 0;
+  margin: 0;
   display: grid;
   gap: 10px;
 }
 a {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 12px;
   color: inherit;
   text-decoration: none;
-  border: 1px solid var(--fp-border);
-  border-radius: 10px;
   padding: 12px;
+  border-radius: 8px;
+  background: var(--fp-hover);
+}
+img {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 strong {
   color: var(--fp-link);

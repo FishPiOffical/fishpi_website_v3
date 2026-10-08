@@ -65,9 +65,6 @@ watch(
     <p v-if="usingMock" class="hint">
       对应 JSON 接口尚未对游客开放或仍为 404，当前为字段对齐的 mock。
     </p>
-    <p v-else-if="kind === 'qna' || kind === 'perfect'" class="hint">
-      独立问答/优选列表未就绪时，会尝试标签接口再回退 mock。
-    </p>
     <p v-if="loading" class="hint">加载中…</p>
     <p v-else-if="error" class="err">{{ error }}</p>
     <ArticleFeed v-else :items="items" />

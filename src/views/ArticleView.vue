@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
@@ -48,9 +48,33 @@ const heat = ref(0)
 const editingId = ref('')
 const editDraft = ref('')
 const editSaving = ref(false)
+const bodyEl = ref<HTMLElement | null>(null)
+const toc = ref<{ id: string; text: string; level: number }[]>([])
 let heatWs: WebSocket | null = null
 
 const id = computed(() => String(route.params.id || ''))
+
+async function buildToc() {
+  await nextTick()
+  const root = bodyEl.value
+  if (!root) {
+    toc.value = []
+    return
+  }
+  const nodes = [...root.querySelectorAll('h1, h2, h3')]
+  toc.value = nodes.map((el, i) => {
+    if (!el.id) el.id = `toc-${i}`
+    return {
+      id: el.id,
+      text: (el.textContent || '').trim(),
+      level: Number(el.tagName.slice(1)) || 2,
+    }
+  }).filter((item) => item.text)
+}
+
+function jumpToc(anchor: string) {
+  document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 const comments = computed<ArticleComment[]>(() => article.value?.articleComments || [])
 const nice = computed(() => article.value?.articleNiceComments || [])
@@ -176,8 +200,10 @@ async function load() {
   } catch (e) {
     error.value = e instanceof Error ? e.message : '帖子加载失败'
     disconnectHeat()
+    toc.value = []
   } finally {
     loading.value = false
+    if (article.value) void buildToc()
   }
 }
 
@@ -374,6 +400,16 @@ async function onReactComment(c: ArticleComment, value: string) {
     </p>
   </article>
   <div v-else-if="article" class="wrap">
+    <aside v-if="toc.length" class="toc">
+      <b>目录</b>
+      <a
+        v-for="item in toc"
+        :key="item.id"
+        :class="'lv' + item.level"
+        href="#"
+        @click.prevent="jumpToc(item.id)"
+      >{{ item.text }}</a>
+    </aside>
     <article class="card post">
       <h1>{{ article.articleTitleEmoj || article.articleTitle }}</h1>
       <p class="meta">
@@ -422,7 +458,7 @@ async function onReactComment(c: ArticleComment, value: string) {
         :disabled="!isLoggedIn"
         @toggle="onReactArticle"
       />
-      <div class="body" v-html="article.articleContent || ''" />
+      <div ref="bodyEl" class="body" v-html="article.articleContent || ''" />
     </article>
 
     <section v-if="nice.length" class="card">
@@ -510,11 +546,67 @@ async function onReactComment(c: ArticleComment, value: string) {
   flex-direction: column;
   gap: 16px;
 }
+.toc {
+  position: sticky;
+  top: calc(var(--fp-nav-h) + 12px);
+  z-index: 5;
+  align-self: flex-start;
+  max-height: 40vh;
+  overflow: auto;
+  background: var(--fp-card);
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.toc b {
+  font-size: 13px;
+  color: var(--fp-head);
+  margin-bottom: 4px;
+}
+.toc a {
+  color: var(--fp-title);
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 2px 0;
+}
+.toc a:hover {
+  color: var(--fp-link);
+}
+.toc a.lv2 {
+  padding-left: 10px;
+}
+.toc a.lv3 {
+  padding-left: 20px;
+  font-size: 12px;
+  color: var(--fp-muted);
+}
 .card {
   background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 12px;
+  box-shadow: var(--fp-card-shadow);
+  border-radius: 10px;
   padding: 20px;
+}
+@media (min-width: 1100px) {
+  .wrap {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    align-items: start;
+  }
+  .toc {
+    grid-row: 1 / span 20;
+    max-height: calc(100vh - var(--fp-nav-h) - 40px);
+  }
+  .card.post {
+    grid-column: 2;
+  }
+  .wrap > .card:not(.post),
+  .wrap > form {
+    grid-column: 2;
+  }
 }
 h1 {
   margin: 0 0 8px;

@@ -21,6 +21,7 @@ const nav = [
 ]
 
 const extraNav = [
+  { to: '/tags', label: '标签' },
   { to: '/good', label: '点赞' },
   { to: '/repeater', label: '复读机' },
   { to: '/logs', label: '日志' },

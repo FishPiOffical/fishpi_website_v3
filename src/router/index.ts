@@ -69,6 +69,7 @@ const router = createRouter({
       meta: { people: 'followers' },
     },
     { path: '/domains', component: () => import('@/views/DomainView.vue') },
+    { path: '/tags', component: () => import('@/views/TagsView.vue') },
     { path: '/breezemoons', component: () => import('@/views/BreezemoonView.vue') },
     { path: '/repeater', component: () => import('@/views/RepeaterView.vue') },
     { path: '/logs', component: () => import('@/views/LogsView.vue'), meta: { auth: true } },
