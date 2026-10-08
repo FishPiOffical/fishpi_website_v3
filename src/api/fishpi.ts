@@ -24,6 +24,8 @@ export interface AccountInfo {
   mbti?: string
   userCity?: string
   userQQ?: string
+  userArticleCount?: number
+  userCommentCount?: number
   /** 0 公开 / 1 私密 */
   userGeoStatus?: number
   userListPageSize?: number
@@ -372,6 +374,115 @@ export async function updateFunctionSettings(apiKey: string, data: FunctionSetti
     body: JSON.stringify(data),
   })
   if (res.code) throw new Error(res.msg || '功能设置失败')
+}
+
+/** 国际化：页面态 POST /settings/i18n。 */
+export async function updateI18nSettings(
+  apiKey: string,
+  data: { userLanguage: string; userTimezone: string },
+) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/settings/i18n', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify(data),
+  })
+  if (res.code) throw new Error(res.msg || '国际化设置失败')
+}
+
+/** 忘记密码：发送短信（GeeTest4 校验结果作 captcha）。 */
+export async function requestForgetPwd(userPhone: string, captcha: unknown) {
+  const res = await request<Envelope<unknown>>('/forget-pwd', {
+    method: 'POST',
+    body: JSON.stringify({ userPhone, captcha }),
+  })
+  if (res.code) throw new Error(res.msg || '发送失败')
+  return res.msg || '验证码已发送'
+}
+
+/** 从上游重置页解析 userId（短信验证码）。 */
+export async function fetchResetPwdMeta(code: string): Promise<{ userId: string; code: string }> {
+  const res = await fetch(`/__fp/reset-pwd-meta?code=${encodeURIComponent(code)}`, {
+    credentials: 'include',
+  })
+  const data = (await res.json()) as { code?: number; msg?: string; userId?: string; resetCode?: string }
+  if (!res.ok || data.code || !data.userId) {
+    throw new Error(data.msg || '验证码无效或已过期')
+  }
+  return { userId: data.userId, code: data.resetCode || code }
+}
+
+/** 重置密码：POST /reset-pwd（MD5）。 */
+export async function resetPassword(userId: string, code: string, passwd: string) {
+  const res = await request<Envelope<unknown>>('/reset-pwd', {
+    method: 'POST',
+    body: JSON.stringify({
+      userId,
+      code,
+      userPassword: md5(passwd),
+    }),
+  })
+  if (res.code) throw new Error(res.msg || '重置失败')
+}
+
+/** 积分兑换邀请码。 */
+export async function buyInvitecode(apiKey: string): Promise<string> {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/point/buy-invitecode', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({}),
+  })
+  if (res.code) throw new Error(res.msg || '兑换失败')
+  return res.msg || '兑换成功'
+}
+
+/** 查询邀请码状态。code 1=可用，其它多为不可用/错误。 */
+export async function queryInvitecode(apiKey: string, invitecode: string): Promise<{ ok: boolean; msg: string }> {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/invitecode/state', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({ invitecode }),
+  })
+  return { ok: res.code === 1, msg: res.msg || (res.code === 1 ? '可用' : '不可用') }
+}
+
+/** 导出帖子与评论压缩包。 */
+export async function exportPosts(apiKey: string): Promise<string> {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<{ url?: string }> & { url?: string }>('/export/posts', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  if (res.code) throw new Error(res.msg || '导出失败')
+  const url = res.url || res.data?.url
+  if (!url) throw new Error('未返回导出地址')
+  return url
+}
+
+/** 官方身份认证提交。 */
+export async function submitIdentity(apiKey: string, data: {
+  type: string
+  idCert: string
+  idId?: string
+}) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/user/identify', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: data.type,
+      idCert: data.idCert,
+      idId: data.idId || '',
+    }),
+  })
+  if (res.code) throw new Error(res.msg || '提交失败')
+  return res.msg || '已提交审核'
 }
 
 export interface EmojiItem {

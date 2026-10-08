@@ -72,7 +72,7 @@ async function submitKey() {
         {{ showKeyLogin ? '改用账号密码' : '已有 apiKey？' }}
       </button>
       <RouterLink to="/register">注册</RouterLink>
-      <a href="https://fishpi.cn/forget-pwd" target="_blank" rel="noopener">忘记密码</a>
+      <RouterLink to="/forget-pwd">忘记密码</RouterLink>
       <RouterLink to="/agreement">用户协议</RouterLink>
       <RouterLink to="/download">客户端</RouterLink>
     </p>

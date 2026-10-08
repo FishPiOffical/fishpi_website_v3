@@ -5,13 +5,19 @@ import { storeToRefs } from 'pinia'
 import AppearancePicker from '@/components/packs/AppearancePicker.vue'
 import EmojiPacks from '@/components/EmojiPacks.vue'
 import {
+  buyInvitecode,
+  exportPosts,
   fetchProfessionMe,
   fetchUserProfile,
+  queryInvitecode,
   setProfessionPrimary,
   setProfessionPrivacy,
+  submitIdentity,
+  transferPoints,
   updateAvatar,
   updateFunctionSettings,
   updateGeoStatus,
+  updateI18nSettings,
   updatePassword,
   updateProfile,
   uploadFiles,
@@ -30,9 +36,35 @@ const tabs = [
   { id: 'account', to: '/settings/account', label: '账号' },
   { id: 'function', to: '/settings/function', label: '功能' },
   { id: 'point', to: '/settings/point', label: '积分' },
+  { id: 'invite', to: '/settings/invite', label: '邀请' },
+  { id: 'identity', to: '/settings/identity', label: '认证' },
+  { id: 'data', to: '/settings/data', label: '数据' },
+  { id: 'i18n', to: '/settings/i18n', label: '语言' },
   { id: 'privacy', to: '/settings/privacy', label: '隐私' },
   { id: 'profession', to: '/settings/profession', label: '职业' },
+  { id: 'help', to: '/settings/help', label: '帮助' },
 ] as const
+
+const languageOptions = [
+  { value: 'zh_CN', label: '简体中文' },
+  { value: 'en_US', label: 'English' },
+]
+const timezoneOptions = [
+  { value: 'Asia/Shanghai', label: 'Asia/Shanghai (CST)' },
+  { value: 'Asia/Hong_Kong', label: 'Asia/Hong_Kong' },
+  { value: 'Asia/Tokyo', label: 'Asia/Tokyo' },
+  { value: 'UTC', label: 'UTC' },
+  { value: 'America/New_York', label: 'America/New_York' },
+  { value: 'Europe/London', label: 'Europe/London' },
+]
+const helpLinks = [
+  { to: '/article/1630569106133', title: '快速开始', tip: '新人上手' },
+  { to: '/article/1630575841478', title: '基础功能', tip: '发帖与互动' },
+  { to: '/article/1631459254239', title: '快捷键', tip: '键盘操作' },
+  { to: '/article/1631460144004', title: 'Markdown 教程', tip: '排版指南' },
+]
+const identityPlaceholder =
+  'https://file.fishpi.cn/id/%E8%90%A5%E4%B8%9A%E6%89%A7%E7%85%A7%E5%89%AF%E6%9C%AC%E5%A4%8D%E5%8D%B0%E4%BB%B6.png'
 
 const tab = computed(() => String(route.meta.settingsTab || 'profile'))
 
@@ -88,6 +120,35 @@ const chatPicOn = ref(true)
 const fnBusy = ref(false)
 const fnMsg = ref('')
 
+const transferTo = ref('')
+const transferAmount = ref(5)
+const transferMemo = ref('请你吃鱼丸')
+const transferBusy = ref(false)
+const transferMsg = ref('')
+
+const inviteLink = computed(() => {
+  if (typeof window === 'undefined' || !account.value?.userName) return ''
+  return `${window.location.origin}/register?r=${encodeURIComponent(account.value.userName)}`
+})
+const boughtCodes = ref<{ code: string; memo: string }[]>([])
+const inviteQuery = ref('')
+const inviteBusy = ref(false)
+const inviteMsg = ref('')
+const copyMsg = ref('')
+
+const idCertUrl = ref('')
+const idFile = ref<HTMLInputElement | null>(null)
+const idBusy = ref(false)
+const idMsg = ref('')
+
+const exportBusy = ref(false)
+const exportMsg = ref('')
+
+const userLanguage = ref('zh_CN')
+const userTimezone = ref('Asia/Shanghai')
+const i18nBusy = ref(false)
+const i18nMsg = ref('')
+
 function enabled(status?: number) {
   return Number(status ?? 0) === 0
 }
@@ -115,6 +176,14 @@ function fill() {
 }
 
 watch(account, fill, { immediate: true })
+
+watch(
+  () => route.query.to,
+  (v) => {
+    if (typeof v === 'string' && v) transferTo.value = v
+  },
+  { immediate: true },
+)
 
 onMounted(async () => {
   if (apiKey.value && !account.value) await auth.restore()
@@ -288,6 +357,141 @@ async function saveFunction() {
     fnMsg.value = e instanceof Error ? e.message : '功能设置失败'
   } finally {
     fnBusy.value = false
+  }
+}
+
+async function submitTransfer() {
+  if (!apiKey.value || !transferTo.value.trim()) return
+  transferBusy.value = true
+  transferMsg.value = ''
+  try {
+    await transferPoints(
+      apiKey.value,
+      transferTo.value.trim(),
+      Number(transferAmount.value),
+      transferMemo.value,
+    )
+    transferMsg.value = '转账成功'
+    await auth.reloadAccount()
+  } catch (e) {
+    transferMsg.value = e instanceof Error ? e.message : '转账失败'
+  } finally {
+    transferBusy.value = false
+  }
+}
+
+async function copyInvite() {
+  if (!inviteLink.value) return
+  copyMsg.value = ''
+  try {
+    await navigator.clipboard.writeText(inviteLink.value)
+    copyMsg.value = '已复制'
+    setTimeout(() => {
+      copyMsg.value = ''
+    }, 2000)
+  } catch {
+    copyMsg.value = '复制失败，请手动选择链接'
+  }
+}
+
+async function doBuyInvite() {
+  if (!apiKey.value) return
+  inviteBusy.value = true
+  inviteMsg.value = ''
+  try {
+    const msgText = await buyInvitecode(apiKey.value)
+    const code = msgText.split(/\s+/)[0] || msgText
+    boughtCodes.value = [{ code, memo: msgText }, ...boughtCodes.value]
+    inviteMsg.value = msgText
+    await auth.reloadAccount()
+  } catch (e) {
+    inviteMsg.value = e instanceof Error ? e.message : '兑换失败'
+  } finally {
+    inviteBusy.value = false
+  }
+}
+
+async function doQueryInvite() {
+  if (!apiKey.value || !inviteQuery.value.trim()) return
+  inviteBusy.value = true
+  inviteMsg.value = ''
+  try {
+    const r = await queryInvitecode(apiKey.value, inviteQuery.value.trim())
+    inviteMsg.value = r.msg
+  } catch (e) {
+    inviteMsg.value = e instanceof Error ? e.message : '查询失败'
+  } finally {
+    inviteBusy.value = false
+  }
+}
+
+async function onIdCert(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file || !apiKey.value) return
+  idBusy.value = true
+  idMsg.value = ''
+  try {
+    const urls = await uploadFiles(apiKey.value, [file])
+    idCertUrl.value = urls[0] || ''
+    if (!idCertUrl.value) throw new Error('上传未返回地址')
+    idMsg.value = '资料已上传，可提交审核'
+  } catch (e2) {
+    idMsg.value = e2 instanceof Error ? e2.message : '上传失败'
+  } finally {
+    idBusy.value = false
+    ;(e.target as HTMLInputElement).value = ''
+  }
+}
+
+async function doSubmitIdentity() {
+  if (!apiKey.value) return
+  if (!idCertUrl.value) {
+    idMsg.value = '请先上传营业执照复印件'
+    return
+  }
+  idBusy.value = true
+  idMsg.value = ''
+  try {
+    idMsg.value = await submitIdentity(apiKey.value, {
+      type: '企业入驻认证',
+      idCert: idCertUrl.value,
+    })
+  } catch (e) {
+    idMsg.value = e instanceof Error ? e.message : '提交失败'
+  } finally {
+    idBusy.value = false
+  }
+}
+
+async function doExport() {
+  if (!apiKey.value) return
+  exportBusy.value = true
+  exportMsg.value = ''
+  try {
+    const url = await exportPosts(apiKey.value)
+    exportMsg.value = '导出成功，正在打开下载…'
+    window.open(url, '_blank', 'noopener')
+  } catch (e) {
+    exportMsg.value = e instanceof Error ? e.message : '导出失败'
+  } finally {
+    exportBusy.value = false
+  }
+}
+
+async function saveI18n() {
+  if (!apiKey.value) return
+  i18nBusy.value = true
+  i18nMsg.value = ''
+  try {
+    await updateI18nSettings(apiKey.value, {
+      userLanguage: userLanguage.value,
+      userTimezone: userTimezone.value,
+    })
+    i18nMsg.value = '已保存'
+  } catch (e) {
+    i18nMsg.value = e instanceof Error ? e.message : '保存失败'
+  } finally {
+    i18nBusy.value = false
   }
 }
 </script>
@@ -479,6 +683,140 @@ async function saveFunction() {
           <p v-if="jobMsg" :class="jobMsg.includes('失败') ? 'err' : 'ok'">{{ jobMsg }}</p>
         </template>
       </section>
+
+      <section v-if="tab === 'point'" class="card">
+        <header class="mod-head">
+          <h1>积分转账</h1>
+          <RouterLink to="/points">流水</RouterLink>
+        </header>
+        <template v-if="isLoggedIn">
+          <p class="hint">
+            当前余额约 {{ account?.userPoint ?? '—' }} 积分。转账收取 1% 手续费（100
+            积分以内固定 1 积分；VIP4 免税）。
+          </p>
+          <label>收款用户名<input v-model="transferTo" maxlength="64" placeholder="userName" /></label>
+          <label>数量<input v-model.number="transferAmount" type="number" min="1" /></label>
+          <label>备注<input v-model="transferMemo" maxlength="64" /></label>
+          <p v-if="transferMsg" :class="transferMsg.includes('失败') ? 'err' : 'ok'">{{ transferMsg }}</p>
+          <button
+            type="button"
+            class="primary"
+            :disabled="transferBusy || !transferTo.trim()"
+            @click="submitTransfer"
+          >
+            {{ transferBusy ? '提交中…' : '确认转账' }}
+          </button>
+        </template>
+      </section>
+
+      <section v-if="tab === 'invite'" class="card">
+        <h1>邀请</h1>
+        <template v-if="isLoggedIn">
+          <h2>邀请链接</h2>
+          <label>
+            分享给好友注册
+            <input :value="inviteLink" type="text" readonly @focus="($event.target as HTMLInputElement).select()" />
+          </label>
+          <button type="button" class="primary" :disabled="!inviteLink" @click="copyInvite">
+            {{ copyMsg || '复制链接' }}
+          </button>
+          <h2>积分兑换邀请码</h2>
+          <button type="button" class="primary danger" :disabled="inviteBusy" @click="doBuyInvite">
+            {{ inviteBusy ? '处理中…' : '确认兑换' }}
+          </button>
+          <ul v-if="boughtCodes.length" class="code-list">
+            <li v-for="(item, i) in boughtCodes" :key="i">
+              <code>{{ item.code }}</code>
+              <span>{{ item.memo }}</span>
+            </li>
+          </ul>
+          <h2>查询邀请码状态</h2>
+          <label>邀请码<input v-model="inviteQuery" placeholder="输入邀请码" /></label>
+          <button type="button" class="primary" :disabled="inviteBusy || !inviteQuery.trim()" @click="doQueryInvite">
+            查询
+          </button>
+          <p v-if="inviteMsg" :class="inviteMsg.includes('失败') || inviteMsg.includes('不') ? 'err' : 'ok'">
+            {{ inviteMsg }}
+          </p>
+        </template>
+      </section>
+
+      <section v-if="tab === 'identity'" class="card">
+        <h1>官方身份认证</h1>
+        <template v-if="isLoggedIn">
+          <p class="hint">
+            摸鱼派为企业入驻等场景提供官方认证。通过后可领取对应勋章。审核材料仅审核员可见，审核后销毁。详见
+            <RouterLink to="/privacy">隐私政策</RouterLink>。
+          </p>
+          <label>
+            认证类别
+            <select disabled>
+              <option selected>企业入驻认证</option>
+            </select>
+          </label>
+          <p class="hint">申请后我们会通过私信联系你补交企业信息、官网、Logo 等，用于定制专属勋章。</p>
+          <div class="id-upload">
+            <button
+              type="button"
+              class="id-thumb"
+              :style="{ backgroundImage: `url(${idCertUrl || identityPlaceholder})` }"
+              :disabled="idBusy"
+              @click="idFile?.click()"
+            />
+            <input ref="idFile" type="file" accept="image/*" class="hidden" @change="onIdCert" />
+            <span class="hint">点击上传营业执照复印件</span>
+          </div>
+          <p v-if="idMsg" :class="idMsg.includes('失败') || idMsg.includes('请先') ? 'err' : 'ok'">{{ idMsg }}</p>
+          <button type="button" class="primary" :disabled="idBusy" @click="doSubmitIdentity">
+            {{ idBusy ? '处理中…' : '提交审核' }}
+          </button>
+        </template>
+      </section>
+
+      <section v-if="tab === 'data'" class="card">
+        <h1>数据导出</h1>
+        <template v-if="isLoggedIn">
+          <p class="hint">
+            帖子：{{ account?.userArticleCount ?? '—' }}　　评论：{{ account?.userCommentCount ?? '—' }}
+          </p>
+          <button type="button" class="primary danger" :disabled="exportBusy" @click="doExport">
+            {{ exportBusy ? '导出中…' : '导出' }}
+          </button>
+          <p v-if="exportMsg" :class="exportMsg.includes('失败') ? 'err' : 'ok'">{{ exportMsg }}</p>
+        </template>
+      </section>
+
+      <section v-if="tab === 'i18n'" class="card">
+        <h1>语言与时区</h1>
+        <template v-if="isLoggedIn">
+          <label>
+            语言
+            <select v-model="userLanguage">
+              <option v-for="opt in languageOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+          </label>
+          <label>
+            时区
+            <select v-model="userTimezone">
+              <option v-for="opt in timezoneOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+          </label>
+          <p v-if="i18nMsg" :class="i18nMsg.includes('失败') ? 'err' : 'ok'">{{ i18nMsg }}</p>
+          <button type="button" class="primary" :disabled="i18nBusy" @click="saveI18n">
+            {{ i18nBusy ? '保存中…' : '保存' }}
+          </button>
+        </template>
+      </section>
+
+      <section v-if="tab === 'help'" class="card">
+        <h1>使用指南</h1>
+        <ul class="help-list">
+          <li v-for="item in helpLinks" :key="item.to">
+            <RouterLink :to="item.to">{{ item.title }}</RouterLink>
+            <span>{{ item.tip }}</span>
+          </li>
+        </ul>
+      </section>
     </div>
   </div>
 </template>
@@ -625,6 +963,65 @@ input[readonly] {
   border-radius: 6px;
   padding: 8px 16px;
   cursor: pointer;
+}
+.primary.danger {
+  background: #c45c4a;
+}
+.code-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+}
+.code-list li {
+  padding: 6px 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.code-list code {
+  background: var(--fp-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.id-upload {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.id-thumb {
+  width: 96px;
+  height: 96px;
+  border: 1px dashed var(--fp-border);
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  padding: 0;
+}
+.hidden {
+  display: none;
+}
+.help-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.help-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--fp-border);
+}
+.help-list a {
+  color: var(--fp-link);
+  text-decoration: none;
+  font-size: 15px;
+}
+.help-list span {
+  font-size: 12px;
+  color: var(--fp-muted);
 }
 .ok {
   color: var(--fp-primary);

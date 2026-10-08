@@ -96,10 +96,16 @@ const routes = [
     meta: { auth: true, robots: 'noindex' },
   },
   {
-    path: '/settings/point',
-    name: 'transfer',
-    component: () => import('@/views/TransferView.vue'),
-    meta: { auth: true, robots: 'noindex' },
+    path: '/forget-pwd',
+    name: 'forget-pwd',
+    component: () => import('@/views/ForgetPwdView.vue'),
+    meta: { robots: 'noindex' },
+  },
+  {
+    path: '/reset-pwd',
+    name: 'reset-pwd',
+    component: () => import('@/views/ResetPwdView.vue'),
+    meta: { robots: 'noindex' },
   },
   {
     path: '/following',
@@ -210,6 +216,43 @@ const routes = [
     path: '/settings/privacy',
     component: () => import('@/views/SettingsView.vue'),
     meta: { robots: 'noindex', settingsTab: 'privacy' },
+  },
+  {
+    path: '/settings/point',
+    name: 'transfer',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'point' },
+  },
+  {
+    path: '/settings/invite',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'invite' },
+  },
+  {
+    path: '/settings/identity',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'identity' },
+  },
+  {
+    path: '/settings/data',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'data' },
+  },
+  {
+    path: '/settings/i18n',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'i18n' },
+  },
+  {
+    path: '/settings/help',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'help' },
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: () => import('@/views/NotFoundView.vue'),
+    meta: { robots: 'noindex' },
   },
 ]
 

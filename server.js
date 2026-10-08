@@ -210,6 +210,44 @@ async function createServer() {
     }
   })
 
+  /** Upstream reset-pwd HTML → userId for SPA password reset. */
+  app.get('/__fp/reset-pwd-meta', async (req, res) => {
+    try {
+      const code = String(req.query?.code || '').trim()
+      if (!code) {
+        res.status(400).json({ code: -1, msg: '缺少短信验证码' })
+        return
+      }
+      const upstream = await fetch(`${apiTarget}/reset-pwd?code=${encodeURIComponent(code)}`, {
+        headers: {
+          'User-Agent': FISHPI_UA,
+          Referer: `${apiTarget}/forget-pwd`,
+        },
+        redirect: 'manual',
+      })
+      const html = await upstream.text()
+      if (!upstream.ok) {
+        res.status(502).json({ code: -1, msg: '无法校验验证码' })
+        return
+      }
+      const userId =
+        html.match(/id=["']rpwdUserId["'][^>]*value=["']([^"']+)["']/)?.[1] ||
+        html.match(/value=["']([^"']+)["'][^>]*id=["']rpwdUserId["']/)?.[1] ||
+        ''
+      const resetCode =
+        html.match(/id=["']code["'][^>]*value=["']([^"']+)["']/)?.[1] ||
+        html.match(/value=["']([^"']+)["'][^>]*id=["']code["']/)?.[1] ||
+        code
+      if (!userId) {
+        res.status(400).json({ code: -1, msg: '验证码无效或已过期' })
+        return
+      }
+      res.status(200).json({ code: 0, userId, resetCode })
+    } catch (e) {
+      res.status(502).json({ code: -1, msg: e instanceof Error ? e.message : 'reset-pwd-meta 失败' })
+    }
+  })
+
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite')
     vite = await createViteServer({

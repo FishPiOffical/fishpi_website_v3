@@ -150,16 +150,22 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/register': { ...proxy, bypass: spaGetBypass },
+        '/forget-pwd': { ...proxy, bypass: spaGetBypass },
+        '/reset-pwd': { ...proxy, bypass: spaGetBypass },
+        '/invitecode': proxy,
+        '/export': proxy,
         '/settings': {
           ...proxy,
           bypass(req) {
             const path = (req.url || '').split('?')[0] || ''
-            // SPA 设置子页；API：POST /settings/password|function|geo/status|privacy
+            // SPA 设置子页；API：POST /settings/password|function|geo/status|privacy|i18n
             if (req.method === 'GET' || req.method === 'HEAD') {
               const spa =
                 path === '/settings' ||
                 path === '/settings/' ||
-                /^\/settings\/(point|account|function|system|profession|privacy|avatar)(\/|$)/.test(path)
+                /^\/settings\/(point|account|function|system|profession|privacy|avatar|invite|identity|data|i18n|help)(\/|$)/.test(
+                  path,
+                )
               if (spa) return req.url
             }
           },

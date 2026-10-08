@@ -40,7 +40,10 @@ export function isNoIndexPath(path: string) {
   if (
     p === '/login' ||
     p === '/register' ||
+    p === '/forget-pwd' ||
+    p === '/reset-pwd' ||
     p === '/settings' ||
+    p.startsWith('/settings/') ||
     p === '/notifications' ||
     p === '/chat' ||
     p.startsWith('/chat/') ||
