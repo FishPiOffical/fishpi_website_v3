@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchArticleFeed, type ArticleFeedKind, type ArticleSummary } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
@@ -31,6 +31,13 @@ const extra = computed(() => {
 const usingMock = computed(() => items.value.some((a) => String(a.oId).startsWith('mock-')))
 const paged = computed(() => true)
 const heading = computed(() => (kind.value === 'tag' ? `#${extra.value}` : title.value))
+const RECENT_TABS = [
+  { to: '/recent', label: '默认' },
+  { to: '/recent/hot', label: '热议' },
+  { to: '/recent/good', label: '👍 好评' },
+  { to: '/recent/reply', label: '最近回帖' },
+]
+const showRecentTabs = computed(() => RECENT_TABS.some((t) => t.to === route.path))
 
 usePageSeo(() => ({
   title: heading.value,
@@ -97,6 +104,11 @@ function nextPage() {
             <span v-if="keyword" class="search-tag">关键词：{{ keyword }}</span>
           </div>
           <div class="head-right">
+            <nav v-if="showRecentTabs" class="sort-tabs">
+              <RouterLink v-for="t in RECENT_TABS" :key="t.to" :to="t.to" :class="{ current: route.path === t.to }">
+                {{ t.label }}
+              </RouterLink>
+            </nav>
             <span class="total-count">第 {{ page }} 页</span>
           </div>
         </div>
@@ -166,6 +178,34 @@ function nextPage() {
   background: var(--fp-hover);
   padding: 2px 8px;
   border-radius: 4px;
+}
+
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sort-tabs {
+  display: flex;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.sort-tabs a {
+  color: var(--fp-muted);
+  padding: 2px 6px;
+}
+
+.sort-tabs a + a::before {
+  content: '/';
+  margin-right: 8px;
+  color: var(--fp-border);
+}
+
+.sort-tabs a.current {
+  color: var(--fp-title);
+  font-weight: 600;
 }
 
 .total-count {

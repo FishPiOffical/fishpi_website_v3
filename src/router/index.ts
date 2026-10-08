@@ -38,7 +38,12 @@ const routes = [
   {
     path: '/recent/good',
     component: () => import('@/views/ArticleListView.vue'),
-    meta: { title: '点赞', list: 'good' },
+    meta: { title: '好评', list: 'good' },
+  },
+  {
+    path: '/recent/reply',
+    component: () => import('@/views/ArticleListView.vue'),
+    meta: { title: '最近回帖', list: 'reply' },
   },
   {
     path: '/recent/long',
@@ -142,6 +147,16 @@ const routes = [
     meta: { title: '领域', list: 'domain' },
   },
   {
+    path: '/pre-post',
+    component: () => import('@/views/PrePostView.vue'),
+    meta: { auth: true, robots: 'noindex' },
+  },
+  {
+    path: '/post/long',
+    component: () => import('@/views/PostView.vue'),
+    meta: { auth: true, robots: 'noindex', long: true },
+  },
+  {
     path: '/post/:id',
     name: 'edit-post',
     component: () => import('@/views/PostView.vue'),
@@ -178,12 +193,14 @@ const routes = [
     component: () => import('@/views/ResetPwdView.vue'),
     meta: { robots: 'noindex' },
   },
-  {
-    path: '/following',
-    name: 'following-feed',
-    component: () => import('@/views/FollowingView.vue'),
-    meta: { auth: true, robots: 'noindex' },
-  },
+  { path: '/following', redirect: '/watch' },
+  ...([['/watch', 'tags'], ['/watch/users', 'users'], ['/watch/breezemoons', 'breezemoons']] as const).map(
+    ([path, watchTab]) => ({
+      path,
+      component: () => import('@/views/WatchView.vue'),
+      meta: { auth: true, robots: 'noindex', watchTab },
+    }),
+  ),
   {
     path: '/activity',
     name: 'activity',

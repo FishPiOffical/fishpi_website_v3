@@ -925,7 +925,17 @@ export async function fetchRecentArticles(apiKey?: string | null, page = 1, size
   )
 }
 
-export type ArticleFeedKind = 'recent' | 'hot' | 'long' | 'good' | 'qna' | 'perfect' | 'search' | 'domain' | 'tag'
+export type ArticleFeedKind =
+  | 'recent'
+  | 'hot'
+  | 'long'
+  | 'good'
+  | 'reply'
+  | 'qna'
+  | 'perfect'
+  | 'search'
+  | 'domain'
+  | 'tag'
 
 export async function fetchArticleFeed(
   kind: ArticleFeedKind,
@@ -942,6 +952,9 @@ export async function fetchArticleFeed(
   }
   if (kind === 'good') {
     return unwrapArticles(`/api/articles/recent/good?p=${page}&size=${size}`, apiKey, () => mockFeed('good', page, size))
+  }
+  if (kind === 'reply') {
+    return unwrapArticles(`/api/articles/recent/reply?p=${page}&size=${size}`, apiKey)
   }
   if (kind === 'qna') {
     const fromQna = await unwrapArticles(`/api/articles/qna?p=${page}&size=${size}`, apiKey)
@@ -1089,6 +1102,9 @@ export interface ArticleDraft {
   articleDraftNotifyFollowers?: boolean
   articleDraftShowInList?: number
   articleDraftStatement?: number
+  articleDraftColumnId?: string
+  articleDraftColumnTitle?: string
+  articleDraftChapterNo?: string
   articleDraftUpdatedTime?: number
   articleTitle?: string
   articleContent?: string
@@ -1526,6 +1542,12 @@ export interface ArticlePayload {
   articleShowInList?: boolean
   /** 0 无 / 1 AI 辅助 / 2 剧透 / 3 虚构 */
   articleStatement?: number
+  /** 长文章专栏：'' 独立长文，'__NEW__' 新建（需 columnTitle），否则为已有专栏 ID */
+  columnId?: string
+  columnTitle?: string
+  /** 留空则排到专栏末尾 */
+  chapterNo?: string
+  columnCoverURL?: string
 }
 
 /** 字段取舍对齐现网 add-article.js：问答只带悬赏，其他类型带打赏与匿名。 */
@@ -1547,6 +1569,12 @@ function articleBody(apiKey: string, p: ArticlePayload) {
     body.articleRewardContent = p.articleRewardContent || ''
     body.articleRewardPoint = p.articleRewardContent?.trim() ? p.articleRewardPoint || 0 : 0
     body.articleAnonymous = p.articleAnonymous ?? false
+  }
+  if (p.articleType === 6) {
+    body.columnId = p.columnId || ''
+    body.columnTitle = p.columnId === '__NEW__' ? p.columnTitle || '' : ''
+    body.chapterNo = p.columnId ? p.chapterNo || '' : ''
+    body.columnCoverURL = p.columnCoverURL || ''
   }
   return body
 }
@@ -1578,6 +1606,9 @@ export async function fetchArticleMd(apiKey: string, id: string): Promise<Articl
     articleCommentable: detail.articleCommentable !== false,
     articleShowInList: Number(detail.articleShowInList ?? 1) !== 0,
     articleStatement: Number(detail.articleStatement || 0),
+    columnId: detail.longArticleColumnView?.column.oId || '',
+    chapterNo: detail.longArticleColumnView?.chapterNo ? String(detail.longArticleColumnView.chapterNo) : '',
+    columnCoverURL: detail.longArticleColumnView?.column.columnCoverURL || '',
   }
 }
 
@@ -1963,11 +1994,6 @@ async function unwrapUsers(paths: string[], apiKey?: string | null): Promise<Sim
 export async function fetchCollectedArticles(apiKey?: string | null, page = 1, size = 40) {
   if (!apiKey) return []
   return unwrapArticles(`/api/articles/collected?p=${page}&size=${size}`, apiKey)
-}
-
-export async function fetchFollowingArticles(apiKey?: string | null, page = 1, size = 40) {
-  if (!apiKey) return []
-  return unwrapArticles(`/api/user/following/articles?p=${page}&size=${size}`, apiKey)
 }
 
 export async function fetchFollowingUsers(userName: string, apiKey?: string | null, page = 1) {

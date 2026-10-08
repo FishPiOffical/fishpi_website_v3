@@ -116,7 +116,7 @@ const accountMenu = computed(() => {
     { to: '/points', label: '积分', hint: account.value?.userPoint != null ? Number(account.value.userPoint).toLocaleString() : '' },
     { to: '/vips', label: isVip.value ? '我的 VIP' : '开通 VIP' },
     { to: '/stars', label: '收藏' },
-    { to: '/following', label: '关注' },
+    { to: '/watch', label: '关注' },
     { to: '/settings', label: '设置' },
     { to: '/activity', label: '活动' },
     { to: '/games', label: '游戏 / 鱼游' },
@@ -198,7 +198,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
       <input class="search" placeholder="搜索你感兴趣的内容" @keydown.enter="onSearch" />
       <div class="user">
         <template v-if="isLoggedIn">
-          <RouterLink to="/post" class="bar-link">发帖</RouterLink>
+          <RouterLink to="/pre-post" class="bar-link">发帖</RouterLink>
           <RouterLink to="/chat" class="bar-link icon-link" title="私信">
             私信
             <em v-if="whisperUnread" class="badge">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</em>

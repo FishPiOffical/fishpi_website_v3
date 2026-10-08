@@ -50,6 +50,12 @@ const commentable = ref(true)
 const notifyFollowers = ref(false)
 const showInList = ref(true)
 const statement = ref(0)
+/** '' 独立长文 / '__NEW__' 新建 / 'existing' 已有专栏（无专栏列表接口，手填 ID） */
+const columnMode = ref<'' | '__NEW__' | 'existing'>('')
+const columnId = ref('')
+const columnTitle = ref('')
+const chapterNo = ref('')
+const columnCoverURL = ref('')
 const error = ref('')
 const sending = ref(false)
 const savingDraft = ref(false)
@@ -60,7 +66,20 @@ const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 let tagTimer = 0
 
 const typeTip = computed(() => TYPES.find((t) => t.value === type.value)?.tip || '')
-const allowAnonymous = computed(() => type.value !== 2 && type.value !== 5)
+const isLong = computed(() => type.value === 6)
+const allowAnonymous = computed(() => type.value !== 2 && type.value !== 5 && !isLong.value)
+const heading = computed(() => {
+  if (isLong.value) return editId.value ? '编辑长文章' : '发布长文章'
+  return editId.value ? '编辑帖子' : '发帖'
+})
+
+function applyColumn(id: string, titleText: string, no: string, cover = '') {
+  columnMode.value = id === '__NEW__' ? '__NEW__' : id ? 'existing' : ''
+  columnId.value = id === '__NEW__' ? '' : id
+  columnTitle.value = titleText
+  chapterNo.value = no
+  columnCoverURL.value = cover
+}
 
 function draftKey(d: ArticleDraft) {
   return String(d.oId || d.articleDraftId || '')
@@ -92,6 +111,7 @@ function applyDraft(d: ArticleDraft) {
   notifyFollowers.value = d.articleDraftNotifyFollowers === true
   showInList.value = Number(d.articleDraftShowInList ?? 1) !== 0
   statement.value = Number(d.articleDraftStatement || 0)
+  applyColumn(d.articleDraftColumnId || '', d.articleDraftColumnTitle || '', String(d.articleDraftChapterNo || ''))
   draftId.value = draftKey(d)
 }
 
@@ -108,6 +128,7 @@ function applyPayload(p: ArticlePayload) {
   commentable.value = p.articleCommentable !== false
   showInList.value = p.articleShowInList !== false
   statement.value = p.articleStatement || 0
+  applyColumn(p.columnId || '', '', p.chapterNo || '', p.columnCoverURL || '')
 }
 
 async function loadDraft(id: string) {
@@ -132,7 +153,9 @@ async function loadEdit() {
 
 onMounted(async () => {
   const qType = Number(route.query.type)
-  if (!editId.value && TYPES.some((t) => t.value === qType)) type.value = qType
+  if (!editId.value && route.meta.long) type.value = 6
+  else if (!editId.value && TYPES.some((t) => t.value === qType)) type.value = qType
+  if (!editId.value && typeof route.query.tags === 'string') tags.value = route.query.tags
   await loadEdit()
   await loadDrafts()
   const q = typeof route.query.draft === 'string' ? route.query.draft : ''
@@ -142,6 +165,12 @@ watch(editId, () => {
   void loadEdit()
   void loadDrafts()
 })
+watch(
+  () => route.meta.long,
+  (long) => {
+    if (!editId.value) type.value = long ? 6 : 0
+  },
+)
 
 watch(tags, (value) => {
   window.clearTimeout(tagTimer)
@@ -182,6 +211,14 @@ function payload(): ArticlePayload {
     articleNotifyFollowers: notifyFollowers.value,
     articleShowInList: showInList.value,
     articleStatement: statement.value,
+    ...(isLong.value
+      ? {
+          columnId: columnMode.value === '__NEW__' ? '__NEW__' : columnMode.value === 'existing' ? columnId.value.trim() : '',
+          columnTitle: columnTitle.value.trim(),
+          chapterNo: chapterNo.value.trim(),
+          columnCoverURL: columnCoverURL.value,
+        }
+      : {}),
   }
 }
 
@@ -192,7 +229,20 @@ async function submit() {
     error.value = '正文不能为空'
     return
   }
-  if (type.value !== 5 && rewardOpen.value && rewardContent.value.trim()) {
+  if (isLong.value) {
+    if (columnMode.value === '__NEW__' && !columnTitle.value.trim()) {
+      error.value = '请输入新专栏名称'
+      return
+    }
+    if (columnMode.value === 'existing' && !/^\d+$/.test(columnId.value.trim())) {
+      error.value = '请填写正确的专栏 ID'
+      return
+    }
+    if (columnMode.value && chapterNo.value.trim() && !/^[1-9]\d*$/.test(chapterNo.value.trim())) {
+      error.value = '章节号必须是正整数'
+      return
+    }
+  } else if (type.value !== 5 && rewardOpen.value && rewardContent.value.trim()) {
     if (!Number.isInteger(Number(rewardPoint.value)) || Number(rewardPoint.value) < 1) {
       error.value = '打赏积分必须是正整数'
       return
@@ -252,7 +302,7 @@ async function dropDraft(id: string) {
 
 <template>
   <form class="card" @submit.prevent="submit">
-    <h1>{{ editId ? '编辑帖子' : '发帖' }}</h1>
+    <h1>{{ heading }}</h1>
     <p v-if="!isLoggedIn" class="hint">请先登录。</p>
     <template v-else>
       <section v-if="!editId && drafts.length" class="drafts">
@@ -268,7 +318,7 @@ async function dropDraft(id: string) {
           <span @click.stop="dropDraft(draftKey(d))">删除</span>
         </button>
       </section>
-      <div v-if="!editId" class="type-row" role="radiogroup" aria-label="文章类型">
+      <div v-if="!editId && !isLong" class="type-row" role="radiogroup" aria-label="文章类型">
         <label v-for="t in TYPES" :key="t.value" class="type-opt" :class="{ current: type === t.value }">
           <input v-model.number="type" type="radio" name="articleType" :value="t.value" />
           {{ t.label }}
@@ -277,6 +327,7 @@ async function dropDraft(id: string) {
       <p class="type-tip">
         <b>{{ TYPE_LABELS[type] || '帖子' }}</b>
         <span v-if="typeTip">{{ typeTip }}</span>
+        <span v-if="isLong">适合创作小说、长篇故事等</span>
         <span v-if="editId">（编辑时不可更改类型）</span>
       </p>
 
@@ -293,6 +344,32 @@ async function dropDraft(id: string) {
         <EmojiPicker @insert="(md) => editorRef?.insert(md)" />
       </div>
 
+      <section v-if="isLong" class="column-form">
+        <p class="type-tip">专栏设置（可选）：可将长文归入已有专栏，或新建专栏进行章节连载。</p>
+        <label class="inline-field">
+          所属专栏
+          <select v-model="columnMode">
+            <option value="">不归属专栏（独立长文）</option>
+            <option value="existing">已有专栏</option>
+            <option value="__NEW__">+ 新建专栏</option>
+          </select>
+        </label>
+        <label v-if="columnMode === 'existing'" class="inline-field">
+          专栏 ID
+          <input v-model="columnId" inputmode="numeric" placeholder="专栏页地址 /column/ 后的数字" />
+        </label>
+        <label v-if="columnMode === '__NEW__'" class="inline-field">
+          新专栏名称
+          <input v-model="columnTitle" maxlength="64" placeholder="请输入专栏名称（例如：《三体》）" />
+        </label>
+        <label v-if="columnMode" class="inline-field">
+          章节号
+          <input v-model="chapterNo" inputmode="numeric" placeholder="可选，留空自动排在该专栏末尾" />
+        </label>
+        <p class="type-tip">同一专栏按章节号排序，阅读页将自动显示章节目录与上下章跳转。</p>
+      </section>
+
+      <template v-if="!isLong">
       <label>
         标签（逗号分隔）
         <input v-model="tags" required placeholder="前端,摸鱼" />
@@ -333,6 +410,7 @@ async function dropDraft(id: string) {
         <label class="check"><input v-model="commentable" type="checkbox" />允许回帖</label>
         <label class="check"><input v-model="notifyFollowers" type="checkbox" />通知关注者</label>
       </section>
+      </template>
 
       <p v-if="error" class="err">{{ error }}</p>
       <div class="tools">
@@ -469,6 +547,17 @@ button {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.column-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px dashed var(--fp-border);
+  border-radius: 8px;
+}
+.column-form .inline-field input {
+  width: 280px;
 }
 .reward-toggle {
   align-self: flex-start;

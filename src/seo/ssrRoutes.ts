@@ -10,6 +10,7 @@ export function shouldPrefetchSsr(path: string) {
     p === '/recent/long' ||
     p === '/recent/hot' ||
     p === '/recent/good' ||
+    p === '/recent/reply' ||
     p === '/column' ||
     p === '/qna' ||
     p === '/perfect' ||
@@ -29,7 +30,6 @@ export function shouldPrefetchSsr(path: string) {
     p === '/repeater' ||
     p === '/download' ||
     p === '/activity' ||
-    p === '/following' ||
     p === '/agreement' ||
     p === '/privacy'
   ) {
@@ -60,6 +60,9 @@ export function isNoIndexPath(path: string) {
     p === '/logs' ||
     p === '/post' ||
     p.startsWith('/post/') ||
+    p === '/pre-post' ||
+    p === '/watch' ||
+    p.startsWith('/watch/') ||
     p === '/charge/point' ||
     p === '/vips'
   ) {
