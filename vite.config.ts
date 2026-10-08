@@ -43,7 +43,8 @@ export default defineConfig(({ mode }) => {
       ssrManifest: true,
     },
     ssr: {
-      noExternal: ['@unhead/vue', '@unhead/ssr', 'unhead'],
+      // hookable 须一起打包：根目录是 pinia devtools 带来的 5.x，unhead 需要 6.x。
+      noExternal: ['@unhead/vue', '@unhead/ssr', 'unhead', 'hookable'],
     },
     server: {
       host: '127.0.0.1',
