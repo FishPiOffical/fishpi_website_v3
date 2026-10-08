@@ -934,8 +934,8 @@ async function saveI18n() {
 
 <template>
   <div class="page">
-    <aside class="side">
-      <nav class="menu">
+    <aside class="set-side">
+      <nav class="set-menu">
         <RouterLink
           v-for="item in tabs"
           :key="item.id"
@@ -947,7 +947,7 @@ async function saveI18n() {
       </nav>
     </aside>
 
-    <div class="main">
+    <div class="set-main">
       <p v-if="!isLoggedIn" class="card hint">
         <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
         后可修改设置。游客仍可调整本机主题外观。
@@ -1462,11 +1462,11 @@ async function saveI18n() {
   align-items: start;
   max-width: 960px;
 }
-.side {
+.set-side {
   position: sticky;
   top: calc(var(--fp-nav-h) + 12px);
 }
-.menu {
+.set-menu {
   display: flex;
   flex-direction: column;
   background: var(--fp-card);
@@ -1474,23 +1474,23 @@ async function saveI18n() {
   border-radius: 8px;
   overflow: hidden;
 }
-.menu a {
+.set-menu a {
   padding: 10px 14px;
   color: var(--fp-text);
   text-decoration: none;
   font-size: 14px;
   border-left: 3px solid transparent;
 }
-.menu a:hover {
+.set-menu a:hover {
   background: var(--fp-hover);
 }
-.menu a.current {
+.set-menu a.current {
   color: var(--fp-primary);
   border-left-color: var(--fp-primary);
   font-weight: 600;
   background: var(--fp-hover);
 }
-.main {
+.set-main {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1748,18 +1748,18 @@ input[readonly] {
   .page {
     grid-template-columns: 1fr;
   }
-  .side {
+  .set-side {
     position: static;
   }
-  .menu {
+  .set-menu {
     flex-direction: row;
     flex-wrap: wrap;
   }
-  .menu a {
+  .set-menu a {
     border-left: 0;
     border-bottom: 2px solid transparent;
   }
-  .menu a.current {
+  .set-menu a.current {
     border-bottom-color: var(--fp-primary);
   }
   .checks {

@@ -24,7 +24,7 @@
   --fp-nav-h: 58px;
   --fp-wrap: 1300px;
 }
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   :root {
     --fp-nav-h: 88px;
   }

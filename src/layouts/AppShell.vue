@@ -745,6 +745,17 @@ main.main--cr-modern {
   gap: 12px 16px;
   margin-top: 10px;
 }
+@media (max-width: 1200px) {
+  nav {
+    gap: 2px;
+  }
+  nav a {
+    padding: 6px 7px;
+  }
+  .search {
+    width: 150px;
+  }
+}
 @media (max-width: 960px) {
   .search {
     width: 120px;
@@ -760,7 +771,7 @@ main.main--cr-modern {
     flex: none;
   }
 }
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .nav {
     flex-wrap: wrap;
     justify-content: space-between;
