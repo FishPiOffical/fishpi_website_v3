@@ -6,7 +6,7 @@ import { fetchBarrageCost, fetchChatRaw } from '@/api/fishpi'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
 import PaintPanel from '@/components/chat/PaintPanel.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
-import MentionSuggest from '@/components/MentionSuggest.vue'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -15,7 +15,9 @@ import type { ChatNodeOption } from '@/api/fishpi'
 
 const auth = useAuthStore()
 const chat = useChatStore()
-const { account, isLoggedIn } = storeToRefs(auth)
+const { account, isLoggedIn, apiKey } = storeToRefs(auth)
+const composerRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
+const composerReady = ref(false)
 const {
   messages,
   sending,
@@ -71,6 +73,7 @@ function scrollToHash() {
 }
 
 onMounted(async () => {
+  composerReady.value = true
   await chat.connect()
   await nextTick()
   if (chatStyle.value === 'modern') {
@@ -143,8 +146,7 @@ async function quoteMessage(msg: { oId: string; userName: string }) {
     const content = await fetchChatRaw(auth.apiKey, msg.oId)
     quote.value = { userName: msg.userName, messageId: msg.oId, content: content.trim() }
     await nextTick()
-    const ta = document.querySelector<HTMLTextAreaElement>('textarea.composer-input')
-    ta?.focus()
+    composerRef.value?.focus()
   } catch (e) {
     quoteErr.value = e instanceof Error ? e.message : '读取原文失败'
   } finally {
@@ -171,12 +173,6 @@ async function openNodePicker() {
   if (showNodes.value) await chat.refreshNodes()
 }
 
-function onComposerKey(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    void submit()
-  }
-}
 
 async function onModernScroll() {
   const el = scroller.value
@@ -278,17 +274,20 @@ function clearScreen() {
             </div>
 
             <!-- 输入框主体：100% 占满卡片宽度 -->
-            <div v-if="isLoggedIn" class="reply-input-wrap">
-              <MentionSuggest v-model="draft" />
-              <textarea
+            <div v-if="composerReady && isLoggedIn" class="reply-input-wrap">
+              <MarkdownEditor
+                ref="composerRef"
                 v-model="draft"
                 class="composer-input classic-textarea"
-                rows="3"
-                placeholder="说点什么吧，支持 Markdown。Enter 发送，Shift+Enter 换行。@ 可快速提及鱼油…"
-                @keydown="onComposerKey"
+                :api-key="apiKey"
+                :height="150"
+                chat
+                cache-id="chatContent"
+                placeholder="说点什么吧！"
+                @submit="submit"
               />
             </div>
-            <div v-else class="comment-login-hint">
+            <div v-else-if="composerReady" class="comment-login-hint">
               <RouterLink to="/login" class="login-link">登录</RouterLink>后参与讨论与收发消息
             </div>
 
@@ -304,7 +303,7 @@ function clearScreen() {
                   >
                     🧧 红包
                   </button>
-                  <EmojiPicker @insert="(md) => (draft += md)" />
+                  <EmojiPicker @insert="(md) => composerRef?.insert(md)" />
                   <button
                     type="button"
                     class="classic-tool-btn"
@@ -676,7 +675,7 @@ function clearScreen() {
 
         <!-- 底部吸底输入与工具区 -->
         <div class="cr-composer-panel">
-          <div v-if="isLoggedIn" class="composer-inner">
+          <div v-if="composerReady && isLoggedIn" class="composer-inner">
             <!-- 引用预览条 -->
             <div v-if="quote" class="quote-preview-box">
               <div class="quote-info">
@@ -688,20 +687,23 @@ function clearScreen() {
 
             <!-- 输入框主体 -->
             <div class="reply-input-wrap">
-              <MentionSuggest v-model="draft" />
-              <textarea
+              <MarkdownEditor
+                ref="composerRef"
                 v-model="draft"
                 class="composer-input modern-textarea"
-                rows="3"
-                placeholder="说点什么吧，支持 Markdown。Enter 发送，Shift+Enter 换行。@ 可快速提及鱼油…"
-                @keydown="onComposerKey"
+                :api-key="apiKey"
+                :height="150"
+                chat
+                cache-id="chatContent"
+                placeholder="说点什么吧！"
+                @submit="submit"
               />
             </div>
 
             <!-- 工具栏与操作行 -->
             <div class="cr-toolbar">
               <div class="tool-actions">
-                <EmojiPicker @insert="(md) => (draft += md)" />
+                <EmojiPicker @insert="(md) => composerRef?.insert(md)" />
                 <button
                   type="button"
                   class="tool-btn"
@@ -790,7 +792,7 @@ function clearScreen() {
             </div>
           </div>
 
-          <div v-else class="guest-bottom-bar">
+          <div v-else-if="composerReady" class="guest-bottom-bar">
             <span>登录后即可参与发言、抢红包与互动。</span>
             <RouterLink to="/login" class="login-link">立即登录</RouterLink>
           </div>
@@ -1071,26 +1073,8 @@ function clearScreen() {
 }
 
 .composer-input {
-  width: 100% !important;
-  min-width: 100% !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-  display: block !important;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  border-radius: 6px;
-  padding: 10px 12px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--fp-text);
-  resize: vertical;
-  min-height: 72px;
-  outline: none;
-  transition: border-color 0.15s ease;
-}
-
-.composer-input:focus {
-  border-color: var(--fp-accent);
+  width: 100%;
+  min-width: 0;
 }
 
 .comment-login-hint {

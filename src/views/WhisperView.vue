@@ -172,11 +172,12 @@ async function submit() {
         <MarkdownEditor
           :key="userName"
           ref="editorRef"
+          :cache-id="`whisper-${userName}`"
           v-model="draft"
           :api-key="apiKey"
-          :height="130"
+          :height="150"
           compact
-          placeholder="说点什么吧，友善第一哦。Ctrl+Enter 发送，可粘贴或拖拽图片"
+          placeholder="说点什么吧，友善第一哦。"
           @submit="submit"
         />
         <div class="send-row">

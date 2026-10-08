@@ -1822,16 +1822,45 @@ export async function fetchUserMedals(apiKey: string, userName: string) {
   }
 }
 
-export async function searchUserNames(apiKey: string, name: string): Promise<string[]> {
-  const res = await request<Envelope<string[] | { userNames?: string[] }>>('/users/names', {
+export interface UserNameHit {
+  userName: string
+  avatar?: string
+}
+
+export async function searchUsers(apiKey: string, name: string): Promise<UserNameHit[]> {
+  const res = await request<Envelope<unknown[] | { userNames?: unknown[] }>>('/users/names', {
     method: 'POST',
     body: JSON.stringify({ apiKey, name }),
   })
   if (res.code) return []
   const data = res.data
-  if (Array.isArray(data)) return data.map(String)
-  if (data && Array.isArray(data.userNames)) return data.userNames.map(String)
-  return []
+  const rows = Array.isArray(data) ? data : data && Array.isArray(data.userNames) ? data.userNames : []
+  return rows
+    .map((r) => {
+      if (typeof r === 'string') return { userName: r }
+      const o = r as { userName?: string; userAvatarURL48?: string; userAvatarURL20?: string; userAvatarURL?: string }
+      return { userName: o.userName || '', avatar: o.userAvatarURL48 || o.userAvatarURL20 || o.userAvatarURL }
+    })
+    .filter((u) => u.userName)
+}
+
+export async function searchUserNames(apiKey: string, name: string): Promise<string[]> {
+  return (await searchUsers(apiKey, name)).map((u) => u.userName)
+}
+
+/** Vditor `hint.emoji` 格式：`{ name: unicode 或图片 URL }`，即用户在设置里配置的常用表情。 */
+export async function fetchVditorEmoji(apiKey: string): Promise<Record<string, string>> {
+  const res = await request<Envelope<unknown>>(withKey('/users/emotions', apiKey))
+  if (res.code || !Array.isArray(res.data)) return {}
+  const out: Record<string, string> = {}
+  for (const item of res.data) {
+    if (item && typeof item === 'object') {
+      for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
+        if (typeof v === 'string') out[k] = v
+      }
+    }
+  }
+  return out
 }
 
 export async function revokeChat(apiKey: string, oId: string) {
