@@ -39,7 +39,11 @@ watch(apiKey, () => void loadExtra())
   <div class="page">
     <section class="card">
       <h1>活动中心</h1>
-      <p class="hint">签到与昨日活跃奖励；未登录仅可浏览推荐内容。</p>
+      <p class="hint">
+        签到与昨日活跃奖励；未登录仅可浏览推荐内容。小游戏与鱼游见
+        <RouterLink to="/games">游戏入口</RouterLink>
+        。
+      </p>
       <CheckinPanel v-if="isLoggedIn" />
       <p v-else class="hint">
         <RouterLink :to="{ path: '/login', query: { redirect: '/activity' } }">登录</RouterLink>

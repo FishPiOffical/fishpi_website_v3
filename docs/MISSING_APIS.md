@@ -135,32 +135,39 @@
 
 ---
 
-## 9. 闲聊室 — 占位
+## 9. 闲聊室 — 故意不做
 
-现网 `/idle-talk` 404。SPA 保留 `/idle-talk` 占位页，引导去 `/cr`。
+现网 `/idle-talk` 404。本站不接闲聊室，主聊天走 `/cr`。
 
 ---
 
-## 10. 管理后台 — 缺失 JSON
+## 10. 鱼游公开列表 — 缺失
 
-现网 `/admin/*` 为 FTL SSR（约 70+ 路由），无公开 `/api/admin/*`。
+已有：`POST /api/fish-games`（投稿）、`GET /api/fish-games/{id}/comments`、投票/评论写接口。  
+审批列表仅注入 FTL `/activities`（`fishGameQueryService.getApproved()`），无公开 JSON。
 
 | 建议契约 | 说明 |
 |----------|------|
-| `GET /api/admin/stats` | 仪表盘计数 |
-| `GET /api/admin/users?p=&size=` | 用户列表 |
-| `GET /api/admin/articles?p=&size=` | 帖子列表 |
-| `GET /api/admin/comments?p=&size=` | 评论列表 |
-| `GET /api/admin/reports?p=&size=` | 举报列表 |
+| `GET /api/fish-games?status=approved` | 已通过鱼游列表（名称/简介/URL/图标/赞踩） |
 
-| 现状 | Vue `/admin` 壳：优先打上述 JSON，失败回退 `src/api/admin.mock.ts`；写操作仍需 Rhythm FTL |
-|------|----------------------------------------------------------------------------------------|
+| 现状 | SPA `/games` 提供官方游戏入口 + 投稿表单；列表待后端 |
+|------|-----------------------------------------------------|
 
 ---
 
 ## 11. 捐助页 — 已有支付口
 
 `GET /pay/wechat?total_amount=&note=`（页面会话）返回 `QRcode_url`。SPA `/charge/point` 已对接。
+
+---
+
+## 12. VIP — 已有（勿当缺失）
+
+- `GET /api/membership/levels`
+- `GET /api/membership/{userId}`
+- `POST /api/membership/open`（积分开通，body 可带 `apiKey` / `couponCode`）
+
+SPA `/vips` 已对接。管理端 VIP 不在本站范围。
 
 ---
 
@@ -171,7 +178,6 @@
 | 首页专栏 | `src/api/gaps.mock.ts` → `mockHomeColumns` |
 | 背包读取 | `src/api/gaps.mock.ts` → `mockUserBag` |
 | 重置密码 meta | `src/api/gaps.mock.ts` → `mockResetPwdMeta` |
-| 管理后台列表 | `src/api/admin.mock.ts` |
 | 匿名列表/详情等 | `src/api/catalog.mock.json`（既有） |
 
 服务端仅保留 `POST /__fp/page-auth`（apiKey → `sym-ce` + csrf，供页面态 POST）。**不再**提供 HTML 抓取类 `__fp/*` 接口。

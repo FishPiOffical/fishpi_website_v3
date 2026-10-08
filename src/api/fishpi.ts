@@ -1940,15 +1940,87 @@ export async function revokeWhisper(apiKey: string, oId: string) {
   if (res.code) throw new Error(res.msg || '撤回失败')
 }
 
-export async function fetchMembership(userId: string) {
-  const res = await request<Envelope<{ expiresAt?: number; status?: string; isActive?: boolean }>>(
+export interface MembershipLevel {
+  oId: string
+  lvName: string
+  lvCode: string
+  price: number
+  durationType: string
+  durationValue: number
+  benefits?: string
+  openedMemberCount?: number
+}
+
+export interface MembershipStatus {
+  state?: number
+  expiresAt?: number
+  lvCode?: string
+  configJson?: string
+  isVip: boolean
+}
+
+export async function fetchMembershipLevels(): Promise<MembershipLevel[]> {
+  const res = await request<Envelope<MembershipLevel[]>>('/api/membership/levels')
+  if (res.code !== 0) throw new Error(res.msg || '获取会员等级失败')
+  return Array.isArray(res.data) ? res.data : []
+}
+
+export async function fetchMembershipDetail(userId: string): Promise<MembershipStatus> {
+  const res = await request<Envelope<Omit<MembershipStatus, 'isVip'> & { isActive?: boolean }>>(
     `/api/membership/${userId}`,
   )
   if (res.code !== 0) return { isVip: false }
-  const data = res.data
-  const expiresAt = Number(data?.expiresAt || 0)
-  const isVip = Boolean(data?.isActive) || (expiresAt > Date.now())
-  return { isVip, expiresAt }
+  const data = res.data || {}
+  const expiresAt = Number(data.expiresAt || 0)
+  const isVip =
+    Number(data.state) === 1 || Boolean(data.isActive) || (expiresAt > Date.now() && expiresAt > 0)
+  return {
+    state: data.state,
+    expiresAt: expiresAt || undefined,
+    lvCode: data.lvCode,
+    configJson: data.configJson,
+    isVip,
+  }
+}
+
+/** @deprecated 使用 fetchMembershipDetail；保留兼容 auth store */
+export async function fetchMembership(userId: string) {
+  return fetchMembershipDetail(userId)
+}
+
+/** 积分开通 VIP：`POST /api/membership/open`（body 含 apiKey） */
+export async function openMembership(apiKey: string, levelOId: string, couponCode = '') {
+  const res = await request<Envelope<unknown>>('/api/membership/open', {
+    method: 'POST',
+    body: JSON.stringify({
+      apiKey,
+      oId: levelOId,
+      couponCode: couponCode || '',
+      configJson: '',
+    }),
+  })
+  if (res.code) throw new Error(res.msg || '开通失败')
+  return res.data
+}
+
+export async function submitFishGame(
+  apiKey: string,
+  payload: {
+    fishGameName: string
+    fishGameDescription?: string
+    fishGameUrl: string
+    fishGameIconUrl?: string
+  },
+) {
+  const { ensureCsrfToken } = await import('./pageAuth')
+  const csrfToken = await ensureCsrfToken(apiKey)
+  const res = await request<Envelope<unknown>>('/api/fish-games', {
+    method: 'POST',
+    headers: { csrfToken },
+    body: JSON.stringify({ ...payload, apiKey }),
+  })
+  if (res.code) throw new Error(res.msg || '投稿失败')
+  return res.data
 }
 
 export async function fetchChatHistory(apiKey?: string | null, page = 1) {

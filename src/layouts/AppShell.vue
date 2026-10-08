@@ -2,7 +2,6 @@
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { computed, watch } from 'vue'
-import { isAdminAccount } from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useNoticeStore } from '@/stores/notices'
@@ -26,6 +25,8 @@ const extraNav = [
   { to: '/good', label: '点赞' },
   { to: '/following', label: '关注' },
   { to: '/activity', label: '活动' },
+  { to: '/games', label: '游戏' },
+  { to: '/vips', label: 'VIP' },
   { to: '/repeater', label: '复读机' },
   { to: '/logs', label: '日志' },
   { to: '/charge/point', label: '捐助' },
@@ -40,12 +41,10 @@ const auth = useAuthStore()
 const appearance = useAppearanceStore()
 const notices = useNoticeStore()
 const whispers = useWhisperStore()
-const { isLoggedIn, account } = storeToRefs(auth)
+const { isLoggedIn, account, isVip } = storeToRefs(auth)
 const { total: unreadTotal } = storeToRefs(notices)
 const { unreadTotal: whisperUnread } = storeToRefs(whispers)
 const memberPath = computed(() => (account.value?.userName ? `/member/${account.value.userName}` : '/login'))
-const showAdmin = computed(() => isAdminAccount(account.value))
-const isAdminRoute = computed(() => route.path === '/admin' || route.path.startsWith('/admin/'))
 
 watch(
   () => auth.apiKey,
@@ -105,6 +104,7 @@ function logout() {
             积分
             <em v-if="account?.userPoint != null" class="pts">{{ Number(account.userPoint).toLocaleString() }}</em>
           </RouterLink>
+          <RouterLink to="/vips" class="vip-link" :class="{ on: isVip }">{{ isVip ? 'VIP' : '开通VIP' }}</RouterLink>
           <RouterLink to="/chat">
             私信
             <em v-if="whisperUnread" class="badge">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</em>
@@ -115,7 +115,6 @@ function logout() {
           </RouterLink>
           <RouterLink :to="memberPath">{{ account?.userName }}</RouterLink>
           <RouterLink to="/settings">设置</RouterLink>
-          <RouterLink v-if="showAdmin" to="/admin">管理</RouterLink>
           <button type="button" @click="logout">退出</button>
         </template>
         <template v-else>
@@ -125,18 +124,16 @@ function logout() {
         <button type="button" class="theme" title="切换颜色模式" @click="appearance.toggleTheme()">◐</button>
       </div>
     </header>
-    <template v-if="!isAdminRoute">
-      <div class="income" aria-label="今日收入">
-        <span>🎉</span>
-        <div class="count-time">今日收入</div>
-        <b>￥365</b>
-      </div>
-      <AdSlot slot-key="home.top" />
-    </template>
-    <main :class="{ adminMain: isAdminRoute }">
+    <div class="income" aria-label="今日收入">
+      <span>🎉</span>
+      <div class="count-time">今日收入</div>
+      <b>￥365</b>
+    </div>
+    <AdSlot slot-key="home.top" />
+    <main>
       <RouterView />
     </main>
-    <footer v-if="!isAdminRoute" class="foot">
+    <footer class="foot">
       <div class="foot-inner">
         <div class="foot-brand">
           <b>摸鱼派</b>
@@ -230,6 +227,10 @@ nav a:hover {
 .user a:hover {
   color: var(--fp-accent);
 }
+.vip-link.on {
+  color: var(--fp-accent);
+  font-weight: 600;
+}
 .badge {
   position: absolute;
   top: -8px;
@@ -280,10 +281,6 @@ nav a:hover {
   color: var(--fp-income);
   font-size: 22px;
   margin-top: 2px;
-}
-main.adminMain {
-  max-width: none;
-  padding: 12px 16px 32px;
 }
 main {
   max-width: var(--fp-wrap);

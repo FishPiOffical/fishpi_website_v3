@@ -74,9 +74,10 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - 设置页侧栏对齐现网（资料/个性化/头像/账号/功能/积分/隐私/职业）；密码、地理位置、功能偏好走 page-auth CSRF
 - 聊天室 UI：上方输入区（话题/红包/弹幕/清屏）+ 下方消息流；游客可浏览历史/在线
 
-闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。
+闲聊室 `/idle-talk` 现网 404，**明确不做**。管理后台不在本站范围（继续用 Rhythm FTL `/admin`）。
+游戏入口：`/games`（官方小游戏跳转 Rhythm + 鱼游投稿）；VIP：`/vips`（积分开通 `/api/membership/*`）。
 用户发帖列表 / 收藏 / 关注粉丝 / 通知 / 私信：接口失败时返回空列表（不再塞 mock）。
 SSR 另 prefetch：`/domains`、`/tags`、`/breezemoons`、`/top`、`/repeater`。
-补齐页面：`/download`、`/agreement`、`/privacy`、`/activity`、`/following`、`/settings/point`、`/member/:name/medals`、`/city/:city`。
+补齐页面：`/download`、`/agreement`、`/privacy`、`/activity`、`/following`、`/settings/point`、`/member/:name/medals`、`/city/:city`、`/charge/point`、`/column/:id`。
 
 新增侧边栏模块：在 `src/chat/sidebar/modules` 加组件，并登记到 `registry.ts`。

@@ -55,9 +55,7 @@ export function isNoIndexPath(path: string) {
     p === '/post' ||
     p.startsWith('/post/') ||
     p === '/charge/point' ||
-    p === '/idle-talk' ||
-    p === '/admin' ||
-    p.startsWith('/admin/')
+    p === '/vips'
   ) {
     return true
   }

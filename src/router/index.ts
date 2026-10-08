@@ -260,77 +260,15 @@ const routes = [
     meta: { robots: 'noindex' },
   },
   {
-    path: '/idle-talk',
-    name: 'idle-talk',
-    component: () => import('@/views/IdleTalkView.vue'),
-    meta: { robots: 'noindex' },
+    path: '/games',
+    name: 'games',
+    component: () => import('@/views/GamesView.vue'),
   },
   {
-    path: '/admin',
-    component: () => import('@/views/admin/AdminLayout.vue'),
-    meta: { robots: 'noindex', auth: true },
-    children: [
-      {
-        path: '',
-        name: 'admin',
-        component: () => import('@/views/admin/AdminDashboardView.vue'),
-      },
-      {
-        path: 'users',
-        name: 'admin-users',
-        component: () => import('@/views/admin/AdminListView.vue'),
-      },
-      {
-        path: 'articles',
-        name: 'admin-articles',
-        component: () => import('@/views/admin/AdminListView.vue'),
-      },
-      {
-        path: 'comments',
-        name: 'admin-comments',
-        component: () => import('@/views/admin/AdminListView.vue'),
-      },
-      {
-        path: 'reports',
-        name: 'admin-reports',
-        component: () => import('@/views/admin/AdminListView.vue'),
-      },
-      {
-        path: 'breezemoons',
-        component: () => import('@/views/admin/AdminStubView.vue'),
-        meta: { adminTitle: '清风明月' },
-      },
-      {
-        path: 'domains',
-        component: () => import('@/views/admin/AdminStubView.vue'),
-        meta: { adminTitle: '领域' },
-      },
-      {
-        path: 'tags',
-        component: () => import('@/views/admin/AdminStubView.vue'),
-        meta: { adminTitle: '标签' },
-      },
-      {
-        path: 'invitecodes',
-        component: () => import('@/views/admin/AdminStubView.vue'),
-        meta: { adminTitle: '邀请码' },
-      },
-      {
-        path: 'roles',
-        component: () => import('@/views/admin/AdminStubView.vue'),
-        meta: { adminTitle: '角色' },
-      },
-      {
-        path: 'misc',
-        component: () => import('@/views/admin/AdminStubView.vue'),
-        meta: { adminTitle: '杂项' },
-      },
-      {
-        path: 'auditlog',
-        component: () => import('@/views/admin/AdminStubView.vue'),
-        meta: { adminTitle: '审计日志' },
-      },
-    ],
+    path: '/vips',
+    name: 'vips',
+    component: () => import('@/views/VipView.vue'),
+    meta: { robots: 'noindex' },
   },
   {
     path: '/:pathMatch(.*)*',

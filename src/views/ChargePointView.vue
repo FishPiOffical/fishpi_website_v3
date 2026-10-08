@@ -79,6 +79,7 @@ async function payWechat() {
       </div>
     </template>
     <p class="links">
+      <RouterLink to="/vips">开通 VIP</RouterLink>
       <RouterLink to="/settings/point">积分转账</RouterLink>
       <RouterLink to="/points">积分流水</RouterLink>
     </p>

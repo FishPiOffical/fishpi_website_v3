@@ -103,20 +103,23 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/chat-channel': { ...proxy, ws: true },
-        '/idle-talk': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/idle-talk' || path === '/idle-talk/')) {
-              return req.url
-            }
-          },
-        },
+        '/idle-talk': proxy,
         '/idle-talk-channel': { ...proxy, ws: true },
         '/charge': { ...proxy, bypass: spaGetBypass },
         '/pay': proxy,
         '/getApiKeyInWeb': proxy,
-        '/admin': { ...proxy, bypass: spaGetBypass },
+        '/vips': { ...proxy, bypass: spaGetBypass },
+        '/games': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            // SPA 入口 /games；子路径（adarkroom 等）走 Rhythm
+            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/games' || path === '/games/')) {
+              return req.url
+            }
+          },
+        },
+        '/activities': proxy,
         '/column': {
           ...proxy,
           bypass(req) {

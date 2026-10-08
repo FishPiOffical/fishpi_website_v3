@@ -974,7 +974,11 @@ async function saveI18n() {
 
       <section v-if="tab === 'system'" class="card">
         <h1>个性化</h1>
-        <p class="hint">主题免费。对话框和头像框的进阶样式后期仅 VIP 可用。</p>
+        <p class="hint">
+          主题免费。对话框和头像框的进阶样式需
+          <RouterLink to="/vips">开通 VIP</RouterLink>
+          。
+        </p>
         <AppearancePicker />
       </section>
 

@@ -66,7 +66,7 @@ export const useAppearanceStore = defineStore('appearance', () => {
     if (!pack) return
     notice.value = ''
     if (!canUse(pack)) {
-      notice.value = '对话框和头像框的进阶样式将作为 VIP 功能开放，开通后即可使用。'
+      notice.value = '该样式需 VIP。请前往「开通 VIP」后再应用。'
       return
     }
     if (kind === 'theme') state.value.theme = id
