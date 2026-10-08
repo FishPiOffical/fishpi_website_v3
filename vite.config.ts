@@ -60,12 +60,39 @@ export default defineConfig(({ mode }) => {
         '/verify': proxy,
         '/register2': proxy,
         '/vote': proxy,
-        '/breezemoon': proxy,
-        '/follow': proxy,
+        '/breezemoon': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            // SPA 列表页 /breezemoons；API 为 POST /breezemoon
+            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/breezemoons' || path === '/breezemoons/')) {
+              return req.url
+            }
+          },
+        },
+        '/follow': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            // SPA /following；API 为 /follow/...
+            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/following' || path === '/following/')) {
+              return req.url
+            }
+          },
+        },
         '/unfollow': proxy,
         '/user': proxy,
         '/users': proxy,
-        '/activity': proxy,
+        '/activity': {
+          ...proxy,
+          bypass(req) {
+            const path = (req.url || '').split('?')[0] || ''
+            // SPA 活动页；签到/活跃 API 仍走 /activity/*
+            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/activity' || path === '/activity/')) {
+              return req.url
+            }
+          },
+        },
         '/notifications': {
           ...proxy,
           bypass(req) {

@@ -297,7 +297,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
         <section v-else-if="mod.id === 'recentB'" class="col" data-home-module="recentB" data-home-title="最新二">
           <div class="index-head">
             <b>&nbsp;</b>
-            <RouterLink to="/">更多</RouterLink>
+            <RouterLink to="/recent">更多</RouterLink>
           </div>
           <p v-if="loading && !right.length" class="hint">加载中…</p>
           <ol class="module-list">

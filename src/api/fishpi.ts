@@ -246,6 +246,10 @@ export interface RankUser {
   userCheckinStreak?: number
   userCurrentCheckinStreak?: number
   onlineMinute?: number
+  userPoint?: number
+  /** 消费榜常见字段 */
+  userUsedPoint?: number
+  point?: number
 }
 
 interface Envelope<T> {
@@ -832,11 +836,17 @@ export async function postComment(apiKey: string, articleId: string, content: st
 }
 
 export async function fetchBreezemoons(page = 1, size = 20) {
-  const res = await request<{ code: number; msg?: string; breezemoons?: Breezemoon[] }>(
-    `/api/breezemoons?p=${page}&size=${size}`,
-  )
+  const res = await request<{
+    code: number
+    msg?: string
+    breezemoons?: Breezemoon[]
+    data?: { breezemoons?: Breezemoon[] } | Breezemoon[]
+  }>(`/api/breezemoons?p=${page}&size=${size}`)
   if (res.code !== 0) throw new Error(res.msg || '清风明月失败')
-  return res.breezemoons ?? []
+  if (Array.isArray(res.breezemoons)) return res.breezemoons
+  if (Array.isArray(res.data)) return res.data
+  if (res.data && Array.isArray(res.data.breezemoons)) return res.data.breezemoons
+  return []
 }
 
 export async function postBreezemoon(apiKey: string, content: string) {
@@ -879,6 +889,29 @@ export async function fetchOnlineRank(apiKey?: string | null): Promise<RankUser[
     /* anonymous top not ready */
   }
   return mockOnline()
+}
+
+async function unwrapTopRank(path: string, apiKey?: string | null): Promise<RankUser[]> {
+  try {
+    const res = await request<Envelope<RankUser[] | { users?: RankUser[] }>>(withKey(path, apiKey))
+    if (Array.isArray(res.data) && res.data.length) return res.data
+    if (res.data && 'users' in res.data && Array.isArray(res.data.users) && res.data.users.length) {
+      return res.data.users
+    }
+  } catch {
+    /* login required or unavailable */
+  }
+  return []
+}
+
+/** 财富榜；现网匿名常 401，需登录。 */
+export async function fetchBalanceRank(apiKey?: string | null) {
+  return unwrapTopRank('/api/top/balance?p=1', apiKey)
+}
+
+/** 消费榜；现网匿名常 401，需登录。 */
+export async function fetchConsumptionRank(apiKey?: string | null) {
+  return unwrapTopRank('/api/top/consumption?p=1', apiKey)
 }
 
 export interface LiteUser {

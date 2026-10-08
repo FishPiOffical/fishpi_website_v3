@@ -20,6 +20,11 @@ const routes = [
   { path: '/article/:id', name: 'article', component: () => import('@/views/ArticleView.vue') },
   { path: '/hot', component: () => import('@/views/ArticleListView.vue'), meta: { title: '热门', list: 'hot' } },
   {
+    path: '/recent',
+    component: () => import('@/views/ArticleListView.vue'),
+    meta: { title: '最新', list: 'recent' },
+  },
+  {
     path: '/recent/long',
     component: () => import('@/views/ArticleListView.vue'),
     meta: { title: '专栏', list: 'long' },
@@ -38,6 +43,16 @@ const routes = [
     path: '/top/online',
     component: () => import('@/views/TopView.vue'),
     meta: { title: '在线榜' },
+  },
+  {
+    path: '/top/balance',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '财富榜' },
+  },
+  {
+    path: '/top/consumption',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '消费榜' },
   },
   { path: '/qna', component: () => import('@/views/ArticleListView.vue'), meta: { title: '问答', list: 'qna' } },
   {

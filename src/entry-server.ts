@@ -85,7 +85,13 @@ async function prefetch(url: string): Promise<SsrPayload> {
       return { breezemoons: await fetchBreezemoons(1, 30) }
     }
 
-    if (path === '/top' || path === '/top/checkin' || path === '/top/online') {
+    if (
+      path === '/top' ||
+      path === '/top/checkin' ||
+      path === '/top/online' ||
+      path === '/top/balance' ||
+      path === '/top/consumption'
+    ) {
       const [checkinRank, onlineRank] = await Promise.all([fetchCheckinRank(null), fetchOnlineRank(null)])
       return { checkinRank, onlineRank }
     }
@@ -96,6 +102,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
 
     const listMap: Record<string, ArticleFeedKind> = {
       '/hot': 'hot',
+      '/recent': 'recent',
       '/recent/long': 'long',
       '/column': 'long',
       '/qna': 'qna',

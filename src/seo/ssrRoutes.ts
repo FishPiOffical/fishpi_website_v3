@@ -6,6 +6,7 @@ export function shouldPrefetchSsr(path: string) {
   if (/^\/member\/[^/]+$/.test(p)) return true
   if (
     p === '/hot' ||
+    p === '/recent' ||
     p === '/recent/long' ||
     p === '/column' ||
     p === '/qna' ||
@@ -17,9 +18,12 @@ export function shouldPrefetchSsr(path: string) {
     p === '/top' ||
     p === '/top/checkin' ||
     p === '/top/online' ||
+    p === '/top/balance' ||
+    p === '/top/consumption' ||
     p === '/repeater' ||
     p === '/download' ||
     p === '/activity' ||
+    p === '/following' ||
     p === '/agreement' ||
     p === '/privacy'
   ) {

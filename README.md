@@ -68,7 +68,8 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - 聊天室进房前预拉 `GET /chat-room/online-users`（在线列表/话题）
 - 用户主页清风明月 `GET /api/user/{name}/breezemoons`（需登录）
 - 首页长篇双货架（最近更新 / 热门专栏）与社区清风明月发布（`POST /breezemoon` + page-auth CSRF）
-- 搜索对齐现网 `GET /api/search?key=`；路由别名 `/column`、`/top/checkin`、`/top/online`
+- 搜索对齐现网 `GET /api/search?key=`；路由别名 `/column`、`/recent`、`/top/checkin|online|balance|consumption`
+- 开发代理 SPA bypass：`/activity`、`/following`、`/breezemoons` 不再被 API 前缀吃掉
 
 闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。
 用户发帖列表 / 收藏 / 关注粉丝 / 通知 / 私信：接口失败时返回空列表（不再塞 mock）。
