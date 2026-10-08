@@ -131,6 +131,7 @@ export interface ArticleSummary {
   columnTitle?: string
   articleAuthorName?: string
   articleAuthorThumbnailURL48?: string
+  articleHeat?: number
 }
 
 export interface ArticleComment {
@@ -1570,6 +1571,22 @@ export async function fetchChatHistory(apiKey?: string | null, page = 1) {
   )
   if (res.code !== 0) throw new Error(res.msg || '聊天记录失败')
   return res.data ?? []
+}
+
+export interface ChatOnlineSnapshot {
+  discussing?: string
+  onlineChatCnt?: number
+  users?: { userName?: string; userNickname?: string; userAvatarURL?: string }[]
+}
+
+export async function fetchChatOnlineUsers(apiKey?: string | null): Promise<ChatOnlineSnapshot> {
+  try {
+    const res = await request<Envelope<ChatOnlineSnapshot>>(withKey('/chat-room/online-users', apiKey))
+    if (res.code !== 0) return {}
+    return res.data ?? {}
+  } catch {
+    return {}
+  }
 }
 
 /** mode: 0 context, 1 before, 2 after */

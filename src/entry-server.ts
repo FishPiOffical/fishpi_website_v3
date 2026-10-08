@@ -6,6 +6,7 @@ import {
   fetchArticleFeed,
   fetchBreezemoons,
   fetchChatHistory,
+  fetchChatOnlineUsers,
   fetchCheckinRank,
   fetchDomains,
   fetchOnlineRank,
@@ -48,10 +49,12 @@ async function prefetch(url: string): Promise<SsrPayload> {
         fetchBreezemoons(1, 8),
         fetchChatHistory(null, 1),
         fetchRepeaterItems(null),
+        fetchChatOnlineUsers(null),
       ])
       const val = <T>(i: number, fallback: T): T =>
         settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
       const tagData = val(6, { tags: [], total: 0 })
+      const onlineSnap = val(10, {} as Awaited<ReturnType<typeof fetchChatOnlineUsers>>)
       return {
         feed: val(0, []),
         feedKind: 'recent',
@@ -65,6 +68,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
         breezemoons: val(7, []),
         chatFeed: val(8, []).slice(0, 12),
         repeater: val(9, []),
+        chatOnline: onlineSnap,
       }
     }
 

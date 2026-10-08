@@ -6,12 +6,14 @@ import {
   fetchArticleFeed,
   fetchBreezemoons,
   fetchChatHistory,
+  fetchChatOnlineUsers,
   fetchCheckinRank,
   fetchOnlineRank,
   fetchRecentArticles,
   fetchRecentRegister,
   fetchRepeaterItems,
   fetchTags,
+  sendChat,
   type ArticleSummary,
   type Breezemoon,
   type ChatHistoryItem,
@@ -21,13 +23,17 @@ import {
   type TagItem,
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
+import { useHomeLayoutStore } from '@/stores/homeLayout'
 import AdSlot from '@/components/ads/AdSlot.vue'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
+import HomePersonalize from '@/components/home/HomePersonalize.vue'
+import HomeRepeaterStation from '@/components/home/HomeRepeaterStation.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeFeedPayload, consumeHomeExtrasPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
 
 const auth = useAuthStore()
+const layout = useHomeLayoutStore()
 const router = useRouter()
 const { apiKey, isLoggedIn } = storeToRefs(auth)
 const left = ref<ArticleSummary[]>([])
@@ -40,7 +46,12 @@ const recentUsers = ref<LiteUser[]>([])
 const tags = ref<TagItem[]>([])
 const moons = ref<Breezemoon[]>([])
 const chatLines = ref<ChatHistoryItem[]>([])
-const repeater = ref<RepeaterItem | null>(null)
+const repeaterItems = ref<RepeaterItem[]>([])
+const onlineChatCnt = ref<number | null>(null)
+const discussing = ref('')
+const chatDraft = ref('')
+const chatBusy = ref(false)
+const chatMsg = ref('')
 const hotMode = ref<'hot' | 'column'>('hot')
 const error = ref('')
 const loading = ref(true)
@@ -48,6 +59,9 @@ const loading = ref(true)
 const usingMock = computed(() => left.value.some((a) => String(a.oId).startsWith('mock-')))
 const hotPanel = computed(() => (hotMode.value === 'hot' ? hot.value : longArticles.value))
 const welcomeUser = computed(() => recentUsers.value[0] || null)
+const topModules = computed(() => layout.modulesIn('top'))
+const longModules = computed(() => layout.modulesIn('long'))
+const midModules = computed(() => layout.modulesIn('middle'))
 
 usePageSeo(() => ({
   title: SITE_NAME,
@@ -61,7 +75,6 @@ function splitArticles(articles: ArticleSummary[]) {
   right.value = articles.slice(mid)
 }
 
-// Apply SSR/client payload synchronously so first paint isn't stuck on "加载中".
 const bootFeed = consumeFeedPayload('recent')
 if (bootFeed?.length) {
   splitArticles(bootFeed)
@@ -77,7 +90,13 @@ if (bootExtra) {
   if (bootExtra.tags?.length) tags.value = bootExtra.tags.slice(0, 24)
   if (bootExtra.breezemoons?.length) moons.value = bootExtra.breezemoons.slice(0, 8)
   if (bootExtra.chatFeed?.length) chatLines.value = bootExtra.chatFeed.slice(0, 10)
-  if (bootExtra.repeater?.length) repeater.value = bootExtra.repeater[0] || null
+  if (bootExtra.repeater?.length) repeaterItems.value = bootExtra.repeater
+  if (bootExtra.chatOnline) {
+    if (typeof bootExtra.chatOnline.onlineChatCnt === 'number') {
+      onlineChatCnt.value = bootExtra.chatOnline.onlineChatCnt
+    }
+    if (bootExtra.chatOnline.discussing) discussing.value = bootExtra.chatOnline.discussing
+  }
 }
 
 async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
@@ -93,7 +112,7 @@ async function load() {
   const needArticles = left.value.length === 0
   if (needArticles) loading.value = true
   try {
-    const [articles, checkinRank, onlineRank, hotList, longList, regs, tagData, breezes, chats, reps] =
+    const [articles, checkinRank, onlineRank, hotList, longList, regs, tagData, breezes, chats, reps, onlineSnap] =
       await Promise.all([
         needArticles
           ? fetchRecentArticles(apiKey.value, 1, 40)
@@ -107,6 +126,7 @@ async function load() {
         safe(fetchBreezemoons(1, 8), []),
         safe(fetchChatHistory(apiKey.value, 1), []),
         safe(fetchRepeaterItems(apiKey.value), []),
+        safe(fetchChatOnlineUsers(apiKey.value), {}),
       ])
     if (needArticles) splitArticles(articles)
     checkin.value = checkinRank.slice(0, 8)
@@ -117,7 +137,9 @@ async function load() {
     tags.value = tagData.tags.slice(0, 24)
     moons.value = breezes.slice(0, 8)
     chatLines.value = chats.slice(0, 10)
-    repeater.value = reps[0] || null
+    repeaterItems.value = reps
+    onlineChatCnt.value = typeof onlineSnap.onlineChatCnt === 'number' ? onlineSnap.onlineChatCnt : null
+    discussing.value = onlineSnap.discussing || ''
   } catch (e) {
     error.value = e instanceof Error ? e.message : '首页加载失败'
   } finally {
@@ -129,6 +151,10 @@ watch(apiKey, () => void load(), { immediate: true })
 
 function views(a: ArticleSummary) {
   return a.articleViewCntDisplayFormat || a.articleViewCount || ''
+}
+
+function heat(a: ArticleSummary) {
+  return a.articleHeat ?? a.articleCommentCount ?? views(a)
 }
 
 function avatarOf(u: RankUser | LiteUser) {
@@ -171,10 +197,33 @@ function chatPreview(item: ChatHistoryItem) {
 function chatAvatar(item: ChatHistoryItem) {
   return item.userAvatarURL || ''
 }
+
+async function postChat() {
+  const content = chatDraft.value.trim()
+  if (!content || !apiKey.value || chatBusy.value) return
+  chatBusy.value = true
+  chatMsg.value = ''
+  try {
+    await sendChat(apiKey.value, content)
+    chatDraft.value = ''
+    const [chats, onlineSnap] = await Promise.all([
+      safe(fetchChatHistory(apiKey.value, 1), []),
+      safe(fetchChatOnlineUsers(apiKey.value), {}),
+    ])
+    chatLines.value = chats.slice(0, 10)
+    onlineChatCnt.value = typeof onlineSnap.onlineChatCnt === 'number' ? onlineSnap.onlineChatCnt : onlineChatCnt.value
+    discussing.value = onlineSnap.discussing || discussing.value
+  } catch (e) {
+    chatMsg.value = e instanceof Error ? e.message : '发送失败'
+  } finally {
+    chatBusy.value = false
+  }
+}
 </script>
 
 <template>
   <div class="home">
+    <HomePersonalize />
     <p v-if="usingMock" class="banner">
       匿名列表接口尚未开放，当前展示与 <code>GET /api/articles/recent</code> 对齐的 mock。
       <RouterLink v-if="!isLoggedIn" to="/login">登录</RouterLink>
@@ -182,252 +231,262 @@ function chatAvatar(item: ChatHistoryItem) {
     </p>
     <p v-else-if="error" class="err">{{ error }}</p>
 
-    <!-- Zone top: recentA + recentB + rank -->
-    <div class="board zone-top" data-home-zone="top">
-      <section class="col" data-home-module="recentA">
-        <div class="index-head">
-          <b>最新</b>
-        </div>
-        <p v-if="loading && !left.length" class="hint">加载最新帖子…</p>
-        <ol class="module-list">
-          <li v-for="item in left" :key="item.oId">
-            <span v-if="item.articleStick" class="cb-stick" title="置顶" />
-            <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-              <span
-                class="avatar-small"
-                :style="
-                  item.articleAuthorThumbnailURL48
-                    ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
-                    : undefined
-                "
-                :aria-label="item.articleAuthorName"
-              />
-            </RouterLink>
-            <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
-              item.articleTitleEmoj || item.articleTitle
-            }}</RouterLink>
-            <span class="count">{{ views(item) }}</span>
-          </li>
-        </ol>
-      </section>
-
-      <section class="col" data-home-module="recentB">
-        <div class="index-head">
-          <b>&nbsp;</b>
-          <RouterLink to="/">更多</RouterLink>
-        </div>
-        <p v-if="loading && !right.length" class="hint">加载中…</p>
-        <ol class="module-list">
-          <li v-for="item in right" :key="item.oId">
-            <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-              <span
-                class="avatar-small"
-                :style="
-                  item.articleAuthorThumbnailURL48
-                    ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
-                    : undefined
-                "
-                :aria-label="item.articleAuthorName"
-              />
-            </RouterLink>
-            <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
-              item.articleTitleEmoj || item.articleTitle
-            }}</RouterLink>
-            <span class="count">{{ views(item) }}</span>
-          </li>
-        </ol>
-      </section>
-
-      <aside class="col side" data-home-module="rank">
-        <div class="download">
-          <img src="https://file.fishpi.cn/logo_app.png" width="35" height="35" alt="" />
-          <div>
-            <b>随时随地摸鱼？</b>
-            <p>下载摸鱼派客户端，想摸就摸！</p>
+    <div v-if="topModules.length" class="board zone-top" data-home-zone="top">
+      <template v-for="mod in topModules" :key="mod.id">
+        <section v-if="mod.id === 'recentA'" class="col" data-home-module="recentA" data-home-title="最新一">
+          <div class="index-head">
+            <b>最新</b>
           </div>
-          <button type="button" class="green" @click="goDownload">下载</button>
-        </div>
-        <AdSlot slot-key="home.sidebar" />
-        <CheckinPanel />
-        <div class="index-head">
-          <b>今日连签排行</b>
-          <RouterLink to="/top">更多</RouterLink>
-        </div>
-        <ol class="module-list rank">
-          <li v-for="(u, i) in checkin" :key="u.userName">
-            <span class="cb-stick gold"><span class="icon-pin-rank">{{ i + 1 }}</span></span>
-            <RouterLink :to="`/member/${u.userName}`">
-              <span
-                class="avatar-small"
-                :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
-              />
-            </RouterLink>
-            <RouterLink class="title fn-ellipsis" :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
-            <span class="count">{{ streakOf(u) }}天</span>
-          </li>
-        </ol>
-        <div class="index-head spaced">
-          <b>在线时间排行</b>
-          <RouterLink to="/top">更多</RouterLink>
-        </div>
-        <ol class="module-list rank">
-          <li v-for="(u, i) in online" :key="u.userName">
-            <span class="cb-stick gold"><span class="icon-pin-rank">{{ i + 1 }}</span></span>
-            <RouterLink :to="`/member/${u.userName}`">
-              <span
-                class="avatar-small"
-                :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
-              />
-            </RouterLink>
-            <RouterLink class="title fn-ellipsis" :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
-            <span class="count">{{ Number(u.onlineMinute || 0).toLocaleString() }} 分钟</span>
-          </li>
-        </ol>
-      </aside>
+          <p v-if="loading && !left.length" class="hint">加载最新帖子…</p>
+          <ol class="module-list">
+            <li v-for="item in left" :key="item.oId">
+              <span v-if="item.articleStick" class="cb-stick" title="置顶" />
+              <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                <span
+                  class="avatar-small"
+                  :style="
+                    item.articleAuthorThumbnailURL48
+                      ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
+                      : undefined
+                  "
+                  :aria-label="item.articleAuthorName"
+                />
+              </RouterLink>
+              <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
+                item.articleTitleEmoj || item.articleTitle
+              }}</RouterLink>
+              <span class="count">{{ views(item) }}</span>
+            </li>
+          </ol>
+        </section>
+
+        <section v-else-if="mod.id === 'recentB'" class="col" data-home-module="recentB" data-home-title="最新二">
+          <div class="index-head">
+            <b>&nbsp;</b>
+            <RouterLink to="/">更多</RouterLink>
+          </div>
+          <p v-if="loading && !right.length" class="hint">加载中…</p>
+          <ol class="module-list">
+            <li v-for="item in right" :key="item.oId">
+              <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                <span
+                  class="avatar-small"
+                  :style="
+                    item.articleAuthorThumbnailURL48
+                      ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
+                      : undefined
+                  "
+                  :aria-label="item.articleAuthorName"
+                />
+              </RouterLink>
+              <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
+                item.articleTitleEmoj || item.articleTitle
+              }}</RouterLink>
+              <span class="count">{{ views(item) }}</span>
+            </li>
+          </ol>
+        </section>
+
+        <aside v-else-if="mod.id === 'rank'" class="col side" data-home-module="rank" data-home-title="排行">
+          <div class="download">
+            <img src="https://file.fishpi.cn/logo_app.png" width="35" height="35" alt="" />
+            <div>
+              <b>随时随地摸鱼？</b>
+              <p>下载摸鱼派客户端，想摸就摸！</p>
+            </div>
+            <button type="button" class="green" @click="goDownload">下载</button>
+          </div>
+          <AdSlot slot-key="home.sidebar" />
+          <CheckinPanel />
+          <div class="index-head">
+            <b>今日连签排行</b>
+            <RouterLink to="/top">更多</RouterLink>
+          </div>
+          <ol class="module-list rank">
+            <li v-for="(u, i) in checkin" :key="u.userName">
+              <span class="cb-stick gold"><span class="icon-pin-rank">{{ i + 1 }}</span></span>
+              <RouterLink :to="`/member/${u.userName}`">
+                <span
+                  class="avatar-small"
+                  :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
+                />
+              </RouterLink>
+              <RouterLink class="title fn-ellipsis" :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
+              <span class="count">{{ streakOf(u) }}天</span>
+            </li>
+          </ol>
+          <div class="index-head spaced">
+            <b>在线时间排行</b>
+            <RouterLink to="/top">更多</RouterLink>
+          </div>
+          <ol class="module-list rank">
+            <li v-for="(u, i) in online" :key="u.userName">
+              <span class="cb-stick gold"><span class="icon-pin-rank">{{ i + 1 }}</span></span>
+              <RouterLink :to="`/member/${u.userName}`">
+                <span
+                  class="avatar-small"
+                  :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
+                />
+              </RouterLink>
+              <RouterLink class="title fn-ellipsis" :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
+              <span class="count">{{ Number(u.onlineMinute || 0).toLocaleString() }} 分钟</span>
+            </li>
+          </ol>
+        </aside>
+
+      </template>
     </div>
 
-    <!-- Full-width long zone -->
-    <section class="long-zone" data-home-module="long">
-      <div class="long-head">
-        <b>长篇专区</b>
-        <RouterLink to="/recent/long">更多</RouterLink>
-      </div>
-      <div class="long-shelf">
-        <article v-for="item in longArticles" :key="item.oId" class="long-card">
-          <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
-            item.articleTitleEmoj || item.articleTitle
-          }}</RouterLink>
-          <div class="long-meta">
-            <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-              {{ item.articleAuthorName }}
-            </RouterLink>
-            <span>{{ views(item) }}</span>
-          </div>
-          <p v-if="item.columnTitle" class="long-preview">{{ item.columnTitle }}</p>
-        </article>
-        <p v-if="!longArticles.length && !loading" class="hint long-empty">暂无长篇</p>
-      </div>
-    </section>
-
-    <!-- Zone middle: chat + hotQna + community -->
-    <div class="board zone-mid" data-home-zone="middle">
-      <section class="col" data-home-module="chat">
-        <div class="index-head">
-          <b>聊天室</b>
-          <RouterLink to="/cr">进入完整版聊天室</RouterLink>
+    <template v-for="mod in longModules" :key="'long-' + mod.id">
+      <section v-if="mod.id === 'long'" class="long-zone" data-home-module="long" data-home-title="长篇专区">
+        <div class="long-head">
+          <b>长篇专区</b>
+          <RouterLink to="/recent/long">更多</RouterLink>
         </div>
-        <ol class="module-list chat-list">
-          <li v-for="m in chatLines" :key="m.oId" class="chat-item">
-            <RouterLink v-if="m.userName" :to="`/member/${m.userName}`">
-              <span
-                class="avatar-mid"
-                :style="chatAvatar(m) ? { backgroundImage: `url('${chatAvatar(m)}')` } : undefined"
-                :aria-label="m.userName"
-              />
-            </RouterLink>
-            <div class="chat-body">
-              <RouterLink v-if="m.userName" class="chat-who" :to="`/member/${m.userName}`">
-                {{ m.userNickname || m.userName }}
-              </RouterLink>
-              <div class="chat-text">{{ chatPreview(m) }}</div>
-            </div>
-          </li>
-          <li v-if="!chatLines.length && !loading" class="hint-li">暂无消息，去聊天室看看</li>
-        </ol>
-      </section>
-
-      <section class="col" data-home-module="hotQna">
-        <div class="index-head">
-          <b class="hot-switch">
-            <button type="button" :class="{ on: hotMode === 'hot' }" @click="hotMode = 'hot'">热议</button>
-            <span class="sep">|</span>
-            <button type="button" :class="{ on: hotMode === 'column' }" @click="hotMode = 'column'">专栏</button>
-          </b>
-          <RouterLink :to="hotMode === 'hot' ? '/hot' : '/recent/long'">更多</RouterLink>
-        </div>
-        <ol class="module-list">
-          <li v-for="item in hotPanel" :key="item.oId">
-            <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-              <span
-                class="avatar-small"
-                :style="
-                  item.articleAuthorThumbnailURL48
-                    ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
-                    : undefined
-                "
-              />
-            </RouterLink>
-            <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
+        <div class="long-shelf">
+          <article v-for="item in longArticles" :key="item.oId" class="long-card">
+            <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
               item.articleTitleEmoj || item.articleTitle
             }}</RouterLink>
-            <span class="count">{{ views(item) }}</span>
-          </li>
-          <li v-if="!hotPanel.length && !loading" class="hint-li">暂无内容</li>
-        </ol>
+            <div class="long-meta">
+              <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                {{ item.articleAuthorName }}
+              </RouterLink>
+              <span>{{ views(item) }}</span>
+            </div>
+            <p v-if="item.columnTitle" class="long-preview">{{ item.columnTitle }}</p>
+          </article>
+          <p v-if="!longArticles.length && !loading" class="hint long-empty">暂无长篇</p>
+        </div>
       </section>
+    </template>
 
-      <aside class="col side" data-home-module="community">
-        <div v-if="repeater" class="repeater-box">
-          <div class="index-head tight">
-            <b>复读机转录站</b>
-            <RouterLink to="/repeater">更多</RouterLink>
+    <div v-if="midModules.length" class="board zone-mid" data-home-zone="middle">
+      <template v-for="mod in midModules" :key="mod.id">
+        <section v-if="mod.id === 'chat'" class="col" data-home-module="chat" data-home-title="聊天室">
+          <div class="index-head">
+            <b>
+              聊天室
+              <span v-if="onlineChatCnt != null" class="online">({{ onlineChatCnt }}人在线)</span>
+            </b>
+            <RouterLink to="/cr">进入完整版聊天室</RouterLink>
           </div>
-          <p class="repeater-quote">{{ stripHtml(repeater.repeaterContent || '', 100) }}</p>
-          <div class="repeater-meta">
-            <span>{{ repeater.repeaterContentTypeLabel || repeater.repeaterContentType || '段子' }}</span>
-            <RouterLink
-              v-if="repeater.repeaterContentAuthorName"
-              :to="`/member/${repeater.repeaterContentAuthorName}`"
-            >
-              {{ repeater.repeaterContentAuthorName }}
+          <p v-if="discussing" class="discuss">当前话题：{{ discussing }}</p>
+          <div class="chat-form">
+            <input
+              v-model="chatDraft"
+              type="text"
+              maxlength="512"
+              :placeholder="isLoggedIn ? '说点什么...' : '登录后发言'"
+              :disabled="!isLoggedIn || chatBusy"
+              @keydown.enter.prevent="postChat"
+            />
+            <button v-if="isLoggedIn" type="button" class="green" :disabled="chatBusy || !chatDraft.trim()" @click="postChat">
+              发送
+            </button>
+            <RouterLink v-else class="green-link" to="/login">登录</RouterLink>
+          </div>
+          <p v-if="chatMsg" class="hint">{{ chatMsg }}</p>
+          <ol class="module-list chat-list">
+            <li v-for="m in chatLines" :key="m.oId" class="chat-item">
+              <RouterLink v-if="m.userName" :to="`/member/${m.userName}`">
+                <span
+                  class="avatar-mid"
+                  :style="chatAvatar(m) ? { backgroundImage: `url('${chatAvatar(m)}')` } : undefined"
+                  :aria-label="m.userName"
+                />
+              </RouterLink>
+              <div class="chat-body">
+                <RouterLink v-if="m.userName" class="chat-who" :to="`/member/${m.userName}`">
+                  {{ m.userNickname || m.userName }}
+                  <span v-if="m.userNickname && m.userName" class="chat-uname">({{ m.userName }})</span>
+                </RouterLink>
+                <div class="chat-text">{{ chatPreview(m) }}</div>
+              </div>
+            </li>
+            <li v-if="!chatLines.length && !loading" class="hint-li">暂无消息，去聊天室看看</li>
+          </ol>
+        </section>
+
+        <section v-else-if="mod.id === 'hotQna'" class="col" data-home-module="hotQna" data-home-title="热议问答">
+          <div class="index-head">
+            <b class="hot-switch">
+              <button type="button" :class="{ on: hotMode === 'hot' }" @click="hotMode = 'hot'">热议</button>
+              <span class="sep">|</span>
+              <button type="button" :class="{ on: hotMode === 'column' }" @click="hotMode = 'column'">专栏</button>
+            </b>
+            <RouterLink :to="hotMode === 'hot' ? '/hot' : '/recent/long'">更多</RouterLink>
+          </div>
+          <ol class="module-list">
+            <li v-for="item in hotPanel" :key="item.oId">
+              <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                <span
+                  class="avatar-small"
+                  :style="
+                    item.articleAuthorThumbnailURL48
+                      ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
+                      : undefined
+                  "
+                />
+              </RouterLink>
+              <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
+                item.articleTitleEmoj || item.articleTitle
+              }}</RouterLink>
+              <span class="count heat">🔥 {{ heat(item) }}</span>
+            </li>
+            <li v-if="!hotPanel.length && !loading" class="hint-li">暂无内容</li>
+          </ol>
+        </section>
+
+        <aside v-else-if="mod.id === 'community'" class="col side" data-home-module="community" data-home-title="社区">
+          <HomeRepeaterStation :initial="repeaterItems" />
+
+          <div class="index-head spaced-sm">
+            <b>最新注册</b>
+            <RouterLink v-if="welcomeUser" :to="`/member/${welcomeUser.userName}`" class="welcome">
+              欢迎新人 <b>{{ welcomeUser.userNickname || welcomeUser.userName }}</b>
             </RouterLink>
           </div>
-        </div>
+          <ul class="people">
+            <li v-for="u in recentUsers" :key="u.oId || u.userName">
+              <RouterLink :to="`/member/${u.userName}`">
+                <span
+                  class="avatar-mid"
+                  :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
+                />
+                <em>{{ u.userNickname || u.userName }}</em>
+              </RouterLink>
+            </li>
+            <li v-if="!recentUsers.length && !loading" class="hint-li">暂无</li>
+          </ul>
 
-        <div class="index-head" :class="{ spaced: !!repeater }">
-          <b>最新注册</b>
-          <RouterLink v-if="welcomeUser" :to="`/member/${welcomeUser.userName}`" class="welcome">
-            欢迎新人 <b>{{ welcomeUser.userNickname || welcomeUser.userName }}</b>
-          </RouterLink>
-        </div>
-        <ul class="people">
-          <li v-for="u in recentUsers" :key="u.oId || u.userName">
-            <RouterLink :to="`/member/${u.userName}`">
-              <span
-                class="avatar-small"
-                :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
-              />
-              <em>{{ u.userNickname || u.userName }}</em>
+          <div class="index-head spaced">
+            <b>标签</b>
+            <RouterLink to="/tags">更多</RouterLink>
+          </div>
+          <div class="tags">
+            <RouterLink v-for="t in tags" :key="t.tagURI || t.tagTitle" :to="tagPath(t)">
+              {{ t.tagTitle }}
             </RouterLink>
-          </li>
-          <li v-if="!recentUsers.length && !loading" class="hint-li">暂无</li>
-        </ul>
+            <span v-if="!tags.length && !loading" class="hint">暂无标签</span>
+          </div>
 
-        <div class="index-head spaced">
-          <b>标签</b>
-          <RouterLink to="/tags">更多</RouterLink>
-        </div>
-        <div class="tags">
-          <RouterLink v-for="t in tags" :key="t.tagURI || t.tagTitle" :to="tagPath(t)">
-            {{ t.tagTitle }}
-          </RouterLink>
-          <span v-if="!tags.length && !loading" class="hint">暂无标签</span>
-        </div>
+          <div class="index-head spaced">
+            <b>清风明月</b>
+            <RouterLink to="/breezemoons">更多</RouterLink>
+          </div>
+          <ul class="moons">
+            <li v-for="m in moons" :key="m.oId">
+              <RouterLink v-if="m.breezemoonAuthorName" class="who" :to="`/member/${m.breezemoonAuthorName}`">
+                {{ m.breezemoonAuthorName }}
+              </RouterLink>
+              <span>{{ stripHtml(m.breezemoonContent || '') }}</span>
+            </li>
+            <li v-if="!moons.length && !loading" class="hint-li">暂无动态</li>
+          </ul>
+        </aside>
 
-        <div class="index-head spaced">
-          <b>清风明月</b>
-          <RouterLink to="/breezemoons">更多</RouterLink>
-        </div>
-        <ul class="moons">
-          <li v-for="m in moons" :key="m.oId">
-            <RouterLink v-if="m.breezemoonAuthorName" class="who" :to="`/member/${m.breezemoonAuthorName}`">
-              {{ m.breezemoonAuthorName }}
-            </RouterLink>
-            <span>{{ stripHtml(m.breezemoonContent || '') }}</span>
-          </li>
-          <li v-if="!moons.length && !loading" class="hint-li">暂无动态</li>
-        </ul>
-      </aside>
+      </template>
     </div>
   </div>
 </template>
@@ -477,8 +536,8 @@ function chatAvatar(item: ChatHistoryItem) {
 .index-head.spaced {
   margin-top: 18px;
 }
-.index-head.tight {
-  margin-bottom: 6px;
+.index-head.spaced-sm {
+  margin-top: 12px;
 }
 .index-head b {
   font-weight: 700;
@@ -488,6 +547,16 @@ function chatAvatar(item: ChatHistoryItem) {
   color: var(--fp-link);
   text-decoration: none;
   flex-shrink: 0;
+}
+.online {
+  font-weight: 500;
+  color: var(--fp-muted);
+  margin-left: 2px;
+}
+.discuss {
+  margin: 0 15px 8px;
+  font-size: 12px;
+  color: var(--fp-muted);
 }
 .welcome {
   font-size: 12px;
@@ -557,6 +626,9 @@ function chatAvatar(item: ChatHistoryItem) {
   margin-left: auto;
   flex-shrink: 0;
 }
+.count.heat {
+  color: var(--fp-accent);
+}
 .download {
   display: flex;
   align-items: center;
@@ -588,6 +660,10 @@ function chatAvatar(item: ChatHistoryItem) {
   cursor: pointer;
   height: 28px;
   flex-shrink: 0;
+}
+.green:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .people li a {
   display: flex;
@@ -697,6 +773,32 @@ function chatAvatar(item: ChatHistoryItem) {
   padding: 8px 0;
 }
 
+.chat-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 15px 8px;
+}
+.chat-form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--fp-border);
+  background: var(--fp-search-bg);
+  color: var(--fp-text);
+  border-radius: 4px;
+  padding: 6px 10px;
+  height: 32px;
+}
+.chat-form .green {
+  margin-left: 0;
+}
+.green-link {
+  color: var(--fp-green);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
 .chat-list .chat-item {
   align-items: flex-start;
 }
@@ -717,36 +819,15 @@ function chatAvatar(item: ChatHistoryItem) {
   color: var(--fp-muted);
   text-decoration: none;
 }
+.chat-uname {
+  opacity: 0.75;
+}
 .chat-text {
   margin-top: 2px;
   font-size: 13px;
   color: var(--fp-title);
   line-height: 1.4;
   word-break: break-word;
-}
-
-.repeater-box {
-  margin: 0 10px 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--fp-border);
-  border-radius: 8px;
-}
-.repeater-quote {
-  margin: 0;
-  font-size: 13px;
-  color: var(--fp-title);
-  line-height: 1.45;
-}
-.repeater-meta {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-.repeater-meta a {
-  color: var(--fp-link);
-  text-decoration: none;
 }
 
 @media (max-width: 960px) {

@@ -117,10 +117,20 @@ function logout() {
     </main>
     <footer class="foot">
       <div class="foot-inner">
-        <p>摸鱼好站</p>
-        <AdSlot slot-key="footer.sponsors" />
+        <div class="foot-brand">
+          <b>摸鱼派</b>
+          <span>鱼油专属摸鱼社区</span>
+        </div>
+        <div class="foot-sponsors">
+          <p class="foot-label">摸鱼好站</p>
+          <AdSlot slot-key="footer.sponsors" />
+        </div>
         <p class="extra">
           <RouterLink v-for="item in extraNav" :key="item.to" :to="item.to">{{ item.label }}</RouterLink>
+        </p>
+        <p class="foot-meta">
+          <a href="https://github.com/FishPiOffical/rhythm" target="_blank" rel="noopener">Rhythm 社区引擎</a>
+          <a href="https://github.com/FishPiOffical" target="_blank" rel="noopener">FishPi Official</a>
         </p>
       </div>
     </footer>
@@ -259,10 +269,43 @@ main {
   margin: 0 auto;
   padding: 8px 15px 0;
 }
+.foot-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--fp-muted);
+}
+.foot-brand b {
+  font-size: 15px;
+  color: var(--fp-nav-text);
+}
+.foot-sponsors {
+  margin-bottom: 14px;
+}
+.foot-label {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fp-nav-text);
+}
 .extra {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   font-size: 12px;
+}
+.foot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 12px 0 0;
+  font-size: 12px;
+}
+.foot-meta a {
+  color: var(--fp-link);
+  text-decoration: none;
 }
 .extra a {
   color: var(--fp-nav-text);
