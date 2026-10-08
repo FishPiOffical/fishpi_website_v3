@@ -92,8 +92,9 @@ const legalLinks = [
 
 const route = useRoute()
 const openRhythm = (href: string) => openRhythmPage(href, auth.apiKey)
-/** 需登录页服务端只出空壳，避免 hydration 复用错页面 DOM（含 scoped 样式标记）。 */
-const ssrAuthShell = computed(() => import.meta.env.SSR && Boolean(route.meta.auth))
+/** 需登录页服务端只出空壳；客户端挂载前也保持空壳，hydration 才能对上，挂载后再渲染真实页面。 */
+const mounted = ref(false)
+const ssrAuthShell = computed(() => Boolean(route.meta.auth) && !mounted.value)
 const router = useRouter()
 const auth = useAuthStore()
 const appearance = useAppearanceStore()
@@ -171,7 +172,10 @@ function onDocClick(e: MouseEvent) {
   if (!t?.closest?.('.user-menu')) menuOpen.value = false
 }
 
-onMounted(() => document.addEventListener('click', onDocClick))
+onMounted(() => {
+  mounted.value = true
+  document.addEventListener('click', onDocClick)
+})
 onUnmounted(() => document.removeEventListener('click', onDocClick))
 </script>
 

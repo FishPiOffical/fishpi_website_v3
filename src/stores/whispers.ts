@@ -36,6 +36,7 @@ export const useWhisperStore = defineStore('whispers', () => {
   const unread = ref<WhisperMsg[]>([])
   const connected = ref(false)
   const loading = ref(false)
+  const listLoading = ref(false)
   const sending = ref(false)
   const error = ref('')
   const usingMock = ref(false)
@@ -46,6 +47,28 @@ export const useWhisperStore = defineStore('whispers', () => {
   let page = 1
 
   const unreadTotal = computed(() => unread.value.length)
+  const unreadBy = computed(() => {
+    const map: Record<string, number> = {}
+    for (const m of unread.value) {
+      const from = m.senderUserName || ''
+      if (from) map[from] = (map[from] || 0) + 1
+    }
+    return map
+  })
+
+  function touchList(msg: WhisperMsg) {
+    const auth = useAuthStore()
+    const who = peerOf(msg, auth.account?.userName)
+    if (!who) return
+    const prev = list.value.find((m) => peerOf(m, auth.account?.userName) === who)
+    const entry: WhisperMsg = {
+      ...prev,
+      ...msg,
+      senderAvatar: msg.senderAvatar || prev?.senderAvatar,
+      receiverAvatar: msg.receiverAvatar || prev?.receiverAvatar,
+    }
+    list.value = [entry, ...list.value.filter((m) => m !== prev)]
+  }
 
   async function refreshUnread() {
     const auth = useAuthStore()
@@ -63,7 +86,7 @@ export const useWhisperStore = defineStore('whispers', () => {
   async function loadList() {
     const auth = useAuthStore()
     if (!auth.apiKey) return
-    loading.value = true
+    listLoading.value = true
     error.value = ''
     try {
       list.value = await fetchWhisperList(auth.apiKey)
@@ -73,7 +96,7 @@ export const useWhisperStore = defineStore('whispers', () => {
       error.value = e instanceof Error ? e.message : '私信列表失败'
       list.value = []
     } finally {
-      loading.value = false
+      listLoading.value = false
     }
   }
 
@@ -158,7 +181,7 @@ export const useWhisperStore = defineStore('whispers', () => {
         if (msg.oId && messages.value.some((m) => m.oId === msg.oId)) return
         error.value = ''
         if (msg.senderUserName === userName) void markWhisperRead(apiKey, userName).catch(() => undefined)
-        messages.value.push({
+        const row: WhisperMsg = {
           oId: msg.oId || `local-${Date.now()}`,
           content: msg.content,
           markdown: msg.markdown,
@@ -168,7 +191,9 @@ export const useWhisperStore = defineStore('whispers', () => {
           receiverUserName: msg.receiverUserName,
           senderAvatar: msg.senderAvatar,
           receiverAvatar: msg.receiverAvatar,
-        })
+        }
+        messages.value.push(row)
+        touchList(row)
       } catch {
         /* ignore non-json */
       }
@@ -226,6 +251,8 @@ export const useWhisperStore = defineStore('whispers', () => {
     unreadTotal,
     connected,
     loading,
+    listLoading,
+    unreadBy,
     sending,
     error,
     usingMock,

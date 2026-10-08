@@ -270,15 +270,9 @@ const routes = [
     meta: { auth: true, robots: 'noindex' },
   },
   {
-    path: '/chat/:userName',
+    path: '/chat/:userName?',
     name: 'whisper',
     component: () => import('@/views/WhisperView.vue'),
-    meta: { auth: true, robots: 'noindex' },
-  },
-  {
-    path: '/chat',
-    name: 'whispers',
-    component: () => import('@/views/WhisperListView.vue'),
     meta: { auth: true, robots: 'noindex' },
   },
   {
