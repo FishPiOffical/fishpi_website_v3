@@ -19,6 +19,9 @@ interface AppearanceState {
 }
 
 function read(): AppearanceState {
+  if (import.meta.env.SSR || typeof localStorage === 'undefined') {
+    return { theme: DEFAULT_THEME, bubble: DEFAULT_BUBBLE, frame: DEFAULT_FRAME }
+  }
   try {
     const raw = localStorage.getItem(STORAGE)
     if (raw) return { theme: DEFAULT_THEME, bubble: DEFAULT_BUBBLE, frame: DEFAULT_FRAME, ...JSON.parse(raw) }
@@ -29,6 +32,7 @@ function read(): AppearanceState {
 }
 
 function applyDom(state: AppearanceState) {
+  if (import.meta.env.SSR || typeof document === 'undefined') return
   const root = document.documentElement
   root.dataset.theme = state.theme
   root.dataset.bubble = state.bubble
@@ -45,7 +49,9 @@ export const useAppearanceStore = defineStore('appearance', () => {
     state,
     (v) => {
       applyDom(v)
-      localStorage.setItem(STORAGE, JSON.stringify(v))
+      if (!import.meta.env.SSR && typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE, JSON.stringify(v))
+      }
     },
     { deep: true },
   )

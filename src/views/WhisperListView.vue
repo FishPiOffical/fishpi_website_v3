@@ -28,7 +28,7 @@ function go() {
 <template>
   <section class="card">
     <h1>私信</h1>
-    <p v-if="usingMock" class="hint">GET /chat/get-list 未返回数据时展示约定字段 mock。</p>
+    <p v-if="usingMock" class="hint">私信列表数据异常，请刷新重试。</p>
     <form class="start" @submit.prevent="go">
       <input v-model="toUser" placeholder="用户名" />
       <button type="submit" :disabled="!toUser.trim()">发起会话</button>

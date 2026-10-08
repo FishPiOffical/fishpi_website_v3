@@ -119,7 +119,7 @@ async function readAll() {
         <button type="button" @click="readAll">全部已读</button>
       </div>
     </header>
-    <p v-if="usingMock" class="hint">GET /api/getNotifications 未返回数据时展示约定字段 mock。</p>
+    <p v-if="usingMock" class="hint">通知数据异常，请刷新重试。</p>
     <nav>
       <button
         v-for="tab in tabs"

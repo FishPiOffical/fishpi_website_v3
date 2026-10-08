@@ -5,6 +5,9 @@ import { storeToRefs } from 'pinia'
 import { fetchArticleFeed, type ArticleFeedKind, type ArticleSummary } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
+import { usePageSeo } from '@/composables/usePageSeo'
+import { consumeFeedPayload } from '@/seo/payload'
+import { SITE_DEFAULT_DESC } from '@/seo/site'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -26,12 +29,23 @@ const extra = computed(() => {
 })
 const usingMock = computed(() => items.value.some((a) => String(a.oId).startsWith('mock-')))
 const paged = computed(() => true)
+const heading = computed(() => (kind.value === 'tag' ? `#${extra.value}` : title.value))
+
+usePageSeo(() => ({
+  title: heading.value,
+  description: keyword.value
+    ? `搜索「${keyword.value}」相关帖子`
+    : `${heading.value} · ${SITE_DEFAULT_DESC}`,
+  path: route.path,
+  robots: String(route.meta.robots || 'index,follow'),
+}))
 
 async function load() {
   error.value = ''
   loading.value = true
   try {
-    items.value = await fetchArticleFeed(kind.value, apiKey.value, page.value, 40, extra.value)
+    const cached = page.value === 1 ? consumeFeedPayload(kind.value) : null
+    items.value = cached || (await fetchArticleFeed(kind.value, apiKey.value, page.value, 40, extra.value))
   } catch (e) {
     error.value = e instanceof Error ? e.message : '加载失败'
     items.value = []

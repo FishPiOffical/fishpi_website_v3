@@ -38,7 +38,7 @@ export const useNoticeStore = defineStore('notices', () => {
   function connect() {
     const auth = useAuthStore()
     disconnect()
-    if (!auth.apiKey) return
+    if (import.meta.env.SSR || typeof WebSocket === 'undefined' || !auth.apiKey) return
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     ws = new WebSocket(`${proto}//${location.host}/user-channel?apiKey=${encodeURIComponent(auth.apiKey)}`)
     ws.onmessage = (ev) => {

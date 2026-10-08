@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchDomains, type DomainItem } from '@/api/fishpi'
+import { usePageSeo } from '@/composables/usePageSeo'
+import { consumeDomainsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
+
+usePageSeo(() => ({ title: '领域', path: '/domains', description: '摸鱼派领域列表' }))
 
 const auth = useAuthStore()
 const { apiKey } = storeToRefs(auth)
@@ -11,16 +15,21 @@ const domains = ref<DomainItem[]>([])
 const error = ref('')
 const loading = ref(true)
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
   try {
-    domains.value = await fetchDomains(apiKey.value)
+    const cached = consumeDomainsPayload()
+    domains.value = cached || (await fetchDomains(apiKey.value))
     if (!domains.value.length) error.value = '暂无领域'
+    else error.value = ''
   } catch (e) {
     error.value = e instanceof Error ? e.message : '领域加载失败'
   } finally {
     loading.value = false
   }
-})
+}
+
+watch(apiKey, () => void load(), { immediate: true })
 </script>
 
 <template>

@@ -4,8 +4,13 @@ import { fetchAccount, fetchMembership, login as loginApi, type AccountInfo } fr
 
 const KEY = 'fp.apiKey'
 
+function readStoredKey() {
+  if (import.meta.env.SSR || typeof localStorage === 'undefined') return null
+  return localStorage.getItem(KEY)
+}
+
 export const useAuthStore = defineStore('auth', () => {
-  const apiKey = ref<string | null>(localStorage.getItem(KEY))
+  const apiKey = ref<string | null>(readStoredKey())
   const account = ref<AccountInfo | null>(null)
   const isVip = ref(false)
   const loading = ref(false)
@@ -14,7 +19,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => Boolean(apiKey.value && account.value))
 
   async function restore() {
-    if (!apiKey.value) return
+    if (import.meta.env.SSR || !apiKey.value) return
     try {
       account.value = await fetchAccount(apiKey.value)
       await refreshMembership()
@@ -42,7 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const key = await loginApi(username, passwd, mfaCode)
       apiKey.value = key
-      localStorage.setItem(KEY, key)
+      if (typeof localStorage !== 'undefined') localStorage.setItem(KEY, key)
       account.value = await fetchAccount(key)
       await refreshMembership()
     } catch (e) {
@@ -57,7 +62,7 @@ export const useAuthStore = defineStore('auth', () => {
     apiKey.value = null
     account.value = null
     isVip.value = false
-    localStorage.removeItem(KEY)
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(KEY)
   }
 
   async function reloadAccount() {

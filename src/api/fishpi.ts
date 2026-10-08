@@ -4,14 +4,8 @@ import {
   mockCheckin,
   mockDomains,
   mockFeed,
-  mockFollowUsers,
-  mockNotifications,
   mockOnline,
   mockProfile,
-  mockUnreadCount,
-  mockUserArticles,
-  mockWhisperList,
-  mockWhisperMessages,
   type DomainItem,
 } from './catalog'
 import { request, requestText, withKey } from './http'
@@ -493,14 +487,15 @@ export async function uploadFiles(apiKey: string, files: File[]): Promise<string
   }
 }
 
-/** 匿名读未开放或接口 404 时回退 mock，字段与正式 JSON 对齐。 */
+/** 匿名读未开放或接口 404 时可选回退 mock；成功但空列表不再当成失败。 */
 async function unwrapArticles(path: string, apiKey?: string | null, fallback?: () => ArticleSummary[]) {
   try {
     const res = await request<Envelope<{ articles?: ArticleSummary[] } | ArticleSummary[]>>(withKey(path, apiKey))
     if (res.code === 0) {
       const data = res.data
-      if (Array.isArray(data) && data.length) return data
-      if (data && 'articles' in data && Array.isArray(data.articles) && data.articles.length) return data.articles
+      if (Array.isArray(data)) return data
+      if (data && 'articles' in data && Array.isArray(data.articles)) return data.articles
+      return []
     }
   } catch {
     /* 401/404 */
@@ -1341,12 +1336,8 @@ export async function fetchUserProfile(userName: string, apiKey?: string | null)
 }
 
 export async function fetchUserArticles(userName: string, apiKey?: string | null, page = 1, size = 40) {
-  const fromApi = await unwrapArticles(
-    `/api/user/${encodeURIComponent(userName)}/articles?p=${page}&size=${size}`,
-    apiKey,
-  )
-  if (fromApi.length) return fromApi
-  return mockUserArticles(userName, page, size)
+  // 需登录；失败或空列表不返回 mock，避免访客看到假帖。
+  return unwrapArticles(`/api/user/${encodeURIComponent(userName)}/articles?p=${page}&size=${size}`, apiKey)
 }
 
 async function unwrapUsers(paths: string[], apiKey?: string | null): Promise<SimpleUser[]> {
@@ -1369,35 +1360,30 @@ async function unwrapUsers(paths: string[], apiKey?: string | null): Promise<Sim
 }
 
 export async function fetchCollectedArticles(apiKey?: string | null, page = 1, size = 40) {
+  if (!apiKey) return []
   const fromApi = await unwrapArticles(`/api/articles/collected?p=${page}&size=${size}`, apiKey)
   if (fromApi.length) return fromApi
-  const alt = await unwrapArticles(`/api/user/following/articles?p=${page}&size=${size}`, apiKey)
-  if (alt.length) return alt
-  return mockFeed('good', page, size)
+  return unwrapArticles(`/api/user/following/articles?p=${page}&size=${size}`, apiKey)
 }
 
 export async function fetchFollowingUsers(userName: string, apiKey?: string | null, page = 1) {
-  const list = await unwrapUsers(
+  return unwrapUsers(
     [
       `/api/user/${encodeURIComponent(userName)}/following?p=${page}`,
       `/follow/users?p=${page}&followingId=${encodeURIComponent(userName)}`,
     ],
     apiKey,
   )
-  if (list.length) return list
-  return mockFollowUsers(userName, 'following')
 }
 
 export async function fetchFollowers(userName: string, apiKey?: string | null, page = 1) {
-  const list = await unwrapUsers(
+  return unwrapUsers(
     [
       `/api/user/${encodeURIComponent(userName)}/followers?p=${page}`,
       `/follow/followers?p=${page}&followingId=${encodeURIComponent(userName)}`,
     ],
     apiKey,
   )
-  if (list.length) return list
-  return mockFollowUsers(userName, 'followers')
 }
 
 export async function fetchPointRecords(apiKey: string, page = 1): Promise<PointRecord[]> {
@@ -1485,7 +1471,7 @@ export async function fetchUnreadCount(apiKey: string): Promise<UnreadCount> {
   } catch {
     /* unread count unavailable */
   }
-  return mockUnreadCount()
+  return {}
 }
 
 export async function fetchNotifications(apiKey: string, type: NoticeType, page = 1): Promise<NoticeItem[]> {
@@ -1497,7 +1483,7 @@ export async function fetchNotifications(apiKey: string, type: NoticeType, page 
   } catch {
     /* GET /api/getNotifications 尚未提供 */
   }
-  return mockNotifications(type)
+  return []
 }
 
 export async function markNoticeRead(apiKey: string, type: NoticeType) {
@@ -1519,7 +1505,7 @@ export async function fetchWhisperList(apiKey: string): Promise<WhisperMsg[]> {
   } catch {
     /* GET /chat/get-list */
   }
-  return mockWhisperList()
+  return []
 }
 
 export async function fetchWhisperMessages(apiKey: string, toUser: string, page = 1, size = 20): Promise<WhisperMsg[]> {
@@ -1534,7 +1520,7 @@ export async function fetchWhisperMessages(apiKey: string, toUser: string, page 
   } catch {
     /* GET /chat/get-message */
   }
-  return mockWhisperMessages(toUser)
+  return []
 }
 
 export async function markWhisperRead(apiKey: string, userName: string) {

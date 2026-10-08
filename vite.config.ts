@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
+    ssr: {
+      noExternal: ['@unhead/vue', '@unhead/ssr', 'unhead'],
+    },
     server: {
       host: '127.0.0.1',
       port: 5173,

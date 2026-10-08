@@ -53,7 +53,11 @@ watch(
       <RouterLink :to="`/member/${userName}`">{{ userName }}</RouterLink>
       的{{ kind === 'followers' ? '粉丝' : '关注' }}
     </h1>
-    <p v-if="usingMock" class="hint">关注/粉丝列表接口未就绪时展示字段对齐的 mock。</p>
+    <p v-if="usingMock" class="hint">关注/粉丝接口返回异常数据。</p>
+    <p v-else-if="!apiKey && !items.length && !loading" class="hint">
+      <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
+      后可查看完整名单（部分接口需登录）。
+    </p>
     <p v-if="loading" class="hint">加载中…</p>
     <p v-else-if="error" class="err">{{ error }}</p>
     <ul v-else>

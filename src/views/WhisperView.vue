@@ -48,7 +48,7 @@ async function submit() {
       </div>
       <span :class="{ on: connected }">{{ connected ? '已连接' : '未连接' }}</span>
     </header>
-    <p v-if="usingMock" class="hint">GET /chat/get-message 未返回数据时为 mock 会话。</p>
+    <p v-if="usingMock" class="hint">会话未连接，消息仅保存在本地预览。</p>
     <p v-if="error" class="err">{{ error }}</p>
     <div ref="scroller" class="msgs">
       <button v-if="hasMore && messages.length" type="button" class="more" :disabled="loadingMore" @click="whispers.loadMore()">

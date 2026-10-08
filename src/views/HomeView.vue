@@ -12,6 +12,9 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import AdSlot from '@/components/ads/AdSlot.vue'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
+import { usePageSeo } from '@/composables/usePageSeo'
+import { consumeFeedPayload } from '@/seo/payload'
+import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
 
 const auth = useAuthStore()
 const { apiKey, isLoggedIn } = storeToRefs(auth)
@@ -24,6 +27,12 @@ const loading = ref(false)
 
 const usingMock = computed(() => left.value.some((a) => String(a.oId).startsWith('mock-')))
 
+usePageSeo(() => ({
+  title: SITE_NAME,
+  description: SITE_DEFAULT_DESC,
+  path: '/',
+}))
+
 function splitArticles(articles: ArticleSummary[]) {
   const mid = Math.ceil(articles.length / 2)
   left.value = articles.slice(0, mid)
@@ -34,10 +43,11 @@ async function load() {
   error.value = ''
   loading.value = true
   try {
+    const cached = consumeFeedPayload('recent')
     const [articles, checkinRank, onlineRank] = await Promise.all([
-      fetchRecentArticles(apiKey.value, 1, 40),
-      fetchCheckinRank(apiKey.value),
-      fetchOnlineRank(apiKey.value),
+      cached ? Promise.resolve(cached) : fetchRecentArticles(apiKey.value, 1, 40),
+      import.meta.env.SSR ? Promise.resolve([] as RankUser[]) : fetchCheckinRank(apiKey.value),
+      import.meta.env.SSR ? Promise.resolve([] as RankUser[]) : fetchOnlineRank(apiKey.value),
     ])
     splitArticles(articles)
     checkin.value = checkinRank.slice(0, 8)
@@ -64,7 +74,9 @@ function streakOf(u: RankUser) {
 }
 
 function goDownload() {
-  window.open('https://fishpi.cn/download', '_blank', 'noreferrer')
+  if (typeof window !== 'undefined') {
+    window.open('https://fishpi.cn/download', '_blank', 'noreferrer')
+  }
 }
 </script>
 

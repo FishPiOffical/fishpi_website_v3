@@ -3,7 +3,11 @@ import { ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchTags, type TagItem } from '@/api/fishpi'
+import { usePageSeo } from '@/composables/usePageSeo'
+import { consumeTagsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
+
+usePageSeo(() => ({ title: '标签', path: '/tags', description: '摸鱼派标签墙' }))
 
 const auth = useAuthStore()
 const { apiKey } = storeToRefs(auth)
@@ -17,7 +21,8 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const data = await fetchTags(apiKey.value, page.value, 50)
+    const cached = page.value === 1 ? consumeTagsPayload() : null
+    const data = cached || (await fetchTags(apiKey.value, page.value, 50))
     tags.value = data.tags
     total.value = data.total
     if (!data.tags.length) error.value = '暂无标签数据'

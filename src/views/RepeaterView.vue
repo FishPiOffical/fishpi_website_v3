@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchRepeaterItems, likeRepeater, type RepeaterItem } from '@/api/fishpi'
+import { usePageSeo } from '@/composables/usePageSeo'
+import { consumeRepeaterPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
+
+usePageSeo(() => ({ title: '复读机', path: '/repeater', description: '摸鱼派复读机精选' }))
 
 const auth = useAuthStore()
 const { apiKey, isLoggedIn } = storeToRefs(auth)
@@ -24,7 +28,8 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    items.value = await fetchRepeaterItems(apiKey.value, kind.value)
+    const cached = !kind.value ? consumeRepeaterPayload() : null
+    items.value = cached || (await fetchRepeaterItems(apiKey.value, kind.value))
   } catch (e) {
     error.value = e instanceof Error ? e.message : '加载失败'
     items.value = []
@@ -33,8 +38,7 @@ async function load() {
   }
 }
 
-onMounted(() => void load())
-watch([apiKey, kind], () => void load())
+watch([apiKey, kind], () => void load(), { immediate: true })
 
 async function like(item: RepeaterItem) {
   if (!apiKey.value) return

@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /register
+Disallow: /settings
+Disallow: /notifications
+Disallow: /chat
+Disallow: /cr
+Disallow: /stars
+Disallow: /points
+Disallow: /logs
+Disallow: /post
+Disallow: /search
+
+Sitemap: https://fishpi.cn/sitemap.xml

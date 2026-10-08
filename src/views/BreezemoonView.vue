@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { fetchBreezemoons, postBreezemoon, type Breezemoon } from '@/api/fishpi'
+import { usePageSeo } from '@/composables/usePageSeo'
+import { consumeBreezemoonsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
+
+usePageSeo(() => ({ title: '清风明月', path: '/breezemoons', description: '摸鱼派清风明月' }))
 
 const auth = useAuthStore()
 const { apiKey, isLoggedIn } = storeToRefs(auth)
@@ -16,7 +20,8 @@ const sending = ref(false)
 async function load() {
   loading.value = true
   try {
-    items.value = await fetchBreezemoons(1, 30)
+    const cached = consumeBreezemoonsPayload()
+    items.value = cached || (await fetchBreezemoons(1, 30))
     error.value = ''
   } catch (e) {
     error.value = e instanceof Error ? e.message : '加载失败'
@@ -25,7 +30,7 @@ async function load() {
   }
 }
 
-onMounted(() => void load())
+watch(apiKey, () => void load(), { immediate: true })
 
 async function submit() {
   if (!apiKey.value || !draft.value.trim()) return

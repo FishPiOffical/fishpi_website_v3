@@ -9,7 +9,11 @@ import {
   type ProfessionRankEntry,
   type RankUser,
 } from '@/api/fishpi'
+import { usePageSeo } from '@/composables/usePageSeo'
+import { consumeRanksPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
+
+usePageSeo(() => ({ title: '总榜', path: '/top', description: '摸鱼派签到与活跃榜' }))
 
 const auth = useAuthStore()
 const { apiKey } = storeToRefs(auth)
@@ -28,16 +32,22 @@ async function load() {
   error.value = ''
   loading.value = true
   try {
-    ;[checkin.value, online.value] = await Promise.all([
-      fetchCheckinRank(apiKey.value),
-      fetchOnlineRank(apiKey.value),
-    ])
+    const cached = consumeRanksPayload()
+    if (cached) {
+      checkin.value = cached.checkin
+      online.value = cached.online
+    } else {
+      ;[checkin.value, online.value] = await Promise.all([
+        fetchCheckinRank(apiKey.value),
+        fetchOnlineRank(apiKey.value),
+      ])
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : '排行榜加载失败'
   } finally {
     loading.value = false
   }
-  await loadJobs()
+  if (!import.meta.env.SSR) await loadJobs()
 }
 
 async function loadJobs() {

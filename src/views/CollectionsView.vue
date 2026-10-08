@@ -37,7 +37,7 @@ watch(
 <template>
   <section class="card">
     <h1>我的收藏</h1>
-    <p v-if="usingMock" class="hint">收藏列表接口未就绪时展示字段对齐的 mock。</p>
+    <p v-if="usingMock" class="hint">收藏列表接口返回异常数据，请稍后重试。</p>
     <p v-if="loading" class="hint">加载中…</p>
     <p v-else-if="error" class="err">{{ error }}</p>
     <ArticleFeed v-else :items="items" empty="还没有收藏" />

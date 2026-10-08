@@ -33,6 +33,9 @@ import EmojiPicker from '@/components/EmojiPicker.vue'
 import MetalBadges from '@/components/MetalBadges.vue'
 import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
+import { usePageSeo } from '@/composables/usePageSeo'
+import { consumeArticlePayload } from '@/seo/payload'
+import { absoluteUrl, SITE_DEFAULT_DESC, stripHtml } from '@/seo/site'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -155,6 +158,38 @@ const canEdit = computed(
 )
 const isQnA = computed(() => Number(article.value?.articleType) === 5)
 
+const articleDesc = computed(() => {
+  const raw = article.value?.articleContent || article.value?.articleOriginalContent || ''
+  return stripHtml(raw) || SITE_DEFAULT_DESC
+})
+
+usePageSeo(() => {
+  const a = article.value
+  if (!a) {
+    return { title: '帖子', path: route.fullPath, robots: 'index,follow' }
+  }
+  const author = a.articleAuthorName || a.articleAuthor?.userName || ''
+  return {
+    title: a.articleTitle,
+    description: articleDesc.value,
+    path: `/article/${a.oId}`,
+    image: a.articleAuthorThumbnailURL48,
+    type: 'article',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: a.articleTitle,
+      description: articleDesc.value,
+      author: author
+        ? { '@type': 'Person', name: author, url: absoluteUrl(`/member/${author}`) }
+        : undefined,
+      datePublished: a.articleCreateTimeStr || undefined,
+      mainEntityOfPage: absoluteUrl(`/article/${a.oId}`),
+      image: a.articleAuthorThumbnailURL48 || absoluteUrl('/favicon.svg'),
+    },
+  }
+})
+
 function isOwnComment(c: ArticleComment) {
   return Boolean(account.value && (c.commentAuthorName === account.value.userName || c.commentAuthorId === account.value.oId))
 }
@@ -185,6 +220,7 @@ function commentFromWs(msg: Record<string, unknown>): ArticleComment | null {
 
 function connectHeat() {
   disconnectHeat()
+  if (import.meta.env.SSR || typeof WebSocket === 'undefined') return
   if (!id.value || String(id.value).startsWith('mock-')) return
   const params = new URLSearchParams({
     articleId: id.value,
@@ -224,6 +260,7 @@ function connectHeat() {
 }
 
 async function refreshHeat() {
+  if (import.meta.env.SSR) return
   if (!id.value || String(id.value).startsWith('mock-')) return
   try {
     heat.value = await fetchArticleHeat(id.value, apiKey.value)
@@ -234,6 +271,19 @@ async function refreshHeat() {
 
 async function load() {
   if (!id.value) return
+  const cached = commentPage.value === 1 ? consumeArticlePayload(id.value) : null
+  if (cached) {
+    article.value = cached
+    loading.value = false
+    error.value = ''
+    heat.value = Number(cached.articleHeat || 0)
+    if (!import.meta.env.SSR) {
+      await refreshHeat()
+      connectHeat()
+    }
+    void buildToc()
+    return
+  }
   loading.value = true
   error.value = ''
   article.value = null

@@ -9,6 +9,25 @@ export class ApiError extends Error {
   }
 }
 
+function apiBase() {
+  if (!import.meta.env.SSR) return ''
+  const fromProcess =
+    typeof globalThis !== 'undefined' &&
+    'process' in globalThis &&
+    (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+  const fromEnv =
+    (fromProcess && (fromProcess.VITE_API_TARGET || fromProcess.API_TARGET)) ||
+    import.meta.env.VITE_API_TARGET ||
+    'https://fishpi.cn'
+  return String(fromEnv).replace(/\/$/, '')
+}
+
+function resolveUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path
+  const base = apiBase()
+  return base ? `${base}${path.startsWith('/') ? path : `/${path}`}` : path
+}
+
 function isJsonContentType(value: string | null) {
   return Boolean(value && value.includes('application/json'))
 }
@@ -23,7 +42,7 @@ export async function request<T = unknown>(
     headers.set('Content-Type', 'application/json')
   }
 
-  const res = await fetch(path, {
+  const res = await fetch(resolveUrl(path), {
     ...init,
     credentials: init.credentials ?? 'include',
     headers,
@@ -53,7 +72,7 @@ export async function request<T = unknown>(
 export async function requestText(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers)
   if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
-  const res = await fetch(path, {
+  const res = await fetch(resolveUrl(path), {
     ...init,
     credentials: init.credentials ?? 'include',
     headers,

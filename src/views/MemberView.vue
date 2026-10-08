@@ -21,6 +21,9 @@ import {
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
 import MetalBadges from '@/components/MetalBadges.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
+import { usePageSeo } from '@/composables/usePageSeo'
+import { consumeMemberPayload } from '@/seo/payload'
+import { SITE_DEFAULT_DESC } from '@/seo/site'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -46,16 +49,35 @@ const usingMock = computed(() => String(profile.value?.oId || '').startsWith('mo
 const isSelf = computed(() => Boolean(account.value && account.value.userName === userName.value))
 const following = computed(() => profile.value?.canFollow === 'no')
 
+usePageSeo(() => {
+  const p = profile.value
+  const name = p?.userNickname || p?.userName || userName.value
+  return {
+    title: name ? `${name} 的主页` : '用户主页',
+    description: p?.userIntro || (name ? `${name} 在摸鱼派的个人主页` : SITE_DEFAULT_DESC),
+    path: `/member/${userName.value}`,
+    image: p?.userAvatarURL,
+    type: 'profile',
+  }
+})
+
 async function load() {
   if (!userName.value) return
+  const cached = consumeMemberPayload(userName.value)
   loading.value = true
   error.value = ''
   actionMsg.value = ''
   try {
+    if (cached) {
+      profile.value = cached
+      if (isSelf.value) profile.value.canFollow = 'hide'
+    }
     const [p, list, moons] = await Promise.all([
-      fetchUserProfile(userName.value, apiKey.value),
-      fetchUserArticles(userName.value, apiKey.value),
-      fetchUserBreezemoons(userName.value, apiKey.value, 1, 12),
+      cached ? Promise.resolve(cached) : fetchUserProfile(userName.value, apiKey.value),
+      import.meta.env.SSR ? Promise.resolve([] as ArticleSummary[]) : fetchUserArticles(userName.value, apiKey.value),
+      import.meta.env.SSR
+        ? Promise.resolve([] as Breezemoon[])
+        : fetchUserBreezemoons(userName.value, apiKey.value, 1, 12),
     ])
     if (isSelf.value) p.canFollow = 'hide'
     profile.value = p
@@ -65,7 +87,7 @@ async function load() {
     viewedVip.value = false
     profession.value = null
     extraMedals.value = []
-    if (p.oId && !String(p.oId).startsWith('mock-')) {
+    if (!import.meta.env.SSR && p.oId && !String(p.oId).startsWith('mock-')) {
       try {
         viewedVip.value = (await fetchMembership(p.oId)).isVip
       } catch {
@@ -176,10 +198,11 @@ async function sendPoints() {
     </section>
     <section class="card">
       <h2>帖子</h2>
-      <p v-if="articlesMock" class="hint">
-        用户发帖列表需登录（<code>GET /api/user/:name/articles</code>），当前为字段对齐 mock。
-        <RouterLink v-if="!isLoggedIn" :to="{ path: '/login', query: { redirect: route.fullPath } }">去登录</RouterLink>
+      <p v-if="!isLoggedIn && !articles.length" class="hint">
+        用户发帖列表需登录（<code>GET /api/user/:name/articles</code>）。
+        <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">去登录</RouterLink>
       </p>
+      <p v-else-if="articlesMock" class="hint">列表接口异常，暂无真实帖子数据。</p>
       <ArticleFeed :items="articles" empty="还没有公开帖子" />
     </section>
     <section v-if="breezemoons.length" class="card">
