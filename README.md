@@ -28,7 +28,7 @@ VITE_API_TARGET=http://localhost:8080
 VITE_SITE_ORIGIN=https://fishpi.cn
 ```
 
-本站优先请求 Rhythm JSON；匿名列表/详情/搜索/领域/广告若 401 或 404，回退到 `src/api/catalog.mock.json` / `ads.mock.json`（字段与正式接口对齐）。登录后仍走真实 API。
+本站优先请求 Rhythm JSON；匿名列表/详情/搜索/领域若 401 或 404，回退到 `src/api/catalog.mock.json`（字段与正式接口对齐）。登录后仍走真实 API。广告位仅保留入口，不拉素材。
 
 ### SEO / SSR
 
@@ -48,7 +48,7 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - 资料编辑、头像/发帖图片上传、表情包、积分转账与流水
 - 我的收藏、聊天室多类型红包/领取明细/撤回/@ 补全
 - 主题、对话框、头像框：`src/packs` 目录包
-- 广告位：`GET /api/ads` 映射现网 `headerBanner`→`home.top`、`sideFull`→`home.sidebar`（wwads），页脚赞助链仍用 mock
+- 广告位：仅保留 `AdSlot` 入口（`home.top` / `home.sidebar` / `footer.sponsors`），暂不拉取素材
 - 聊天室侧边栏模块化
 - 帖子热度 `GET /api/article/heat/{id}` 与 `article-channel` 实时在看/新评
 - 举报 `POST /report`（帖子/评论/用户）
@@ -68,6 +68,7 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - 聊天室进房前预拉 `GET /chat-room/online-users`（在线列表/话题）
 - 用户主页清风明月 `GET /api/user/{name}/breezemoons`（需登录）
 - 首页长篇双货架（最近更新 / 热门专栏）与社区清风明月发布（`POST /breezemoon` + page-auth CSRF）
+- 搜索对齐现网 `GET /api/search?key=`；路由别名 `/column`、`/top/checkin`、`/top/online`
 
 闲聊室 `/idle-talk` 在现网 Rhythm 返回 404，暂不接页面。
 用户发帖列表 / 收藏 / 关注粉丝 / 通知 / 私信：接口失败时返回空列表（不再塞 mock）。

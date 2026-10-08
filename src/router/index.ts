@@ -24,6 +24,21 @@ const routes = [
     component: () => import('@/views/ArticleListView.vue'),
     meta: { title: '专栏', list: 'long' },
   },
+  {
+    path: '/column',
+    component: () => import('@/views/ArticleListView.vue'),
+    meta: { title: '专栏', list: 'long' },
+  },
+  {
+    path: '/top/checkin',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '连签榜' },
+  },
+  {
+    path: '/top/online',
+    component: () => import('@/views/TopView.vue'),
+    meta: { title: '在线榜' },
+  },
   { path: '/qna', component: () => import('@/views/ArticleListView.vue'), meta: { title: '问答', list: 'qna' } },
   {
     path: '/perfect',

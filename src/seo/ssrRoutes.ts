@@ -7,6 +7,7 @@ export function shouldPrefetchSsr(path: string) {
   if (
     p === '/hot' ||
     p === '/recent/long' ||
+    p === '/column' ||
     p === '/qna' ||
     p === '/perfect' ||
     p === '/good' ||
@@ -14,6 +15,8 @@ export function shouldPrefetchSsr(path: string) {
     p === '/tags' ||
     p === '/breezemoons' ||
     p === '/top' ||
+    p === '/top/checkin' ||
+    p === '/top/online' ||
     p === '/repeater' ||
     p === '/download' ||
     p === '/activity' ||

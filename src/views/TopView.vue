@@ -74,7 +74,7 @@ watch(apiKey, () => void load(), { immediate: true })
     <p v-else-if="usingMock && !apiKey" class="banner">
       匿名榜单接口尚未开放，当前为与 <code>/api/top/checkin|online</code> 对齐的 mock。
     </p>
-    <section class="card">
+    <section id="checkin" class="card">
       <h1>今日连签排行</h1>
       <ol>
         <li v-for="(u, i) in checkin" :key="u.userName">
@@ -84,7 +84,7 @@ watch(apiKey, () => void load(), { immediate: true })
         </li>
       </ol>
     </section>
-    <section class="card">
+    <section id="online" class="card">
       <h1>在线时间排行</h1>
       <ol>
         <li v-for="(u, i) in online" :key="u.userName">

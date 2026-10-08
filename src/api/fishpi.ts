@@ -564,13 +564,18 @@ export async function fetchArticleFeed(
 
 export async function fetchSearch(q: string, apiKey?: string | null, page = 1, size = 40) {
   const query = q.trim()
+  if (!query) return []
   try {
-    const res = await request<Envelope<{ articles?: ArticleSummary[] }>>(
-      withKey(`/api/search?q=${encodeURIComponent(query)}&p=${page}&size=${size}`, apiKey),
+    // Rhythm 现网参数名为 key（非 q/keyword）；空结果也是合法响应，勿回退 mock。
+    const res = await request<Envelope<{ articles?: ArticleSummary[]; key?: string; total?: number }>>(
+      withKey(`/api/search?key=${encodeURIComponent(query)}&p=${page}&size=${size}`, apiKey),
     )
-    if (res.code === 0 && Array.isArray(res.data?.articles)) return res.data.articles
-  } catch {
-    /* GET /api/search 尚未提供 */
+    if (res.code === 0 && res.data) {
+      return Array.isArray(res.data.articles) ? res.data.articles : []
+    }
+    if (res.code === -1) throw new Error(res.msg || '搜索请求过于频繁，请稍后再试')
+  } catch (e) {
+    if (e instanceof Error && (e.message.includes('频繁') || e.message.includes('搜索'))) throw e
   }
   return mockFeed('search', page, size, query)
 }

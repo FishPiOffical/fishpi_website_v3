@@ -18,6 +18,6 @@ export const CHAT_SIDEBAR_MODULES: ChatSidebarModule[] = [
   { id: 'online', title: '在线成员', defaultOn: true, component: OnlineModule },
   { id: 'barrage', title: '弹幕花费', defaultOn: true, component: BarrageModule },
   { id: 'appearance', title: '外观', defaultOn: true, component: AppearanceModule },
-  { id: 'ad', title: '广告', defaultOn: true, component: AdModule },
+  { id: 'ad', title: '广告', defaultOn: false, component: AdModule },
   { id: 'mutes', title: '思过崖', defaultOn: false, component: MutesModule },
 ]

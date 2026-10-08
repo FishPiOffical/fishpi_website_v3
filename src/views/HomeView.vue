@@ -334,7 +334,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
           <CheckinPanel />
           <div class="index-head">
             <b>今日连签排行</b>
-            <RouterLink to="/top">更多</RouterLink>
+            <RouterLink to="/top/checkin">更多</RouterLink>
           </div>
           <ol class="module-list rank">
             <li v-for="(u, i) in checkin" :key="u.userName">
@@ -351,7 +351,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
           </ol>
           <div class="index-head spaced">
             <b>在线时间排行</b>
-            <RouterLink to="/top">更多</RouterLink>
+            <RouterLink to="/top/online">更多</RouterLink>
           </div>
           <ol class="module-list rank">
             <li v-for="(u, i) in online" :key="u.userName">
@@ -375,7 +375,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
       <section v-if="mod.id === 'long'" class="long-zone" data-home-module="long" data-home-title="长篇专区">
         <div class="long-head">
           <b>长篇专区</b>
-          <RouterLink to="/recent/long">更多</RouterLink>
+          <RouterLink to="/column">更多</RouterLink>
         </div>
 
         <div class="long-row">
@@ -484,7 +484,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <span class="sep">|</span>
               <button type="button" :class="{ on: hotMode === 'column' }" @click="hotMode = 'column'">专栏</button>
             </b>
-            <RouterLink :to="hotMode === 'hot' ? '/hot' : '/recent/long'">更多</RouterLink>
+            <RouterLink :to="hotMode === 'hot' ? '/hot' : '/column'">更多</RouterLink>
           </div>
           <ol class="module-list">
             <li v-for="item in hotPanel" :key="item.oId">

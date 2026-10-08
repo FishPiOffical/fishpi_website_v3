@@ -8,6 +8,7 @@ export const useAdsStore = defineStore('ads', () => {
   const loaded = ref(false)
 
   async function load() {
+    if (loaded.value) return
     items.value = await fetchAds()
     loaded.value = true
   }

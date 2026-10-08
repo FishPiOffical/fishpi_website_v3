@@ -10,7 +10,7 @@ import AdSlot from '@/components/ads/AdSlot.vue'
 
 const nav = [
   { to: '/', label: '最新' },
-  { to: '/recent/long', label: '专栏' },
+  { to: '/column', label: '专栏' },
   { to: '/hot', label: '热门' },
   { to: '/cr', label: '聊天室' },
   { to: '/domains', label: '领域' },
@@ -77,7 +77,17 @@ function logout() {
         <img src="/logo.png" width="48" height="48" alt="摸鱼派" />
       </RouterLink>
       <nav>
-        <RouterLink v-for="item in nav" :key="item.to" :to="item.to" :class="{ current: route.path === item.to }">
+        <RouterLink
+          v-for="item in nav"
+          :key="item.to"
+          :to="item.to"
+          :class="{
+            current:
+              route.path === item.to ||
+              (item.to === '/column' && route.path === '/recent/long') ||
+              (item.to === '/top' && route.path.startsWith('/top/')),
+          }"
+        >
           {{ item.label }}
         </RouterLink>
       </nav>
