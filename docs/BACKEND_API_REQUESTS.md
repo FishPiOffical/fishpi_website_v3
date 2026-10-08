@@ -20,6 +20,11 @@
 | 9 | P2 | 新增 | `GET /api/city/{cityName}` | 同城列表 |
 | 10 | P2 | 调整 | `GET /api/articles/*`、`GET /api/article/{id}`、`GET /api/domains` | 游客匿名可读 |
 | 11 | P1 | 新增 | `GET /api/user/{userName}/comments` 等 9 个 | 个人主页子页列表（现网仅 FTL） |
+| 12 | P1 | 新增 | `GET /api/watch/tags/articles` 等 3 个 | 关注动态 `/watch*`（现网仅 FTL） |
+| 13 | P1 | 新增 | `GET /api/columns/mine` | 长文章发帖选择已有专栏、`/column/manage` |
+| 14 | P1 | 调整 | `POST /article/stick` | 置顶支持 apiKey（现网只认 Cookie 会话） |
+| 15 | P2 | 调整 | `GET /api/article/{id}` | 补相关帖子、上一贴/下一贴 |
+| 16 | P2 | 调整 | `GET /api/article/{id}` | 评论排序参数（现网固定正序） |
 
 ---
 
@@ -274,6 +279,44 @@ GET /api/city/{cityName}?p=1&size=20
 分页统一返回 `pagination: { paginationPageCount, paginationRecordCount }`；隐私设置不允许查看时返回 `code != 0` 及原因。
 
 前端接入点：`src/views/MemberView.vue` 的 `PENDING_API`，以及 `fetchFollowingUsers` / `fetchFollowers`（当前调用的 `/api/user/{u}/following`、`/follow/users` 在现网均不存在）。
+
+---
+
+## 12. 关注动态（P1，新增，需登录）
+
+现网 `/watch`、`/watch/users`、`/watch/breezemoons` 由 `IndexProcessor.showWatch` / `BreezemoonProcessor.showWatchBreezemoon` 渲染 FTL，没有 JSON。前端 `WatchView` 目前显示「等待后端开放」。注意 `/api/user/following/articles` 现网不存在（会被 `/api/user/{userName}` 匹配成用户名 `following`，返回「用户不存在」）。
+
+| 页面 | 建议接口 | 数据来源 |
+|------|----------|----------|
+| `/watch` | `GET /api/watch/tags/articles?p=&size=` | `articleQueryService.getFollowingTagArticles` |
+| `/watch/users` | `GET /api/watch/users/articles?p=&size=` | `articleQueryService.getFollowingUserArticles` |
+| `/watch/breezemoons` | `GET /api/watch/breezemoons?p=&size=` | `showWatchBreezemoon` 里的关注用户清风明月 |
+
+返回结构与 `GET /api/articles/recent` / `GET /api/breezemoons` 一致。
+
+## 13. 我的专栏（P1，新增，需登录）
+
+长文章发帖页的「所属专栏」下拉，现网由 `fillLongArticleColumnRequisite` 在 FTL 里注入 `longArticleColumns`，没有 JSON。前端目前只能让用户手填专栏 ID。
+
+- `GET /api/columns/mine?size=100` → `longArticleColumnQueryService.getUserColumns(userId, size)`，字段：`oId`、`columnTitle`、`columnArticleCount`、`columnCoverURL`、`columnHasCover`。
+- `/column/manage`（`LongArticleColumnProcessor.showManage`）同样需要这份列表，外加重命名/排序/删除接口；现网只有 `POST /api/columns/{columnId}/cover`。
+
+## 14. 置顶支持 apiKey（P1，调整）
+
+`POST /article/stick` 的 `stickArticle` 用 `Sessions.getUser()` 取当前用户，apiKey 客户端拿到的是 `null`，直接 403。请改为与其它接口一致：优先 `context.attr(User.USER)`（`loginCheck` 已按 apiKey 填好）。前端目前只展示「置顶中 · 剩余 N 分钟」（`articleStickRemains`），不提供置顶按钮。
+
+## 15. 帖子详情补相关帖与上下贴（P2，调整）
+
+`article.ftl` 用到的 `sideRelevantArticles`、`articlePrevious`、`articleNext` 只在 FTL 数据模型里，`GET /api/article/{id}` 没返回。请在 `data` 层加：
+
+- `relevantArticles`：`[{ oId, articleTitle, articleTitleEmoj, articlePermalink, articleAuthorName, articleAuthorThumbnailURL20 }]`
+- `previous` / `next`：`{ oId, articleTitle, articleTitleEmojUnicode, articlePermalink }`
+
+长文章的上一章/下一章已由 `longArticleColumnView.previous/next` 提供，前端已接入。随机帖子用的是现有 `GET /article/random/{size}`。
+
+## 16. 评论排序参数（P2，调整）
+
+`showArticleApi` 里 `cmtViewMode` 写死为 `0`（传统正序）。请支持 `?m=0|1`（正序/实时倒序），与网页端用户设置 `userCommentViewMode` 一致。另外 `pagination` 在 `data` 层而不在 `article` 里，前端已适配，无需调整。
 
 ---
 
