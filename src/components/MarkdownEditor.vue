@@ -11,14 +11,12 @@ const props = withDefaults(
     height?: number
     placeholder?: string
     outline?: boolean
-    /** 精简模式：只留表情/链接/上传/编辑模式，仅编辑区不分屏预览（对齐现网私信） */
-    compact?: boolean
-    /** 聊天室工具栏（对齐现网 chat-room.js），同样只有编辑区 */
-    chat?: boolean
+    /** reply：聊天室 / 私信 / 回帖共用的短文工具栏，仅编辑区；post：发帖的长文工具栏，分屏预览 */
+    mode?: 'reply' | 'post'
     /** 启用本地草稿缓存（Vditor localStorage），值为缓存键 */
     cacheId?: string
   }>(),
-  { apiKey: null, height: 500, placeholder: '', outline: false, compact: false, chat: false, cacheId: '' },
+  { apiKey: null, height: 500, placeholder: '', outline: false, mode: 'post', cacheId: '' },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
 
@@ -45,44 +43,55 @@ function loadEmoji(apiKey: string | null) {
   return emojiLoader.p
 }
 
-const COMPACT_TOOLBAR = [
-  'emoji',
-  'link',
-  'upload',
-  'edit-mode',
-  { name: 'more', toolbar: ['insert-after', 'fullscreen', 'preview', 'info', 'help'] },
-]
+const MORE_TOOLS = ['outdent', 'indent', 'insert-before', 'insert-after', 'line', 'info', 'help']
 
-const CHAT_TOOLBAR = [
+const REPLY_TOOLBAR = [
   'emoji',
   'headings',
   'bold',
   'italic',
-  '|',
+  'strike',
   'link',
+  '|',
+  'list',
+  'ordered-list',
+  'check',
+  'quote',
+  'code',
+  'inline-code',
+  '|',
   'upload',
+  'table',
   '|',
   'undo',
   'redo',
   '|',
   'edit-mode',
   'fullscreen',
+  { name: 'more', toolbar: MORE_TOOLS },
+]
+
+const POST_TOOLBAR = [
+  ...REPLY_TOOLBAR.slice(0, -3),
+  'record',
+  '|',
+  'edit-mode',
+  'both',
+  'preview',
+  'outline',
+  'fullscreen',
+  { name: 'more', toolbar: MORE_TOOLS },
+]
+
+const MOBILE_TOOLBAR = [
+  'emoji',
+  'bold',
+  'link',
+  'upload',
+  'edit-mode',
   {
     name: 'more',
-    toolbar: [
-      'table',
-      'list',
-      'ordered-list',
-      'check',
-      'outdent',
-      'indent',
-      'quote',
-      'code',
-      'insert-before',
-      'insert-after',
-      'info',
-      'help',
-    ],
+    toolbar: ['headings', 'italic', 'strike', 'quote', 'list', 'ordered-list', 'check', 'code', 'inline-code', 'table', 'undo', 'redo', 'fullscreen', 'preview', 'info', 'help'],
   },
 ]
 
@@ -154,8 +163,8 @@ onMounted(async () => {
   }
   if (!host.value) return
   const narrow = window.innerWidth < 768
-  const inline = props.compact || props.chat
-  const toolbar = narrow ? COMPACT_TOOLBAR : props.chat ? CHAT_TOOLBAR : props.compact ? COMPACT_TOOLBAR : undefined
+  const inline = props.mode === 'reply'
+  const toolbar = narrow ? MOBILE_TOOLBAR : inline ? REPLY_TOOLBAR : POST_TOOLBAR
   editor = new Vditor(host.value, {
     value: props.modelValue,
     height: props.height,
@@ -167,7 +176,8 @@ onMounted(async () => {
     resize: { enable: !narrow, position: 'bottom' },
     preview: { delay: 500, mode: inline ? 'editor' : 'both', url: '/markdown' },
     counter: { enable: !inline },
-    ...(toolbar ? { toolbar } : {}),
+    toolbar,
+    toolbarConfig: { pin: !inline },
     ctrlEnter: () => emit('submit'),
     upload: {
       accept: 'image/*,.zip,.rar,.7z,.mp3,.mp4,.webm,.mov',
@@ -247,7 +257,7 @@ defineExpose({
     :style="{ height: `${height}px` }"
     @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
   />
-  <div v-else class="md-editor">
+  <div v-else class="md-editor" :class="`md-editor--${mode}`">
     <div ref="host" />
     <div v-if="!ready" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
   </div>
@@ -275,5 +285,130 @@ defineExpose({
   color: var(--fp-text);
   border-radius: 8px;
   padding: 8px 10px;
+}
+</style>
+
+<style>
+/* 鱼排编辑器主题：把 Vditor 的主题变量映射到站点 --fp-*，随站点明暗主题切换 */
+.md-editor .vditor,
+.md-editor .vditor.vditor--dark {
+  --border-color: color-mix(in srgb, var(--fp-text) 14%, transparent);
+  --second-color: color-mix(in srgb, var(--fp-muted) 55%, transparent);
+  --panel-background-color: var(--fp-card);
+  --panel-shadow: 0 6px 24px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --toolbar-background-color: var(--fp-card);
+  --toolbar-icon-color: var(--fp-muted);
+  --toolbar-icon-hover-color: var(--fp-primary);
+  --toolbar-height: 34px;
+  --toolbar-divider-margin-top: 10px;
+  --textarea-background-color: color-mix(in srgb, var(--fp-text) 4%, var(--fp-card));
+  --textarea-text-color: var(--fp-text);
+  --resize-icon-color: var(--fp-muted);
+  --resize-background-color: transparent;
+  --resize-hover-icon-color: #fff;
+  --resize-hover-background-color: var(--fp-primary);
+  --count-background-color: color-mix(in srgb, var(--fp-primary) 14%, transparent);
+  --heading-border-color: var(--fp-border);
+  --blockquote-color: var(--fp-muted);
+  --ir-heading-color: var(--fp-primary);
+  --ir-title-color: var(--fp-muted);
+  --ir-bi-color: var(--fp-accent);
+  --ir-link-color: var(--fp-link);
+  --ir-bracket-color: var(--fp-link);
+  --ir-paren-color: var(--fp-primary);
+
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  /* clip 不建立滚动容器，发帖页的工具栏吸顶才能生效 */
+  overflow: clip;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.md-editor .vditor-toolbar--pin {
+  top: var(--fp-nav-h);
+}
+.md-editor .vditor:focus-within {
+  border-color: color-mix(in srgb, var(--fp-primary) 70%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fp-primary) 16%, transparent);
+}
+.md-editor .vditor.vditor--fullscreen {
+  border-radius: 0;
+}
+
+.md-editor .vditor-toolbar {
+  padding: 0 6px !important;
+  border-bottom: 1px solid var(--border-color);
+}
+.md-editor .vditor-toolbar__item {
+  padding: 4px 1px;
+}
+.md-editor .vditor-toolbar__item .vditor-tooltipped {
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.md-editor .vditor-toolbar__item .vditor-tooltipped:hover,
+.md-editor .vditor-toolbar__item .vditor-tooltipped:focus,
+.md-editor .vditor-toolbar__item .vditor-menu--current {
+  background: color-mix(in srgb, var(--fp-primary) 14%, transparent);
+  color: var(--fp-primary);
+}
+.md-editor .vditor-toolbar__item svg {
+  width: 16px;
+  height: 16px;
+}
+.md-editor .vditor-toolbar__item input {
+  top: 4px;
+  width: 26px;
+  height: 26px;
+}
+.md-editor .vditor-toolbar__divider {
+  height: 14px;
+  margin: 10px 6px;
+}
+
+.md-editor .vditor-sv,
+.md-editor .vditor-ir pre.vditor-reset,
+.md-editor .vditor-wysiwyg pre.vditor-reset,
+.md-editor .vditor-sv:focus,
+.md-editor .vditor-ir pre.vditor-reset:focus,
+.md-editor .vditor-wysiwyg pre.vditor-reset:focus {
+  background-color: var(--textarea-background-color);
+  color: var(--textarea-text-color);
+  caret-color: var(--fp-primary);
+}
+.md-editor--reply .vditor-sv,
+.md-editor--reply .vditor-ir pre.vditor-reset,
+.md-editor--reply .vditor-wysiwyg pre.vditor-reset {
+  padding: 10px 14px !important;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.md-editor .vditor-preview {
+  border-left: 1px solid var(--border-color);
+  background: var(--fp-card);
+}
+
+.md-editor .vditor-panel,
+.md-editor .vditor-hint {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.md-editor .vditor-hint button {
+  color: var(--fp-text);
+}
+.md-editor .vditor-hint--current,
+.md-editor .vditor-hint button:not(.vditor-menu--disabled):hover {
+  background-color: color-mix(in srgb, var(--fp-primary) 14%, transparent) !important;
+}
+.md-editor .vditor-emojis button {
+  border-radius: 6px;
+}
+.md-editor .vditor-emojis button:hover {
+  background: color-mix(in srgb, var(--fp-primary) 14%, transparent);
+}
+.md-editor .vditor-counter {
+  color: var(--fp-primary);
 }
 </style>

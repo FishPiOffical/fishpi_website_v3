@@ -7,8 +7,6 @@ const props = withDefaults(
   defineProps<{
     modelValue: string
     apiKey?: string | null
-    /** chat：聊天室完整工具栏；compact：私信精简工具栏 */
-    variant?: 'chat' | 'compact'
     cacheId?: string
     placeholder?: string
     height?: number
@@ -16,16 +14,17 @@ const props = withDefaults(
     disabled?: boolean
     /** 正文为空也允许发送（如带引用） */
     allowEmpty?: boolean
+    submitText?: string
   }>(),
   {
     apiKey: null,
-    variant: 'chat',
     cacheId: '',
     placeholder: '',
     height: 150,
     sending: false,
     disabled: false,
     allowEmpty: false,
+    submitText: '发 送',
   },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
@@ -60,8 +59,7 @@ defineExpose({
       :model-value="modelValue"
       :api-key="apiKey"
       :height="height"
-      :chat="variant === 'chat'"
-      :compact="variant === 'compact'"
+      mode="reply"
       :cache-id="cacheId"
       :placeholder="placeholder"
       @update:model-value="(v: string) => emit('update:modelValue', v)"
@@ -75,7 +73,7 @@ defineExpose({
       <div class="actions">
         <slot name="actions" />
         <button type="button" class="send" :disabled="!canSend" @click="submit">
-          {{ sending ? '发送中…' : '发 送' }}
+          {{ sending ? '发送中…' : submitText }}
         </button>
       </div>
     </div>

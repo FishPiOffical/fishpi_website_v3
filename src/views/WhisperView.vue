@@ -167,7 +167,6 @@ async function submit() {
         :key="userName"
         v-model="draft"
         class="composer"
-        variant="compact"
         :api-key="apiKey"
         :cache-id="`whisper-${userName}`"
         :sending="sending"

@@ -32,8 +32,7 @@ import {
   type ArticleSummary,
   type ReactionSummary,
 } from '@/api/fishpi'
-import EmojiPicker from '@/components/EmojiPicker.vue'
-import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import ChatComposer from '@/components/ChatComposer.vue'
 import MetalBadges from '@/components/MetalBadges.vue'
 import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -187,7 +186,7 @@ const typeBadge = computed(() => TYPE_BADGES[Number(article.value?.articleType)]
 const statementLabel = computed(() => STATEMENT_LABELS[Number(article.value?.articleStatement)] || '')
 
 const randomArticles = ref<ArticleSummary[]>([])
-const composerRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
+const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 const shareCopied = ref(false)
 const shareUrl = computed(() => {
   const base = absoluteUrl(`/article/${id.value}`)
@@ -549,7 +548,8 @@ function parentAuthor(c: ArticleComment) {
 
 function startReply(c: ArticleComment) {
   replyId.value = c.oId
-  document.querySelector('.composer-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  if (composerRef.value) composerRef.value.reveal()
+  else document.querySelector('.composer-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 function itemProps(c: ArticleComment) {
@@ -854,7 +854,7 @@ async function onReactComment(c: ArticleComment, value: string) {
     </section>
 
     <!-- 底部发表回帖区域 -->
-    <form class="card composer-card" @submit.prevent="submit">
+    <section class="card composer-card">
       <div class="module-header">
         <span><b>参与讨论</b></span>
       </div>
@@ -865,30 +865,27 @@ async function onReactComment(c: ArticleComment, value: string) {
             回复 <b>@{{ comments.find((c) => c.oId === replyId)?.commentAuthorName || replyId }}</b>
             <button type="button" class="btn-text cancel-reply" @click="replyId = ''">取消回复</button>
           </p>
-          <MarkdownEditor
+          <ChatComposer
             ref="composerRef"
             v-model="draft"
             :api-key="apiKey"
-            :height="200"
+            :height="180"
+            :sending="sending"
+            submit-text="发表评论"
             placeholder="请友善发言，支持 Markdown、@用户、拖拽上传图片…Ctrl+Enter 发送"
             @submit="submit"
-          />
-          <div class="composer-toolbar">
-            <EmojiPicker @insert="(md) => composerRef?.insert(md)" />
-            <div class="composer-submit-wrap">
+          >
+            <template #actions>
               <span v-if="sendError" class="err-tip">{{ sendError }}</span>
-              <button type="submit" class="btn small" :disabled="sending || !draft.trim()">
-                {{ sending ? '发送中…' : '发表评论' }}
-              </button>
-            </div>
-          </div>
+            </template>
+          </ChatComposer>
         </template>
         <p v-else class="hint-login">
           <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }" class="login-link">登录</RouterLink>
           后即可参与讨论。
         </p>
       </div>
-    </form>
+    </section>
 
     <section v-if="!isLong && randomArticles.length" class="card random-card">
       <div class="module-header">
@@ -1357,17 +1354,6 @@ h1 {
 }
 .cancel-reply {
   color: var(--fp-accent);
-}
-.composer-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 10px;
-}
-.composer-submit-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 .card.load-error {
   max-width: 1060px;
