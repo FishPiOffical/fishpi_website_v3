@@ -44,6 +44,9 @@ import FpLoading from '@/components/FpLoading.vue'
 import ArticleSkeleton from '@/components/ArticleSkeleton.vue'
 import CommentItem from '@/components/CommentItem.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
+import LongArticleReader from '@/components/articles/LongArticleReader.vue'
+import { useLayoutStore } from '@/stores/layout'
+import { createReusableTemplate } from '@/utils/reusableTemplate'
 import { readCache, writeCache } from '@/utils/swr'
 
 const route = useRoute()
@@ -191,6 +194,11 @@ const statementLabel = computed(() => STATEMENT_LABELS[Number(article.value?.art
 
 const randomArticles = ref<ArticleSummary[]>([])
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
+const readerRef = ref<InstanceType<typeof LongArticleReader> | null>(null)
+const [DefineReward, ReuseReward] = createReusableTemplate()
+const [DefineRevisions, ReuseRevisions] = createReusableTemplate()
+const [DefineComments, ReuseComments] = createReusableTemplate()
+const [DefineComposer, ReuseComposer] = createReusableTemplate()
 const shareCopied = ref(false)
 const shareUrl = computed(() => {
   const base = absoluteUrl(`/article/${id.value}`)
@@ -217,7 +225,8 @@ async function copyShare() {
 
 function gotoCommentPage(page: number) {
   commentPage.value = page
-  document.getElementById('articleCommentsPanel')?.scrollIntoView({ block: 'start' })
+  if (isLong.value) readerRef.value?.scrollCommentsTop()
+  else document.getElementById('articleCommentsPanel')?.scrollIntoView({ block: 'start' })
 }
 
 async function loadRandom() {
@@ -389,7 +398,14 @@ async function load() {
   }
 }
 
-onUnmounted(() => disconnectHeat())
+const layout = useLayoutStore()
+if (!import.meta.env.SSR) {
+  watch(isLong, (v) => (layout.immersive = v), { immediate: true })
+}
+onUnmounted(() => {
+  disconnectHeat()
+  layout.immersive = false
+})
 
 watch(
   () => id.value,
@@ -563,6 +579,11 @@ function parentAuthor(c: ArticleComment) {
 
 function startReply(c: ArticleComment) {
   replyId.value = c.oId
+  if (isLong.value) {
+    readerRef.value?.openComposer()
+    void nextTick(() => composerRef.value?.reveal())
+    return
+  }
   if (composerRef.value) composerRef.value.reveal()
   else document.querySelector('.composer-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
@@ -628,78 +649,8 @@ async function onReactComment(c: ArticleComment, value: string) {
       后可查看需要权限的帖子。
     </p>
   </article>
-  <div v-else-if="article" class="wrap" :class="{ 'has-toc': hasToc }">
-    <aside v-if="toc.length" class="toc">
-      <b>目录</b>
-      <a
-        v-for="item in toc"
-        :key="item.id"
-        :class="'lv' + item.level"
-        href="#"
-        @click.prevent="jumpToc(item.id)"
-      >{{ item.text }}</a>
-    </aside>
-    <article class="card post">
-      <div class="article-title-row">
-        <span v-if="article.articlePerfect" class="icon-perfect" title="优选">🌟</span>
-        <h1>{{ articleTitle(article) }}</h1>
-      </div>
-
-      <div v-if="typeBadge || Number(article.articleStickRemains) > 0 || column" class="badges">
-        <span v-if="typeBadge" class="badge">{{ typeBadge }}</span>
-        <span v-if="isQnA && Number(article.articleQnAOfferPoint) > 0" class="badge offer">
-          {{ article.offered ? '已采纳' : `悬赏 ${article.articleQnAOfferPoint} 积分` }}
-        </span>
-        <span v-if="Number(article.articleStickRemains) > 0" class="badge stick">
-          📌 置顶中 · 剩余 {{ article.articleStickRemains }} 分钟
-        </span>
-        <RouterLink v-if="column" :to="`/column/${column.column.oId}`" class="badge column-link">
-          《{{ column.column.columnTitle }}》第 {{ column.chapterNo }} 章 / 共 {{ column.chapters.length }} 章
-        </RouterLink>
-      </div>
-
-      <div class="meta">
-        <RouterLink
-          v-if="article.articleAuthorName"
-          :to="`/member/${article.articleAuthorName}`"
-          class="meta-author"
-        >
-          <span
-            class="avatar-small"
-            :style="article.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${article.articleAuthorThumbnailURL48}')` } : undefined"
-          />
-          <b>{{ article.articleAuthorName }}</b>
-        </RouterLink>
-        <span v-else class="meta-author">匿名用户</span>
-        <span>•</span>
-        <time>{{ article.articleCreateTimeStr || article.timeAgo }}</time>
-        <span>•</span>
-        <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
-        <span>•</span>
-        <span>{{ commentTotal }} 评论</span>
-        <span v-if="heat">（{{ heat }} 在看）</span>
-      </div>
-
-      <div v-if="tagList.length" class="tags">
-        <RouterLink v-for="t in tagList" :key="t" :to="`/tags/${encodeURIComponent(t)}`" class="tag-pill">
-          # {{ t }}
-        </RouterLink>
-      </div>
-
-      <div v-if="metals.length" class="article-metals">
-        <MetalBadges :items="metals" />
-      </div>
-
-      <p v-if="String(article.oId).startsWith('mock-')" class="hint">
-        匿名详情接口未开放，当前为 mock 正文。
-      </p>
-
-      <p v-if="statementLabel" class="statement">创作声明：{{ statementLabel }}</p>
-
-      <audio v-if="article.articleAudioURL" class="article-audio" :src="article.articleAudioURL" controls preload="none" />
-
-      <div ref="bodyEl" class="body" @click="onContentClick" v-html="article.articleContent || ''" />
-
+  <template v-else-if="article">
+    <DefineReward>
       <section v-if="Number(article.articleRewardPoint) > 0" class="reward-box" :class="{ unlocked: article.rewarded }">
         <header class="reward-head">
           <span class="reward-title">🎁 打赏区</span>
@@ -724,45 +675,8 @@ async function onReactComment(c: ArticleComment, value: string) {
           <p v-if="rewardError" class="err-tip">{{ rewardError }}</p>
         </div>
       </section>
-
-      <nav v-if="column && (column.previous || column.next)" class="chapter-nav">
-        <RouterLink v-if="column.previous" :to="column.previous.articlePermalink" class="chapter-link">
-          ← 第 {{ column.previous.chapterNo }} 章 {{ articleTitle(column.previous) }}
-        </RouterLink>
-        <span v-else />
-        <RouterLink v-if="column.next" :to="column.next.articlePermalink" class="chapter-link next">
-          第 {{ column.next.chapterNo }} 章 {{ articleTitle(column.next) }} →
-        </RouterLink>
-      </nav>
-
-      <!-- 文章底部互动操作栏 -->
-      <div class="article-tail-bar">
-        <div v-if="isLoggedIn" class="actions">
-          <button type="button" class="btn small" @click="vote">👍 点赞</button>
-          <button type="button" class="btn small" :disabled="article.thanked" @click="thank">
-            {{ article.thanked ? '❤️ 已感谢' : '❤️ 感谢' }}
-          </button>
-          <button type="button" class="btn small" @click="toggleCollect">
-            {{ article.isFollowing ? '★ 取消收藏' : '☆ 收藏' }}
-          </button>
-          <button type="button" class="btn small" @click="toggleWatch">
-            {{ article.isWatching ? '取消关注' : '+ 关注帖子' }}
-          </button>
-          <RouterLink v-if="canEdit" class="btn small edit-btn" :to="`/post/${article.oId}`">编辑</RouterLink>
-          <button v-if="Number(article.articleRevisionCount ?? 2) > 1" type="button" class="btn small" @click="toggleRevisions">
-            {{ showRevisions ? '收起历史' : '修订历史' }}
-          </button>
-          <ReportDialog :api-key="apiKey" :data-id="article.oId" :data-type="0" />
-        </div>
-        <div class="share-row">
-          <span class="share-label">分享</span>
-          <button type="button" class="btn-text" @click="copyShare">{{ shareCopied ? '✅ 已复制' : '🔗 复制链接' }}</button>
-          <a class="btn-text" :href="weiboShareUrl" target="_blank" rel="noopener noreferrer">微博</a>
-          <a class="btn-text" :href="twitterShareUrl" target="_blank" rel="noopener noreferrer">Twitter</a>
-        </div>
-        <p v-if="actionMsg" class="action-alert">{{ actionMsg }}</p>
-      </div>
-
+    </DefineReward>
+    <DefineRevisions>
       <!-- 修订历史展开卡片 -->
       <section v-if="showRevisions" class="revisions">
         <h3>修订历史</h3>
@@ -789,59 +703,8 @@ async function onReactComment(c: ArticleComment, value: string) {
           <div v-else class="body" v-html="revisionHtml" />
         </div>
       </section>
-
-      <!-- 表情回应栏 -->
-      <div class="reaction-wrap">
-        <ReactionBar
-          :summary="article.reactionSummary"
-          :current="article.currentUserReaction"
-          :disabled="!isLoggedIn"
-          @toggle="onReactArticle"
-        />
-      </div>
-
-      <!-- 作者信息卡片 (对齐现网 Rhythm .article__meta) -->
-      <div v-if="article.articleAuthorName" class="author-summary-card">
-        <RouterLink :to="`/member/${article.articleAuthorName}`" class="summary-avatar-link">
-          <span
-            class="summary-avatar"
-            :style="article.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${article.articleAuthorThumbnailURL48}')` } : undefined"
-          />
-        </RouterLink>
-        <div class="summary-meta">
-          <div class="summary-name-row">
-            <RouterLink :to="`/member/${article.articleAuthorName}`" class="summary-name">
-              {{ article.articleAuthorName }}
-            </RouterLink>
-            <span v-if="article.articleCity" class="summary-city">
-              📍 {{ article.articleCity }}
-            </span>
-          </div>
-          <div class="summary-counts">
-            <span>获赞 {{ article.articleGoodCnt ?? 0 }}</span>
-            <span>•</span>
-            <span>被收藏 {{ article.articleCollectCnt ?? 0 }}</span>
-            <span>•</span>
-            <span>回帖 {{ commentTotal }}</span>
-          </div>
-        </div>
-      </div>
-    </article>
-
-    <section v-if="nice.length" class="card nice-comments-card">
-      <div class="module-header">
-        <span><b>✨ 优质回帖</b></span>
-      </div>
-      <div class="comments-list">
-        <CommentItem v-for="c in nice" :key="'n' + c.oId" class="cmt-root" :comment="c" readonly />
-      </div>
-    </section>
-
-    <section id="articleCommentsPanel" class="card comments-card">
-      <div class="module-header comments-header">
-        <span><b>💬 全部回帖 ({{ commentTotal }})</b></span>
-      </div>
-
+    </DefineRevisions>
+    <DefineComments>
       <div class="comments-list">
         <CommentItem
           v-for="t in threads"
@@ -888,13 +751,8 @@ async function onReactComment(c: ArticleComment, value: string) {
         <span class="pager-info">{{ commentPage }} / {{ commentPages }}</span>
         <button type="button" class="btn small" :disabled="commentPage >= commentPages" @click="gotoCommentPage(commentPage + 1)">下一页</button>
       </footer>
-    </section>
-
-    <!-- 底部发表回帖区域 -->
-    <section class="card composer-card">
-      <div class="module-header">
-        <span><b>参与讨论</b></span>
-      </div>
+    </DefineComments>
+    <DefineComposer>
       <div class="composer-inner">
         <p v-if="article.articleCommentable === false" class="hint-login">作者已关闭回帖。</p>
         <template v-else-if="isLoggedIn">
@@ -922,25 +780,227 @@ async function onReactComment(c: ArticleComment, value: string) {
           后即可参与讨论。
         </p>
       </div>
-    </section>
+    </DefineComposer>
+    <LongArticleReader
+      v-if="isLong"
+      ref="readerRef"
+      :article="article"
+      :column="column"
+      :comment-total="commentTotal"
+      :logged-in="isLoggedIn"
+      :can-edit="canEdit"
+      :api-key="apiKey"
+      :statement="statementLabel"
+      :action-msg="actionMsg"
+      @vote="vote"
+      @thank="thank"
+      @collect="toggleCollect"
+      @watch="toggleWatch"
+      @revisions="toggleRevisions"
+      @react="onReactArticle"
+      @content-click="onContentClick"
+      @reply="replyId = ''"
+    >
+      <template #reward><ReuseReward /></template>
+      <template #extra><ReuseRevisions /></template>
+      <template #comments><ReuseComments /></template>
+      <template #composer><ReuseComposer /></template>
+    </LongArticleReader>
+    <div v-else class="wrap" :class="{ 'has-toc': hasToc }">
+      <aside v-if="toc.length" class="toc">
+        <b>目录</b>
+        <a
+          v-for="item in toc"
+          :key="item.id"
+          :class="'lv' + item.level"
+          href="#"
+          @click.prevent="jumpToc(item.id)"
+        >{{ item.text }}</a>
+      </aside>
+      <article class="card post">
+        <div class="article-title-row">
+          <span v-if="article.articlePerfect" class="icon-perfect" title="优选">🌟</span>
+          <h1>{{ articleTitle(article) }}</h1>
+        </div>
 
-    <section v-if="!isLong && randomArticles.length" class="card random-card">
-      <div class="module-header">
-        <span><b>随便看看</b></span>
-        <button type="button" class="btn-text" @click="loadRandom">换一批</button>
-      </div>
-      <ul class="random-list">
-        <li v-for="a in randomArticles" :key="a.oId">
-          <span
-            class="avatar-mini"
-            :style="a.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${a.articleAuthorThumbnailURL48}')` } : undefined"
+        <div v-if="typeBadge || Number(article.articleStickRemains) > 0 || column" class="badges">
+          <span v-if="typeBadge" class="badge">{{ typeBadge }}</span>
+          <span v-if="isQnA && Number(article.articleQnAOfferPoint) > 0" class="badge offer">
+            {{ article.offered ? '已采纳' : `悬赏 ${article.articleQnAOfferPoint} 积分` }}
+          </span>
+          <span v-if="Number(article.articleStickRemains) > 0" class="badge stick">
+            📌 置顶中 · 剩余 {{ article.articleStickRemains }} 分钟
+          </span>
+          <RouterLink v-if="column" :to="`/column/${column.column.oId}`" class="badge column-link">
+            《{{ column.column.columnTitle }}》第 {{ column.chapterNo }} 章 / 共 {{ column.chapters.length }} 章
+          </RouterLink>
+        </div>
+
+        <div class="meta">
+          <RouterLink
+            v-if="article.articleAuthorName"
+            :to="`/member/${article.articleAuthorName}`"
+            class="meta-author"
+          >
+            <span
+              class="avatar-small"
+              :style="article.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${article.articleAuthorThumbnailURL48}')` } : undefined"
+            />
+            <b>{{ article.articleAuthorName }}</b>
+          </RouterLink>
+          <span v-else class="meta-author">匿名用户</span>
+          <span>•</span>
+          <time>{{ article.articleCreateTimeStr || article.timeAgo }}</time>
+          <span>•</span>
+          <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
+          <span>•</span>
+          <span>{{ commentTotal }} 评论</span>
+          <span v-if="heat">（{{ heat }} 在看）</span>
+        </div>
+
+        <div v-if="tagList.length" class="tags">
+          <RouterLink v-for="t in tagList" :key="t" :to="`/tags/${encodeURIComponent(t)}`" class="tag-pill">
+            # {{ t }}
+          </RouterLink>
+        </div>
+
+        <div v-if="metals.length" class="article-metals">
+          <MetalBadges :items="metals" />
+        </div>
+
+        <p v-if="String(article.oId).startsWith('mock-')" class="hint">
+          匿名详情接口未开放，当前为 mock 正文。
+        </p>
+
+        <p v-if="statementLabel" class="statement">创作声明：{{ statementLabel }}</p>
+
+        <audio v-if="article.articleAudioURL" class="article-audio" :src="article.articleAudioURL" controls preload="none" />
+
+        <div ref="bodyEl" class="body" @click="onContentClick" v-html="article.articleContent || ''" />
+
+        <ReuseReward />
+
+        <nav v-if="column && (column.previous || column.next)" class="chapter-nav">
+          <RouterLink v-if="column.previous" :to="column.previous.articlePermalink" class="chapter-link">
+            ← 第 {{ column.previous.chapterNo }} 章 {{ articleTitle(column.previous) }}
+          </RouterLink>
+          <span v-else />
+          <RouterLink v-if="column.next" :to="column.next.articlePermalink" class="chapter-link next">
+            第 {{ column.next.chapterNo }} 章 {{ articleTitle(column.next) }} →
+          </RouterLink>
+        </nav>
+
+        <!-- 文章底部互动操作栏 -->
+        <div class="article-tail-bar">
+          <div v-if="isLoggedIn" class="actions">
+            <button type="button" class="btn small" @click="vote">👍 点赞</button>
+            <button type="button" class="btn small" :disabled="article.thanked" @click="thank">
+              {{ article.thanked ? '❤️ 已感谢' : '❤️ 感谢' }}
+            </button>
+            <button type="button" class="btn small" @click="toggleCollect">
+              {{ article.isFollowing ? '★ 取消收藏' : '☆ 收藏' }}
+            </button>
+            <button type="button" class="btn small" @click="toggleWatch">
+              {{ article.isWatching ? '取消关注' : '+ 关注帖子' }}
+            </button>
+            <RouterLink v-if="canEdit" class="btn small edit-btn" :to="`/post/${article.oId}`">编辑</RouterLink>
+            <button v-if="Number(article.articleRevisionCount ?? 2) > 1" type="button" class="btn small" @click="toggleRevisions">
+              {{ showRevisions ? '收起历史' : '修订历史' }}
+            </button>
+            <ReportDialog :api-key="apiKey" :data-id="article.oId" :data-type="0" />
+          </div>
+          <div class="share-row">
+            <span class="share-label">分享</span>
+            <button type="button" class="btn-text" @click="copyShare">{{ shareCopied ? '✅ 已复制' : '🔗 复制链接' }}</button>
+            <a class="btn-text" :href="weiboShareUrl" target="_blank" rel="noopener noreferrer">微博</a>
+            <a class="btn-text" :href="twitterShareUrl" target="_blank" rel="noopener noreferrer">Twitter</a>
+          </div>
+          <p v-if="actionMsg" class="action-alert">{{ actionMsg }}</p>
+        </div>
+
+        <ReuseRevisions />
+
+        <!-- 表情回应栏 -->
+        <div class="reaction-wrap">
+          <ReactionBar
+            :summary="article.reactionSummary"
+            :current="article.currentUserReaction"
+            :disabled="!isLoggedIn"
+            @toggle="onReactArticle"
           />
-          <RouterLink :to="`/article/${a.oId}`">{{ articleTitle(a) }}</RouterLink>
-        </li>
-      </ul>
-    </section>
+        </div>
+
+        <!-- 作者信息卡片 (对齐现网 Rhythm .article__meta) -->
+        <div v-if="article.articleAuthorName" class="author-summary-card">
+          <RouterLink :to="`/member/${article.articleAuthorName}`" class="summary-avatar-link">
+            <span
+              class="summary-avatar"
+              :style="article.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${article.articleAuthorThumbnailURL48}')` } : undefined"
+            />
+          </RouterLink>
+          <div class="summary-meta">
+            <div class="summary-name-row">
+              <RouterLink :to="`/member/${article.articleAuthorName}`" class="summary-name">
+                {{ article.articleAuthorName }}
+              </RouterLink>
+              <span v-if="article.articleCity" class="summary-city">
+                📍 {{ article.articleCity }}
+              </span>
+            </div>
+            <div class="summary-counts">
+              <span>获赞 {{ article.articleGoodCnt ?? 0 }}</span>
+              <span>•</span>
+              <span>被收藏 {{ article.articleCollectCnt ?? 0 }}</span>
+              <span>•</span>
+              <span>回帖 {{ commentTotal }}</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <section v-if="nice.length" class="card nice-comments-card">
+        <div class="module-header">
+          <span><b>✨ 优质回帖</b></span>
+        </div>
+        <div class="comments-list">
+          <CommentItem v-for="c in nice" :key="'n' + c.oId" class="cmt-root" :comment="c" readonly />
+        </div>
+      </section>
+
+      <section id="articleCommentsPanel" class="card comments-card">
+        <div class="module-header comments-header">
+          <span><b>💬 全部回帖 ({{ commentTotal }})</b></span>
+        </div>
+
+        <ReuseComments />
+      </section>
+
+      <!-- 底部发表回帖区域 -->
+      <section class="card composer-card">
+        <div class="module-header">
+          <span><b>参与讨论</b></span>
+        </div>
+        <ReuseComposer />
+      </section>
+
+      <section v-if="!isLong && randomArticles.length" class="card random-card">
+        <div class="module-header">
+          <span><b>随便看看</b></span>
+          <button type="button" class="btn-text" @click="loadRandom">换一批</button>
+        </div>
+        <ul class="random-list">
+          <li v-for="a in randomArticles" :key="a.oId">
+            <span
+              class="avatar-mini"
+              :style="a.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${a.articleAuthorThumbnailURL48}')` } : undefined"
+            />
+            <RouterLink :to="`/article/${a.oId}`">{{ articleTitle(a) }}</RouterLink>
+          </li>
+        </ul>
+      </section>
+    </div>
     <ImageLightbox v-model="zoomed" />
-  </div>
+  </template>
 </template>
 
 <style scoped>

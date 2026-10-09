@@ -297,7 +297,10 @@ export interface ArticleDetail extends ArticleSummary {
   articleStatement?: number
   rewardedCnt?: number
   sysMetal?: MetalItem[]
-  articleAuthor?: { sysMetal?: MetalItem[]; userName?: string }
+  articleAuthor?: { sysMetal?: MetalItem[]; userName?: string; userNickname?: string }
+  thankedCnt?: number
+  /** 0 已赞同，1 已反对，-1 未投票 */
+  articleVote?: number
   articleType?: number
   articleHeat?: number
   articleAudioURL?: string
@@ -310,6 +313,13 @@ export interface ArticleDetail extends ArticleSummary {
   currentUserReaction?: string
   /** 长文章所属专栏（接口 data 层字段，前端合并进来） */
   longArticleColumnView?: LongArticleColumnView
+  /** 长文阅读激励统计 */
+  longArticleReadStat?: {
+    registeredUnsettledCnt?: number
+    anonymousUnsettledCnt?: number
+    registeredTotalCnt?: number
+    anonymousTotalCnt?: number
+  }
 }
 
 export interface LongArticleChapter {
