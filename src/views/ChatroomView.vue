@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import type { ChatNodeOption } from '@/api/fishpi'
 import FpLoading from '@/components/FpLoading.vue'
+import FpDialog from '@/components/FpDialog.vue'
 
 const auth = useAuthStore()
 const chat = useChatStore()
@@ -678,65 +679,47 @@ function clearScreen() {
 
     <!-- ==================== 浮层与弹窗 ==================== -->
     <!-- 大区节点选择弹层 -->
-    <div v-if="showNodes && isLoggedIn" class="node-panel-dialog">
-      <div class="node-panel-card">
-        <div class="node-panel-head">
-          <strong>切换聊天室大区节点</strong>
-          <button type="button" class="close-btn" @click="showNodes = false">✕</button>
-        </div>
-        <div class="node-grid">
-          <button
-            v-for="opt in nodeOptions"
-            :key="opt.node + opt.name"
-            type="button"
-            class="node-opt"
-            :class="{ current: opt.name === nodeName }"
-            @click="pickNode(opt)"
-          >
-            <span class="opt-name">{{ opt.name }}</span>
-            <em v-if="opt.online != null">{{ opt.online }} 人</em>
-          </button>
-        </div>
+    <FpDialog :open="showNodes && isLoggedIn" title="切换聊天室大区节点" :width="520" @close="showNodes = false">
+      <div class="node-grid">
+        <button
+          v-for="opt in nodeOptions"
+          :key="opt.node + opt.name"
+          type="button"
+          class="node-opt"
+          :class="{ current: opt.name === nodeName }"
+          @click="pickNode(opt)"
+        >
+          <span class="opt-name">{{ opt.name }}</span>
+          <em v-if="opt.online != null">{{ opt.online }} 人</em>
+        </button>
       </div>
-    </div>
+    </FpDialog>
 
     <!-- Markdown 原文弹窗 -->
-    <div v-if="rawText || rawLoading" class="overlay-card">
-      <div class="card-head">
-        <strong>Markdown 原文</strong>
-        <button type="button" class="close-btn" @click="rawText = ''">✕</button>
-      </div>
+    <FpDialog :open="!!rawText || rawLoading" title="Markdown 原文" :width="560" @close="rawText = ''">
       <FpLoading v-if="rawLoading" small />
       <pre v-else class="raw-pre">{{ rawText }}</pre>
-    </div>
+    </FpDialog>
 
     <!-- 红包明细弹窗 -->
-    <div v-if="packetDetail" class="overlay-card">
-      <div class="card-head">
-        <strong>{{ packetDetail.msg || '红包领取明细' }}</strong>
-        <button type="button" class="close-btn" @click="chat.closePacketDetail()">✕</button>
-      </div>
-      <ul class="packet-detail-list">
+    <FpDialog :open="!!packetDetail" :title="packetDetail?.msg || '红包领取明细'" @close="chat.closePacketDetail()">
+      <ul v-if="packetDetail" class="packet-detail-list">
         <li v-for="(r, i) in packetDetail.recivers" :key="i">
           <span class="user">{{ r.userName }}</span>
           <span class="money">{{ r.money }} 积分</span>
         </li>
       </ul>
-    </div>
+    </FpDialog>
 
     <!-- 猜拳参与弹窗 -->
-    <div v-if="pendingGesture" class="overlay-card gesture-card">
-      <div class="card-head">
-        <strong>参与猜拳抢红包</strong>
-        <button type="button" class="close-btn" @click="pendingGesture = null">✕</button>
-      </div>
+    <FpDialog :open="!!pendingGesture" title="参与猜拳抢红包" :width="380" @close="pendingGesture = null">
       <p class="gesture-tip">请选择出拳手势（赢者瓜分积分）：</p>
       <div class="gesture-choices">
         <button type="button" class="gesture-btn" @click="playGesture(0)">✊ 石头</button>
         <button type="button" class="gesture-btn" @click="playGesture(1)">✌️ 剪刀</button>
         <button type="button" class="gesture-btn" @click="playGesture(2)">✋ 布</button>
       </div>
-    </div>
+    </FpDialog>
   </div>
 </template>
 
@@ -1409,34 +1392,8 @@ function clearScreen() {
 /* =========================================================
    弹窗与浮层
    ========================================================= */
-.node-panel-dialog {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
 
-.node-panel-card {
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 10px;
-  padding: 18px 22px;
-  width: 90%;
-  max-width: 520px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-}
 
-.node-panel-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
-  font-size: 14px;
-  color: var(--fp-title);
-}
 
 .node-grid {
   display: grid;
@@ -1474,47 +1431,18 @@ function clearScreen() {
   color: var(--fp-muted);
 }
 
-.overlay-card {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
-  padding: 18px;
-  z-index: 1001;
-  width: 90%;
-  max-width: 480px;
-}
 
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  color: var(--fp-title);
-}
 
-.close-btn {
-  border: 0;
-  background: transparent;
-  color: var(--fp-muted);
-  font-size: 16px;
-  cursor: pointer;
-}
 
-.close-btn:hover {
-  color: #e74c3c;
-}
 
 .raw-pre {
+  margin: 0;
   background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
   padding: 10px;
   border-radius: 6px;
   font-size: 12px;
-  max-height: 260px;
+  max-height: 50vh;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
@@ -1537,7 +1465,7 @@ function clearScreen() {
 }
 
 .packet-detail-list .money {
-  color: #e74c3c;
+  color: var(--fp-accent);
   font-weight: 600;
 }
 
@@ -1548,10 +1476,17 @@ function clearScreen() {
   margin-top: 14px;
 }
 
+.gesture-tip {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fp-muted);
+}
+
 .gesture-btn {
   padding: 10px 18px;
   font-size: 15px;
-  background: var(--fp-hover);
+  background: var(--fp-bg);
+  color: var(--fp-text);
   border: 1px solid var(--fp-border);
   border-radius: 8px;
   cursor: pointer;
@@ -1559,7 +1494,7 @@ function clearScreen() {
 }
 
 .gesture-btn:hover {
-  border-color: var(--fp-accent);
+  border-color: var(--fp-primary);
   transform: scale(1.05);
 }
 

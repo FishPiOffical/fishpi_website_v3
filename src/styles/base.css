@@ -64,6 +64,83 @@ a {
   color: var(--fp-link);
 }
 
+/* 弹窗等通用控件，配合 FpDialog 使用 */
+.fp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fp-text);
+  font-size: 13px;
+  line-height: 1.5;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+.fp-btn:hover {
+  border-color: var(--fp-primary);
+  color: var(--fp-primary);
+}
+.fp-btn--primary {
+  border-color: var(--fp-primary);
+  background: var(--fp-primary);
+  color: #fff;
+}
+.fp-btn--primary:hover {
+  color: #fff;
+  filter: brightness(1.08);
+}
+.fp-btn--danger {
+  border-color: var(--fp-accent);
+  background: var(--fp-accent);
+  color: #fff;
+}
+.fp-btn--danger:hover {
+  color: #fff;
+  border-color: var(--fp-accent);
+  filter: brightness(1.08);
+}
+.fp-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.fp-field {
+  display: block;
+  margin-bottom: 14px;
+}
+.fp-field > span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--fp-muted);
+}
+.fp-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
+  background: var(--fp-bg);
+  color: var(--fp-text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.fp-input:focus {
+  border-color: var(--fp-primary);
+}
+textarea.fp-input {
+  resize: vertical;
+}
+
 .fp-avatar-frame {
   position: relative;
   display: inline-flex;

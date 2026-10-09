@@ -3,6 +3,7 @@ import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { validateRiskCaptcha } from '@/api/fishpi'
 import { useGeetest4 } from '@/composables/useGeetest4'
 import { registerRiskCaptchaOpener } from '@/utils/riskCaptcha'
+import FpDialog from '@/components/FpDialog.vue'
 
 const open = ref(false)
 const tip = ref('')
@@ -82,69 +83,29 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Teleport v-if="open" to="body">
-    <div class="risk-mask" @click.self="dismiss">
-      <div class="risk-box" role="dialog" aria-modal="true" aria-labelledby="risk-title">
-        <header>
-          <strong id="risk-title">安全验证</strong>
-          <button type="button" class="x" aria-label="关闭" @click="dismiss">×</button>
-        </header>
-        <p class="tip">{{ tip }}</p>
-        <div ref="captchaEl" class="captcha" />
-        <p v-if="gtError" class="err">{{ gtError }}</p>
-        <p v-if="busy" class="hint">请稍候…</p>
-      </div>
-    </div>
-  </Teleport>
+  <FpDialog :open="open" title="安全验证" :width="380" layer="top" @close="dismiss">
+    <p class="tip">{{ tip }}</p>
+    <div ref="captchaEl" class="captcha" />
+    <p v-if="gtError" class="err">{{ gtError }}</p>
+    <p v-if="busy" class="tip wait">请稍候…</p>
+  </FpDialog>
 </template>
 
 <style scoped>
-.risk-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.55);
-}
-.risk-box {
-  width: min(380px, 100%);
-  padding: 18px 18px 16px;
-  border-radius: 12px;
-  border: 1px solid var(--fp-border);
-  background: var(--fp-card);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
-}
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  color: var(--fp-title);
-}
-.x {
-  border: 0;
-  background: transparent;
-  color: var(--fp-muted);
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
-}
-.tip,
-.hint {
-  margin: 0 0 10px;
+.tip {
+  margin: 0 0 12px;
   font-size: 13px;
   color: var(--fp-muted);
-  line-height: 1.5;
+}
+.tip.wait {
+  margin: 10px 0 0;
 }
 .captcha {
   min-height: 44px;
 }
 .err {
   margin: 8px 0 0;
-  color: #e07a5f;
   font-size: 13px;
+  color: var(--fp-accent);
 }
 </style>
