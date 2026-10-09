@@ -57,6 +57,9 @@ export default defineConfig(({ mode }) => {
         '/chat-room': { ...proxy, ws: true },
         '/chat-room-channel': { ...proxy, ws: true },
         '/captcha': proxy,
+        // Rhythm 风控人机验证页与校验接口（IP 黑名单时接口会 302 → /test）
+        '/test': proxy,
+        '/validateCaptcha': proxy,
         '/comment': proxy,
         '/verify': proxy,
         '/register2': proxy,

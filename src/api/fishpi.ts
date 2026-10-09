@@ -427,6 +427,15 @@ export async function login(username: string, passwd: string, mfaCode = '') {
   return res.Key
 }
 
+/** 通过极验结果解除 Rhythm IP 风控黑名单（对应现网 /validateCaptcha） */
+export async function validateRiskCaptcha(captcha: unknown) {
+  const res = await request<Envelope<unknown>>('/validateCaptcha', {
+    method: 'POST',
+    body: JSON.stringify({ captcha }),
+  })
+  if (res.code) throw new Error(res.msg || '人机验证失败，请重试')
+}
+
 export async function fetchAccount(apiKey: string) {
   const res = await request<Envelope<AccountInfo & { userTag?: string; mbti?: string }>>(withKey('/api/user', apiKey))
   if (res.code !== 0 || !res.data) throw new Error(res.msg || '密钥无效')

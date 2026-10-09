@@ -3,10 +3,17 @@ export const FISHPI_UA =
 
 export class ApiError extends Error {
   status: number
-  constructor(message: string, status = 0) {
+  /** captcha：Rhythm 风控要求人机验证（302 → /test） */
+  code?: string
+  constructor(message: string, status = 0, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
+}
+
+export function isCaptchaRequired(e: unknown) {
+  return e instanceof ApiError && e.code === 'captcha'
 }
 
 function apiBase() {
@@ -47,6 +54,16 @@ export async function request<T = unknown>(
     credentials: init.credentials ?? 'include',
     headers,
   })
+
+  // Rhythm BeforeRequestHandler：IP 进入验证码黑名单时 302 → /test
+  try {
+    const pathname = new URL(res.url).pathname
+    if (/^\/test\/?$/.test(pathname)) {
+      throw new ApiError('访问过于频繁，请完成人机验证后再试', 302, 'captcha')
+    }
+  } catch (e) {
+    if (e instanceof ApiError) throw e
+  }
 
   const text = await res.text()
   const looksJson = isJsonContentType(res.headers.get('content-type')) || text.startsWith('{') || text.startsWith('[')
