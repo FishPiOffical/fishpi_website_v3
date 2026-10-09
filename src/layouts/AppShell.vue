@@ -10,6 +10,11 @@ import { useChatStore } from '@/stores/chat'
 import AdSlot from '@/components/ads/AdSlot.vue'
 import LogoMark from '@/components/LogoMark.vue'
 import RiskCaptchaGate from '@/components/RiskCaptchaGate.vue'
+import SystemAlertDialog from '@/components/SystemAlertDialog.vue'
+import WarnBroadcastDialog from '@/components/WarnBroadcastDialog.vue'
+import CountWidget from '@/components/CountWidget.vue'
+import { useCountStore } from '@/stores/count'
+import { useLayoutStore } from '@/stores/layout'
 import { openRhythmPage } from '@/api/pageAuth'
 
 const nav = [
@@ -102,6 +107,8 @@ const appearance = useAppearanceStore()
 const notices = useNoticeStore()
 const whispers = useWhisperStore()
 const chat = useChatStore()
+const countStore = useCountStore()
+const { immersive } = storeToRefs(useLayoutStore())
 const { isLoggedIn, account, isVip } = storeToRefs(auth)
 const { total: unreadTotal } = storeToRefs(notices)
 const { unreadTotal: whisperUnread } = storeToRefs(whispers)
@@ -163,6 +170,11 @@ function logout() {
   if (route.meta.auth) router.push('/')
 }
 
+function openCountSettings() {
+  menuOpen.value = false
+  countStore.settingsOpen = true
+}
+
 function toggleMenu(e: Event) {
   e.stopPropagation()
   menuOpen.value = !menuOpen.value
@@ -200,7 +212,7 @@ onUnmounted(() => {
       </RouterLink>
       <button type="button" class="dismiss" aria-label="关闭" @click="apiOffline = false">×</button>
     </div>
-    <header class="nav">
+    <header v-if="!immersive" class="nav">
       <RouterLink to="/" class="logo" aria-label="摸鱼派">
         <LogoMark />
       </RouterLink>
@@ -269,6 +281,7 @@ onUnmounted(() => {
                 <span>{{ item.label }}</span>
                 <em v-if="item.hint">{{ item.hint }}</em>
               </RouterLink>
+              <button type="button" class="menu-btn" role="menuitem" @click="openCountSettings">⏰ 下班倒计时</button>
               <button type="button" class="logout" role="menuitem" @click="logout">退出登录</button>
             </div>
           </div>
@@ -280,17 +293,13 @@ onUnmounted(() => {
         <button type="button" class="theme" title="切换颜色模式" @click="appearance.toggleTheme()">◐</button>
       </div>
     </header>
-    <div class="income" aria-label="今日收入">
-      <span>🎉</span>
-      <div class="count-time">今日收入</div>
-      <b>￥365</b>
-    </div>
-    <AdSlot slot-key="home.top" />
-    <main :class="{ 'main--cr-modern': isModernChat }">
+    <CountWidget />
+    <AdSlot v-if="!immersive" slot-key="home.top" />
+    <main :class="{ 'main--cr-modern': isModernChat, 'main--immersive': immersive }">
       <div v-if="ssrAuthShell" class="auth-shell" />
       <RouterView v-else />
     </main>
-    <footer v-if="!isModernChat" class="foot">
+    <footer v-if="!isModernChat && !immersive" class="foot">
       <div class="foot-inner">
         <p class="slogan">摸鱼派 - 鱼油专属摸鱼社区</p>
         <div class="foot-main">
@@ -377,6 +386,8 @@ onUnmounted(() => {
       </div>
     </footer>
     <RiskCaptchaGate />
+    <SystemAlertDialog />
+    <WarnBroadcastDialog />
   </div>
 </template>
 
@@ -593,6 +604,7 @@ nav a:hover {
   font-weight: 600;
 }
 .menu a,
+.menu-btn,
 .logout {
   display: flex;
   justify-content: space-between;
@@ -606,10 +618,12 @@ nav a:hover {
   background: transparent;
   border: 0;
   text-align: left;
+  font-family: inherit;
   cursor: pointer;
   box-sizing: border-box;
 }
 .menu a:hover,
+.menu-btn:hover,
 .logout:hover {
   background: var(--fp-hover);
   color: var(--fp-accent);
@@ -633,35 +647,14 @@ nav a:hover {
   color: var(--fp-nav-text);
   cursor: pointer;
 }
-.income {
-  position: fixed;
-  top: 70px;
-  right: 20px;
-  z-index: 20;
-  width: 110px;
-  text-align: center;
-  background: var(--fp-income-bg);
-  box-shadow: var(--fp-income-shadow);
-  border-radius: 16px;
-  padding: 8px 0 10px;
-  font-size: 12px;
-  color: var(--fp-text);
-}
-@media (max-width: 1400px) {
-  .income {
-    display: none;
-  }
-}
-.income b {
-  display: block;
-  color: var(--fp-income);
-  font-size: 22px;
-  margin-top: 2px;
-}
 main {
   max-width: var(--fp-wrap);
   margin: 0 auto;
   padding: 25px 15px 20px;
+}
+main.main--immersive {
+  max-width: none;
+  padding: 0;
 }
 main.main--cr-modern {
   padding: 8px 15px 0;

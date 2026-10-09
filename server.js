@@ -247,6 +247,43 @@ async function createServer() {
     }
   })
 
+  /**
+   * 与现网首页 Util.alert 一致：未绑手机 / 管理组未开两步验证。
+   * 通过页面会话拉取 Rhythm 首页，读取服务端已算好的条件（不依赖 /api/user 脱敏字段）。
+   */
+  app.post('/__fp/security-alerts', express.json({ limit: '32kb' }), async (req, res) => {
+    try {
+      const apiKey = String(req.body?.apiKey || '')
+      if (!apiKey) {
+        res.status(400).json({ code: -1, msg: '缺少 apiKey' })
+        return
+      }
+      const existingSymCe = parseRequestCookie(req.headers.cookie)['sym-ce'] || ''
+      const { csrfToken, symCe, reused } = await exchangePageAuth(apiKey, existingSymCe)
+      if (!reused || symCe !== existingSymCe) {
+        res.setHeader(
+          'Set-Cookie',
+          `sym-ce=${symCe}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`,
+        )
+      }
+      const homeRes = await fetch(`${apiTarget}/`, {
+        headers: {
+          'User-Agent': FISHPI_UA,
+          Cookie: `sym-ce=${symCe}`,
+          Referer: `${apiTarget}/`,
+        },
+      })
+      const html = await homeRes.text()
+      // 与 skins/classic/*/index.ftl 中 Util.alert 文案对齐
+      const needBindPhone = html.includes('您需要绑定手机号后方可正常访问摸鱼派')
+      const need2fa =
+        html.includes('致管理组成员的重要通知') || html.includes('立即在个人设置-账户中启用两步验证')
+      res.status(200).json({ code: 0, csrfToken, needBindPhone, need2fa })
+    } catch (e) {
+      res.status(502).json({ code: -1, msg: e instanceof Error ? e.message : 'security-alerts 失败' })
+    }
+  })
+
   // 缺失 JSON 用前端 gaps.mock，不再 HTML 抓取现网。清单见 docs/MISSING_APIS.md。
 
   if (!isProd) {

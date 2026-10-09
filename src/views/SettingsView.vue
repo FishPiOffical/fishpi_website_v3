@@ -314,9 +314,24 @@ watch(
   { immediate: true },
 )
 
+function scrollToHashTarget() {
+  const id = route.hash.replace(/^#/, '')
+  if (!id || typeof document === 'undefined') return
+  void nextTick(() => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
 watch(tab, (t) => {
-  if (t === 'account' && apiKey.value) void loadAccountExtras()
+  if (t === 'account' && apiKey.value) void loadAccountExtras().then(scrollToHashTarget)
 })
+
+watch(
+  () => route.hash,
+  () => {
+    if (tab.value === 'account') scrollToHashTarget()
+  },
+)
 
 onMounted(async () => {
   if (apiKey.value && !account.value) await auth.restore()
@@ -333,7 +348,10 @@ onMounted(async () => {
       /* keep /api/user */
     }
     await loadJobs()
-    if (tab.value === 'account') await loadAccountExtras()
+    if (tab.value === 'account') {
+      await loadAccountExtras()
+      scrollToHashTarget()
+    }
   }
 })
 
@@ -1098,7 +1116,7 @@ async function saveI18n() {
             {{ pwdBusy ? '提交中…' : '更新密码' }}
           </button>
 
-          <h2>绑定手机</h2>
+          <h2 id="bind-phone">绑定手机</h2>
           <label>
             手机号
             <input v-model="phoneInput" type="tel" maxlength="11" :readonly="!phoneBindOpen || phoneCodeReady" />
@@ -1170,7 +1188,7 @@ async function saveI18n() {
           <img v-else-if="appQr" class="mfa-qr" :src="appQr" width="150" height="150" alt="APP 登录二维码" />
           <button type="button" class="ghost-btn" :disabled="appQrLoading" @click="loadAppQr">刷新二维码</button>
 
-          <h2>两步验证</h2>
+          <h2 id="mfaCode">两步验证</h2>
           <FpLoading v-if="mfaLoading" />
           <template v-else-if="mfaEnabled">
             <p class="ok">验证器已启用，账户受保护。</p>

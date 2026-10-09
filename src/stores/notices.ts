@@ -7,6 +7,8 @@ import { useWhisperStore } from './whispers'
 export const useNoticeStore = defineStore('notices', () => {
   const unread = ref<UnreadCount>({})
   const loading = ref(false)
+  /** 管理员 /admin/broadcast/warn 推送的紧急公告 */
+  const warnBroadcast = ref<{ text: string; who: string } | null>(null)
   let ws: WebSocket | null = null
 
   const total = computed(() => Number(unread.value.unreadNotificationCnt || 0))
@@ -48,6 +50,11 @@ export const useNoticeStore = defineStore('notices', () => {
           applyCount(msg)
         } else if (msg.command === 'chatUnreadCountRefresh') {
           void useWhisperStore().refreshUnread()
+        } else if (msg.command === 'warnBroadcast') {
+          warnBroadcast.value = {
+            text: String(msg.warnBroadcastText ?? ''),
+            who: String(msg.who ?? ''),
+          }
         }
       } catch {
         /* ignore */
@@ -65,5 +72,5 @@ export const useNoticeStore = defineStore('notices', () => {
     disconnect()
   }
 
-  return { unread, loading, total, refresh, clear, connect, disconnect }
+  return { unread, loading, total, warnBroadcast, refresh, clear, connect, disconnect }
 })
