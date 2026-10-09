@@ -1,3 +1,5 @@
+import { ensureRiskCaptcha } from '@/utils/riskCaptcha'
+
 export const FISHPI_UA =
   'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
 
@@ -14,6 +16,11 @@ export class ApiError extends Error {
 
 export function isCaptchaRequired(e: unknown) {
   return e instanceof ApiError && e.code === 'captcha'
+}
+
+type RequestInitExtra = RequestInit & {
+  /** 内部：人机验证通过后已重试过，避免死循环 */
+  __captchaRetried?: boolean
 }
 
 function apiBase() {
@@ -39,18 +46,20 @@ function isJsonContentType(value: string | null) {
   return Boolean(value && value.includes('application/json'))
 }
 
-export async function request<T = unknown>(
-  path: string,
-  init: RequestInit = {},
-): Promise<T> {
+function isRiskCaptchaPath(path: string) {
+  return path.includes('/validateCaptcha') || /(^|\/)test(\?|$)/.test(path)
+}
+
+async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {}): Promise<T> {
   const headers = new Headers(init.headers)
   if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
   if (init.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
 
+  const { __captchaRetried: _, ...fetchInit } = init
   const res = await fetch(resolveUrl(path), {
-    ...init,
+    ...fetchInit,
     credentials: init.credentials ?? 'include',
     headers,
   })
@@ -86,14 +95,57 @@ export async function request<T = unknown>(
   return data
 }
 
-export async function requestText(path: string, init: RequestInit = {}) {
+export async function request<T = unknown>(path: string, init: RequestInitExtra = {}): Promise<T> {
+  try {
+    return await requestOnce<T>(path, init)
+  } catch (e) {
+    if (
+      !import.meta.env.SSR &&
+      isCaptchaRequired(e) &&
+      !init.__captchaRetried &&
+      !isRiskCaptchaPath(path)
+    ) {
+      await ensureRiskCaptcha()
+      return requestOnce<T>(path, { ...init, __captchaRetried: true })
+    }
+    throw e
+  }
+}
+
+export async function requestText(path: string, init: RequestInitExtra = {}): Promise<string> {
+  try {
+    return await requestTextOnce(path, init)
+  } catch (e) {
+    if (
+      !import.meta.env.SSR &&
+      isCaptchaRequired(e) &&
+      !init.__captchaRetried &&
+      !isRiskCaptchaPath(path)
+    ) {
+      await ensureRiskCaptcha()
+      return requestTextOnce(path, { ...init, __captchaRetried: true })
+    }
+    throw e
+  }
+}
+
+async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
   const headers = new Headers(init.headers)
   if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
+  const { __captchaRetried: _, ...fetchInit } = init
   const res = await fetch(resolveUrl(path), {
-    ...init,
+    ...fetchInit,
     credentials: init.credentials ?? 'include',
     headers,
   })
+  try {
+    const pathname = new URL(res.url).pathname
+    if (/^\/test\/?$/.test(pathname)) {
+      throw new ApiError('访问过于频繁，请完成人机验证后再试', 302, 'captcha')
+    }
+  } catch (e) {
+    if (e instanceof ApiError) throw e
+  }
   const text = await res.text()
   if (!res.ok) throw new ApiError(text.slice(0, 120) || '请求失败', res.status)
   return text

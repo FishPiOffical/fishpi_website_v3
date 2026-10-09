@@ -9,6 +9,7 @@ import { useWhisperStore } from '@/stores/whispers'
 import { useChatStore } from '@/stores/chat'
 import AdSlot from '@/components/ads/AdSlot.vue'
 import LogoMark from '@/components/LogoMark.vue'
+import RiskCaptchaGate from '@/components/RiskCaptchaGate.vue'
 import { openRhythmPage } from '@/api/pageAuth'
 
 const nav = [
@@ -357,6 +358,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
         </div>
       </div>
     </footer>
+    <RiskCaptchaGate />
   </div>
 </template>
 

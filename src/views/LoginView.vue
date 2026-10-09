@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { validateRiskCaptcha } from '@/api/fishpi'
-import { isCaptchaRequired } from '@/api/http'
-import { useGeetest4 } from '@/composables/useGeetest4'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 
@@ -13,10 +10,6 @@ const passwd = ref('')
 const mfa = ref('')
 const showKeyLogin = ref(false)
 const apiKeyInput = ref('')
-const needCaptcha = ref(false)
-const captchaTip = ref('')
-const verifying = ref(false)
-const captchaEl = ref<HTMLElement | null>(null)
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
@@ -31,66 +24,24 @@ async function afterLogin() {
   await router.replace(redirectTarget())
 }
 
-const { error: gtError, mount: mountGt, destroy: destroyGt } = useGeetest4(captchaEl, (validate) => {
-  void onCaptchaSuccess(validate)
-})
-
-async function showCaptcha(message?: string) {
-  needCaptcha.value = true
-  captchaTip.value = message || '访问过于频繁，请完成人机验证后再登录'
-  await nextTick()
-  destroyGt()
-  try {
-    await mountGt('float')
-  } catch (e) {
-    captchaTip.value = e instanceof Error ? e.message : '验证码加载失败'
-  }
-}
-
-async function onCaptchaSuccess(captcha: unknown) {
-  verifying.value = true
-  captchaTip.value = '验证中…'
-  try {
-    await validateRiskCaptcha(captcha)
-    needCaptcha.value = false
-    captchaTip.value = '验证通过，正在登录…'
-    destroyGt()
-    if (showKeyLogin.value) await submitKey(true)
-    else await submit(true)
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : '人机验证失败'
-    captchaTip.value = msg
-    await showCaptcha(msg)
-  } finally {
-    verifying.value = false
-  }
-}
-
 if (auth.isLoggedIn) void router.replace(redirectTarget())
 
-async function submit(skipCaptchaGate = false) {
+async function submit() {
   try {
+    // 若 IP 被风控，request() 会弹出全局极验，通过后自动重试 getKey
     await auth.login(username.value, passwd.value, mfa.value)
     localStorage.setItem(LAST_USER, username.value)
     await afterLogin()
-  } catch (e) {
-    if (!skipCaptchaGate && isCaptchaRequired(e)) {
-      await showCaptcha(e instanceof Error ? e.message : undefined)
-      return
-    }
+  } catch {
     /* 错误已写在 auth.error */
   }
 }
 
-async function submitKey(skipCaptchaGate = false) {
+async function submitKey() {
   try {
     await auth.loginWithApiKey(apiKeyInput.value)
     await afterLogin()
-  } catch (e) {
-    if (!skipCaptchaGate && isCaptchaRequired(e)) {
-      await showCaptcha(e instanceof Error ? e.message : undefined)
-      return
-    }
+  } catch {
     /* auth.error */
   }
 }
@@ -111,25 +62,9 @@ async function submitKey(skipCaptchaGate = false) {
       </label>
       <p class="hint">浏览器会把 apiKey 存到 localStorage（<code>fp.apiKey</code>），下次自动恢复，无需再输密码。</p>
     </template>
-
-    <div v-if="needCaptcha" class="captcha-block">
-      <p class="hint">{{ captchaTip || '请完成人机验证' }}</p>
-      <div ref="captchaEl" class="captcha" />
-      <p v-if="gtError" class="err">{{ gtError }}</p>
-      <button type="button" class="linkish" @click="showCaptcha()">重新加载验证码</button>
-    </div>
-
-    <p v-if="auth.error && !needCaptcha" class="err">{{ auth.error }}</p>
-    <button type="submit" :disabled="auth.loading || verifying || needCaptcha">
-      {{
-        verifying || auth.loading
-          ? '登录中…'
-          : needCaptcha
-            ? '请先完成上方验证'
-            : showKeyLogin
-              ? '使用 apiKey 进入'
-              : '登录'
-      }}
+    <p v-if="auth.error" class="err">{{ auth.error }}</p>
+    <button type="submit" :disabled="auth.loading">
+      {{ auth.loading ? '登录中…' : showKeyLogin ? '使用 apiKey 进入' : '登录' }}
     </button>
     <p class="links">
       <button type="button" class="linkish" @click="showKeyLogin = !showKeyLogin">
@@ -191,8 +126,6 @@ button[type='submit']:disabled {
   cursor: pointer;
   padding: 0;
   font: inherit;
-  font-size: 13px;
-  text-align: left;
 }
 .err {
   color: #e07a5f;
@@ -206,18 +139,6 @@ button[type='submit']:disabled {
 }
 .hint code {
   font-size: 11px;
-}
-.captcha-block {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px dashed var(--fp-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--fp-accent) 6%, transparent);
-}
-.captcha {
-  min-height: 44px;
 }
 .links {
   display: flex;
