@@ -15,6 +15,7 @@ import SystemAlertDialog from '@/components/SystemAlertDialog.vue'
 import WarnBroadcastDialog from '@/components/WarnBroadcastDialog.vue'
 import CountToast from '@/components/count/CountToast.vue'
 import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
+import UserHoverCard from '@/components/user/UserHoverCard.vue'
 import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import { useLayoutStore } from '@/stores/layout'
 import { openRhythmPage } from '@/api/pageAuth'
@@ -369,6 +370,7 @@ onUnmounted(() => {
     </header>
     <CountToast />
     <SettingsDrawer />
+    <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />
     <main :class="{ 'main--cr-modern': isModernChat, 'main--immersive': immersive }">
       <div v-if="ssrAuthShell" class="auth-shell" />

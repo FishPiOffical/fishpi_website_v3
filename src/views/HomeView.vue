@@ -812,7 +812,9 @@ function scrollShelf(id: string, dir: -1 | 1) {
   display: flex;
   flex-direction: column;
 }
-.mod:last-child > .mod-body > .module-list:last-child:not(.chat-list) {
+/* 仅「最新」两栏把列表行距拉开；热议/专栏等保持自然高度，底部留白 */
+.mod[data-home-module='recentA']:last-child > .mod-body > .module-list:last-child,
+.mod[data-home-module='recentB']:last-child > .mod-body > .module-list:last-child {
   flex: 1;
   display: flex;
   flex-direction: column;
