@@ -72,7 +72,7 @@ watch(apiKey, () => void loadExtra())
       <ul class="people">
         <li v-if="!recent.length" class="hint">暂无数据</li>
         <li v-for="u in recent" :key="u.oId || u.userName">
-          <img v-if="u.userAvatarURL" class="fp-avatar" :src="u.userAvatarURL" alt="" />
+          <img v-if="u.userAvatarURL" class="fp-avatar" :data-user-card="u.userName" :src="u.userAvatarURL" alt="" />
           <RouterLink :to="`/member/${u.userName}`">{{ u.userNickname || u.userName }}</RouterLink>
         </li>
       </ul>

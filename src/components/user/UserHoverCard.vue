@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchUserProfile, type UserProfile } from '@/api/fishpi'
 import MedalList from '@/components/medal/MedalList.vue'
@@ -12,6 +12,7 @@ const GAP = 10
 const VIEWPORT_PADDING = 12
 const SHOW_DELAY = 260
 const HIDE_DELAY = 160
+const CACHE_LIMIT = 100
 const AVATAR_SELECTOR = [
   '[data-user-card]',
   '.avatar-small',
@@ -19,16 +20,28 @@ const AVATAR_SELECTOR = [
   '.avatar-middle',
   '.avatar-tile',
   '.user-avatar',
+  '.fp-avatar',
+  '.avatar-tiny',
+  '.summary-avatar',
+  '.avatar-mini',
+  '.people-avatar',
+  '.user-card-avatar',
+  '.avatar-img',
+  '.person-avatar',
+  'a.avatar',
   'img.avatar',
   'span.avatar',
 ].join(',')
 
 const auth = useAuthStore()
+const route = useRoute()
 const { apiKey, account, isLoggedIn } = storeToRefs(auth)
 const mounted = ref(false)
 const cardEl = ref<HTMLElement | null>(null)
 const active = ref(false)
 const loading = ref(false)
+const failed = ref(false)
+const currentUserName = ref('')
 const profile = ref<UserProfile | null>(null)
 const anchor = ref<HTMLElement | null>(null)
 const position = ref({ left: VIEWPORT_PADDING, top: VIEWPORT_PADDING, side: 'right' as 'left' | 'right' })
@@ -37,6 +50,7 @@ const cache = new Map<string, UserProfile>()
 let showTimer: ReturnType<typeof setTimeout> | undefined
 let hideTimer: ReturnType<typeof setTimeout> | undefined
 let requestId = 0
+let lastPointerType = ''
 
 const isSelf = computed(() => account.value?.userName === profile.value?.userName)
 const memberDescription = computed(() => {
@@ -56,10 +70,12 @@ const roleBadge = computed(() => {
 
 function usernameFrom(target: EventTarget | null): { userName: string; element: HTMLElement } | null {
   if (!(target instanceof Element)) return null
+  if (cardEl.value?.contains(target)) return null
   const element = target.closest<HTMLElement>(AVATAR_SELECTOR)
+    || target.closest('a, button')?.querySelector<HTMLElement>(AVATAR_SELECTOR)
   if (!element || cardEl.value?.contains(element)) return null
 
-  const explicit = element.dataset.userCard?.trim()
+  const explicit = element.closest<HTMLElement>('[data-user-card]')?.dataset.userCard?.trim()
   if (explicit) return { userName: explicit, element }
 
   const link = element.closest<HTMLAnchorElement>('a[href*="/member/"]')
@@ -86,10 +102,30 @@ function cancelHide() {
 function scheduleHide() {
   cancelShow()
   cancelHide()
-  hideTimer = setTimeout(() => {
-    active.value = false
-    anchor.value = null
-  }, HIDE_DELAY)
+  hideTimer = setTimeout(hide, HIDE_DELAY)
+}
+
+function hide() {
+  cancelShow()
+  cancelHide()
+  ++requestId
+  active.value = false
+  anchor.value = null
+  profile.value = null
+  loading.value = false
+  failed.value = false
+  currentUserName.value = ''
+}
+
+function containsInteraction(target: EventTarget | null) {
+  if (!(target instanceof Node)) return false
+  return Boolean(cardEl.value?.contains(target)
+    || anchor.value?.contains(target)
+    || (target instanceof Element && usernameFrom(target)?.element === anchor.value))
+}
+
+function canHover(e: PointerEvent) {
+  return e.pointerType !== 'touch' && window.matchMedia('(any-hover: hover)').matches
 }
 
 function positionCard() {
@@ -111,36 +147,49 @@ function positionCard() {
 }
 
 async function show(userName: string, element: HTMLElement) {
+  cancelShow()
   cancelHide()
+  if (active.value && anchor.value === element && currentUserName.value === userName) return
+  const id = ++requestId
+  const key = apiKey.value
   anchor.value = element
+  currentUserName.value = userName
+  failed.value = false
   active.value = true
   positionCard()
 
   const cached = cache.get(userName)
   if (cached) {
+    cache.delete(userName)
+    cache.set(userName, cached)
     profile.value = cached
     loading.value = false
     await nextTick()
-    positionCard()
+    if (id === requestId) positionCard()
     return
   }
 
   profile.value = null
   loading.value = true
-  const id = ++requestId
   try {
-    const data = await fetchUserProfile(userName, apiKey.value)
-    cache.set(userName, data)
+    const data = await fetchUserProfile(userName, key, { fallbackToMock: false })
     if (id !== requestId || !active.value) return
+    cache.set(userName, data)
+    if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!)
     profile.value = data
+  } catch {
+    if (id === requestId && active.value) failed.value = true
   } finally {
-    if (id === requestId) loading.value = false
-    await nextTick()
-    positionCard()
+    if (id === requestId) {
+      loading.value = false
+      await nextTick()
+      if (id === requestId) positionCard()
+    }
   }
 }
 
 function onPointerOver(e: PointerEvent) {
+  if (!canHover(e)) return
   const hit = usernameFrom(e.target)
   if (!hit) return
   if (e.relatedTarget instanceof Node && hit.element.contains(e.relatedTarget)) return
@@ -150,23 +199,50 @@ function onPointerOver(e: PointerEvent) {
 }
 
 function onPointerOut(e: PointerEvent) {
+  if (!canHover(e)) return
   const hit = usernameFrom(e.target)
   if (!hit) return
   if (e.relatedTarget instanceof Node && (hit.element.contains(e.relatedTarget) || cardEl.value?.contains(e.relatedTarget))) {
     return
   }
-  scheduleHide()
+  if (!containsInteraction(document.activeElement)) scheduleHide()
 }
 
 function onFocusIn(e: FocusEvent) {
+  if (containsInteraction(e.target)) {
+    cancelHide()
+    return
+  }
+  if (lastPointerType === 'touch' || window.matchMedia('(hover: none)').matches) return
   const hit = usernameFrom(e.target)
   if (hit) void show(hit.userName, hit.element)
 }
 
 function onFocusOut(e: FocusEvent) {
-  if (e.relatedTarget instanceof Node && cardEl.value?.contains(e.relatedTarget)) return
+  if (!containsInteraction(e.target)) return
+  if (containsInteraction(e.relatedTarget)) return
   scheduleHide()
 }
+
+function onCardPointerLeave(e: PointerEvent) {
+  if (canHover(e) && !containsInteraction(e.relatedTarget) && !containsInteraction(document.activeElement)) scheduleHide()
+}
+
+function onPointerDown(e: PointerEvent) {
+  lastPointerType = e.pointerType
+  if (e.pointerType === 'touch') hide()
+}
+
+function onKeyDown(e: KeyboardEvent) {
+  lastPointerType = ''
+  if (e.key === 'Escape') hide()
+}
+
+watch(() => route.fullPath, hide, { flush: 'sync' })
+watch([apiKey, () => account.value?.userName, () => account.value?.oId], () => {
+  hide()
+  cache.clear()
+}, { flush: 'sync' })
 
 function onViewportChange() {
   if (active.value) positionCard()
@@ -178,17 +254,21 @@ onMounted(() => {
   document.addEventListener('pointerout', onPointerOut)
   document.addEventListener('focusin', onFocusIn)
   document.addEventListener('focusout', onFocusOut)
+  document.addEventListener('pointerdown', onPointerDown, true)
+  document.addEventListener('keydown', onKeyDown)
   window.addEventListener('resize', onViewportChange)
   window.addEventListener('scroll', onViewportChange, true)
 })
 
 onUnmounted(() => {
-  cancelShow()
-  cancelHide()
+  hide()
+  cache.clear()
   document.removeEventListener('pointerover', onPointerOver)
   document.removeEventListener('pointerout', onPointerOut)
   document.removeEventListener('focusin', onFocusIn)
   document.removeEventListener('focusout', onFocusOut)
+  document.removeEventListener('pointerdown', onPointerDown, true)
+  document.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('resize', onViewportChange)
   window.removeEventListener('scroll', onViewportChange, true)
 })
@@ -206,7 +286,7 @@ onUnmounted(() => {
         role="dialog"
         aria-label="用户资料"
         @pointerenter="cancelHide"
-        @pointerleave="scheduleHide"
+        @pointerleave="onCardPointerLeave"
         @focusin="cancelHide"
         @focusout="onFocusOut"
       >
@@ -217,6 +297,11 @@ onUnmounted(() => {
             <span class="skeleton line" />
             <span class="skeleton line short" />
           </div>
+        </div>
+
+        <div v-else-if="failed" class="card-error" role="status">
+          <p>用户资料加载失败，请稍后再试。</p>
+          <RouterLink :to="`/member/${encodeURIComponent(currentUserName)}`">查看用户主页</RouterLink>
         </div>
 
         <template v-else-if="profile">
@@ -451,6 +536,16 @@ onUnmounted(() => {
   grid-template-columns: 72px 1fr;
   gap: 12px;
   padding: 16px;
+}
+.card-error {
+  padding: 16px;
+  font-size: 13px;
+}
+.card-error p {
+  margin: 0 0 10px;
+}
+.card-error a {
+  color: var(--fp-link);
 }
 .skeleton {
   display: block;

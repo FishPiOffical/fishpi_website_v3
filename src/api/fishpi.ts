@@ -253,6 +253,7 @@ export interface ArticleSummary {
   timeAgo?: string
   columnTitle?: string
   columnId?: string
+  articleAuthorId?: string
   articleAuthorName?: string
   articleAuthorThumbnailURL48?: string
   articleAuthorThumbnailURL20?: string
@@ -2022,18 +2023,27 @@ export async function finishRegister(payload: {
   if (res.code) throw new Error(res.msg || '注册失败')
 }
 
-export async function fetchUserProfile(userName: string, apiKey?: string | null): Promise<UserProfile> {
+export async function fetchUserProfile(
+  userName: string,
+  apiKey?: string | null,
+  options: { fallbackToMock?: boolean } = {},
+): Promise<UserProfile> {
   const paths = [`/user/${encodeURIComponent(userName)}`, `/api/user/${encodeURIComponent(userName)}`]
+  let lastError: unknown
   for (const path of paths) {
     try {
       const res = await request<UserProfile & Envelope<UserProfile> & { sysMetal?: unknown }>(withKey(path, apiKey))
       const profile = res.userName ? res : res.code === 0 && res.data?.userName ? res.data : null
-      if (!profile) continue
+      if (!profile) throw new Error('用户资料响应无效')
       profile.sysMetal = normalizeMetals((profile as { sysMetal?: unknown }).sysMetal)
       return profile
-    } catch {
-      /* try next */
+    } catch (error) {
+      lastError = error
     }
+  }
+  if (options.fallbackToMock === false) {
+    // 对外消息不包含请求地址、API Key 或服务端响应；原始错误仅用于内部排查。
+    throw new Error('用户资料加载失败', { cause: lastError })
   }
   return mockProfile(userName)
 }
@@ -2418,7 +2428,7 @@ export async function fetchChatHistory(apiKey?: string | null, page = 1) {
 export interface ChatOnlineSnapshot {
   discussing?: string
   onlineChatCnt?: number
-  users?: { userName?: string; userNickname?: string; userAvatarURL?: string }[]
+  users?: { userOId?: string; oId?: string; userName?: string; userNickname?: string; userAvatarURL?: string }[]
 }
 
 export async function fetchChatOnlineUsers(apiKey?: string | null): Promise<ChatOnlineSnapshot> {
@@ -2775,6 +2785,7 @@ export async function fetchHomeColumns(): Promise<{ recent: HomeColumnCard[]; ho
 
 export interface ChatHistoryItem {
   oId: string
+  userOId?: string
   userName: string
   userNickname?: string
   userAvatarURL?: string

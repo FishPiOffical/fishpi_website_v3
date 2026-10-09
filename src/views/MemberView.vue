@@ -382,7 +382,7 @@ async function sendPoints() {
           <FpLoading v-if="peopleLoading" />
           <ul v-else-if="people.length" class="people-list">
             <li v-for="u in people" :key="u.oId || u.userName">
-              <img v-if="u.userAvatarURL" class="people-avatar" :src="u.userAvatarURL" alt="" />
+              <img v-if="u.userAvatarURL" class="people-avatar" :data-user-card="u.userName" :src="u.userAvatarURL" alt="" />
               <RouterLink :to="`/member/${u.userName}`">{{ u.userNickname || u.userName }}</RouterLink>
               <span v-if="u.userNickname" class="people-handle">@{{ u.userName }}</span>
             </li>
@@ -419,7 +419,7 @@ async function sendPoints() {
               :class="{ highlighted: String(m.oId) === highlightMoonId }"
             >
               <div class="breeze-header">
-                <span class="avatar-small" :style="{ backgroundImage: `url('${profile.userAvatarURL}')` }" />
+                <span class="avatar-small" :data-user-card="profile.userName" :style="{ backgroundImage: `url('${profile.userAvatarURL}')` }" />
                 <span class="breeze-author">{{ profile.userNickname || profile.userName }}</span>
                 <RouterLink class="breeze-time" :to="`${base}/breezemoons/${m.oId}`">{{ m.timeAgo }}</RouterLink>
               </div>
@@ -500,6 +500,7 @@ async function sendPoints() {
         <div class="avatar-stage" :class="{ 'avatar-stage--overlap': !!profile.cardBg }">
           <div
             class="user-card-avatar"
+            :data-user-card="profile.userName"
             :aria-label="profile.userName"
             :style="
               profile.userAvatarURL210 || profile.userAvatarURL

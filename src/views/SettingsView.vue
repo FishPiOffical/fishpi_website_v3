@@ -1001,7 +1001,7 @@ async function saveI18n() {
         <h1>头像</h1>
         <template v-if="isLoggedIn">
           <div class="avatar-row">
-            <img class="fp-avatar" :src="avatar || '/favicon.svg'" alt="" />
+            <img class="fp-avatar" :data-user-card="account?.userName" :src="avatar || '/favicon.svg'" alt="" />
             <label class="file">
               {{ uploading ? '上传中…' : '更换头像' }}
               <input type="file" accept="image/*" :disabled="uploading" @change="onAvatar" />

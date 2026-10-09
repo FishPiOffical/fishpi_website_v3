@@ -1,0 +1,101 @@
+.vip-nickname {
+  --vip-decoration: currentColor;
+  color: var(--vip-color, inherit);
+  font-weight: var(--vip-weight, inherit);
+  text-decoration-line: var(--vip-decoration-line, none);
+  text-decoration-color: var(--vip-decoration);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.vip-nickname--effect {
+  display: inline-block;
+  color: transparent !important;
+  background-repeat: repeat;
+  background-size: 260% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: vip-name-flow 5s linear infinite;
+}
+
+.vip-nickname--rainbow {
+  --vip-decoration: #a78bfa;
+  background-image: linear-gradient(
+    90deg,
+    #ff4d6d,
+    #ff9f1c,
+    #ffe66d,
+    #2ec4b6,
+    #38bdf8,
+    #818cf8,
+    #c084fc,
+    #ff4d6d
+  );
+}
+
+.vip-nickname--neon {
+  --vip-color: #35ffe0;
+  --vip-decoration: #35ffe0;
+  color: #35ffe0 !important;
+  text-shadow:
+    0 0 5px rgba(53, 255, 224, 0.9),
+    0 0 12px rgba(53, 255, 224, 0.7),
+    0 0 22px rgba(53, 255, 224, 0.45);
+}
+
+.vip-nickname--fire {
+  --vip-decoration: #ff7a18;
+  background-image: linear-gradient(100deg, #ff2d55, #ff7a18, #ffd166, #ff5c35, #ff2d55);
+}
+
+.vip-nickname--ocean {
+  --vip-decoration: #22d3ee;
+  background-image: linear-gradient(100deg, #2563eb, #06b6d4, #67e8f9, #34d399, #2563eb);
+}
+
+.vip-nickname--forest {
+  --vip-decoration: #34d399;
+  background-image: linear-gradient(100deg, #059669, #34d399, #bef264, #22c55e, #059669);
+}
+
+.vip-nickname--sunset {
+  --vip-decoration: #fb7185;
+  background-image: linear-gradient(100deg, #f43f5e, #fb7185, #fbbf24, #c084fc, #f43f5e);
+}
+
+.vip-nickname--metal {
+  --vip-decoration: #fbbf24;
+  background-image: linear-gradient(
+    100deg,
+    #64748b,
+    #f8fafc,
+    #94a3b8,
+    #fbbf24,
+    #fff7cc,
+    #64748b
+  );
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28);
+}
+
+.vip-nickname--galaxy {
+  --vip-decoration: #c084fc;
+  background-image: linear-gradient(100deg, #312e81, #7c3aed, #ec4899, #38bdf8, #312e81);
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
+}
+
+@keyframes vip-name-flow {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 260% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vip-nickname--effect {
+    animation: none;
+    background-position: 50% 50%;
+  }
+}

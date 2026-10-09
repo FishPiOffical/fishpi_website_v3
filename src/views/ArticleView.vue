@@ -994,6 +994,7 @@ async function onReactComment(c: ArticleComment, value: string) {
           <li v-for="a in randomArticles" :key="a.oId">
             <span
               class="avatar-mini"
+              :data-user-card="a.articleAuthorName"
               :style="a.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${a.articleAuthorThumbnailURL48}')` } : undefined"
             />
             <RouterLink :to="`/article/${a.oId}`">{{ articleTitle(a) }}</RouterLink>

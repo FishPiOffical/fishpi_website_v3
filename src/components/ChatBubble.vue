@@ -3,9 +3,11 @@ import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
+import VipNickname from '@/components/user/VipNickname.vue'
 
 withDefaults(
   defineProps<{
+    userId?: string
     userName: string
     nickname?: string
     avatar?: string
@@ -14,7 +16,7 @@ withDefaults(
     self?: boolean
     medals?: unknown
   }>(),
-  { nickname: '', avatar: '', time: '', html: '', self: false, medals: undefined },
+  { userId: '', nickname: '', avatar: '', time: '', html: '', self: false, medals: undefined },
 )
 
 const zoomed = ref('')
@@ -35,7 +37,10 @@ function onBodyClick(e: MouseEvent) {
     <div class="fp-bubble" @click="onBodyClick">
       <div class="head">
         <RouterLink :to="`/member/${userName}`" class="name">
-          {{ nickname || userName }}<small v-if="nickname && nickname !== userName">({{ userName }})</small>
+          <VipNickname :user-id="userId" :user-name="userName">
+            {{ nickname || userName }}
+          </VipNickname>
+          <small v-if="nickname && nickname !== userName">({{ userName }})</small>
         </RouterLink>
         <MedalList :items="medals" variant="chat" />
       </div>

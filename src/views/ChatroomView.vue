@@ -17,6 +17,7 @@ import { useChatStore } from '@/stores/chat'
 import type { ChatNodeOption } from '@/api/fishpi'
 import FpLoading from '@/components/FpLoading.vue'
 import FpDialog from '@/components/FpDialog.vue'
+import VipNickname from '@/components/user/VipNickname.vue'
 
 const auth = useAuthStore()
 const chat = useChatStore()
@@ -398,7 +399,11 @@ function clearScreen() {
                   class="avatar-tiny"
                   :style="u.userAvatarURL ? { backgroundImage: `url('${u.userAvatarURL}')` } : undefined"
                 />
-                <span class="user-name">{{ u.userNickname || u.userName }}</span>
+                <span class="user-name">
+                  <VipNickname :user-id="u.userOId || u.oId" :user-name="u.userName">
+                    {{ u.userNickname || u.userName }}
+                  </VipNickname>
+                </span>
               </RouterLink>
             </div>
           </section>
@@ -412,6 +417,7 @@ function clearScreen() {
               v-for="msg in classicMessages"
               :id="`chatroom${msg.oId}`"
               :key="msg.oId"
+              :user-id="msg.userOId"
               :user-name="msg.userName"
               :nickname="msg.userNickname"
               :avatar="msg.userAvatarURL"
@@ -530,6 +536,7 @@ function clearScreen() {
               v-for="msg in messages"
               :id="`chatroom${msg.oId}`"
               :key="msg.oId"
+              :user-id="msg.userOId"
               :user-name="msg.userName"
               :nickname="msg.userNickname"
               :avatar="msg.userAvatarURL"

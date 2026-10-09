@@ -76,7 +76,7 @@ async function submit() {
     <p v-else-if="error" class="err">{{ error }}</p>
     <ol v-else>
       <li v-for="item in items" :key="item.oId">
-        <img v-if="item.breezemoonAuthorThumbnailURL48" :src="item.breezemoonAuthorThumbnailURL48" alt="" />
+        <img v-if="item.breezemoonAuthorThumbnailURL48" :data-user-card="item.breezemoonAuthorName" :src="item.breezemoonAuthorThumbnailURL48" alt="" />
         <div>
           <header>
             <b><RouterLink v-if="item.breezemoonAuthorName" :to="`/member/${item.breezemoonAuthorName}`">{{ item.breezemoonAuthorName }}</RouterLink></b>

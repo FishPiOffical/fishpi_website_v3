@@ -113,7 +113,7 @@ async function submit() {
       <ol v-else>
         <li v-for="item in list" :key="peer(item)">
           <RouterLink :to="`/chat/${encodeURIComponent(peer(item))}`" :class="{ current: peer(item) === userName }">
-            <img class="fp-avatar" :src="peerAvatar(item)" alt="" />
+            <img class="fp-avatar" :data-user-card="peer(item)" :src="peerAvatar(item)" alt="" />
             <div class="peer-main">
               <div class="peer-head">
                 <b>{{ peer(item) }}</b>

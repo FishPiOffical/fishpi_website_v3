@@ -23,6 +23,7 @@ export type ChatStyle = 'classic' | 'modern'
 
 export interface ChatLine {
   oId: string
+  userOId?: string
   userName: string
   userNickname?: string
   userAvatarURL?: string
@@ -36,6 +37,8 @@ export interface ChatLine {
 }
 
 export interface OnlineUser {
+  userOId?: string
+  oId?: string
   userName: string
   userAvatarURL?: string
   userNickname?: string
@@ -74,6 +77,7 @@ function asLine(item: ChatHistoryItem | Record<string, unknown>): ChatLine {
   const card = redPacket ? undefined : parseChatCard(content)
   return {
     oId: String(item.oId ?? ''),
+    userOId: item.userOId != null ? String(item.userOId) : undefined,
     userName: String(item.userName ?? ''),
     userNickname: item.userNickname as string | undefined,
     userAvatarURL: item.userAvatarURL as string | undefined,
@@ -147,6 +151,7 @@ export const useChatStore = defineStore('chat', () => {
         onlines.value = snap.users
           .filter((u) => u?.userName)
           .map((u) => ({
+            userOId: u.userOId != null ? String(u.userOId) : u.oId != null ? String(u.oId) : undefined,
             userName: String(u.userName),
             userNickname: u.userNickname,
             userAvatarURL: u.userAvatarURL,
