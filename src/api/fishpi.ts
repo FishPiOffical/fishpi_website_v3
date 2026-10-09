@@ -2682,14 +2682,56 @@ export interface HomeColumnCard {
  * 首页专栏货架。现网无 JSON（见 docs/MISSING_APIS.md），使用假数据。
  * 建议后端：GET /api/columns/latest|hot?size=
  */
+interface RawColumnChapter {
+  articleId?: string
+  chapterNo?: number | string
+  articleTitle?: string
+  title?: string
+  articlePermalink?: string
+  permalink?: string
+}
+
+interface RawColumnCard {
+  columnId?: string
+  oId?: string
+  columnTitle?: string
+  columnArticleCount?: number
+  chapters?: RawColumnChapter[]
+  latestChapter?: RawColumnChapter | null
+  secondLatestChapter?: RawColumnChapter | null
+}
+
+function normalizeChapter(ch: RawColumnChapter): HomeColumnChapter {
+  const no = ch.chapterNo
+  return {
+    articleId: String(ch.articleId || ''),
+    permalink: ch.articlePermalink || ch.permalink || (ch.articleId ? `/article/${ch.articleId}` : ''),
+    chapterNo: typeof no === 'number' ? `第 ${no} 章` : String(no ?? ''),
+    title: ch.articleTitle || ch.title || '',
+  }
+}
+
+/** 现网 /api/columns/* 只给 latestChapter / secondLatestChapter，没有 chapters 数组。 */
+function normalizeColumnCard(c: RawColumnCard): HomeColumnCard {
+  const raw = c.chapters?.length ? c.chapters : [c.latestChapter, c.secondLatestChapter]
+  const chapters = raw.filter((ch): ch is RawColumnChapter => Boolean(ch)).map(normalizeChapter)
+  return {
+    columnId: String(c.columnId || c.oId || ''),
+    columnTitle: c.columnTitle || '',
+    columnArticleCount: Number(c.columnArticleCount || 0),
+    chapters,
+    latestChapter: chapters[0] || null,
+  }
+}
+
 export async function fetchHomeColumns(): Promise<{ recent: HomeColumnCard[]; hot: HomeColumnCard[] }> {
   try {
     const [latest, hot] = await Promise.all([
-      request<Envelope<HomeColumnCard[]>>('/api/columns/latest?size=12'),
-      request<Envelope<HomeColumnCard[]>>('/api/columns/hot?size=12'),
+      request<Envelope<RawColumnCard[]>>('/api/columns/latest?size=12'),
+      request<Envelope<RawColumnCard[]>>('/api/columns/hot?size=12'),
     ])
     if (!latest.code && !hot.code && Array.isArray(latest.data) && Array.isArray(hot.data)) {
-      return { recent: latest.data, hot: hot.data }
+      return { recent: latest.data.map(normalizeColumnCard), hot: hot.data.map(normalizeColumnCard) }
     }
   } catch {
     /* 接口未开放 */
