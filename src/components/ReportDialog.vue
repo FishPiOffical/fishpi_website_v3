@@ -70,8 +70,8 @@ async function submit() {
 
 <template>
   <button type="button" class="ghost" @click="show">举报</button>
-  <Teleport to="body">
-    <div v-if="open" class="report-mask" @click.self="close">
+  <Teleport v-if="open" to="body">
+    <div class="report-mask" @click.self="close">
       <form class="report-box" @submit.prevent="submit">
         <header>
           <strong>举报</strong>

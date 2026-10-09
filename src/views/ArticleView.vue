@@ -43,6 +43,7 @@ import { absoluteUrl, SITE_DEFAULT_DESC, stripHtml } from '@/seo/site'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
 import ArticleSkeleton from '@/components/ArticleSkeleton.vue'
+import CommentItem from '@/components/CommentItem.vue'
 import { readCache, writeCache } from '@/utils/swr'
 
 const route = useRoute()
@@ -138,24 +139,27 @@ async function openRevision(revisionId: string) {
 
 const comments = computed<ArticleComment[]>(() => article.value?.articleComments || [])
 const nice = computed(() => article.value?.articleNiceComments || [])
-const threaded = computed(() => {
+/** 一级评论 + 其下全部回复（多级回复拍平到根评论下，按原顺序）。 */
+const threads = computed(() => {
   const list = comments.value
-  const ids = new Set(list.map((c) => c.oId))
-  const byParent = new Map<string, ArticleComment[]>()
-  for (const c of list) {
-    const parent = String(c.commentOriginalCommentId || '')
-    if (parent && ids.has(parent)) {
-      const kids = byParent.get(parent) || []
-      kids.push(c)
-      byParent.set(parent, kids)
+  const byId = new Map(list.map((c) => [c.oId, c]))
+  const rootOf = (c: ArticleComment) => {
+    let cur = c
+    const seen = new Set<string>()
+    while (cur.commentOriginalCommentId && byId.has(cur.commentOriginalCommentId) && !seen.has(cur.oId)) {
+      seen.add(cur.oId)
+      cur = byId.get(cur.commentOriginalCommentId)!
     }
+    return cur
   }
-  return list
-    .filter((c) => {
-      const parent = String(c.commentOriginalCommentId || '')
-      return !parent || !ids.has(parent)
-    })
-    .flatMap((c) => [{ c, nested: false }, ...(byParent.get(c.oId) || []).map((r) => ({ c: r, nested: true }))])
+  const replies = new Map<string, ArticleComment[]>()
+  const roots: ArticleComment[] = []
+  for (const c of list) {
+    const root = rootOf(c)
+    if (root === c) roots.push(c)
+    else replies.set(root.oId, [...(replies.get(root.oId) || []), c])
+  }
+  return roots.map((c) => ({ c, replies: replies.get(c.oId) || [] }))
 })
 const commentPages = computed(() => Number(article.value?.pagination?.paginationPageCount || 1))
 const tagList = computed(() =>
@@ -543,6 +547,35 @@ function parentAuthor(c: ArticleComment) {
   return parent ? who(parent) : ''
 }
 
+function startReply(c: ArticleComment) {
+  replyId.value = c.oId
+  document.querySelector('.composer-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+function itemProps(c: ArticleComment) {
+  const own = isLoggedIn.value && isOwnComment(c)
+  return {
+    comment: c,
+    loggedIn: isLoggedIn.value,
+    own,
+    canAccept: isLoggedIn.value && canEdit.value && isQnA.value && !c.commentQnAOffered && !own,
+    editing: editingId.value === c.oId,
+    apiKey: apiKey.value,
+  }
+}
+
+function itemHandlers(c: ArticleComment) {
+  return {
+    reply: () => startReply(c),
+    vote: () => onVoteComment(c),
+    thank: () => onThankComment(c),
+    edit: () => startEdit(c),
+    remove: () => onRemoveComment(c),
+    accept: () => onAccept(c),
+    react: (v: string) => onReactComment(c, v),
+  }
+}
+
 async function onReactArticle(value: string) {
   if (!apiKey.value || !article.value) return
   try {
@@ -763,23 +796,7 @@ async function onReactComment(c: ArticleComment, value: string) {
         <span><b>✨ 优质回帖</b></span>
       </div>
       <div class="comments-list">
-        <div v-for="c in nice" :key="'n' + c.oId" class="cmt-row">
-          <div class="cmt-avatar-col">
-            <RouterLink :to="`/member/${who(c)}`" class="cmt-avatar-wrap">
-              <span
-                class="avatar-cmt"
-                :style="c.commentAuthorThumbnailURL ? { backgroundImage: `url('${c.commentAuthorThumbnailURL}')` } : undefined"
-              />
-            </RouterLink>
-          </div>
-          <div class="cmt-main-col">
-            <header class="cmt-header">
-              <RouterLink :to="`/member/${who(c)}`" class="cmt-author-name">{{ who(c) }}</RouterLink>
-              <time class="cmt-time">{{ c.commentCreateTimeStr || c.timeAgo }}</time>
-            </header>
-            <div class="cmt-body" v-html="c.commentContent || ''" />
-          </div>
-        </div>
+        <CommentItem v-for="c in nice" :key="'n' + c.oId" class="cmt-root" :comment="c" readonly />
       </div>
     </section>
 
@@ -789,78 +806,43 @@ async function onReactComment(c: ArticleComment, value: string) {
       </div>
 
       <div class="comments-list">
-        <div
-          v-for="row in threaded"
-          :key="row.c.oId"
-          class="cmt-row"
-          :class="{ nested: row.nested }"
+        <CommentItem
+          v-for="t in threads"
+          :key="t.c.oId"
+          v-bind="itemProps(t.c)"
+          class="cmt-root"
+          v-on="itemHandlers(t.c)"
         >
-          <div class="cmt-avatar-col">
-            <RouterLink :to="`/member/${who(row.c)}`" class="cmt-avatar-wrap">
-              <span
-                class="avatar-cmt"
-                :style="row.c.commentAuthorThumbnailURL ? { backgroundImage: `url('${row.c.commentAuthorThumbnailURL}')` } : undefined"
-              />
-            </RouterLink>
-          </div>
-          <div class="cmt-main-col">
-            <header class="cmt-header">
-              <div class="cmt-meta-left">
-                <RouterLink :to="`/member/${who(row.c)}`" class="cmt-author-name">
-                  {{ who(row.c) }}
-                </RouterLink>
-                <time class="cmt-time">{{ row.c.commentCreateTimeStr || row.c.timeAgo }}</time>
-                <em v-if="parentAuthor(row.c)" class="reply-to">回复 @{{ parentAuthor(row.c) }}</em>
-              </div>
-              <div class="cmt-actions-right">
-                <button v-if="isLoggedIn" type="button" class="btn-text" @click="replyId = row.c.oId">回复</button>
-                <button v-if="isLoggedIn" type="button" class="btn-text" @click="onVoteComment(row.c)">
-                  👍 {{ row.c.commentGoodCnt ? row.c.commentGoodCnt : '赞' }}
-                </button>
-                <button
-                  v-if="isLoggedIn"
-                  type="button"
-                  class="btn-text"
-                  :disabled="row.c.rewarded"
-                  @click="onThankComment(row.c)"
-                >
-                  {{ row.c.rewarded ? '❤️ 已感谢' : '❤️ 感谢' }}
-                </button>
-                <button v-if="isLoggedIn && isOwnComment(row.c)" type="button" class="btn-text" @click="startEdit(row.c)">
-                  编辑
-                </button>
-                <button v-if="isLoggedIn && isOwnComment(row.c)" type="button" class="btn-text danger" @click="onRemoveComment(row.c)">
-                  删除
-                </button>
-                <button
-                  v-if="isLoggedIn && canEdit && isQnA && !row.c.commentQnAOffered && !isOwnComment(row.c)"
-                  type="button"
-                  class="btn-text accept"
-                  @click="onAccept(row.c)"
-                >
-                  采纳
-                </button>
-                <ReportDialog v-if="isLoggedIn && !isOwnComment(row.c)" :api-key="apiKey" :data-id="row.c.oId" :data-type="1" />
-              </div>
-            </header>
-            <div v-if="editingId === row.c.oId" class="edit-box">
+          <template #editor>
+            <div class="edit-box">
               <textarea v-model="editDraft" rows="3" />
               <div class="edit-box-btns">
                 <button type="button" class="btn small" :disabled="editSaving || !editDraft.trim()" @click="saveEdit">保存</button>
                 <button type="button" class="btn small ghost" @click="editingId = ''">取消</button>
               </div>
             </div>
-            <div v-else class="cmt-body" v-html="row.c.commentContent || ''" />
-            <div class="cmt-reaction-bar">
-              <ReactionBar
-                :summary="row.c.reactionSummary"
-                :current="row.c.currentUserReaction"
-                :disabled="!isLoggedIn"
-                @toggle="(v) => onReactComment(row.c, v)"
-              />
-            </div>
-          </div>
-        </div>
+          </template>
+          <template v-if="t.replies.length" #default>
+            <CommentItem
+              v-for="r in t.replies"
+              :key="r.oId"
+              v-bind="itemProps(r)"
+              reply
+              :reply-to="parentAuthor(r)"
+              v-on="itemHandlers(r)"
+            >
+              <template #editor>
+                <div class="edit-box">
+                  <textarea v-model="editDraft" rows="3" />
+                  <div class="edit-box-btns">
+                    <button type="button" class="btn small" :disabled="editSaving || !editDraft.trim()" @click="saveEdit">保存</button>
+                    <button type="button" class="btn small ghost" @click="editingId = ''">取消</button>
+                  </div>
+                </div>
+              </template>
+            </CommentItem>
+          </template>
+        </CommentItem>
       </div>
 
       <p v-if="!comments.length" class="empty-hint">暂无回帖，快来抢沙发吧～</p>
@@ -1129,13 +1111,11 @@ h1 {
   color: var(--fp-muted);
   border-radius: 0 4px 4px 0;
 }
-.body :deep(img),
-.cmt-body :deep(img) {
+.body :deep(img) {
   max-width: 100%;
   border-radius: 4px;
 }
-.body :deep(pre),
-.cmt-body :deep(pre) {
+.body :deep(pre) {
   overflow-x: auto;
   background: var(--fp-bg);
   padding: 14px;
@@ -1161,14 +1141,12 @@ h1 {
   background: var(--fp-bg);
   font-weight: 500;
 }
-.body :deep(a),
-.cmt-body :deep(a) {
+.body :deep(a) {
   color: var(--fp-link);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.body :deep(a:hover),
-.cmt-body :deep(a:hover) {
+.body :deep(a:hover) {
   color: var(--fp-accent);
 }
 
@@ -1302,88 +1280,12 @@ h1 {
 .comments-list {
   padding: 0 18px;
 }
-.cmt-row {
-  display: flex;
-  gap: 14px;
-  padding: 16px 0;
+.cmt-root {
+  padding: 12px 0;
   border-bottom: 1px solid var(--fp-border);
 }
-.cmt-row:last-child {
+.cmt-root:last-child {
   border-bottom: none;
-}
-.cmt-row.nested {
-  margin-left: 48px;
-  border-left: 2px solid var(--fp-border);
-  padding-left: 14px;
-}
-.cmt-avatar-col {
-  flex-shrink: 0;
-}
-.cmt-avatar-wrap {
-  display: block;
-}
-.avatar-cmt {
-  display: block;
-  width: 36px;
-  height: 36px;
-  border-radius: 4px;
-  background-size: cover;
-  background-position: center;
-  background-color: var(--fp-border);
-}
-
-.cmt-main-col {
-  flex: 1;
-  min-width: 0;
-}
-.cmt-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  gap: 8px;
-}
-@media (max-width: 768px) {
-  .cmt-header {
-    flex-wrap: wrap;
-  }
-  .cmt-actions-right {
-    justify-content: flex-start;
-  }
-}
-.cmt-meta-left {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.cmt-author-name {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--fp-title);
-  text-decoration: none;
-}
-.cmt-author-name:hover {
-  color: var(--fp-accent);
-}
-.cmt-time {
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-.reply-to {
-  font-style: normal;
-  font-size: 12px;
-  color: var(--fp-accent);
-}
-.cmt-actions-right {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.cmt-actions-right > * {
-  white-space: nowrap;
 }
 .btn-text {
   background: none;
@@ -1403,16 +1305,6 @@ h1 {
 .btn-text.accept {
   color: var(--fp-green);
   font-weight: 500;
-}
-
-.cmt-body {
-  font-size: 14px;
-  line-height: 1.65;
-  color: var(--fp-text);
-  word-break: break-word;
-}
-.cmt-reaction-bar {
-  margin-top: 8px;
 }
 
 .edit-box textarea {

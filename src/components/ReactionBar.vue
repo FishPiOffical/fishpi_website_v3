@@ -2,11 +2,15 @@
 import { computed, ref } from 'vue'
 import { REACTION_EMOJIS, type ReactionSummary } from '@/api/fishpi'
 
-const props = defineProps<{
-  summary?: ReactionSummary[]
-  current?: string
-  disabled?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    summary?: ReactionSummary[]
+    current?: string
+    disabled?: boolean
+    addLabel?: string
+  }>(),
+  { summary: () => [], current: '', disabled: false, addLabel: '+' },
+)
 
 const emit = defineEmits<{ toggle: [value: string] }>()
 const open = ref(false)
@@ -41,7 +45,7 @@ function pick(value: string) {
     >
       {{ s.emoji }} {{ s.count }}
     </button>
-    <button v-if="!disabled" type="button" class="ghost" @click="open = !open">+</button>
+    <button v-if="!disabled" type="button" class="ghost" title="添加表情" @click="open = !open">{{ addLabel }}</button>
     <div v-if="open" class="panel">
       <button v-for="e in REACTION_EMOJIS" :key="e.value" type="button" :title="e.value" @click="pick(e.value)">
         {{ e.emoji }}

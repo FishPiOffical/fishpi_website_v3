@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 
 withDefaults(
   defineProps<{
@@ -22,16 +23,6 @@ function onBodyClick(e: MouseEvent) {
   e.preventDefault()
   zoomed.value = img.currentSrc || img.src
 }
-
-function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') zoomed.value = ''
-}
-
-watch(zoomed, (v) => {
-  if (v) window.addEventListener('keydown', onKey)
-  else window.removeEventListener('keydown', onKey)
-})
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
@@ -52,12 +43,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <time>{{ time }}</time>
       </div>
     </div>
-    <Teleport to="body">
-      <div v-if="zoomed" class="img-zoom" @click="zoomed = ''">
-        <img :src="zoomed" alt="" />
-        <a :href="zoomed" target="_blank" rel="noopener" class="open" @click.stop>查看原图</a>
-      </div>
-    </Teleport>
+    <ImageLightbox v-model="zoomed" />
   </article>
 </template>
 
@@ -221,34 +207,5 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   .fp-bubble:hover :deep(.rx.empty) {
     opacity: 1;
   }
-}
-.img-zoom {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.75);
-  cursor: zoom-out;
-}
-.img-zoom img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: 4px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-}
-.img-zoom .open {
-  position: absolute;
-  right: 20px;
-  bottom: 16px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font-size: 12px;
-  text-decoration: none;
 }
 </style>
