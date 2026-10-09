@@ -2154,31 +2154,51 @@ function livenessScope(apiKey: string) {
   return (h >>> 0).toString(36)
 }
 
-function readLiveness(scope: string): { value: number; at: number } | null {
+interface LivenessRecord {
+  scope: string
+  /** 最近一次成功拿到的值 */
+  value: number | null
+  /** 最近一次实际发出请求的时间（无论成败） */
+  at: number
+}
+
+let livenessInflight: Promise<number> | null = null
+
+function readLiveness(scope: string): LivenessRecord | null {
   if (typeof localStorage === 'undefined') return null
   try {
-    const s = JSON.parse(localStorage.getItem(LIVENESS_STORE) || 'null')
-    return s && s.scope === scope && typeof s.value === 'number' ? s : null
+    const s = JSON.parse(localStorage.getItem(LIVENESS_STORE) || 'null') as LivenessRecord | null
+    return s && s.scope === scope && typeof s.at === 'number' ? s : null
   } catch {
     return null
   }
 }
 
-export async function fetchLiveness(apiKey: string) {
+function saveLiveness(rec: LivenessRecord) {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(LIVENESS_STORE, JSON.stringify(rec))
+}
+
+export async function fetchLiveness(apiKey: string): Promise<number> {
   const scope = livenessScope(apiKey)
   const saved = readLiveness(scope)
-  if (saved && Date.now() - saved.at < LIVENESS_TTL) return saved.value
-  try {
-    const res = await request<{ liveness?: number }>(withKey('/user/liveness', apiKey))
-    const value = Number(res.liveness ?? 0)
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(LIVENESS_STORE, JSON.stringify({ scope, value, at: Date.now() }))
-    }
-    return value
-  } catch (e) {
-    if (saved) return saved.value
-    throw e
+  if (saved && Date.now() - saved.at < LIVENESS_TTL) {
+    if (saved.value !== null) return saved.value
+    throw new Error('活跃度查询过于频繁，请稍后再试')
   }
+  if (livenessInflight) return livenessInflight
+  const prev = saved?.value ?? null
+  saveLiveness({ scope, value: prev, at: Date.now() })
+  livenessInflight = (async () => {
+    try {
+      const res = await request<{ liveness?: number }>(withKey('/user/liveness', apiKey))
+      const value = Number(res.liveness ?? 0)
+      saveLiveness({ scope, value, at: Date.now() })
+      return value
+    } finally {
+      livenessInflight = null
+    }
+  })()
+  return livenessInflight
 }
 
 export async function fetchCollectedLiveness(apiKey: string) {
