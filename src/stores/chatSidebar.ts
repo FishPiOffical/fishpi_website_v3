@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { CHAT_SIDEBAR_MODULES, type ChatSidebarModule } from '@/chat/sidebar/registry'
+import { CHAT_SIDEBAR_META, type ChatSidebarModuleMeta } from '@/chat/sidebar/meta'
 
 const STORAGE = 'fp.chatSidebar'
 
@@ -11,22 +11,23 @@ interface SidebarPref {
 
 function defaults(): SidebarPref {
   return {
-    order: CHAT_SIDEBAR_MODULES.map((m) => m.id),
-    hidden: CHAT_SIDEBAR_MODULES.filter((m) => !m.defaultOn).map((m) => m.id),
+    order: CHAT_SIDEBAR_META.map((m) => m.id),
+    hidden: CHAT_SIDEBAR_META.filter((m) => !m.defaultOn).map((m) => m.id),
   }
 }
 
 function read(): SidebarPref {
+  if (typeof localStorage === 'undefined') return defaults()
   try {
     const raw = localStorage.getItem(STORAGE)
     if (!raw) return defaults()
     const parsed = JSON.parse(raw) as SidebarPref
-    const known = new Set(CHAT_SIDEBAR_MODULES.map((m) => m.id))
-    const order = parsed.order.filter((id) => known.has(id))
-    for (const m of CHAT_SIDEBAR_MODULES) {
-      if (!order.includes(m.id)) order.push(m.id)
-    }
-    return { order, hidden: parsed.hidden.filter((id) => known.has(id)) }
+    const known = new Set(CHAT_SIDEBAR_META.map((m) => m.id))
+    const order = parsed.order.filter((id) => known.has(id as ChatSidebarModuleMeta['id']))
+    CHAT_SIDEBAR_META.forEach((m, i) => {
+      if (!order.includes(m.id)) order.splice(Math.min(i, order.length), 0, m.id)
+    })
+    return { order, hidden: parsed.hidden.filter((id) => known.has(id as ChatSidebarModuleMeta['id'])) }
   } catch {
     return defaults()
   }
@@ -34,16 +35,14 @@ function read(): SidebarPref {
 
 export const useChatSidebarStore = defineStore('chatSidebar', () => {
   const pref = ref(read())
-  const configuring = ref(false)
 
-  const visibleModules = computed(() =>
+  const orderedModules = computed(() =>
     pref.value.order
-      .map((id) => CHAT_SIDEBAR_MODULES.find((mod) => mod.id === id))
-      .filter((mod): mod is ChatSidebarModule => {
-        if (!mod) return false
-        return !pref.value.hidden.includes(mod.id)
-      }),
+      .map((id) => CHAT_SIDEBAR_META.find((mod) => mod.id === id))
+      .filter((mod): mod is ChatSidebarModuleMeta => Boolean(mod)),
   )
+
+  const visibleModules = computed(() => orderedModules.value.filter((mod) => !pref.value.hidden.includes(mod.id)))
 
   function persist() {
     localStorage.setItem(STORAGE, JSON.stringify(pref.value))
@@ -76,5 +75,5 @@ export const useChatSidebarStore = defineStore('chatSidebar', () => {
     persist()
   }
 
-  return { pref, configuring, visibleModules, isOn, toggle, move, reset }
+  return { pref, orderedModules, visibleModules, isOn, toggle, move, reset }
 })

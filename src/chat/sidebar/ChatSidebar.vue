@@ -1,39 +1,23 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { CHAT_SIDEBAR_MODULES } from './registry'
+import { sidebarModule } from './registry'
 import { useChatSidebarStore } from '@/stores/chatSidebar'
+import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 
-const store = useChatSidebarStore()
-const { visibleModules, configuring } = storeToRefs(store)
+const { visibleModules } = storeToRefs(useChatSidebarStore())
+const drawer = useSettingsDrawerStore()
 </script>
 
 <template>
   <aside class="side">
     <header class="toolbar">
       <strong>侧边栏</strong>
-      <button type="button" @click="configuring = !configuring">{{ configuring ? '完成' : '配置模块' }}</button>
+      <button type="button" @click="drawer.show('chatSidebar')">配置模块</button>
     </header>
-
-    <div v-if="configuring" class="config">
-      <p>勾选显示，上下调整顺序。模块互不耦合，后续可继续加新块。</p>
-      <ul>
-        <li v-for="mod in CHAT_SIDEBAR_MODULES" :key="mod.id">
-          <label>
-            <input type="checkbox" :checked="store.isOn(mod.id)" @change="store.toggle(mod.id)" />
-            {{ mod.title }}
-          </label>
-          <span>
-            <button type="button" @click="store.move(mod.id, -1)">上</button>
-            <button type="button" @click="store.move(mod.id, 1)">下</button>
-          </span>
-        </li>
-      </ul>
-      <button type="button" class="ghost" @click="store.reset">恢复默认</button>
-    </div>
 
     <section v-for="mod in visibleModules" :key="mod.id" class="card">
       <h3>{{ mod.title }}</h3>
-      <component :is="mod.component" />
+      <component :is="sidebarModule(mod.id)?.component" />
     </section>
   </aside>
 </template>
@@ -44,8 +28,7 @@ const { visibleModules, configuring } = storeToRefs(store)
   flex-direction: column;
   gap: 12px;
 }
-.toolbar,
-.config li {
+.toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -55,8 +38,7 @@ const { visibleModules, configuring } = storeToRefs(store)
   font-size: 13px;
   color: var(--fp-head);
 }
-.toolbar button,
-.config button {
+.toolbar button {
   border: 1px solid var(--fp-border);
   background: var(--fp-card);
   color: var(--fp-text);
@@ -64,19 +46,6 @@ const { visibleModules, configuring } = storeToRefs(store)
   padding: 4px 8px;
   cursor: pointer;
   font-size: 12px;
-}
-.config {
-  background: var(--fp-card);
-  box-shadow: var(--fp-card-shadow);
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-.config ul {
-  list-style: none;
-  margin: 8px 0;
-  padding: 0;
 }
 .card {
   background: var(--fp-card);
@@ -89,8 +58,5 @@ const { visibleModules, configuring } = storeToRefs(store)
   font-size: 13px;
   color: var(--fp-head);
   font-weight: 700;
-}
-.ghost {
-  width: 100%;
 }
 </style>

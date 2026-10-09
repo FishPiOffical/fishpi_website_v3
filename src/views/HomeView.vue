@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { articleTitle } from '@/utils/text'
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
@@ -27,16 +27,18 @@ import {
   type TagItem,
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
-import { useHomeLayoutStore } from '@/stores/homeLayout'
+import { useHomeLayoutStore, type HomeRowView } from '@/stores/homeLayout'
+import { useHomeDrag } from '@/home/useHomeDrag'
 import AdSlot from '@/components/ads/AdSlot.vue'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
-import HomePersonalize from '@/components/home/HomePersonalize.vue'
+import HomeSideWidgets from '@/components/home/HomeSideWidgets.vue'
 import HomeRepeaterStation from '@/components/home/HomeRepeaterStation.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeFeedPayload, consumeHomeExtrasPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
 import FpLoading from '@/components/FpLoading.vue'
 import { readCache, writeCache } from '@/utils/swr'
+import { avatarStyle, avatarUrl } from '@/utils/avatar'
 
 const auth = useAuthStore()
 const layout = useHomeLayoutStore()
@@ -68,9 +70,19 @@ const loading = ref(true)
 const usingMock = computed(() => left.value.some((a) => String(a.oId).startsWith('mock-')))
 const hotPanel = computed(() => (hotMode.value === 'hot' ? hot.value : longArticles.value))
 const welcomeUser = computed(() => recentUsers.value[0] || null)
-const topModules = computed(() => layout.modulesIn('top'))
-const longModules = computed(() => layout.modulesIn('long'))
-const midModules = computed(() => layout.modulesIn('middle'))
+const REG_PER_ROW = 10
+const regGrid = computed(() => {
+  const list = recentUsers.value
+  const full = Math.floor(list.length / REG_PER_ROW) * REG_PER_ROW
+  return full ? list.slice(0, full) : list
+})
+const { editing } = storeToRefs(layout)
+const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive } = useHomeDrag()
+onUnmounted(() => (editing.value = false))
+/** 长篇专区自带卡片样式，独占一行时不再套外框 */
+function isBareRow(row: HomeRowView) {
+  return row.cells.length === 1 && row.cells[0].modules.every((m) => m.id === 'long')
+}
 /** 专栏货架：优先 /api/columns/*，否则 gaps.mock；再否则长篇帖近似. */
 const homeColumnsRecent = ref<HomeColumnCard[]>([])
 const homeColumnsHot = ref<HomeColumnCard[]>([])
@@ -105,7 +117,7 @@ if (bootExtra) {
   if (bootExtra.long?.length) longArticles.value = bootExtra.long.slice(0, 12)
   if (bootExtra.checkin?.length) checkin.value = bootExtra.checkin.slice(0, 8)
   if (bootExtra.online?.length) online.value = bootExtra.online.slice(0, 8)
-  if (bootExtra.recentUsers?.length) recentUsers.value = bootExtra.recentUsers.slice(0, 12)
+  if (bootExtra.recentUsers?.length) recentUsers.value = bootExtra.recentUsers.slice(0, 20)
   if (bootExtra.tags?.length) tags.value = bootExtra.tags.slice(0, 24)
   if (bootExtra.breezemoons?.length) moons.value = bootExtra.breezemoons.slice(0, 8)
   if (bootExtra.chatFeed?.length) chatLines.value = bootExtra.chatFeed.slice(0, 10)
@@ -237,12 +249,7 @@ function heat(a: ArticleSummary) {
 }
 
 function avatarOf(u: RankUser | LiteUser) {
-  return (
-    ('userAvatarURL20' in u && u.userAvatarURL20) ||
-    u.userAvatarURL48 ||
-    u.userAvatarURL ||
-    ''
-  )
+  return avatarUrl(u)
 }
 
 function streakOf(u: RankUser) {
@@ -274,7 +281,7 @@ function chatPreview(item: ChatHistoryItem) {
 }
 
 function chatAvatar(item: ChatHistoryItem) {
-  return item.userAvatarURL || ''
+  return avatarUrl(item)
 }
 
 async function postChat() {
@@ -324,8 +331,12 @@ function scrollShelf(id: string, dir: -1 | 1) {
 </script>
 
 <template>
-  <div class="home">
-    <HomePersonalize />
+  <div class="home" :class="{ editing }">
+    <div v-if="editing" class="edit-bar" role="toolbar" aria-label="首页布局编辑">
+      <span>拖动模块到任意位置：模块上下半部插入同一列，左右边缘新开一列，行间空隙新起一行</span>
+      <button type="button" @click="layout.resetPositions()">恢复默认位置</button>
+      <button type="button" class="green" @click="editing = false">完成</button>
+    </div>
     <p v-if="usingMock" class="banner">
       匿名列表接口尚未开放，当前展示与 <code>GET /api/articles/recent</code> 对齐的 mock。
       <RouterLink v-if="!isLoggedIn" to="/login">登录</RouterLink>
@@ -333,367 +344,374 @@ function scrollShelf(id: string, dir: -1 | 1) {
     </p>
     <p v-else-if="error" class="err">{{ error }}</p>
 
-    <div v-if="topModules.length" class="board zone-top" data-home-zone="top">
-      <template v-for="mod in topModules" :key="mod.id">
-        <section v-if="mod.id === 'recentA'" class="col" data-home-module="recentA" data-home-title="最新一">
-          <div class="index-head">
-            <b>最新</b>
-          </div>
-          <FpLoading v-if="loading && !left.length" :rows="6" />
-          <ol class="module-list">
-            <li v-for="item in left" :key="item.oId">
-              <span v-if="item.articleStick" class="cb-stick" title="置顶" />
-              <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                <span
-                  class="avatar-small"
-                  :style="
-                    item.articleAuthorThumbnailURL48
-                      ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
-                      : undefined
-                  "
-                  :aria-label="item.articleAuthorName"
-                />
-              </RouterLink>
-              <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
-                articleTitle(item)
-              }}</RouterLink>
-              <span class="count">{{ views(item) }}</span>
-            </li>
-          </ol>
-        </section>
-
-        <section v-else-if="mod.id === 'recentB'" class="col" data-home-module="recentB" data-home-title="最新二">
-          <div class="index-head">
-            <b>&nbsp;</b>
-            <RouterLink to="/recent">更多</RouterLink>
-          </div>
-          <FpLoading v-if="loading && !right.length" :rows="6" />
-          <ol class="module-list">
-            <li v-for="item in right" :key="item.oId">
-              <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                <span
-                  class="avatar-small"
-                  :style="
-                    item.articleAuthorThumbnailURL48
-                      ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
-                      : undefined
-                  "
-                  :aria-label="item.articleAuthorName"
-                />
-              </RouterLink>
-              <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
-                articleTitle(item)
-              }}</RouterLink>
-              <span class="count">{{ views(item) }}</span>
-            </li>
-          </ol>
-        </section>
-
-        <aside v-else-if="mod.id === 'rank'" class="col side" data-home-module="rank" data-home-title="排行">
-          <div class="download">
-            <img src="https://file.fishpi.cn/logo_app.png" width="35" height="35" alt="" />
-            <div>
-              <b>随时随地摸鱼？</b>
-              <p>下载摸鱼派客户端，想摸就摸！</p>
-            </div>
-            <button type="button" class="green" @click="goDownload">下载</button>
-          </div>
-          <AdSlot slot-key="home.sidebar" />
-          <CheckinPanel />
-          <div class="index-head">
-            <b>今日连签排行</b>
-            <RouterLink to="/top/checkin">更多</RouterLink>
-          </div>
-          <ol class="module-list rank">
-            <li v-for="(u, i) in checkin" :key="u.userName">
-              <span class="cb-stick gold"><span class="icon-pin-rank">{{ i + 1 }}</span></span>
-              <RouterLink :to="`/member/${u.userName}`">
-                <span
-                  class="avatar-small"
-                  :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
-                />
-              </RouterLink>
-              <RouterLink class="title fn-ellipsis" :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
-              <span class="count">{{ streakOf(u) }}天</span>
-            </li>
-          </ol>
-          <div class="index-head spaced">
-            <b>在线时间排行</b>
-            <RouterLink to="/top/online">更多</RouterLink>
-          </div>
-          <ol class="module-list rank">
-            <li v-for="(u, i) in online" :key="u.userName">
-              <span class="cb-stick gold"><span class="icon-pin-rank">{{ i + 1 }}</span></span>
-              <RouterLink :to="`/member/${u.userName}`">
-                <span
-                  class="avatar-small"
-                  :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
-                />
-              </RouterLink>
-              <RouterLink class="title fn-ellipsis" :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
-              <span class="count">{{ Number(u.onlineMinute || 0).toLocaleString() }} 分钟</span>
-            </li>
-          </ol>
-        </aside>
-
-      </template>
-    </div>
-
-    <template v-for="mod in longModules" :key="'long-' + mod.id">
-      <section v-if="mod.id === 'long'" class="long-zone" data-home-module="long" data-home-title="长篇专区">
-        <div class="long-head">
-          <b>长篇专区</b>
-          <RouterLink to="/column">更多</RouterLink>
-        </div>
-
-        <div class="long-row">
-          <div class="long-row-head">
-            <span class="badge">最近更新</span>
-            <div class="long-nav">
-              <button type="button" aria-label="向左滚动" @click="scrollShelf('long-recent', -1)">‹</button>
-              <button type="button" aria-label="向右滚动" @click="scrollShelf('long-recent', 1)">›</button>
-            </div>
-          </div>
-          <div id="long-recent" class="long-shelf">
-            <template v-if="useColumnCards && homeColumnsRecent.length">
-              <article v-for="col in homeColumnsRecent" :key="'r-' + col.columnId" class="long-card column">
-                <div class="long-col-head">
-                  <RouterLink class="long-title" :to="`/column/${col.columnId}`">
-                    {{ col.columnTitle }}
-                  </RouterLink>
-                  <span class="long-count">{{ col.columnArticleCount }} 章</span>
-                </div>
-                <RouterLink
-                  v-for="(ch, i) in col.chapters.slice(0, 2)"
-                  :key="ch.articleId || i"
-                  class="long-chapter"
-                  :to="ch.articleId ? `/article/${ch.articleId}` : `/column/${col.columnId}`"
-                >
-                  <em>{{ ch.chapterNo }}</em>
-                  <span>{{ ch.title }}</span>
-                </RouterLink>
-              </article>
-            </template>
-            <template v-else>
-              <article v-for="item in longRecentShelf" :key="item.oId" class="long-card">
-                <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
-                  articleTitle(item)
-                }}</RouterLink>
-                <div class="long-meta">
-                  <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
-                  <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                    {{ item.articleAuthorName }}
-                  </RouterLink>
-                  <span>{{ views(item) }}</span>
-                </div>
-              </article>
-            </template>
-            <p
-              v-if="!(useColumnCards ? homeColumnsRecent.length : longRecentShelf.length) && !loading"
-              class="hint long-empty"
-            >
-              暂无长篇
-            </p>
-          </div>
-        </div>
-
-        <div class="long-row">
-          <div class="long-row-head">
-            <span class="badge hot">热门专栏</span>
-            <div class="long-nav">
-              <button type="button" aria-label="向左滚动" @click="scrollShelf('long-hot', -1)">‹</button>
-              <button type="button" aria-label="向右滚动" @click="scrollShelf('long-hot', 1)">›</button>
-            </div>
-          </div>
-          <div id="long-hot" class="long-shelf">
-            <template v-if="useColumnCards && homeColumnsHot.length">
-              <article v-for="col in homeColumnsHot" :key="'h-' + col.columnId" class="long-card column hot">
-                <div class="long-col-head">
-                  <RouterLink class="long-title" :to="`/column/${col.columnId}`">
-                    {{ col.columnTitle }}
-                  </RouterLink>
-                  <span class="long-count">{{ col.columnArticleCount }} 章</span>
-                </div>
-                <RouterLink
-                  v-for="(ch, i) in col.chapters.slice(0, 2)"
-                  :key="ch.articleId || i"
-                  class="long-chapter"
-                  :to="ch.articleId ? `/article/${ch.articleId}` : `/column/${col.columnId}`"
-                >
-                  <em>{{ ch.chapterNo }}</em>
-                  <span>{{ ch.title }}</span>
-                </RouterLink>
-              </article>
-            </template>
-            <template v-else>
-              <article v-for="item in longHotShelf" :key="'hot-' + item.oId" class="long-card hot">
-                <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
-                  articleTitle(item)
-                }}</RouterLink>
-                <div class="long-meta">
-                  <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
-                  <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                    {{ item.articleAuthorName }}
-                  </RouterLink>
-                  <span class="heat">🔥 {{ heat(item) }}</span>
-                </div>
-              </article>
-            </template>
-            <p
-              v-if="!(useColumnCards ? homeColumnsHot.length : longHotShelf.length) && !loading"
-              class="hint long-empty"
-            >
-              暂无热门
-            </p>
-          </div>
-        </div>
-      </section>
-    </template>
-
-    <div v-if="midModules.length" class="board zone-mid" data-home-zone="middle">
-      <template v-for="mod in midModules" :key="mod.id">
-        <section v-if="mod.id === 'chat'" class="col" data-home-module="chat" data-home-title="聊天室">
-          <div class="index-head">
-            <b>
-              聊天室
-              <span v-if="onlineChatCnt != null" class="online">({{ onlineChatCnt }}人在线)</span>
-            </b>
-            <RouterLink to="/cr">进入完整版聊天室</RouterLink>
-          </div>
-          <p v-if="discussing" class="discuss">当前话题：{{ discussing }}</p>
-          <div class="chat-form">
-            <input
-              v-model="chatDraft"
-              type="text"
-              maxlength="512"
-              :placeholder="isLoggedIn ? '说点什么...' : '登录后发言'"
-              :disabled="!isLoggedIn || chatBusy"
-              @keydown.enter.prevent="postChat"
-            />
-            <button v-if="isLoggedIn" type="button" class="green" :disabled="chatBusy || !chatDraft.trim()" @click="postChat">
-              发送
-            </button>
-            <RouterLink v-else class="green-link" to="/login">登录</RouterLink>
-          </div>
-          <p v-if="chatMsg" class="hint">{{ chatMsg }}</p>
-          <ol class="module-list chat-list">
-            <li v-for="m in chatLines" :key="m.oId" class="chat-item">
-              <RouterLink v-if="m.userName" :to="`/member/${m.userName}`">
-                <span
-                  class="avatar-mid"
-                  :style="chatAvatar(m) ? { backgroundImage: `url('${chatAvatar(m)}')` } : undefined"
-                  :aria-label="m.userName"
-                />
-              </RouterLink>
-              <div class="chat-body">
-                <RouterLink v-if="m.userName" class="chat-who" :to="`/member/${m.userName}`">
-                  {{ m.userNickname || m.userName }}
-                  <span v-if="m.userNickname && m.userName" class="chat-uname">({{ m.userName }})</span>
-                </RouterLink>
-                <div class="chat-text">{{ chatPreview(m) }}</div>
+    <template v-for="row in layout.visibleRows" :key="row.key">
+      <div
+        v-if="editing"
+        class="row-gap"
+        :class="{ on: gapActive(row.cells[0].modules[0].id) }"
+        @dragover="onGapOver($event, row.cells[0].modules[0].id)"
+        @drop="onDrop"
+      />
+      <div class="board" :class="{ bare: isBareRow(row) }" :style="{ gridTemplateColumns: row.columns }">
+        <div v-for="cell in row.cells" :key="cell.key" class="cell" :class="{ 'cell--narrow': cell.narrow }">
+          <div
+            v-for="mod in cell.modules"
+            :key="mod.id"
+            class="mod"
+            :class="[edgeOf(mod.id) ? `drop-${edgeOf(mod.id)}` : '', { dragging: dragging === mod.id }]"
+            :draggable="editing"
+            :data-home-module="mod.id"
+            :data-home-title="mod.title"
+            @dragstart="onDragStart($event, mod.id)"
+            @dragend="onDragEnd"
+            @dragover="onModuleOver($event, mod.id)"
+            @drop="onDrop"
+          >
+            <span v-if="editing" class="mod-badge">⠿ {{ mod.title }}</span>
+            <section v-if="mod.id === 'recentA'" class="mod-body">
+              <div class="index-head">
+                <b>最新</b>
               </div>
-            </li>
-            <li v-if="!chatLines.length && !loading" class="hint-li">暂无消息，去聊天室看看</li>
-          </ol>
-        </section>
+              <FpLoading v-if="loading && !left.length" :rows="6" />
+              <ol class="module-list">
+                <li v-for="item in left" :key="item.oId">
+                  <span v-if="item.articleStick" class="cb-stick" title="置顶" />
+                  <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                    <span
+                      class="avatar-small"
+                      :style="avatarStyle(item.articleAuthorThumbnailURL48)"
+                      :aria-label="item.articleAuthorName"
+                    />
+                  </RouterLink>
+                  <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
+                    articleTitle(item)
+                  }}</RouterLink>
+                  <span class="count">{{ views(item) }}</span>
+                </li>
+              </ol>
+            </section>
 
-        <section v-else-if="mod.id === 'hotQna'" class="col" data-home-module="hotQna" data-home-title="热议问答">
-          <div class="index-head">
-            <b class="hot-switch">
-              <button type="button" :class="{ on: hotMode === 'hot' }" @click="hotMode = 'hot'">热议</button>
-              <span class="sep">|</span>
-              <button type="button" :class="{ on: hotMode === 'column' }" @click="hotMode = 'column'">专栏</button>
-            </b>
-            <RouterLink :to="hotMode === 'hot' ? '/hot' : '/column'">更多</RouterLink>
-          </div>
-          <ol class="module-list">
-            <li v-for="item in hotPanel" :key="item.oId">
-              <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                <span
-                  class="avatar-small"
-                  :style="
-                    item.articleAuthorThumbnailURL48
-                      ? { backgroundImage: `url('${item.articleAuthorThumbnailURL48}')` }
-                      : undefined
-                  "
+            <section v-else-if="mod.id === 'recentB'" class="mod-body">
+              <div class="index-head">
+                <b>&nbsp;</b>
+                <RouterLink to="/recent">更多</RouterLink>
+              </div>
+              <FpLoading v-if="loading && !right.length" :rows="6" />
+              <ol class="module-list">
+                <li v-for="item in right" :key="item.oId">
+                  <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                    <span
+                      class="avatar-small"
+                      :style="avatarStyle(item.articleAuthorThumbnailURL48)"
+                      :aria-label="item.articleAuthorName"
+                    />
+                  </RouterLink>
+                  <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
+                    articleTitle(item)
+                  }}</RouterLink>
+                  <span class="count">{{ views(item) }}</span>
+                </li>
+              </ol>
+            </section>
+
+            <aside v-else-if="mod.id === 'rank'" class="mod-body">
+              <div class="download">
+                <img src="https://file.fishpi.cn/logo_app.png" width="35" height="35" alt="" />
+                <div>
+                  <b>随时随地摸鱼？</b>
+                  <p>下载摸鱼派客户端，想摸就摸！</p>
+                </div>
+                <button type="button" class="green" @click="goDownload">下载</button>
+              </div>
+              <AdSlot slot-key="home.sidebar" />
+              <CheckinPanel />
+              <div class="index-head">
+                <b>今日连签排行</b>
+                <RouterLink to="/top/checkin">更多</RouterLink>
+              </div>
+              <ol class="module-list rank">
+                <li v-for="(u, i) in checkin" :key="u.userName">
+                  <span class="cb-stick gold"><span class="icon-pin-rank">{{ i + 1 }}</span></span>
+                  <RouterLink :to="`/member/${u.userName}`">
+                    <span
+                      class="avatar-small"
+                      :style="avatarStyle(avatarOf(u))"
+                    />
+                  </RouterLink>
+                  <RouterLink class="title fn-ellipsis" :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
+                  <span class="count">{{ streakOf(u) }}天</span>
+                </li>
+              </ol>
+              <div class="index-head spaced">
+                <b>在线时间排行</b>
+                <RouterLink to="/top/online">更多</RouterLink>
+              </div>
+              <ol class="module-list rank">
+                <li v-for="(u, i) in online" :key="u.userName">
+                  <span class="cb-stick gold"><span class="icon-pin-rank">{{ i + 1 }}</span></span>
+                  <RouterLink :to="`/member/${u.userName}`">
+                    <span
+                      class="avatar-small"
+                      :style="avatarStyle(avatarOf(u))"
+                    />
+                  </RouterLink>
+                  <RouterLink class="title fn-ellipsis" :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
+                  <span class="count">{{ Number(u.onlineMinute || 0).toLocaleString() }} 分钟</span>
+                </li>
+              </ol>
+            </aside>
+
+            <section v-else-if="mod.id === 'long'" class="long-zone">
+              <div class="long-head">
+                <b>长篇专区</b>
+                <RouterLink to="/column">更多</RouterLink>
+              </div>
+
+              <div class="long-row">
+                <div class="long-row-head">
+                  <span class="badge">最近更新</span>
+                  <div class="long-nav">
+                    <button type="button" aria-label="向左滚动" @click="scrollShelf('long-recent', -1)">‹</button>
+                    <button type="button" aria-label="向右滚动" @click="scrollShelf('long-recent', 1)">›</button>
+                  </div>
+                </div>
+                <div id="long-recent" class="long-shelf">
+                  <template v-if="useColumnCards && homeColumnsRecent.length">
+                    <article v-for="col in homeColumnsRecent" :key="'r-' + col.columnId" class="long-card column">
+                      <div class="long-col-head">
+                        <RouterLink class="long-title" :to="`/column/${col.columnId}`">
+                          {{ col.columnTitle }}
+                        </RouterLink>
+                        <span class="long-count">{{ col.columnArticleCount }} 章</span>
+                      </div>
+                      <RouterLink
+                        v-for="(ch, i) in col.chapters.slice(0, 2)"
+                        :key="ch.articleId || i"
+                        class="long-chapter"
+                        :to="ch.articleId ? `/article/${ch.articleId}` : `/column/${col.columnId}`"
+                      >
+                        <em>{{ ch.chapterNo }}</em>
+                        <span>{{ ch.title }}</span>
+                      </RouterLink>
+                    </article>
+                  </template>
+                  <template v-else>
+                    <article v-for="item in longRecentShelf" :key="item.oId" class="long-card">
+                      <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
+                        articleTitle(item)
+                      }}</RouterLink>
+                      <div class="long-meta">
+                        <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
+                        <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                          {{ item.articleAuthorName }}
+                        </RouterLink>
+                        <span>{{ views(item) }}</span>
+                      </div>
+                    </article>
+                  </template>
+                  <p
+                    v-if="!(useColumnCards ? homeColumnsRecent.length : longRecentShelf.length) && !loading"
+                    class="hint long-empty"
+                  >
+                    暂无长篇
+                  </p>
+                </div>
+              </div>
+
+              <div class="long-row">
+                <div class="long-row-head">
+                  <span class="badge hot">热门专栏</span>
+                  <div class="long-nav">
+                    <button type="button" aria-label="向左滚动" @click="scrollShelf('long-hot', -1)">‹</button>
+                    <button type="button" aria-label="向右滚动" @click="scrollShelf('long-hot', 1)">›</button>
+                  </div>
+                </div>
+                <div id="long-hot" class="long-shelf">
+                  <template v-if="useColumnCards && homeColumnsHot.length">
+                    <article v-for="col in homeColumnsHot" :key="'h-' + col.columnId" class="long-card column hot">
+                      <div class="long-col-head">
+                        <RouterLink class="long-title" :to="`/column/${col.columnId}`">
+                          {{ col.columnTitle }}
+                        </RouterLink>
+                        <span class="long-count">{{ col.columnArticleCount }} 章</span>
+                      </div>
+                      <RouterLink
+                        v-for="(ch, i) in col.chapters.slice(0, 2)"
+                        :key="ch.articleId || i"
+                        class="long-chapter"
+                        :to="ch.articleId ? `/article/${ch.articleId}` : `/column/${col.columnId}`"
+                      >
+                        <em>{{ ch.chapterNo }}</em>
+                        <span>{{ ch.title }}</span>
+                      </RouterLink>
+                    </article>
+                  </template>
+                  <template v-else>
+                    <article v-for="item in longHotShelf" :key="'hot-' + item.oId" class="long-card hot">
+                      <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
+                        articleTitle(item)
+                      }}</RouterLink>
+                      <div class="long-meta">
+                        <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
+                        <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                          {{ item.articleAuthorName }}
+                        </RouterLink>
+                        <span class="heat">🔥 {{ heat(item) }}</span>
+                      </div>
+                    </article>
+                  </template>
+                  <p
+                    v-if="!(useColumnCards ? homeColumnsHot.length : longHotShelf.length) && !loading"
+                    class="hint long-empty"
+                  >
+                    暂无热门
+                  </p>
+                </div>
+              </div>
+            </section>
+            <section v-else-if="mod.id === 'chat'" class="mod-body">
+              <div class="index-head">
+                <b>
+                  聊天室
+                  <span v-if="onlineChatCnt != null" class="online">({{ onlineChatCnt }}人在线)</span>
+                </b>
+                <RouterLink to="/cr">进入完整版聊天室</RouterLink>
+              </div>
+              <p v-if="discussing" class="discuss">当前话题：{{ discussing }}</p>
+              <div class="chat-form">
+                <input
+                  v-model="chatDraft"
+                  type="text"
+                  maxlength="512"
+                  :placeholder="isLoggedIn ? '说点什么...' : '登录后发言'"
+                  :disabled="!isLoggedIn || chatBusy"
+                  @keydown.enter.prevent="postChat"
                 />
-              </RouterLink>
-              <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
-                articleTitle(item)
-              }}</RouterLink>
-              <span class="count heat">🔥 {{ heat(item) }}</span>
-            </li>
-            <li v-if="!hotPanel.length && !loading" class="hint-li">暂无内容</li>
-          </ol>
-        </section>
+                <button v-if="isLoggedIn" type="button" class="green" :disabled="chatBusy || !chatDraft.trim()" @click="postChat">
+                  发送
+                </button>
+                <RouterLink v-else class="green-link" to="/login">登录</RouterLink>
+              </div>
+              <p v-if="chatMsg" class="hint">{{ chatMsg }}</p>
+              <ol class="module-list chat-list">
+                <li v-for="m in chatLines" :key="m.oId" class="chat-item">
+                  <RouterLink v-if="m.userName" :to="`/member/${m.userName}`">
+                    <span
+                      class="avatar-mid"
+                      :style="avatarStyle(chatAvatar(m))"
+                      :aria-label="m.userName"
+                    />
+                  </RouterLink>
+                  <div class="chat-body">
+                    <RouterLink v-if="m.userName" class="chat-who" :to="`/member/${m.userName}`">
+                      {{ m.userNickname || m.userName }}
+                      <span v-if="m.userNickname && m.userName" class="chat-uname">({{ m.userName }})</span>
+                    </RouterLink>
+                    <div class="chat-text">{{ chatPreview(m) }}</div>
+                  </div>
+                </li>
+                <li v-if="!chatLines.length && !loading" class="hint-li">暂无消息，去聊天室看看</li>
+              </ol>
+            </section>
 
-        <aside v-else-if="mod.id === 'community'" class="col side" data-home-module="community" data-home-title="社区">
-          <HomeRepeaterStation :initial="repeaterItems" />
+            <section v-else-if="mod.id === 'hotQna'" class="mod-body">
+              <div class="index-head">
+                <b class="hot-switch">
+                  <button type="button" :class="{ on: hotMode === 'hot' }" @click="hotMode = 'hot'">热议</button>
+                  <span class="sep">|</span>
+                  <button type="button" :class="{ on: hotMode === 'column' }" @click="hotMode = 'column'">专栏</button>
+                </b>
+                <RouterLink :to="hotMode === 'hot' ? '/hot' : '/column'">更多</RouterLink>
+              </div>
+              <ol class="module-list">
+                <li v-for="item in hotPanel" :key="item.oId">
+                  <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                    <span
+                      class="avatar-small"
+                      :style="avatarStyle(item.articleAuthorThumbnailURL48)"
+                    />
+                  </RouterLink>
+                  <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
+                    articleTitle(item)
+                  }}</RouterLink>
+                  <span class="count heat">🔥 {{ heat(item) }}</span>
+                </li>
+                <li v-if="!hotPanel.length && !loading" class="hint-li">暂无内容</li>
+              </ol>
+            </section>
 
-          <div class="index-head spaced-sm">
-            <b>最新注册</b>
-            <RouterLink v-if="welcomeUser" :to="`/member/${welcomeUser.userName}`" class="welcome">
-              欢迎新人 <b>{{ welcomeUser.userNickname || welcomeUser.userName }}</b>
-            </RouterLink>
-          </div>
-          <div class="recent-reg-avatars">
-            <RouterLink
-              v-for="u in recentUsers"
-              :key="u.oId || u.userName"
-              :to="`/member/${u.userName}`"
-              class="reg-avatar-link"
-              :title="u.userNickname ? `${u.userNickname} (@${u.userName})` : u.userName"
-            >
-              <span
-                class="avatar-tile"
-                :style="avatarOf(u) ? { backgroundImage: `url('${avatarOf(u)}')` } : undefined"
+            <aside v-else-if="mod.id === 'community'" class="mod-body">
+              <HomeRepeaterStation :initial="repeaterItems" />
+
+              <div class="index-head spaced-sm">
+                <b>最新注册</b>
+                <RouterLink v-if="welcomeUser" :to="`/member/${welcomeUser.userName}`" class="welcome">
+                  欢迎新人 <b>{{ welcomeUser.userNickname || welcomeUser.userName }}</b>
+                </RouterLink>
+              </div>
+              <div class="recent-reg-avatars">
+                <RouterLink
+                  v-for="u in regGrid"
+                  :key="u.oId || u.userName"
+                  :to="`/member/${u.userName}`"
+                  class="reg-avatar-link"
+                  :title="u.userNickname ? `${u.userNickname} (@${u.userName})` : u.userName"
+                >
+                  <span
+                    class="avatar-tile"
+                    :style="avatarStyle(avatarOf(u))"
+                  />
+                </RouterLink>
+                <span v-if="!recentUsers.length && !loading" class="hint">暂无最新注册</span>
+              </div>
+
+              <div class="index-head spaced">
+                <b>标签</b>
+                <RouterLink to="/tags">更多</RouterLink>
+              </div>
+              <div class="tags">
+                <RouterLink v-for="t in tags" :key="t.tagURI || t.tagTitle" :to="tagPath(t)">
+                  {{ t.tagTitle }}
+                </RouterLink>
+                <span v-if="!tags.length && !loading" class="hint">暂无标签</span>
+              </div>
+
+            <div class="index-head spaced">
+              <b>清风明月</b>
+              <RouterLink to="/breezemoons" title="清风明月是什么？">更多</RouterLink>
+            </div>
+            <div class="moon-form">
+              <input
+                v-model="moonDraft"
+                type="text"
+                maxlength="128"
+                :placeholder="isLoggedIn ? '清风明月' : '登录后发布清风明月'"
+                :disabled="!isLoggedIn || moonBusy"
+                @keydown.enter.prevent="postMoon"
               />
-            </RouterLink>
-            <span v-if="!recentUsers.length && !loading" class="hint">暂无最新注册</span>
+              <button v-if="isLoggedIn" type="button" class="green" :disabled="moonBusy || !moonDraft.trim()" @click="postMoon">
+                发布
+              </button>
+              <RouterLink v-else class="green-link" to="/login">登录</RouterLink>
+            </div>
+            <p v-if="moonMsg" class="hint moon-msg">{{ moonMsg }}</p>
+            <ul class="moons">
+              <li v-for="m in moons" :key="m.oId">
+                <RouterLink v-if="m.breezemoonAuthorName" class="who" :to="`/member/${m.breezemoonAuthorName}`">
+                  {{ m.breezemoonAuthorName }}
+                </RouterLink>
+                <span>{{ stripHtml(m.breezemoonContent || '') }}</span>
+              </li>
+              <li v-if="!moons.length && !loading" class="hint-li">暂无动态</li>
+            </ul>
+            </aside>
+            <HomeSideWidgets v-else-if="mod.sidebarId" :modules="[mod]" />
           </div>
-
-          <div class="index-head spaced">
-            <b>标签</b>
-            <RouterLink to="/tags">更多</RouterLink>
-          </div>
-          <div class="tags">
-            <RouterLink v-for="t in tags" :key="t.tagURI || t.tagTitle" :to="tagPath(t)">
-              {{ t.tagTitle }}
-            </RouterLink>
-            <span v-if="!tags.length && !loading" class="hint">暂无标签</span>
-          </div>
-
-        <div class="index-head spaced">
-          <b>清风明月</b>
-          <RouterLink to="/breezemoons" title="清风明月是什么？">更多</RouterLink>
         </div>
-        <div class="moon-form">
-          <input
-            v-model="moonDraft"
-            type="text"
-            maxlength="128"
-            :placeholder="isLoggedIn ? '清风明月' : '登录后发布清风明月'"
-            :disabled="!isLoggedIn || moonBusy"
-            @keydown.enter.prevent="postMoon"
-          />
-          <button v-if="isLoggedIn" type="button" class="green" :disabled="moonBusy || !moonDraft.trim()" @click="postMoon">
-            发布
-          </button>
-          <RouterLink v-else class="green-link" to="/login">登录</RouterLink>
-        </div>
-        <p v-if="moonMsg" class="hint moon-msg">{{ moonMsg }}</p>
-        <ul class="moons">
-          <li v-for="m in moons" :key="m.oId">
-            <RouterLink v-if="m.breezemoonAuthorName" class="who" :to="`/member/${m.breezemoonAuthorName}`">
-              {{ m.breezemoonAuthorName }}
-            </RouterLink>
-            <span>{{ stripHtml(m.breezemoonContent || '') }}</span>
-          </li>
-          <li v-if="!moons.length && !loading" class="hint-li">暂无动态</li>
-        </ul>
-        </aside>
-
-      </template>
+      </div>
+    </template>
+    <div v-if="editing" class="row-gap end" :class="{ on: gapActive(null) }" @dragover="onGapOver($event, null)" @drop="onDrop">
+      拖到这里新起一行
     </div>
   </div>
 </template>
@@ -717,24 +735,177 @@ function scrollShelf(id: string, dir: -1 | 1) {
   flex-direction: column;
   gap: 18px;
 }
-.board {
+.edit-bar {
+  position: sticky;
+  top: 60px;
+  z-index: 20;
   display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--fp-link);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--fp-card) 92%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--fp-card-shadow);
+  font-size: 13px;
+  color: var(--fp-text);
+}
+.edit-bar span {
+  flex: 1;
+  min-width: 0;
+}
+.edit-bar button {
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
+  background: var(--fp-card);
+  color: var(--fp-text);
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.edit-bar button.green {
+  border-color: transparent;
+  background: var(--fp-primary);
+  color: #fff;
+}
+.board {
+  display: grid;
   background: var(--fp-card);
   box-shadow: var(--fp-card-shadow);
   border: 1px solid var(--fp-border);
   padding: 16px 14px 20px;
   border-radius: 8px;
 }
-.col {
-  flex: 1;
+.board.bare {
+  display: block;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  padding: 0;
+}
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   min-width: 0;
   padding: 0 10px;
 }
-.col:not(:last-child) {
+.board.bare .cell {
+  padding: 0;
+}
+.cell:not(:last-child) {
   border-right: 1px solid var(--fp-border);
 }
-.col.side {
-  flex: 0.95;
+.mod {
+  position: relative;
+  min-width: 0;
+}
+/* 列内最后一个模块撑满剩余高度，列表均匀铺开，避免与相邻列高度不齐时底部留白 */
+.mod:last-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.mod:last-child > .mod-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.mod:last-child > .mod-body > .module-list:last-child:not(.chat-list) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.home.editing .mod {
+  cursor: grab;
+  border-radius: 8px;
+  outline: 1px dashed color-mix(in srgb, var(--fp-link) 55%, transparent);
+  outline-offset: 4px;
+}
+.home.editing .mod > :not(.mod-badge) {
+  pointer-events: none;
+  user-select: none;
+}
+.home.editing .mod.dragging {
+  opacity: 0.35;
+}
+.mod-badge {
+  position: absolute;
+  top: -12px;
+  left: 6px;
+  z-index: 2;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--fp-link);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  pointer-events: none;
+}
+.mod::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  border-radius: 3px;
+  background: var(--fp-link);
+  pointer-events: none;
+  opacity: 0;
+}
+.mod.drop-top::after,
+.mod.drop-bottom::after {
+  left: 0;
+  right: 0;
+  height: 4px;
+  opacity: 1;
+}
+.mod.drop-top::after {
+  top: -10px;
+}
+.mod.drop-bottom::after {
+  bottom: -10px;
+}
+.mod.drop-left::after,
+.mod.drop-right::after {
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  opacity: 1;
+}
+.mod.drop-left::after {
+  left: -12px;
+}
+.mod.drop-right::after {
+  right: -12px;
+}
+.row-gap {
+  height: 14px;
+  margin: -16px 0;
+  border-radius: 8px;
+  transition:
+    height 0.15s,
+    background-color 0.15s;
+}
+.row-gap.on {
+  height: 40px;
+  margin: -6px 0;
+  background: color-mix(in srgb, var(--fp-link) 18%, transparent);
+  outline: 2px dashed var(--fp-link);
+}
+.row-gap.end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  margin: 0;
+  border: 1px dashed var(--fp-border);
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+.row-gap.end.on {
+  color: var(--fp-link);
 }
 .index-head {
   display: flex;
@@ -899,14 +1070,14 @@ function scrollShelf(id: string, dir: -1 | 1) {
   cursor: not-allowed;
 }
 .recent-reg-avatars {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 4px 15px 12px;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 5px;
+  padding: 4px 8px 12px;
 }
 
 .reg-avatar-link {
-  display: inline-block;
+  display: block;
   line-height: 0;
   transition: transform 0.15s ease;
 }
@@ -917,9 +1088,9 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
 .avatar-tile {
   display: block;
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 4px;
   background-size: cover;
   background-position: center;
   background-color: var(--fp-border);
@@ -1181,22 +1352,18 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
 @media (max-width: 960px) {
   .board {
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr) !important;
     padding: 12px 10px;
     gap: 12px;
   }
-  .col {
+  .cell {
     padding: 0;
   }
-  .col:not(:last-child) {
+  .cell:not(:last-child) {
     border-right: none;
     border-bottom: 1px solid var(--fp-border);
     padding-bottom: 14px;
     margin-bottom: 8px;
-  }
-  .col.side {
-    border-left: none;
-    padding-left: 0;
   }
   .long-card {
     flex-basis: 180px;

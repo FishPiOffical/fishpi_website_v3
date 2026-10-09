@@ -2,22 +2,31 @@ import type { Component } from 'vue'
 import AdModule from './modules/AdModule.vue'
 import AppearanceModule from './modules/AppearanceModule.vue'
 import BarrageModule from './modules/BarrageModule.vue'
+import IncomeModule from './modules/IncomeModule.vue'
 import MutesModule from './modules/MutesModule.vue'
 import OnlineModule from './modules/OnlineModule.vue'
 import TopicModule from './modules/TopicModule.vue'
+import { CHAT_SIDEBAR_META, type ChatSidebarModuleId, type ChatSidebarModuleMeta } from './meta'
 
-export interface ChatSidebarModule {
-  id: string
-  title: string
-  defaultOn: boolean
+export interface ChatSidebarModule extends ChatSidebarModuleMeta {
   component: Component
 }
 
-export const CHAT_SIDEBAR_MODULES: ChatSidebarModule[] = [
-  { id: 'topic', title: '当前话题', defaultOn: true, component: TopicModule },
-  { id: 'online', title: '在线成员', defaultOn: true, component: OnlineModule },
-  { id: 'barrage', title: '弹幕花费', defaultOn: true, component: BarrageModule },
-  { id: 'appearance', title: '外观', defaultOn: true, component: AppearanceModule },
-  { id: 'ad', title: '广告', defaultOn: false, component: AdModule },
-  { id: 'mutes', title: '思过崖', defaultOn: false, component: MutesModule },
-]
+const COMPONENTS: Record<ChatSidebarModuleId, Component> = {
+  income: IncomeModule,
+  topic: TopicModule,
+  online: OnlineModule,
+  barrage: BarrageModule,
+  appearance: AppearanceModule,
+  ad: AdModule,
+  mutes: MutesModule,
+}
+
+export const CHAT_SIDEBAR_MODULES: ChatSidebarModule[] = CHAT_SIDEBAR_META.map((m) => ({
+  ...m,
+  component: COMPONENTS[m.id],
+}))
+
+export function sidebarModule(id: string): ChatSidebarModule | undefined {
+  return CHAT_SIDEBAR_MODULES.find((m) => m.id === id)
+}

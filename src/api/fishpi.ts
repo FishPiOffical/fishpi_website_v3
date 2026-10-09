@@ -1325,15 +1325,21 @@ export async function removeBreezemoon(apiKey: string, id: string) {
   if (res.code) throw new Error(res.msg || '删除失败')
 }
 
+type TopRankPayload = RankUser[] | { users?: RankUser[]; list?: RankUser[] }
+
+/** 现网 /api/top/* 返回 `data.list`；兼容数组与 `data.users`。 */
+function rankUsersOf(data: TopRankPayload | undefined): RankUser[] {
+  if (Array.isArray(data)) return data
+  if (data && Array.isArray(data.list)) return data.list
+  if (data && Array.isArray(data.users)) return data.users
+  return []
+}
+
 export async function fetchCheckinRank(apiKey?: string | null): Promise<RankUser[]> {
   try {
-    const res = await request<Envelope<RankUser[] | { users?: RankUser[] }>>(
-      withKey('/api/top/checkin?p=1', apiKey),
-    )
-    if (Array.isArray(res.data) && res.data.length) return res.data
-    if (res.data && 'users' in res.data && Array.isArray(res.data.users) && res.data.users.length) {
-      return res.data.users
-    }
+    const res = await request<Envelope<TopRankPayload>>(withKey('/api/top/checkin?p=1', apiKey))
+    const list = rankUsersOf(res.data)
+    if (list.length) return list
   } catch {
     /* anonymous top not ready */
   }
@@ -1342,13 +1348,9 @@ export async function fetchCheckinRank(apiKey?: string | null): Promise<RankUser
 
 export async function fetchOnlineRank(apiKey?: string | null): Promise<RankUser[]> {
   try {
-    const res = await request<Envelope<RankUser[] | { users?: RankUser[] }>>(
-      withKey('/api/top/online?p=1', apiKey),
-    )
-    if (Array.isArray(res.data) && res.data.length) return res.data
-    if (res.data && 'users' in res.data && Array.isArray(res.data.users) && res.data.users.length) {
-      return res.data.users
-    }
+    const res = await request<Envelope<TopRankPayload>>(withKey('/api/top/online?p=1', apiKey))
+    const list = rankUsersOf(res.data)
+    if (list.length) return list
   } catch {
     /* anonymous top not ready */
   }
@@ -1357,11 +1359,8 @@ export async function fetchOnlineRank(apiKey?: string | null): Promise<RankUser[
 
 async function unwrapTopRank(path: string, apiKey?: string | null): Promise<RankUser[]> {
   try {
-    const res = await request<Envelope<RankUser[] | { users?: RankUser[] }>>(withKey(path, apiKey))
-    if (Array.isArray(res.data) && res.data.length) return res.data
-    if (res.data && 'users' in res.data && Array.isArray(res.data.users) && res.data.users.length) {
-      return res.data.users
-    }
+    const res = await request<Envelope<TopRankPayload>>(withKey(path, apiKey))
+    return rankUsersOf(res.data)
   } catch {
     /* login required or unavailable */
   }

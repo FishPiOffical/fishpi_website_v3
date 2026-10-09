@@ -13,8 +13,9 @@ import LogoMark from '@/components/LogoMark.vue'
 import RiskCaptchaGate from '@/components/RiskCaptchaGate.vue'
 import SystemAlertDialog from '@/components/SystemAlertDialog.vue'
 import WarnBroadcastDialog from '@/components/WarnBroadcastDialog.vue'
-import CountWidget from '@/components/CountWidget.vue'
-import { useCountStore } from '@/stores/count'
+import CountToast from '@/components/count/CountToast.vue'
+import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
+import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import { useLayoutStore } from '@/stores/layout'
 import { openRhythmPage } from '@/api/pageAuth'
 
@@ -107,7 +108,7 @@ const appearance = useAppearanceStore()
 const notices = useNoticeStore()
 const whispers = useWhisperStore()
 const chat = useChatStore()
-const countStore = useCountStore()
+const settingsDrawer = useSettingsDrawerStore()
 const { immersive } = storeToRefs(useLayoutStore())
 const { isLoggedIn, account, isVip } = storeToRefs(auth)
 const { total: unreadTotal } = storeToRefs(notices)
@@ -204,7 +205,7 @@ function logout() {
 
 function openCountSettings() {
   menuOpen.value = false
-  countStore.settingsOpen = true
+  settingsDrawer.show('income')
 }
 
 function toggleMenu(e: Event) {
@@ -366,7 +367,8 @@ onUnmounted(() => {
         </template>
       </div>
     </header>
-    <CountWidget />
+    <CountToast />
+    <SettingsDrawer />
     <AdSlot v-if="!immersive" slot-key="home.top" />
     <main :class="{ 'main--cr-modern': isModernChat, 'main--immersive': immersive }">
       <div v-if="ssrAuthShell" class="auth-shell" />
