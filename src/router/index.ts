@@ -381,6 +381,16 @@ export function createAppRouter(history?: RouterHistory) {
   const router = createRouter({
     history: history || (import.meta.env.SSR ? createMemoryHistory() : createWebHistory()),
     routes,
+    scrollBehavior(to, from, savedPosition) {
+      if (savedPosition) return savedPosition
+      if (to.hash) {
+        const navH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fp-nav-h')) || 58
+        const el = document.getElementById(decodeURIComponent(to.hash.slice(1)))
+        if (el) return { el, top: navH + 12 }
+      }
+      if (to.path === from.path && to.hash !== from.hash) return false
+      return { top: 0 }
+    },
   })
 
   router.beforeEach(async (to) => {
