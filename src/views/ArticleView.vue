@@ -43,6 +43,7 @@ import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
 import ArticleSkeleton from '@/components/ArticleSkeleton.vue'
 import CommentItem from '@/components/CommentItem.vue'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 import { readCache, writeCache } from '@/utils/swr'
 
 const route = useRoute()
@@ -58,6 +59,7 @@ const sendError = ref('')
 const actionMsg = ref('')
 const rewarding = ref(false)
 const rewardError = ref('')
+const zoomed = ref('')
 const replyId = ref('')
 const commentPage = ref(1)
 const heat = ref(0)
@@ -565,6 +567,12 @@ function startReply(c: ArticleComment) {
   else document.querySelector('.composer-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
+function onContentClick(e: MouseEvent) {
+  const img = (e.target as HTMLElement | null)?.closest('img')
+  if (!img || img.classList.contains('emoji') || img.closest('a')) return
+  zoomed.value = img.currentSrc || img.src
+}
+
 function itemProps(c: ArticleComment) {
   const own = isLoggedIn.value && isOwnComment(c)
   return {
@@ -690,7 +698,7 @@ async function onReactComment(c: ArticleComment, value: string) {
 
       <audio v-if="article.articleAudioURL" class="article-audio" :src="article.articleAudioURL" controls preload="none" />
 
-      <div ref="bodyEl" class="body" v-html="article.articleContent || ''" />
+      <div ref="bodyEl" class="body" @click="onContentClick" v-html="article.articleContent || ''" />
 
       <section v-if="Number(article.articleRewardPoint) > 0" class="reward-box" :class="{ unlocked: article.rewarded }">
         <header class="reward-head">
@@ -699,7 +707,12 @@ async function onReactComment(c: ArticleComment, value: string) {
             {{ article.articleRewardPoint }} 积分<template v-if="Number(article.rewardedCnt) > 0"> · {{ article.rewardedCnt }} 人已打赏</template>
           </span>
         </header>
-        <div v-if="article.rewarded" class="body reward-body" v-html="article.articleRewardContent || '<p>打赏区暂无内容</p>'" />
+        <div
+          v-if="article.rewarded"
+          class="body reward-body"
+          @click="onContentClick"
+          v-html="article.articleRewardContent || '<p>打赏区暂无内容</p>'"
+        />
         <div v-else class="reward-locked">
           <p>作者设置了打赏区，打赏 <b>{{ article.articleRewardPoint }}</b> 积分后可见</p>
           <button v-if="isLoggedIn" type="button" class="btn orange small" :disabled="rewarding" @click="reward">
@@ -926,6 +939,7 @@ async function onReactComment(c: ArticleComment, value: string) {
         </li>
       </ul>
     </section>
+    <ImageLightbox v-model="zoomed" />
   </div>
 </template>
 
@@ -1134,7 +1148,31 @@ h1 {
 }
 .body :deep(img) {
   max-width: 100%;
+  height: auto;
   border-radius: 4px;
+  cursor: zoom-in;
+}
+.body :deep(img.emoji) {
+  width: 20px;
+  height: 20px;
+  margin: 0 1px;
+  vertical-align: -4px;
+  cursor: default;
+}
+.body :deep(a img) {
+  cursor: pointer;
+}
+.reward-body :deep(img) {
+  max-width: min(480px, 100%);
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  vertical-align: middle;
+}
+.reward-body :deep(img[alt='图片表情']) {
+  max-height: 120px;
+  border-radius: 0;
 }
 .body :deep(pre) {
   overflow-x: auto;
