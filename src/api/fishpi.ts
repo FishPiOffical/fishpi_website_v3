@@ -80,8 +80,13 @@ export interface PrivacySettings {
 }
 
 export interface MetalItem {
+  /** 勋章定义 ID，现网用 `/gen?id=` 渲染勋章图 */
+  id?: string
   name?: string
   description?: string
+  /** 稀有度：普通 / 精良 / 稀有 / 史诗 / 传说 / 神话 / 限定 */
+  type?: string
+  order?: number
   attr?: string
   /** 解析自 attr，如 url=...&backcolor=...&fontcolor=... */
   url?: string
@@ -113,8 +118,11 @@ export function normalizeMetals(raw: unknown): MetalItem[] {
     if (!name) continue
     const attr = String(row.attr || '')
     const parsed: MetalItem = {
+      id: String(row.id ?? row.medalId ?? '').trim() || undefined,
       name,
       description: String(row.description || row.desc || ''),
+      type: String(row.type || '').trim() || undefined,
+      order: Number.isFinite(Number(row.order)) ? Number(row.order) : undefined,
       attr,
     }
     for (const part of attr.split('&')) {
@@ -124,11 +132,14 @@ export function normalizeMetals(raw: unknown): MetalItem[] {
       const v = decodeURIComponent(part.slice(i + 1))
       if (k === 'url') parsed.url = v
       if (k === 'backcolor') parsed.backcolor = v.startsWith('#') ? v : `#${v}`
-      if (k === 'fontcolor') parsed.fontcolor = v.startsWith('#') ? v : `#${v}`
+      if (k === 'fontcolor') {
+        const first = v.split(',')[0] || ''
+        parsed.fontcolor = first.startsWith('#') ? first : `#${first}`
+      }
     }
     out.push(parsed)
   }
-  return out
+  return out.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 }
 
 export interface UserProfile {
@@ -269,6 +280,7 @@ export interface ArticleComment {
   reactionSummary?: ReactionSummary[]
   currentUserReaction?: string
   commentQnAOffered?: number
+  sysMetal?: MetalItem[] | string
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -1825,19 +1837,13 @@ export async function fetchUserMedals(apiKey: string, userName: string) {
       : raw && typeof raw === 'object' && Array.isArray((raw as { list?: unknown[] }).list)
         ? (raw as { list: unknown[] }).list
         : []
-    const medals: MetalItem[] = []
-    for (const item of list) {
-      if (!item || typeof item !== 'object') continue
-      const row = item as Record<string, unknown>
-      const name = String(row.name || row.metalName || row.metal || '')
-      if (!name) continue
-      medals.push({
-        name,
-        description: String(row.description || row.desc || ''),
-        attr: String(row.attr || ''),
-      })
-    }
-    return medals
+    return normalizeMetals(
+      list.map((item) =>
+        item && typeof item === 'object' && !(item as { name?: unknown }).name
+          ? { ...(item as object), name: (item as { metal?: unknown }).metal }
+          : item,
+      ),
+    )
   } catch {
     return []
   }
@@ -2618,9 +2624,10 @@ export interface MyMedal {
   expireTime: number
 }
 
-export function medalImageUrl(medalId: string) {
+/** 现网勋章图（需页面会话，未登录时返回 0×0 空图）；mini 为聊天室用的无文字小图 */
+export function medalImageUrl(medalId: string, mini = false) {
   if (!medalId) return ''
-  return `/gen?id=${encodeURIComponent(medalId)}`
+  return `/gen?${mini ? 'mini=yes&' : ''}id=${encodeURIComponent(medalId)}`
 }
 
 export async function fetchMyMedals(apiKey: string): Promise<MyMedal[]> {
@@ -2778,6 +2785,7 @@ export interface ChatHistoryItem {
   type?: string
   reactionSummary?: ReactionSummary[]
   currentUserReaction?: string
+  sysMetal?: MetalItem[] | string
 }
 
 export interface RedPacketContent {
@@ -2788,6 +2796,8 @@ export interface RedPacketContent {
   msg?: string
   type?: string
   recivers?: string[]
+  senderId?: string
+  who?: { userId?: string; userName?: string; money?: number; gesture?: number }[]
 }
 
 export interface MuteItem {

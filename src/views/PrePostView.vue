@@ -28,13 +28,20 @@ const OPTIONS = [
 
 <style scoped>
 .pre-post {
+  display: block;
   max-width: 960px;
   margin: 0 auto;
+  padding: 24px;
+  box-sizing: border-box;
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: 12px;
 }
 .pre-post h1 {
   font-size: 18px;
   margin: 0 0 20px;
   text-align: center;
+  color: var(--fp-title);
 }
 .grid {
   display: grid;

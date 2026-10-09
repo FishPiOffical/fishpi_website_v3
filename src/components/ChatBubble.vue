@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import ImageLightbox from '@/components/ImageLightbox.vue'
+import MedalList from '@/components/medal/MedalList.vue'
 
 withDefaults(
   defineProps<{
@@ -11,8 +12,9 @@ withDefaults(
     time?: string
     html?: string
     self?: boolean
+    medals?: unknown
   }>(),
-  { nickname: '', avatar: '', time: '', html: '', self: false },
+  { nickname: '', avatar: '', time: '', html: '', self: false, medals: undefined },
 )
 
 const zoomed = ref('')
@@ -31,9 +33,12 @@ function onBodyClick(e: MouseEvent) {
       <img class="fp-avatar" :src="avatar || '/favicon.svg'" alt="" loading="lazy" />
     </RouterLink>
     <div class="fp-bubble" @click="onBodyClick">
-      <RouterLink :to="`/member/${userName}`" class="name">
-        {{ nickname || userName }}<small v-if="nickname && nickname !== userName">({{ userName }})</small>
-      </RouterLink>
+      <div class="head">
+        <RouterLink :to="`/member/${userName}`" class="name">
+          {{ nickname || userName }}<small v-if="nickname && nickname !== userName">({{ userName }})</small>
+        </RouterLink>
+        <MedalList :items="medals" variant="chat" />
+      </div>
       <slot>
         <div class="vditor-reset body" v-html="html" />
       </slot>
@@ -53,6 +58,7 @@ function onBodyClick(e: MouseEvent) {
   gap: 10px;
   align-items: flex-start;
   max-width: 88%;
+  overflow: visible;
 }
 .fp-msg.is-self {
   margin-left: auto;
@@ -67,10 +73,20 @@ function onBodyClick(e: MouseEvent) {
   padding: 6px 12px 4px;
   border-radius: 6px;
   background: var(--fp-hover);
+  overflow: visible;
   overflow-wrap: anywhere;
 }
 .is-self .fp-bubble {
   background: var(--fp-self);
+}
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+.is-self .head {
+  flex-direction: row-reverse;
 }
 .name {
   display: block;

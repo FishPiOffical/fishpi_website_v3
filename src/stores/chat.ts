@@ -32,6 +32,7 @@ export interface ChatLine {
   card?: ChatCardData
   reactionSummary?: ReactionSummary[]
   currentUserReaction?: string
+  sysMetal?: unknown
 }
 
 export interface OnlineUser {
@@ -82,6 +83,7 @@ function asLine(item: ChatHistoryItem | Record<string, unknown>): ChatLine {
     card,
     reactionSummary: (item as ChatHistoryItem).reactionSummary,
     currentUserReaction: (item as ChatHistoryItem).currentUserReaction,
+    sysMetal: item.sysMetal,
   }
 }
 
@@ -236,6 +238,12 @@ export const useChatStore = defineStore('chat', () => {
           pushIncoming({ ...msg, content })
         } else if (msg.type === 'redPacketStatus') {
           lastPacket.value = `${msg.whoGot} 领取了 ${msg.whoGive} 的红包`
+          const line = messages.value.find((m) => m.oId === String(msg.oId ?? ''))
+          if (line?.redPacket) {
+            const got = Number(msg.got ?? line.redPacket.got ?? 0)
+            const count = Number(msg.count ?? line.redPacket.count ?? 0)
+            line.redPacket = { ...line.redPacket, got, count }
+          }
         } else if (msg.type === 'chatReaction') {
           const line = messages.value.find((m) => m.oId === String(msg.oId || msg.targetId || ''))
           if (line) {

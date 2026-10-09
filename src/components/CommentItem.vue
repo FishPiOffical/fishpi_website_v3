@@ -5,6 +5,7 @@ import type { ArticleComment } from '@/api/fishpi'
 import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
+import MedalList from '@/components/medal/MedalList.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -19,8 +20,20 @@ const props = withDefaults(
     readonly?: boolean
     editing?: boolean
     apiKey?: string | null
+    /** 长篇文章评论不展示勋章（与现网一致） */
+    hideMedals?: boolean
   }>(),
-  { reply: false, replyTo: '', loggedIn: false, own: false, canAccept: false, readonly: false, editing: false, apiKey: '' },
+  {
+    reply: false,
+    replyTo: '',
+    loggedIn: false,
+    own: false,
+    canAccept: false,
+    readonly: false,
+    editing: false,
+    apiKey: '',
+    hideMedals: false,
+  },
 )
 
 const emit = defineEmits<{
@@ -66,6 +79,7 @@ function onBodyClick(e: MouseEvent) {
       <div class="cmt-main">
         <header class="cmt-head">
           <RouterLink :to="`/member/${author}`" class="name">{{ author }}</RouterLink>
+          <MedalList v-if="!hideMedals" :items="comment.sysMetal" class="cmt-medals" />
           <span v-if="replyTo" class="reply-to">回复 @{{ replyTo }}</span>
           <time class="time" :title="fullTime">{{ shownTime }}</time>
         </header>

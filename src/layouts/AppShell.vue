@@ -2,6 +2,7 @@
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ensureMedalSession } from '@/utils/medalSession'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useNoticeStore } from '@/stores/notices'
@@ -17,7 +18,7 @@ import { useCountStore } from '@/stores/count'
 import { useLayoutStore } from '@/stores/layout'
 import { openRhythmPage } from '@/api/pageAuth'
 
-const nav = [
+const baseNav = [
   { to: '/', label: '最新' },
   { to: '/column', label: '专栏' },
   { to: '/hot', label: '热门' },
@@ -26,8 +27,7 @@ const nav = [
   { to: '/breezemoons', label: '清风明月' },
   { to: '/qna', label: '问答' },
   { to: '/perfect', label: '优选' },
-  { to: '/top', label: '总榜' },
-]
+] as const
 
 /** 与现网 footer 赞助卡对齐（静态，非广告位拉取） */
 const partnerCards = [
@@ -118,23 +118,54 @@ const isModernChat = computed(() => route.path === '/cr' && chat.chatStyle === '
 const memberPath = computed(() => (account.value?.userName ? `/member/${account.value.userName}` : '/login'))
 const avatarUrl = computed(() => account.value?.userAvatarURL || '')
 const displayName = computed(() => account.value?.userNickname || account.value?.userName || '')
+const userCity = computed(() => (account.value?.userCity || '').trim())
 const menuOpen = ref(false)
 
-const accountMenu = computed(() => {
+/** 与现网 header.ftl nav-tabs 顺序一致：优选 → [城市] → 总榜 → [关注] */
+const navItems = computed(() => {
+  const items: { to: string; label: string; key: string }[] = baseNav.map((item) => ({
+    ...item,
+    key: item.to,
+  }))
+  if (isLoggedIn.value && userCity.value) {
+    items.push({
+      to: `/city/${encodeURIComponent(userCity.value)}`,
+      label: userCity.value,
+      key: 'city',
+    })
+  }
+  items.push({ to: '/top', label: '总榜', key: 'top' })
+  if (isLoggedIn.value) {
+    items.push({ to: '/watch', label: '关注', key: 'watch' })
+  }
+  return items
+})
+
+function navCurrent(item: { to: string; key: string }) {
+  const path = route.path
+  if (item.key === 'city') return path.startsWith('/city/')
+  if (item.to === '/') return path === '/'
+  if (item.to === '/column') {
+    return path === '/column' || path === '/recent/long' || path.startsWith('/column/')
+  }
+  if (item.to === '/top') return path === '/top' || path.startsWith('/top/')
+  if (item.to === '/watch') return path === '/watch' || path.startsWith('/watch/')
+  return path === item.to || path.startsWith(`${item.to}/`)
+}
+
+/** 与现网 person-list 对齐（倒计时为按钮，插在设置后） */
+const accountMenuTop = computed(() => {
   const name = account.value?.userName
   return [
     { to: name ? `/member/${name}` : '/login', label: '我的主页' },
-    { to: '/points', label: '积分', hint: account.value?.userPoint != null ? Number(account.value.userPoint).toLocaleString() : '' },
-    { to: '/vips', label: isVip.value ? '我的 VIP' : '开通 VIP' },
-    { to: '/stars', label: '收藏' },
-    { to: '/watch', label: '关注' },
     { to: '/settings', label: '设置' },
-    { to: '/activity', label: '活动' },
-    { to: '/games', label: '游戏 / 鱼游' },
-    { to: '/logs', label: '公开日志' },
-    { to: '/charge/point', label: '捐助' },
   ]
 })
+const accountMenuBottom = computed(() => [
+  { to: '/charge/point', label: '❤ 捐助' },
+  { to: '/vips', label: isVip.value ? '👑 我的 VIP' : '👑 开通 VIP' },
+  { to: '/settings/help', label: '帮助' },
+])
 
 watch(
   () => auth.apiKey,
@@ -143,6 +174,7 @@ watch(
       void notices.refresh()
       notices.connect()
       void whispers.refreshUnread()
+      void ensureMedalSession(key)
     } else {
       notices.disconnect()
       notices.clear()
@@ -216,18 +248,12 @@ onUnmounted(() => {
       <RouterLink to="/" class="logo" aria-label="摸鱼派">
         <LogoMark />
       </RouterLink>
-      <nav>
+      <nav class="nav-tabs">
         <RouterLink
-          v-for="item in nav"
-          :key="item.to"
+          v-for="item in navItems"
+          :key="item.key"
           :to="item.to"
-          :class="{
-            current:
-              route.path === item.to ||
-              (item.to === '/column' &&
-                (route.path === '/recent/long' || route.path.startsWith('/column/'))) ||
-              (item.to === '/top' && route.path.startsWith('/top/')),
-          }"
+          :class="{ current: navCurrent(item) }"
         >
           {{ item.label }}
         </RouterLink>
@@ -235,15 +261,52 @@ onUnmounted(() => {
       <input class="search" placeholder="搜索你感兴趣的内容" @keydown.enter="onSearch" />
       <div class="user">
         <template v-if="isLoggedIn">
-          <RouterLink to="/pre-post" class="bar-link">发帖</RouterLink>
-          <RouterLink to="/games" class="bar-link" title="活动">游戏</RouterLink>
-          <RouterLink to="/chat" class="bar-link icon-link" title="私信">
-            私信
-            <em v-if="whisperUnread" class="badge">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</em>
+          <RouterLink to="/games" class="bar-icon" title="活动" aria-label="活动">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M21 6H3a1 1 0 0 0-1 1v4a5 5 0 0 0 5 5h1l1 2h2l1-2h4l1 2h2l1-2h1a5 5 0 0 0 5-5V7a1 1 0 0 0-1-1zM7.5 13.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9-1h-1v1h-2v-1h-1v-2h1v-1h2v1h1v2z"
+              />
+            </svg>
           </RouterLink>
-          <RouterLink to="/notifications" class="bar-link icon-link" title="通知">
-            通知
-            <em v-if="unreadTotal" class="badge">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</em>
+          <button type="button" class="bar-icon theme" title="切换颜色模式" @click="appearance.toggleTheme()">
+            ◐
+          </button>
+          <RouterLink
+            to="/notifications"
+            class="bar-icon count-link"
+            :class="{ 'has-msg': unreadTotal > 0 }"
+            title="通知"
+            aria-label="通知"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 1 0-14 0v5l-2 2v1h18v-1l-2-2z"
+              />
+            </svg>
+            <span>{{ unreadTotal > 99 ? '99+' : unreadTotal }}</span>
+          </RouterLink>
+          <RouterLink
+            to="/chat"
+            class="bar-icon count-link"
+            :class="{ 'has-msg': whisperUnread > 0 }"
+            title="私信"
+            aria-label="私信"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 3v-3H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
+              />
+            </svg>
+            <span>{{ whisperUnread > 99 ? '99+' : whisperUnread }}</span>
+          </RouterLink>
+          <RouterLink to="/pre-post" class="nav-pre-post" title="发帖">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z" />
+            </svg>
+            <span>发帖</span>
           </RouterLink>
           <div class="user-menu" :class="{ open: menuOpen }">
             <button
@@ -272,16 +335,24 @@ onUnmounted(() => {
                 </p>
               </div>
               <RouterLink
-                v-for="item in accountMenu"
+                v-for="item in accountMenuTop"
                 :key="item.to"
                 :to="item.to"
                 role="menuitem"
                 @click="menuOpen = false"
               >
-                <span>{{ item.label }}</span>
-                <em v-if="item.hint">{{ item.hint }}</em>
+                {{ item.label }}
               </RouterLink>
               <button type="button" class="menu-btn" role="menuitem" @click="openCountSettings">⏰ 下班倒计时</button>
+              <RouterLink
+                v-for="item in accountMenuBottom"
+                :key="item.to"
+                :to="item.to"
+                role="menuitem"
+                @click="menuOpen = false"
+              >
+                {{ item.label }}
+              </RouterLink>
               <button type="button" class="logout" role="menuitem" @click="logout">退出登录</button>
             </div>
           </div>
@@ -289,8 +360,10 @@ onUnmounted(() => {
         <template v-else>
           <RouterLink to="/login">登录</RouterLink>
           <RouterLink to="/register">注册</RouterLink>
+          <button type="button" class="bar-icon theme" title="切换颜色模式" @click="appearance.toggleTheme()">
+            ◐
+          </button>
         </template>
-        <button type="button" class="theme" title="切换颜色模式" @click="appearance.toggleTheme()">◐</button>
       </div>
     </header>
     <CountWidget />
@@ -301,85 +374,85 @@ onUnmounted(() => {
     </main>
     <footer v-if="!isModernChat && !immersive" class="foot">
       <div class="foot-inner">
-        <p class="slogan">摸鱼派 - 鱼油专属摸鱼社区</p>
-        <div class="foot-main">
-          <div class="partner-row">
-            <a
-              v-for="p in partnerCards"
-              :key="p.href"
-              class="partner"
-              :href="p.href"
-              target="_blank"
-              rel="noopener"
-              :style="{ color: p.color, background: p.bg }"
-            >
-              <span class="partner-title">
-                <img v-if="p.icon" :src="p.icon" width="14" height="14" alt="" />
-                {{ p.title }}
-              </span>
-              <span class="partner-desc">{{ p.desc }}</span>
-            </a>
-          </div>
+        <div class="partner-row">
+          <a
+            v-for="p in partnerCards"
+            :key="p.href"
+            class="partner"
+            :href="p.href"
+            target="_blank"
+            rel="noopener"
+            :style="{ color: p.color, background: p.bg }"
+          >
+            <span class="partner-title">
+              <img v-if="p.icon" :src="p.icon" width="16" height="16" alt="" />
+              {{ p.title }}
+            </span>
+            <span class="partner-desc">{{ p.desc }}</span>
+          </a>
+        </div>
 
-          <div class="foot-block">
+        <div class="foot-nav">
+          <div class="foot-col">
             <div class="foot-label">摸鱼好站</div>
-            <p class="pipe-links">
-              <template v-for="(s, i) in goodSites" :key="s.href">
-                <span v-if="i">｜</span>
-                <a :href="s.href" target="_blank" rel="noopener">{{ s.label }}</a>
-              </template>
-            </p>
+            <div class="foot-links">
+              <a v-for="s in goodSites" :key="s.href" :href="s.href" target="_blank" rel="noopener">{{ s.label }}</a>
+            </div>
           </div>
-
-          <div class="foot-block">
+          <div class="foot-col">
             <div class="foot-label">探索</div>
-            <p class="pipe-links">
-              <template v-for="(s, i) in exploreLinks" :key="s.href">
-                <span v-if="i">｜</span>
+            <div class="foot-links">
+              <template v-for="s in exploreLinks" :key="s.href">
                 <a v-if="s.external" :href="s.href" target="_blank" rel="noopener">{{ s.label }}</a>
                 <a v-else-if="'rhythm' in s" :href="s.href" @click.prevent="openRhythm(s.href)">{{ s.label }}</a>
                 <RouterLink v-else :to="s.href">{{ s.label }}</RouterLink>
               </template>
-            </p>
-            <p class="clients">
-              <RouterLink to="/download">摸鱼派客户端</RouterLink>
-              <span class="client-icons">
-                <RouterLink v-for="c in clientLinks" :key="c.href" :to="c.href" :title="c.label">{{
-                  c.label
-                }}</RouterLink>
-              </span>
-            </p>
-          </div>
-
-          <div class="foot-legal">
-            <div class="copy">
-              <p>Copyright © 2021 - 2026 W&amp;P Tech. All Rights Reserved. 北京白与画科技有限公司 版权所有</p>
-              <p class="beian">
-                <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">京ICP备2022000226号-1</a>
-                <a
-                  href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=11011302003886"
-                  target="_blank"
-                  rel="noopener"
-                  class="police"
-                >
-                  <img
-                    src="https://mbdp01.bdstatic.com/static/landing-pc/img/icon_police.7296bdfd.png"
-                    width="16"
-                    height="16"
-                    alt=""
-                  />
-                  京公网安备 11011302003886号
-                </a>
-              </p>
             </div>
-            <p class="legal-links">
+          </div>
+          <div class="foot-col">
+            <div class="foot-label">摸鱼派客户端</div>
+            <div class="foot-links">
+              <RouterLink to="/download" class="client-main">客户端下载</RouterLink>
+              <div class="client-icons">
+                <RouterLink v-for="c in clientLinks" :key="c.href" :to="c.href" :title="c.label">{{ c.label }}</RouterLink>
+              </div>
+            </div>
+          </div>
+          <div class="foot-col">
+            <div class="foot-label">关于 & 支持</div>
+            <div class="foot-links">
               <template v-for="item in legalLinks" :key="item.href">
                 <a v-if="item.external" :href="item.href" target="_blank" rel="noopener">{{ item.label }}</a>
-                <a v-else-if="'rhythm' in item" :href="item.href" @click.prevent="openRhythm(item.href)">{{
-                  item.label
-                }}</a>
+                <a v-else-if="'rhythm' in item" :href="item.href" @click.prevent="openRhythm(item.href)">{{ item.label }}</a>
                 <RouterLink v-else :to="item.href">{{ item.label }}</RouterLink>
               </template>
+            </div>
+          </div>
+        </div>
+
+        <div class="foot-bottom">
+          <div class="slogan-box">
+            <img src="/logo.png" alt="" class="foot-logo" width="24" height="24" />
+            <span class="slogan">摸鱼派 - 鱼油专属摸鱼社区</span>
+          </div>
+          <div class="copy">
+            <p>Copyright © 2021 - 2026 W&amp;P Tech. All Rights Reserved. 北京白与画科技有限公司 版权所有</p>
+            <p class="beian">
+              <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">京ICP备2022000226号-1</a>
+              <a
+                href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=11011302003886"
+                target="_blank"
+                rel="noopener"
+                class="police"
+              >
+                <img
+                  src="https://mbdp01.bdstatic.com/static/landing-pc/img/icon_police.7296bdfd.png"
+                  width="16"
+                  height="16"
+                  alt=""
+                />
+                京公网安备 11011302003886号
+              </a>
             </p>
           </div>
         </div>
@@ -444,13 +517,20 @@ onUnmounted(() => {
 .logo :deep(.logo-animate) {
   display: block;
 }
-nav {
+.nav-tabs {
   display: flex;
-  gap: 18px;
+  align-items: center;
+  gap: 2px;
   flex: 1;
+  min-width: 0;
   justify-content: center;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-nav a {
+.nav-tabs::-webkit-scrollbar {
+  display: none;
+}
+.nav-tabs a {
   color: var(--fp-nav-text);
   text-decoration: none;
   font-size: 14px;
@@ -458,8 +538,8 @@ nav a {
   padding: 6px 10px;
   border-radius: 6px;
 }
-nav a.current,
-nav a:hover {
+.nav-tabs a.current,
+.nav-tabs a:hover {
   color: var(--fp-accent);
   background: var(--fp-hover);
 }
@@ -471,43 +551,72 @@ nav a:hover {
   color: var(--fp-nav-text);
   border-radius: 3px;
   padding: 5px 8px;
+  flex-shrink: 0;
 }
 .user {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
   font-size: 14px;
   flex-shrink: 0;
 }
-.user > a,
-.bar-link {
+.user > a {
   color: var(--fp-nav-text);
   text-decoration: none;
-  position: relative;
   white-space: nowrap;
 }
-.user > a:hover,
-.bar-link:hover {
+.user > a:hover {
   color: var(--fp-accent);
 }
-.icon-link {
-  padding-right: 4px;
+.bar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fp-nav-text);
+  text-decoration: none;
+  cursor: pointer;
+  line-height: 1;
 }
-.badge {
-  position: absolute;
-  top: -8px;
-  right: -10px;
-  min-width: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: #c45c4a;
-  color: #fff;
-  font-size: 10px;
-  font-style: normal;
-  text-align: center;
+.bar-icon:hover {
+  color: var(--fp-accent);
+  background: var(--fp-hover);
+}
+.bar-icon.theme {
+  font-size: 18px;
+}
+.count-link span {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  min-width: 1ch;
+}
+.count-link.has-msg {
+  color: var(--fp-accent);
+}
+.nav-pre-post {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--fp-nav-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.nav-pre-post:hover {
+  color: var(--fp-accent);
+  background: var(--fp-hover);
 }
 .user-menu {
   position: relative;
+  margin-left: 4px;
 }
 .avatar-btn {
   display: flex;
@@ -549,7 +658,7 @@ nav a:hover {
   border: 1px solid var(--fp-border);
   border-radius: 10px;
   box-shadow: var(--fp-card-shadow, 0 8px 24px rgba(0, 0, 0, 0.12));
-  padding: 8px 0;
+  padding: 0;
   opacity: 0;
   visibility: hidden;
   transform: translateY(-4px);
@@ -558,6 +667,7 @@ nav a:hover {
     transform 0.12s ease,
     visibility 0.12s;
   z-index: 40;
+  overflow: hidden;
 }
 .user-menu:hover .menu,
 .user-menu.open .menu {
@@ -566,22 +676,33 @@ nav a:hover {
   transform: translateY(0);
 }
 .menu-head {
-  padding: 8px 12px 10px;
+  padding: 10px 12px 12px;
   border-bottom: 1px solid var(--fp-border);
-  margin-bottom: 4px;
 }
 .menu-user {
   display: flex;
   gap: 10px;
   align-items: center;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent !important;
   text-decoration: none;
-  color: inherit;
+  color: inherit !important;
+  cursor: pointer;
+}
+.menu-user:hover,
+.menu-user.router-link-active,
+.menu-user.router-link-exact-active {
+  background: transparent !important;
+  color: inherit !important;
 }
 .menu-user img {
   width: 40px;
   height: 40px;
   border-radius: 50%;
   object-fit: cover;
+  flex-shrink: 0;
 }
 .menu-user b {
   display: block;
@@ -603,13 +724,10 @@ nav a:hover {
   color: var(--fp-accent);
   font-weight: 600;
 }
-.menu a,
+.menu > a:not(.menu-user),
 .menu-btn,
 .logout {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
+  display: block;
   width: 100%;
   padding: 8px 14px;
   font-size: 13px;
@@ -617,35 +735,24 @@ nav a:hover {
   text-decoration: none;
   background: transparent;
   border: 0;
+  border-bottom: 1px solid var(--fp-border);
   text-align: left;
   font-family: inherit;
   cursor: pointer;
   box-sizing: border-box;
+  line-height: 21px;
 }
-.menu a:hover,
+.menu > :last-child {
+  border-bottom: 0;
+}
+.menu > a:not(.menu-user):hover,
 .menu-btn:hover,
 .logout:hover {
   background: var(--fp-hover);
   color: var(--fp-accent);
 }
-.menu a em {
-  font-style: normal;
-  color: var(--fp-muted);
-  font-size: 12px;
-}
 .logout {
-  border-top: 1px solid var(--fp-border);
-  margin-top: 4px;
   color: #c45c4a;
-}
-.theme {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--fp-border) !important;
-  background: transparent;
-  color: var(--fp-nav-text);
-  cursor: pointer;
 }
 main {
   max-width: var(--fp-wrap);
@@ -663,42 +770,33 @@ main.main--cr-modern {
 .foot {
   background: var(--fp-footer);
   color: var(--fp-nav-text);
-  padding: 24px 0 36px;
+  padding: 32px 0;
 }
 .foot-inner {
   max-width: var(--fp-wrap);
   margin: 0 auto;
   padding: 0 15px;
   display: flex;
-  gap: 28px;
-  align-items: flex-start;
-}
-.slogan {
-  flex: 0 0 160px;
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.5;
-  color: var(--fp-nav-text);
-}
-.foot-main {
-  flex: 1;
-  min-width: 0;
+  flex-direction: column;
+  gap: 32px;
 }
 .partner-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 16px;
 }
 .partner {
-  width: 175px;
+  flex: 1 1 200px;
   text-align: center;
-  padding: 8px 0;
-  line-height: 20px;
-  border-radius: 12px;
+  padding: 12px;
+  line-height: 1.4;
+  border-radius: 8px;
   text-decoration: none;
-  font-size: 12px;
+  font-size: 13px;
+  transition: transform 0.2s;
+}
+.partner:hover {
+  transform: translateY(-2px);
 }
 .partner-title {
   display: flex;
@@ -706,71 +804,128 @@ main.main--cr-modern {
   justify-content: center;
   gap: 6px;
   font-weight: 600;
+  margin-bottom: 4px;
 }
 .partner-title img {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
 }
 .partner-desc {
   display: block;
-  color: #323232;
-  margin-top: 2px;
+  opacity: 0.8;
+  color: inherit;
 }
-.foot-block {
-  margin-bottom: 10px;
-  font-size: 12px;
+.foot-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 24px;
+  border-top: 1px solid var(--fp-border);
+  border-bottom: 1px solid var(--fp-border);
+  padding: 24px 0;
+}
+.foot-col {
+  flex: 1;
+  min-width: 140px;
 }
 .foot-label {
-  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fp-title);
+  margin-bottom: 12px;
+}
+.foot-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--fp-nav-text);
 }
-.pipe-links,
-.clients,
-.legal-links {
-  margin: 0;
-  line-height: 1.8;
-}
-.pipe-links a,
-.clients a,
-.legal-links a,
-.beian a {
+.foot-links a {
   color: var(--fp-nav-text);
   text-decoration: none;
+  transition: color 0.2s;
 }
-.pipe-links a:hover,
-.clients a:hover,
-.legal-links a:hover,
-.beian a:hover {
+.foot-links a:hover {
   color: var(--fp-accent);
 }
-.pipe-links span {
-  margin: 0 4px;
-  color: var(--fp-muted);
-  opacity: 0.7;
-}
-.clients {
-  margin-top: 4px;
+.client-main {
+  font-weight: 600;
+  color: var(--fp-primary) !important;
 }
 .client-icons {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-left: 10px;
+  gap: 6px;
+  margin-top: 2px;
 }
 .client-icons a {
-  font-size: 11px;
+  background: var(--fp-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  border: 1px solid var(--fp-border);
   opacity: 0.85;
 }
-.foot-legal {
-  margin-top: 14px;
+.client-icons a:hover {
+  border-color: var(--fp-accent);
+  color: var(--fp-accent);
+  opacity: 1;
+}
+.foot-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
   font-size: 12px;
+}
+.slogan-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.slogan {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fp-title);
+}
+.copy {
+  text-align: right;
+  line-height: 1.6;
 }
 .copy p {
   margin: 0 0 6px;
   color: var(--fp-muted);
-  line-height: 1.5;
+}
+.beian {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.beian a {
+  color: var(--fp-nav-text);
+  text-decoration: none;
+}
+.beian a:hover {
+  color: var(--fp-accent);
+}
+.police {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 768px) {
+  .foot-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .copy, .beian {
+    text-align: left;
+    justify-content: flex-start;
+  }
 }
 .beian {
   display: flex;
@@ -790,10 +945,7 @@ main.main--cr-modern {
   margin-top: 10px;
 }
 @media (max-width: 1200px) {
-  nav {
-    gap: 2px;
-  }
-  nav a {
+  .nav-tabs a {
     padding: 6px 7px;
   }
   .search {
@@ -801,11 +953,25 @@ main.main--cr-modern {
   }
 }
 @media (max-width: 960px) {
-  .search {
-    width: 120px;
+  .nav {
+    justify-content: space-between;
+    gap: 6px;
+    padding: 5px 10px;
   }
-  .bar-link {
-    font-size: 13px;
+  .nav-tabs {
+    justify-content: flex-start;
+  }
+  .nav-tabs a {
+    padding: 4px 8px;
+  }
+  .search {
+    display: none;
+  }
+  .user {
+    gap: 2px;
+  }
+  .nav-pre-post span {
+    display: none;
   }
   .foot-inner {
     flex-direction: column;
@@ -813,36 +979,6 @@ main.main--cr-modern {
   }
   .slogan {
     flex: none;
-  }
-}
-@media (max-width: 960px) {
-  .nav {
-    flex-wrap: wrap;
-    justify-content: space-between;
-    height: auto;
-    row-gap: 2px;
-    padding: 5px 10px 0;
-  }
-  nav {
-    order: 3;
-    flex: 0 0 100%;
-    justify-content: flex-start;
-    gap: 2px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 4px;
-  }
-  nav::-webkit-scrollbar {
-    display: none;
-  }
-  nav a {
-    padding: 4px 8px;
-  }
-  .search {
-    display: none;
-  }
-  .user {
-    gap: 10px;
   }
 }
 </style>

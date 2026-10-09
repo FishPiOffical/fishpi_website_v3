@@ -33,7 +33,7 @@ import {
   type ReactionSummary,
 } from '@/api/fishpi'
 import ChatComposer from '@/components/ChatComposer.vue'
-import MetalBadges from '@/components/MetalBadges.vue'
+import MedalList from '@/components/medal/MedalList.vue'
 import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
@@ -603,6 +603,7 @@ function itemProps(c: ArticleComment) {
     canAccept: isLoggedIn.value && canEdit.value && isQnA.value && !c.commentQnAOffered && !own,
     editing: editingId.value === c.oId,
     apiKey: apiKey.value,
+    hideMedals: isLong.value,
   }
 }
 
@@ -865,7 +866,8 @@ async function onReactComment(c: ArticleComment, value: string) {
         </div>
 
         <div v-if="metals.length" class="article-metals">
-          <MetalBadges :items="metals" />
+          <span class="article-metals-label">作者勋章</span>
+          <MedalList :items="metals" />
         </div>
 
         <p v-if="String(article.oId).startsWith('mock-')" class="hint">
@@ -1173,7 +1175,15 @@ h1 {
 }
 
 .article-metals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 14px;
+}
+.article-metals-label {
+  color: var(--fp-muted);
+  font-size: 12px;
 }
 
 .body {

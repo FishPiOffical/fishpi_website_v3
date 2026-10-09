@@ -152,3 +152,6 @@ vite.config.ts.timestamp-*
 .turbo
 
 .DS_Store
+
+# JetBrains IDE
+.idea/

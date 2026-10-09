@@ -22,7 +22,8 @@ import {
   type UserProfile,
 } from '@/api/fishpi'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
-import MetalBadges from '@/components/MetalBadges.vue'
+import MedalIcon from '@/components/medal/MedalIcon.vue'
+import MedalList from '@/components/medal/MedalList.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeMemberPayload } from '@/seo/payload'
@@ -431,15 +432,12 @@ async function sendPoints() {
         <!-- 徽章与勋章 -->
         <div v-else-if="activeTab === 'medals'" class="tab-panel medals-panel">
           <div v-if="allMedals.length" class="medals-grid">
-            <div
-              v-for="item in allMedals"
-              :key="item.name"
-              class="medal-card"
-              :style="{ borderColor: item.backcolor || 'var(--fp-border)' }"
-            >
-              <img v-if="item.url" class="medal-icon" :src="item.url" :alt="item.name" />
+            <div v-for="item in allMedals" :key="item.id || item.name" class="medal-card">
+              <MedalIcon :medal="item" :tooltip="false" />
               <div class="medal-info">
-                <b class="medal-name" :style="{ color: item.fontcolor || 'inherit' }">{{ item.name }}</b>
+                <b class="medal-name">
+                  {{ item.name }}<small v-if="item.type" class="medal-type">[{{ item.type }}]</small>
+                </b>
                 <span v-if="item.description" class="medal-desc">{{ item.description }}</span>
               </div>
             </div>
@@ -477,25 +475,42 @@ async function sendPoints() {
     <!-- 主体右侧用户卡片 (对齐现网 Rhythm home/home-side.ftl) -->
     <div class="side">
       <div v-if="profile" class="module profile-module">
-        <!-- 封面图背景 -->
+        <!-- 有封面时用完整封面图；无封面时用头像柔光铺底并淡进卡片 -->
         <div
+          v-if="profile.cardBg"
           class="user-background"
-          :style="
-            profile.cardBg
-              ? { backgroundImage: `url('${profile.cardBg}')` }
-              : { background: 'linear-gradient(135deg, #74ebd5 0%, #9face6 100%)' }
-          "
+          :style="{ backgroundImage: `url('${profile.cardBg}')` }"
         />
+        <template v-else>
+          <div
+            v-if="profile.userAvatarURL210 || profile.userAvatarURL"
+            class="soft-bg"
+            aria-hidden="true"
+          >
+            <div
+              class="soft-bg-img"
+              :style="{
+                backgroundImage: `url('${profile.userAvatarURL210 || profile.userAvatarURL}')`,
+              }"
+            />
+          </div>
+          <div class="user-background-spacer" />
+        </template>
 
-        <!-- 外突居中圆形大头像 -->
-        <div class="avatar-wrap">
-          <img
-            v-if="profile.userAvatarURL"
+        <div class="avatar-stage" :class="{ 'avatar-stage--overlap': !!profile.cardBg }">
+          <div
             class="user-card-avatar"
-            :src="profile.userAvatarURL"
-            :alt="profile.userName"
-          />
-          <div v-else class="user-card-avatar fallback">{{ profile.userName.slice(0, 1) }}</div>
+            :aria-label="profile.userName"
+            :style="
+              profile.userAvatarURL210 || profile.userAvatarURL
+                ? { backgroundImage: `url('${profile.userAvatarURL210 || profile.userAvatarURL}')` }
+                : undefined
+            "
+          >
+            <span v-if="!(profile.userAvatarURL210 || profile.userAvatarURL)" class="user-card-avatar-fallback">
+              {{ profile.userName.slice(0, 1) }}
+            </span>
+          </div>
         </div>
 
         <!-- 名字与徽章区 -->
@@ -505,7 +520,7 @@ async function sendPoints() {
 
           <!-- 勋章小图标 -->
           <div v-if="profile.sysMetal?.length" class="side-metals">
-            <MetalBadges :items="profile.sysMetal" />
+            <MedalList :items="profile.sysMetal" />
           </div>
 
           <!-- 身份徽章与在线标识 -->
@@ -807,24 +822,29 @@ async function sendPoints() {
 
 .medal-card {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   padding: 10px 12px;
   background: var(--fp-hover);
   border: 1px solid var(--fp-border);
   border-radius: 8px;
 }
 
-.medal-icon {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
+.medal-card > .medal {
+  flex-shrink: 0;
+}
+.medal-type {
+  margin-left: 4px;
+  font-weight: 400;
+  color: var(--fp-muted);
 }
 
 .medal-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -836,11 +856,9 @@ async function sendPoints() {
 }
 
 .medal-desc {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--fp-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.5;
 }
 
 /* 职业资料面板 */
@@ -886,39 +904,109 @@ async function sendPoints() {
 
 /* 右侧用户卡片 */
 .profile-module {
+  position: relative;
   overflow: hidden;
   text-align: center;
 }
 
-.user-background {
-  height: 90px;
-  background-size: cover;
-  background-position: center;
+/* 无封面：淡淡的头像色晕 + 主题色，整段向下融进卡片，不形成色块 */
+.soft-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 100%;
+  height: 70%;
+  max-height: 360px;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 80% at 50% -10%,
+    color-mix(in srgb, var(--fp-primary) 16%, var(--fp-card)) 0%,
+    var(--fp-card) 70%
+  );
 }
 
-.avatar-wrap {
+.soft-bg-img {
+  position: absolute;
+  top: -20%;
+  left: -10%;
+  width: 120%;
+  height: 80%;
+  background-size: cover;
+  background-position: center 30%;
+  filter: blur(60px) saturate(1.2);
+  opacity: 0.28;
+  mix-blend-mode: soft-light;
+}
+
+.soft-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 0%, var(--fp-card) 85%);
+}
+
+html[data-theme='classic-light'] .soft-bg {
+  background: radial-gradient(
+    120% 80% at 50% -10%,
+    color-mix(in srgb, var(--fp-primary) 10%, #fff) 0%,
+    var(--fp-card) 72%
+  );
+}
+
+html[data-theme='classic-light'] .soft-bg-img {
+  filter: blur(64px) saturate(1.1) brightness(1.2);
+  opacity: 0.22;
+  mix-blend-mode: multiply;
+}
+
+.profile-module > :not(.soft-bg) {
   position: relative;
-  margin-top: -46px;
+  z-index: 1;
+}
+
+.user-background {
+  width: 100%;
+  height: 200px;
+  background-size: cover;
+  background-position: center;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.user-background-spacer {
+  height: 24px;
+}
+
+.avatar-stage {
   display: flex;
   justify-content: center;
 }
 
-.user-card-avatar {
-  width: 92px;
-  height: 92px;
-  border-radius: 50%;
-  border: 4px solid var(--fp-card);
-  background: var(--fp-card);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-  object-fit: cover;
+.avatar-stage--overlap {
+  margin-top: -10%;
 }
 
-.user-card-avatar.fallback {
+.user-card-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background-color: var(--fp-card);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 0 0 4px var(--fp-card);
+}
+
+.user-card-avatar-fallback {
   display: grid;
   place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
   background: var(--fp-hover);
   color: var(--fp-title);
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 700;
 }
 

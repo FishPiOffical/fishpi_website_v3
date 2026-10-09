@@ -6,6 +6,7 @@ import { fetchUserMedals, fetchUserProfile, type MetalItem, type UserProfile } f
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import MedalIcon from '@/components/medal/MedalIcon.vue'
 import { createSwrLoader } from '@/utils/swr'
 
 const route = useRoute()
@@ -22,14 +23,6 @@ usePageSeo(() => ({
   path: `/member/${userName.value}/medals`,
   description: `${userName.value} 在摸鱼派获得的徽章`,
 }))
-
-function metalSrc(m: MetalItem) {
-  const attr = String(m.attr || '').trim()
-  if (!attr) return ''
-  if (/^https?:\/\//i.test(attr)) return attr
-  if (attr.includes('=')) return `https://fishpi.cn/gen?${attr.replace(/^\?/, '')}`
-  return `https://fishpi.cn/gen?id=${encodeURIComponent(attr)}`
-}
 
 const swr = createSwrLoader({ loading, error })
 
@@ -74,9 +67,9 @@ watch(
     <ul v-else class="grid">
       <li v-if="!medals.length" class="hint">还没有徽章</li>
       <li v-for="(m, i) in medals" :key="(m.name || '') + i">
-        <img v-if="metalSrc(m)" :src="metalSrc(m)" :alt="m.name || '徽章'" />
+        <MedalIcon :medal="m" :tooltip="false" />
         <div>
-          <b>{{ m.name || '徽章' }}</b>
+          <b>{{ m.name || '徽章' }}<small v-if="m.type">[{{ m.type }}]</small></b>
           <p>{{ m.description || '—' }}</p>
         </div>
       </li>
@@ -117,11 +110,13 @@ h1 {
   border-radius: 10px;
   padding: 10px;
 }
-img {
-  width: 56px;
-  height: 56px;
-  object-fit: contain;
+.grid li > .medal {
   flex-shrink: 0;
+}
+b small {
+  margin-left: 4px;
+  font-weight: 400;
+  color: var(--fp-muted);
 }
 b {
   display: block;

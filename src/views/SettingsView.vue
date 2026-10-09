@@ -16,7 +16,6 @@ import {
   fetchProfessionMe,
   fetchUserBag,
   fetchUserProfile,
-  medalImageUrl,
   queryInvitecode,
   removeMfa,
   reorderMyMedal,
@@ -49,10 +48,12 @@ import {
 import { useGeetest4 } from '@/composables/useGeetest4'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import MedalIcon from '@/components/medal/MedalIcon.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
 const { apiKey, account, isLoggedIn } = storeToRefs(auth)
+const settingsMenuOpen = ref(false)
 
 const tabs = [
   { id: 'profile', to: '/settings', label: '资料' },
@@ -92,6 +93,14 @@ const identityPlaceholder =
   'https://file.fishpi.cn/id/%E8%90%A5%E4%B8%9A%E6%89%A7%E7%85%A7%E5%89%AF%E6%9C%AC%E5%A4%8D%E5%8D%B0%E4%BB%B6.png'
 
 const tab = computed(() => String(route.meta.settingsTab || 'profile'))
+const currentTabLabel = computed(() => tabs.find((t) => t.id === tab.value)?.label || '资料')
+
+watch(
+  () => route.fullPath,
+  () => {
+    settingsMenuOpen.value = false
+  },
+)
 
 const nickname = ref('')
 const intro = ref('')
@@ -953,19 +962,6 @@ async function saveI18n() {
 
 <template>
   <div class="page">
-    <aside class="set-side">
-      <nav class="set-menu">
-        <RouterLink
-          v-for="item in tabs"
-          :key="item.id"
-          :to="item.to"
-          :class="{ current: tab === item.id || (item.id === 'profile' && tab === 'profile') }"
-        >
-          {{ item.label }}
-        </RouterLink>
-      </nav>
-    </aside>
-
     <div class="set-main">
       <p v-if="!isLoggedIn" class="card hint">
         <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
@@ -1075,7 +1071,7 @@ async function saveI18n() {
           <p v-if="!myMedals.length && !medalMsg" class="hint">暂无勋章，或尚未加载。</p>
           <ul v-if="myMedals.length" class="medal-list">
             <li v-for="m in myMedals" :key="m.medalId">
-              <img :src="medalImageUrl(m.medalId)" :alt="m.name" />
+              <MedalIcon :medal="{ id: m.medalId, name: m.name, type: m.type, description: m.description }" :tooltip="false" />
               <div class="medal-info">
                 <b>{{ m.name }} <small>[{{ m.type }}]</small></b>
                 <span v-if="m.description">{{ m.description }}</span>
@@ -1470,13 +1466,36 @@ async function saveI18n() {
         </ul>
       </section>
     </div>
+
+    <aside class="set-side">
+      <button
+        type="button"
+        class="set-toggle"
+        :aria-expanded="settingsMenuOpen"
+        @click="settingsMenuOpen = !settingsMenuOpen"
+      >
+        <span>{{ currentTabLabel }}</span>
+        <span class="chevron" :class="{ open: settingsMenuOpen }">▾</span>
+      </button>
+      <nav class="set-menu" :class="{ open: settingsMenuOpen }">
+        <RouterLink
+          v-for="item in tabs"
+          :key="item.id"
+          :to="item.to"
+          :class="{ current: tab === item.id }"
+        >
+          {{ item.label }}
+        </RouterLink>
+      </nav>
+    </aside>
   </div>
 </template>
 
 <style scoped>
 .page {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
+  /* 与现网 settings 一致：内容在左、菜单在右 */
+  grid-template-columns: minmax(0, 1fr) 200px;
   gap: 16px;
   align-items: start;
   max-width: 960px;
@@ -1485,6 +1504,9 @@ async function saveI18n() {
 .set-side {
   position: sticky;
   top: calc(var(--fp-nav-h) + 12px);
+}
+.set-toggle {
+  display: none;
 }
 .set-menu {
   display: flex;
@@ -1655,17 +1677,9 @@ input[readonly] {
 }
 .medal-list li {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
-}
-.medal-list img {
-  width: 64px;
-  height: 64px;
-  object-fit: cover;
-  border-radius: 6px;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
 }
 .medal-info {
   display: flex;
@@ -1770,17 +1784,47 @@ input[readonly] {
   }
   .set-side {
     position: static;
+    order: -1;
+  }
+  .set-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 14px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--fp-card);
+    box-shadow: var(--fp-card-shadow);
+    color: var(--fp-title);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .chevron {
+    color: var(--fp-muted);
+    transition: transform 0.15s ease;
+  }
+  .chevron.open {
+    transform: rotate(180deg);
   }
   .set-menu {
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: none;
+    margin-top: 8px;
+  }
+  .set-menu.open {
+    display: flex;
   }
   .set-menu a {
     border-left: 0;
-    border-bottom: 2px solid transparent;
+    border-bottom: 1px solid var(--fp-border);
+  }
+  .set-menu a:last-child {
+    border-bottom: 0;
   }
   .set-menu a.current {
-    border-bottom-color: var(--fp-primary);
+    border-left-color: transparent;
   }
   .checks {
     grid-template-columns: 1fr;

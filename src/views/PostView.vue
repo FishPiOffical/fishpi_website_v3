@@ -318,17 +318,10 @@ async function dropDraft(id: string) {
           <span @click.stop="dropDraft(draftKey(d))">删除</span>
         </button>
       </section>
-      <div v-if="!editId && !isLong" class="type-row" role="radiogroup" aria-label="文章类型">
-        <label v-for="t in TYPES" :key="t.value" class="type-opt" :class="{ current: type === t.value }">
-          <input v-model.number="type" type="radio" name="articleType" :value="t.value" />
-          {{ t.label }}
-        </label>
-      </div>
       <p class="type-tip">
         <b>{{ TYPE_LABELS[type] || '帖子' }}</b>
         <span v-if="typeTip">{{ typeTip }}</span>
         <span v-if="isLong">适合创作小说、长篇故事等</span>
-        <span v-if="editId">（编辑时不可更改类型）</span>
       </p>
 
       <input v-model="title" class="title-input" required placeholder="标题" />
@@ -499,28 +492,6 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-.type-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.type-opt {
-  flex-direction: row;
-  align-items: center;
-  padding: 6px 14px;
-  border: 1px solid var(--fp-border);
-  border-radius: 999px;
-  color: var(--fp-text);
-  cursor: pointer;
-}
-.type-opt input {
-  display: none;
-}
-.type-opt.current {
-  border-color: var(--fp-primary);
-  color: var(--fp-primary);
-  font-weight: 600;
 }
 .type-tip {
   margin: 0;

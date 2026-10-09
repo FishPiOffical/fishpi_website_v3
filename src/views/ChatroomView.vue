@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { fetchBarrageCost, fetchChatRaw } from '@/api/fishpi'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
 import PaintPanel from '@/components/chat/PaintPanel.vue'
+import HongbaoCard from '@/components/chat/HongbaoCard.vue'
 import ChatBubble from '@/components/ChatBubble.vue'
 import ChatCard from '@/components/ChatCard.vue'
 import ChatComposer from '@/components/ChatComposer.vue'
@@ -56,11 +57,30 @@ function togglePanel(panel: 'packet' | 'barrage' | 'paint') {
   showBarrage.value = panel === 'barrage' && !showBarrage.value
   showPaint.value = panel === 'paint' && !showPaint.value
 }
+
+watch(packetType, (type) => {
+  if (type === 'rockPaperScissors') {
+    packetCount.value = 1
+    packetMoney.value = 256
+    packetMsg.value = '石头剪刀布！'
+  } else if (type === 'heartbeat') {
+    packetCount.value = 3
+    packetMoney.value = 32
+    packetMsg.value = '玩的就是心跳！'
+  } else if (type === 'average') {
+    packetCount.value = 5
+    packetMsg.value = '平分红包，人人有份！'
+  } else if (type === 'specify') {
+    packetCount.value = 1
+    packetMsg.value = '试试看，这是给你的红包吗？'
+  } else {
+    packetMsg.value = '摸鱼者，事竟成！'
+  }
+})
 const showNodes = ref(false)
 const showClassicOnlines = ref(false)
 const barrageText = ref('')
 const barrageCost = ref('')
-const pendingGesture = ref<string | null>(null)
 const rawText = ref('')
 const rawLoading = ref(false)
 const topicDraft = ref('')
@@ -219,25 +239,8 @@ async function sendBarrage() {
   showBarrage.value = false
 }
 
-async function claim(oId: string, type?: string) {
-  if (type === 'rockPaperScissors') {
-    pendingGesture.value = oId
-    return
-  }
-  await chat.openPacket(oId)
-}
-
-async function playGesture(g: number) {
-  if (!pendingGesture.value) return
-  await chat.openPacket(pendingGesture.value, g)
-  pendingGesture.value = null
-}
-
-function packetLabel(type?: string) {
-  if (type === 'average') return '普通均分红包'
-  if (type === 'specify') return '专属定向红包'
-  if (type === 'rockPaperScissors') return '猜拳胜利红包'
-  return '拼手气红包'
+async function claim(oId: string, gesture?: number) {
+  await chat.openPacket(oId, gesture)
 }
 
 async function showRaw(oId: string) {
@@ -336,9 +339,10 @@ function clearScreen() {
             <form v-if="showPacket" class="pop-sub-form packet-sub-form" @submit.prevent="sendPacket">
               <select v-model="packetType">
                 <option value="random">拼手气红包</option>
-                <option value="average">普通均分红包</option>
-                <option value="specify">专属定向红包</option>
-                <option value="rockPaperScissors">猜拳胜利红包</option>
+                <option value="average">普通红包</option>
+                <option value="specify">专属红包</option>
+                <option value="heartbeat">心跳红包</option>
+                <option value="rockPaperScissors">猜拳红包</option>
               </select>
               <label>积分: <input v-model.number="packetMoney" type="number" min="1" /></label>
               <label v-if="packetType !== 'specify'">个数: <input v-model.number="packetCount" type="number" min="1" /></label>
@@ -411,26 +415,18 @@ function clearScreen() {
               :user-name="msg.userName"
               :nickname="msg.userNickname"
               :avatar="msg.userAvatarURL"
+              :medals="msg.sysMetal"
               :time="msg.time"
               :html="msg.html || ''"
               :self="msg.userName === me"
             >
-              <div
+              <HongbaoCard
                 v-if="msg.redPacket"
-                class="hongbao-card"
-                :class="{ 'is-empty': Number(msg.redPacket.count) === Number(msg.redPacket.got) }"
-                @click="claim(msg.oId, msg.redPacket.type)"
-              >
-                <span class="hongbao-icon">🧧</span>
-                <div class="hongbao-info">
-                  <div class="hongbao-msg">{{ msg.redPacket.msg || '大吉大利，摸鱼派！' }}</div>
-                  <div class="hongbao-badge">{{ packetLabel(msg.redPacket.type) }}</div>
-                  <div class="hongbao-tip">
-                    <span v-if="Number(msg.redPacket.count) === Number(msg.redPacket.got)">已经被抢光啦</span>
-                    <span v-else>已领 {{ msg.redPacket.got || 0 }}/{{ msg.redPacket.count || 0 }} 个 · 点击领取</span>
-                  </div>
-                </div>
-              </div>
+                :packet="msg.redPacket"
+                :is-sender="msg.userName === me"
+                :user-id="account?.oId"
+                @open="(g) => claim(msg.oId, g)"
+              />
               <ChatCard v-else-if="msg.card" :card="msg.card" />
               <template #reactions>
                 <ReactionBar
@@ -537,26 +533,18 @@ function clearScreen() {
               :user-name="msg.userName"
               :nickname="msg.userNickname"
               :avatar="msg.userAvatarURL"
+              :medals="msg.sysMetal"
               :time="msg.time"
               :html="msg.html || ''"
               :self="msg.userName === me"
             >
-              <div
+              <HongbaoCard
                 v-if="msg.redPacket"
-                class="hongbao-card"
-                :class="{ 'is-empty': Number(msg.redPacket.count) === Number(msg.redPacket.got) }"
-                @click="claim(msg.oId, msg.redPacket.type)"
-              >
-                <span class="hongbao-icon">🧧</span>
-                <div class="hongbao-info">
-                  <div class="hongbao-msg">{{ msg.redPacket.msg || '大吉大利，摸鱼派！' }}</div>
-                  <div class="hongbao-badge">{{ packetLabel(msg.redPacket.type) }}</div>
-                  <div class="hongbao-tip">
-                    <span v-if="Number(msg.redPacket.count) === Number(msg.redPacket.got)">已经被抢光啦</span>
-                    <span v-else>已领 {{ msg.redPacket.got || 0 }}/{{ msg.redPacket.count || 0 }} 个 · 点击领取</span>
-                  </div>
-                </div>
-              </div>
+                :packet="msg.redPacket"
+                :is-sender="msg.userName === me"
+                :user-id="account?.oId"
+                @open="(g) => claim(msg.oId, g)"
+              />
               <ChatCard v-else-if="msg.card" :card="msg.card" />
               <template #reactions>
                 <ReactionBar
@@ -633,9 +621,10 @@ function clearScreen() {
             <form v-if="showPacket" class="pop-sub-form packet-sub-form" @submit.prevent="sendPacket">
               <select v-model="packetType">
                 <option value="random">拼手气红包</option>
-                <option value="average">普通均分红包</option>
-                <option value="specify">专属定向红包</option>
-                <option value="rockPaperScissors">猜拳胜利红包</option>
+                <option value="average">普通红包</option>
+                <option value="specify">专属红包</option>
+                <option value="heartbeat">心跳红包</option>
+                <option value="rockPaperScissors">猜拳红包</option>
               </select>
               <label>积分: <input v-model.number="packetMoney" type="number" min="1" /></label>
               <label v-if="packetType !== 'specify'">个数: <input v-model.number="packetCount" type="number" min="1" /></label>
@@ -711,15 +700,6 @@ function clearScreen() {
       </ul>
     </FpDialog>
 
-    <!-- 猜拳参与弹窗 -->
-    <FpDialog :open="!!pendingGesture" title="参与猜拳抢红包" :width="380" @close="pendingGesture = null">
-      <p class="gesture-tip">请选择出拳手势（赢者瓜分积分）：</p>
-      <div class="gesture-choices">
-        <button type="button" class="gesture-btn" @click="playGesture(0)">✊ 石头</button>
-        <button type="button" class="gesture-btn" @click="playGesture(1)">✌️ 剪刀</button>
-        <button type="button" class="gesture-btn" @click="playGesture(2)">✋ 布</button>
-      </div>
-    </FpDialog>
   </div>
 </template>
 
@@ -729,8 +709,6 @@ function clearScreen() {
   max-width: 1400px;
   margin: 0 auto;
 }
-
-/* =========================================================
 
 :deep(video),
 :deep(iframe) {
@@ -748,69 +726,6 @@ function clearScreen() {
   padding: 8px 12px;
   border-radius: 4px;
   font-size: 12px;
-}
-
-/* =========================================================
-   红包精致卡片（自适应紧凑尺寸，绝不撑满整行）
-   ========================================================= */
-.hongbao-card {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-  color: #fff;
-  border-radius: 8px;
-  padding: 8px 14px;
-  max-width: 290px;
-  min-width: 190px;
-  box-shadow: 0 3px 8px rgba(231, 76, 60, 0.3);
-  cursor: pointer;
-  user-select: none;
-  margin: 4px 0;
-  box-sizing: border-box;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.hongbao-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 5px 12px rgba(231, 76, 60, 0.4);
-}
-
-.hongbao-card.is-empty {
-  opacity: 0.65;
-}
-
-.hongbao-icon {
-  font-size: 26px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.hongbao-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.hongbao-msg {
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
-}
-
-.hongbao-badge {
-  font-size: 11px;
-  font-weight: 700;
-  opacity: 0.95;
-}
-
-.hongbao-tip {
-  font-size: 11px;
-  opacity: 0.8;
 }
 
 /* =========================================================
@@ -1467,35 +1382,6 @@ function clearScreen() {
 .packet-detail-list .money {
   color: var(--fp-accent);
   font-weight: 600;
-}
-
-.gesture-choices {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 14px;
-}
-
-.gesture-tip {
-  margin: 0;
-  font-size: 13px;
-  color: var(--fp-muted);
-}
-
-.gesture-btn {
-  padding: 10px 18px;
-  font-size: 15px;
-  background: var(--fp-bg);
-  color: var(--fp-text);
-  border: 1px solid var(--fp-border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-
-.gesture-btn:hover {
-  border-color: var(--fp-primary);
-  transform: scale(1.05);
 }
 
 /* 响应式适配 */
