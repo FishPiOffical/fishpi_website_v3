@@ -56,6 +56,8 @@ const draft = ref('')
 const sending = ref(false)
 const sendError = ref('')
 const actionMsg = ref('')
+const rewarding = ref(false)
+const rewardError = ref('')
 const replyId = ref('')
 const commentPage = ref(1)
 const heat = ref(0)
@@ -336,22 +338,25 @@ async function load() {
   if (!id.value) return
   const cached = commentPage.value === 1 ? consumeArticlePayload(id.value) : null
   if (cached) {
-    writeCache(`article:${id.value}:1`, cached)
     article.value = cached
     loading.value = false
     error.value = ''
     heat.value = Number(cached.articleHeat || 0)
-    if (!import.meta.env.SSR) {
-      await refreshHeat()
-      connectHeat()
-    }
     void buildToc()
-    return
+    // SSR 不带登录态，rewarded / thanked / isFollowing 等需要用 apiKey 再取一次
+    if (import.meta.env.SSR || !apiKey.value) {
+      writeCache(`article:${id.value}:1`, cached)
+      if (!import.meta.env.SSR) {
+        await refreshHeat()
+        connectHeat()
+      }
+      return
+    }
   }
   const reqId = id.value
   const cacheKey = `article:${reqId}:${commentPage.value}`
   const paging = article.value?.oId === reqId
-  const hit = readCache<ArticleDetail>(cacheKey)
+  const hit = cached || readCache<ArticleDetail>(cacheKey)
   if (hit) {
     article.value = hit
     heat.value = Number(hit.articleHeat || 0)
@@ -462,13 +467,21 @@ async function toggleWatch() {
 }
 
 async function reward() {
-  if (!apiKey.value) return
+  const a = article.value
+  if (!apiKey.value || !a || rewarding.value) return
+  if (!window.confirm(`确定打赏 ${a.articleRewardPoint} 积分查看打赏区内容？`)) return
+  rewarding.value = true
+  rewardError.value = ''
   try {
-    await rewardArticle(apiKey.value, id.value)
-    actionMsg.value = '打赏成功'
-    await load()
+    const html = await rewardArticle(apiKey.value, id.value)
+    a.rewarded = true
+    a.rewardedCnt = Number(a.rewardedCnt || 0) + 1
+    if (html) a.articleRewardContent = html
+    void load()
   } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '打赏失败'
+    rewardError.value = e instanceof Error ? e.message : '打赏失败'
+  } finally {
+    rewarding.value = false
   }
 }
 
@@ -679,6 +692,26 @@ async function onReactComment(c: ArticleComment, value: string) {
 
       <div ref="bodyEl" class="body" v-html="article.articleContent || ''" />
 
+      <section v-if="Number(article.articleRewardPoint) > 0" class="reward-box" :class="{ unlocked: article.rewarded }">
+        <header class="reward-head">
+          <span class="reward-title">🎁 打赏区</span>
+          <span class="reward-meta">
+            {{ article.articleRewardPoint }} 积分<template v-if="Number(article.rewardedCnt) > 0"> · {{ article.rewardedCnt }} 人已打赏</template>
+          </span>
+        </header>
+        <div v-if="article.rewarded" class="body reward-body" v-html="article.articleRewardContent || '<p>打赏区暂无内容</p>'" />
+        <div v-else class="reward-locked">
+          <p>作者设置了打赏区，打赏 <b>{{ article.articleRewardPoint }}</b> 积分后可见</p>
+          <button v-if="isLoggedIn" type="button" class="btn orange small" :disabled="rewarding" @click="reward">
+            {{ rewarding ? '打赏中…' : `打赏 ${article.articleRewardPoint} 积分` }}
+          </button>
+          <RouterLink v-else :to="{ path: '/login', query: { redirect: route.fullPath } }" class="btn orange small">
+            登录后打赏
+          </RouterLink>
+          <p v-if="rewardError" class="err-tip">{{ rewardError }}</p>
+        </div>
+      </section>
+
       <nav v-if="column && (column.previous || column.next)" class="chapter-nav">
         <RouterLink v-if="column.previous" :to="column.previous.articlePermalink" class="chapter-link">
           ← 第 {{ column.previous.chapterNo }} 章 {{ articleTitle(column.previous) }}
@@ -701,15 +734,6 @@ async function onReactComment(c: ArticleComment, value: string) {
           </button>
           <button type="button" class="btn small" @click="toggleWatch">
             {{ article.isWatching ? '取消关注' : '+ 关注帖子' }}
-          </button>
-          <button
-            v-if="Number(article.articleRewardPoint) > 0"
-            type="button"
-            class="btn orange small"
-            :disabled="article.rewarded"
-            @click="reward"
-          >
-            {{ article.rewarded ? '已打赏' : `打赏 ${article.articleRewardPoint} 积分` }}
           </button>
           <RouterLink v-if="canEdit" class="btn small edit-btn" :to="`/post/${article.oId}`">编辑</RouterLink>
           <button v-if="Number(article.articleRevisionCount ?? 2) > 1" type="button" class="btn small" @click="toggleRevisions">
@@ -1420,6 +1444,54 @@ h1 {
   display: block;
   width: 100%;
   margin: 12px 0;
+}
+.reward-box {
+  margin: 0 0 24px;
+  border: 1px dashed color-mix(in srgb, var(--fp-accent) 45%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--fp-accent) 5%, transparent);
+  overflow: hidden;
+}
+.reward-box.unlocked {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--fp-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--fp-primary) 4%, transparent);
+}
+.reward-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px dashed var(--fp-border);
+}
+.reward-title {
+  font-weight: 600;
+  color: var(--fp-title);
+}
+.reward-meta {
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+.reward-body {
+  margin: 0;
+  padding: 12px 16px;
+}
+.reward-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 16px;
+  font-size: 14px;
+  color: var(--fp-muted);
+  text-align: center;
+}
+.reward-locked p {
+  margin: 0;
+}
+.reward-locked b {
+  color: var(--fp-accent);
 }
 .chapter-nav {
   display: flex;

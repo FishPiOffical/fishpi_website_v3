@@ -1922,12 +1922,17 @@ export async function unwatchArticle(apiKey: string, followingId: string) {
   if (res.code) throw new Error(res.msg || '取消关注失败')
 }
 
-export async function rewardArticle(apiKey: string, oId: string) {
-  const res = await request<Envelope<unknown>>(`/article/reward?articleId=${encodeURIComponent(oId)}`, {
-    method: 'POST',
-    body: JSON.stringify({ apiKey }),
-  })
+/** 成功后返回渲染好的打赏区 HTML */
+export async function rewardArticle(apiKey: string, oId: string): Promise<string> {
+  const res = await request<Envelope<unknown> & { articleRewardContent?: string }>(
+    `/article/reward?articleId=${encodeURIComponent(oId)}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ apiKey }),
+    },
+  )
   if (res.code) throw new Error(res.msg || '打赏失败')
+  return String(res.articleRewardContent || '')
 }
 
 export async function thankComment(apiKey: string, commentId: string) {
