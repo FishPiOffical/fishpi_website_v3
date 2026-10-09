@@ -173,15 +173,33 @@ function onDocClick(e: MouseEvent) {
   if (!t?.closest?.('.user-menu')) menuOpen.value = false
 }
 
+const apiOffline = ref(false)
+
+function onApiOffline() {
+  if (route.name === 'offline') return
+  apiOffline.value = true
+}
+
 onMounted(() => {
   mounted.value = true
   document.addEventListener('click', onDocClick)
+  window.addEventListener('fp:api-offline', onApiOffline)
 })
-onUnmounted(() => document.removeEventListener('click', onDocClick))
+onUnmounted(() => {
+  document.removeEventListener('click', onDocClick)
+  window.removeEventListener('fp:api-offline', onApiOffline)
+})
 </script>
 
 <template>
   <div class="shell">
+    <div v-if="apiOffline && route.name !== 'offline'" class="offline-banner">
+      <span>连不上摸鱼派接口</span>
+      <RouterLink :to="{ path: '/offline', query: { from: route.fullPath } }" @click="apiOffline = false">
+        查看详情
+      </RouterLink>
+      <button type="button" class="dismiss" aria-label="关闭" @click="apiOffline = false">×</button>
+    </div>
     <header class="nav">
       <RouterLink to="/" class="logo" aria-label="摸鱼派">
         <LogoMark />
@@ -365,6 +383,33 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 <style scoped>
 .shell {
   min-height: 100vh;
+}
+.offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--fp-accent) 18%, var(--fp-card));
+  border-bottom: 1px solid var(--fp-border);
+  color: var(--fp-title);
+  font-size: 13px;
+}
+.offline-banner a {
+  color: var(--fp-link);
+}
+.offline-banner .dismiss {
+  position: absolute;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--fp-muted);
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
 }
 .nav {
   position: sticky;

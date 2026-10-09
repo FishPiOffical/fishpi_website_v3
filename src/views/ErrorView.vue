@@ -8,14 +8,13 @@ import { useAuthStore } from '@/stores/auth'
 const ERRORS: Record<number, { title: string; desc: string }> = {
   401: { title: '401 Unauthorized!', desc: '请登录后再试~' },
   403: { title: '403 Forbidden!', desc: '因权限不足操作已被禁止 :(' },
-  404: { title: '404 Not Found!', desc: '页面不存在' },
   500: { title: '500 Internal Server Error!', desc: '服务器开小差了' },
 }
 
 const route = useRoute()
 const { isLoggedIn } = storeToRefs(useAuthStore())
-const code = computed(() => Number(route.meta.errorCode) || 404)
-const info = computed(() => ERRORS[code.value] || ERRORS[404])
+const code = computed(() => Number(route.meta.errorCode) || 500)
+const info = computed(() => ERRORS[code.value] || ERRORS[500])
 const redirect = computed(() => (typeof route.query.redirect === 'string' ? route.query.redirect : '/'))
 
 usePageSeo(() => ({ title: info.value.title, path: route.fullPath, robots: 'noindex' }))
@@ -26,10 +25,14 @@ usePageSeo(() => ({ title: info.value.title, path: route.fullPath, robots: 'noin
     <p class="code">{{ code }}</p>
     <h1>{{ info.title }}</h1>
     <p class="hint">{{ info.desc }}</p>
-    <p v-if="code === 404" class="hint">路径 <code>{{ route.fullPath }}</code> 没有对应页面。</p>
     <p v-if="code === 500" class="hint">
       请到 <a href="https://github.com/FishPiOffical/rhythm/issues" target="_blank" rel="noopener noreferrer">这里</a>
       反馈问题以帮助我们进行改进，非常感谢 ♥
+    </p>
+    <p class="hint">
+      若是接口连不上，请打开
+      <RouterLink to="/offline">网络故障页</RouterLink>；页面不存在请看
+      <RouterLink to="/error/404">404 页</RouterLink>。
     </p>
     <p v-if="(code === 401 || code === 403) && !isLoggedIn" class="links">
       <RouterLink :to="{ path: '/login', query: { redirect } }">登录</RouterLink>

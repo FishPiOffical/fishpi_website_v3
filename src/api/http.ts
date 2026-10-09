@@ -18,6 +18,45 @@ export function isCaptchaRequired(e: unknown) {
   return e instanceof ApiError && e.code === 'captcha'
 }
 
+export function isOfflineError(e: unknown) {
+  return e instanceof ApiError && (e.code === 'offline' || e.status === 0)
+}
+
+function notifyOffline() {
+  if (import.meta.env.SSR || typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('fp:api-offline'))
+}
+
+function asNetworkError(e: unknown): never {
+  const msg = e instanceof Error ? e.message : String(e)
+  if (/Failed to fetch|NetworkError|Load failed|network|ECONNREFUSED|ETIMEDOUT|fetch|aborted/i.test(msg)) {
+    notifyOffline()
+    throw new ApiError('无法连接摸鱼派接口，请检查网络或稍后重试', 0, 'offline')
+  }
+  throw e instanceof Error ? e : new Error(msg)
+}
+
+/** 探测后端是否可达（能拿到任意 HTTP 响应即视为连通，含 4xx）。 */
+export async function pingApi(timeoutMs = 8000): Promise<boolean> {
+  if (import.meta.env.SSR) return true
+  const ctrl = new AbortController()
+  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    const res = await fetch(resolveUrl('/api/articles/recent?p=1&size=1'), {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'User-Agent': FISHPI_UA },
+      signal: ctrl.signal,
+    })
+    // 连上了就行；5xx 仍算「服务异常」但不是「完全连不上」
+    return res.status > 0
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 type RequestInitExtra = RequestInit & {
   /** 内部：人机验证通过后已重试过，避免死循环 */
   __captchaRetried?: boolean
@@ -58,11 +97,16 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {
   }
 
   const { __captchaRetried: _, ...fetchInit } = init
-  const res = await fetch(resolveUrl(path), {
-    ...fetchInit,
-    credentials: init.credentials ?? 'include',
-    headers,
-  })
+  let res: Response
+  try {
+    res = await fetch(resolveUrl(path), {
+      ...fetchInit,
+      credentials: init.credentials ?? 'include',
+      headers,
+    })
+  } catch (e) {
+    asNetworkError(e)
+  }
 
   // Rhythm BeforeRequestHandler：IP 进入验证码黑名单时 302 → /test
   try {
@@ -133,11 +177,16 @@ async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
   const headers = new Headers(init.headers)
   if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
   const { __captchaRetried: _, ...fetchInit } = init
-  const res = await fetch(resolveUrl(path), {
-    ...fetchInit,
-    credentials: init.credentials ?? 'include',
-    headers,
-  })
+  let res: Response
+  try {
+    res = await fetch(resolveUrl(path), {
+      ...fetchInit,
+      credentials: init.credentials ?? 'include',
+      headers,
+    })
+  } catch (e) {
+    asNetworkError(e)
+  }
   try {
     const pathname = new URL(res.url).pathname
     if (/^\/test\/?$/.test(pathname)) {

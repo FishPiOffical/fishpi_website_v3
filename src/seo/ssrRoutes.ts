@@ -64,7 +64,9 @@ export function isNoIndexPath(path: string) {
     p === '/watch' ||
     p.startsWith('/watch/') ||
     p === '/charge/point' ||
-    p === '/vips'
+    p === '/vips' ||
+    p === '/offline' ||
+    p.startsWith('/error/')
   ) {
     return true
   }

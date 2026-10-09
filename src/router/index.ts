@@ -370,9 +370,25 @@ const routes = [
     meta: { robots: 'noindex', errorCode },
   })),
   {
+    path: '/error/404',
+    name: 'error-404',
+    component: () => import('@/views/NotFoundView.vue'),
+    meta: { robots: 'noindex', errorCode: 404 },
+  },
+  {
+    path: '/offline',
+    name: 'offline',
+    component: () => import('@/views/OfflineView.vue'),
+    meta: { robots: 'noindex', errorCode: 503 },
+  },
+  {
+    path: '/error/offline',
+    redirect: (to: RouteLocation) => ({ path: '/offline', query: to.query }),
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
-    component: () => import('@/views/ErrorView.vue'),
+    component: () => import('@/views/NotFoundView.vue'),
     meta: { robots: 'noindex', errorCode: 404 },
   },
 ]
