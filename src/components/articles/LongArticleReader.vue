@@ -759,8 +759,8 @@ html:not([data-theme='classic-light']) .la {
 }
 .la-home:hover {
   background: var(--la-hover);
-  color: var(--la-strong);
   transform: translateX(-2px);
+  text-decoration: underline;
 }
 .la-title {
   margin: 0;
@@ -788,7 +788,7 @@ html:not([data-theme='classic-light']) .la {
   text-decoration: none;
 }
 .la-meta a:hover {
-  color: var(--la-btn-hover-text);
+  text-decoration: underline;
 }
 .la-meta .la-author {
   color: var(--la-strong);
@@ -1426,7 +1426,13 @@ html[data-theme='classic-light'] .la-ico-sun {
 }
 .la-more-item:hover:not(:disabled) {
   background: var(--la-btn-hover-bg);
+}
+button.la-more-item:hover:not(:disabled) {
   color: var(--la-btn-hover-text);
+}
+.la-more-item:is(a):hover:not(:disabled) {
+  color: var(--la-btn-text);
+  text-decoration: underline;
 }
 .la-more-item.on {
   color: var(--la-badge);

@@ -70,10 +70,23 @@ export const useChatSidebarStore = defineStore('chatSidebar', () => {
     persist()
   }
 
+  function moveTo(id: string, targetId: string, after = false) {
+    if (id === targetId) return
+    const order = [...pref.value.order]
+    const from = order.indexOf(id)
+    const target = order.indexOf(targetId)
+    if (from < 0 || target < 0) return
+    order.splice(from, 1)
+    const targetAfterRemoval = order.indexOf(targetId)
+    order.splice(targetAfterRemoval + (after ? 1 : 0), 0, id)
+    pref.value.order = order
+    persist()
+  }
+
   function reset() {
     pref.value = defaults()
     persist()
   }
 
-  return { pref, orderedModules, visibleModules, isOn, toggle, move, reset }
+  return { pref, orderedModules, visibleModules, isOn, toggle, move, moveTo, reset }
 })

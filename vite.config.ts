@@ -52,6 +52,12 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/api': proxy,
+        '/rhypic-upload': {
+          target: 'https://pic.fishpi.cn',
+          changeOrigin: true,
+          secure: true,
+          rewrite: (path) => path.replace(/^\/rhypic-upload/, ''),
+        },
         // apiKey → web session (sym-ce); used by server page-auth and direct clients.
         '/loginWebInApiKey': proxy,
         '/chat-room': { ...proxy, ws: true },

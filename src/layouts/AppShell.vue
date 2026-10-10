@@ -181,6 +181,8 @@ watch(
       notices.disconnect()
       notices.clear()
       whispers.clear()
+      chat.floatingChatroomOpen = false
+      chat.disconnect()
     }
   },
   { immediate: true },
@@ -545,7 +547,6 @@ onUnmounted(() => {
 }
 .nav-tabs a.current,
 .nav-tabs a:hover {
-  color: var(--fp-accent);
   background: var(--fp-hover);
 }
 .search {
@@ -571,7 +572,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .user > a:hover {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 .bar-icon {
   display: inline-flex;
@@ -754,7 +755,6 @@ onUnmounted(() => {
 .menu-btn:hover,
 .logout:hover {
   background: var(--fp-hover);
-  color: var(--fp-accent);
 }
 .logout {
   color: #c45c4a;
@@ -852,7 +852,7 @@ main.main--cr-modern {
   transition: color 0.2s;
 }
 .foot-links a:hover {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 .client-main {
   font-weight: 600;
@@ -874,7 +874,6 @@ main.main--cr-modern {
 }
 .client-icons a:hover {
   border-color: var(--fp-accent);
-  color: var(--fp-accent);
   opacity: 1;
 }
 .foot-bottom {
@@ -914,7 +913,7 @@ main.main--cr-modern {
   text-decoration: none;
 }
 .beian a:hover {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 .police {
   display: inline-flex;

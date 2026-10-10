@@ -115,7 +115,7 @@ a {
   background: var(--fp-hover);
 }
 a:hover {
-  color: var(--fp-link);
+  text-decoration: underline;
 }
 img {
   width: 18px;

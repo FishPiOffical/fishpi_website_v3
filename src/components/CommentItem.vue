@@ -6,7 +6,6 @@ import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
-import VipNickname from '@/components/user/VipNickname.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -80,7 +79,7 @@ function onBodyClick(e: MouseEvent) {
       <div class="cmt-main">
         <header class="cmt-head">
           <RouterLink :to="`/member/${author}`" class="name">
-            <VipNickname :user-id="comment.commentAuthorId" :user-name="author">{{ author }}</VipNickname>
+            {{ author }}
           </RouterLink>
           <MedalList v-if="!hideMedals" :items="comment.sysMetal" class="cmt-medals" />
           <span v-if="replyTo" class="reply-to">回复 @{{ replyTo }}</span>
@@ -182,7 +181,7 @@ function onBodyClick(e: MouseEvent) {
   text-decoration: none;
 }
 .name:hover {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 .reply-to {
   font-size: 12px;

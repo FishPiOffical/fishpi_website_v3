@@ -1104,7 +1104,7 @@ const topCatalog = [
 }
 
 .tabs-sub a:hover {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 
 .tabs-sub a.current {
@@ -1320,7 +1320,7 @@ const topCatalog = [
 }
 
 .uname:hover {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 
 .uname.anonymous {

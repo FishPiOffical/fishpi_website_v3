@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   cachedVipName,
   loadVipName,
@@ -13,7 +13,7 @@ const props = withDefaults(
     userId?: string | number
     userName?: string
     text?: string
-    /** 非首屏或很长的名单可关闭自动加载，仅使用已有缓存。 */
+    /** 在昵称接近可视区域时加载会员配置。 */
     lazy?: boolean
   }>(),
   { userId: '', userName: '', text: '', lazy: true },
@@ -21,6 +21,7 @@ const props = withDefaults(
 
 const root = ref<HTMLElement | null>(null)
 const config = ref<VipNameConfig>()
+const currentConfig = computed(() => cachedVipName(props.userId, props.userName) || config.value)
 let observer: IntersectionObserver | undefined
 let token = 0
 
@@ -61,14 +62,22 @@ onUnmounted(() => {
 watch(
   () => [props.userId, props.userName],
   () => {
+    token++
     config.value = cachedVipName(props.userId, props.userName)
     observe()
+  },
+)
+
+watch(
+  () => cachedVipName(props.userId, props.userName),
+  (value, previous) => {
+    if (!value && previous) void load()
   },
 )
 </script>
 
 <template>
-  <span ref="root" :class="vipNameClass(config)" :style="vipNameStyle(config)">
+  <span ref="root" :class="vipNameClass(currentConfig)" :style="vipNameStyle(currentConfig)">
     <slot>{{ text || userName }}</slot>
   </span>
 </template>

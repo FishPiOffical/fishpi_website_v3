@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { fetchUnreadCount, type UnreadCount } from '@/api/fishpi'
+import type { WhisperMsg } from '@/api/fishpi'
 import { useAuthStore } from './auth'
 import { useWhisperStore } from './whispers'
 
@@ -10,6 +11,9 @@ export const useNoticeStore = defineStore('notices', () => {
   /** 管理员 /admin/broadcast/warn 推送的紧急公告 */
   const warnBroadcast = ref<{ text: string; who: string } | null>(null)
   let ws: WebSocket | null = null
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let reconnectAttempts = 0
+  let lastChatCountPushAt = 0
 
   const total = computed(() => Number(unread.value.unreadNotificationCnt || 0))
 
@@ -37,19 +41,28 @@ export const useNoticeStore = defineStore('notices', () => {
     unread.value = next
   }
 
-  function connect() {
+  function connectSocket(apiKey: string) {
     const auth = useAuthStore()
-    disconnect()
-    if (import.meta.env.SSR || typeof WebSocket === 'undefined' || !auth.apiKey) return
+    if (auth.apiKey !== apiKey || typeof WebSocket === 'undefined') return
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    ws = new WebSocket(`${proto}//${location.host}/user-channel?apiKey=${encodeURIComponent(auth.apiKey)}`)
-    ws.onmessage = (ev) => {
+    const socket = new WebSocket(`${proto}//${location.host}/user-channel?apiKey=${encodeURIComponent(apiKey)}`)
+    ws = socket
+    socket.onopen = () => {
+      reconnectAttempts = 0
+    }
+    socket.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data) as Record<string, unknown> & { command?: string }
         if (msg.command === 'refreshNotification') {
           applyCount(msg)
         } else if (msg.command === 'chatUnreadCountRefresh') {
-          void useWhisperStore().refreshUnread()
+          const whispers = useWhisperStore()
+          lastChatCountPushAt = Date.now()
+          if (msg.count !== undefined) whispers.applyUnreadCount(msg.count)
+          else void whispers.refreshUnread()
+        } else if (msg.command === 'newIdleChatMessage') {
+          const hasRecentCountPush = Date.now() - lastChatCountPushAt < 1500
+          useWhisperStore().noteIncomingMessage(msg as Partial<WhisperMsg>, !hasRecentCountPush)
         } else if (msg.command === 'warnBroadcast') {
           warnBroadcast.value = {
             text: String(msg.warnBroadcastText ?? ''),
@@ -60,11 +73,38 @@ export const useNoticeStore = defineStore('notices', () => {
         /* ignore */
       }
     }
+    socket.onerror = () => socket.close()
+    socket.onclose = () => {
+      if (ws !== socket) return
+      ws = null
+      if (reconnectTimer || auth.apiKey !== apiKey) return
+      const delay = Math.min(1000 * 2 ** reconnectAttempts, 30_000)
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+        reconnectAttempts += 1
+        connectSocket(apiKey)
+      }, delay)
+    }
+  }
+
+  function connect() {
+    const auth = useAuthStore()
+    disconnect()
+    if (import.meta.env.SSR || typeof WebSocket === 'undefined' || !auth.apiKey) return
+    connectSocket(auth.apiKey)
   }
 
   function disconnect() {
-    ws?.close()
+    if (reconnectTimer) clearTimeout(reconnectTimer)
+    reconnectTimer = null
+    reconnectAttempts = 0
+    const socket = ws
     ws = null
+    if (socket) {
+      socket.onclose = null
+      socket.onerror = null
+      socket.close()
+    }
   }
 
   function clear() {

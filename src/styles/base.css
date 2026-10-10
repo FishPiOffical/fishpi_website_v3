@@ -65,6 +65,9 @@ textarea {
 a {
   color: var(--fp-link);
 }
+a:hover {
+  text-decoration: underline;
+}
 
 /* 弹窗等通用控件，配合 FpDialog 使用 */
 .fp-btn {
@@ -287,10 +290,13 @@ textarea.fp-input {
   cursor: pointer;
 }
 
-.tabs-sub a.current,
-.tabs-sub a:hover {
+.tabs-sub a.current {
   color: var(--fp-text);
   border-bottom-color: var(--fp-accent);
+}
+.tabs-sub a:hover {
+  border-bottom-color: var(--fp-accent);
+  text-decoration: underline;
 }
 
 .tabs-sub a .count {

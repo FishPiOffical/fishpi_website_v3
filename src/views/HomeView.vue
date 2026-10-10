@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import VipNickname from '@/components/user/VipNickname.vue'
 import { articleTitle } from '@/utils/text'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
@@ -27,6 +28,7 @@ import {
   type TagItem,
 } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
+import { useChatStore } from '@/stores/chat'
 import { useHomeLayoutStore, type HomeRowView } from '@/stores/homeLayout'
 import { useHomeDrag } from '@/home/useHomeDrag'
 import AdSlot from '@/components/ads/AdSlot.vue'
@@ -41,6 +43,7 @@ import { readCache, writeCache } from '@/utils/swr'
 import { avatarStyle, avatarUrl } from '@/utils/avatar'
 
 const auth = useAuthStore()
+const chat = useChatStore()
 const layout = useHomeLayoutStore()
 const router = useRouter()
 const { apiKey, isLoggedIn } = storeToRefs(auth)
@@ -79,6 +82,31 @@ const regGrid = computed(() => {
 const { editing } = storeToRefs(layout)
 const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive } = useHomeDrag()
 onUnmounted(() => (editing.value = false))
+const { messages: liveChatMessages } = storeToRefs(chat)
+let homeMounted = false
+
+function syncLiveChatMessages() {
+  if (!liveChatMessages.value.length) return
+  chatLines.value = liveChatMessages.value.slice(-10).reverse().map((line) => ({
+    oId: line.oId,
+    userOId: line.userOId,
+    userName: line.userName,
+    userNickname: line.userNickname,
+    userAvatarURL: line.userAvatarURL,
+    content: line.redPacket || (line.card?.msgType === 'music' ? line.card.title || '音乐分享' : line.card ? '天气信息' : line.html || ''),
+    time: line.time,
+  }))
+}
+
+watch(() => liveChatMessages.value.length, syncLiveChatMessages)
+onMounted(() => {
+  homeMounted = true
+  if (apiKey.value) void chat.connect()
+})
+onUnmounted(() => {
+  homeMounted = false
+  if (!chat.floatingChatroomOpen) chat.disconnect()
+})
 /** 长篇专区自带卡片样式，独占一行时不再套外框 */
 function isBareRow(row: HomeRowView) {
   return row.cells.length === 1 && row.cells[0].modules.every((m) => m.id === 'long')
@@ -238,7 +266,13 @@ async function load() {
   }
 }
 
-watch(apiKey, () => void load(), { immediate: true })
+watch(apiKey, () => {
+  void load()
+  if (homeMounted) {
+    if (apiKey.value) void chat.connect()
+    else chat.disconnect()
+  }
+}, { immediate: true })
 
 function views(a: ArticleSummary) {
   return a.articleViewCntDisplayFormat || a.articleViewCount || ''
@@ -604,7 +638,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                   </RouterLink>
                   <div class="chat-body">
                     <RouterLink v-if="m.userName" class="chat-who" :to="`/member/${m.userName}`">
-                      {{ m.userNickname || m.userName }}
+                      <VipNickname :user-name="m.userName">{{ m.userNickname || m.userName }}</VipNickname>
                       <span v-if="m.userNickname && m.userName" class="chat-uname">({{ m.userName }})</span>
                     </RouterLink>
                     <div class="chat-text">{{ chatPreview(m) }}</div>
@@ -938,7 +972,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   flex-shrink: 0;
 }
 .index-head a:hover {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 .online {
   font-weight: normal;
@@ -1239,7 +1273,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   color: var(--fp-muted);
 }
 .long-chapter:hover span {
-  color: var(--fp-primary);
+  text-decoration: underline;
 }
 .long-title {
   display: block;

@@ -5,27 +5,96 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSettingsDrawerStore, type SettingsSection } from '@/stores/settingsDrawer'
 import { useHomeLayoutStore } from '@/stores/homeLayout'
 import { useChatSidebarStore } from '@/stores/chatSidebar'
+import { useChatFilterStore, type ChatBlockMatch, type ChatBlockMode } from '@/stores/chatFilter'
+import { useAuthStore } from '@/stores/auth'
+import { useWhisperStore } from '@/stores/whispers'
 import { useCountStore } from '@/stores/count'
 import IncomeCard from '@/components/count/IncomeCard.vue'
+import HiddenChatConversations from '@/components/chat/HiddenChatConversations.vue'
+import WhisperConversations from '@/components/chat/WhisperConversations.vue'
 
 const drawer = useSettingsDrawerStore()
 const { open, section } = storeToRefs(drawer)
 const home = useHomeLayoutStore()
 const sidebar = useChatSidebarStore()
+const chatFilter = useChatFilterStore()
+const auth = useAuthStore()
+const whispers = useWhisperStore()
 const count = useCountStore()
 const route = useRoute()
 const router = useRouter()
 
 const mounted = ref(false)
+const hiddenChatsOpen = ref(false)
+const { isLoggedIn } = storeToRefs(auth)
+const { unreadTotal: whisperUnread, inboxOpen: whisperInboxOpen } = storeToRefs(whispers)
+const draggedSidebarId = ref('')
+const overSidebarId = ref('')
+const blockForm = reactive({ match: 'nickname' as ChatBlockMatch, value: '', mode: 'block' as ChatBlockMode })
+const isChatroom = computed(() => route.path === '/cr')
+const isHome = computed(() => route.path === '/')
+const showHiddenHandle = computed(() => (isChatroom.value || isHome.value) && chatFilter.enabled)
+watch([showHiddenHandle], ([visible]) => {
+  if (!visible) hiddenChatsOpen.value = false
+})
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
   { id: 'home', label: '首页模块', icon: '🏠' },
   { id: 'chatSidebar', label: '聊天室侧栏', icon: '💬' },
-  { id: 'income', label: '今日收入', icon: '💰' },
+  { id: 'chatBlock', label: '聊天室屏蔽', icon: '🚫' },
+  { id: 'income', label: '上下班时间', icon: '🕒' },
 ]
 
+const visibleSections = computed(() => SECTIONS.filter((item) => item.id !== 'income' || sidebar.isOn('income')))
 const homeCore = computed(() => home.orderedModules.filter((m) => !m.sidebarId))
 const homeSide = computed(() => home.orderedModules.filter((m) => m.sidebarId))
+
+watch(
+  () => sidebar.isOn('income'),
+  (isOn) => {
+    if (!isOn && section.value === 'income') section.value = 'chatSidebar'
+  },
+  { immediate: true },
+)
+
+function startSidebarDrag(e: DragEvent, id: string) {
+  draggedSidebarId.value = id
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id)
+  }
+}
+
+function dragOverSidebarItem(e: DragEvent, id: string) {
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  overSidebarId.value = id
+}
+
+function dropSidebarItem(e: DragEvent, id: string) {
+  e.preventDefault()
+  const draggedId = draggedSidebarId.value || e.dataTransfer?.getData('text/plain') || ''
+  const row = e.currentTarget as HTMLElement
+  const after = e.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2
+  if (draggedId) sidebar.moveTo(draggedId, id, after)
+  draggedSidebarId.value = ''
+  overSidebarId.value = ''
+}
+
+function endSidebarDrag() {
+  draggedSidebarId.value = ''
+  overSidebarId.value = ''
+}
+
+function addChatBlockRule() {
+  chatFilter.addRule(blockForm.match, blockForm.value, blockForm.mode)
+  blockForm.value = ''
+}
+
+function openWhisperInbox() {
+  const currentPeer = route.path.startsWith('/chat/') ? String(route.params.userName || '') : ''
+  whispers.showInbox(currentPeer)
+}
 
 async function startHomeEdit() {
   drawer.hide()
@@ -33,7 +102,7 @@ async function startHomeEdit() {
   home.editing = true
 }
 
-const form = reactive({ enabled: true, startTime: '09:00', time: '18:00', lunch: '11:30', salary: '365' })
+const form = reactive({ startTime: '09:00', time: '18:00', lunch: '11:30', salary: '365' })
 const saved = ref(false)
 
 function toInput(hhmm: string) {
@@ -43,7 +112,6 @@ function toInput(hhmm: string) {
 
 function fillForm() {
   const d = count.data
-  form.enabled = d.status !== 'disabled'
   form.startTime = toInput(d.startTime)
   form.time = toInput(d.time)
   form.lunch = toInput(d.lunch)
@@ -53,7 +121,6 @@ function fillForm() {
 
 function saveIncome() {
   count.update({
-    status: form.enabled ? 'enabled' : 'disabled',
     startTime: form.startTime.replace(':', ''),
     time: form.time.replace(':', ''),
     lunch: form.lunch.replace(':', ''),
@@ -104,6 +171,36 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
       </svg>
     </button>
 
+    <button
+      v-if="showHiddenHandle"
+      type="button"
+      class="fp-hidden-handle"
+      aria-label="打开隐藏会话"
+      title="隐藏会话"
+      @click="hiddenChatsOpen = true"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 5.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8l-5 3v-3a2 2 0 0 1-3-2v-8a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+        <path d="M8 11.5h.01M12 11.5h.01M16 11.5h.01" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+      </svg>
+    </button>
+    <button
+      v-if="isLoggedIn"
+      type="button"
+      class="fp-whisper-handle"
+      :class="{ 'after-hidden': showHiddenHandle }"
+      aria-label="打开聊天"
+      :title="whisperUnread ? `聊天（${whisperUnread} 条未读）` : '聊天'"
+      @click="openWhisperInbox"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 3v-3H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+      </svg>
+      <span v-if="whisperUnread" class="unread-badge">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</span>
+    </button>
+    <HiddenChatConversations v-model="hiddenChatsOpen" />
+    <WhisperConversations v-model="whisperInboxOpen" />
+
     <Transition name="fp-set-mask">
       <div v-if="open" class="fp-set-mask" @click="drawer.hide()" />
     </Transition>
@@ -113,7 +210,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
         <nav class="nav">
           <b class="brand">设置</b>
           <button
-            v-for="s in SECTIONS"
+            v-for="s in visibleSections"
             :key="s.id"
             type="button"
             class="nav-item"
@@ -127,7 +224,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 
         <div class="body">
           <header class="head">
-            <b>{{ SECTIONS.find((s) => s.id === section)?.label }}</b>
+            <b>{{ visibleSections.find((s) => s.id === section)?.label }}</b>
             <button type="button" class="close" aria-label="关闭设置" @click="drawer.hide()">✕</button>
           </header>
 
@@ -162,16 +259,32 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
 
           <div v-else-if="section === 'chatSidebar'" class="content">
+            <p class="drag-hint">拖动 ⠿ 调整侧栏模块顺序，也可用右侧箭头微调。</p>
             <div class="chips">
               <button type="button" @click="sidebar.reset()">恢复默认</button>
             </div>
             <ul class="rows">
-              <li v-for="m in sidebar.orderedModules" :key="m.id">
+              <li
+                v-for="m in sidebar.orderedModules"
+                :key="m.id"
+                :class="{ 'is-dragging': draggedSidebarId === m.id, 'is-drop-target': overSidebarId === m.id }"
+                @dragover="dragOverSidebarItem($event, m.id)"
+                @drop="dropSidebarItem($event, m.id)"
+              >
                 <label class="check">
                   <input type="checkbox" :checked="sidebar.isOn(m.id)" @change="sidebar.toggle(m.id)" />
                   <span>{{ m.title }}</span>
                 </label>
                 <span class="sort">
+                  <span
+                    class="drag-handle"
+                    draggable="true"
+                    role="button"
+                    :aria-label="`拖动排序：${m.title}`"
+                    title="按住拖动排序"
+                    @dragstart="startSidebarDrag($event, m.id)"
+                    @dragend="endSidebarDrag"
+                  >⠿</span>
                   <button type="button" aria-label="上移" @click="sidebar.move(m.id, -1)">↑</button>
                   <button type="button" aria-label="下移" @click="sidebar.move(m.id, 1)">↓</button>
                 </span>
@@ -179,12 +292,60 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
             </ul>
           </div>
 
-          <form v-else class="content" @submit.prevent="saveIncome">
-            <div class="preview"><IncomeCard /></div>
-            <label class="check switch">
-              <input v-model="form.enabled" type="checkbox" />
-              <span>开启下班倒计时与提醒</span>
+          <div v-else-if="section === 'chatBlock'" class="content">
+            <label class="check block-enable">
+              <input v-model="chatFilter.enabled" type="checkbox" />
+              <span>启用聊天室屏蔽</span>
             </label>
+            <p class="drag-hint">规则仅保存在此浏览器。昵称按显示昵称或用户名匹配，UID 按用户 ID 匹配，关键词按消息内容包含匹配（不区分大小写）。</p>
+            <form class="block-form" @submit.prevent="addChatBlockRule">
+              <select v-model="blockForm.match" class="fp-input" aria-label="屏蔽条件">
+                <option value="nickname">昵称</option>
+                <option value="uid">UID</option>
+                <option value="keyword">关键词</option>
+              </select>
+              <input
+                v-model="blockForm.value"
+                class="fp-input"
+                :placeholder="
+                  blockForm.match === 'uid'
+                    ? '输入用户 ID'
+                    : blockForm.match === 'keyword'
+                      ? '输入要匹配的关键词'
+                      : '输入昵称或用户名'
+                "
+                required
+              />
+              <select v-model="blockForm.mode" class="fp-input" aria-label="屏蔽方式">
+                <option value="block">完全屏蔽</option>
+                <option value="hide">移入隐藏列表</option>
+              </select>
+              <button type="submit" class="fp-btn fp-btn--primary">添加</button>
+            </form>
+            <p class="group">屏蔽规则 <small>{{ chatFilter.rules.length }}</small></p>
+            <p v-if="!chatFilter.rules.length" class="block-empty">还没有屏蔽规则</p>
+            <ul v-else class="block-rules">
+              <li v-for="rule in chatFilter.rules" :key="rule.id">
+                <span class="rule-target">
+                  <small>{{ rule.match === 'uid' ? 'UID' : rule.match === 'keyword' ? '关键词' : '昵称' }}</small>
+                  <b>{{ rule.value }}</b>
+                </span>
+                <select
+                  :value="rule.mode"
+                  class="rule-mode"
+                  :aria-label="`设置 ${rule.value} 的屏蔽方式`"
+                  @change="chatFilter.setMode(rule.id, ($event.target as HTMLSelectElement).value as ChatBlockMode)"
+                >
+                  <option value="block">完全屏蔽</option>
+                  <option value="hide">移入隐藏列表</option>
+                </select>
+                <button type="button" class="remove-rule" :aria-label="`移除 ${rule.value} 屏蔽规则`" @click="chatFilter.removeRule(rule.id)">✕</button>
+              </li>
+            </ul>
+          </div>
+
+          <form v-else-if="section === 'income'" class="content" @submit.prevent="saveIncome">
+            <div class="preview"><IncomeCard /></div>
             <div class="grid">
               <label class="field">
                 <span>上班时间</span>
@@ -223,31 +384,121 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 44px;
-  padding: 0 2px 0 0;
-  transform: translate(-6px, -50%);
+  width: 28px;
+  height: 38px;
+  transform: translateY(-50%);
   border: 1px solid var(--fp-border);
   border-left: 0;
-  border-radius: 0 10px 10px 0;
+  border-radius: 0 9px 9px 0;
   background: var(--fp-card);
   color: var(--fp-muted);
-  opacity: 0.35;
   cursor: pointer;
-  transition:
-    opacity 0.2s,
-    transform 0.2s,
-    color 0.2s;
+  transition: color 0.2s, background 0.2s, transform 0.2s ease;
 }
 .fp-set-handle:hover,
 .fp-set-handle.active {
-  opacity: 1;
-  transform: translate(0, -50%);
+  background: var(--fp-hover);
   color: var(--fp-link);
 }
+.fp-set-handle:hover {
+  transform: translate(4px, -50%);
+}
 .fp-set-handle svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.35s ease;
+}
+.fp-set-handle:hover svg {
+  transform: rotate(45deg);
+}
+.fp-hidden-handle {
+  position: fixed;
+  left: 0;
+  top: calc(50% + 30px);
+  z-index: 1190;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 38px;
+  border: 1px solid var(--fp-border);
+  border-left: 0;
+  border-radius: 0 9px 9px 0;
+  background: var(--fp-card);
+  color: var(--fp-muted);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, transform 0.2s ease;
+}
+.fp-hidden-handle:hover {
+  background: var(--fp-hover);
+  color: var(--fp-link);
+  transform: translateX(4px);
+}
+.fp-hidden-handle svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+.fp-hidden-handle:hover svg {
+  transform: scale(1.12);
+}
+.fp-whisper-handle {
+  position: fixed;
+  left: 0;
+  top: calc(50% + 30px);
+  z-index: 1190;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 38px;
+  border: 1px solid var(--fp-border);
+  border-left: 0;
+  border-radius: 0 9px 9px 0;
+  background: var(--fp-card);
+  color: var(--fp-muted);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, transform 0.2s ease, top 0.24s ease;
+}
+.fp-whisper-handle.after-hidden {
+  top: calc(50% + 74px);
+}
+.fp-whisper-handle:hover {
+  transform: translateX(4px);
+  background: var(--fp-hover);
+  color: var(--fp-link);
+}
+.fp-whisper-handle svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+.fp-whisper-handle:hover svg {
+  transform: scale(1.12);
+}
+.unread-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 16px;
+  padding: 2px 4px;
+  border-radius: 10px;
+  background: var(--fp-accent);
+  color: #fff;
+  font-size: 9px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fp-set-handle,
+  .fp-set-handle svg,
+  .fp-hidden-handle,
+  .fp-hidden-handle svg,
+  .fp-whisper-handle,
+  .fp-whisper-handle svg {
+    transition: none;
+  }
 }
 
 .fp-set-mask {
@@ -418,6 +669,13 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 .rows li:hover {
   background: var(--fp-hover);
 }
+.rows li.is-dragging {
+  opacity: 0.45;
+}
+.rows li.is-drop-target {
+  outline: 1px dashed var(--fp-link);
+  outline-offset: -1px;
+}
 .check {
   display: inline-flex;
   align-items: center;
@@ -428,10 +686,104 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 }
 .sort {
   display: flex;
+  align-items: center;
   gap: 4px;
 }
 .sort button {
   padding: 1px 7px;
+}
+.drag-handle {
+  padding: 0 3px;
+  color: var(--fp-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.drag-hint,
+.block-empty {
+  margin: 0 0 10px;
+  color: var(--fp-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.block-enable {
+  margin-bottom: 8px;
+}
+.block-form {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  margin: 12px 0;
+}
+.block-form .fp-input {
+  min-width: 0;
+}
+.block-form button {
+  justify-self: start;
+}
+.block-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.block-rules li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: var(--fp-hover);
+}
+.rule-target {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.rule-target small {
+  flex: none;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--fp-card);
+  color: var(--fp-muted);
+  font-size: 10px;
+}
+.rule-target b {
+  overflow: hidden;
+  color: var(--fp-title);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rule-mode {
+  max-width: 130px;
+  padding: 4px 5px;
+  border: 1px solid var(--fp-border);
+  border-radius: 5px;
+  background: var(--fp-card);
+  color: var(--fp-text);
+  font: inherit;
+  font-size: 11px;
+}
+.remove-rule {
+  border: 0;
+  background: transparent;
+  color: var(--fp-muted);
+  cursor: pointer;
+}
+.remove-rule:hover {
+  color: var(--fp-accent);
 }
 
 .preview {

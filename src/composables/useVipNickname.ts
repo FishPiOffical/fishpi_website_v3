@@ -37,14 +37,15 @@ const pending = new Map<string, Promise<VipNameConfig>>()
 function normalizeColor(value: unknown) {
   if (typeof value !== 'string') return ''
   const color = value.trim()
-  return /^#[\da-f]{3,8}$/i.test(color) ? color : ''
+  return /^#(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/i.test(color) ? color : ''
 }
 
 export function parseVipNameConfig(isVip: boolean, configJson?: string | Record<string, unknown>): VipNameConfig {
   if (!isVip) return { ...EMPTY_CONFIG }
   let raw: Record<string, unknown> = {}
   try {
-    raw = typeof configJson === 'string' ? JSON.parse(configJson || '{}') : configJson || {}
+    const parsed = typeof configJson === 'string' ? JSON.parse(configJson || '{}') : configJson
+    raw = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
   } catch {
     raw = {}
   }
@@ -103,7 +104,8 @@ export async function loadVipName(userId?: string | number, userName?: string): 
       const status = await fetchMembershipDetail(resolvedId)
       return write(parseVipNameConfig(status.isVip, status.configJson), resolvedId, userName)
     } catch {
-      return write({ ...EMPTY_CONFIG }, resolvedId || userId, userName)
+      // 网络错误不缓存为非会员，后续展示时允许重新加载。
+      return { ...EMPTY_CONFIG }
     } finally {
       pending.delete(requestKey)
     }
@@ -119,7 +121,7 @@ export function invalidateVipName(userId?: string | number, userName?: string) {
 export function vipNameClass(config: VipNameConfig | undefined) {
   return {
     'vip-nickname': Boolean(config?.isVip),
-    'vip-nickname--effect': Boolean(config?.effect && config.effect !== 'neon'),
+    'vip-nickname--effect': Boolean(config?.effect),
     [`vip-nickname--${config?.effect}`]: Boolean(config?.effect),
   }
 }

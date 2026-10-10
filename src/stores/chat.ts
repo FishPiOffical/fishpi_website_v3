@@ -61,6 +61,7 @@ function resolveWsUrl(url: string) {
 }
 
 function asLine(item: ChatHistoryItem | Record<string, unknown>): ChatLine {
+  const userId = (item as { userId?: unknown }).userId
   let content = item.content as unknown
   if (typeof content === 'string') {
     try {
@@ -77,7 +78,7 @@ function asLine(item: ChatHistoryItem | Record<string, unknown>): ChatLine {
   const card = redPacket ? undefined : parseChatCard(content)
   return {
     oId: String(item.oId ?? ''),
-    userOId: item.userOId != null ? String(item.userOId) : undefined,
+    userOId: item.userOId != null ? String(item.userOId) : userId != null ? String(userId) : undefined,
     userName: String(item.userName ?? ''),
     userNickname: item.userNickname as string | undefined,
     userAvatarURL: item.userAvatarURL as string | undefined,
@@ -100,6 +101,9 @@ export const useChatStore = defineStore('chat', () => {
   const discuss = ref('加载中…')
   const mutes = ref<MuteItem[]>([])
   const connected = ref(false)
+  const connecting = ref(false)
+  /** 浮动聊天窗正在使用聊天室实时连接；离开 /cr 时据此保留连接。 */
+  const floatingChatroomOpen = ref(false)
   const sending = ref(false)
   const loading = ref(false)
   const loadingMore = ref(false)
@@ -129,6 +133,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function connect() {
+    if (connected.value || connecting.value || loading.value) return
+    connecting.value = true
     const auth = useAuthStore()
     error.value = ''
     loading.value = true
@@ -175,6 +181,7 @@ export const useChatStore = defineStore('chat', () => {
     // 游客可浏览历史/在线；实时通道需 apiKey
     if (!auth.apiKey) {
       connected.value = false
+      connecting.value = false
       return
     }
 
@@ -210,15 +217,18 @@ export const useChatStore = defineStore('chat', () => {
     ws = new WebSocket(node)
     ws.onopen = () => {
       connected.value = true
+      connecting.value = false
       error.value = ''
       if (hb) window.clearInterval(hb)
       hb = window.setInterval(() => ws?.send('-hb-'), 1000 * 60 * 3)
     }
     ws.onclose = () => {
       connected.value = false
+      connecting.value = false
     }
     ws.onerror = () => {
       error.value = '聊天室连接失败'
+      connecting.value = false
     }
     ws.onmessage = (ev) => {
       try {
@@ -311,6 +321,7 @@ export const useChatStore = defineStore('chat', () => {
     ws?.close()
     ws = null
     connected.value = false
+    connecting.value = false
   }
 
   async function send(text: string) {
@@ -404,6 +415,8 @@ export const useChatStore = defineStore('chat', () => {
     discuss,
     mutes,
     connected,
+    connecting,
+    floatingChatroomOpen,
     sending,
     loading,
     loadingMore,

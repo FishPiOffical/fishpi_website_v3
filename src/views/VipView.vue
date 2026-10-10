@@ -12,6 +12,7 @@ import {
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useAuthStore } from '@/stores/auth'
+import { invalidateVipName, parseVipNameConfig, vipNameClass, vipNameStyle } from '@/composables/useVipNickname'
 
 usePageSeo(() => ({
   title: '摸鱼派 VIP',
@@ -38,6 +39,11 @@ const configUnderline = ref(false)
 const configColor = ref('#e74c3c')
 const configGradient = ref('')
 const configSaving = ref(false)
+const previewConfig = computed(() => parseVipNameConfig(true, {
+  bold: configBold.value,
+  underline: configUnderline.value,
+  color: configGradient.value || configColor.value,
+}))
 
 // FAQ 展开状态
 const openFaq = ref<number | null>(null)
@@ -166,6 +172,7 @@ async function saveVipConfig() {
       underline: configUnderline.value,
       color: finalColor,
     })
+    invalidateVipName(account.value?.oId, account.value?.userName)
     ok.value = 'VIP 专属效果配置已成功保存！'
     await auth.reloadAccount()
   } catch (e) {
@@ -227,12 +234,8 @@ onMounted(async () => {
         <div class="preview-box">
           <span
             class="preview-name"
-            :class="configGradient"
-            :style="{
-              fontWeight: configBold ? 'bold' : 'normal',
-              textDecoration: configUnderline ? 'underline' : 'none',
-              color: configGradient ? undefined : configColor,
-            }"
+            :class="vipNameClass(previewConfig)"
+            :style="vipNameStyle(previewConfig)"
           >
             {{ account?.userNickname || account?.userName || '我的专属昵称' }}
           </span>

@@ -11,7 +11,6 @@ export interface CountData {
   salary: string
   /** 上班时间 HHmm */
   startTime: string
-  status?: 'enabled' | 'disabled'
   left?: number
   top?: number
 }
@@ -36,7 +35,6 @@ function normalize(raw: Partial<CountData> | null | undefined): CountData {
     lunch: d.lunch || '1130',
     salary: /^\d+(\.\d+)?$/.test(salary) ? salary : '365',
     startTime: d.startTime || '0900',
-    status: d.status === 'disabled' ? 'disabled' : 'enabled',
     left: Number.isFinite(d.left) ? d.left : undefined,
     top: Number.isFinite(d.top) ? d.top : undefined,
   }
@@ -63,7 +61,7 @@ export const useCountStore = defineStore('count', () => {
   const view = ref<CountView | null>(null)
   const toast = ref<CountToast | null>(null)
 
-  const enabled = computed(() => loaded.value && data.value.status !== 'disabled')
+  const enabled = computed(() => loaded.value)
 
   let timer: ReturnType<typeof setInterval> | undefined
   let toastTimer: ReturnType<typeof setTimeout> | undefined

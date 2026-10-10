@@ -1046,7 +1046,7 @@ async function onReactComment(c: ArticleComment, value: string) {
   transition: color 0.15s ease;
 }
 .toc a:hover {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 .toc a.lv2 {
   padding-left: 10px;
@@ -1141,7 +1141,7 @@ h1 {
   font-weight: 500;
 }
 .meta-author:hover {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 .avatar-small {
   width: 22px;
@@ -1277,7 +1277,7 @@ h1 {
   text-underline-offset: 3px;
 }
 .body :deep(a:hover) {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 
 .article-tail-bar {

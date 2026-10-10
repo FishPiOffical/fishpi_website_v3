@@ -13,10 +13,12 @@ const props = withDefaults(
     outline?: boolean
     /** reply：聊天室 / 私信 / 回帖共用的短文工具栏，仅编辑区；post：发帖的长文工具栏，分屏预览 */
     mode?: 'reply' | 'post'
+    /** 私信输入使用精简工具栏，避免显示发帖和长文编辑功能 */
+    toolbarPreset?: 'default' | 'message'
     /** 启用本地草稿缓存（Vditor localStorage），值为缓存键 */
     cacheId?: string
   }>(),
-  { apiKey: null, height: 500, placeholder: '', outline: false, mode: 'post', cacheId: '' },
+  { apiKey: null, height: 500, placeholder: '', outline: false, mode: 'post', toolbarPreset: 'default', cacheId: '' },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
 
@@ -95,6 +97,8 @@ const MOBILE_TOOLBAR = [
   },
 ]
 
+const MESSAGE_TOOLBAR = ['emoji', 'bold', 'italic', 'link', 'upload']
+
 function loadVditor(): Promise<VditorCtor> {
   const w = window as unknown as { Vditor?: VditorCtor }
   if (w.Vditor) return Promise.resolve(w.Vditor)
@@ -164,7 +168,9 @@ onMounted(async () => {
   if (!host.value) return
   const narrow = window.innerWidth < 768
   const inline = props.mode === 'reply'
-  const toolbar = narrow ? MOBILE_TOOLBAR : inline ? REPLY_TOOLBAR : POST_TOOLBAR
+  const toolbar = props.toolbarPreset === 'message'
+    ? MESSAGE_TOOLBAR
+    : narrow ? MOBILE_TOOLBAR : inline ? REPLY_TOOLBAR : POST_TOOLBAR
   editor = new Vditor(host.value, {
     value: props.modelValue,
     height: props.height,

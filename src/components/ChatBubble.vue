@@ -15,8 +15,9 @@ withDefaults(
     html?: string
     self?: boolean
     medals?: unknown
+    vipNickname?: boolean
   }>(),
-  { userId: '', nickname: '', avatar: '', time: '', html: '', self: false, medals: undefined },
+  { userId: '', nickname: '', avatar: '', time: '', html: '', self: false, medals: undefined, vipNickname: false },
 )
 
 const zoomed = ref('')
@@ -37,9 +38,10 @@ function onBodyClick(e: MouseEvent) {
     <div class="fp-bubble" @click="onBodyClick">
       <div class="head">
         <RouterLink :to="`/member/${userName}`" class="name">
-          <VipNickname :user-id="userId" :user-name="userName">
+          <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">
             {{ nickname || userName }}
           </VipNickname>
+          <template v-else>{{ nickname || userName }}</template>
           <small v-if="nickname && nickname !== userName">({{ userName }})</small>
         </RouterLink>
         <MedalList :items="medals" variant="chat" />

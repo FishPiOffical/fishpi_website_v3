@@ -15,6 +15,8 @@ const props = withDefaults(
     /** 正文为空也允许发送（如带引用） */
     allowEmpty?: boolean
     submitText?: string
+    /** 私信等场景只保留常用的格式、链接和图片工具 */
+    compact?: boolean
   }>(),
   {
     apiKey: null,
@@ -25,6 +27,7 @@ const props = withDefaults(
     disabled: false,
     allowEmpty: false,
     submitText: '发 送',
+    compact: false,
   },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
@@ -60,6 +63,7 @@ defineExpose({
       :api-key="apiKey"
       :height="height"
       mode="reply"
+      :toolbar-preset="compact ? 'message' : 'default'"
       :cache-id="cacheId"
       :placeholder="placeholder"
       @update:model-value="(v: string) => emit('update:modelValue', v)"
@@ -67,7 +71,7 @@ defineExpose({
     />
     <div class="bar">
       <div class="tools">
-        <EmojiPicker @insert="(md) => editor?.insert(md)" />
+        <EmojiPicker v-if="!compact" @insert="(md) => editor?.insert(md)" />
         <slot name="tools" />
       </div>
       <div class="actions">

@@ -34,7 +34,12 @@ export const useWhisperStore = defineStore('whispers', () => {
   const list = ref<WhisperMsg[]>([])
   const messages = ref<WhisperMsg[]>([])
   const unread = ref<WhisperMsg[]>([])
+  const realtimeUnreadPeers = ref<Record<string, boolean>>({})
+  const unreadCountOverride = ref<number | null>(null)
+  const inboxOpen = ref(false)
+  const inboxPeer = ref('')
   const connected = ref(false)
+  const connecting = ref(false)
   const loading = ref(false)
   const listLoading = ref(false)
   const sending = ref(false)
@@ -45,13 +50,18 @@ export const useWhisperStore = defineStore('whispers', () => {
   let ws: WebSocket | null = null
   let peer = ''
   let page = 1
+  let openSequence = 0
+  let unreadRequestSequence = 0
 
-  const unreadTotal = computed(() => unread.value.length)
+  const unreadTotal = computed(() => unreadCountOverride.value ?? unread.value.length)
   const unreadBy = computed(() => {
     const map: Record<string, number> = {}
     for (const m of unread.value) {
       const from = m.senderUserName || ''
       if (from) map[from] = (map[from] || 0) + 1
+    }
+    for (const [userName, hasUnread] of Object.entries(realtimeUnreadPeers.value)) {
+      if (hasUnread) map[userName] = Math.max(map[userName] || 0, 1)
     }
     return map
   })
@@ -71,19 +81,72 @@ export const useWhisperStore = defineStore('whispers', () => {
   }
 
   async function refreshUnread() {
+    const sequence = ++unreadRequestSequence
     const auth = useAuthStore()
     if (!auth.apiKey) {
       unread.value = []
+      unreadCountOverride.value = null
       return
     }
     try {
-      unread.value = await fetchWhisperUnread(auth.apiKey)
+      const rows = await fetchWhisperUnread(auth.apiKey)
+      if (sequence !== unreadRequestSequence) return
+      unread.value = rows
+      unreadCountOverride.value = null
     } catch {
+      if (sequence !== unreadRequestSequence) return
       unread.value = []
+      unreadCountOverride.value = null
     }
   }
 
-  async function loadList() {
+  function applyUnreadCount(count: unknown) {
+    const value = Number(count)
+    if (Number.isFinite(value) && value >= 0) {
+      unreadRequestSequence += 1
+      unreadCountOverride.value = Math.floor(value)
+    }
+  }
+
+  function noteIncomingMessage(msg: Partial<WhisperMsg>, incrementCount = true) {
+    if (!msg.senderUserName) return
+    const auth = useAuthStore()
+    const row = {
+      ...msg,
+      oId: msg.oId || `notice-${Date.now()}`,
+      receiverUserName: msg.receiverUserName || auth.account?.userName,
+    } as WhisperMsg
+    touchList(row)
+
+    const incomingPeer = peerOf(row, auth.account?.userName)
+    if (incomingPeer && isOpenWith(incomingPeer)) {
+      delete realtimeUnreadPeers.value[incomingPeer]
+      if (!messages.value.some((item) => item.oId === row.oId)) messages.value.push(row)
+      if (auth.apiKey) {
+        void markWhisperRead(auth.apiKey, msg.senderUserName)
+          .then(() => refreshUnread())
+          .catch(() => undefined)
+      }
+      return
+    }
+
+    if (incomingPeer) realtimeUnreadPeers.value[incomingPeer] = true
+    if (incrementCount) {
+      unreadRequestSequence += 1
+      unreadCountOverride.value = unreadTotal.value + 1
+    }
+  }
+
+  function isOpenWith(userName: string) {
+    return peer === userName
+  }
+
+  function showInbox(userName = '') {
+    inboxPeer.value = userName
+    inboxOpen.value = true
+  }
+
+  async function loadList(refreshCounts = true) {
     const auth = useAuthStore()
     if (!auth.apiKey) return
     listLoading.value = true
@@ -91,7 +154,7 @@ export const useWhisperStore = defineStore('whispers', () => {
     try {
       list.value = await fetchWhisperList(auth.apiKey)
       usingMock.value = list.value.some((m) => String(m.oId).startsWith('mock-'))
-      await refreshUnread()
+      if (refreshCounts) await refreshUnread()
     } catch (e) {
       error.value = e instanceof Error ? e.message : '私信列表失败'
       list.value = []
@@ -103,25 +166,34 @@ export const useWhisperStore = defineStore('whispers', () => {
   async function open(userName: string) {
     const auth = useAuthStore()
     if (!auth.apiKey || !userName) return
+    delete realtimeUnreadPeers.value[userName]
+    const sequence = ++openSequence
+    const previousSocket = ws
+    ws = null
+    previousSocket?.close()
+    connected.value = false
     peer = userName
+    connecting.value = true
     page = 1
     hasMore.value = true
     loading.value = true
     error.value = ''
     try {
       const rows = await fetchWhisperMessages(auth.apiKey, userName, 1, 40)
+      if (sequence !== openSequence) return
       usingMock.value = rows.some((m) => String(m.oId).startsWith('mock-'))
       messages.value = [...rows].reverse()
       if (rows.length < 40) hasMore.value = false
       await markWhisperRead(auth.apiKey, userName).catch(() => undefined)
       await refreshUnread()
     } catch (e) {
+      if (sequence !== openSequence) return
       error.value = e instanceof Error ? e.message : '私信加载失败'
       messages.value = []
     } finally {
-      loading.value = false
+      if (sequence === openSequence) loading.value = false
     }
-    connectWs(userName, auth.apiKey)
+    if (sequence === openSequence) connectWs(userName, auth.apiKey)
   }
 
   async function loadMore() {
@@ -153,18 +225,27 @@ export const useWhisperStore = defineStore('whispers', () => {
 
   function connectWs(userName: string, apiKey: string) {
     disconnect()
+    peer = userName
+    connecting.value = true
     const url = resolveWsUrl(`/chat-channel?apiKey=${encodeURIComponent(apiKey)}&toUser=${encodeURIComponent(userName)}`)
-    ws = new WebSocket(url)
-    ws.onopen = () => {
+    const socket = new WebSocket(url)
+    ws = socket
+    socket.onopen = () => {
+      if (ws !== socket) return
       connected.value = true
+      connecting.value = false
     }
-    ws.onclose = () => {
+    socket.onclose = () => {
+      if (ws !== socket) return
       connected.value = false
+      connecting.value = false
     }
-    ws.onerror = () => {
+    socket.onerror = () => {
+      if (ws !== socket) return
       connected.value = false
+      connecting.value = false
     }
-    ws.onmessage = (ev) => {
+    socket.onmessage = (ev) => {
       try {
         const raw = JSON.parse(String(ev.data)) as WhisperMsg & { type?: string; data?: WhisperMsg | string }
         if (raw.type === 'revoke') {
@@ -178,9 +259,9 @@ export const useWhisperStore = defineStore('whispers', () => {
         }
         const msg = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as WhisperMsg
         if (!msg.oId && !msg.content && !msg.markdown) return
+        if (msg.senderUserName === userName) void markWhisperRead(apiKey, userName).catch(() => undefined)
         if (msg.oId && messages.value.some((m) => m.oId === msg.oId)) return
         error.value = ''
-        if (msg.senderUserName === userName) void markWhisperRead(apiKey, userName).catch(() => undefined)
         const row: WhisperMsg = {
           oId: msg.oId || `local-${Date.now()}`,
           content: msg.content,
@@ -230,16 +311,22 @@ export const useWhisperStore = defineStore('whispers', () => {
   }
 
   function disconnect() {
+    openSequence += 1
     connected.value = false
-    ws?.close()
+    connecting.value = false
+    const socket = ws
     ws = null
+    socket?.close()
     peer = ''
   }
 
   function clear() {
+    unreadRequestSequence += 1
     list.value = []
     messages.value = []
     unread.value = []
+    realtimeUnreadPeers.value = {}
+    unreadCountOverride.value = null
     usingMock.value = false
     disconnect()
   }
@@ -249,10 +336,17 @@ export const useWhisperStore = defineStore('whispers', () => {
     messages,
     unread,
     unreadTotal,
+    inboxOpen,
+    inboxPeer,
     connected,
+    connecting,
     loading,
     listLoading,
     unreadBy,
+    applyUnreadCount,
+    noteIncomingMessage,
+    isOpenWith,
+    showInbox,
     sending,
     error,
     usingMock,

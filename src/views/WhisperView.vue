@@ -35,12 +35,17 @@ onMounted(() => {
   void whispers.loadList()
   if (userName.value) void whispers.open(userName.value)
 })
-onUnmounted(() => whispers.disconnect())
+onUnmounted(() => {
+  if (!whispers.inboxOpen) whispers.disconnect()
+})
 
 watch(userName, (name) => {
   draft.value = ''
-  if (name) void whispers.open(name)
-  else whispers.disconnect()
+  if (!name) {
+    if (!whispers.inboxOpen) whispers.disconnect()
+    return
+  }
+  if (!whispers.isOpenWith(name)) void whispers.open(name)
 })
 let stickToBottom = true
 
@@ -168,6 +173,8 @@ async function submit() {
         v-model="draft"
         class="composer"
         :api-key="apiKey"
+        :height="110"
+        compact
         :cache-id="`whisper-${userName}`"
         :sending="sending"
         :disabled="!connected && !usingMock"
@@ -292,7 +299,7 @@ async function submit() {
   min-width: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: #c45c4a;
+  background: var(--fp-accent);
   color: #fff;
   font-size: 10px;
   font-style: normal;

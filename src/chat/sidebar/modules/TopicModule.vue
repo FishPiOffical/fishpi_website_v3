@@ -24,8 +24,15 @@ function save() {
 
 <style scoped>
 .topic {
-  margin: 0 0 8px;
-  color: var(--fp-link);
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  border-left: 3px solid var(--fp-primary);
+  border-radius: 5px;
+  background: var(--fp-hover);
+  color: var(--fp-primary);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
   word-break: break-all;
 }
 .row {

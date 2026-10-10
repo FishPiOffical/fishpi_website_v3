@@ -10,87 +10,101 @@
 
 .vip-nickname--effect {
   display: inline-block;
-  color: transparent !important;
   background-repeat: repeat;
-  background-size: 260% auto;
-  background-clip: text;
   -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: vip-name-flow 5s linear infinite;
+  background-clip: text;
+  color: rgba(0, 0, 0, 0);
+  -webkit-text-fill-color: rgba(0, 0, 0, 0);
 }
 
 .vip-nickname--rainbow {
-  --vip-decoration: #a78bfa;
-  background-image: linear-gradient(
-    90deg,
-    #ff4d6d,
-    #ff9f1c,
-    #ffe66d,
-    #2ec4b6,
-    #38bdf8,
-    #818cf8,
-    #c084fc,
-    #ff4d6d
-  );
+  background-image: linear-gradient(90deg, #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0000ff, #8000ff, #ff00ff);
+  background-size: 800% 100%;
+  animation: vip-name-rainbow 6s linear infinite;
 }
 
 .vip-nickname--neon {
-  --vip-color: #35ffe0;
-  --vip-decoration: #35ffe0;
-  color: #35ffe0 !important;
-  text-shadow:
-    0 0 5px rgba(53, 255, 224, 0.9),
-    0 0 12px rgba(53, 255, 224, 0.7),
-    0 0 22px rgba(53, 255, 224, 0.45);
+  background-image: linear-gradient(90deg, #ff00cc, #ff0066, #ff3333, #ff6600, #ffcc00);
+  background-size: 400% 100%;
+  animation: vip-name-neon 3s ease infinite;
+  text-shadow: 0 0 5px rgba(255, 0, 204, 0.5);
 }
 
 .vip-nickname--fire {
-  --vip-decoration: #ff7a18;
-  background-image: linear-gradient(100deg, #ff2d55, #ff7a18, #ffd166, #ff5c35, #ff2d55);
+  background-image: linear-gradient(90deg, #ff8a00, #ff0000, #ff8a00, #ff4500);
+  background-size: 300% 100%;
+  animation: vip-name-fire 2.5s ease-in-out infinite;
 }
 
 .vip-nickname--ocean {
-  --vip-decoration: #22d3ee;
-  background-image: linear-gradient(100deg, #2563eb, #06b6d4, #67e8f9, #34d399, #2563eb);
+  background-image: linear-gradient(90deg, #00b4db, #0083b0, #00b4db, #00c9ff);
+  background-size: 300% 100%;
+  animation: vip-name-ocean 5s ease-in-out infinite;
 }
 
 .vip-nickname--forest {
-  --vip-decoration: #34d399;
-  background-image: linear-gradient(100deg, #059669, #34d399, #bef264, #22c55e, #059669);
+  background-image: linear-gradient(90deg, #00ff7f, #32cd32, #228b22, #006400);
+  background-size: 400% 100%;
+  animation: vip-name-forest 7s ease infinite;
 }
 
 .vip-nickname--sunset {
-  --vip-decoration: #fb7185;
-  background-image: linear-gradient(100deg, #f43f5e, #fb7185, #fbbf24, #c084fc, #f43f5e);
+  background-image: linear-gradient(90deg, #ff7e5f, #feb47b, #ff7e5f, #ff512f);
+  background-size: 400% 100%;
+  animation: vip-name-sunset 6s ease infinite;
 }
 
 .vip-nickname--metal {
-  --vip-decoration: #fbbf24;
-  background-image: linear-gradient(
-    100deg,
-    #64748b,
-    #f8fafc,
-    #94a3b8,
-    #fbbf24,
-    #fff7cc,
-    #64748b
-  );
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28);
+  background-image: linear-gradient(90deg, #bdc3c7, #2c3e50, #bdc3c7, #95a5a6);
+  background-size: 400% 100%;
+  animation: vip-name-metal 4s linear infinite;
 }
 
 .vip-nickname--galaxy {
-  --vip-decoration: #c084fc;
-  background-image: linear-gradient(100deg, #312e81, #7c3aed, #ec4899, #38bdf8, #312e81);
-  text-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
+  background-image: linear-gradient(90deg, #8a2be2, #4b0082, #9400d3, #8a2be2);
+  background-size: 400% 100%;
+  animation: vip-name-galaxy 8s ease infinite;
+  text-shadow: 0 0 8px rgba(138, 43, 226, 0.4);
 }
 
-@keyframes vip-name-flow {
-  from {
-    background-position: 0% 50%;
-  }
-  to {
-    background-position: 260% 50%;
-  }
+@keyframes vip-name-rainbow {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+
+@keyframes vip-name-neon {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes vip-name-fire {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes vip-name-ocean {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes vip-name-forest {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes vip-name-sunset {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes vip-name-metal {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+
+@keyframes vip-name-galaxy {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

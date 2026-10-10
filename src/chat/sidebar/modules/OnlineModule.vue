@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import VipNickname from '@/components/user/VipNickname.vue'
 import { storeToRefs } from 'pinia'
 import { RouterLink } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
@@ -14,7 +15,7 @@ const { onlines } = storeToRefs(useChatStore())
       <span class="fp-avatar-frame">
         <img class="fp-avatar" :src="user.userAvatarURL || '/favicon.svg'" :alt="user.userName" />
       </span>
-      <span>{{ user.userNickname || user.userName }}</span>
+      <span><VipNickname :user-name="user.userName">{{ user.userNickname || user.userName }}</VipNickname></span>
       </RouterLink>
     </li>
   </ul>

@@ -1,5 +1,6 @@
 import type { Component } from 'vue'
 import AdModule from './modules/AdModule.vue'
+import ActivityModule from './modules/ActivityModule.vue'
 import AppearanceModule from './modules/AppearanceModule.vue'
 import BarrageModule from './modules/BarrageModule.vue'
 import IncomeModule from './modules/IncomeModule.vue'
@@ -16,6 +17,7 @@ const COMPONENTS: Record<ChatSidebarModuleId, Component> = {
   income: IncomeModule,
   topic: TopicModule,
   online: OnlineModule,
+  activity: ActivityModule,
   barrage: BarrageModule,
   appearance: AppearanceModule,
   ad: AdModule,

@@ -237,7 +237,7 @@ function goDownload() {
 }
 
 .person-name:hover {
-  color: var(--fp-link);
+  text-decoration: underline;
 }
 
 .person-sub {

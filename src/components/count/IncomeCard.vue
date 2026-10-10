@@ -1,21 +1,32 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { useCountStore } from '@/stores/count'
+import { useChatSidebarStore } from '@/stores/chatSidebar'
 import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 
-const { loaded, enabled, view } = storeToRefs(useCountStore())
+const { loaded, view } = storeToRefs(useCountStore())
+const sidebar = useChatSidebarStore()
 const drawer = useSettingsDrawerStore()
+
+function openSettings() {
+  drawer.show(sidebar.isOn('income') ? 'income' : 'chatSidebar')
+}
 </script>
 
 <template>
-  <button type="button" class="income" title="点击设置下班倒计时" @click="drawer.show('income')">
+  <button
+    type="button"
+    class="income"
+    :title="sidebar.isOn('income') ? '点击设置上下班时间' : '请先在聊天室侧栏设置中启用上下班时间'"
+    @click="openSettings"
+  >
     <template v-if="!loaded">
-      <span class="label">下班倒计时</span>
+      <span class="label">上下班时间</span>
       <span class="time">--:--:--</span>
     </template>
-    <template v-else-if="!enabled || !view">
-      <span class="label">下班倒计时已关闭</span>
-      <span class="sub">点击开启</span>
+    <template v-else-if="!view">
+      <span class="label">上下班时间</span>
+      <span class="sub">正在计算…</span>
     </template>
     <template v-else-if="view.kind === 'lunch'">
       <span class="label">🍲 距离午饭</span>

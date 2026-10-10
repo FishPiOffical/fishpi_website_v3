@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import VipNickname from '@/components/user/VipNickname.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -516,7 +517,7 @@ async function sendPoints() {
 
         <!-- 名字与徽章区 -->
         <div class="user-name-section">
-          <h2 class="user-nickname">{{ profile.userNickname || profile.userName }}</h2>
+          <h2 class="user-nickname"><VipNickname :user-name="profile.userName">{{ profile.userNickname || profile.userName }}</VipNickname></h2>
           <div class="user-handle">@{{ profile.userName }}</div>
 
           <!-- 勋章小图标 -->

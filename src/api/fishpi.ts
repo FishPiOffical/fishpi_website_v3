@@ -907,9 +907,19 @@ export async function uploadFiles(apiKey: string, files: File[]): Promise<string
   if (ticketRes.code || !ticket || !uploadURL) {
     throw new Error(ticketRes.msg || '获取 RhyPic 上传票据失败')
   }
+  let uploadOrigin: URL
+  try {
+    uploadOrigin = new URL(uploadURL)
+  } catch {
+    throw new Error('图床上传地址无效')
+  }
+  if (uploadOrigin.protocol !== 'https:' || uploadOrigin.hostname !== 'pic.fishpi.cn') {
+    throw new Error('图床返回了不支持的上传地址')
+  }
   const body = new FormData()
   files.forEach((f) => body.append('file', f, f.name))
-  const res = await fetch(`${String(uploadURL).replace(/\/$/, '')}/api/v1/files`, {
+  // 通过同源代理上传，避免 pic.fishpi.cn 未开放浏览器跨域预检导致上传被拦截。
+  const res = await fetch('/rhypic-upload/api/v1/files', {
     method: 'POST',
     headers: { Authorization: `Bearer ${ticket}` },
     body,

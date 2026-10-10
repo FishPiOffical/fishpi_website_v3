@@ -14,6 +14,7 @@ import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
+import { useChatFilterStore } from '@/stores/chatFilter'
 import type { ChatNodeOption } from '@/api/fishpi'
 import FpLoading from '@/components/FpLoading.vue'
 import FpDialog from '@/components/FpDialog.vue'
@@ -21,6 +22,7 @@ import VipNickname from '@/components/user/VipNickname.vue'
 
 const auth = useAuthStore()
 const chat = useChatStore()
+const chatFilter = useChatFilterStore()
 const { account, isLoggedIn, apiKey } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 const composerReady = ref(false)
@@ -40,6 +42,7 @@ const {
   nodeOptions,
   chatStyle,
 } = storeToRefs(chat)
+const visibleMessages = computed(() => messages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
 
 const draft = ref('')
 const scroller = ref<HTMLElement | null>(null)
@@ -93,7 +96,7 @@ const quoteErr = ref('')
 const me = computed(() => account.value?.userName)
 
 // 经典版：最新消息排在最上面！
-const classicMessages = computed(() => [...messages.value].reverse())
+const classicMessages = computed(() => [...visibleMessages.value].reverse())
 
 function scrollToHash() {
   if (typeof location === 'undefined') return
@@ -105,7 +108,7 @@ function scrollToHash() {
 
 onMounted(async () => {
   composerReady.value = true
-  await chat.connect()
+  if (!chat.connected && !chat.connecting && !chat.loading) await chat.connect()
   await nextTick()
   if (chatStyle.value === 'modern') {
     scrollBottom()
@@ -120,7 +123,9 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => chat.disconnect())
+onUnmounted(() => {
+  if (!chat.floatingChatroomOpen) chat.disconnect()
+})
 
 watch(
   () => messages.value.length,
@@ -411,6 +416,7 @@ function clearScreen() {
           <!-- 2. 下方消息列表：与输入区在同一个卡片中，自上而下阅读，最新在最上方 -->
           <section class="cr-classic-list">
             <FpLoading v-if="loading && !messages.length" />
+            <p v-else-if="messages.length && !visibleMessages.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
             <p v-else-if="!messages.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
 
             <ChatBubble
@@ -420,6 +426,7 @@ function clearScreen() {
               :user-id="msg.userOId"
               :user-name="msg.userName"
               :nickname="msg.userNickname"
+              vip-nickname
               :avatar="msg.userAvatarURL"
               :medals="msg.sysMetal"
               :time="msg.time"
@@ -529,16 +536,18 @@ function clearScreen() {
           </button>
 
           <FpLoading v-if="loading && !messages.length" />
+          <p v-else-if="messages.length && !visibleMessages.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
           <p v-else-if="!messages.length" class="empty-hint">暂无新消息，快来打破宁静吧！</p>
 
           <div class="messages-container">
             <ChatBubble
-              v-for="msg in messages"
+              v-for="msg in visibleMessages"
               :id="`chatroom${msg.oId}`"
               :key="msg.oId"
               :user-id="msg.userOId"
               :user-name="msg.userName"
               :nickname="msg.userNickname"
+              vip-nickname
               :avatar="msg.userAvatarURL"
               :medals="msg.sysMetal"
               :time="msg.time"
@@ -574,7 +583,7 @@ function clearScreen() {
             </ChatBubble>
           </div>
 
-          <p v-if="!isLoggedIn && messages.length" class="guest-tip-bottom">
+          <p v-if="!isLoggedIn && visibleMessages.length" class="guest-tip-bottom">
             登录摸鱼派后可实时收发消息、发弹幕抢红包。
           </p>
         </div>

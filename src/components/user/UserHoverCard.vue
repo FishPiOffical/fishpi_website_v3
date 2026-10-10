@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import VipNickname from '@/components/user/VipNickname.vue'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -69,6 +70,7 @@ const roleBadge = computed(() => {
 })
 
 function usernameFrom(target: EventTarget | null): { userName: string; element: HTMLElement } | null {
+  if (/^\/chat(?:\/|$)/.test(route.path)) return null
   if (!(target instanceof Element)) return null
   if (cardEl.value?.contains(target)) return null
   const element = target.closest<HTMLElement>(AVATAR_SELECTOR)
@@ -314,7 +316,7 @@ onUnmounted(() => {
             <div class="card-meta">
               <div class="name-line">
                 <RouterLink class="nickname" :to="`/member/${profile.userName}`">
-                  {{ profile.userNickname || profile.userName }}
+                  <VipNickname :user-name="profile.userName">{{ profile.userNickname || profile.userName }}</VipNickname>
                 </RouterLink>
                 <span v-if="profile.mbti" class="mbti">{{ profile.mbti }}</span>
               </div>
@@ -498,7 +500,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .fact-link:hover {
-  color: var(--fp-link);
+  text-decoration: underline;
 }
 .external {
   font-size: 14px;
