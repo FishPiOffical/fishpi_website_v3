@@ -316,7 +316,6 @@ onUnmounted(() => {
             <button
               type="button"
               class="avatar-btn"
-              :data-user-card="account?.userName"
               :title="displayName"
               aria-haspopup="menu"
               :aria-expanded="menuOpen"
@@ -328,7 +327,7 @@ onUnmounted(() => {
             <div class="menu" role="menu">
               <div class="menu-head">
                 <RouterLink :to="memberPath" class="menu-user" @click="menuOpen = false">
-                  <img v-if="avatarUrl" :data-user-card="account?.userName" :src="avatarUrl" alt="" />
+                  <img v-if="avatarUrl" :src="avatarUrl" alt="" />
                   <div>
                     <b>{{ displayName }}</b>
                     <span>@{{ account?.userName }}</span>
