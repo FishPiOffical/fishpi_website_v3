@@ -28,7 +28,7 @@ VITE_API_TARGET=http://localhost:8080
 VITE_SITE_ORIGIN=https://fishpi.cn
 ```
 
-本站优先请求 Rhythm JSON；匿名列表/详情/搜索/领域若 401 或 404，回退到 `src/api/catalog.mock.json`。  
+本站优先请求 Rhythm JSON；匿名列表/详情/领域若 401 或 404，回退到 `src/api/catalog.mock.json`（成功的空结果不回退；搜索、用户资料失败直接报错）。  
 现网缺失的专用 JSON（首页专栏、背包读取、重置密码 meta 等）用 `src/api/gaps.mock.ts` 假数据，**不抓取现网 HTML**。清单见 [docs/MISSING_APIS.md](docs/MISSING_APIS.md)。广告位仅保留入口，不拉素材。
 
 ### SEO / SSR

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
@@ -8,11 +8,16 @@ import FpDialog from '@/components/FpDialog.vue'
 type AlertKind = 'phone' | 'mfa'
 
 const auth = useAuthStore()
-const { apiKey, isLoggedIn } = storeToRefs(auth)
+const { account } = storeToRefs(auth)
 
-const open = ref(false)
-const kind = ref<AlertKind | null>(null)
 const dismissed = ref(false)
+
+// 与现网一致：优先提示绑手机，其次管理组 2FA
+const kind = computed<AlertKind | null>(() => {
+  if (account.value?.needBindPhone) return 'phone'
+  if (account.value?.need2fa) return 'mfa'
+  return null
+})
 
 const title = computed(() =>
   kind.value === 'mfa' ? '致管理组成员的重要通知' : '系统公告',
@@ -31,52 +36,20 @@ const actionTo = computed(() =>
 
 const actionLabel = computed(() => (kind.value === 'mfa' ? '前往开启两步验证' : '前往绑定手机'))
 
-async function load() {
-  if (import.meta.env.SSR || !apiKey.value || !isLoggedIn.value || dismissed.value) return
-  try {
-    const res = await fetch('/__fp/security-alerts', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: apiKey.value }),
-    })
-    const data = (await res.json()) as { code?: number; needBindPhone?: boolean; need2fa?: boolean }
-    if (!res.ok || data.code) return
-    // 与现网一致：优先提示绑手机，其次管理组 2FA
-    if (data.needBindPhone) {
-      kind.value = 'phone'
-      open.value = true
-    } else if (data.need2fa) {
-      kind.value = 'mfa'
-      open.value = true
-    }
-  } catch {
-    /* 探测失败时不打扰 */
-  }
-}
-
 function close() {
-  open.value = false
   dismissed.value = true
 }
 
-onMounted(() => {
-  void load()
-})
-
-watch(isLoggedIn, (v) => {
-  if (v) {
+watch(
+  () => account.value?.userName,
+  () => {
     dismissed.value = false
-    void load()
-  } else {
-    open.value = false
-    kind.value = null
-  }
-})
+  },
+)
 </script>
 
 <template>
-  <FpDialog :open="open && !!kind" :title="title" tone="danger" @close="close">
+  <FpDialog :open="!dismissed && !!kind" :title="title" tone="danger" @close="close">
     <p class="body">{{ body }}</p>
     <template #footer>
       <button type="button" class="fp-btn" @click="close">稍后再说</button>

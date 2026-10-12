@@ -174,7 +174,7 @@ async function show(userName: string, element: HTMLElement) {
   profile.value = null
   loading.value = true
   try {
-    const data = await fetchUserProfile(userName, key, { fallbackToMock: false })
+    const data = await fetchUserProfile(userName, key)
     if (id !== requestId || !active.value) return
     cache.set(userName, data)
     if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!)

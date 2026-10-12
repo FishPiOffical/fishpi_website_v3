@@ -165,10 +165,16 @@ const routes = [
   { path: '/post', name: 'post', component: () => import('@/views/PostView.vue'), meta: { auth: true, robots: 'noindex' } },
   { path: '/good', component: () => import('@/views/ArticleListView.vue'), meta: { title: '点赞', list: 'good' } },
   {
-    path: '/tags/:tag',
+    path: '/tag/:tag',
     component: () => import('@/views/ArticleListView.vue'),
     meta: { title: '标签', list: 'tag' },
   },
+  // 现网标签内排序子页暂无对应 JSON，先落到标签默认列表，避免旧链接 404。
+  {
+    path: '/tag/:tag/:sort(hot|good|reply|perfect)',
+    redirect: (to: RouteLocation) => `/tag/${encodeURIComponent(String(to.params.tag))}`,
+  },
+  { path: '/tags/:tag', redirect: (to: RouteLocation) => `/tag/${encodeURIComponent(String(to.params.tag))}` },
   {
     path: '/stars',
     name: 'stars',

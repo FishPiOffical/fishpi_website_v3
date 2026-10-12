@@ -44,7 +44,6 @@ export const useWhisperStore = defineStore('whispers', () => {
   const listLoading = ref(false)
   const sending = ref(false)
   const error = ref('')
-  const usingMock = ref(false)
   const hasMore = ref(true)
   const loadingMore = ref(false)
   let ws: WebSocket | null = null
@@ -153,7 +152,6 @@ export const useWhisperStore = defineStore('whispers', () => {
     error.value = ''
     try {
       list.value = await fetchWhisperList(auth.apiKey)
-      usingMock.value = list.value.some((m) => String(m.oId).startsWith('mock-'))
       if (refreshCounts) await refreshUnread()
     } catch (e) {
       error.value = e instanceof Error ? e.message : '私信列表失败'
@@ -181,7 +179,6 @@ export const useWhisperStore = defineStore('whispers', () => {
     try {
       const rows = await fetchWhisperMessages(auth.apiKey, userName, 1, 40)
       if (sequence !== openSequence) return
-      usingMock.value = rows.some((m) => String(m.oId).startsWith('mock-'))
       messages.value = [...rows].reverse()
       if (rows.length < 40) hasMore.value = false
       await markWhisperRead(auth.apiKey, userName).catch(() => undefined)
@@ -284,21 +281,8 @@ export const useWhisperStore = defineStore('whispers', () => {
   async function send(text: string) {
     const content = text.trim()
     if (!content) return
-    const auth = useAuthStore()
-    if (usingMock.value || !ws || ws.readyState !== WebSocket.OPEN) {
-      if (!usingMock.value) {
-        error.value = '私信通道未连接'
-        return
-      }
-      messages.value.push({
-        oId: `mock-local-${Date.now()}`,
-        senderUserName: auth.account?.userName,
-        receiverUserName: peer,
-        markdown: content,
-        preview: content,
-        content: content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
-        time: '刚刚',
-      })
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      error.value = '私信通道未连接'
       return
     }
     sending.value = true
@@ -327,7 +311,6 @@ export const useWhisperStore = defineStore('whispers', () => {
     unread.value = []
     realtimeUnreadPeers.value = {}
     unreadCountOverride.value = null
-    usingMock.value = false
     disconnect()
   }
 
@@ -349,7 +332,6 @@ export const useWhisperStore = defineStore('whispers', () => {
     showInbox,
     sending,
     error,
-    usingMock,
     hasMore,
     loadingMore,
     peerOf,

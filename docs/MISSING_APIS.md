@@ -175,19 +175,19 @@ SPA `/vips` 已对接。管理端 VIP 不在本站范围。
 
 ## 13. 排行榜匿名读取 — 降级
 
-前端已对接以下路径，但匿名常 401 / 空，失败时部分榜单回退演示数据：
+前端已对接以下路径，但匿名常 401 / 空。成功的空榜单原样展示，仅请求失败时连签/在线榜回退演示数据（页面有提示）：
 
 | 接口 | 失败时 |
 |------|--------|
 | `GET /api/top/checkin` | `mockCheckin()` |
 | `GET /api/top/online` | `mockOnline()` |
-| `GET /api/top/donate`（鱼排续命师，含 `totalData.totalAmount/donateMakeDays`） | 内置演示数据 |
-| `GET /api/top/perfect`（优选榜） | 内置演示数据 |
-| `GET /api/top/invite`（邀请榜） | 内置演示数据 |
-| `GET /api/top/{game}`（游戏榜） | 内置演示数据 |
+| `GET /api/top/donate`（鱼排续命师，含 `totalData.totalAmount/donateMakeDays`） | 空列表 |
+| `GET /api/top/perfect`（优选榜） | 空列表 |
+| `GET /api/top/invite`（邀请榜） | 空列表 |
+| `GET /api/top/{game}`（游戏榜） | 空列表 |
 | `GET /api/top/balance`、`/api/top/consumption` | 空列表（需登录） |
 
-诉求：确认以上榜单的匿名可读性及返回结构（`data[]` / `users[]` 二选一统一），开放后删除 `fishpi.ts` 内演示数据。
+诉求：确认以上榜单的匿名可读性及返回结构（`data[]` / `users[]` 二选一统一），开放后删除连签/在线榜的演示数据。
 
 ---
 
@@ -210,7 +210,12 @@ SPA `/vips` 已对接。管理端 VIP 不在本站范围。
 | 首页专栏 | `src/api/gaps.mock.ts` → `mockHomeColumns` |
 | 背包读取 | `src/api/gaps.mock.ts` → `mockUserBag` |
 | 重置密码 meta | `src/api/gaps.mock.ts` → `mockResetPwdMeta` |
-| 匿名列表/详情等 | `src/api/catalog.mock.json`（既有） |
-| 榜单演示数据 | `src/api/fishpi.ts` → `fetchDonateRank` / `fetchPerfectRank` / `fetchInviteRank` / `fetchGameRank` |
+| 匿名列表/详情、领域、连签/在线榜（仅请求失败时） | `src/api/catalog.mock.json`（既有） |
+
+用户资料、搜索失败时直接报错，不使用假数据。
 
 服务端仅保留 `POST /__fp/page-auth`（apiKey → `sym-ce` + csrf，供页面态 POST）。**不再**提供 HTML 抓取类 `__fp/*` 接口。
+
+## 15. 账号安全提醒 — 缺失
+
+现网首页会对未绑手机、管理组未开两步验证的账号弹窗。前端 `SystemAlertDialog` 读取 `GET /api/user` 的 `needBindPhone`、`need2fa`（布尔）；字段未提供前不弹窗。

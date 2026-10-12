@@ -20,7 +20,7 @@ const whispers = useWhisperStore()
 const route = useRoute()
 const router = useRouter()
 const { account, apiKey } = storeToRefs(auth)
-const { list, listLoading, unreadBy, unreadTotal, messages, sending, loading, error, connected, connecting, usingMock, hasMore, loadingMore, inboxPeer } =
+const { list, listLoading, unreadBy, unreadTotal, messages, sending, loading, error, connected, connecting, hasMore, loadingMore, inboxPeer } =
   storeToRefs(whispers)
 const {
   messages: roomMessages,
@@ -41,7 +41,7 @@ const isChatroomSelected = computed(() => selectedPeer.value === CHATROOM_PEER)
 const visibleRoomMessages = computed(() => roomMessages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
 const canSend = computed(() => isChatroomSelected.value
   ? Boolean(draft.value.trim()) && !roomSending.value && roomConnected.value
-  : Boolean(draft.value.trim()) && !sending.value && (connected.value || usingMock.value))
+  : Boolean(draft.value.trim()) && !sending.value && connected.value)
 const connectionLabel = computed(() => connected.value ? '已连接' : connecting.value ? '连接中' : '已断开')
 const roomConnectionLabel = computed(() => roomConnected.value ? '已连接' : roomConnecting.value ? '连接中' : '已断开')
 const scroller = ref<HTMLElement | null>(null)
@@ -462,7 +462,6 @@ onUnmounted(() => {
                 </div>
               </header>
               <p v-if="isChatroomSelected && roomError" class="error">{{ roomError }}</p>
-              <p v-else-if="!isChatroomSelected && usingMock" class="hint">当前会话不可用，消息仅保存在本地预览。</p>
               <p v-if="!isChatroomSelected && error" class="error">{{ error }}</p>
               <div ref="scroller" class="messages" @scroll.passive="onScroll">
                 <button
@@ -512,7 +511,7 @@ onUnmounted(() => {
                     type="text"
                     :aria-label="isChatroomSelected ? '聊天室消息' : '私信消息'"
                     placeholder="说点什么吧…"
-                    :disabled="isChatroomSelected ? !roomConnected : !connected && !usingMock"
+                    :disabled="isChatroomSelected ? !roomConnected : !connected"
                   />
                   <button type="submit" :disabled="!canSend">{{ (isChatroomSelected ? roomSending : sending) ? '发送中' : '发送' }}</button>
                 </form>
@@ -526,7 +525,7 @@ onUnmounted(() => {
                   compact
                   :cache-id="isChatroomSelected ? 'chatroom-drawer' : `whisper-drawer-${selectedPeer}`"
                   :sending="isChatroomSelected ? roomSending : sending"
-                  :disabled="isChatroomSelected ? !roomConnected : !connected && !usingMock"
+                  :disabled="isChatroomSelected ? !roomConnected : !connected"
                   placeholder="说点什么吧，友善第一哦。"
                   @submit="submit"
                 />

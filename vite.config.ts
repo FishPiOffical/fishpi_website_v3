@@ -113,8 +113,6 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/chat-channel': { ...proxy, ws: true },
-        '/idle-talk': proxy,
-        '/idle-talk-channel': { ...proxy, ws: true },
         '/charge': { ...proxy, bypass: spaGetBypass },
         '/pay': proxy,
         '/getApiKeyInWeb': proxy,

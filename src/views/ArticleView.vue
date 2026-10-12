@@ -886,7 +886,7 @@ async function onReactComment(c: ArticleComment, value: string) {
         </div>
 
         <div v-if="tagList.length" class="tags">
-          <RouterLink v-for="t in tagList" :key="t" :to="`/tags/${encodeURIComponent(t)}`" class="tag-pill">
+          <RouterLink v-for="t in tagList" :key="t" :to="`/tag/${encodeURIComponent(t)}`" class="tag-pill">
             # {{ t }}
           </RouterLink>
         </div>

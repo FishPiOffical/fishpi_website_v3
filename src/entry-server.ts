@@ -126,7 +126,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
       }
     }
 
-    const tagMatch = path.match(/^\/tags\/([^/]+)$/)
+    const tagMatch = path.match(/^\/tag\/([^/]+)$/)
     if (tagMatch) {
       return {
         feed: await fetchArticleFeed('tag', null, 1, 40, decodeURIComponent(tagMatch[1])),

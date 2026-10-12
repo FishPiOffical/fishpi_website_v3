@@ -14,7 +14,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const whispers = useWhisperStore()
 const { account, apiKey } = storeToRefs(auth)
-const { list, listLoading, unreadBy, messages, sending, loading, error, connected, usingMock, hasMore, loadingMore } =
+const { list, listLoading, unreadBy, messages, sending, loading, error, connected, hasMore, loadingMore } =
   storeToRefs(whispers)
 
 const draft = ref('')
@@ -140,7 +140,6 @@ async function submit() {
         </h1>
         <span :class="{ on: connected }">{{ connected ? '已连接' : '未连接' }}</span>
       </header>
-      <p v-if="usingMock" class="hint">会话未连接，消息仅保存在本地预览。</p>
       <p v-if="error" class="err">{{ error }}</p>
       <div ref="scroller" class="msgs" @scroll.passive="onScroll" @load.capture="onMediaLoad">
         <button
@@ -177,7 +176,7 @@ async function submit() {
         compact
         :cache-id="`whisper-${userName}`"
         :sending="sending"
-        :disabled="!connected && !usingMock"
+        :disabled="!connected"
         placeholder="说点什么吧，友善第一哦。"
         @submit="submit"
       />

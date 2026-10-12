@@ -154,7 +154,6 @@ const moonFound = computed(
   () => !highlightMoonId.value || breezemoons.value.some((m) => String(m.oId) === highlightMoonId.value),
 )
 
-const usingMock = computed(() => String(profile.value?.oId || '').startsWith('mock-'))
 const isSelf = computed(() => Boolean(account.value && account.value.userName === userName.value))
 const following = computed(() => profile.value?.canFollow === 'no')
 
@@ -192,7 +191,7 @@ usePageSeo(() => {
 })
 
 async function loadExtras(p: UserProfile) {
-  if (import.meta.env.SSR || !p.oId || String(p.oId).startsWith('mock-')) return
+  if (import.meta.env.SSR || !p.oId) return
   try {
     viewedVip.value = (await fetchMembership(p.oId)).isVip
   } catch {
@@ -308,7 +307,6 @@ async function sendPoints() {
       <p v-else-if="error" class="err">{{ error }}</p>
 
       <div v-else-if="profile" class="module">
-        <p v-if="usingMock" class="mock-tip">⚠️ 接口未返回，当前展示演示数据</p>
         <!-- 一级分组（对齐现网 home/macro-home.ftl：发布 / 关注 / 积分） -->
         <nav class="home-groups">
           <RouterLink :to="base" :class="{ current: activeGroup === 'post' }">发布</RouterLink>

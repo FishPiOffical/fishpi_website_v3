@@ -117,7 +117,7 @@ const clientLinks = [
 
 const legalLinks = [
   { href: '/article/1630569106133', label: '关于', external: false },
-  { href: '/tags/announcement', label: '系统公告', external: false },
+  { href: '/tag/announcement', label: '系统公告', external: false },
   { href: '/statistic', label: '数据统计', external: false, rhythm: true },
   { href: '/agreement', label: '用户协议', external: false },
   { href: '/privacy', label: '隐私政策', external: false },

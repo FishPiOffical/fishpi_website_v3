@@ -36,7 +36,7 @@ export function shouldPrefetchSsr(path: string) {
     return true
   }
   if (/^\/domain\/[^/]+$/.test(p)) return true
-  if (/^\/tags\/[^/]+$/.test(p)) return true
+  if (/^\/tag\/[^/]+$/.test(p)) return true
   if (/^\/column\/[^/]+$/.test(p)) return true
   return false
 }

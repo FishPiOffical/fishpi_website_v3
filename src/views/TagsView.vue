@@ -39,9 +39,9 @@ watch([apiKey, page], () => void load(), { immediate: true })
 function tagPath(tag: TagItem) {
   const uri = tag.tagURI || tag.tagTitle
   try {
-    return `/tags/${encodeURIComponent(decodeURIComponent(uri))}`
+    return `/tag/${encodeURIComponent(decodeURIComponent(uri))}`
   } catch {
-    return `/tags/${encodeURIComponent(uri)}`
+    return `/tag/${encodeURIComponent(uri)}`
   }
 }
 </script>

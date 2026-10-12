@@ -5,7 +5,6 @@ import {
   mockDomains,
   mockFeed,
   mockOnline,
-  mockProfile,
   type DomainItem,
 } from './catalog'
 import { ApiError, request, requestText, withKey } from './http'
@@ -32,6 +31,9 @@ export interface AccountInfo {
   userCommentCount?: number
   userPhone?: string
   userEmail?: string
+  /** 待后端在 /api/user 提供：未绑手机 / 管理组未开两步验证，对应现网首页的安全弹窗。 */
+  needBindPhone?: boolean
+  need2fa?: boolean
   /** 0 公开 / 1 私密 */
   userGeoStatus?: number
   /** 隐私开关：0 公开 / 1 私密（与现网一致） */
@@ -993,8 +995,8 @@ export async function uploadFiles(apiKey: string, files: File[]): Promise<string
   return urls
 }
 
-/** 匿名读未开放或接口 404 时可选回退 mock；成功但空列表不再当成失败。 */
-async function unwrapArticles(path: string, apiKey?: string | null, fallback?: () => ArticleSummary[]) {
+/** 请求失败（401/404/code≠0）返回 null，与成功的空列表区分。 */
+async function tryArticles(path: string, apiKey?: string | null): Promise<ArticleSummary[] | null> {
   try {
     const res = await request<Envelope<{ articles?: ArticleSummary[] } | ArticleSummary[]>>(withKey(path, apiKey))
     if (res.code === 0) {
@@ -1006,7 +1008,12 @@ async function unwrapArticles(path: string, apiKey?: string | null, fallback?: (
   } catch {
     /* 401/404 */
   }
-  return fallback ? fallback() : []
+  return null
+}
+
+/** 匿名读未开放或接口 404 时可选回退 mock；成功但空列表不再当成失败。 */
+async function unwrapArticles(path: string, apiKey?: string | null, fallback?: () => ArticleSummary[]) {
+  return (await tryArticles(path, apiKey)) ?? (fallback ? fallback() : [])
 }
 
 export async function fetchRecentArticles(apiKey?: string | null, page = 1, size = 40) {
@@ -1047,33 +1054,25 @@ export async function fetchArticleFeed(
     return unwrapArticles(`/api/articles/recent/reply?p=${page}&size=${size}`, apiKey)
   }
   if (kind === 'qna') {
-    const fromQna = await unwrapArticles(`/api/articles/qna?p=${page}&size=${size}`, apiKey)
-    if (fromQna.length) return fromQna
-    const fromTag = await unwrapArticles(`/api/articles/tag/${encodeURIComponent('q&a')}?p=${page}&size=${size}`, apiKey)
-    if (fromTag.length) return fromTag
-    return mockFeed('qna', page, size)
+    const fromQna = await tryArticles(`/api/articles/qna?p=${page}&size=${size}`, apiKey)
+    if (fromQna) return fromQna
+    return unwrapArticles(`/api/articles/tag/${encodeURIComponent('q&a')}?p=${page}&size=${size}`, apiKey, () =>
+      mockFeed('qna', page, size),
+    )
   }
   if (kind === 'perfect') {
-    const fromPerfect = await unwrapArticles(`/api/articles/perfect?p=${page}&size=${size}`, apiKey)
-    if (fromPerfect.length) return fromPerfect
-    return mockFeed('perfect', page, size)
+    return unwrapArticles(`/api/articles/perfect?p=${page}&size=${size}`, apiKey, () => mockFeed('perfect', page, size))
   }
   if (kind === 'tag') {
-    const fromTag = await unwrapArticles(
-      `/api/articles/tag/${encodeURIComponent(extra)}?p=${page}&size=${size}`,
-      apiKey,
+    return unwrapArticles(`/api/articles/tag/${encodeURIComponent(extra)}?p=${page}&size=${size}`, apiKey, () =>
+      mockFeed('tag', page, size, extra),
     )
-    if (fromTag.length) return fromTag
-    return mockFeed('tag', page, size, extra)
   }
   if (kind === 'search') return fetchSearch(extra, apiKey, page, size)
   if (kind === 'domain') {
-    const fromDomain = await unwrapArticles(
-      `/api/articles/domain/${encodeURIComponent(extra)}?p=${page}&size=${size}`,
-      apiKey,
+    return unwrapArticles(`/api/articles/domain/${encodeURIComponent(extra)}?p=${page}&size=${size}`, apiKey, () =>
+      mockFeed('domain', page, size, extra),
     )
-    if (fromDomain.length) return fromDomain
-    return mockFeed('domain', page, size, extra)
   }
   return fetchRecentArticles(apiKey, page, size)
 }
@@ -1093,7 +1092,7 @@ export async function fetchSearch(q: string, apiKey?: string | null, page = 1, s
   } catch (e) {
     if (e instanceof Error && (e.message.includes('频繁') || e.message.includes('搜索'))) throw e
   }
-  return mockFeed('search', page, size, query)
+  throw new Error('搜索失败，请稍后再试')
 }
 
 function normalizeDomain(raw: DomainItem): DomainItem | null {
@@ -1118,8 +1117,7 @@ export async function fetchDomains(apiKey?: string | null): Promise<DomainItem[]
         : data && 'domains' in data && Array.isArray(data.domains)
           ? data.domains
           : []
-      const normalized = list.map(normalizeDomain).filter((d): d is DomainItem => Boolean(d))
-      if (normalized.length) return normalized
+      return list.map(normalizeDomain).filter((d): d is DomainItem => Boolean(d))
     }
   } catch {
     /* GET /api/domains 尚未提供 */
@@ -1394,11 +1392,11 @@ function rankUsersOf(data: TopRankPayload | undefined): RankUser[] {
   return []
 }
 
+/** 请求失败时才回退演示榜单，成功的空榜单原样返回。 */
 export async function fetchCheckinRank(apiKey?: string | null): Promise<RankUser[]> {
   try {
     const res = await request<Envelope<TopRankPayload>>(withKey('/api/top/checkin?p=1', apiKey))
-    const list = rankUsersOf(res.data)
-    if (list.length) return list
+    if (!res.code) return rankUsersOf(res.data)
   } catch {
     /* anonymous top not ready */
   }
@@ -1408,8 +1406,7 @@ export async function fetchCheckinRank(apiKey?: string | null): Promise<RankUser
 export async function fetchOnlineRank(apiKey?: string | null): Promise<RankUser[]> {
   try {
     const res = await request<Envelope<TopRankPayload>>(withKey('/api/top/online?p=1', apiKey))
-    const list = rankUsersOf(res.data)
-    if (list.length) return list
+    if (!res.code) return rankUsersOf(res.data)
   } catch {
     /* anonymous top not ready */
   }
@@ -1475,7 +1472,7 @@ export async function fetchDonateRank(apiKey?: string | null): Promise<DonateRan
     const res = await request<Envelope<{ data?: DonateRankEntry[]; totalData?: { totalAmount?: number; donateMakeDays?: number } }>>(
       withKey('/api/top/donate?p=1', apiKey),
     )
-    if (res.data && Array.isArray(res.data.data) && res.data.data.length) {
+    if (res.data && Array.isArray(res.data.data)) {
       return {
         totalAmount: Number(res.data.totalData?.totalAmount || 0),
         donateMakeDays: Number(res.data.totalData?.donateMakeDays || 0),
@@ -1483,39 +1480,9 @@ export async function fetchDonateRank(apiKey?: string | null): Promise<DonateRan
       }
     }
   } catch {
-    /* fallback mock */
+    /* login required or unavailable */
   }
-  return {
-    totalAmount: 18888,
-    donateMakeDays: 3777,
-    data: [
-      {
-        total: 2333,
-        totalCount: 16,
-        profile: { userName: 'Vanessa', userNickname: 'Vanessa', userNo: 2, userAppRole: 1, userIntro: '开源与社区建设者' },
-      },
-      {
-        total: 1888,
-        totalCount: 12,
-        profile: { userName: 'D', userNickname: 'D', userNo: 1, userAppRole: 0, userIntro: '摸鱼派发起人' },
-      },
-      {
-        total: 1280,
-        totalCount: 9,
-        profile: { userName: 'csfwff', userNickname: 'csfwff', userNo: 168, userAppRole: 0, userIntro: '全栈摸鱼老哥' },
-      },
-      {
-        total: 999,
-        totalCount: 6,
-        profile: { userName: 'Yui', userNickname: 'Yui', userNo: 66, userAppRole: 1, userIntro: '机器人维护者' },
-      },
-      {
-        total: 666,
-        totalCount: 4,
-        profile: { userName: 'adventext', userNickname: 'adventext', userNo: 888, userAppRole: 0, userIntro: '摸鱼常驻大佬' },
-      },
-    ],
-  }
+  return { totalAmount: 0, donateMakeDays: 0, data: [] }
 }
 
 export async function fetchPerfectRank(apiKey?: string | null): Promise<CountRankEntry[]> {
@@ -1523,17 +1490,12 @@ export async function fetchPerfectRank(apiKey?: string | null): Promise<CountRan
     const res = await request<Envelope<CountRankEntry[] | { data?: CountRankEntry[] }>>(
       withKey('/api/top/perfect?p=1', apiKey),
     )
-    if (Array.isArray(res.data) && res.data.length) return res.data
-    if (res.data && 'data' in res.data && Array.isArray(res.data.data) && res.data.data.length) return res.data.data
+    if (Array.isArray(res.data)) return res.data
+    if (res.data && 'data' in res.data && Array.isArray(res.data.data)) return res.data.data
   } catch {
-    /* fallback */
+    /* login required or unavailable */
   }
-  return [
-    { count: 48, profile: { userName: 'D', userNickname: 'D', userNo: 1, userAppRole: 0, userIntro: '摸鱼派发起人' } },
-    { count: 32, profile: { userName: 'Vanessa', userNickname: 'Vanessa', userNo: 2, userAppRole: 1, userIntro: '开源与社区建设者' } },
-    { count: 26, profile: { userName: 'csfwff', userNickname: 'csfwff', userNo: 168, userAppRole: 0, userIntro: '高质量文章作者' } },
-    { count: 18, profile: { userName: 'Yui', userNickname: 'Yui', userNo: 66, userAppRole: 1, userIntro: '技术干货分享' } },
-  ]
+  return []
 }
 
 export async function fetchInviteRank(apiKey?: string | null): Promise<CountRankEntry[]> {
@@ -1541,16 +1503,12 @@ export async function fetchInviteRank(apiKey?: string | null): Promise<CountRank
     const res = await request<Envelope<CountRankEntry[] | { data?: CountRankEntry[] }>>(
       withKey('/api/top/invite?p=1', apiKey),
     )
-    if (Array.isArray(res.data) && res.data.length) return res.data
-    if (res.data && 'data' in res.data && Array.isArray(res.data.data) && res.data.data.length) return res.data.data
+    if (Array.isArray(res.data)) return res.data
+    if (res.data && 'data' in res.data && Array.isArray(res.data.data)) return res.data.data
   } catch {
-    /* fallback */
+    /* login required or unavailable */
   }
-  return [
-    { count: 120, c: 120, profile: { userName: 'csfwff', userNickname: 'csfwff', userNo: 168, userAppRole: 0, userIntro: '邀请了 120 位小伙伴' } },
-    { count: 96, c: 96, profile: { userName: 'Yui', userNickname: 'Yui', userNo: 66, userAppRole: 1, userIntro: '邀请了 96 位小伙伴' } },
-    { count: 64, c: 64, profile: { userName: 'Vanessa', userNickname: 'Vanessa', userNo: 2, userAppRole: 1, userIntro: '社区引路人' } },
-  ]
+  return []
 }
 
 export async function fetchGameRank(game: string, apiKey?: string | null): Promise<GameRankEntry[]> {
@@ -1558,16 +1516,12 @@ export async function fetchGameRank(game: string, apiKey?: string | null): Promi
     const res = await request<Envelope<GameRankEntry[] | { data?: GameRankEntry[] }>>(
       withKey(`/api/top/${encodeURIComponent(game)}?p=1`, apiKey),
     )
-    if (Array.isArray(res.data) && res.data.length) return res.data
-    if (res.data && 'data' in res.data && Array.isArray(res.data.data) && res.data.data.length) return res.data.data
+    if (Array.isArray(res.data)) return res.data
+    if (res.data && 'data' in res.data && Array.isArray(res.data.data)) return res.data.data
   } catch {
-    /* fallback */
+    /* login required or unavailable */
   }
-  return [
-    { userName: 'csfwff', userNickname: 'csfwff', score: 9999, rank: 1, userIntro: '无敌大玩家' },
-    { userName: 'Yui', userNickname: 'Yui', score: 8888, rank: 2, userIntro: '修仙榜霸' },
-    { userName: 'Vanessa', userNickname: 'Vanessa', score: 7777, rank: 3, userIntro: '摸鱼高手' },
-  ]
+  return []
 }
 
 export interface LiteUser {
@@ -2081,11 +2035,7 @@ export async function finishRegister(payload: {
   if (res.code) throw new Error(res.msg || '注册失败')
 }
 
-export async function fetchUserProfile(
-  userName: string,
-  apiKey?: string | null,
-  options: { fallbackToMock?: boolean } = {},
-): Promise<UserProfile> {
+export async function fetchUserProfile(userName: string, apiKey?: string | null): Promise<UserProfile> {
   const paths = [`/user/${encodeURIComponent(userName)}`, `/api/user/${encodeURIComponent(userName)}`]
   let lastError: unknown
   for (const path of paths) {
@@ -2099,11 +2049,8 @@ export async function fetchUserProfile(
       lastError = error
     }
   }
-  if (options.fallbackToMock === false) {
-    // 对外消息不包含请求地址、API Key 或服务端响应；原始错误仅用于内部排查。
-    throw new Error('用户资料加载失败', { cause: lastError })
-  }
-  return mockProfile(userName)
+  // 资料会被设置页回填后提交，失败时不能用假资料顶替；对外消息不含请求地址或 API Key。
+  throw new Error('用户资料加载失败', { cause: lastError })
 }
 
 export async function fetchUserArticles(userName: string, apiKey?: string | null, page = 1, size = 40) {
@@ -2136,23 +2083,11 @@ export async function fetchCollectedArticles(apiKey?: string | null, page = 1, s
 }
 
 export async function fetchFollowingUsers(userName: string, apiKey?: string | null, page = 1) {
-  return unwrapUsers(
-    [
-      `/api/user/${encodeURIComponent(userName)}/following?p=${page}`,
-      `/follow/users?p=${page}&followingId=${encodeURIComponent(userName)}`,
-    ],
-    apiKey,
-  )
+  return unwrapUsers([`/api/user/${encodeURIComponent(userName)}/following/users?p=${page}`], apiKey)
 }
 
 export async function fetchFollowers(userName: string, apiKey?: string | null, page = 1) {
-  return unwrapUsers(
-    [
-      `/api/user/${encodeURIComponent(userName)}/followers?p=${page}`,
-      `/follow/followers?p=${page}&followingId=${encodeURIComponent(userName)}`,
-    ],
-    apiKey,
-  )
+  return unwrapUsers([`/api/user/${encodeURIComponent(userName)}/followers?p=${page}`], apiKey)
 }
 
 export async function fetchUserPoint(userName: string, apiKey?: string | null) {
