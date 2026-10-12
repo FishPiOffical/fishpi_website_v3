@@ -140,6 +140,8 @@ function preview(line: (typeof messages.value)[number]) {
                   :html="line.html || ''"
                   :self="line.userName === account?.userName"
                   vip-nickname
+                  chatroom
+                  :standalone="Boolean(line.redPacket)"
                 >
                   <HongbaoCard
                     v-if="line.redPacket"

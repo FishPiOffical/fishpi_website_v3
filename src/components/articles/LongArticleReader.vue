@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import type { ArticleDetail, LongArticleChapter, LongArticleColumnView } from '@/api/fishpi'
+import {
+  fetchParagraphCommentSummary,
+  fetchParagraphComments,
+  type ArticleComment,
+  type ArticleDetail,
+  type LongArticleChapter,
+  type LongArticleColumnView,
+} from '@/api/fishpi'
 import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAppearanceStore } from '@/stores/appearance'
@@ -27,6 +34,7 @@ const emit = defineEmits<{
   react: [value: string]
   contentClick: [e: MouseEvent]
   reply: []
+  paragraphReply: [paragraphId: string, commentId: string, comment?: ArticleComment]
 }>()
 
 /** 与现网 js/long-article.js 共用同一 localStorage 键 */
@@ -54,6 +62,16 @@ const drawerScrollEl = ref<HTMLElement | null>(null)
 const catalogEl = ref<HTMLElement | null>(null)
 const moreEl = ref<HTMLElement | null>(null)
 const layoutEl = ref<HTMLElement | null>(null)
+const paragraphCounts = ref<Record<string, number>>({})
+const activeParagraphId = ref('')
+const activeSnapshot = ref('')
+const paragraphComments = ref<ArticleComment[]>([])
+const paragraphLoading = ref(false)
+const paragraphError = ref('')
+const paragraphPage = ref(1)
+const paragraphPages = ref(1)
+const paragraphSort = ref('')
+let paragraphRequest = 0
 
 const chapters = computed(() => props.column?.chapters || [])
 const currentChapterId = computed(() => props.article.oId)
@@ -167,12 +185,144 @@ function toggleCatalog() {
 function openComments() {
   catalogOpen.value = false
   closeFloating()
+  if (activeParagraphId.value) emit('paragraphReply', '', '')
+  activeParagraphId.value = ''
+  activeSnapshot.value = ''
   commentsOpen.value = true
+}
+
+function paragraphSnapshot(el: Element) {
+  const text = (el.textContent || '').replace(/\s+/g, ' ').trim()
+  return text.length > 160 ? `${text.slice(0, 159)}…` : text
+}
+
+function updateParagraphUrl(value: string) {
+  const params = new URLSearchParams(location.search)
+  if (value) params.set('paragraph', value)
+  else params.delete('paragraph')
+  const search = params.toString()
+  history.replaceState({}, '', `${location.pathname}${search ? `?${search}` : ''}${location.hash}`)
+}
+
+function updateParagraphButtons() {
+  contentEl.value?.querySelectorAll<HTMLElement>('[data-open-paragraph-comments]').forEach((button) => {
+    const id = button.dataset.openParagraphComments || ''
+    const count = Number(paragraphCounts.value[id] || 0)
+    button.classList.toggle('has-comments', count > 0)
+    const badge = button.querySelector<HTMLElement>('.la-paragraph-comment-count')
+    if (badge) {
+      badge.textContent = count > 0 ? String(count) : ''
+      badge.hidden = count <= 0
+    }
+    button.setAttribute('aria-label', count > 0 ? `查看段评 ${count}` : '写段评')
+  })
+}
+
+function decorateParagraphs() {
+  const root = contentEl.value
+  if (!root) return
+  root.querySelectorAll<HTMLElement>('[data-long-paragraph-id]').forEach((paragraph) => {
+    if (paragraph.querySelector(':scope > .la-paragraph-comment-btn')) return
+    paragraph.classList.add('long-article-commentable-block')
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'la-paragraph-comment-btn'
+    button.dataset.openParagraphComments = paragraph.dataset.longParagraphId || ''
+    button.setAttribute('aria-label', '写段评')
+    button.title = '查看 / 写段评'
+    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg><span class="la-paragraph-comment-count" hidden></span>'
+    button.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      openParagraph(paragraph.dataset.longParagraphId || '')
+    })
+    const lines = paragraph.querySelectorAll('.la-line')
+    const lastLine = lines[lines.length - 1]
+    ;(lastLine || paragraph).appendChild(button)
+  })
+  updateParagraphButtons()
+}
+
+async function loadParagraphSummary() {
+  const articleId = props.article.oId
+  if (!articleId) return
+  try {
+    const summary = await fetchParagraphCommentSummary(articleId)
+    if (props.article.oId !== articleId) return
+    paragraphCounts.value = Object.fromEntries(summary.map((item) => [item.paragraphId, item.commentCount]))
+    updateParagraphButtons()
+  } catch {
+    // 段评统计接口失败时仍保留每段的入口，打开后显示具体状态。
+  }
+}
+
+async function loadParagraphComments(page = 1) {
+  const articleId = props.article.oId
+  const paragraphId = activeParagraphId.value
+  if (!articleId || !paragraphId) return
+  const requestId = ++paragraphRequest
+  paragraphLoading.value = true
+  paragraphError.value = ''
+  paragraphPage.value = page
+  try {
+    const data = await fetchParagraphComments(articleId, paragraphId, page, paragraphSort.value, props.apiKey)
+    if (requestId !== paragraphRequest || activeParagraphId.value !== paragraphId || props.article.oId !== articleId) return
+    paragraphComments.value = data.commentThreadParents || []
+    activeSnapshot.value = data.paragraphSnapshot || activeSnapshot.value
+    paragraphPages.value = Math.max(1, Number(data.pagination?.paginationPageCount || 1))
+  } catch (error) {
+    if (requestId !== paragraphRequest) return
+    paragraphError.value = error instanceof Error ? error.message : '段评加载失败'
+    paragraphComments.value = []
+  } finally {
+    if (requestId === paragraphRequest) paragraphLoading.value = false
+  }
+}
+
+function openParagraph(paragraphId: string) {
+  const paragraph = contentEl.value?.querySelector<HTMLElement>(`[data-long-paragraph-id="${CSS.escape(paragraphId)}"]`)
+  if (!paragraph) return
+  if (activeParagraphId.value === paragraphId && commentsOpen.value) {
+    closeComments()
+    return
+  }
+  catalogOpen.value = false
+  closeFloating()
+  activeParagraphId.value = paragraphId
+  activeSnapshot.value = paragraphSnapshot(paragraph)
+  emit('paragraphReply', paragraphId, '')
+  paragraphComments.value = []
+  paragraphSort.value = ''
+  paragraphPage.value = 1
+  commentsOpen.value = true
+  contentEl.value?.querySelectorAll('.is-commenting').forEach((item) => item.classList.remove('is-commenting'))
+  paragraph.classList.add('is-commenting')
+  updateParagraphUrl(paragraphId)
+  void loadParagraphComments(1)
+}
+
+function handleContentClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  const image = target?.closest('img')
+  if (image) emit('contentClick', event)
+  const paragraph = target?.closest<HTMLElement>('[data-long-paragraph-id]')
+  if (!paragraph || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
+  if (target?.closest('a, button, img, input, textarea, select, video, audio, iframe, pre, code, table, [contenteditable="true"]')) return
+  const selection = window.getSelection()
+  if (selection && !selection.isCollapsed && paragraph.contains(selection.anchorNode)) return
+  openParagraph(paragraph.dataset.longParagraphId || '')
 }
 
 function closeComments() {
   commentsOpen.value = false
   composerOpen.value = false
+  if (activeParagraphId.value) {
+    contentEl.value?.querySelectorAll('.is-commenting').forEach((item) => item.classList.remove('is-commenting'))
+    activeParagraphId.value = ''
+    activeSnapshot.value = ''
+    updateParagraphUrl('')
+    emit('paragraphReply', '', '')
+  }
 }
 
 function toggleComments() {
@@ -181,6 +331,12 @@ function toggleComments() {
 }
 
 function openComposer() {
+  if (activeParagraphId.value) {
+    activeParagraphId.value = ''
+    activeSnapshot.value = ''
+    updateParagraphUrl('')
+    emit('paragraphReply', '', '')
+  }
   if (!commentsOpen.value) openComments()
   composerOpen.value = true
 }
@@ -196,7 +352,19 @@ function toTop() {
 
 function onReplyTrigger() {
   composerOpen.value = true
-  emit('reply')
+  if (activeParagraphId.value) emit('paragraphReply', activeParagraphId.value, '')
+  else emit('reply')
+}
+
+function replyToParagraphComment(comment: ArticleComment) {
+  if (!activeParagraphId.value) return
+  composerOpen.value = true
+  emit('paragraphReply', activeParagraphId.value, comment.oId, comment)
+}
+
+function refreshParagraphComments() {
+  if (activeParagraphId.value) void loadParagraphComments(paragraphPage.value)
+  void loadParagraphSummary()
 }
 
 function moreAction(name: 'vote' | 'thank' | 'collect' | 'watch' | 'revisions') {
@@ -259,7 +427,11 @@ function onDocClick(e: MouseEvent) {
 
 watch(
   () => props.article.articleContent,
-  () => void nextTick(formatParagraphs),
+  () => void nextTick(() => {
+    formatParagraphs()
+    decorateParagraphs()
+    void loadParagraphSummary()
+  }),
 )
 
 watch(
@@ -268,6 +440,15 @@ watch(
     catalogOpen.value = false
     composerOpen.value = false
     closeFloating()
+    activeParagraphId.value = ''
+    paragraphComments.value = []
+    paragraphCounts.value = {}
+    emit('paragraphReply', '', '')
+    void nextTick(() => {
+      formatParagraphs()
+      decorateParagraphs()
+      void loadParagraphSummary()
+    })
   },
 )
 
@@ -276,13 +457,15 @@ onMounted(() => {
   onResize()
   onScroll()
   formatParagraphs()
+  decorateParagraphs()
+  void loadParagraphSummary()
   window.addEventListener('resize', onResize)
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('keydown', onKey)
   document.addEventListener('click', onDocClick)
-  if (/(?:^|&)(?:p|m|sort|author)=/.test(location.search.slice(1)) || location.hash.startsWith('#comments')) {
-    openComments()
-  }
+  const initialParagraph = new URLSearchParams(location.search).get('paragraph')
+  if (initialParagraph) openParagraph(initialParagraph)
+  else if (/(?:^|&)(?:p|m|sort|author)=/.test(location.search.slice(1)) || location.hash.startsWith('#comments')) openComments()
 })
 
 onUnmounted(() => {
@@ -292,7 +475,7 @@ onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
 })
 
-defineExpose({ openComments, openComposer, scrollCommentsTop })
+defineExpose({ openComments, openComposer, scrollCommentsTop, refreshParagraphComments })
 
 function chapterTitle(c: LongArticleChapter) {
   return articleTitle(c)
@@ -342,7 +525,7 @@ function chapterTitle(c: LongArticleChapter) {
         <div
           ref="contentEl"
           class="la-content"
-          @click="emit('contentClick', $event)"
+          @click="handleContentClick"
           v-html="article.articleContent || ''"
         />
 
@@ -416,7 +599,7 @@ function chapterTitle(c: LongArticleChapter) {
     <!-- 评论抽屉 -->
     <aside id="articleCommentsPanel" class="la-drawer" :aria-hidden="!commentsOpen">
       <header class="la-drawer-head">
-        <span class="la-drawer-title">评论 <em>{{ commentTotal }} 条</em></span>
+        <span class="la-drawer-title">{{ activeParagraphId ? '段评' : '评论' }} <em>{{ activeParagraphId ? `${paragraphCounts[activeParagraphId] || 0} 条` : `${commentTotal} 条` }}</em></span>
         <button type="button" class="la-round-btn" aria-label="关闭评论" title="关闭评论" @click="closeComments">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
@@ -427,10 +610,42 @@ function chapterTitle(c: LongArticleChapter) {
         </button>
       </header>
       <div ref="drawerScrollEl" class="la-drawer-scroll">
-        <slot name="comments" />
+        <template v-if="activeParagraphId">
+          <div class="la-paragraph-context">{{ activeSnapshot || '此段落' }}</div>
+          <div class="la-paragraph-sort" role="tablist" aria-label="段评排序">
+            <button type="button" :class="{ active: paragraphSort === '' }" @click="paragraphSort = ''; loadParagraphComments(1)">正序</button>
+            <button type="button" :class="{ active: paragraphSort === 'hot' }" @click="paragraphSort = 'hot'; loadParagraphComments(1)">热门</button>
+          </div>
+          <p v-if="paragraphLoading" class="la-paragraph-state">段评加载中…</p>
+          <p v-else-if="paragraphError" class="la-paragraph-state error">{{ paragraphError }}</p>
+          <div v-else-if="paragraphComments.length" class="la-paragraph-list">
+            <article v-for="comment in paragraphComments" :key="comment.oId" class="la-paragraph-comment">
+              <div class="la-paragraph-comment-head">
+                <RouterLink v-if="comment.commentAuthorName" :to="`/member/${comment.commentAuthorName}`">{{ comment.commentAuthorName }}</RouterLink>
+                <span v-else>匿名用户</span>
+                <time>{{ comment.commentCreateTimeStr || '' }}</time>
+              </div>
+              <div class="la-paragraph-comment-body" v-html="comment.commentContent || ''" />
+              <button v-if="loggedIn" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
+              <div v-for="reply in comment.commentThreadReplies || []" :key="reply.oId" class="la-paragraph-reply-item">
+                <RouterLink v-if="reply.commentAuthorName" :to="`/member/${reply.commentAuthorName}`">{{ reply.commentAuthorName }}</RouterLink>
+                <span v-else>匿名用户</span><span class="reply-colon">：</span>
+                <span class="reply-content" v-html="reply.commentContent || ''" />
+                <button v-if="loggedIn" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
+              </div>
+            </article>
+          </div>
+          <p v-else class="la-paragraph-state">暂无段评</p>
+          <div v-if="paragraphPages > 1" class="la-paragraph-pager">
+            <button type="button" :disabled="paragraphPage <= 1 || paragraphLoading" @click="loadParagraphComments(paragraphPage - 1)">上一页</button>
+            <span>{{ paragraphPage }} / {{ paragraphPages }}</span>
+            <button type="button" :disabled="paragraphPage >= paragraphPages || paragraphLoading" @click="loadParagraphComments(paragraphPage + 1)">下一页</button>
+          </div>
+        </template>
+        <slot v-else name="comments" />
       </div>
       <div class="la-drawer-reply">
-        <button v-if="loggedIn" type="button" class="la-reply-trigger" @click="onReplyTrigger">请输入回帖内容 ...</button>
+        <button v-if="loggedIn" type="button" class="la-reply-trigger" @click="onReplyTrigger">{{ activeParagraphId ? '写段评 ...' : '请输入回帖内容 ...' }}</button>
         <RouterLink v-else :to="{ path: '/login', query: { redirect: $route.fullPath } }" class="la-reply-trigger">
           登录参与讨论 ...
         </RouterLink>
@@ -820,6 +1035,40 @@ html:not([data-theme='classic-light']) .la {
   line-height: 1.9;
   overflow-wrap: anywhere;
 }
+.la-content :deep(.long-article-commentable-block) {
+  border-radius: 4px;
+  transition: background-color .18s ease;
+}
+.la-content :deep(.long-article-commentable-block:hover) {
+  background: color-mix(in srgb, var(--la-active) 5%, transparent);
+}
+.la-content :deep(.la-paragraph-comment-btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: .18em;
+  width: 24px;
+  height: 20px;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--la-muted);
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
+  text-indent: 0;
+  transition: opacity .18s ease, color .18s ease, background .18s ease;
+}
+.la-content :deep(.long-article-commentable-block:hover .la-paragraph-comment-btn),
+.la-content :deep(.la-paragraph-comment-btn:focus-visible),
+.la-content :deep(.la-paragraph-comment-btn.has-comments) { opacity: .82; }
+.la-content :deep(.la-paragraph-comment-btn:hover),
+.la-content :deep(.long-article-commentable-block.is-commenting .la-paragraph-comment-btn) { color: var(--la-active); background: var(--la-soft); opacity: 1; }
+.la-content :deep(.la-paragraph-comment-btn svg) { width: 14px; height: 14px; }
+.la-content :deep(.la-paragraph-comment-btn span:not([hidden])) { display: inline-block; min-width: 12px; margin-left: 2px; padding: 0 3px; border-radius: 8px; color: var(--la-muted); background: var(--la-soft); font: 10px/16px sans-serif; text-align: center; }
+.la-content :deep(.long-article-commentable-block.is-commenting) { background: color-mix(in srgb, var(--la-active) 8%, transparent); }
+@media (hover: none) { .la-content :deep(.la-paragraph-comment-btn) { opacity: .72; } }
 .la-content :deep(> p) {
   margin: 1.15em 0;
   text-indent: 2em;
@@ -829,6 +1078,11 @@ html:not([data-theme='classic-light']) .la {
 }
 .la-content :deep(.la-line) {
   display: block;
+  text-indent: 2em;
+}
+.la-content :deep(.long-article-paragraph-line) {
+  display: block;
+  margin-bottom: 1.15em;
   text-indent: 2em;
 }
 .la-content :deep(> p:has(> img)),
@@ -1091,6 +1345,26 @@ html[data-theme='classic-light'] .la-ico-sun {
   overscroll-behavior: contain;
   padding-bottom: 12px;
 }
+.la-paragraph-context { margin: 16px 0 10px; padding: 10px 12px; border-left: 3px solid var(--la-active); border-radius: 0 7px 7px 0; color: var(--la-muted); background: var(--la-soft); font-size: 12px; line-height: 1.65; }
+.la-paragraph-sort { display: flex; gap: 14px; padding: 4px 0 10px; border-bottom: 1px solid var(--la-line); }
+.la-paragraph-sort button { padding: 4px 0; border: 0; color: var(--la-muted); background: transparent; font-size: 12px; cursor: pointer; }
+.la-paragraph-sort button.active { color: var(--la-active); font-weight: 600; }
+.la-paragraph-state { padding: 24px 8px; color: var(--la-muted); font-size: 13px; text-align: center; }
+.la-paragraph-state.error { color: #c96b58; }
+.la-paragraph-comment { position: relative; padding: 14px 0 12px; border-bottom: 1px solid var(--la-line); }
+.la-paragraph-comment-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 7px; font-size: 12px; }
+.la-paragraph-comment-head a,.la-paragraph-reply-item a { color: var(--la-title); text-decoration: none; font-weight: 600; }
+.la-paragraph-comment-head a:hover,.la-paragraph-reply-item a:hover { text-decoration: underline; }
+.la-paragraph-comment-head time { color: var(--la-muted); font-size: 10px; }
+.la-paragraph-comment-body { color: var(--la-text); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.la-paragraph-comment-body :deep(p) { margin: 0 0 6px; }.la-paragraph-comment-body :deep(img) { max-width: 100%; }
+.la-paragraph-reply { padding: 3px 0; border: 0; color: var(--la-muted); background: transparent; font-size: 10px; cursor: pointer; }
+.la-paragraph-reply:hover { color: var(--la-active); }
+.la-paragraph-reply-item { margin-top: 8px; padding: 8px; border-radius: 6px; color: var(--la-text); background: var(--la-soft); font-size: 11px; line-height: 1.6; }
+.la-paragraph-reply-item .reply-colon { color: var(--la-muted); }.la-paragraph-reply-item .reply-content :deep(p) { display: inline; margin: 0; }
+.la-paragraph-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0; color: var(--la-muted); font-size: 11px; }
+.la-paragraph-pager button { padding: 5px 8px; border: 1px solid var(--la-line); border-radius: 5px; color: var(--la-title); background: var(--la-surface); cursor: pointer; }
+.la-paragraph-pager button:disabled { opacity: .45; cursor: default; }
 .la-drawer-reply {
   margin: 0 -20px;
   padding: 14px 20px;

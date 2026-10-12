@@ -20,13 +20,18 @@ onMounted(async () => {
 
 <template>
   <p v-if="error" class="hint">{{ error }}</p>
-  <p v-else class="hint">发送弹幕约消耗 {{ cost || '…' }}。本页不代发弹幕。</p>
+  <template v-else>
+    <div class="cost"><span>当前发送花费</span><strong>{{ cost || '读取中…' }}</strong></div>
+    <p class="hint">点击聊天输入框下方的「弹幕」发送</p>
+  </template>
 </template>
 
 <style scoped>
 .hint {
-  margin: 0;
+  margin: 6px 0 0;
   color: var(--fp-muted);
-  font-size: 12px;
+  font-size: 11px;
 }
+.cost { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px; color: var(--fp-muted); font-size: 12px; }
+.cost strong { color: var(--fp-title); font-size: 16px; font-weight: 600; }
 </style>

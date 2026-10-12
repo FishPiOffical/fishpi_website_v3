@@ -1,4 +1,4 @@
-export type ChatSidebarModuleId = 'income' | 'topic' | 'online' | 'activity' | 'barrage' | 'appearance' | 'ad' | 'mutes'
+export type ChatSidebarModuleId = 'profile' | 'breezemoons' | 'income' | 'topic' | 'online' | 'activity' | 'barrage' | 'appearance' | 'ad' | 'mutes'
 
 export interface ChatSidebarModuleMeta {
   id: ChatSidebarModuleId
@@ -11,6 +11,8 @@ export interface ChatSidebarModuleMeta {
 }
 
 export const CHAT_SIDEBAR_META: ChatSidebarModuleMeta[] = [
+  { id: 'profile', title: '我的资料', defaultOn: true, portable: true },
+  { id: 'breezemoons', title: '清风明月', defaultOn: true, portable: true },
   { id: 'income', title: '上下班时间', defaultOn: true, portable: true, homeDefaultOn: true },
   { id: 'topic', title: '当前话题', defaultOn: true, portable: false },
   { id: 'online', title: '在线成员', defaultOn: true, portable: false },

@@ -31,6 +31,7 @@ function selected(kind: PackKind) {
           :key="pack.id"
           type="button"
           :class="{ on: selected(group.kind) === pack.id }"
+          :aria-pressed="selected(group.kind) === pack.id"
           :title="pack.name"
           @click="appearance.apply(group.kind, pack.id)"
         >

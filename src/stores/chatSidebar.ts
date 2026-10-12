@@ -7,12 +7,14 @@ const STORAGE = 'fp.chatSidebar'
 interface SidebarPref {
   order: string[]
   hidden: string[]
+  collapsed: string[]
 }
 
 function defaults(): SidebarPref {
   return {
     order: CHAT_SIDEBAR_META.map((m) => m.id),
     hidden: CHAT_SIDEBAR_META.filter((m) => !m.defaultOn).map((m) => m.id),
+    collapsed: [],
   }
 }
 
@@ -27,7 +29,13 @@ function read(): SidebarPref {
     CHAT_SIDEBAR_META.forEach((m, i) => {
       if (!order.includes(m.id)) order.splice(Math.min(i, order.length), 0, m.id)
     })
-    return { order, hidden: parsed.hidden.filter((id) => known.has(id as ChatSidebarModuleMeta['id'])) }
+    return {
+      order,
+      hidden: parsed.hidden.filter((id) => known.has(id as ChatSidebarModuleMeta['id'])),
+      collapsed: Array.isArray(parsed.collapsed)
+        ? parsed.collapsed.filter((id) => known.has(id as ChatSidebarModuleMeta['id']))
+        : [],
+    }
   } catch {
     return defaults()
   }
@@ -60,6 +68,14 @@ export const useChatSidebarStore = defineStore('chatSidebar', () => {
     persist()
   }
 
+  function toggleCollapsed(id: string) {
+    const collapsed = new Set(pref.value.collapsed)
+    if (collapsed.has(id)) collapsed.delete(id)
+    else collapsed.add(id)
+    pref.value.collapsed = [...collapsed]
+    persist()
+  }
+
   function move(id: string, dir: -1 | 1) {
     const order = [...pref.value.order]
     const i = order.indexOf(id)
@@ -88,5 +104,5 @@ export const useChatSidebarStore = defineStore('chatSidebar', () => {
     persist()
   }
 
-  return { pref, orderedModules, visibleModules, isOn, toggle, move, moveTo, reset }
+  return { pref, orderedModules, visibleModules, isOn, toggle, toggleCollapsed, move, moveTo, reset }
 })

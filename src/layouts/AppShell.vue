@@ -10,6 +10,7 @@ import { useWhisperStore } from '@/stores/whispers'
 import { useChatStore } from '@/stores/chat'
 import AdSlot from '@/components/ads/AdSlot.vue'
 import LogoMark from '@/components/LogoMark.vue'
+import NavIcon from '@/components/navigation/NavIcon.vue'
 import RiskCaptchaGate from '@/components/RiskCaptchaGate.vue'
 import SystemAlertDialog from '@/components/SystemAlertDialog.vue'
 import WarnBroadcastDialog from '@/components/WarnBroadcastDialog.vue'
@@ -64,6 +65,33 @@ const goodSites = [
   { href: 'https://www.lundao.pub/', label: '论道社区' },
   { href: 'https://nbtab.com/', label: 'NBtab新标签页' },
   { href: 'https://www.haozpay.com/', label: '皓臻聚合支付' },
+]
+
+const ecosystemLinks = [
+  {
+    href: 'https://market.time-pack.com/',
+    title: '鱼排市场',
+    desc: '摸鱼派交易市场',
+    color: '#a9442f',
+    bg: '#fff0e9',
+    icon: 'https://market.time-pack.com/favicon.ico',
+  },
+  {
+    href: 'https://tiaoom.com/',
+    title: '竞技大厅',
+    desc: '摸鱼派竞技大厅',
+    color: '#4d6da8',
+    bg: '#edf3ff',
+    icon: 'https://tiaoom.com/logo.svg',
+  },
+  {
+    href: 'https://ext.adventext.fun/',
+    title: '插件市场',
+    desc: '摸鱼派插件市场',
+    color: '#47885d',
+    bg: '#eaf7ed',
+    icon: 'https://ext.adventext.fun/favicon.ico',
+  },
 ]
 
 const exploreLinks = [
@@ -266,50 +294,34 @@ onUnmounted(() => {
       <div class="user">
         <template v-if="isLoggedIn">
           <RouterLink to="/games" class="bar-icon" title="活动" aria-label="活动">
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M21 6H3a1 1 0 0 0-1 1v4a5 5 0 0 0 5 5h1l1 2h2l1-2h4l1 2h2l1-2h1a5 5 0 0 0 5-5V7a1 1 0 0 0-1-1zM7.5 13.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9-1h-1v1h-2v-1h-1v-2h1v-1h2v1h1v2z"
-              />
-            </svg>
+            <NavIcon name="game" />
           </RouterLink>
-          <button type="button" class="bar-icon theme" title="切换颜色模式" @click="appearance.toggleTheme()">
-            ◐
+          <button type="button" class="bar-icon theme" title="切换颜色模式" aria-label="切换颜色模式" @click="appearance.toggleTheme()">
+            <NavIcon name="theme" />
           </button>
+          <span class="tool-divider" aria-hidden="true" />
           <RouterLink
             to="/notifications"
             class="bar-icon count-link"
             :class="{ 'has-msg': unreadTotal > 0 }"
             title="通知"
-            aria-label="通知"
+            :aria-label="unreadTotal > 0 ? `通知（${unreadTotal} 条未读）` : '通知'"
           >
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 1 0-14 0v5l-2 2v1h18v-1l-2-2z"
-              />
-            </svg>
-            <span>{{ unreadTotal > 99 ? '99+' : unreadTotal }}</span>
+            <NavIcon name="notice" />
+            <span v-if="unreadTotal > 0" class="unread-badge" aria-hidden="true">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</span>
           </RouterLink>
           <RouterLink
             to="/chat"
             class="bar-icon count-link"
             :class="{ 'has-msg': whisperUnread > 0 }"
             title="私信"
-            aria-label="私信"
+            :aria-label="whisperUnread > 0 ? `私信（${whisperUnread} 条未读）` : '私信'"
           >
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 3v-3H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
-              />
-            </svg>
-            <span>{{ whisperUnread > 99 ? '99+' : whisperUnread }}</span>
+            <NavIcon name="message" />
+            <span v-if="whisperUnread > 0" class="unread-badge" aria-hidden="true">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</span>
           </RouterLink>
-          <RouterLink to="/pre-post" class="nav-pre-post" title="发帖">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-              <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z" />
-            </svg>
+          <RouterLink to="/pre-post" class="nav-pre-post" title="发帖" aria-label="发帖">
+            <NavIcon name="write" />
             <span>发帖</span>
           </RouterLink>
           <div class="user-menu" :class="{ open: menuOpen }">
@@ -317,6 +329,7 @@ onUnmounted(() => {
               type="button"
               class="avatar-btn"
               :title="displayName"
+              :aria-label="`${displayName}，打开用户菜单`"
               aria-haspopup="menu"
               :aria-expanded="menuOpen"
               @click="toggleMenu"
@@ -364,8 +377,8 @@ onUnmounted(() => {
         <template v-else>
           <RouterLink to="/login">登录</RouterLink>
           <RouterLink to="/register">注册</RouterLink>
-          <button type="button" class="bar-icon theme" title="切换颜色模式" @click="appearance.toggleTheme()">
-            ◐
+          <button type="button" class="bar-icon theme" title="切换颜色模式" aria-label="切换颜色模式" @click="appearance.toggleTheme()">
+            <NavIcon name="theme" />
           </button>
         </template>
       </div>
@@ -395,6 +408,22 @@ onUnmounted(() => {
               {{ p.title }}
             </span>
             <span class="partner-desc">{{ p.desc }}</span>
+          </a>
+          <span class="partner-divider" aria-hidden="true">丨</span>
+          <a
+            v-for="item in ecosystemLinks"
+            :key="item.href"
+            class="partner"
+            :href="item.href"
+            target="_blank"
+            rel="noopener noreferrer"
+            :style="{ color: item.color, background: item.bg }"
+          >
+            <span class="partner-title">
+              <img :src="item.icon" width="16" height="16" alt="" />
+              {{ item.title }}
+            </span>
+            <span class="partner-desc">{{ item.desc }}</span>
           </a>
         </div>
 
@@ -561,7 +590,7 @@ onUnmounted(() => {
 .user {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 14px;
   flex-shrink: 0;
 }
@@ -574,54 +603,94 @@ onUnmounted(() => {
   text-decoration: underline;
 }
 .bar-icon {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-width: 36px;
-  height: 36px;
-  padding: 0 8px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: none;
   border: 0;
-  border-radius: 6px;
+  border-radius: 9px;
   background: transparent;
   color: var(--fp-nav-text);
   text-decoration: none;
   cursor: pointer;
   line-height: 1;
+  transition: background-color 160ms ease, transform 160ms ease;
 }
-.bar-icon:hover {
-  color: var(--fp-accent);
+.user > .bar-icon:hover {
   background: var(--fp-hover);
+  text-decoration: none;
+  transform: translateY(-1px);
 }
-.bar-icon.theme {
-  font-size: 18px;
+.bar-icon.theme:hover {
+  background: var(--fp-hover);
+  transform: translateY(-1px);
 }
-.count-link span {
-  font-size: 12px;
+.tool-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 5px;
+  background: color-mix(in srgb, var(--fp-nav-text) 14%, transparent);
+}
+.unread-badge {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  display: grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 2px solid var(--fp-nav);
+  border-radius: 999px;
+  background: var(--fp-accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  min-width: 1ch;
+  line-height: 1;
+  pointer-events: none;
 }
-.count-link.has-msg {
+.user > .count-link.has-msg {
   color: var(--fp-accent);
 }
 .nav-pre-post {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 36px;
-  padding: 0 10px;
-  border-radius: 6px;
+  gap: 6px;
+  height: 34px;
+  margin-left: 5px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--fp-nav-text) 12%, transparent);
+  border-radius: 9px;
+  background: var(--fp-hover);
   color: var(--fp-nav-text);
   text-decoration: none;
   white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 160ms ease, transform 160ms ease;
 }
-.nav-pre-post:hover {
-  color: var(--fp-accent);
-  background: var(--fp-hover);
+.nav-pre-post :deep(.nav-icon) {
+  width: 16px;
+  height: 16px;
+}
+.user > .nav-pre-post:hover {
+  background: color-mix(in srgb, var(--fp-nav-text) 8%, var(--fp-nav));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transform: translateY(-1px);
+}
+.bar-icon:focus-visible, .nav-pre-post:focus-visible, .avatar-btn:focus-visible {
+  outline: 2px solid var(--fp-primary);
+  outline-offset: 3px;
 }
 .user-menu {
   position: relative;
-  margin-left: 4px;
+  margin-left: 8px;
 }
 .avatar-btn {
   display: flex;
@@ -634,12 +703,13 @@ onUnmounted(() => {
   border-radius: 50%;
 }
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   object-fit: cover;
   display: block;
   box-shadow: 0 0 0 2px transparent;
+  transition: box-shadow 160ms ease;
 }
 .avatar-btn:hover .avatar,
 .user-menu.open .avatar {
@@ -786,11 +856,19 @@ main.main--cr-modern {
 }
 .partner-row {
   display: flex;
+  align-items: stretch;
   flex-wrap: wrap;
   gap: 16px;
 }
+.partner-divider {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--fp-muted);
+  user-select: none;
+}
 .partner {
-  flex: 1 1 200px;
+  flex: 1 1 150px;
   text-align: center;
   padding: 12px;
   line-height: 1.4;
@@ -873,7 +951,7 @@ main.main--cr-modern {
 }
 .client-icons a:hover {
   border-color: var(--fp-accent);
-  opacity: 1;
+  text-decoration: underline;
 }
 .foot-bottom {
   display: flex;
@@ -973,6 +1051,17 @@ main.main--cr-modern {
   .user {
     gap: 2px;
   }
+  .tool-divider {
+    margin: 0 2px;
+  }
+  .nav-pre-post {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+  .user-menu {
+    margin-left: 5px;
+  }
   .nav-pre-post span {
     display: none;
   }
@@ -983,5 +1072,8 @@ main.main--cr-modern {
   .slogan {
     flex: none;
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar-icon, .nav-pre-post, .avatar { transition: none; }
 }
 </style>

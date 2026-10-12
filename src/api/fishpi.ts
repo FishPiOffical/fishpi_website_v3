@@ -282,6 +282,52 @@ export interface ArticleComment {
   currentUserReaction?: string
   commentQnAOffered?: number
   sysMetal?: MetalItem[] | string
+  commentParagraphId?: string
+  commentParagraphStatus?: number
+  commentThreadReplies?: ArticleComment[]
+}
+
+export interface ParagraphCommentSummary {
+  paragraphId: string
+  commentCount: number
+}
+
+export interface ParagraphCommentPage {
+  paragraphSnapshot?: string
+  paragraphId?: string
+  commentThreadParents?: ArticleComment[]
+  pagination?: ArticleDetail['pagination']
+}
+
+export async function fetchParagraphCommentSummary(articleId: string) {
+  const res = await request<{ code?: number; msg?: string; paragraphComments?: ParagraphCommentSummary[] }>(
+    '/comment/paragraph/summary',
+    { method: 'POST', body: JSON.stringify({ articleId }) },
+  )
+  if (res.code) throw new Error(res.msg || '段评统计加载失败')
+  return res.paragraphComments || []
+}
+
+export async function fetchParagraphComments(
+  articleId: string,
+  paragraphId: string,
+  page = 1,
+  sort = '',
+  apiKey?: string | null,
+) {
+  const body: Record<string, unknown> = {
+    articleId,
+    paragraphId,
+    paginationCurrentPageNum: page,
+    sort,
+  }
+  if (apiKey) body.apiKey = apiKey
+  const res = await request<{ code?: number; msg?: string } & ParagraphCommentPage>(
+    '/comment/paragraph/thread/parents',
+    { method: 'POST', body: JSON.stringify(body) },
+  )
+  if (res.code) throw new Error(res.msg || '段评加载失败')
+  return res
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -339,6 +385,7 @@ export interface LongArticleChapter {
   articleId: string
   articleTitle: string
   articleTitleEmoj?: string
+  articleCreateTime?: string
   articlePermalink: string
   chapterNo: number
   articlePreviewContent?: string
@@ -1284,7 +1331,7 @@ export async function fetchArticleRevision(apiKey: string, id: string, revisionI
   return res.revision
 }
 
-export async function postComment(apiKey: string, articleId: string, content: string, replyId = '') {
+export async function postComment(apiKey: string, articleId: string, content: string, replyId = '', paragraphId = '') {
   const body: Record<string, unknown> = {
     apiKey,
     articleId,
@@ -1293,6 +1340,7 @@ export async function postComment(apiKey: string, articleId: string, content: st
     commentVisible: false,
   }
   if (replyId) body.commentOriginalCommentId = replyId
+  if (paragraphId) body.commentParagraphId = paragraphId
   const res = await request<Envelope<unknown>>('/comment', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -2718,20 +2766,19 @@ export interface HomeColumnChapter {
   permalink: string
   chapterNo: string
   title: string
+  preview?: string
 }
 
 export interface HomeColumnCard {
   columnId: string
   columnTitle: string
   columnArticleCount: number
+  columnCoverURL?: string
   chapters: HomeColumnChapter[]
   latestChapter?: HomeColumnChapter | null
 }
 
-/**
- * 首页专栏货架。现网无 JSON（见 docs/MISSING_APIS.md），使用假数据。
- * 建议后端：GET /api/columns/latest|hot?size=
- */
+/** 首页专栏货架，接口不可用时以 gaps.mock.ts 兜底。 */
 interface RawColumnChapter {
   articleId?: string
   chapterNo?: number | string
@@ -2739,6 +2786,7 @@ interface RawColumnChapter {
   title?: string
   articlePermalink?: string
   permalink?: string
+  articlePreviewContent?: string
 }
 
 interface RawColumnCard {
@@ -2746,6 +2794,7 @@ interface RawColumnCard {
   oId?: string
   columnTitle?: string
   columnArticleCount?: number
+  columnCoverURL?: string
   chapters?: RawColumnChapter[]
   latestChapter?: RawColumnChapter | null
   secondLatestChapter?: RawColumnChapter | null
@@ -2758,6 +2807,7 @@ function normalizeChapter(ch: RawColumnChapter): HomeColumnChapter {
     permalink: ch.articlePermalink || ch.permalink || (ch.articleId ? `/article/${ch.articleId}` : ''),
     chapterNo: typeof no === 'number' ? `第 ${no} 章` : String(no ?? ''),
     title: ch.articleTitle || ch.title || '',
+    preview: ch.articlePreviewContent || '',
   }
 }
 
@@ -2769,6 +2819,7 @@ function normalizeColumnCard(c: RawColumnCard): HomeColumnCard {
     columnId: String(c.columnId || c.oId || ''),
     columnTitle: c.columnTitle || '',
     columnArticleCount: Number(c.columnArticleCount || 0),
+    columnCoverURL: c.columnCoverURL || '',
     chapters,
     latestChapter: chapters[0] || null,
   }

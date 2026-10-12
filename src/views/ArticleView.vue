@@ -64,6 +64,8 @@ const rewarding = ref(false)
 const rewardError = ref('')
 const zoomed = ref('')
 const replyId = ref('')
+const replyComment = ref<ArticleComment | null>(null)
+const paragraphIdForReply = ref('')
 const commentPage = ref(1)
 const heat = ref(0)
 const editingId = ref('')
@@ -144,6 +146,8 @@ async function openRevision(revisionId: string) {
 }
 
 const comments = computed<ArticleComment[]>(() => article.value?.articleComments || [])
+const replyAuthor = computed(() => replyComment.value?.commentAuthorName || comments.value.find((c) => c.oId === replyId.value)?.commentAuthorName || replyId.value)
+const replyPreview = computed(() => stripHtml(replyComment.value?.commentContent || '', 180))
 const nice = computed(() => article.value?.articleNiceComments || [])
 /** 一级评论 + 其下全部回复（多级回复拍平到根评论下，按原顺序）。 */
 const threads = computed(() => {
@@ -429,15 +433,30 @@ async function submit() {
   sending.value = true
   sendError.value = ''
   try {
-    await postComment(apiKey.value, id.value, draft.value.trim(), replyId.value)
+    await postComment(apiKey.value, id.value, draft.value.trim(), replyId.value, paragraphIdForReply.value)
     draft.value = ''
     replyId.value = ''
+    replyComment.value = null
+    paragraphIdForReply.value = ''
     await load()
+    readerRef.value?.refreshParagraphComments()
   } catch (e) {
     sendError.value = e instanceof Error ? e.message : '评论失败'
   } finally {
     sending.value = false
   }
+}
+
+function onParagraphReply(paragraphId: string, commentId: string, comment?: ArticleComment) {
+  paragraphIdForReply.value = paragraphId
+  replyId.value = commentId
+  replyComment.value = comment || (commentId ? comments.value.find((c) => c.oId === commentId) || null : null)
+}
+
+function clearReplyTarget() {
+  replyId.value = ''
+  replyComment.value = null
+  paragraphIdForReply.value = ''
 }
 
 async function vote() {
@@ -579,6 +598,7 @@ function parentAuthor(c: ArticleComment) {
 
 function startReply(c: ArticleComment) {
   replyId.value = c.oId
+  replyComment.value = c
   if (isLong.value) {
     readerRef.value?.openComposer()
     void nextTick(() => composerRef.value?.reveal())
@@ -757,10 +777,6 @@ async function onReactComment(c: ArticleComment, value: string) {
       <div class="composer-inner">
         <p v-if="article.articleCommentable === false" class="hint-login">作者已关闭回帖。</p>
         <template v-else-if="isLoggedIn">
-          <p v-if="replyId" class="reply-target-tip">
-            回复 <b>@{{ comments.find((c) => c.oId === replyId)?.commentAuthorName || replyId }}</b>
-            <button type="button" class="btn-text cancel-reply" @click="replyId = ''">取消回复</button>
-          </p>
           <ChatComposer
             ref="composerRef"
             v-model="draft"
@@ -771,6 +787,15 @@ async function onReactComment(c: ArticleComment, value: string) {
             placeholder="请友善发言，支持 Markdown、@用户、拖拽上传图片…Ctrl+Enter 发送"
             @submit="submit"
           >
+            <template #top>
+              <div v-if="replyId" class="reply-quote-box">
+                <div class="reply-quote-info">
+                  <span class="reply-quote-label">回复 @{{ replyAuthor }}</span>
+                  <div v-if="replyPreview" class="reply-quote-text">{{ replyPreview }}</div>
+                </div>
+                <button type="button" class="reply-quote-cancel" title="取消回复" aria-label="取消回复" @click="clearReplyTarget">✕</button>
+              </div>
+            </template>
             <template #actions>
               <span v-if="sendError" class="err-tip">{{ sendError }}</span>
             </template>
@@ -800,7 +825,8 @@ async function onReactComment(c: ArticleComment, value: string) {
       @revisions="toggleRevisions"
       @react="onReactArticle"
       @content-click="onContentClick"
-      @reply="replyId = ''"
+      @reply="clearReplyTarget"
+      @paragraph-reply="onParagraphReply"
     >
       <template #reward><ReuseReward /></template>
       <template #extra><ReuseRevisions /></template>
@@ -1385,7 +1411,7 @@ h1 {
   text-decoration: none;
 }
 .summary-name:hover {
-  color: var(--fp-accent);
+  text-decoration: underline;
 }
 .summary-city {
   font-size: 12px;
@@ -1477,16 +1503,44 @@ h1 {
 .composer-inner {
   padding: 18px;
 }
-.reply-target-tip {
-  font-size: 13px;
-  color: var(--fp-muted);
-  margin-bottom: 8px;
+.reply-quote-box {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border-left: 3px solid var(--fp-accent);
+  border-radius: 4px;
+  background: var(--fp-hover);
+  font-size: 12px;
 }
-.cancel-reply {
+.reply-quote-info {
+  flex: 1;
+  min-width: 0;
+}
+.reply-quote-label {
   color: var(--fp-accent);
+  font-weight: 600;
+}
+.reply-quote-text {
+  max-height: 40px;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--fp-muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.reply-quote-cancel {
+  flex: none;
+  border: 0;
+  padding: 3px 5px;
+  color: var(--fp-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.reply-quote-cancel:hover {
+  color: #e74c3c;
 }
 .card.load-error {
   max-width: 1060px;

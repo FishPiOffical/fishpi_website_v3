@@ -427,6 +427,8 @@ function clearScreen() {
               :user-name="msg.userName"
               :nickname="msg.userNickname"
               vip-nickname
+              chatroom
+              :standalone="Boolean(msg.redPacket)"
               :avatar="msg.userAvatarURL"
               :medals="msg.sysMetal"
               :time="msg.time"
@@ -548,6 +550,8 @@ function clearScreen() {
               :user-name="msg.userName"
               :nickname="msg.userNickname"
               vip-nickname
+              chatroom
+              :standalone="Boolean(msg.redPacket)"
               :avatar="msg.userAvatarURL"
               :medals="msg.sysMetal"
               :time="msg.time"
@@ -938,7 +942,7 @@ function clearScreen() {
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 18px;
 }
 
 /* =========================================================
@@ -1153,7 +1157,7 @@ function clearScreen() {
 .messages-container {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 18px;
 }
 
 .guest-tip-bottom {

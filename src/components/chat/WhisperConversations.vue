@@ -485,6 +485,7 @@ onUnmounted(() => {
                     :user-name="line.userName"
                     :avatar="line.userAvatarURL"
                     :time="line.time"
+                    chatroom
                     :html="line.html || (line.redPacket ? '[红包]' : line.card ? '[聊天室消息]' : '')"
                     :self="line.userName === account?.userName"
                   />
@@ -1015,8 +1016,8 @@ onUnmounted(() => {
   .whisper-panel .messages :deep(.fp-bubble) { padding: 4px 8px 3px; border-radius: 8px; transition: padding 180ms ease; }
   .whisper-panel .messages :deep(.fp-bubble .body) { font-size: 12px; }
   .whisper-panel .messages :deep(.fp-bubble .body blockquote) { font-size: 10px; }
-  .whisper-panel .messages :deep(.fp-bubble .head .name) { font-size: 10px; line-height: 14px; }
-  .whisper-panel .messages :deep(.fp-bubble .foot) { min-height: 14px; font-size: 9px; line-height: 14px; }
+  .whisper-panel .messages :deep(.head .name) { font-size: 10px; line-height: 14px; }
+  .whisper-panel .messages :deep(.foot) { min-height: 14px; font-size: 9px; line-height: 14px; }
 }
 @media (max-width: 560px) {
   .whisper-panel {

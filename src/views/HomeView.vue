@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import VipNickname from '@/components/user/VipNickname.vue'
 import { articleTitle } from '@/utils/text'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
@@ -37,7 +37,7 @@ import HomeSideWidgets from '@/components/home/HomeSideWidgets.vue'
 import HomeRepeaterStation from '@/components/home/HomeRepeaterStation.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeFeedPayload, consumeHomeExtrasPayload } from '@/seo/payload'
-import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
+import { SITE_DEFAULT_DESC, SITE_NAME, SITE_ORIGIN } from '@/seo/site'
 import FpLoading from '@/components/FpLoading.vue'
 import { readCache, writeCache } from '@/utils/swr'
 import { avatarStyle, avatarUrl } from '@/utils/avatar'
@@ -84,6 +84,8 @@ const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeO
 onUnmounted(() => (editing.value = false))
 const { messages: liveChatMessages } = storeToRefs(chat)
 let homeMounted = false
+let longShelfTimer: ReturnType<typeof setInterval> | undefined
+const activeLongShelf = ref<'recent' | 'hot'>('recent')
 
 function syncLiveChatMessages() {
   if (!liveChatMessages.value.length) return
@@ -102,9 +104,13 @@ watch(() => liveChatMessages.value.length, syncLiveChatMessages)
 onMounted(() => {
   homeMounted = true
   if (apiKey.value) void chat.connect()
+  longShelfTimer = setInterval(() => {
+    scrollShelf('long-active', 1)
+  }, 6000)
 })
 onUnmounted(() => {
   homeMounted = false
+  if (longShelfTimer) clearInterval(longShelfTimer)
   if (!chat.floatingChatroomOpen) chat.disconnect()
 })
 /** 长篇专区自带卡片样式，独占一行时不再套外框 */
@@ -115,13 +121,22 @@ function isBareRow(row: HomeRowView) {
 const homeColumnsRecent = ref<HomeColumnCard[]>([])
 const homeColumnsHot = ref<HomeColumnCard[]>([])
 const longRecentShelf = computed(() => longArticles.value.slice(0, 8))
+const defaultColumnCover = `${SITE_ORIGIN}/images/holiday/book-bg.jpg`
 const longHotShelf = computed(() => {
   const withCol = hot.value.filter((a) => a.columnTitle)
   if (withCol.length) return withCol.slice(0, 8)
   return (hot.value.length ? hot.value : longArticles.value).slice(0, 8)
 })
-const useColumnCards = computed(() => homeColumnsRecent.value.length > 0 || homeColumnsHot.value.length > 0)
-
+const activeColumnsShelf = computed(() =>
+  (activeLongShelf.value === 'recent' ? homeColumnsRecent.value : homeColumnsHot.value).slice(0, 8),
+)
+const activeArticlesShelf = computed(() =>
+  activeLongShelf.value === 'recent' ? longRecentShelf.value : longHotShelf.value,
+)
+watch(activeLongShelf, async () => {
+  await nextTick()
+  document.getElementById('long-active')?.scrollTo({ left: 0 })
+})
 usePageSeo(() => ({
   title: SITE_NAME,
   description: SITE_DEFAULT_DESC,
@@ -359,9 +374,17 @@ async function postMoon() {
 
 function scrollShelf(id: string, dir: -1 | 1) {
   const el = document.getElementById(id)
-  if (!el) return
-  el.scrollBy({ left: dir * 240, behavior: 'smooth' })
+  if (!el || (dir > 0 && el.matches(':hover')) || document.visibilityState !== 'visible') return
+  const firstCard = el.querySelector<HTMLElement>('.long-card')
+  const gap = Number.parseFloat(getComputedStyle(el).columnGap) || 0
+  const step = (firstCard?.getBoundingClientRect().width || el.clientWidth) + gap
+  if (dir > 0 && el.scrollLeft + el.clientWidth >= el.scrollWidth - 4) {
+    el.scrollTo({ left: 0, behavior: 'smooth' })
+    return
+  }
+  el.scrollBy({ left: dir * step, behavior: 'smooth' })
 }
+
 </script>
 
 <template>
@@ -497,110 +520,71 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
             <section v-else-if="mod.id === 'long'" class="long-zone">
               <div class="long-head">
-                <b>长篇专区</b>
-                <RouterLink to="/column">更多</RouterLink>
+                <div class="long-heading">
+                  <b>长篇专区</b>
+                  <span>发现值得追更的故事</span>
+                </div>
+                <RouterLink to="/column">全部专栏 <span aria-hidden="true">›</span></RouterLink>
               </div>
 
-              <div class="long-row">
-                <div class="long-row-head">
-                  <span class="badge">最近更新</span>
-                  <div class="long-nav">
-                    <button type="button" aria-label="向左滚动" @click="scrollShelf('long-recent', -1)">‹</button>
-                    <button type="button" aria-label="向右滚动" @click="scrollShelf('long-recent', 1)">›</button>
-                  </div>
-                </div>
-                <div id="long-recent" class="long-shelf">
-                  <template v-if="useColumnCards && homeColumnsRecent.length">
-                    <article v-for="col in homeColumnsRecent" :key="'r-' + col.columnId" class="long-card column">
-                      <div class="long-col-head">
-                        <RouterLink class="long-title" :to="`/column/${col.columnId}`">
-                          {{ col.columnTitle }}
-                        </RouterLink>
-                        <span class="long-count">{{ col.columnArticleCount }} 章</span>
-                      </div>
-                      <RouterLink
-                        v-for="(ch, i) in col.chapters.slice(0, 2)"
-                        :key="ch.articleId || i"
-                        class="long-chapter"
-                        :to="ch.articleId ? `/article/${ch.articleId}` : `/column/${col.columnId}`"
-                      >
-                        <em>{{ ch.chapterNo }}</em>
-                        <span>{{ ch.title }}</span>
-                      </RouterLink>
-                    </article>
-                  </template>
-                  <template v-else>
-                    <article v-for="item in longRecentShelf" :key="item.oId" class="long-card">
-                      <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
-                        articleTitle(item)
-                      }}</RouterLink>
-                      <div class="long-meta">
-                        <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
-                        <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                          {{ item.articleAuthorName }}
-                        </RouterLink>
-                        <span>{{ views(item) }}</span>
-                      </div>
-                    </article>
-                  </template>
-                  <p
-                    v-if="!(useColumnCards ? homeColumnsRecent.length : longRecentShelf.length) && !loading"
-                    class="hint long-empty"
-                  >
-                    暂无长篇
-                  </p>
+              <div class="long-tabs" role="tablist" aria-label="长篇专栏分类">
+                <button
+                  type="button"
+                  role="tab"
+                  :aria-selected="activeLongShelf === 'recent'"
+                  :class="{ active: activeLongShelf === 'recent' }"
+                  @click="activeLongShelf = 'recent'"
+                >最近更新</button>
+                <button
+                  type="button"
+                  role="tab"
+                  :aria-selected="activeLongShelf === 'hot'"
+                  :class="{ active: activeLongShelf === 'hot' }"
+                  @click="activeLongShelf = 'hot'"
+                >热门专栏</button>
+                <div class="long-nav">
+                  <button type="button" aria-label="向左滚动专栏" @click="scrollShelf('long-active', -1)">‹</button>
+                  <button type="button" aria-label="向右滚动专栏" @click="scrollShelf('long-active', 1)">›</button>
                 </div>
               </div>
-
-              <div class="long-row">
-                <div class="long-row-head">
-                  <span class="badge hot">热门专栏</span>
-                  <div class="long-nav">
-                    <button type="button" aria-label="向左滚动" @click="scrollShelf('long-hot', -1)">‹</button>
-                    <button type="button" aria-label="向右滚动" @click="scrollShelf('long-hot', 1)">›</button>
-                  </div>
-                </div>
-                <div id="long-hot" class="long-shelf">
-                  <template v-if="useColumnCards && homeColumnsHot.length">
-                    <article v-for="col in homeColumnsHot" :key="'h-' + col.columnId" class="long-card column hot">
-                      <div class="long-col-head">
-                        <RouterLink class="long-title" :to="`/column/${col.columnId}`">
-                          {{ col.columnTitle }}
-                        </RouterLink>
-                        <span class="long-count">{{ col.columnArticleCount }} 章</span>
-                      </div>
+              <div id="long-active" class="long-shelf">
+                <template v-if="activeColumnsShelf.length">
+                  <article v-for="col in activeColumnsShelf" :key="activeLongShelf + '-' + col.columnId" class="long-card column">
+                    <RouterLink class="long-cover" :to="`/column/${col.columnId}`" :aria-label="`阅读专栏：${col.columnTitle}`">
+                      <img :src="col.columnCoverURL || defaultColumnCover" alt="" loading="lazy">
+                    </RouterLink>
+                    <div class="long-copy">
+                      <RouterLink class="long-title" :to="`/column/${col.columnId}`">{{ col.columnTitle }}</RouterLink>
                       <RouterLink
-                        v-for="(ch, i) in col.chapters.slice(0, 2)"
-                        :key="ch.articleId || i"
-                        class="long-chapter"
-                        :to="ch.articleId ? `/article/${ch.articleId}` : `/column/${col.columnId}`"
-                      >
-                        <em>{{ ch.chapterNo }}</em>
-                        <span>{{ ch.title }}</span>
-                      </RouterLink>
-                    </article>
-                  </template>
-                  <template v-else>
-                    <article v-for="item in longHotShelf" :key="'hot-' + item.oId" class="long-card hot">
-                      <RouterLink class="long-title" :to="`/article/${item.oId}`">{{
-                        articleTitle(item)
-                      }}</RouterLink>
+                        v-if="col.latestChapter?.articleId"
+                        class="long-summary"
+                        :to="`/article/${col.latestChapter.articleId}`"
+                      >{{ col.latestChapter.preview || col.latestChapter.title }}</RouterLink>
+                      <p v-else class="long-summary">{{ col.latestChapter?.title || '持续更新中' }}</p>
                       <div class="long-meta">
-                        <span v-if="item.columnTitle">{{ item.columnTitle }}</span>
-                        <RouterLink v-else-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                          {{ item.articleAuthorName }}
-                        </RouterLink>
-                        <span class="heat">🔥 {{ heat(item) }}</span>
+                        <span>{{ activeLongShelf === 'recent' ? '最近更新' : '热门连载' }}</span>
+                        <span>{{ col.columnArticleCount }} 章</span>
                       </div>
-                    </article>
-                  </template>
-                  <p
-                    v-if="!(useColumnCards ? homeColumnsHot.length : longHotShelf.length) && !loading"
-                    class="hint long-empty"
-                  >
-                    暂无热门
-                  </p>
-                </div>
+                    </div>
+                  </article>
+                </template>
+                <template v-else>
+                  <article v-for="item in activeArticlesShelf" :key="activeLongShelf + '-' + item.oId" class="long-card">
+                    <RouterLink class="long-cover" :to="`/article/${item.oId}`" :aria-label="`阅读：${articleTitle(item)}`">
+                      <img :src="defaultColumnCover" alt="" loading="lazy">
+                    </RouterLink>
+                    <div class="long-copy">
+                      <RouterLink class="long-title" :to="`/article/${item.oId}`">{{ articleTitle(item) }}</RouterLink>
+                      <p class="long-summary">{{ item.articlePreviewContent || item.articleTitle }}</p>
+                      <div class="long-meta">
+                        <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">{{ item.articleAuthorName }}</RouterLink>
+                        <span v-else>长篇连载</span>
+                        <span>{{ activeLongShelf === 'hot' ? `热度 ${heat(item)}` : item.timeAgo || '最近更新' }}</span>
+                      </div>
+                    </div>
+                  </article>
+                </template>
+                <p v-if="!activeColumnsShelf.length && !activeArticlesShelf.length && !loading" class="hint long-empty">暂无内容</p>
               </div>
             </section>
             <section v-else-if="mod.id === 'chat'" class="mod-body">
@@ -1054,7 +1038,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   font-size: 14px;
 }
 .title:hover {
-  color: var(--fp-link);
+  text-decoration: underline;
 }
 .count {
   color: var(--fp-muted);
@@ -1168,143 +1152,169 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 
 .long-zone {
+  --long-gutter: 20px;
   background: var(--fp-card);
   box-shadow: var(--fp-card-shadow);
   border-radius: 10px;
-  padding: 12px 0 16px;
+  padding: 16px 0 18px;
 }
 .long-head {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  margin: 5px 16px 8px;
+  margin: 0 var(--long-gutter) 16px;
   font-size: 13px;
   color: var(--fp-head);
 }
+.long-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
 .long-head b {
   font-weight: 700;
+  font-size: 16px;
+  color: var(--fp-title);
+}
+.long-heading > span {
+  color: var(--fp-muted);
+  font-size: 12px;
 }
 .long-head a {
   color: var(--fp-link);
   text-decoration: none;
 }
-.long-row {
-  margin-top: 8px;
+.long-head a span {
+  font-size: 17px;
+  vertical-align: -1px;
 }
-.long-row-head {
+.long-tabs {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 0 16px 8px;
+  gap: 7px;
+  margin: 0 var(--long-gutter) 10px;
 }
-.badge {
-  display: inline-block;
+.long-tabs [role='tab'] {
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fp-muted);
   font-size: 12px;
-  font-weight: 700;
-  color: var(--fp-head);
-  background: var(--fp-hover);
-  border: 1px solid var(--fp-border);
-  border-radius: 4px;
-  padding: 2px 8px;
+  cursor: pointer;
 }
-.badge.hot {
-  color: var(--fp-accent);
+.long-tabs [role='tab'].active {
+  border-color: var(--fp-border);
+  background: var(--fp-hover);
+  color: var(--fp-title);
+  font-weight: 600;
 }
 .long-nav {
   display: flex;
-  gap: 4px;
+  gap: 5px;
+  margin-left: auto;
 }
 .long-nav button {
-  width: 28px;
-  height: 24px;
+  width: 27px;
+  height: 25px;
   border: 1px solid var(--fp-border);
-  background: var(--fp-hover);
-  color: var(--fp-text);
-  border-radius: 4px;
+  border-radius: 5px;
+  background: var(--fp-card);
+  color: var(--fp-muted);
   cursor: pointer;
-  line-height: 1;
+}
+.long-nav button:hover {
+  background: var(--fp-hover);
 }
 .long-shelf {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   overflow-x: auto;
-  padding: 0 16px 4px;
+  padding: 0 var(--long-gutter) 7px;
+  scroll-padding-inline: var(--long-gutter);
   scroll-snap-type: x mandatory;
-  scrollbar-width: thin;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  overscroll-behavior-inline: contain;
+}
+.long-shelf::-webkit-scrollbar {
+  display: none;
 }
 .long-card {
-  flex: 0 0 220px;
+  display: grid;
+  flex: 0 0 calc((100% - 42px) / 4);
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 120px;
+  padding: 8px 10px 8px 0;
+  border-right: 1px solid var(--fp-border);
   scroll-snap-align: start;
-  border: 1px solid var(--fp-border);
-  border-radius: 8px;
-  padding: 12px;
+}
+.long-cover {
+  display: block;
+  width: 72px;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 2px;
   background: var(--fp-hover);
+  text-decoration: none;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 15%);
 }
-.long-card.hot {
-  border-color: rgba(210, 63, 49, 0.25);
+.long-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-.long-card.column {
-  flex-basis: 260px;
+.long-copy {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-.long-col-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: flex-start;
-}
-.long-count {
-  flex-shrink: 0;
-  font-size: 11px;
-  color: var(--fp-muted);
-}
-.long-chapter {
-  display: flex;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--fp-text);
-  text-decoration: none;
-  line-height: 1.35;
-}
-.long-chapter em {
-  flex-shrink: 0;
-  font-style: normal;
-  color: var(--fp-muted);
-}
-.long-chapter:hover span {
-  text-decoration: underline;
+  min-width: 0;
+  align-self: stretch;
 }
 .long-title {
-  display: block;
+  display: -webkit-box;
   color: var(--fp-title);
   text-decoration: none;
   font-weight: 600;
   font-size: 14px;
   line-height: 1.4;
-  max-height: 2.8em;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
-.long-title:hover {
-  color: var(--fp-link);
+.long-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 9px 0 0;
+  color: var(--fp-muted);
+  font-size: 13px;
+  line-height: 1.6;
+  text-decoration: none;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .long-meta {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: auto;
+  padding-top: 9px;
   font-size: 12px;
   color: var(--fp-muted);
 }
 .long-meta a {
-  color: var(--fp-link);
+  color: var(--fp-muted);
   text-decoration: none;
 }
-.long-meta .heat {
-  color: var(--fp-accent);
-}
 .long-empty {
-  padding: 8px 0;
+  flex: 0 0 100%;
+  padding: 18px 0;
 }
 .moon-form {
   display: flex;
@@ -1401,8 +1411,27 @@ function scrollShelf(id: string, dir: -1 | 1) {
     padding-bottom: 14px;
     margin-bottom: 8px;
   }
+  .long-zone {
+    --long-gutter: 14px;
+  }
   .long-card {
-    flex-basis: 180px;
+    flex-basis: calc((100% - 28px) / 3);
+  }
+  .long-card {
+    flex-basis: calc((100% - 28px) / 3);
+  }
+  .long-heading > span {
+    display: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .long-card {
+    flex-basis: 82%;
+    min-height: 112px;
+  }
+  .long-cover {
+    width: 68px;
   }
 }
 </style>

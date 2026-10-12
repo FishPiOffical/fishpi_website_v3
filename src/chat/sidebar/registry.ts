@@ -3,9 +3,11 @@ import AdModule from './modules/AdModule.vue'
 import ActivityModule from './modules/ActivityModule.vue'
 import AppearanceModule from './modules/AppearanceModule.vue'
 import BarrageModule from './modules/BarrageModule.vue'
+import BreezemoonsModule from './modules/BreezemoonsModule.vue'
 import IncomeModule from './modules/IncomeModule.vue'
 import MutesModule from './modules/MutesModule.vue'
 import OnlineModule from './modules/OnlineModule.vue'
+import ProfileModule from './modules/ProfileModule.vue'
 import TopicModule from './modules/TopicModule.vue'
 import { CHAT_SIDEBAR_META, type ChatSidebarModuleId, type ChatSidebarModuleMeta } from './meta'
 
@@ -14,6 +16,8 @@ export interface ChatSidebarModule extends ChatSidebarModuleMeta {
 }
 
 const COMPONENTS: Record<ChatSidebarModuleId, Component> = {
+  profile: ProfileModule,
+  breezemoons: BreezemoonsModule,
   income: IncomeModule,
   topic: TopicModule,
   online: OnlineModule,

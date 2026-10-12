@@ -208,12 +208,11 @@ function avatarOf(a: ArticleSummary) {
   border-radius: 4px;
   font-size: 12px;
   line-height: 18px;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
 .tag-link:hover {
-  color: var(--fp-link);
-  background: rgba(66, 133, 244, 0.1);
+  text-decoration: underline;
 }
 
 .stats-row {
@@ -257,11 +256,10 @@ function avatarOf(a: ArticleSummary) {
 .title-link {
   color: var(--fp-title);
   text-decoration: none;
-  transition: color 0.15s ease;
 }
 
 .title-link:hover {
-  color: var(--fp-link);
+  text-decoration: underline;
 }
 
 .column-pill {
@@ -317,7 +315,7 @@ function avatarOf(a: ArticleSummary) {
 }
 
 .author-name:hover {
-  color: var(--fp-link);
+  text-decoration: underline;
 }
 
 .author-intro {
@@ -347,7 +345,7 @@ function avatarOf(a: ArticleSummary) {
 }
 
 .latest-cmter:hover {
-  color: var(--fp-link);
+  text-decoration: underline;
 }
 
 /* 紧凑模式 */
@@ -383,7 +381,7 @@ function avatarOf(a: ArticleSummary) {
 }
 
 .compact-item .title:hover {
-  color: var(--fp-link);
+  text-decoration: underline;
 }
 
 .compact-item .count {

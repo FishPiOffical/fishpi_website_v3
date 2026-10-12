@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
+import { DEFAULT_AVATAR } from '@/utils/avatar'
+import { isSingleImageMessage } from '@/utils/chatMessage'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     userId?: string
     userName: string
@@ -16,11 +18,21 @@ withDefaults(
     self?: boolean
     medals?: unknown
     vipNickname?: boolean
+    chatroom?: boolean
+    /** 红包由调用方明确标记，图片则根据完整消息内容判断。 */
+    standalone?: boolean
   }>(),
-  { userId: '', nickname: '', avatar: '', time: '', html: '', self: false, medals: undefined, vipNickname: false },
+  { userId: '', nickname: '', avatar: '', time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
 const zoomed = ref('')
+const singleImage = computed(() => props.chatroom && isSingleImageMessage(props.html))
+const isStandalone = computed(() => props.chatroom && (props.standalone || singleImage.value))
+
+function onAvatarError(e: Event) {
+  const img = e.target as HTMLImageElement
+  if (img.getAttribute('src') !== DEFAULT_AVATAR) img.src = DEFAULT_AVATAR
+}
 
 function onBodyClick(e: MouseEvent) {
   const img = (e.target as HTMLElement | null)?.closest('img')
@@ -31,12 +43,12 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <article class="fp-msg" :class="{ 'is-self': self }">
-    <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :title="userName">
-      <img class="fp-avatar" :src="avatar || '/favicon.svg'" alt="" loading="lazy" />
+  <article class="fp-msg" :class="{ 'is-self': self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
+    <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`">
+      <img class="fp-avatar" :src="avatar || DEFAULT_AVATAR" alt="" loading="lazy" @error="onAvatarError" />
     </RouterLink>
-    <div class="fp-bubble" @click="onBodyClick">
-      <div class="head">
+    <div class="message-stack">
+      <div v-if="chatroom" class="head">
         <RouterLink :to="`/member/${userName}`" class="name">
           <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">
             {{ nickname || userName }}
@@ -46,13 +58,30 @@ function onBodyClick(e: MouseEvent) {
         </RouterLink>
         <MedalList :items="medals" variant="chat" />
       </div>
-      <slot>
-        <div class="vditor-reset body" v-html="html" />
-      </slot>
-      <slot name="reactions" />
-      <div class="foot">
-        <span class="actions"><slot name="actions" /></span>
+      <div class="fp-bubble" @click="onBodyClick">
+        <div v-if="!chatroom" class="head">
+          <RouterLink :to="`/member/${userName}`" class="name">
+            <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>
+            <template v-else>{{ nickname || userName }}</template>
+            <small v-if="nickname && nickname !== userName">({{ userName }})</small>
+          </RouterLink>
+          <MedalList :items="medals" variant="chat" />
+        </div>
+        <slot>
+          <div class="vditor-reset body" v-html="html" />
+        </slot>
+        <template v-if="!chatroom">
+          <slot name="reactions" />
+          <div class="foot">
+            <span class="actions"><slot name="actions" /></span>
+            <time>{{ time }}</time>
+          </div>
+        </template>
+      </div>
+      <div v-if="chatroom" class="foot">
         <time>{{ time }}</time>
+        <div v-if="$slots.reactions" class="message-reactions"><slot name="reactions" /></div>
+        <span v-if="$slots.actions" class="actions"><slot name="actions" /></span>
       </div>
     </div>
     <ImageLightbox v-model="zoomed" />
@@ -73,6 +102,9 @@ function onBodyClick(e: MouseEvent) {
 }
 .fp-avatar-frame {
   flex: none;
+}
+.message-stack {
+  min-width: 0;
 }
 .fp-bubble {
   position: relative;
@@ -230,5 +262,165 @@ function onBodyClick(e: MouseEvent) {
   .fp-bubble:hover :deep(.rx.empty) {
     opacity: 1;
   }
+}
+
+/* 聊天室与私信共享渲染逻辑，聊天室将身份、内容及交互分层排布。 */
+.fp-msg.is-room {
+  gap: 12px;
+  max-width: 94%;
+}
+.is-room .fp-avatar-frame {
+  margin-top: 2px;
+}
+.is-room .fp-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.is-room .message-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  max-width: 100%;
+}
+.is-room.is-self .message-stack {
+  align-items: flex-end;
+}
+.is-room .head {
+  gap: 4px 8px;
+  min-height: 20px;
+  max-width: 100%;
+}
+.is-room .name {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.is-room .name small {
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 400;
+}
+.is-room .name:hover { text-decoration: underline; text-underline-offset: 3px; }
+.is-room .fp-bubble {
+  padding: 10px 14px;
+  max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--fp-text) 5%, transparent);
+  border-radius: 3px 14px 14px 14px;
+}
+.is-room.is-self .fp-bubble {
+  border-radius: 14px 3px 14px 14px;
+}
+.is-room .body {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.is-room .body :deep(p + p) { margin-top: 6px; }
+.is-room .body :deep(img:not(.emoji)) {
+  max-width: min(220px, 100%);
+  max-height: 260px;
+  border-radius: 8px;
+}
+.is-room .body :deep(video), .is-room .body :deep(iframe) {
+  max-width: 100%;
+  border-radius: 8px;
+}
+.is-room .body :deep(blockquote) {
+  margin: 5px 0 8px;
+  padding: 6px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--fp-muted) 35%, transparent);
+  border-radius: 0 5px 5px 0;
+  background: color-mix(in srgb, var(--fp-card) 45%, transparent);
+  color: var(--fp-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.is-room .body :deep(h5) { margin: 0 0 4px; font-size: 11px; line-height: 1.6; }
+.is-room .body :deep(blockquote img:not(.emoji)) { max-width: 80px; max-height: 80px; }
+.is-room .body :deep(pre) {
+  max-width: 100%;
+  margin: 6px 0;
+  padding: 10px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+.fp-msg.is-room.is-standalone .fp-bubble {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.is-room.is-image .body { line-height: 0; }
+.is-room.is-image .body :deep(img:not(.emoji)) {
+  display: block;
+  max-width: min(280px, 100%);
+  max-height: 320px;
+  border-radius: 12px;
+}
+.is-room .foot {
+  position: relative;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-height: 22px;
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 18px;
+}
+.is-room.is-self .foot { flex-direction: row-reverse; }
+.is-room time { font-variant-numeric: tabular-nums; }
+.is-room .actions, .is-room.is-self .actions {
+  position: static;
+  padding: 0;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.is-room .actions > :deep(button) {
+  padding: 2px 5px;
+  font-size: 10px;
+  line-height: 16px;
+  border-radius: 5px;
+}
+.is-room .actions > :deep(button:hover) {
+  color: var(--fp-text);
+  background: var(--fp-hover);
+}
+.is-room .message-reactions { min-width: 0; }
+.is-room .message-reactions:has(.rx:empty) { display: none; }
+.is-room .message-reactions :deep(.rx) { position: static; margin: 0; gap: 3px; }
+.is-room .message-reactions :deep(.chip), .is-room .message-reactions :deep(.ghost) {
+  padding: 1px 6px;
+  line-height: 17px;
+  font-size: 10px;
+  background: var(--fp-card);
+}
+.is-room.is-self .message-reactions :deep(.panel) { left: auto; right: 0; }
+.is-room .message-reactions :deep(.panel) { top: calc(100% + 4px); max-width: min(240px, calc(100vw - 80px)); }
+@media (hover: hover) and (pointer: fine) {
+  .is-room .actions, .is-room .message-reactions :deep(.rx.empty:not(.open)) {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+  }
+  .is-room:hover .actions, .is-room:focus-within .actions,
+  .is-room:hover .message-reactions :deep(.rx.empty), .is-room:focus-within .message-reactions :deep(.rx.empty) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (max-width: 600px) {
+  .fp-msg.is-room { gap: 8px; max-width: 100%; }
+  .is-room .fp-avatar { width: 30px; height: 30px; border-radius: 8px; }
+  .is-room .fp-bubble { padding: 8px 11px; }
+  .is-room .name { font-size: 11px; }
+  .is-room .name small { font-size: 9px; }
+  .is-room .body { font-size: 13px; }
+  .is-room .foot { gap: 3px 6px; font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-room .actions, .is-room .message-reactions :deep(.rx.empty:not(.open)) { transition: none; }
 }
 </style>

@@ -66,6 +66,12 @@ function onGesture(g: number, e: Event) {
   e.stopPropagation()
   emit('open', g)
 }
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
+  e.preventDefault()
+  onCardClick()
+}
 </script>
 
 <template>
@@ -75,7 +81,7 @@ function onGesture(g: number, e: Event) {
     role="button"
     tabindex="0"
     @click="onCardClick"
-    @keydown.enter.prevent="onCardClick"
+    @keydown="onKeydown"
   >
     <div v-if="showGestures" class="hongbao__finger_guessing">
       <button
@@ -111,17 +117,18 @@ function onGesture(g: number, e: Event) {
     <div class="hongbao__body">
       <div class="hongbao__msg">
         {{ packet.msg || '摸鱼者，事竟成！' }}
-        <br />
-        <b>{{ typeLabel }}</b>
       </div>
-      <div v-if="packet.money != null" class="hongbao__money">
+      <div class="hongbao__type">{{ typeLabel }}</div>
+    </div>
+    <div class="hongbao__footer">
+      <span class="hongbao__desc">{{ desc || '摸鱼派红包' }}</span>
+      <span v-if="packet.money != null" class="hongbao__money">
         <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
           <circle cx="8" cy="8" r="7" fill="#f0c040" stroke="#d4a017" stroke-width="1" />
           <text x="8" y="11.5" text-anchor="middle" font-size="9" font-weight="700" fill="#8a6d1b">¥</text>
         </svg>
-        {{ packet.money }}
-      </div>
-      <div class="hongbao__desc">{{ desc }}</div>
+        {{ packet.money }}<small>积分</small>
+      </span>
     </div>
   </div>
 </template>
@@ -129,36 +136,51 @@ function onGesture(g: number, e: Event) {
 <style scoped>
 .hongbao__item {
   position: relative;
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin: 3px 5px 8px 3px;
-  padding: 7px;
-  border-radius: 3px;
-  background: var(--fp-card);
+  display: inline-grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 238px;
+  margin: 2px 0;
+  padding: 14px 14px 10px;
+  border: 1px solid color-mix(in srgb, #e59230 22%, var(--fp-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, #e59230 8%, var(--fp-card));
   color: var(--fp-text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.035);
   cursor: pointer;
   user-select: none;
-  max-width: 280px;
+  max-width: 100%;
   box-sizing: border-box;
-  transition: box-shadow 0.15s ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 .hongbao__item:hover {
-  box-shadow:
-    0 0 3px rgba(0, 0, 0, 0.13),
-    0 3px 6px rgba(0, 0, 0, 0.26);
+  border-color: color-mix(in srgb, #e59230 55%, var(--fp-border));
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
+}
+.hongbao__item:focus-visible {
+  outline: 2px solid var(--fp-primary);
+  outline-offset: 3px;
 }
 .hongbao__item.opened {
-  opacity: 0.36;
+  background: var(--fp-hover);
+  border-color: var(--fp-border);
+  box-shadow: none;
+  color: var(--fp-muted);
+}
+.hongbao__item.opened .hongbao__icon {
+  opacity: .55;
+  filter: saturate(.5);
 }
 .hongbao__item.is-rps {
-  margin-right: 56px;
+  min-height: 116px;
+  margin-right: 42px;
+  max-width: calc(100% - 42px);
 }
 .hongbao__icon {
   flex-shrink: 0;
-  width: 50px;
-  height: 50px;
+  width: 42px;
+  height: 48px;
 }
 .hongbao__body {
   min-width: 0;
@@ -167,22 +189,42 @@ function onGesture(g: number, e: Event) {
 }
 .hongbao__msg {
   word-break: break-word;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
 }
-.hongbao__msg b {
-  font-weight: 700;
+.hongbao__type {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--fp-muted);
+}
+.hongbao__footer {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding-top: 9px;
+  border-top: 1px solid color-mix(in srgb, #e59230 12%, var(--fp-border));
 }
 .hongbao__money {
   display: flex;
   align-items: center;
   gap: 3px;
-  margin-top: 2px;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.hongbao__money small {
+  margin-left: 1px;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--fp-muted);
 }
 .hongbao__desc {
-  margin-top: 2px;
-  font-size: 12px;
+  font-size: 10px;
   color: var(--fp-muted);
-  min-height: 1em;
 }
 .hongbao__finger_guessing {
   position: absolute;
@@ -192,9 +234,9 @@ function onGesture(g: number, e: Event) {
 }
 .hongbao__finger_guessing_icon {
   position: absolute;
-  right: -25px;
-  width: 45px;
-  height: 45px;
+  right: -40px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 50%;
@@ -210,19 +252,21 @@ function onGesture(g: number, e: Event) {
   border-color: #5c1151;
 }
 .hongbao__finger_guessing_icon.rock {
-  top: -25px;
+  top: 3px;
   background-image: url('/images/redpacket/gesture/rock.png');
 }
 .hongbao__finger_guessing_icon.scissors {
-  top: 15px;
-  right: -50px;
+  top: 41px;
   background-image: url('/images/redpacket/gesture/scissors.png');
 }
 .hongbao__finger_guessing_icon.paper {
-  top: 55px;
+  top: 79px;
   background-image: url('/images/redpacket/gesture/paper.png');
 }
 .opened .hongbao__finger_guessing {
   display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hongbao__item, .hongbao__finger_guessing_icon { transition: none; }
 }
 </style>

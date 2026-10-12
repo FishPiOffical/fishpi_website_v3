@@ -1,60 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { fetchBreezemoons, postBreezemoon, type Breezemoon } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
-import FpLoading from '@/components/FpLoading.vue'
-import { readCache, writeCache } from '@/utils/swr'
+import PersonInfoCard from '@/components/sidebar/PersonInfoCard.vue'
+import BreezemoonFeed from '@/components/sidebar/BreezemoonFeed.vue'
 
-const auth = useAuthStore()
 const router = useRouter()
-const { account, isLoggedIn, apiKey } = storeToRefs(auth)
-
-const MOONS_KEY = 'sidebar:moons'
-const moons = ref<Breezemoon[]>([])
-const moonsLoaded = ref(false)
-const moonDraft = ref('')
-const moonBusy = ref(false)
-const moonMsg = ref('')
-
-async function loadMoons() {
-  const hit = readCache<Breezemoon[]>(MOONS_KEY)
-  if (hit) {
-    moons.value = hit
-    moonsLoaded.value = true
-  }
-  try {
-    moons.value = (await fetchBreezemoons(1, 6)).slice(0, 6)
-    writeCache(MOONS_KEY, moons.value)
-  } catch {
-    if (!hit) moons.value = []
-  } finally {
-    moonsLoaded.value = true
-  }
-}
-
-onMounted(() => {
-  void loadMoons()
-})
-
-async function onPostMoon() {
-  const content = moonDraft.value.trim()
-  if (!content || !apiKey.value || moonBusy.value) return
-  moonBusy.value = true
-  moonMsg.value = ''
-  try {
-    await postBreezemoon(apiKey.value, content)
-    moonDraft.value = ''
-    moonMsg.value = '已发布'
-    await loadMoons()
-  } catch (e) {
-    moonMsg.value = e instanceof Error ? e.message : '发布失败'
-  } finally {
-    moonBusy.value = false
-  }
-}
+const { isLoggedIn } = storeToRefs(useAuthStore())
 
 function goDownload() {
   void router.push('/download')
@@ -65,58 +18,7 @@ function goDownload() {
   <aside class="sidebar-wrapper">
     <!-- 用户个人信息模块 (对齐现网 Rhythm common/person-info.ftl) -->
     <div class="module person-card">
-      <template v-if="isLoggedIn && account">
-        <div class="person-head">
-          <RouterLink :to="`/member/${account.userName}`" class="person-avatar-link">
-            <img
-              v-if="account.userAvatarURL"
-              class="person-avatar"
-              :src="account.userAvatarURL"
-              :alt="account.userName"
-            />
-            <span v-else class="person-avatar fallback">{{ account.userName.slice(0, 1) }}</span>
-          </RouterLink>
-          <div class="person-meta">
-            <RouterLink :to="`/member/${account.userName}`" class="person-name">
-              <b>{{ account.userNickname || account.userName }}</b>
-            </RouterLink>
-            <div class="person-sub">
-              <span class="uname">@{{ account.userName }}</span>
-              <span class="role-tag">{{ account.userAppRole === 1 ? '🎨 画家' : '💻 黑客' }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="person-stats">
-          <RouterLink :to="`/member/${account.userName}`" class="stat-col">
-            <strong>{{ account.userPoint ?? 0 }}</strong>
-            <span>积分</span>
-          </RouterLink>
-          <RouterLink :to="`/following`" class="stat-col">
-            <strong>关注</strong>
-            <span>我的关注</span>
-          </RouterLink>
-          <RouterLink :to="`/stars`" class="stat-col">
-            <strong>收藏</strong>
-            <span>我的收藏</span>
-          </RouterLink>
-          <RouterLink :to="`/post`" class="stat-col action">
-            <strong class="post-strong">＋发帖</strong>
-            <span>发新内容</span>
-          </RouterLink>
-        </div>
-      </template>
-
-      <template v-else>
-        <div class="guest-card">
-          <h3 class="guest-title">摸鱼派</h3>
-          <p class="guest-slogan">鱼油专属摸鱼社区，畅聊生活与技术</p>
-          <div class="guest-actions">
-            <RouterLink to="/login" class="btn green flex-btn">登录</RouterLink>
-            <RouterLink to="/register" class="btn flex-btn">注册</RouterLink>
-          </div>
-        </div>
-      </template>
+      <PersonInfoCard />
     </div>
 
     <!-- 签到模块 -->
@@ -141,47 +43,7 @@ function goDownload() {
         <RouterLink to="/breezemoons" class="more-link">更多</RouterLink>
       </div>
       <div class="module-panel">
-        <div v-if="isLoggedIn" class="moon-input-row">
-          <input
-            v-model="moonDraft"
-            type="text"
-            class="moon-input"
-            placeholder="与清风明月为伴，写一句话…"
-            :disabled="moonBusy"
-            @keydown.enter="onPostMoon"
-          />
-          <button
-            type="button"
-            class="btn orange small"
-            :disabled="moonBusy || !moonDraft.trim()"
-            @click="onPostMoon"
-          >
-            发表
-          </button>
-        </div>
-        <p v-if="moonMsg" class="moon-msg">{{ moonMsg }}</p>
-
-        <ul class="moon-list">
-          <li v-for="item in moons" :key="item.oId" class="moon-item">
-            <RouterLink :to="`/member/${item.breezemoonAuthorName}`" class="moon-avatar-wrap">
-              <span
-                class="avatar-small"
-                :style="
-                  item.breezemoonAuthorThumbnailURL48
-                    ? { backgroundImage: `url('${item.breezemoonAuthorThumbnailURL48}')` }
-                    : undefined
-                "
-                :aria-label="item.breezemoonAuthorName"
-              />
-            </RouterLink>
-            <div class="moon-body">
-              <div class="moon-content fn-ellipsis" v-html="item.breezemoonContent" />
-              <div class="moon-time">{{ item.timeAgo }}</div>
-            </div>
-          </li>
-          <li v-if="!moons.length && !moonsLoaded"><FpLoading small /></li>
-          <li v-else-if="!moons.length" class="empty-moon">暂无动态</li>
-        </ul>
+        <BreezemoonFeed />
       </div>
     </div>
   </aside>
@@ -286,8 +148,8 @@ function goDownload() {
   font-size: 11px;
 }
 
-.stat-col:hover strong {
-  color: var(--fp-link);
+.stat-col:hover {
+  text-decoration: underline;
 }
 
 .stat-col.action .post-strong {
@@ -362,7 +224,7 @@ function goDownload() {
 }
 
 .more-link:hover {
-  color: var(--fp-link);
+  text-decoration: underline;
 }
 
 .moon-input-row {

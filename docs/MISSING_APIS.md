@@ -1,30 +1,32 @@
-# 缺失 / 未开放 JSON 接口清单
+# JSON 接口覆盖与缺口清单
 
-本站优先走 Rhythm 真实 JSON；下列能力在现网**没有可用的公开 JSON**（或仅 HTML 页注入），前端用 `src/api/gaps.mock.ts` / `catalog.mock.json` 假数据或降级方案。  
-**禁止**再用 HTML 抓取现网补数据。后端补齐后，删掉对应 mock 并改 `src/api/fishpi.ts` 调用。
+本站优先走 Rhythm 真实 JSON；本清单记录已接入、缺失或需降级处理的能力。缺失项使用 `src/api/gaps.mock.ts` / `catalog.mock.json` 假数据或降级方案。
+**禁止**用 HTML 抓取现网拼装运行时数据。后端补齐缺失接口后，删掉对应 mock 并改 `src/api/fishpi.ts` 调用。
 
 | 状态 | 含义 |
 |------|------|
+| 已接入 | 已有可用 JSON，前端正常请求；保留 mock 作为异常兜底 |
 | 缺失 | 无对应 JSON，SPA 用假数据 |
 | 降级 | 有近似接口/页面态，但缺少专用 JSON |
 | 故意不做 | 产品范围外或暂不接 |
 
 ---
 
-## 1. 首页长篇专栏货架 — 缺失
+## 1. 首页长篇专栏货架 — 已接入
 
 | 建议契约 | 说明 |
 |----------|------|
 | `GET /api/columns/latest?size=12` | 首页「最近更新」专栏卡片 |
 | `GET /api/columns/hot?size=12` | 首页「热门专栏」卡片 |
 
-建议每条字段（与现网 FTL `hotLongColumns` / `latestLongColumns` 对齐）：
+现网接口已提供专栏摘要与封面字段，首页从两个接口获取：
 
 ```json
 {
   "columnId": "string",
   "columnTitle": "string",
   "columnArticleCount": 0,
+  "columnCoverURL": "https://...",
   "latestChapter": {
     "articleId": "string",
     "articlePermalink": "/article/...",
@@ -35,8 +37,8 @@
 }
 ```
 
-| 现状 | `fetchHomeColumns()` → `gaps.mock.ts` 假数据 |
-|------|-----------------------------------------------|
+| 现状 | `fetchHomeColumns()` 请求上述接口；请求失败时回退 `gaps.mock.ts` |
+|------|--------------------------------------------------------------|
 
 ---
 

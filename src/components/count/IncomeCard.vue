@@ -41,6 +41,7 @@ function openSettings() {
       <span class="label">🎉 {{ view.salary ? '下班啦，今天赚了' : '下班时间到' }}</span>
       <span v-if="view.salary" class="money big">￥{{ view.salary }}</span>
     </template>
+    <slot />
   </button>
 </template>
 
