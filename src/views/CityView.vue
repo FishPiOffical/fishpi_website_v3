@@ -6,6 +6,7 @@ import { fetchBreezemoons, type Breezemoon } from '@/api/fishpi'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import SideBar from '@/components/SideBar.vue'
 import { createSwrLoader } from '@/utils/swr'
 
 const route = useRoute()
@@ -54,87 +55,223 @@ watch(
 </script>
 
 <template>
-  <section class="card">
-    <h1>{{ cityName || '同城' }}</h1>
-    <p class="hint">
-      同城页在现网需登录。此处展示清风明月中标注了该城市的动态（近似实现）。
-    </p>
-    <p v-if="!isLoggedIn" class="hint">
-      <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
-      后可查看。
-    </p>
-    <FpLoading v-else-if="loading" />
-    <p v-else-if="error" class="err">{{ error }}</p>
-    <ul v-else class="list">
-      <li v-if="!items.length" class="hint">暂无来自「{{ cityName }}」的清风明月</li>
-      <li v-for="m in items" :key="m.oId">
-        <header>
-          <RouterLink v-if="m.breezemoonAuthorName" :to="`/member/${m.breezemoonAuthorName}`">
-            {{ m.breezemoonAuthorName }}
-          </RouterLink>
-          <time>{{ m.timeAgo || m.breezemoonCity }}</time>
-        </header>
-        <div class="body" v-html="m.breezemoonContent || ''" />
-      </li>
-    </ul>
-  </section>
+  <div class="wrapper list-page-wrap">
+    <div class="content">
+      <div class="module">
+        <div class="module-header list-page-head">
+          <div class="head-left">
+            <h2>📍 {{ cityName || '同城' }}</h2>
+            <span class="sub-tag">同城鱼油动态</span>
+          </div>
+          <div class="head-right">
+            <span v-if="isLoggedIn" class="total-count">共 {{ items.length }} 条动态</span>
+          </div>
+        </div>
+
+        <p class="mock-hint">
+          同城页在现网需登录访问，此处展示清风明月中标注了「{{ cityName || '该城市' }}」的同城动态。
+        </p>
+
+        <p v-if="!isLoggedIn" class="empty-hint">
+          <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
+          后可查看同城动态。
+        </p>
+        <FpLoading v-else-if="loading" :rows="6" />
+        <p v-else-if="error" class="err">{{ error }}</p>
+        <p v-else-if="!items.length" class="empty-hint">暂无来自「{{ cityName }}」的清风明月动态</p>
+        <ul v-else class="city-list">
+          <li v-for="m in items" :key="m.oId" class="city-item">
+            <RouterLink
+              v-if="m.breezemoonAuthorName"
+              :to="`/member/${m.breezemoonAuthorName}`"
+              class="city-avatar-link"
+            >
+              <img
+                v-if="m.breezemoonAuthorThumbnailURL48"
+                class="city-avatar"
+                :data-user-card="m.breezemoonAuthorName"
+                :src="m.breezemoonAuthorThumbnailURL48"
+                alt=""
+              />
+              <span v-else class="city-avatar fallback">{{ m.breezemoonAuthorName.slice(0, 1) }}</span>
+            </RouterLink>
+            <div class="city-main">
+              <header class="city-meta">
+                <b>
+                  <RouterLink v-if="m.breezemoonAuthorName" :to="`/member/${m.breezemoonAuthorName}`">
+                    {{ m.breezemoonAuthorName }}
+                  </RouterLink>
+                </b>
+                <time>{{ m.timeAgo }}</time>
+                <span v-if="m.breezemoonCity" class="city-pill">📍 {{ m.breezemoonCity }}</span>
+              </header>
+              <div class="body" v-html="m.breezemoonContent || ''" />
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="side">
+      <SideBar />
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.card {
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 12px;
-  padding: 18px 20px;
+.list-page-wrap {
+  padding-top: 4px;
 }
-h1 {
-  margin: 0 0 8px;
-  font-size: 18px;
+
+.list-page-head {
+  padding: 12px 18px;
 }
-.hint {
+
+.head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.head-left h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fp-title);
+}
+
+.sub-tag {
+  font-size: 12px;
   color: var(--fp-muted);
-  font-size: 13px;
 }
-.err {
-  color: #e07a5f;
+
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.list {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
+
+.total-count {
+  font-size: 12px;
+  color: var(--fp-muted);
 }
-li {
-  padding: 12px 0;
+
+.mock-hint {
+  padding: 10px 18px;
+  margin: 0;
+  background: var(--fp-hover);
+  color: var(--fp-muted);
+  font-size: 12px;
   border-bottom: 1px solid var(--fp-border);
 }
-header {
+
+.empty-hint,
+.err {
+  padding: 36px 18px;
+  margin: 0;
+  text-align: center;
+  color: var(--fp-muted);
+  font-size: 14px;
+}
+
+.err {
+  color: var(--fp-danger, #e07a5f);
+}
+
+.city-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.city-item {
   display: flex;
-  gap: 10px;
-  align-items: baseline;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--fp-border);
+  transition: background-color 0.15s ease;
+}
+
+.city-item:last-child {
+  border-bottom: 0;
+}
+
+.city-item:hover {
+  background: var(--fp-hover);
+}
+
+.city-avatar-link {
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.city-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.city-avatar.fallback {
+  display: grid;
+  place-items: center;
+  background: var(--fp-hover);
+  color: var(--fp-title);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.city-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.city-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   margin-bottom: 6px;
   font-size: 13px;
 }
-time {
+
+.city-meta a {
+  color: var(--fp-title);
+  text-decoration: none;
+}
+
+.city-meta a:hover {
+  color: var(--fp-link);
+}
+
+.city-meta time {
   color: var(--fp-muted);
   font-size: 12px;
 }
+
+.city-pill {
+  font-size: 11px;
+  color: var(--fp-muted);
+  background: var(--fp-hover);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
 .body {
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
+  color: var(--fp-text);
   word-break: break-all;
   overflow-wrap: anywhere;
 }
+
 .body :deep(a) {
   word-break: break-all;
   overflow-wrap: anywhere;
 }
+
 .body :deep(p) {
   margin: 0;
   word-break: break-all;
   overflow-wrap: anywhere;
-}
-a {
-  color: var(--fp-link);
-  text-decoration: none;
 }
 </style>

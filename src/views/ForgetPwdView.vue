@@ -98,11 +98,12 @@ onMounted(() => {
   margin: 40px auto;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 12px;
+  box-shadow: var(--fp-card-shadow);
+  border-radius: var(--fp-radius-lg, 10px);
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 h1 {
   margin: 0;
@@ -121,23 +122,39 @@ label {
   font-size: 13px;
   color: var(--fp-muted);
 }
-input {
+input:not([type='checkbox']):not([type='radio']) {
   background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-text);
-  border-radius: 6px;
-  padding: 8px 10px;
+  border-radius: var(--fp-radius-md, 8px);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+input:not([type='checkbox']):not([type='radio']):hover {
+  border-color: var(--fp-border-strong, var(--fp-border));
+}
+input:not([type='checkbox']):not([type='radio']):focus {
+  border-color: var(--fp-primary);
+  box-shadow: var(--fp-focus-ring);
 }
 .captcha {
   min-height: 44px;
 }
 .primary {
-  border: 0;
+  border: 1px solid var(--fp-primary);
   background: var(--fp-primary);
   color: #fff;
-  border-radius: 6px;
+  border-radius: var(--fp-radius-sm, 6px);
   padding: 8px 16px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.primary:hover {
+  background: var(--fp-primary-hover, var(--fp-primary));
+  border-color: var(--fp-primary-hover, var(--fp-primary));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--fp-primary) 28%, transparent);
 }
 .ok {
   margin: 0;
@@ -146,7 +163,7 @@ input {
 }
 .err {
   margin: 0;
-  color: #e07a5f;
+  color: var(--fp-danger, #e07a5f);
   font-size: 13px;
 }
 .links {

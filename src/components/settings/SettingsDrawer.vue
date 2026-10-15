@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useSettingsDrawerStore, type SettingsSection } from '@/stores/settingsDrawer'
 import { useHomeLayoutStore } from '@/stores/homeLayout'
+import { usePageSidebarStore, type PageSidebarModuleId } from '@/stores/pageSidebar'
 import { useChatSidebarStore } from '@/stores/chatSidebar'
 import { useChatFilterStore, type ChatBlockMatch, type ChatBlockMode } from '@/stores/chatFilter'
 import { useAuthStore } from '@/stores/auth'
@@ -16,6 +17,7 @@ import WhisperConversations from '@/components/chat/WhisperConversations.vue'
 const drawer = useSettingsDrawerStore()
 const { open, section } = storeToRefs(drawer)
 const home = useHomeLayoutStore()
+const pageSidebar = usePageSidebarStore()
 const sidebar = useChatSidebarStore()
 const chatFilter = useChatFilterStore()
 const auth = useAuthStore()
@@ -30,6 +32,8 @@ const { isLoggedIn } = storeToRefs(auth)
 const { unreadTotal: whisperUnread, inboxOpen: whisperInboxOpen } = storeToRefs(whispers)
 const draggedSidebarId = ref('')
 const overSidebarId = ref('')
+const draggedPageSidebarId = ref<PageSidebarModuleId | ''>('')
+const overPageSidebarId = ref<PageSidebarModuleId | ''>('')
 const blockForm = reactive({ match: 'nickname' as ChatBlockMatch, value: '', mode: 'block' as ChatBlockMode })
 const isChatroom = computed(() => route.path === '/cr')
 const isHome = computed(() => route.path === '/')
@@ -40,22 +44,54 @@ watch([showHiddenHandle], ([visible]) => {
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
   { id: 'home', label: '首页模块', icon: '🏠' },
+  { id: 'pageSidebar', label: '内页侧栏', icon: '📑' },
   { id: 'chatSidebar', label: '聊天室侧栏', icon: '💬' },
   { id: 'chatBlock', label: '聊天室屏蔽', icon: '🚫' },
   { id: 'income', label: '上下班时间', icon: '🕒' },
 ]
 
-const visibleSections = computed(() => SECTIONS.filter((item) => item.id !== 'income' || sidebar.isOn('income')))
+const visibleSections = computed(() =>
+  SECTIONS.filter((item) => item.id !== 'income' || sidebar.isOn('income') || pageSidebar.isOn('income')),
+)
 const homeCore = computed(() => home.orderedModules.filter((m) => !m.sidebarId))
 const homeSide = computed(() => home.orderedModules.filter((m) => m.sidebarId))
 
 watch(
-  () => sidebar.isOn('income'),
+  () => sidebar.isOn('income') || pageSidebar.isOn('income'),
   (isOn) => {
-    if (!isOn && section.value === 'income') section.value = 'chatSidebar'
+    if (!isOn && section.value === 'income') section.value = 'pageSidebar'
   },
   { immediate: true },
 )
+
+function startPageSidebarDrag(e: DragEvent, id: PageSidebarModuleId) {
+  draggedPageSidebarId.value = id
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', id)
+  }
+}
+
+function dragOverPageSidebarItem(e: DragEvent, id: PageSidebarModuleId) {
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  overPageSidebarId.value = id
+}
+
+function dropPageSidebarItem(e: DragEvent, id: PageSidebarModuleId) {
+  e.preventDefault()
+  const draggedId = (draggedPageSidebarId.value || e.dataTransfer?.getData('text/plain') || '') as PageSidebarModuleId
+  const row = e.currentTarget as HTMLElement
+  const after = e.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2
+  if (draggedId) pageSidebar.moveTo(draggedId, id, after)
+  draggedPageSidebarId.value = ''
+  overPageSidebarId.value = ''
+}
+
+function endPageSidebarDrag() {
+  draggedPageSidebarId.value = ''
+  overPageSidebarId.value = ''
+}
 
 function startSidebarDrag(e: DragEvent, id: string) {
   draggedSidebarId.value = id
@@ -254,6 +290,42 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
                   <input type="checkbox" :checked="!home.isHidden(m.id)" @change="home.toggle(m.id)" />
                   <span>{{ m.title }}</span>
                 </label>
+              </li>
+            </ul>
+          </div>
+
+          <div v-else-if="section === 'pageSidebar'" class="content">
+            <p class="drag-hint">控制内页（清风明月、问答、优选、总榜、同城、领域等）右侧边栏模块的显示与排序。</p>
+            <div class="chips">
+              <button type="button" @click="pageSidebar.applyPreset('compact')">精简</button>
+              <button type="button" @click="pageSidebar.applyPreset('all')">全部显示</button>
+              <button type="button" @click="pageSidebar.reset()">恢复默认</button>
+            </div>
+            <ul class="rows">
+              <li
+                v-for="m in pageSidebar.orderedModules"
+                :key="m.id"
+                :class="{ 'is-dragging': draggedPageSidebarId === m.id, 'is-drop-target': overPageSidebarId === m.id }"
+                @dragover="dragOverPageSidebarItem($event, m.id)"
+                @drop="dropPageSidebarItem($event, m.id)"
+              >
+                <label class="check">
+                  <input type="checkbox" :checked="pageSidebar.isOn(m.id)" @change="pageSidebar.toggle(m.id)" />
+                  <span>{{ m.title }}</span>
+                </label>
+                <span class="sort">
+                  <span
+                    class="drag-handle"
+                    draggable="true"
+                    role="button"
+                    :aria-label="`拖动排序：${m.title}`"
+                    title="按住拖动排序"
+                    @dragstart="startPageSidebarDrag($event, m.id)"
+                    @dragend="endPageSidebarDrag"
+                  >⠿</span>
+                  <button type="button" aria-label="上移" @click="pageSidebar.move(m.id, -1)">↑</button>
+                  <button type="button" aria-label="下移" @click="pageSidebar.move(m.id, 1)">↓</button>
+                </span>
               </li>
             </ul>
           </div>
@@ -623,21 +695,25 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 .chips {
   display: flex;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .chips button,
 .sort button {
   border: 1px solid var(--fp-border);
   background: var(--fp-card);
   color: var(--fp-text);
-  border-radius: 6px;
-  padding: 3px 9px;
+  border-radius: var(--fp-radius-sm, 6px);
+  padding: 4px 10px;
   font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
 }
 .chips button:hover,
 .sort button:hover {
-  color: var(--fp-link);
+  border-color: var(--fp-border-strong, var(--fp-border));
+  background: var(--fp-hover);
+  color: var(--fp-primary);
 }
 .group {
   margin: 12px 0 6px;
@@ -656,15 +732,16 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 .rows li {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 5px 8px;
-  border-radius: 6px;
+  padding: 6px 8px;
+  border-radius: var(--fp-radius-md, 8px);
+  transition: background-color 0.15s ease;
 }
 .rows li:hover {
   background: var(--fp-hover);
@@ -679,10 +756,11 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 .check {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 13px;
   color: var(--fp-title);
   cursor: pointer;
+  user-select: none;
 }
 .sort {
   display: flex;

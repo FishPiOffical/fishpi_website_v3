@@ -36,6 +36,7 @@ import ChatComposer from '@/components/ChatComposer.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import ReactionBar from '@/components/ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
+import { fpConfirm } from '@/composables/useDialog'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeArticlePayload } from '@/seo/payload'
 import { absoluteUrl, SITE_DEFAULT_DESC, stripHtml } from '@/seo/site'
@@ -506,7 +507,12 @@ async function toggleWatch() {
 async function reward() {
   const a = article.value
   if (!apiKey.value || !a || rewarding.value) return
-  if (!window.confirm(`确定打赏 ${a.articleRewardPoint} 积分查看打赏区内容？`)) return
+  const confirmed = await fpConfirm({
+    title: '打赏确认',
+    message: `确定打赏 ${a.articleRewardPoint} 积分查看打赏区内容？`,
+    confirmText: '确认打赏',
+  })
+  if (!confirmed) return
   rewarding.value = true
   rewardError.value = ''
   try {

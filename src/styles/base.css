@@ -44,28 +44,48 @@
   --fp-bg: #282a2a;
   --fp-nav: #242525;
   --fp-card: #282a2a;
+  --fp-elevated: #2f3232;
   --fp-text: #cbc5ba;
   --fp-nav-text: #cbc5ba;
-  --fp-title: #cbc5ba;
+  --fp-title: #ddd7cc;
   --fp-head: #aca396;
-  --fp-muted: #aca396;
+  --fp-muted: #9e9689;
   --fp-primary: #69aa69;
+  --fp-primary-hover: #5b9a5b;
+  --fp-primary-soft: rgba(105, 170, 105, 0.15);
   --fp-link: #5c9fdf;
-  --fp-accent: #d23f31;
-  --fp-border: rgba(255, 255, 255, 0.06);
-  --fp-hover: rgba(255, 255, 255, 0.04);
+  --fp-accent: #e59230;
+  --fp-accent-hover: #cf8024;
+  --fp-accent-soft: rgba(229, 146, 48, 0.15);
+  --fp-danger: #d9534f;
+  --fp-danger-hover: #c6433f;
+  --fp-danger-soft: rgba(217, 83, 79, 0.15);
+  --fp-success: #69aa69;
+  --fp-warning: #e59230;
+  --fp-border: rgba(255, 255, 255, 0.08);
+  --fp-border-strong: rgba(255, 255, 255, 0.16);
+  --fp-hover: rgba(255, 255, 255, 0.05);
   --fp-self: #2f5d55;
   --fp-green: #69aa69;
   --fp-income: #69aa69;
-  --fp-nav-shadow: none;
-  --fp-card-shadow: none;
-  --fp-search-bg: #3a3b3b;
-  --fp-income-bg: rgba(39, 40, 39, 0.85);
+  --fp-nav-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
+  --fp-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  --fp-dialog-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  --fp-mask-bg: rgba(0, 0, 0, 0.55);
+  --fp-search-bg: #343636;
+  --fp-control-bg: rgba(255, 255, 255, 0.14);
+  --fp-income-bg: rgba(39, 40, 39, 0.88);
   --fp-income-shadow: none;
-  --fp-footer: #282a2a;
+  --fp-footer: #242525;
+  --fp-focus-ring: 0 0 0 3px rgba(105, 170, 105, 0.22);
+  --fp-radius-sm: 6px;
+  --fp-radius-md: 8px;
+  --fp-radius-lg: 10px;
+  --fp-radius-xl: 14px;
   --fp-nav-h: 58px;
   --fp-wrap: 1300px;
 }
+
 @media (max-width: 960px) {
   :root {
     --fp-nav-h: 88px;
@@ -83,6 +103,7 @@ body {
   background: var(--fp-bg);
   color: var(--fp-text);
   font-size: 14px;
+  line-height: 1.5;
   font-family:
     HarmonyOS,
     'PingFang SC',
@@ -90,6 +111,7 @@ body {
     'Microsoft YaHei',
     'Helvetica Neue',
     sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 #app {
@@ -98,104 +120,365 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
 
 a {
   color: var(--fp-link);
+  transition: color 0.15s ease;
 }
 a:hover {
   text-decoration: underline;
 }
 
-/* 弹窗等通用控件，配合 FpDialog 使用 */
-.fp-btn {
+/* ==========================================================================
+   统一现代风按钮系统 (.fp-btn & .btn)
+   ========================================================================== */
+.fp-btn,
+.btn,
+button.btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 16px;
+  padding: 6px 14px;
   border: 1px solid var(--fp-border);
-  border-radius: 6px;
-  background: transparent;
+  border-radius: var(--fp-radius-sm);
+  background-color: var(--fp-card);
   color: var(--fp-text);
   font-size: 13px;
-  line-height: 1.5;
+  font-weight: 500;
+  line-height: 1.45;
+  white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
+  box-sizing: border-box;
+  user-select: none;
   transition:
-    border-color 0.15s,
-    background 0.15s,
-    color 0.15s;
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    opacity 0.16s ease;
 }
-.fp-btn:hover {
+
+.fp-btn:hover,
+.btn:hover,
+button.btn:hover {
+  border-color: color-mix(in srgb, var(--fp-primary) 55%, var(--fp-border));
+  background-color: var(--fp-hover);
+  color: var(--fp-title);
+  text-decoration: none;
+}
+
+.fp-btn:focus-visible,
+.btn:focus-visible,
+button.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--fp-focus-ring);
+}
+
+.fp-btn:active,
+.btn:active,
+button.btn:active {
+  filter: brightness(0.96);
+}
+
+/* 主按钮 (.fp-btn--primary / .btn.green) */
+.fp-btn--primary,
+.btn.green,
+button.btn.green {
   border-color: var(--fp-primary);
-  color: var(--fp-primary);
-}
-.fp-btn--primary {
-  border-color: var(--fp-primary);
-  background: var(--fp-primary);
+  background-color: var(--fp-primary);
   color: #fff;
 }
-.fp-btn--primary:hover {
+
+.fp-btn--primary:hover,
+.btn.green:hover,
+button.btn.green:hover {
+  border-color: var(--fp-primary-hover);
+  background-color: var(--fp-primary-hover);
   color: #fff;
-  filter: brightness(1.08);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--fp-primary) 28%, transparent);
 }
-.fp-btn--danger {
+
+/* 强调色按钮 (.fp-btn--accent / .btn.orange) */
+.fp-btn--accent,
+.btn.orange,
+button.btn.orange {
   border-color: var(--fp-accent);
-  background: var(--fp-accent);
+  background-color: var(--fp-accent);
   color: #fff;
 }
-.fp-btn--danger:hover {
+
+.fp-btn--accent:hover,
+.btn.orange:hover,
+button.btn.orange:hover {
+  border-color: var(--fp-accent-hover);
+  background-color: var(--fp-accent-hover);
   color: #fff;
-  border-color: var(--fp-accent);
-  filter: brightness(1.08);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--fp-accent) 28%, transparent);
 }
-.fp-btn:disabled {
-  opacity: 0.55;
+
+/* 危险色按钮 (.fp-btn--danger / .btn.danger) */
+.fp-btn--danger,
+.btn.danger,
+button.btn.danger {
+  border-color: var(--fp-danger);
+  background-color: var(--fp-danger);
+  color: #fff;
+}
+
+.fp-btn--danger:hover,
+.btn.danger:hover,
+button.btn.danger:hover {
+  border-color: var(--fp-danger-hover);
+  background-color: var(--fp-danger-hover);
+  color: #fff;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--fp-danger) 28%, transparent);
+}
+
+/* 幽灵/次级描边按钮 (.fp-btn--ghost / .btn.ghost) */
+.fp-btn--ghost,
+.btn.ghost,
+button.btn.ghost {
+  background-color: transparent;
+  border-color: var(--fp-border);
+  color: var(--fp-muted);
+}
+
+.fp-btn--ghost:hover,
+.btn.ghost:hover,
+button.btn.ghost:hover {
+  background-color: var(--fp-hover);
+  border-color: var(--fp-border-strong);
+  color: var(--fp-text);
+}
+
+/* 小尺寸按钮 (.fp-btn--sm / .btn.small) */
+.fp-btn--sm,
+.btn.small,
+button.btn.small {
+  padding: 3px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: 5px;
+}
+
+.fp-btn:disabled,
+.btn:disabled,
+button.btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
   filter: none;
 }
 
+/* ==========================================================================
+   表单输入与选择器 (.fp-field / .fp-input)
+   ========================================================================== */
 .fp-field {
   display: block;
   margin-bottom: 14px;
 }
+
 .fp-field > span {
   display: block;
   margin-bottom: 6px;
   font-size: 13px;
+  font-weight: 500;
   color: var(--fp-muted);
 }
-.fp-input {
+
+.fp-input,
+select.fp-input,
+textarea.fp-input {
   width: 100%;
-  padding: 7px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--fp-border);
-  border-radius: 6px;
+  border-radius: var(--fp-radius-md);
   background: var(--fp-bg);
   color: var(--fp-text);
   font-size: 13px;
+  line-height: 1.45;
   outline: none;
-  transition: border-color 0.15s;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
 }
+
+.fp-input:hover {
+  border-color: var(--fp-border-strong);
+}
+
 .fp-input:focus {
   border-color: var(--fp-primary);
+  box-shadow: var(--fp-focus-ring);
 }
+
 textarea.fp-input {
   resize: vertical;
 }
 
+/* ==========================================================================
+   现代风 Switch 滑动开关 (默认美化所有 input[type="checkbox"]) 与 单选框
+   ========================================================================== */
+input[type='checkbox'] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 36px !important;
+  height: 20px !important;
+  min-width: 36px;
+  margin: 0;
+  padding: 0 !important;
+  border: 1px solid var(--fp-border-strong) !important;
+  border-radius: 999px !important;
+  background-color: var(--fp-control-bg) !important;
+  cursor: pointer;
+  vertical-align: middle;
+  flex-shrink: 0;
+  outline: none;
+  transition:
+    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s ease;
+}
+
+input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input[type='checkbox']:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--fp-primary) 50%, var(--fp-border-strong)) !important;
+}
+
+input[type='checkbox']:checked {
+  background-color: var(--fp-primary) !important;
+  border-color: var(--fp-primary) !important;
+}
+
+input[type='checkbox']:checked::after {
+  transform: translateX(16px);
+}
+
+input[type='checkbox']:focus-visible {
+  box-shadow: var(--fp-focus-ring);
+}
+
+input[type='checkbox']:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 可选：传统勾选框变体 (.fp-checkbox) */
+input[type='checkbox'].fp-checkbox {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px;
+  border-radius: 4px !important;
+}
+
+input[type='checkbox'].fp-checkbox::after {
+  top: 2px;
+  left: 5px;
+  width: 4px;
+  height: 8px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0);
+}
+
+input[type='checkbox'].fp-checkbox:checked::after {
+  transform: rotate(45deg) scale(1);
+}
+
+/* 现代风单选框 (input[type="radio"]) */
+input[type='radio'] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  display: inline-grid;
+  place-content: center;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px;
+  margin: 0;
+  padding: 0 !important;
+  border: 1.5px solid var(--fp-border-strong) !important;
+  border-radius: 50% !important;
+  background-color: var(--fp-bg) !important;
+  cursor: pointer;
+  vertical-align: middle;
+  flex-shrink: 0;
+  outline: none;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+input[type='radio']::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--fp-primary);
+  transform: scale(0);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+input[type='radio']:hover:not(:disabled) {
+  border-color: var(--fp-primary) !important;
+}
+
+input[type='radio']:checked {
+  border-color: var(--fp-primary) !important;
+}
+
+input[type='radio']:checked::after {
+  transform: scale(1);
+}
+
+input[type='radio']:focus-visible {
+  box-shadow: var(--fp-focus-ring);
+}
+
+input[type='radio']:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   头像与徽标通用组件
+   ========================================================================== */
 .fp-avatar-frame {
   position: relative;
   display: inline-flex;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 .fp-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 3px;
+  border-radius: 4px;
   object-fit: cover;
   display: block;
 }
@@ -204,7 +487,7 @@ textarea.fp-input {
   display: inline-block;
   width: 20px;
   height: 20px;
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--fp-hover) center / cover no-repeat;
   flex-shrink: 0;
 }
@@ -241,9 +524,11 @@ textarea.fp-input {
   font-style: normal;
 }
 
-/* Rhythm 线上全局通用栅格与基础组件 */
+/* ==========================================================================
+   全局栅格与模块卡片 (.wrapper / .module / .tabs-sub)
+   ========================================================================== */
 .wrapper {
-  width: 90%;
+  width: 92%;
   max-width: var(--fp-wrap);
   min-width: 320px;
   margin: 0 auto;
@@ -251,7 +536,7 @@ textarea.fp-input {
 }
 
 .main {
-  padding: 22px 0 24px;
+  padding: 20px 0 28px;
   min-height: 320px;
 }
 
@@ -270,8 +555,8 @@ textarea.fp-input {
 }
 
 .module {
-  margin-bottom: 20px;
-  border-radius: 8px;
+  margin-bottom: 18px;
+  border-radius: var(--fp-radius-lg);
   width: 100%;
   word-wrap: break-word;
   box-sizing: border-box;
@@ -279,16 +564,18 @@ textarea.fp-input {
   background: var(--fp-card);
   box-shadow: var(--fp-card-shadow);
   border: 1px solid var(--fp-border);
-  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+  transition:
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .module-header {
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--fp-radius-lg) var(--fp-radius-lg) 0 0;
   border-bottom: 1px solid var(--fp-border);
-  padding: 10px 16px;
+  padding: 12px 16px;
   font-size: 14px;
   line-height: 20px;
-  font-weight: 500;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -297,122 +584,64 @@ textarea.fp-input {
 .module-header h2 {
   display: inline;
   font-size: 14px;
-  color: var(--fp-head);
-  font-weight: 500;
+  color: var(--fp-title);
+  font-weight: 600;
   margin: 0;
 }
 
 .module-panel {
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 var(--fp-radius-lg) var(--fp-radius-lg);
 }
 
 .tabs-sub {
   display: flex;
-  line-height: 38px;
+  line-height: 40px;
   border-bottom: 1px solid var(--fp-border);
   margin: 0;
-  padding: 0;
+  padding: 0 4px;
   background: var(--fp-card);
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--fp-radius-lg) var(--fp-radius-lg) 0 0;
 }
 
 .tabs-sub a {
-  line-height: 38px;
+  line-height: 40px;
   text-decoration: none;
   flex: 1;
   text-align: center;
   color: var(--fp-head);
-  padding: 0 8px;
+  padding: 0 10px;
   font-size: 13px;
   font-weight: 500;
   border-bottom: 2px solid transparent;
-  transition: color 0.18s ease, border-color 0.18s ease;
+  transition:
+    color 0.16s ease,
+    border-color 0.16s ease,
+    background-color 0.16s ease;
   cursor: pointer;
 }
 
 .tabs-sub a.current {
-  color: var(--fp-text);
-  border-bottom-color: var(--fp-accent);
+  color: var(--fp-title);
+  font-weight: 600;
+  border-bottom-color: var(--fp-primary);
 }
+
 .tabs-sub a:hover {
-  border-bottom-color: var(--fp-accent);
-  text-decoration: underline;
+  color: var(--fp-title);
+  border-bottom-color: color-mix(in srgb, var(--fp-primary) 65%, transparent);
+  text-decoration: none;
 }
 
 .tabs-sub a .count {
   display: inline-block;
   padding: 0 6px;
   line-height: 18px;
-  border-radius: 9px;
+  border-radius: 999px;
   background: var(--fp-hover);
-  color: var(--fp-accent);
+  color: var(--fp-primary);
   font-size: 11px;
   font-weight: 600;
   margin-left: 4px;
-}
-
-/* 按钮规范 */
-.btn,
-button.btn {
-  cursor: pointer;
-  color: var(--fp-text);
-  border-radius: 4px;
-  padding: 6px 14px;
-  background-color: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  box-sizing: border-box;
-  line-height: 19px;
-  white-space: nowrap;
-  font-weight: 500;
-  font-size: 13px;
-  transition: transform 180ms ease, box-shadow 180ms ease, background 160ms linear, color 160ms linear;
-}
-
-.btn:hover,
-button.btn:hover {
-  transform: scale(1.02);
-  color: var(--fp-link);
-  box-shadow: 0 4px 14px rgba(25, 140, 255, 0.12);
-}
-
-.btn:active,
-button.btn:active {
-  transform: scale(0.98);
-}
-
-.btn.green,
-button.btn.green {
-  color: #fff;
-  background-color: var(--fp-primary);
-  border-color: var(--fp-primary);
-}
-
-.btn.green:hover,
-button.btn.green:hover {
-  background-color: #569e3d;
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(96, 176, 68, 0.25);
-}
-
-.btn.orange,
-button.btn.orange {
-  color: #fff;
-  background-color: var(--fp-accent);
-  border-color: var(--fp-accent);
-}
-
-.btn.orange:hover,
-button.btn.orange:hover {
-  background-color: #d27e1f;
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(229, 146, 48, 0.25);
-}
-
-.btn.small,
-button.btn.small {
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 18px;
 }
 
 /* 响应式断点 */
@@ -423,11 +652,10 @@ button.btn.small {
   }
   .content {
     margin-right: 0;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
   }
   .side {
     width: 100%;
     max-width: 100%;
   }
 }
-

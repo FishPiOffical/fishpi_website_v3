@@ -11,6 +11,7 @@ import { useChatStore } from '@/stores/chat'
 import AdSlot from '@/components/ads/AdSlot.vue'
 import LogoMark from '@/components/LogoMark.vue'
 import NavIcon from '@/components/navigation/NavIcon.vue'
+import FpConfirmHost from '@/components/FpConfirmHost.vue'
 import RiskCaptchaGate from '@/components/RiskCaptchaGate.vue'
 import SystemAlertDialog from '@/components/SystemAlertDialog.vue'
 import WarnBroadcastDialog from '@/components/WarnBroadcastDialog.vue'
@@ -493,6 +494,7 @@ onUnmounted(() => {
         </div>
       </div>
     </footer>
+    <FpConfirmHost />
     <RiskCaptchaGate />
     <SystemAlertDialog />
     <WarnBroadcastDialog />
@@ -579,13 +581,19 @@ onUnmounted(() => {
 }
 .search {
   width: 210px;
-  height: 38px;
+  height: 36px;
   background: var(--fp-search-bg);
-  border: 0;
+  border: 1px solid transparent;
   color: var(--fp-nav-text);
-  border-radius: 3px;
-  padding: 5px 8px;
+  border-radius: var(--fp-radius-md, 8px);
+  padding: 5px 12px;
   flex-shrink: 0;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+}
+.search:focus {
+  border-color: var(--fp-primary);
+  box-shadow: var(--fp-focus-ring);
 }
 .user {
   display: flex;

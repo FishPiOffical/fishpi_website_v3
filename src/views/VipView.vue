@@ -9,6 +9,7 @@ import {
   type MembershipLevel,
   type MembershipStatus,
 } from '@/api/fishpi'
+import { fpConfirm } from '@/composables/useDialog'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useAuthStore } from '@/stores/auth'
@@ -144,7 +145,12 @@ async function buy(level?: MembershipLevel) {
     err.value = `积分不足（需要 ${level.price}，当前 ${points.value}）。可先去捐助兑换积分。`
     return
   }
-  if (!window.confirm(`确认花费 ${level.price} 积分开通「${level.lvName}」${level.durationType}？`)) return
+  const confirmed = await fpConfirm({
+    title: '开通 VIP 确认',
+    message: `确认花费 ${level.price} 积分开通「${level.lvName}」${level.durationType}？`,
+    confirmText: '确认开通',
+  })
+  if (!confirmed) return
   busyId.value = level.oId
   try {
     await openMembership(apiKey.value, level.oId, coupon.value.trim())

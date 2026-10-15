@@ -60,62 +60,64 @@ async function submit() {
 </script>
 
 <template>
-  <button type="button" class="ghost" @click="show">举报</button>
-  <FpDialog :open="open" title="举报" @close="close">
+  <button type="button" class="fp-btn fp-btn--ghost fp-btn--sm" @click="show">举报</button>
+  <FpDialog :open="open" title="举报内容" @close="close">
     <form id="report-form" class="report-form" @submit.prevent="submit">
       <div class="kinds">
-        <label v-for="k in kinds" :key="k.value" :class="{ on: reportType === k.value }">
-          <input v-model.number="reportType" type="radio" :value="k.value" />
-          {{ k.label }}
+        <label v-for="k in kinds" :key="k.value" class="kind-option" :class="{ on: reportType === k.value }">
+          <input v-model.number="reportType" type="radio" name="reportType" :value="k.value" />
+          <span>{{ k.label }}</span>
         </label>
       </div>
-      <textarea v-model="memo" class="fp-input" rows="3" placeholder="请说明举报理由" required />
+      <textarea v-model="memo" class="fp-input" rows="3" placeholder="请说明具体举报理由…" required />
     </form>
     <template #footer>
       <span class="tip">{{ msg }}</span>
-      <button type="button" class="fp-btn" @click="close">取消</button>
+      <button type="button" class="fp-btn fp-btn--ghost" @click="close">取消</button>
       <button type="submit" form="report-form" class="fp-btn fp-btn--primary" :disabled="sending || !memo.trim()">
-        {{ sending ? '提交中…' : '提交' }}
+        {{ sending ? '提交中…' : '提交举报' }}
       </button>
     </template>
   </FpDialog>
 </template>
 
 <style scoped>
-.ghost {
-  border: 1px solid var(--fp-border);
-  background: transparent;
-  color: var(--fp-muted);
-  border-radius: 6px;
-  padding: 2px 8px;
-  cursor: pointer;
-  font-size: 12px;
-}
 .report-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .kinds {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
-.kinds label {
-  padding: 3px 10px;
+.kind-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
   border: 1px solid var(--fp-border);
-  border-radius: 999px;
+  border-radius: var(--fp-radius-md, 8px);
+  background: var(--fp-bg);
   font-size: 12px;
+  color: var(--fp-text);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  user-select: none;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    color 0.16s ease;
 }
-.kinds label:hover,
-.kinds label.on {
+.kind-option:hover {
+  border-color: var(--fp-border-strong, var(--fp-border));
+  background: var(--fp-hover);
+}
+.kind-option.on {
   border-color: var(--fp-primary);
-  color: var(--fp-primary);
-}
-.kinds input {
-  display: none;
+  background: var(--fp-primary-soft, rgba(105, 170, 105, 0.14));
+  color: var(--fp-title);
+  font-weight: 500;
 }
 .tip {
   flex: 1;

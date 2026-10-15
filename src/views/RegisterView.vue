@@ -118,11 +118,12 @@ async function complete() {
   margin: 40px auto;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 12px;
+  box-shadow: var(--fp-card-shadow);
+  border-radius: var(--fp-radius-lg, 10px);
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .hint,
 label {
@@ -134,13 +135,24 @@ label {
   flex-direction: column;
   gap: 6px;
 }
-input,
+input:not([type='checkbox']):not([type='radio']),
 select {
   background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-text);
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: var(--fp-radius-md, 8px);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+input:not([type='checkbox']):not([type='radio']):hover,
+select:hover {
+  border-color: var(--fp-border-strong, var(--fp-border));
+}
+input:not([type='checkbox']):not([type='radio']):focus,
+select:focus {
+  border-color: var(--fp-primary);
+  box-shadow: var(--fp-focus-ring);
 }
 .captcha {
   display: flex;
@@ -148,20 +160,31 @@ select {
   align-items: center;
 }
 .captcha img {
-  height: 40px;
-  border-radius: 6px;
+  height: 38px;
+  border-radius: var(--fp-radius-sm, 6px);
   cursor: pointer;
 }
 button {
-  border: 0;
+  border: 1px solid var(--fp-primary);
   background: var(--fp-primary);
   color: #fff;
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: var(--fp-radius-sm, 6px);
+  padding: 9px 16px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+}
+button:hover:not(:disabled) {
+  background: var(--fp-primary-hover, var(--fp-primary));
+  border-color: var(--fp-primary-hover, var(--fp-primary));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--fp-primary) 28%, transparent);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .err {
-  color: #e07a5f;
+  color: var(--fp-danger, #e07a5f);
   margin: 0;
 }
 a {

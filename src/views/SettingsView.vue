@@ -45,6 +45,7 @@ import {
   type ProfessionProgress,
   type UserBag,
 } from '@/api/fishpi'
+import { fpConfirm, fpPrompt } from '@/composables/useDialog'
 import { useGeetest4 } from '@/composables/useGeetest4'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
@@ -422,26 +423,44 @@ async function runBag(action: () => Promise<string>) {
   }
 }
 
-function use1day() {
-  if (!confirm('使用单日免签卡后，明天签到将由系统自动完成。确定？')) return
+async function use1day() {
+  const ok = await fpConfirm({
+    title: '使用单日免签卡',
+    message: '使用单日免签卡后，明天签到将由系统自动完成。确定使用？',
+  })
+  if (!ok) return
   void runBag(() => useBag1dayCheckin(apiKey.value!))
 }
 
-function use2day() {
-  if (!confirm('使用两天免签卡后，明后两天签到将由系统自动完成。确定？')) return
+async function use2day() {
+  const ok = await fpConfirm({
+    title: '使用两天免签卡',
+    message: '使用两天免签卡后，明后两天签到将由系统自动完成。确定使用？',
+  })
+  if (!ok) return
   void runBag(() => useBag2dayCheckin(apiKey.value!))
 }
 
-function usePatch() {
+async function usePatch() {
   const tip = bag.value.patchStart
-    ? `补签后签到记录将提前至 ${bag.value.patchStart}。确定？`
-    : '补签卡仅适用于断签一天的情况。确定？'
-  if (!confirm(tip)) return
+    ? `补签后签到记录将提前至 ${bag.value.patchStart}。确定使用？`
+    : '补签卡仅适用于断签一天的情况。确定使用？'
+  const ok = await fpConfirm({
+    title: '使用补签卡',
+    message: tip,
+  })
+  if (!ok) return
   void runBag(() => useBagPatchCheckin(apiKey.value!))
 }
 
-function useRename() {
-  const name = prompt('请输入要修改的用户名', account.value?.userName || '')
+async function useRename() {
+  const name = await fpPrompt({
+    title: '使用改名卡',
+    message: '请输入要修改的新用户名：',
+    defaultValue: account.value?.userName || '',
+    placeholder: '请输入新用户名',
+    confirmText: '确认修改',
+  })
   if (!name) return
   void runBag(() => useBagNameCard(apiKey.value!, name.trim()))
 }
@@ -529,7 +548,13 @@ async function bindMfa() {
 
 async function unbindMfa() {
   if (!apiKey.value) return
-  if (!confirm('确定解绑两步验证？')) return
+  const ok = await fpConfirm({
+    title: '解绑两步验证',
+    message: '确定解绑两步验证？解绑后账户将仅受密码保护。',
+    confirmText: '确认解绑',
+    tone: 'danger',
+  })
+  if (!ok) return
   mfaBusy.value = true
   mfaMsg.value = ''
   try {
@@ -1512,8 +1537,9 @@ async function saveI18n() {
   display: flex;
   flex-direction: column;
   background: var(--fp-card);
+  border: 1px solid var(--fp-border);
   box-shadow: var(--fp-card-shadow);
-  border-radius: 8px;
+  border-radius: var(--fp-radius-lg, 10px);
   overflow: hidden;
 }
 .set-menu a {
@@ -1522,6 +1548,7 @@ async function saveI18n() {
   text-decoration: none;
   font-size: 14px;
   border-left: 3px solid transparent;
+  transition: background-color 0.16s ease, color 0.16s ease;
 }
 .set-menu a:hover {
   background: var(--fp-hover);
@@ -1540,9 +1567,10 @@ async function saveI18n() {
 }
 .card {
   background: var(--fp-card);
+  border: 1px solid var(--fp-border);
   box-shadow: var(--fp-card-shadow);
-  border-radius: 8px;
-  padding: 18px 20px;
+  border-radius: var(--fp-radius-lg, 10px);
+  padding: 20px 22px;
 }
 .mod-head {
   display: flex;
@@ -1557,12 +1585,12 @@ async function saveI18n() {
 h1 {
   margin: 0 0 12px;
   font-size: 18px;
-  color: var(--fp-head);
+  color: var(--fp-title);
 }
 h2 {
   margin: 18px 0 8px;
   font-size: 15px;
-  color: var(--fp-head);
+  color: var(--fp-title);
 }
 .hint {
   color: var(--fp-muted);
@@ -1572,7 +1600,7 @@ h2 {
 .card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 label {
   display: flex;
@@ -1581,14 +1609,27 @@ label {
   color: var(--fp-muted);
   font-size: 13px;
 }
-input,
+input:not([type='checkbox']):not([type='radio']):not([type='file']),
 textarea,
 select {
   background: var(--fp-bg);
   border: 1px solid var(--fp-border);
   color: var(--fp-text);
-  border-radius: 6px;
-  padding: 8px 10px;
+  border-radius: var(--fp-radius-md, 8px);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+input:not([type='checkbox']):not([type='radio']):not([type='file']):hover,
+textarea:hover,
+select:hover {
+  border-color: var(--fp-border-strong, var(--fp-border));
+}
+input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+textarea:focus,
+select:focus {
+  border-color: var(--fp-primary);
+  box-shadow: var(--fp-focus-ring);
 }
 input[readonly] {
   opacity: 0.75;
@@ -1596,15 +1637,23 @@ input[readonly] {
 .checks {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
 }
 .check {
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-radius-md, 8px);
+  background: var(--fp-bg);
+  color: var(--fp-text);
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
 }
-.check input {
-  width: auto;
+.check:hover {
+  border-color: var(--fp-border-strong, var(--fp-border));
+  background: var(--fp-hover);
 }
 .avatar-row {
   display: flex;
@@ -1619,10 +1668,16 @@ input[readonly] {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--fp-border);
-  border-radius: 6px;
-  padding: 6px 12px;
+  border-radius: var(--fp-radius-sm, 6px);
+  padding: 6px 14px;
   cursor: pointer;
   font-size: 13px;
+  color: var(--fp-text);
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+.file:hover {
+  border-color: var(--fp-primary);
+  background: var(--fp-hover);
 }
 .file input {
   position: absolute;
@@ -1632,24 +1687,51 @@ input[readonly] {
 }
 .primary {
   align-self: flex-end;
-  border: 0;
+  border: 1px solid var(--fp-primary);
   background: var(--fp-primary);
   color: #fff;
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: var(--fp-radius-sm, 6px);
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+}
+.primary:hover:not(:disabled) {
+  background: var(--fp-primary-hover, var(--fp-primary));
+  border-color: var(--fp-primary-hover, var(--fp-primary));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--fp-primary) 28%, transparent);
+}
+.primary:disabled,
+.ghost-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .primary.danger {
-  background: #c45c4a;
+  background: var(--fp-danger, #d9534f);
+  border-color: var(--fp-danger, #d9534f);
+}
+.primary.danger:hover:not(:disabled) {
+  background: var(--fp-danger-hover, #c6433f);
+  border-color: var(--fp-danger-hover, #c6433f);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--fp-danger) 28%, transparent);
 }
 .ghost-btn {
   align-self: flex-end;
   border: 1px solid var(--fp-border);
   background: transparent;
-  color: var(--fp-muted);
-  border-radius: 6px;
-  padding: 8px 16px;
+  color: var(--fp-text);
+  border-radius: var(--fp-radius-sm, 6px);
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.ghost-btn:hover:not(:disabled) {
+  background: var(--fp-hover);
+  border-color: var(--fp-border-strong, var(--fp-border));
+  color: var(--fp-title);
 }
 .captcha {
   min-height: 44px;

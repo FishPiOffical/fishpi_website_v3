@@ -7,6 +7,7 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeTagsPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import SideBar from '@/components/SideBar.vue'
 import { createSwrLoader } from '@/utils/swr'
 
 usePageSeo(() => ({ title: '标签', path: '/tags', description: '摸鱼派标签墙' }))
@@ -47,83 +48,130 @@ function tagPath(tag: TagItem) {
 </script>
 
 <template>
-  <section class="board">
-    <header>
-      <h1>标签</h1>
-      <span v-if="total" class="hint">共 {{ total }} 个</span>
-    </header>
-    <FpLoading v-if="loading" />
-    <p v-else-if="error" class="err">{{ error }}</p>
-    <ul v-else>
-      <li v-for="tag in tags" :key="tag.tagURI || tag.tagTitle">
-        <RouterLink :to="tagPath(tag)">
-          <img v-if="tag.tagIconPath" :src="tag.tagIconPath" alt="" />
-          <strong>{{ tag.tagTitle }}</strong>
-          <em>{{ tag.tagReferenceCount ?? 0 }}</em>
-        </RouterLink>
-      </li>
-    </ul>
-    <footer class="pager">
-      <button type="button" :disabled="page <= 1 || loading" @click="page -= 1">上一页</button>
-      <span>{{ page }}</span>
-      <button type="button" :disabled="tags.length < 50 || loading" @click="page += 1">下一页</button>
-    </footer>
-  </section>
+  <div class="wrapper list-page-wrap">
+    <div class="content">
+      <div class="module">
+        <div class="module-header list-page-head">
+          <div class="head-left">
+            <h2>标签墙</h2>
+            <span v-if="total" class="sub-tag">共 {{ total }} 个标签</span>
+          </div>
+          <div class="head-right">
+            <span class="total-count">第 {{ page }} 页</span>
+          </div>
+        </div>
+
+        <FpLoading v-if="loading" :rows="6" />
+        <p v-else-if="error" class="err">{{ error }}</p>
+        <ul v-else class="tag-grid">
+          <li v-for="tag in tags" :key="tag.tagURI || tag.tagTitle">
+            <RouterLink :to="tagPath(tag)" class="tag-card">
+              <img v-if="tag.tagIconPath" :src="tag.tagIconPath" alt="" />
+              <strong>{{ tag.tagTitle }}</strong>
+              <em>{{ tag.tagReferenceCount ?? 0 }}</em>
+            </RouterLink>
+          </li>
+        </ul>
+
+        <div class="pagination-bar">
+          <button type="button" class="btn page-btn" :disabled="page <= 1 || loading" @click="page -= 1">
+            ‹ 上一页
+          </button>
+          <span class="current-page-num">{{ page }}</span>
+          <button type="button" class="btn page-btn" :disabled="tags.length < 50 || loading" @click="page += 1">
+            下一页 ›
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <SideBar />
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.board {
-  background: var(--fp-card);
-  box-shadow: var(--fp-card-shadow);
-  border-radius: 10px;
-  padding: 15px;
+.list-page-wrap {
+  padding-top: 4px;
 }
-header {
+
+.list-page-head {
+  padding: 12px 18px;
+}
+
+.head-left {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 10px;
 }
-h1 {
-  margin: 0;
+
+.head-left h2 {
   font-size: 16px;
-  color: var(--fp-head);
+  font-weight: 600;
+  color: var(--fp-title);
 }
-.hint {
+
+.sub-tag {
+  font-size: 12px;
   color: var(--fp-muted);
-  font-size: 13px;
 }
+
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.total-count {
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+
 .err {
-  color: #e07a5f;
+  padding: 36px 18px;
+  margin: 0;
+  text-align: center;
+  color: var(--fp-danger, #e07a5f);
+  font-size: 14px;
 }
-ul {
+
+.tag-grid {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 16px 18px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
 }
-a {
+
+.tag-card {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 9px 12px;
   color: var(--fp-title);
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: var(--fp-radius-md, 8px);
+  border: 1px solid var(--fp-border);
+  background: var(--fp-bg);
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.tag-card:hover {
+  border-color: var(--fp-border-strong, var(--fp-border));
   background: var(--fp-hover);
+  text-decoration: none;
 }
-a:hover {
-  text-decoration: underline;
-}
-img {
+
+.tag-card img {
   width: 18px;
   height: 18px;
-  border-radius: 3px;
+  border-radius: 4px;
   object-fit: cover;
 }
-strong {
+
+.tag-card strong {
   flex: 1;
   font-size: 13px;
   font-weight: 500;
@@ -131,27 +179,31 @@ strong {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-em {
+
+.tag-card em {
   font-style: normal;
   color: var(--fp-muted);
   font-size: 12px;
 }
-.pager {
+
+.pagination-bar {
   display: flex;
-  gap: 12px;
   align-items: center;
-  margin-top: 16px;
+  justify-content: center;
+  gap: 16px;
+  padding: 18px 0;
+  border-top: 1px solid var(--fp-border);
 }
-.pager button {
-  border: 1px solid var(--fp-border);
-  background: transparent;
-  color: var(--fp-text);
-  border-radius: 6px;
-  padding: 4px 12px;
-  cursor: pointer;
+
+.page-btn {
+  min-width: 80px;
 }
-.pager button:disabled {
-  opacity: 0.45;
-  cursor: default;
+
+.current-page-num {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fp-title);
+  min-width: 24px;
+  text-align: center;
 }
 </style>

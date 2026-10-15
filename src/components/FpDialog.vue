@@ -71,7 +71,7 @@ onBeforeUnmount(() => {
             <strong :id="titleId" class="fp-dialog-title">
               <slot name="title">{{ title }}</slot>
             </strong>
-            <button v-if="closable" type="button" class="fp-dialog-x" aria-label="关闭" @click="close">×</button>
+            <button v-if="closable" type="button" class="fp-dialog-x" aria-label="关闭" @click="close">✕</button>
           </header>
           <div class="fp-dialog-body">
             <slot />
@@ -94,7 +94,9 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--fp-mask-bg, rgba(0, 0, 0, 0.55));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 .fp-dialog-mask.layer-top {
   z-index: 1400;
@@ -104,21 +106,21 @@ onBeforeUnmount(() => {
   flex-direction: column;
   width: 100%;
   max-height: calc(100vh - 40px);
-  background: var(--fp-card);
+  background: color-mix(in srgb, var(--fp-card) 96%, transparent);
   color: var(--fp-text);
-  border: 1px solid var(--fp-border);
-  border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--fp-border-strong, var(--fp-border));
+  border-radius: var(--fp-radius-xl, 14px);
+  box-shadow: var(--fp-dialog-shadow, 0 18px 48px rgba(0, 0, 0, 0.42));
   overflow: hidden;
 }
 .fp-dialog.tone-danger {
-  border-top: 3px solid var(--fp-accent);
+  border-top: 3px solid var(--fp-danger, var(--fp-accent));
 }
 .fp-dialog-head {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 18px 12px;
+  padding: 15px 20px 13px;
   border-bottom: 1px solid var(--fp-border);
 }
 .fp-dialog-title {
@@ -130,26 +132,30 @@ onBeforeUnmount(() => {
 }
 .fp-dialog-x {
   flex: none;
-  width: 26px;
-  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--fp-radius-sm, 6px);
   background: transparent;
   color: var(--fp-muted);
-  font-size: 20px;
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
 }
 .fp-dialog-x:hover {
   background: var(--fp-hover);
-  color: var(--fp-accent);
+  color: var(--fp-title);
 }
 .fp-dialog-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 16px 18px;
+  padding: 18px 20px;
   font-size: 14px;
   line-height: 1.6;
 }
@@ -159,16 +165,16 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  padding: 0 18px 16px;
+  padding: 0 20px 18px;
 }
 
 .fp-dialog-enter-active,
 .fp-dialog-leave-active {
-  transition: opacity 0.15s ease;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .fp-dialog-enter-active .fp-dialog,
 .fp-dialog-leave-active .fp-dialog {
-  transition: transform 0.15s ease;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .fp-dialog-enter-from,
 .fp-dialog-leave-to {
@@ -176,6 +182,6 @@ onBeforeUnmount(() => {
 }
 .fp-dialog-enter-from .fp-dialog,
 .fp-dialog-leave-to .fp-dialog {
-  transform: translateY(8px) scale(0.98);
+  transform: translateY(10px) scale(0.97);
 }
 </style>
