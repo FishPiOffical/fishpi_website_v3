@@ -45,3 +45,17 @@ export async function moveV3Medal(medal: string, direction: 'up' | 'down', key: 
   if (id(result.id) !== medal || result.direction !== direction || order < 0) throw invalid()
   return { id: medal, direction, order }
 }
+
+export type PublicMedal = Omit<OwnerMedal, 'displayed'>
+export async function fetchV3PublicMedals(userName: string, p = 1): Promise<{ list: PublicMedal[]; p: number; size: number; total: number; pageCount: number }> {
+  if (!userName || userName.length > 64 || /[^A-Za-z0-9_-]/.test(userName) || !Number.isSafeInteger(p) || p < 1 || p > 42949672) throw new ApiError('用户或页码不合法', 422)
+  const result = await data(`/api/v3/users/${encodeURIComponent(userName)}/medals?p=${p}&size=20`, { cache: 'no-store' }), page = object(result.pagination)
+  const pagination = { p: integer(page.p), size: integer(page.size), total: integer(page.total), pageCount: integer(page.pageCount) }
+  if (pagination.p !== p || pagination.size !== 20 || pagination.total < 0 || pagination.pageCount !== Math.ceil(pagination.total / 20) || !Array.isArray(result.list) || result.list.length > 20) throw invalid()
+  const list = result.list.map(value => {
+    const row = object(value), expiresAt = integer(row.expiresAt)
+    if (expiresAt < 0 || expiresAt > 8640000000000000) throw invalid()
+    return { id: id(row.id), name: string(row.name, 128), type: string(row.type, 128), description: string(row.description, 1024), order: integer(row.order), expiresAt }
+  })
+  return { ...pagination, list }
+}
