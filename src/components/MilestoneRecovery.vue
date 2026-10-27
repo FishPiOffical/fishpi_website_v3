@@ -1,0 +1,16 @@
+<script setup lang="ts">
+import {onBeforeUnmount,watch} from 'vue'
+import {getAuthContextVersion} from '@/api/http'
+import {useAuthStore} from '@/stores/auth'
+import {useV3MilestonesStore} from '@/stores/v3Milestones'
+import {RouterLink} from 'vue-router'
+import {fpConfirm} from '@/composables/useDialog'
+const auth=useAuthStore(),store=useV3MilestonesStore()
+let abort:AbortController|null=null
+const identity=()=>JSON.stringify([getAuthContextVersion(),!!auth.accessToken,auth.account?.oId||''])
+function cancel(){abort?.abort();abort=null}
+async function retry(){if(store.busy||!store.pending)return;cancel();const original=store.pending,reader=identity(),controller=new AbortController();abort=controller;let yes=true;if(store.needsConfirmation)yes=await fpConfirm({title:'再次确认原大事记操作',message:'平台要求再次确认。将以原投稿内容及请求键恢复本次大事记操作，是否继续？',confirmText:'确认原大事记操作',signal:controller.signal});if(yes&&!controller.signal.aborted&&reader===identity()&&store.pending===original)await store.retry(true);if(abort===controller)abort=null}
+watch(identity,cancel,{flush:'sync'});onBeforeUnmount(cancel)
+</script>
+<template><div v-if="auth.accessToken&&(store.pending||store.receipt||store.error)" class="milestone-recovery"><p v-if="store.error" role="alert">{{ store.error }}</p><div v-if="store.pending" role="status"><p>本次大事记投稿结果尚未确认，原操作可恢复；刷新或退出会丢失本地恢复信息。</p><button type="button" :disabled="store.busy" @click="retry">{{ store.needsConfirmation?'再次确认原大事记操作':'恢复本次大事记操作' }}</button><button v-if="store.needsConfirmation" type="button" :disabled="store.busy" @click="store.cancelConfirmation">取消待确认操作</button></div><p v-if="store.receipt" role="status">大事记投稿 {{ store.receipt.id }} 已确认。提交时为待审，当前审核状态请查看本人投稿；此回执不代表审核通过。<RouterLink :to="'/milestones?submission='+store.receipt.id">查看当前投稿状态</RouterLink></p><button v-if="!store.pending&&!store.busy" type="button" @click="store.dismiss">关闭大事记提示</button></div></template>
+<style scoped lang="scss">.milestone-recovery{box-sizing:border-box;max-width:1100px;width:calc(100% - 24px);margin:8px auto;overflow-wrap:anywhere;font-size:13px}p{margin:6px 0}[role=alert]{color:#bd503c}button{font:inherit;margin:3px;padding:5px 8px;border:1px solid var(--fp-border);border-radius:5px;background:var(--fp-card);color:var(--fp-text)}</style>

@@ -368,6 +368,11 @@ const routes = [
     meta: { robots: 'noindex' },
   },
   {
+    path: '/milestones',
+    name: 'milestones',
+    component: () => import('@/views/MilestonesView.vue'),
+  },
+  {
     path: '/games',
     name: 'games',
     component: () => import('@/views/GamesView.vue'),

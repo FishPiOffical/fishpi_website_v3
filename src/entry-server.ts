@@ -16,6 +16,7 @@ import {
 } from './api/fishpi'
 import { SSR_PAYLOAD_KEY, type SsrPayload } from './seo/payload'
 import { fetchV3Breezemoons } from './api/v3-breezemoons'
+import { listMilestones } from './api/v3-milestones'
 import { shouldPrefetchSsr } from './seo/ssrRoutes'
 
 async function prefetch(url: string): Promise<SsrPayload> {
@@ -23,6 +24,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
   if (!shouldPrefetchSsr(path)) return {}
 
   try {
+    if (path === '/milestones') return { milestonePage: await listMilestones() }
     const articleMatch = path.match(/^\/article\/([^/]+)$/)
     if (articleMatch) {
       const article = await fetchArticle(articleMatch[1])

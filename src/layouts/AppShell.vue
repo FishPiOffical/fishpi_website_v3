@@ -20,6 +20,7 @@ import CountToast from '@/components/count/CountToast.vue'
 import ChatRedPacketDialog from '@/components/chat/ChatRedPacketDialog.vue'
 import ChatRedPacketRecovery from '@/components/chat/ChatRedPacketRecovery.vue'
 import ReportRecovery from '@/components/ReportRecovery.vue'
+import MilestoneRecovery from '@/components/MilestoneRecovery.vue'
 import FishGameRecovery from '@/components/FishGameRecovery.vue'
 import RepeaterRecovery from '@/components/RepeaterRecovery.vue'
 import ChatBarrageOverlay from '@/components/chat/ChatBarrageOverlay.vue'
@@ -105,7 +106,7 @@ const ecosystemLinks = [
 const exploreLinks = [
   { href: 'https://github.com/orgs/FishPiOffical/repositories', label: '摸鱼派开源项目组', external: true },
   { href: 'https://github.com/FishPiOffical/rhythm', label: 'Rhythm社区引擎', external: true },
-  { href: '/milestones', label: '大事记', external: false, rhythm: true },
+  { href: '/milestones', label: '大事记', external: false },
   { href: '/domains', label: '领域', external: false },
   { href: '/tags', label: '标签', external: false },
   { href: 'https://cloudy.iwpz.cn', label: 'Cloudy 词云', external: true },
@@ -396,6 +397,7 @@ onUnmounted(() => {
     <ReportRecovery />
     <RepeaterRecovery />
     <FishGameRecovery />
+    <MilestoneRecovery />
     <SettingsDrawer />
     <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />
