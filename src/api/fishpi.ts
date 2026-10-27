@@ -1423,13 +1423,6 @@ export async function fetchChatNode(apiKey: string) {
   return bundle.data
 }
 
-export async function fetchAppLoginQr(apiKey: string): Promise<string> {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown> & { apiKey?: string }>('/getApiKeyInWeb')
-  if (res.code || !res.apiKey) throw new Error(res.msg || '获取 APP 登录码失败')
-  return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`login:${res.apiKey}`)}`
-}
 
 export interface MyMedal {
   medalId: string

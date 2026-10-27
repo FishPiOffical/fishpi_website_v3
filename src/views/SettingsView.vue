@@ -6,11 +6,8 @@ import AppearancePicker from '@/components/packs/AppearancePicker.vue'
 import EmojiPacks from '@/components/EmojiPacks.vue'
 import OwnerProfileSettings from '@/components/settings/OwnerProfileSettings.vue'
 import OwnerPreferences from '@/components/settings/OwnerPreferences.vue'
-import {
-  fetchAppLoginQr,
-} from '@/api/fishpi'
+import OwnerAppLogin from '@/components/settings/OwnerAppLogin.vue'
 import { useAuthStore } from '@/stores/auth'
-import FpLoading from '@/components/FpLoading.vue'
 import OwnerMedals from '@/components/settings/OwnerMedals.vue'
 import OwnerProfessions from '@/components/settings/OwnerProfessions.vue'
 import PointTransfer from '@/components/settings/PointTransfer.vue'
@@ -22,7 +19,7 @@ import OwnerInvitations from '@/components/settings/OwnerInvitations.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
-const { apiKey, account, isLoggedIn: authenticated } = storeToRefs(auth)
+const { account, isLoggedIn: authenticated } = storeToRefs(auth)
 const mounted = ref(false)
 const isLoggedIn = computed(() => mounted.value && authenticated.value)
 const settingsMenuOpen = ref(false)
@@ -60,10 +57,6 @@ watch(
 )
 
 
-const appQr = ref('')
-const appQrLoading = ref(false)
-const appQrErr = ref('')
-
 function scrollToHashTarget() {
   const id = route.hash.replace(/^#/, '')
   if (!id || typeof document === 'undefined') return
@@ -73,7 +66,7 @@ function scrollToHashTarget() {
 }
 
 watch(tab, (t) => {
-  if (t === 'account' && apiKey.value) void loadAccountExtras().then(scrollToHashTarget)
+  if (t === 'account') scrollToHashTarget()
 })
 
 watch(
@@ -83,35 +76,7 @@ watch(
   },
 )
 
-onMounted(async () => {
-  mounted.value = true
-  if (apiKey.value && !account.value) await auth.restore()
-  const name = account.value?.userName
-  if (apiKey.value && name) {
-    if (tab.value === 'account') {
-      await loadAccountExtras()
-      scrollToHashTarget()
-    }
-  }
-})
-
-async function loadAccountExtras() {
-  await Promise.all([loadAppQr()])
-}
-
-async function loadAppQr() {
-  if (!apiKey.value) return
-  appQrLoading.value = true
-  appQrErr.value = ''
-  try {
-    appQr.value = await fetchAppLoginQr(apiKey.value)
-  } catch (e) {
-    appQrErr.value = e instanceof Error ? e.message : 'APP 扫码加载失败'
-    appQr.value = ''
-  } finally {
-    appQrLoading.value = false
-  }
-}
+onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHashTarget() })
 
 </script>
 
@@ -159,12 +124,7 @@ async function loadAppQr() {
 
           <OwnerSecurity />
 
-          <h2>官方 APP 扫码登录</h2>
-          <p class="hint">请使用摸鱼派官方 APP 扫码登录。勿将本二维码分享给他人。</p>
-          <FpLoading v-if="appQrLoading" />
-          <p v-else-if="appQrErr" class="err">{{ appQrErr }}</p>
-          <img v-else-if="appQr" class="mfa-qr" :src="appQr" width="150" height="150" alt="APP 登录二维码" />
-          <button type="button" class="ghost-btn" :disabled="appQrLoading" @click="loadAppQr">刷新二维码</button>
+          <OwnerAppLogin />
 
         </template>
       </section>
