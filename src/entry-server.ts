@@ -1,3 +1,4 @@
+import { fetchPublicUser } from './api/v3-public-user'
 import { fetchRanking, rankingTitles, type RankingType } from './api/v3-rankings'
 import { fetchStatistics } from './api/v3-statistics'
 import { renderToString } from 'vue/server-renderer'
@@ -11,7 +12,6 @@ import {
   fetchRecentRegister,
   fetchRepeaterItems,
   fetchTags,
-  fetchUserProfile,
   type ArticleFeedKind,
 } from './api/fishpi'
 import { SSR_PAYLOAD_KEY, type SsrPayload } from './seo/payload'
@@ -34,7 +34,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
 
     const memberMatch = path.match(/^\/member\/([^/]+)$/)
     if (memberMatch) {
-      const member = await fetchUserProfile(decodeURIComponent(memberMatch[1]))
+      const member = await fetchPublicUser(decodeURIComponent(memberMatch[1]))
       return { member }
     }
 

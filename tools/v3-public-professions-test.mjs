@@ -52,5 +52,5 @@ let releaseReader;__publicAPI.fetchV3PublicProfessions=async()=>auth.accessToken
 console.log('PASS public professions 6 actual target/credential changes replace reader-bound output and reject delayed old target/private summaries')
 __publicAPI.fetchV3PublicProfessions=async()=>{throw new ApiError('concealed',404)};view=mount();await tick();assert.match(view.text(),/当前没有可展示的职业资料/);assert.ok(!view.text().includes('concealed'));view.app.unmount()
 __publicAPI.fetchV3PublicProfessions=async()=>{throw new ApiError('temporary unavailable',503)};view=mount();await tick();assert.match(view.text(),/temporary unavailable/);assert.ok(!view.text().includes('当前没有可展示的职业资料'));view.app.unmount()
-const member=await fs.readFile('src/views/MemberView.vue','utf8');assert.ok(!member.includes('fetchPublicProfession')&&!member.includes('profession?.primaryProfession'));assert.match(member,/<PublicProfessions v-else-if="activeTab === 'profession'"/)
+const member=await fs.readFile('src/views/MemberView.vue','utf8');assert.ok(!member.includes('fetchPublicProfession')&&!member.includes('profession?.primaryProfession'));assert.match(member,/<PublicProfessions v-if="activeTab === 'profession'"/)
 console.log('PASS public professions 7 concealed 404 and real failures remain distinct; member tab is no longer gated by visible primary profession or old profession API')

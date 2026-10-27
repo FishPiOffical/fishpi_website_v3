@@ -1,3 +1,4 @@
+import { decodePublicUser, type PublicUser } from '@/api/v3-public-user'
 import type { RankingPage } from '@/api/v3-rankings'
 import type { CommunityStatistics } from '@/api/v3-statistics'
 import { getCurrentInstance, inject, type InjectionKey } from 'vue'
@@ -11,7 +12,6 @@ import type {
   LiteUser,
   RepeaterItem,
   TagItem,
-  UserProfile,
 } from '@/api/fishpi'
 
 export interface SsrPayload {
@@ -20,7 +20,7 @@ export interface SsrPayload {
   breezemoonPage?: BreezemoonPage | null
   homeBreezemoonPage?: BreezemoonPage | null
   article?: ArticleDetail | null
-  member?: UserProfile | null
+  member?: PublicUser | null
   feed?: ArticleSummary[]
   feedKind?: string
   hotFeed?: ArticleSummary[]
@@ -85,12 +85,12 @@ export function consumeArticlePayload(id: string): ArticleDetail | null {
   return null
 }
 
-export function consumeMemberPayload(userName: string): UserProfile | null {
+export function consumeMemberPayload(userName: string): PublicUser | null {
   const payload = getSsrPayload()
   if (payload.member && payload.member.userName === userName) {
     const member = payload.member
     payload.member = undefined
-    return member
+    try { return decodePublicUser(member, userName) } catch { return null }
   }
   return null
 }

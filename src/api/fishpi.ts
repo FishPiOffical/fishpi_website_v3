@@ -920,43 +920,6 @@ export async function setProfessionPrivacy(apiKey: string, preset: string) {
   return res.data ?? null
 }
 
-export async function fetchUserBreezemoons(userName: string, apiKey?: string | null, page = 1, size = 20) {
-  try {
-    const res = await request<Envelope<{ breezemoons?: Breezemoon[] }>>(
-      withKey(`/api/user/${encodeURIComponent(userName)}/breezemoons?p=${page}&size=${size}`, apiKey),
-    )
-    if (res.code === 0 && Array.isArray(res.data?.breezemoons)) return res.data.breezemoons
-  } catch {
-    /* login required */
-  }
-  return []
-}
-
-export async function fetchUserMedals(apiKey: string, userName: string) {
-  try {
-    const res = await request<Envelope<unknown>>('/api/medal/user/list', {
-      method: 'POST',
-      body: JSON.stringify({ apiKey, userName }),
-    })
-    if (res.code) return []
-    const raw = res.data
-    const list = Array.isArray(raw)
-      ? raw
-      : raw && typeof raw === 'object' && Array.isArray((raw as { list?: unknown[] }).list)
-        ? (raw as { list: unknown[] }).list
-        : []
-    return normalizeMetals(
-      list.map((item) =>
-        item && typeof item === 'object' && !(item as { name?: unknown }).name
-          ? { ...(item as object), name: (item as { metal?: unknown }).metal }
-          : item,
-      ),
-    )
-  } catch {
-    return []
-  }
-}
-
 export interface UserNameHit {
   userName: string
   avatar?: string
@@ -1027,29 +990,6 @@ export async function finishRegister(payload: {
     }),
   })
   if (res.code) throw new Error(res.msg || '注册失败')
-}
-
-export async function fetchUserProfile(userName: string, apiKey?: string | null): Promise<UserProfile> {
-  const paths = [`/user/${encodeURIComponent(userName)}`, `/api/user/${encodeURIComponent(userName)}`]
-  let lastError: unknown
-  for (const path of paths) {
-    try {
-      const res = await request<UserProfile & Envelope<UserProfile> & { sysMetal?: unknown }>(withKey(path, apiKey))
-      const profile = res.userName ? res : res.code === 0 && res.data?.userName ? res.data : null
-      if (!profile) throw new Error('用户资料响应无效')
-      profile.sysMetal = normalizeMetals((profile as { sysMetal?: unknown }).sysMetal)
-      return profile
-    } catch (error) {
-      lastError = error
-    }
-  }
-  // 资料会被设置页回填后提交，失败时不能用假资料顶替；对外消息不含请求地址或 API Key。
-  throw new Error('用户资料加载失败', { cause: lastError })
-}
-
-export async function fetchUserArticles(userName: string, apiKey?: string | null, page = 1, size = 40) {
-  // 需登录；失败或空列表不返回 mock，避免访客看到假帖。
-  return unwrapArticles(`/api/user/${encodeURIComponent(userName)}/articles?p=${page}&size=${size}`, apiKey)
 }
 
 
