@@ -1382,26 +1382,6 @@ export async function openMembership(apiKey: string, levelOId: string, couponCod
   return res.data
 }
 
-export async function submitFishGame(
-  apiKey: string,
-  payload: {
-    fishGameName: string
-    fishGameDescription?: string
-    fishGameUrl: string
-    fishGameIconUrl?: string
-  },
-) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/api/fish-games', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ ...payload, apiKey }),
-  })
-  if (res.code) throw new Error(res.msg || '投稿失败')
-  return res.data
-}
-
 export interface ChatNodeOption {
   node: string
   name: string

@@ -20,6 +20,7 @@ import CountToast from '@/components/count/CountToast.vue'
 import ChatRedPacketDialog from '@/components/chat/ChatRedPacketDialog.vue'
 import ChatRedPacketRecovery from '@/components/chat/ChatRedPacketRecovery.vue'
 import ReportRecovery from '@/components/ReportRecovery.vue'
+import FishGameRecovery from '@/components/FishGameRecovery.vue'
 import RepeaterRecovery from '@/components/RepeaterRecovery.vue'
 import ChatBarrageOverlay from '@/components/chat/ChatBarrageOverlay.vue'
 import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
@@ -394,6 +395,7 @@ onUnmounted(() => {
     <ChatRedPacketRecovery />
     <ReportRecovery />
     <RepeaterRecovery />
+    <FishGameRecovery />
     <SettingsDrawer />
     <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />
