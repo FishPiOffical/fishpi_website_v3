@@ -1,3 +1,4 @@
+import type { CommunityStatistics } from '@/api/v3-statistics'
 import { getCurrentInstance, inject, type InjectionKey } from 'vue'
 import type { MilestonePage } from '@/api/v3-milestones'
 import type { BreezemoonPage } from '@/api/v3-breezemoons'
@@ -14,6 +15,7 @@ import type {
 } from '@/api/fishpi'
 
 export interface SsrPayload {
+  statistics?: CommunityStatistics | null
   milestonePage?: MilestonePage | null
   breezemoonPage?: BreezemoonPage | null
   homeBreezemoonPage?: BreezemoonPage | null
@@ -174,3 +176,5 @@ export function consumeHomeExtrasPayload(): {
 }
 
 export function consumeMilestonePayload(): MilestonePage | null { return takeField('milestonePage') || null }
+
+export function consumeStatisticsPayload(): CommunityStatistics | null { return takeField('statistics') || null }

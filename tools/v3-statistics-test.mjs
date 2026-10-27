@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import ts from 'typescript'
+import {parse,compileScript} from '@vue/compiler-sfc'
+import {createRenderer,createSSRApp,h,ref,nextTick} from 'vue'
+import {createPinia,defineStore} from 'pinia'
+import {renderToString} from '@vue/server-renderer'
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`).replaceAll(`from "${a}"`,`from '${b}'`);return s}
+const state=globalThis.__statistics={context:1,calls:[],dispatch:null,ssr:false,initial:null}
+const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAuthContextVersion(){return globalThis.__statistics.context}export async function request(path,init){globalThis.__statistics.calls.push({path,init});return globalThis.__statistics.dispatch(path,init)}`)
+const apiURL=url(replace(compile(await fs.readFile('src/api/v3-statistics.ts','utf8')),[['./http',http]])),api=await import(apiURL)
+const auth=defineStore('stats-auth',()=>({accessToken:ref(null),account:ref(null)}));globalThis.__statsAuth=auth
+const authURL=url('export const useAuthStore=globalThis.__statsAuth'),feedURL=url(replace(compile((await fs.readFile('src/composables/useStatistics.ts','utf8')).replaceAll('import.meta.env.SSR','globalThis.__statistics.ssr')),[['vue',import.meta.resolve('vue')],['@/api/http',http],['@/api/v3-statistics',apiURL],['@/stores/auth',authURL]]))
+const d=parse(await fs.readFile('src/views/StatisticsView.vue','utf8')).descriptor
+const Page=(await import(url(replace(compile(compileScript(d,{id:'stats',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['@/api/v3-statistics',apiURL],['@/composables/useStatistics',feedURL],['@/composables/usePageSeo',url('export function usePageSeo(){}')],['@/seo/payload',url('export function consumeStatisticsPayload(){return globalThis.__statistics.initial}')]])))).default
+const insert=(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}const i=a?p.children.indexOf(a):-1;p.children.splice(i<0?p.children.length:i,0,n);n.parent=p},renderer=createRenderer({patchProp(n,k,o,v){n.props[k]=v},insert,remove(n){if(n.parent)n.parent.children=n.parent.children.filter(c=>c!==n)},createElement(tag){return{tag,props:{},children:[]}},createText(text){return{text,children:[]}},createComment(){return{children:[]}},setText(n,t){n.text=t},setElementText(n,t){n.children=[{text:t,children:[]}]},parentNode:n=>n.parent,nextSibling(n){const c=n.parent?.children||[];return c[c.indexOf(n)+1]||null},insertStaticContent(t,p,a){const n={text:t,children:[]};insert(n,p,a);return[n,n]}})
+const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' '),find=(n,f)=>f(n)?n:(n.children||[]).map(c=>find(c,f)).find(Boolean),all=(n,f)=>[...(f(n)?[n]:[]),...(n.children||[]).flatMap(c=>all(c,f))],tick=async()=>{for(let i=0;i<30;i++)await Promise.resolve();await nextTick()}
+const counts=Object.fromEntries(api.statisticFields.map(([key],i)=>[key,i===0?12345:i])),env=data=>({code:0,data}),dispatch=async()=>env(counts);state.dispatch=dispatch
+function mount(pinia=createPinia()){const root={children:[]},app=renderer.createApp(Page);app.use(pinia);app.mount(root);return{app,root,user:auth(pinia),text:()=>text(root)}}
+const click=(v,label)=>{const b=find(v.root,n=>n.tag==='button'&&text(n).trim()===label);assert.ok(b,'Missing '+label);assert.ok(!b.props.disabled);return b.props.onClick()}
+assert.deepEqual(await api.fetchStatistics(),counts);assert.deepEqual(state.calls.at(-1),{path:'/api/v3/statistics',init:{cache:'no-store'}})
+console.log('PASS statistics 1 exact existing public endpoint without legacy credentials and cache')
+assert.deepEqual(api.decodeStatistics({...counts,password:'SECRET',userPhone:'SECRET'}),counts)
+for(const value of [null,[],{},'data',...[-1,1.5,NaN,Infinity,Number.MAX_SAFE_INTEGER+1,'1',null].map(memberCount=>({...counts,memberCount}))])assert.throws(()=>api.decodeStatistics(value),e=>e.status===502)
+assert.equal(api.decodeStatistics({...counts,memberCount:Number.MAX_SAFE_INTEGER}).memberCount,Number.MAX_SAFE_INTEGER)
+console.log('PASS statistics 2 nine-field whitelist, safe integer bounds and malformed payload rejected')
+for(const value of [null,{code:1,data:counts},{code:0,data:[]},{data:counts}]){state.dispatch=async()=>value;await assert.rejects(api.fetchStatistics(),e=>e.status===502)}state.dispatch=dispatch
+console.log('PASS statistics 3 malformed envelopes cannot become fabricated zero data')
+let v=mount();await tick();assert.equal(all(v.root,n=>n.tag==='dt').length,9);assert.match(v.text(),/12,345/);assert.match(v.text(),/历史最高在线总数/);assert.ok(!find(v.root,n=>n.props?.innerHTML));assert.equal(all(v.root,n=>n.tag==='dd')[1].children[0].text,'1');let before=state.calls.length;await click(v,'刷新统计');await tick();assert.equal(state.calls.length,before+1);v.app.unmount()
+console.log('PASS statistics 4 actual page nine values, explicit locale formatting, refresh and no HTML insertion')
+v=mount();await tick();state.dispatch=async()=>{throw new Error('statistics503')};await click(v,'刷新统计');await tick();assert.match(v.text(),/statistics503/);assert.equal(all(v.root,n=>n.tag==='dd').length,0);state.dispatch=dispatch;await click(v,'重试统计');await tick();assert.equal(all(v.root,n=>n.tag==='dd').length,9);v.app.unmount()
+console.log('PASS statistics 5 failure clears stale snapshot; retry performs only current statistics GET')
+let release;state.dispatch=()=>new Promise(r=>release=r);v=mount();await tick();assert.match(v.text(),/正在读取/);assert.ok(find(v.root,n=>n.tag==='button').props.disabled);const stale=release;state.dispatch=dispatch;state.context++;v.user.accessToken='A';v.user.account={oId:'1'};await tick();stale(env({...counts,memberCount:999999}));await tick();assert.ok(!v.text().includes('999,999'));assert.match(v.text(),/12,345/);v.app.unmount()
+console.log('PASS statistics 6 login boundary rejects late anonymous snapshot and starts current read')
+v=mount();await tick();v.user.accessToken='A';v.user.account={oId:'1'};await tick();state.dispatch=()=>new Promise(r=>release=r);const old=click(v,'刷新统计');await tick();const late=release;state.dispatch=dispatch;state.context++;v.user.accessToken=null;v.user.account=null;await tick();late(env({...counts,memberCount:888888}));await old;assert.ok(!v.text().includes('888,888'));before=state.calls.length;v.user.accessToken='rotated';await tick();assert.ok(state.calls.length>before);v.app.unmount()
+console.log('PASS statistics 7 logout and token rotation clear/reread, old response cannot overwrite')
+state.dispatch=()=>new Promise(r=>release=r);v=mount();await tick();v.app.unmount();release(env(counts));await tick();assert.equal(v.root.children.length,0);state.dispatch=dispatch
+console.log('PASS statistics 8 unmount drops late response')
+state.ssr=true;state.initial=counts;let app=createSSRApp(Page);app.use(createPinia());before=state.calls.length;let html=await renderToString(app);assert.equal(state.calls.length,before);assert.match(html,/12,345/);assert.ok(!html.includes('SECRET'));state.initial={...counts,memberCount:-1};app=createSSRApp(Page);app.use(createPinia());html=await renderToString(app);assert.ok(!html.includes('<dd'));assert.match(html,/统计尚未读取/);state.ssr=false
+console.log('PASS statistics 9 validated public SSR snapshot without client fetch or fake zero on malformed state')
+state.initial=counts;before=state.calls.length;v=mount();await tick();assert.equal(state.calls.length,before);v.app.unmount();const pinia=createPinia();auth(pinia).accessToken='A';before=state.calls.length;v=mount(pinia);await tick();assert.equal(state.calls.length,before+1);v.app.unmount();state.initial={};before=state.calls.length;v=mount();await tick();assert.equal(state.calls.length,before+1);v.app.unmount();state.initial=null
+console.log('PASS statistics 10 guest hydration reuses valid snapshot; authenticated or malformed initial rereads')
+state.dispatch=async()=>env(Object.fromEntries(api.statisticFields.map(([key])=>[key,0])));v=mount();await tick();assert.equal(all(v.root,n=>n.tag==='dd').length,9);assert.ok(all(v.root,n=>n.tag==='dd').every(n=>text(n).trim()==='0'));v.app.unmount();state.dispatch=dispatch
+console.log('PASS statistics 11 actual zero remains valid data')
+const [router,shell,entry,routes,source]=await Promise.all(['src/router/index.ts','src/layouts/AppShell.vue','src/entry-server.ts','src/seo/ssrRoutes.ts','src/views/StatisticsView.vue'].map(p=>fs.readFile(p,'utf8')))
+assert.match(router,/path: '\/statistic'.*StatisticsView/);assert.match(shell,/href: '\/statistic', label: '数据统计', external: false }/);assert.match(entry,/path === '\/statistic'.*statistics: await fetchStatistics/);assert.ok(routes.includes("p === '/statistic'"));assert.ok(source.includes('lang="scss"'));assert.ok(!source.includes('v-html')&&!source.includes('apiKey'));assert.ok(!source.includes('class="card"'))
+console.log('PASS statistics 12 route/footer/SSR wiring and sibling metric cards with SCSS')

@@ -367,6 +367,7 @@ const routes = [
     component: () => import('@/views/ChargePointView.vue'),
     meta: { robots: 'noindex' },
   },
+  { path: '/statistic', name: 'statistics', component: () => import('@/views/StatisticsView.vue') },
   {
     path: '/milestones',
     name: 'milestones',

@@ -1,3 +1,4 @@
+import { fetchStatistics } from './api/v3-statistics'
 import { renderToString } from 'vue/server-renderer'
 import { renderSSRHead } from '@unhead/vue/server'
 import { createFishpiApp } from './app'
@@ -24,6 +25,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
   if (!shouldPrefetchSsr(path)) return {}
 
   try {
+    if (path === '/statistic') return { statistics: await fetchStatistics() }
     if (path === '/milestones') return { milestonePage: await listMilestones() }
     const articleMatch = path.match(/^\/article\/([^/]+)$/)
     if (articleMatch) {
