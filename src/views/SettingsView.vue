@@ -6,6 +6,7 @@ import AppearancePicker from '@/components/packs/AppearancePicker.vue'
 import EmojiPacks from '@/components/EmojiPacks.vue'
 import OwnerProfileSettings from '@/components/settings/OwnerProfileSettings.vue'
 import OwnerPreferences from '@/components/settings/OwnerPreferences.vue'
+import OwnerGameSaves from '@/components/settings/OwnerGameSaves.vue'
 import OwnerAppLogin from '@/components/settings/OwnerAppLogin.vue'
 import { useAuthStore } from '@/stores/auth'
 import OwnerMedals from '@/components/settings/OwnerMedals.vue'
@@ -174,9 +175,10 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
       </section>
 
       <section v-if="tab === 'data'" class="card">
-        <h1>数据导出</h1>
+        <h1>本人数据</h1>
         <nav v-if="isLoggedIn && account" aria-label="本人匿名创作入口"><RouterLink :to="`/member/${encodeURIComponent(account.userName)}/articles/anonymous`">本人匿名文章</RouterLink> · <RouterLink :to="`/member/${encodeURIComponent(account.userName)}/comments/anonymous`">本人匿名评论</RouterLink></nav>
         <OwnerPostExport v-if="isLoggedIn" />
+        <OwnerGameSaves v-if="isLoggedIn" />
       </section>
 
       <section v-if="tab === 'i18n'" class="card">
