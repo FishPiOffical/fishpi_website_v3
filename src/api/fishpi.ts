@@ -1,3 +1,4 @@
+import { fetchPublicColumnCards, type PublicColumn } from './v3-public-columns'
 import {repeaterList,type RepeaterEntry} from './v3-repeater'
 import { md5 } from 'js-md5'
 import {
@@ -1116,82 +1117,13 @@ export interface HomeColumnCard {
   latestChapter?: HomeColumnChapter | null
 }
 
-interface RawColumnChapter {
-  id?: string
-  articleId?: string
-  chapterNo?: number | string
-  title?: string
-  articleTitle?: string
-  articlePermalink?: string
-  permalink?: string
-  articlePreviewContent?: string
-  preview?: string
-  createdAt?: string
-}
-
-interface RawColumnCard {
-  id?: string
-  columnId?: string
-  oId?: string
-  title?: string
-  columnTitle?: string
-  coverURL?: string
-  articleCount?: number
-  columnArticleCount?: number
-  columnCoverURL?: string
-  chapters?: RawColumnChapter[]
-  latestChapter?: RawColumnChapter | null
-  secondLatestChapter?: RawColumnChapter | null
-}
-
-function normalizeChapter(ch: RawColumnChapter): HomeColumnChapter {
-  const no = ch.chapterNo
-  return {
-    articleId: String(ch.id || ch.articleId || ''),
-    permalink: ch.articlePermalink || ch.permalink || (ch.articleId ? `/article/${ch.articleId}` : ''),
-    chapterNo: typeof no === 'number' ? `第 ${no} 章` : String(no ?? ''),
-    title: ch.title || ch.articleTitle || '',
-    preview: ch.preview || ch.articlePreviewContent || '',
-    createdAt: ch.createdAt || '',
-  }
-}
-
-function normalizeColumnCard(c: RawColumnCard): HomeColumnCard {
-  const raw = c.chapters?.length ? c.chapters : [c.latestChapter, c.secondLatestChapter]
-  const chapters = raw.filter((ch): ch is RawColumnChapter => Boolean(ch)).map(normalizeChapter)
-  return {
-    columnId: String(c.id || c.columnId || c.oId || ''),
-    columnTitle: c.title || c.columnTitle || '',
-    columnArticleCount: Number(c.articleCount ?? c.columnArticleCount ?? 0),
-    columnCoverURL: c.coverURL || c.columnCoverURL || '',
-    chapters,
-    latestChapter: chapters[0] || null,
-  }
-}
-
-interface RawColumnDetail {
-  column?: RawColumnCard
-  chapters?: RawColumnChapter[]
-}
-
-export async function fetchColumnDetail(columnId: string): Promise<HomeColumnCard> {
-  const res = await request<Envelope<RawColumnDetail>>(`/api/v3/columns/${encodeURIComponent(columnId)}`)
-  if (res.code !== 0 || !res.data?.column) throw new Error(res.msg || '专栏不存在')
-  const column = normalizeColumnCard({ ...res.data.column, chapters: res.data.chapters || [] })
-  if (!column.columnArticleCount) column.columnArticleCount = column.chapters.length
-  return column
-}
-
 export async function fetchHomeColumns(): Promise<{ recent: HomeColumnCard[]; hot: HomeColumnCard[] }> {
-  const [latest, hot] = await Promise.all([
-    request<Envelope<{ list?: RawColumnCard[] }>>('/api/v3/columns?size=12'),
-    request<Envelope<{ list?: RawColumnCard[] }>>('/api/v3/columns/hot?size=12'),
-  ])
-  if (latest.code !== 0 || hot.code !== 0) throw new Error('加载专栏失败')
-  return {
-    recent: (latest.data?.list || []).map(normalizeColumnCard),
-    hot: (hot.data?.list || []).map(normalizeColumnCard),
+  const [latest, hot] = await Promise.all([fetchPublicColumnCards('latest'), fetchPublicColumnCards('hot')])
+  function adapt(value: PublicColumn): HomeColumnCard {
+    const chapters = value.chapters.map(ch => ({ articleId: ch.id, permalink: '/article/' + ch.id, chapterNo: '第 ' + ch.chapterNo + ' 章', title: ch.title, preview: ch.preview || '', createdAt: ch.createdAt ? new Date(ch.createdAt).toISOString() : '' }))
+    return { columnId: value.id, columnTitle: value.title, columnArticleCount: value.articleCount, columnCoverURL: value.coverURL, chapters, latestChapter: chapters[0] || null }
   }
+  return { recent: latest.list.map(adapt), hot: hot.list.map(adapt) }
 }
 
 export interface ChatHistoryItem {

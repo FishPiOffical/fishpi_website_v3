@@ -1,119 +1,46 @@
 <script setup lang="ts">
-import { articleTitle } from '@/utils/text'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import {
-  fetchColumnDetail,
-  type ArticleSummary,
-  type HomeColumnCard,
-} from '@/api/fishpi'
+import { usePublicColumn } from '@/composables/usePublicColumn'
 import { usePageSeo } from '@/composables/usePageSeo'
-import FpLoading from '@/components/FpLoading.vue'
-import { createSwrLoader } from '@/utils/swr'
-
-const route = useRoute()
-const columnId = computed(() => String(route.params.columnId || ''))
-const meta = ref<HomeColumnCard | null>(null)
-const chapters = ref<ArticleSummary[]>([])
-const loading = ref(true)
-const err = ref('')
-
-const title = computed(() => meta.value?.columnTitle || `专栏 ${columnId.value}`)
-const firstChapter = computed(() => chapters.value[chapters.value.length - 1] || chapters.value[0] || null)
-const latestChapter = computed(() => chapters.value[0] || null)
-const author = computed(() => latestChapter.value?.articleAuthorName || '')
-const synopsis = computed(() => latestChapter.value?.articlePreviewContent || firstChapter.value?.articlePreviewContent || '一段正在展开的故事，欢迎从第一章开始阅读。')
-
-usePageSeo(() => ({
-  title: title.value,
-  path: `/column/${columnId.value}`,
-  description: `${title.value} · 摸鱼派长篇专栏`,
-}))
-
-const swr = createSwrLoader({ loading, error: err })
-
-async function load() {
-  const id = columnId.value
-  if (!id) return
-  await swr(
-    `column:${id}`,
-    async () => {
-      const m = await fetchColumnDetail(id)
-      const list: ArticleSummary[] = (m.chapters || [])
-        .slice()
-        .sort((a, b) => Number(b.chapterNo.replace(/\D/g, '')) - Number(a.chapterNo.replace(/\D/g, '')))
-        .map((chapter) => ({
-          oId: chapter.articleId,
-          articleTitle: chapter.title,
-          articleTitleEmoj: chapter.title,
-          columnTitle: m.columnTitle,
-          columnId: m.columnId,
-          articleCreateTimeStr: chapter.createdAt || chapter.chapterNo,
-          articlePreviewContent: chapter.preview,
-        }))
-      return { meta: { ...m, columnArticleCount: m.columnArticleCount || list.length }, chapters: list }
-    },
-    (data) => {
-      meta.value = data.meta
-      chapters.value = data.chapters
-    },
-  )
-}
-
-watch(columnId, () => void load(), { immediate: true })
+const route = useRoute(), columnId = computed(() => String(route.params.columnId || ''))
+const { meta, page, p, metaError, pageError, metaLoading, pageLoading, readMeta, readPage } = usePublicColumn(columnId)
+const title = computed(() => meta.value?.column.title || `专栏 ${columnId.value}`), panel = ref<HTMLElement | null>(null), coverFailed = ref(false)
+watch(() => meta.value?.column.coverURL, () => { coverFailed.value = false })
+let lastPage = 1
+watch(page, data => { if (!data) return; const moved = lastPage !== data.p; lastPage = data.p; if (moved) void nextTick(() => { if (page.value === data) panel.value?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }) }) })
+function date(value: number) { return value ? new Date(value).toISOString().replace('T', ' ').replace('.000Z', ' UTC') : '' }
+usePageSeo(() => ({ title: title.value, path: `/column/${encodeURIComponent(columnId.value)}`, description: `${title.value} · 摸鱼派长篇专栏` }))
 </script>
-
 <template>
   <main class="column-page">
     <p class="crumb"><RouterLink to="/column">长篇专栏</RouterLink><span>/</span>{{ title }}</p>
-    <FpLoading v-if="loading" />
-    <p v-else-if="err" class="err">{{ err }}</p>
-    <template v-else>
-      <section class="book-hero">
-        <div class="cover-wrap"><img :src="meta?.columnCoverURL || '/images/holiday/book-bg.jpg'" alt="" class="book-cover"><span class="cover-shine"></span></div>
-        <div class="book-info">
-          <div class="book-kicker"><span>摸鱼派 · 长篇专栏</span><span class="ongoing"><i></i> 专栏作品</span></div>
-          <h1>{{ title }}</h1>
-          <div class="book-byline"><RouterLink v-if="author" :to="`/member/${author}`">{{ author }}</RouterLink><span v-else>社区创作</span><i>·</i><span>{{ meta?.columnArticleCount || chapters.length }} 章</span></div>
-          <p class="synopsis">{{ synopsis }}</p>
-          <div class="book-actions">
-            <RouterLink v-if="firstChapter" class="primary-action" :to="`/article/${firstChapter.oId}`">开始阅读 <span>→</span></RouterLink>
-            <RouterLink v-if="latestChapter && latestChapter.oId !== firstChapter?.oId" class="secondary-action" :to="`/article/${latestChapter.oId}`">阅读最新章</RouterLink>
-          </div>
-          <div class="book-facts"><span><b>{{ meta?.columnArticleCount || chapters.length }}</b> 章节</span><span><b>{{ chapters.length }}</b> 章目录</span><span v-if="latestChapter?.timeAgo"><b>{{ latestChapter.timeAgo }}</b> 最近更新</span></div>
-        </div>
-        <div class="hero-stamp" aria-hidden="true"><span>连载</span><i>Pi</i></div>
-      </section>
-
-      <div class="column-body">
-        <section class="chapter-panel">
-          <header class="chapter-heading"><div><span class="section-kicker">CONTENTS</span><h2>章节目录</h2></div><span>{{ chapters.length }} 条记录</span></header>
-          <ol class="chapters">
-            <li v-if="!chapters.length" class="empty">暂无章节</li>
-            <li v-for="(item, index) in chapters" :key="item.oId">
-              <span class="chapter-index">{{ String(chapters.length - index).padStart(2, '0') }}</span>
-              <RouterLink :to="`/article/${item.oId}`">{{ articleTitle(item) }}</RouterLink>
-              <span class="chapter-time">{{ item.timeAgo || item.articleCreateTimeStr || '' }}</span>
-              <span class="chapter-arrow" aria-hidden="true">›</span>
-            </li>
-          </ol>
-        </section>
-        <aside class="column-aside">
-          <div class="aside-card">
-            <span class="section-kicker">ABOUT THIS COLUMN</span><h3>关于本专栏</h3>
-            <p>沿着章节顺序阅读，跟随作者一起把故事写下去。</p>
-            <div class="aside-rule"></div>
-            <div class="aside-stat"><span>专栏章节</span><b>{{ meta?.columnArticleCount || chapters.length }}</b></div>
-            <div class="aside-stat"><span>当前收录</span><b>{{ chapters.length }}</b></div>
-            <RouterLink to="/column" class="back-catalog">浏览更多专栏 <span>→</span></RouterLink>
-          </div>
-        </aside>
+    <p v-if="metaLoading" role="status">正在读取专栏资料…</p>
+    <div v-else-if="metaError" role="alert"><p>{{ metaError }}</p><button type="button" @click="readMeta">重试专栏资料</button></div>
+    <section v-else-if="meta" class="book-hero">
+      <div class="cover-wrap"><img v-if="meta.column.coverURL && !coverFailed" :src="meta.column.coverURL" alt="" class="book-cover" @error="coverFailed = true" /><div v-else class="cover-placeholder" role="img" aria-label="未设置专栏封面">专栏</div><span class="cover-shine" /></div>
+      <div class="book-info">
+        <div class="book-kicker"><span>摸鱼派 · 长篇专栏</span></div>
+        <h1>{{ title }}</h1><p class="synopsis">按章节序号查看当前公开目录。</p>
+        <div class="book-actions"><RouterLink v-if="meta.first" class="primary-action" :to="`/article/${meta.first.id}`">开始阅读 <span>→</span></RouterLink><RouterLink v-if="meta.latest && meta.latest.id !== meta.first?.id" class="secondary-action" :to="`/article/${meta.latest.id}`">阅读最新章</RouterLink></div>
+        <div class="book-facts"><span><b>{{ meta.column.articleCount }}</b> 可见章节</span><span v-if="meta.column.updatedAt">最近更新 {{ date(meta.column.updatedAt) }}</span></div>
       </div>
-    </template>
+    </section>
+    <section ref="panel" class="chapter-panel">
+      <header class="chapter-heading"><h2>章节目录</h2><button type="button" :disabled="pageLoading" @click="readPage()">刷新章节目录</button></header>
+      <p v-if="pageLoading" role="status">正在读取章节目录…</p>
+      <div v-else-if="pageError" role="alert"><p>{{ pageError }}</p><button type="button" @click="readPage()">重试章节目录</button><button v-if="p > 1" type="button" @click="readPage(1)">返回目录首页</button></div>
+      <template v-else-if="page">
+        <p class="hint">当前目录共 {{ page.total }} 条</p>
+        <ol class="chapters"><li v-for="item in page.list" :key="item.id"><span class="chapter-index">{{ item.chapterNo }}</span><RouterLink :to="`/article/${item.id}`">{{ item.title }}</RouterLink><time class="chapter-time" :datetime="item.createdAt ? new Date(item.createdAt).toISOString() : undefined">{{ date(item.createdAt) }}</time><span class="chapter-arrow" aria-hidden="true">›</span></li></ol>
+        <p v-if="!page.list.length" class="hint">本页没有可见章节。</p>
+        <div class="column-pager"><button type="button" :disabled="p <= 1" @click="readPage(p - 1)">上一页章节</button><span>第 {{ p }} 页 / 共 {{ page.pageCount }} 页</span><button type="button" :disabled="p >= page.pageCount" @click="readPage(p + 1)">下一页章节</button><button v-if="p > page.pageCount" type="button" @click="readPage(1)">返回目录首页</button></div>
+      </template>
+      <p v-else role="status">章节目录尚未读取。</p>
+    </section>
   </main>
 </template>
-
-<style scoped>
+<style scoped lang="scss">
 .column-page { max-width: 1120px; margin: 0 auto; padding: 8px 0 30px; }
 .crumb { display: flex; align-items: center; gap: 9px; margin: 4px 0 15px; color: var(--fp-muted); font-size: 12px; }
 .crumb a { color: var(--fp-muted); text-decoration: none; }
@@ -152,4 +79,6 @@ watch(columnId, () => void load(), { immediate: true })
 .hint { margin: 10px 2px; color: var(--fp-muted); font-size: 11px; }.err { padding: 30px 18px; color: #e07a5f; font-size: 13px; }
 @media (max-width:900px) { .column-page { padding-right: 12px; padding-left: 12px; }.column-body { grid-template-columns: 1fr; }.column-aside { display: none; } }
 @media (max-width:560px) { .book-hero { grid-template-columns: 94px minmax(0,1fr); gap: 16px; padding: 18px 14px; }.hero-stamp { display: none; }.book-kicker { flex-wrap: wrap; gap: 7px; font-size: 10px; }.book-info h1 { margin-top: 8px; font-size: 20px; }.book-byline { font-size: 11px; }.synopsis { grid-column: 1/-1; margin: 12px 0; font-size: 12px; }.book-actions { flex-wrap: wrap; }.primary-action,.secondary-action { min-height: 34px; padding: 0 11px; font-size: 11px; }.book-facts { grid-column: 1/-1; gap: 11px; padding-top: 12px; font-size: 9px; }.book-facts b { font-size: 11px; }.chapter-heading { padding: 15px; }.chapters li { min-height: 45px; grid-template-columns: 24px minmax(0,1fr) auto 9px; gap: 7px; padding: 0 12px; }.chapters a { font-size: 12px; }.chapter-time { font-size: 9px; } }
+.cover-placeholder { display: grid; place-items: center; width: 100%; height: 100%; min-height: 150px; color: #58452f; font-size: 28px; letter-spacing: 5px; background: linear-gradient(120deg, #d9c19a, #bba076); }
+.chapter-panel { margin-top: 24px; scroll-margin-top: 88px; } .column-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px; } button { border: 1px solid var(--fp-border); background: var(--fp-card); color: var(--fp-text); border-radius: 6px; padding: 7px 10px; cursor: pointer; &:disabled { opacity: .5; cursor: default; } } [role=alert] { padding: 16px; color: #bd503c; }
 </style>
