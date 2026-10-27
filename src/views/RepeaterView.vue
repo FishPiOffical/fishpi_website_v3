@@ -1,98 +1,17 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
-import { storeToRefs } from 'pinia'
-import { fetchRepeaterItems, likeRepeater, type RepeaterItem } from '@/api/fishpi'
-import { usePageSeo } from '@/composables/usePageSeo'
-import { consumeRepeaterPayload } from '@/seo/payload'
-import { useAuthStore } from '@/stores/auth'
-import FpLoading from '@/components/FpLoading.vue'
-import { createSwrLoader } from '@/utils/swr'
-
-usePageSeo(() => ({ title: '复读机', path: '/repeater', description: '摸鱼派复读机精选' }))
-
-const auth = useAuthStore()
-const { apiKey, isLoggedIn } = storeToRefs(auth)
-const items = ref<RepeaterItem[]>([])
-const kind = ref('')
-const loading = ref(true)
-const error = ref('')
-const actionMsg = ref('')
-
-const kinds = [
-  { value: '', label: '全部' },
-  { value: 'joke', label: '段子' },
-  { value: 'kfc', label: '疯狂星期四' },
-  { value: 'fish', label: '鱼类科普' },
-]
-
-const swr = createSwrLoader({ loading, error })
-
-async function load() {
-  await swr(
-    `repeater:${kind.value}`,
-    async () => (!kind.value && consumeRepeaterPayload()) || fetchRepeaterItems(apiKey.value, kind.value),
-    (data) => (items.value = data),
-  )
-}
-
-watch([apiKey, kind], () => void load(), { immediate: true })
-
-async function like(item: RepeaterItem) {
-  if (!apiKey.value) return
-  actionMsg.value = ''
-  try {
-    const data = await likeRepeater(apiKey.value, item.oId)
-    if (data) {
-      item.repeaterContentLiked = Boolean(data.liked)
-      if (data.likeCount != null) item.repeaterContentLikeCount = data.likeCount
-    }
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '点赞失败'
-  }
-}
+import {ref} from 'vue'
+import {RouterLink} from 'vue-router'
+import {REPEATER_KINDS,type RepeaterKind} from '@/api/v3-repeater'
+import {useRepeaterFeed} from '@/composables/useRepeaterFeed'
+import {usePageSeo} from '@/composables/usePageSeo'
+import {consumeRepeaterPayload} from '@/seo/payload'
+import RepeaterLikeButton from '@/components/RepeaterLikeButton.vue'
+import RepeaterComposer from '@/components/RepeaterComposer.vue'
+usePageSeo(()=>({title:'复读机',path:'/repeater',description:'摸鱼派复读机精选'}))
+const kind=ref<RepeaterKind>(''),feed=useRepeaterFeed(kind,consumeRepeaterPayload()),{items,loading,error}=feed
 </script>
-
-<template>
-  <section class="card">
-    <h1>复读机</h1>
-    <p class="hint">转录站内容来自 <code>GET /api/repeater/items</code>。</p>
-    <div class="tabs">
-      <button
-        v-for="k in kinds"
-        :key="k.value"
-        type="button"
-        :class="{ on: kind === k.value }"
-        @click="kind = k.value"
-      >
-        {{ k.label }}
-      </button>
-    </div>
-    <p v-if="actionMsg" class="err">{{ actionMsg }}</p>
-    <FpLoading v-if="loading" />
-    <p v-else-if="error" class="err">{{ error }}</p>
-    <ol v-else>
-      <li v-for="item in items" :key="item.oId">
-        <header>
-          <b>
-            <RouterLink v-if="item.repeaterContentAuthorName" :to="`/member/${item.repeaterContentAuthorName}`">
-              {{ item.repeaterContentAuthorName }}
-            </RouterLink>
-            <span v-else>匿名</span>
-          </b>
-          <span>{{ item.repeaterContentTypeLabel || item.repeaterContentType }}</span>
-        </header>
-        <p>{{ item.repeaterContent }}</p>
-        <button v-if="isLoggedIn" type="button" class="ghost" @click="like(item)">
-          {{ item.repeaterContentLiked ? '已赞' : '赞' }} {{ item.repeaterContentLikeCount || 0 }}
-        </button>
-      </li>
-    </ol>
-    <p v-if="!loading && !error && !items.length" class="hint">还没有内容。</p>
-  </section>
-</template>
-
-<style scoped>
+<template><section class="card"><h1>复读机</h1><p class="hint">按点赞数与时间展示前12条，支持筛选类型。</p><div class="tabs"><button v-for="option in [{value:'',label:'全部'},...REPEATER_KINDS]" :key="option.value" type="button" :class="{on:kind===option.value}" @click="kind=option.value as RepeaterKind">{{ option.label }}</button></div><button type="button" :disabled="loading" @click="feed.refresh">刷新列表</button><p v-if="loading" role="status">正在读取复读内容…</p><p v-if="error" class="err" role="alert">{{ error }} <button type="button" @click="feed.retry">重试读取</button></p><ol><li v-for="item in items" :key="item.id"><header><RouterLink v-if="item.author" :to="`/member/${encodeURIComponent(item.author.name)}`">{{ item.author.name }}</RouterLink><span v-else>作者未展示</span><span>{{ REPEATER_KINDS.find(k=>k.value===item.type)?.label }}</span></header><p>{{ item.content }}</p><RepeaterLikeButton :item="item"/></li></ol><p v-if="!loading&&!error&&!items.length" class="hint">当前没有内容。</p><RepeaterComposer/></section></template>
+<style scoped lang="scss">
 .card {
   background: var(--fp-card);
   border: 1px solid var(--fp-border);

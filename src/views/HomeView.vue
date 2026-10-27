@@ -234,7 +234,7 @@ async function load() {
       safe(fetchArticleFeed('long', apiKey.value, 1, 12), []),
       safe(fetchRecentRegister(apiKey.value), []),
       safe(fetchTags(apiKey.value, 1, 24), { tags: [], total: 0 }),
-      safe(fetchRepeaterItems(apiKey.value), []),
+      safe(fetchRepeaterItems(apiKey.value, 'joke'), []),
       safe(fetchHomeColumns(), { recent: [], hot: [] }),
     ])
     if (version !== loadVersion || token !== accessToken.value) return

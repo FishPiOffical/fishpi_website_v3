@@ -1,148 +1,20 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
-import { storeToRefs } from 'pinia'
-import { fetchRepeaterItems, likeRepeater, type RepeaterItem } from '@/api/fishpi'
-import { useAuthStore } from '@/stores/auth'
-
-const props = defineProps<{ initial?: RepeaterItem[] }>()
-
-const auth = useAuthStore()
-const { apiKey, isLoggedIn } = storeToRefs(auth)
-
-const kinds = [
-  { value: 'joke', label: '段子' },
-  { value: 'kfc', label: '星期四' },
-  { value: 'fish', label: '鱼科普' },
-] as const
-
-const kind = ref<(typeof kinds)[number]['value']>('joke')
-const pool = ref<RepeaterItem[]>([])
-const index = ref(0)
-const busy = ref(false)
-const msg = ref('')
-
-const current = computed(() => pool.value[index.value] || null)
-const typeLabel = computed(() => {
-  const hit = kinds.find((k) => k.value === kind.value)
-  return current.value?.repeaterContentTypeLabel || hit?.label || '段子'
-})
-
-async function load(reset = true) {
-  busy.value = true
-  msg.value = ''
-  try {
-    if (reset && kind.value === 'joke' && props.initial?.length) {
-      pool.value = props.initial
-    } else {
-      pool.value = await fetchRepeaterItems(apiKey.value, kind.value)
-    }
-    index.value = 0
-  } catch (e) {
-    pool.value = []
-    msg.value = e instanceof Error ? e.message : '加载失败'
-  } finally {
-    busy.value = false
-  }
-}
-
-watch(kind, () => void load(true))
-watch(
-  () => props.initial,
-  (list) => {
-    if (kind.value === 'joke' && list?.length && !pool.value.length) {
-      pool.value = list
-      index.value = 0
-    } else if (!pool.value.length) {
-      void load(true)
-    }
-  },
-  { immediate: true },
-)
-
-function next() {
-  if (!pool.value.length) {
-    void load(false)
-    return
-  }
-  index.value = (index.value + 1) % pool.value.length
-}
-
-async function copy() {
-  if (!current.value?.repeaterContent) return
-  try {
-    await navigator.clipboard.writeText(current.value.repeaterContent)
-    msg.value = '已复制'
-  } catch {
-    msg.value = '复制失败'
-  }
-}
-
-async function like() {
-  if (!apiKey.value || !current.value) return
-  try {
-    const data = await likeRepeater(apiKey.value, current.value.oId)
-    if (data) {
-      current.value.repeaterContentLiked = Boolean(data.liked)
-      if (data.likeCount != null) current.value.repeaterContentLikeCount = data.likeCount
-    }
-  } catch (e) {
-    msg.value = e instanceof Error ? e.message : '点赞失败'
-  }
-}
-
-function strip(html: string) {
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-}
+import {computed,ref,watch} from 'vue'
+import {RouterLink} from 'vue-router'
+import {getAuthContextVersion} from '@/api/http'
+import {REPEATER_KINDS,type RepeaterEntry,type RepeaterKind} from '@/api/v3-repeater'
+import {useRepeaterFeed} from '@/composables/useRepeaterFeed'
+import {useAuthStore} from '@/stores/auth'
+import RepeaterLikeButton from '@/components/RepeaterLikeButton.vue'
+const props=defineProps<{initial?:RepeaterEntry[]}>(),auth=useAuthStore(),kind=ref<RepeaterKind>('joke'),feed=useRepeaterFeed(kind,props.initial),{items,loading,error}=feed,current=computed(()=>items.value[0]||null),msg=ref('')
+watch([kind,()=>auth.account?.oId,()=>!!auth.accessToken],()=>{msg.value=''},{flush:'sync'})
+async function copy(){const item=current.value,context=getAuthContextVersion();if(!item)return;try{await navigator.clipboard.writeText(item.content);if(context===getAuthContextVersion()&&current.value?.id===item.id)msg.value='已复制'}catch{if(context===getAuthContextVersion()&&current.value?.id===item.id)msg.value='复制失败'}}
 </script>
-
-<template>
-  <section class="repeater">
-    <header class="head">
-      <b>复读机转录站</b>
-      <div class="tabs" role="tablist">
-        <button
-          v-for="k in kinds"
-          :key="k.value"
-          type="button"
-          role="tab"
-          :aria-selected="kind === k.value"
-          :class="{ on: kind === k.value }"
-          @click="kind = k.value"
-        >
-          {{ k.label }}
-        </button>
-      </div>
-    </header>
-    <p class="quote">{{ current ? strip(current.repeaterContent || '') : busy ? '加载中…' : '暂无内容' }}</p>
-    <div class="meta">
-      <span>{{ typeLabel }}</span>
-      <RouterLink
-        v-if="current?.repeaterContentAuthorName"
-        :to="`/member/${current.repeaterContentAuthorName}`"
-      >
-        {{ current.repeaterContentAuthorName }}
-      </RouterLink>
-    </div>
-    <div class="actions">
-      <button type="button" @click="copy">复制</button>
-      <button type="button" @click="next">换一个</button>
-      <button v-if="isLoggedIn" type="button" class="like" @click="like">
-        ♥ {{ current?.repeaterContentLikeCount || 0 }}
-      </button>
-      <RouterLink v-else to="/login" class="login">登录</RouterLink>
-      <RouterLink to="/repeater" class="more">更多</RouterLink>
-    </div>
-    <p v-if="msg" class="msg">{{ msg }}</p>
-  </section>
-</template>
-
-<style scoped>
+<template><section class="repeater"><header class="head"><b>复读机转录站</b><div class="tabs" role="tablist"><button v-for="option in REPEATER_KINDS" :key="option.value" type="button" role="tab" :aria-selected="kind===option.value" :class="{on:kind===option.value}" @click="kind=option.value">{{ option.label }}</button></div></header><p v-if="loading" role="status">正在读取复读内容…</p><p v-if="error" class="msg" role="alert">{{ error }} <button type="button" @click="feed.retry">重试读取</button></p><p v-else-if="current" class="quote">{{ current.content }}</p><p v-else-if="!loading" class="quote">暂无候选内容。</p><div v-if="current" class="meta"><span>{{ REPEATER_KINDS.find(k=>k.value===current.type)?.label }}</span><RouterLink v-if="current.author" :to="`/member/${encodeURIComponent(current.author.name)}`">{{ current.author.name }}</RouterLink></div><div class="actions"><button type="button" :disabled="loading||!current" @click="copy">复制</button><button type="button" :disabled="loading||!!error" @click="feed.next">换一个</button><button type="button" :disabled="loading" @click="feed.refresh">刷新</button><RepeaterLikeButton v-if="current" :item="current"/><RouterLink to="/repeater" class="more">更多与投稿</RouterLink></div><p v-if="msg" class="msg">{{ msg }}</p></section></template>
+<style scoped lang="scss">
 .repeater {
   margin: 0 10px 8px;
   padding: 10px 12px;
-  border: 1px solid var(--fp-border);
-  border-radius: 8px;
 }
 .head {
   display: flex;

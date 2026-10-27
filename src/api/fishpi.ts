@@ -1,3 +1,4 @@
+import {repeaterList,type RepeaterEntry} from './v3-repeater'
 import { md5 } from 'js-md5'
 import {
   mockCheckin,
@@ -752,32 +753,8 @@ export async function fetchTags(_apiKey?: string | null, page = 1, size = 50): P
 
 
 
-export interface RepeaterItem {
-  oId: string
-  repeaterContent?: string
-  repeaterContentType?: string
-  repeaterContentTypeLabel?: string
-  repeaterContentAuthorName?: string
-  repeaterContentLikeCount?: number
-  repeaterContentLiked?: boolean
-  repeaterContentCreatedTime?: number
-}
-
-export async function fetchRepeaterItems(apiKey?: string | null, type = '') {
-  const q = type ? `?type=${encodeURIComponent(type)}` : ''
-  const res = await request<Envelope<{ items?: RepeaterItem[] }>>(withKey(`/api/repeater/items${q}`, apiKey))
-  if (res.code) throw new Error(res.msg || '复读机加载失败')
-  return res.data?.items ?? []
-}
-
-export async function likeRepeater(apiKey: string, id: string) {
-  const res = await request<Envelope<{ liked?: boolean; likeCount?: number }>>(
-    `/api/repeater/${encodeURIComponent(id)}/like`,
-    { method: 'POST', body: JSON.stringify({ apiKey }) },
-  )
-  if (res.code) throw new Error(res.msg || '点赞失败')
-  return res.data
-}
+export type RepeaterItem = RepeaterEntry
+export function fetchRepeaterItems(_apiKey?: string | null, type = '') { return repeaterList(type as import('./v3-repeater').RepeaterKind) }
 
 export async function fetchArticle(id: string, _apiKey?: string | null, page = 1): Promise<ArticleDetail> {
   return v3Article(id, page)

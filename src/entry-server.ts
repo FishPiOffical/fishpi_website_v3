@@ -45,7 +45,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
         fetchRecentRegister(null),
         fetchTags(null, 1, 24),
         fetchV3Breezemoons(1, 8),
-        fetchRepeaterItems(null),
+        fetchRepeaterItems(null, 'joke'),
       ])
       const val = <T>(i: number, fallback: T): T =>
         settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
