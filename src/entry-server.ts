@@ -1,3 +1,4 @@
+import { fetchRanking, rankingTitles, type RankingType } from './api/v3-rankings'
 import { fetchStatistics } from './api/v3-statistics'
 import { renderToString } from 'vue/server-renderer'
 import { renderSSRHead } from '@unhead/vue/server'
@@ -5,9 +6,7 @@ import { createFishpiApp } from './app'
 import {
   fetchArticle,
   fetchArticleFeed,
-  fetchCheckinRank,
   fetchDomains,
-  fetchOnlineRank,
   fetchRecentArticles,
   fetchRecentRegister,
   fetchRepeaterItems,
@@ -44,8 +43,8 @@ async function prefetch(url: string): Promise<SsrPayload> {
         fetchRecentArticles(null, 1, 40),
         fetchArticleFeed('hot', null, 1, 12),
         fetchArticleFeed('long', null, 1, 12),
-        fetchCheckinRank(null),
-        fetchOnlineRank(null),
+        fetchRanking('checkin', 1, undefined, 8),
+        fetchRanking('online', 1, undefined, 8),
         fetchRecentRegister(null),
         fetchTags(null, 1, 24),
         fetchV3Breezemoons(1, 8),
@@ -60,8 +59,8 @@ async function prefetch(url: string): Promise<SsrPayload> {
         feedKind: 'recent',
         hotFeed: val(1, []),
         longFeed: val(2, []),
-        checkinRank: val(3, []),
-        onlineRank: val(4, []),
+        homeCheckinRanking: val(3, null),
+        homeOnlineRanking: val(4, null),
         recentUsers: val(5, []),
         tags: tagData.tags,
         tagsTotal: tagData.total,
@@ -83,17 +82,8 @@ async function prefetch(url: string): Promise<SsrPayload> {
       return { breezemoonPage: await fetchV3Breezemoons(1, 20) }
     }
 
-    if (
-      path === '/top' ||
-      path === '/top/checkin' ||
-      path === '/top/online' ||
-      path === '/top/balance' ||
-      path === '/top/consumption' ||
-      path === '/top/profession'
-    ) {
-      const [checkinRank, onlineRank] = await Promise.all([fetchCheckinRank(null), fetchOnlineRank(null)])
-      return { checkinRank, onlineRank }
-    }
+    const ranking = path.match(/^\/top\/([^/]+)$/)?.[1]
+    if (ranking && Object.hasOwn(rankingTitles, ranking)) return { rankingPage: await fetchRanking(ranking as RankingType) }
 
     if (path === '/repeater') {
       return { repeater: await fetchRepeaterItems(null) }

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RankingBoard from '@/components/RankingBoard.vue'
+import { consumeHomeRankingPayload } from '@/seo/payload'
 import {getAuthContextVersion} from '@/api/http'
 import VipNickname from '@/components/user/VipNickname.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
@@ -10,9 +12,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   fetchArticleFeed,
-  fetchCheckinRank,
   fetchHomeColumns,
-  fetchOnlineRank,
   fetchRecentArticles,
   fetchRecentRegister,
   fetchRepeaterItems,
@@ -21,7 +21,6 @@ import {
   type ChatHistoryItem,
   type HomeColumnCard,
   type LiteUser,
-  type RankUser,
   type RepeaterItem,
   type TagItem,
 } from '@/api/fishpi'
@@ -49,8 +48,6 @@ const left = ref<ArticleSummary[]>([])
 const right = ref<ArticleSummary[]>([])
 const hot = ref<ArticleSummary[]>([])
 const longArticles = ref<ArticleSummary[]>([])
-const checkin = ref<RankUser[]>([])
-const online = ref<RankUser[]>([])
 const recentUsers = ref<LiteUser[]>([])
 const tags = ref<TagItem[]>([])
 const chatLines = ref<ChatHistoryItem[]>([])
@@ -149,12 +146,12 @@ if (bootFeed?.length) {
   splitArticles(bootFeed)
   loading.value = false
 }
+const homeRanks = ref(consumeHomeRankingPayload())
+onMounted(() => { homeRanks.value = { checkin: null, online: null } })
 const bootExtra = consumeHomeExtrasPayload()
 if (bootExtra) {
   if (bootExtra.hot?.length) hot.value = bootExtra.hot.slice(0, 12)
   if (bootExtra.long?.length) longArticles.value = bootExtra.long.slice(0, 12)
-  if (bootExtra.checkin?.length) checkin.value = bootExtra.checkin.slice(0, 8)
-  if (bootExtra.online?.length) online.value = bootExtra.online.slice(0, 8)
   if (bootExtra.recentUsers?.length) recentUsers.value = bootExtra.recentUsers.slice(0, 20)
   if (bootExtra.tags?.length) tags.value = bootExtra.tags.slice(0, 24)
   if (bootExtra.repeater?.length) repeaterItems.value = bootExtra.repeater
@@ -171,8 +168,6 @@ async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
 
 interface HomeSnapshot {
   articles: ArticleSummary[]
-  checkin: RankUser[]
-  online: RankUser[]
   hot: ArticleSummary[]
   long: ArticleSummary[]
   recentUsers: LiteUser[]
@@ -188,8 +183,6 @@ const HOME_CACHE_KEY = 'home'
 
 function applySnapshot(s: HomeSnapshot) {
   splitArticles(s.articles)
-  checkin.value = s.checkin
-  online.value = s.online
   hot.value = s.hot
   longArticles.value = s.long
   recentUsers.value = s.recentUsers
@@ -216,8 +209,6 @@ async function load() {
   try {
     const [
       articles,
-      checkinRank,
-      onlineRank,
       hotList,
       longList,
       regs,
@@ -228,8 +219,6 @@ async function load() {
       needArticles
         ? fetchRecentArticles(apiKey.value, 1, 40)
         : Promise.resolve(left.value.concat(right.value)),
-      safe(fetchCheckinRank(apiKey.value), []),
-      safe(fetchOnlineRank(apiKey.value), []),
       safe(fetchArticleFeed('hot', apiKey.value, 1, 12), []),
       safe(fetchArticleFeed('long', apiKey.value, 1, 12), []),
       safe(fetchRecentRegister(apiKey.value), []),
@@ -240,8 +229,6 @@ async function load() {
     if (version !== loadVersion || token !== accessToken.value) return
     const snap: HomeSnapshot = {
       articles,
-      checkin: checkinRank.slice(0, 8),
-      online: onlineRank.slice(0, 8),
       hot: hotList.slice(0, 12),
       long: longList.slice(0, 12),
       recentUsers: regs.slice(0, 20),
@@ -279,12 +266,8 @@ function heat(a: ArticleSummary) {
   return a.articleHeat ?? a.articleCommentCount ?? views(a)
 }
 
-function avatarOf(u: RankUser | LiteUser) {
+function avatarOf(u: LiteUser) {
   return avatarUrl(u)
-}
-
-function streakOf(u: RankUser) {
-  return u.userCurrentCheckinStreak ?? u.userCheckinStreak ?? ''
 }
 
 function tagPath(tag: TagItem) {
@@ -437,36 +420,12 @@ function scrollShelf(id: string, dir: -1 | 1) {
                 <b>今日连签排行</b>
                 <RouterLink to="/top/checkin">更多</RouterLink>
               </div>
-              <ol class="module-list rank">
-                <li v-for="(u, i) in checkin" :key="u.userName">
-                  <span class="cb-stick gold"><span class="icon-pin-rank">{{ i + 1 }}</span></span>
-                  <RouterLink :to="`/member/${u.userName}`">
-                    <span
-                      class="avatar-small"
-                      :style="avatarStyle(avatarOf(u))"
-                    />
-                  </RouterLink>
-                  <RouterLink class="title fn-ellipsis" :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
-                  <span class="count">{{ streakOf(u) }}天</span>
-                </li>
-              </ol>
+              <RankingBoard type="checkin" :initial="homeRanks.checkin" compact />
               <div class="index-head spaced">
                 <b>在线时间排行</b>
                 <RouterLink to="/top/online">更多</RouterLink>
               </div>
-              <ol class="module-list rank">
-                <li v-for="(u, i) in online" :key="u.userName">
-                  <span class="cb-stick gold"><span class="icon-pin-rank">{{ i + 1 }}</span></span>
-                  <RouterLink :to="`/member/${u.userName}`">
-                    <span
-                      class="avatar-small"
-                      :style="avatarStyle(avatarOf(u))"
-                    />
-                  </RouterLink>
-                  <RouterLink class="title fn-ellipsis" :to="`/member/${u.userName}`">{{ u.userName }}</RouterLink>
-                  <span class="count">{{ Number(u.onlineMinute || 0).toLocaleString() }} 分钟</span>
-                </li>
-              </ol>
+              <RankingBoard type="online" :initial="homeRanks.online" compact />
             </aside>
 
             <section v-else-if="mod.id === 'long'" class="long-zone">

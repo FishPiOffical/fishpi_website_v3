@@ -70,14 +70,6 @@ export function mockArticle(id: string): ArticleDetail | null {
   }
 }
 
-export function mockCheckin() {
-  return data.checkin
-}
-
-export function mockOnline() {
-  return data.online
-}
-
 export function mockDomains() {
   return data.domains
 }

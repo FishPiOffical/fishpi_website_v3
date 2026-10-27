@@ -27,6 +27,14 @@ export function shouldPrefetchSsr(path: string) {
     p === '/top/donate' ||
     p === '/top/perfect' ||
     p === '/top/invite' ||
+    p === '/top/links' ||
+    p === '/top/evolve' ||
+    p === '/top/xiaoice' ||
+    p === '/top/adr' ||
+    p === '/top/mofish' ||
+    p === '/top/smallmofish' ||
+    p === '/top/lifeRestart' ||
+    p === '/top/emoji' ||
     p === '/statistic' ||
     p === '/milestones' ||
     p === '/repeater' ||

@@ -1,3 +1,4 @@
+import type { RankingPage } from '@/api/v3-rankings'
 import type { CommunityStatistics } from '@/api/v3-statistics'
 import { getCurrentInstance, inject, type InjectionKey } from 'vue'
 import type { MilestonePage } from '@/api/v3-milestones'
@@ -8,7 +9,6 @@ import type {
   ChatHistoryItem,
   DomainItem,
   LiteUser,
-  RankUser,
   RepeaterItem,
   TagItem,
   UserProfile,
@@ -28,8 +28,9 @@ export interface SsrPayload {
   domains?: DomainItem[]
   tags?: TagItem[]
   tagsTotal?: number
-  checkinRank?: RankUser[]
-  onlineRank?: RankUser[]
+  rankingPage?: RankingPage | null
+  homeCheckinRanking?: RankingPage | null
+  homeOnlineRanking?: RankingPage | null
   recentUsers?: LiteUser[]
   repeater?: RepeaterItem[]
   chatFeed?: ChatHistoryItem[]
@@ -121,13 +122,6 @@ export function consumeBreezemoonPagePayload(scope: 'global' | 'home'): Breezemo
   return takeField(scope === 'global' ? 'breezemoonPage' : 'homeBreezemoonPage') || null
 }
 
-export function consumeRanksPayload(): { checkin: RankUser[]; online: RankUser[] } | null {
-  const checkin = takeField('checkinRank')
-  const online = takeField('onlineRank')
-  if (!Array.isArray(checkin) && !Array.isArray(online)) return null
-  return { checkin: checkin || [], online: online || [] }
-}
-
 export function consumeRepeaterPayload(): RepeaterItem[] | null {
   const v = takeField('repeater')
   return Array.isArray(v) ? v : null
@@ -136,8 +130,6 @@ export function consumeRepeaterPayload(): RepeaterItem[] | null {
 export function consumeHomeExtrasPayload(): {
   hot?: ArticleSummary[]
   long?: ArticleSummary[]
-  checkin?: RankUser[]
-  online?: RankUser[]
   recentUsers?: LiteUser[]
   tags?: TagItem[]
   chatFeed?: ChatHistoryItem[]
@@ -145,8 +137,6 @@ export function consumeHomeExtrasPayload(): {
 } | null {
   const hot = takeField('hotFeed')
   const long = takeField('longFeed')
-  const checkin = takeField('checkinRank')
-  const online = takeField('onlineRank')
   const recentUsers = takeField('recentUsers')
   const tags = takeField('tags')
   const chatFeed = takeField('chatFeed')
@@ -154,8 +144,6 @@ export function consumeHomeExtrasPayload(): {
   if (
     !Array.isArray(hot) &&
     !Array.isArray(long) &&
-    !Array.isArray(checkin) &&
-    !Array.isArray(online) &&
     !Array.isArray(recentUsers) &&
     !Array.isArray(tags) &&
     !Array.isArray(chatFeed) &&
@@ -166,8 +154,6 @@ export function consumeHomeExtrasPayload(): {
   return {
     hot: Array.isArray(hot) ? hot : undefined,
     long: Array.isArray(long) ? long : undefined,
-    checkin: Array.isArray(checkin) ? checkin : undefined,
-    online: Array.isArray(online) ? online : undefined,
     recentUsers: Array.isArray(recentUsers) ? recentUsers : undefined,
     tags: Array.isArray(tags) ? tags : undefined,
     chatFeed: Array.isArray(chatFeed) ? chatFeed : undefined,
@@ -178,3 +164,6 @@ export function consumeHomeExtrasPayload(): {
 export function consumeMilestonePayload(): MilestonePage | null { return takeField('milestonePage') || null }
 
 export function consumeStatisticsPayload(): CommunityStatistics | null { return takeField('statistics') || null }
+
+export function consumeRankingPayload(): RankingPage | null { return takeField('rankingPage') || null }
+export function consumeHomeRankingPayload() { return { checkin: takeField('homeCheckinRanking') || null, online: takeField('homeOnlineRanking') || null } }
