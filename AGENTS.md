@@ -165,7 +165,7 @@
 
 - 关注动态WatchView/v3-following-feed固定当前账号与source，真实pageCount而非短页长度；清风只呈现既有服务端清洗的contentHtml，BreezemoonList复用decodeV3RelationUser公开白名单，不回退源文HTML/全站数据。读者/分类代际清理，SSR准备态；全站清风/侧栏写入仍旧链。
 
-- 清风主列表/首页/侧栏用BreezemoonPanel与v3Breezemoons，未知写命令原key跨组件恢复，completed通知清除原提交草稿；成功后仅重读，列表失败不重写。SSR载荷必须由每个app的SSR_PAYLOAD_KEY提供，不用进程global；客户端initial state仍一次消费。城市与个人清风旧读取另迁移，首页签到/复读既有hydration差异不冒充清风验收通过。
+- 清风主列表/首页/侧栏用BreezemoonPanel与v3Breezemoons，未知写命令原key跨组件恢复，completed通知清除原提交草稿；成功后仅重读，列表失败不重写。SSR载荷必须由每个app的SSR_PAYLOAD_KEY提供，不用进程global；客户端initial state仍一次消费。个人清风旧读取另迁移，首页签到/复读既有hydration差异不冒充清风验收通过。
 
 - ContentRelationButton/v3ContentRelations按kind+ID共享明确命令，覆盖标签/普通文章/长篇阅读器，未知原key恢复，receipt后GET当前状态。跨组件完成通知必须废弃在途旧GET再重读，不能因loading丢通知；UserFollowButton同样处理。旧followArticle/watchArticle包装已删，禁止回用详情缺省isFollowing/isWatching推状态。
 
@@ -236,3 +236,5 @@
 - website_v3复读机由v3-repeater/useRepeaterFeed/v3Repeater接列表、服务端next及原键写恢复；榜单仅前12，写回执仅编号，成功GET当前榜单，随机项可离榜。Home/SSR明确joke，纯文本不stripHTML；见docs/api-v3-client-repeater-work.md。
 
 - website_v3鱼游在v3-fish-games/useFishGames/v3FishGames：默认votes分页、详情/评论独立读、明确三态投票，五字段投稿/编辑含OAuth必填；回执不写当前公开内容，未知原键跨SPA恢复。官方游戏只导航经典站点，见docs/api-v3-client-fish-games-work.md。
+
+- website_v3同城用v3-cities/useCityFeed双资源真分页，访客沿现有optional scope，独立错误/原页重试；Vue Router城市参数已解码，禁止再decodeURIComponent，API仅编码一次。移除近50条清风过滤，见docs/api-v3-client-cities-work.md。

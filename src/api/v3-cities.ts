@@ -1,0 +1,13 @@
+import {ApiError,request} from './http'
+import {adaptV3Article,decodeV3ContentPage} from './v3-content'
+import {decodeV3RelationUser,type RelationUser} from './v3-user-relations'
+import type {ArticleSummary} from './fishpi'
+export type CitySort='latest'|'active'|'hot'|'comments'
+export type CityUser=RelationUser&{userIntro:string}
+export interface CityPage<T>{list:T[];p:number;size:number;total:number;pageCount:number}
+const invalid=()=>new ApiError('同城响应格式不正确',502)
+export function cityInput(value:string){if(typeof value!=='string')throw new ApiError('城市名称不合法',422);const city=value.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g,'');if(!city||city.length>64||/[\u0000-\u001f\u007f-\u009f]/u.test(city)||Array.from(city).some(c=>c.length===1&&/[\ud800-\udfff]/u.test(c)))throw new ApiError('城市名称须为1至64个有效字符',422);return city}
+function row(value:unknown):Record<string,unknown>{if(!value||typeof value!=='object'||Array.isArray(value))throw invalid();return value as Record<string,unknown>}
+async function page<T>(city:string,resource:'users'|'articles',p:number,decode:(v:unknown)=>T,sort?:CitySort):Promise<CityPage<T>>{city=cityInput(city);if(!Number.isSafeInteger(p)||p<1||p>42949672)throw new ApiError('同城页码不合法',422);const query=new URLSearchParams({p:String(p),size:'20'});if(sort)query.set('sort',sort);const envelope=row(await request(`/api/v3/cities/${encodeURIComponent(city)}/${resource}?${query}`,{cache:'no-store'}));if(envelope.code!==0)throw invalid();const data=decodeV3ContentPage(envelope.data);if(data.pagination.p!==p||data.pagination.size!==20)throw invalid();return{...data.pagination,list:data.list.map(decode)}}
+export async function fetchCityUsers(city:string,p=1):Promise<CityPage<CityUser>>{const result=await page(city,'users',p,value=>{const data=row(value),user=decodeV3RelationUser(data);if(typeof data.userIntro!=='string'||data.userIntro.length>65536)throw invalid();return{...user,userIntro:data.userIntro}});if(new Set(result.list.map(u=>u.id)).size!==result.list.length)throw invalid();return result}
+export async function fetchCityArticles(city:string,p=1,sort:CitySort='latest'):Promise<CityPage<ArticleSummary>>{if(!['latest','active','hot','comments'].includes(sort))throw new ApiError('同城文章排序不合法',422);const result=await page(city,'articles',p,value=>{const data=row(value);if(data.anonymous!==false)throw invalid();const article=adaptV3Article(data),user=decodeV3RelationUser(data.author);return{...article,articleAuthorId:user.id,articleAuthorName:user.userName,articleAuthorThumbnailURL48:user.userAvatarURL,articleAuthorThumbnailURL20:user.userAvatarURL}} ,sort);if(new Set(result.list.map(a=>a.oId)).size!==result.list.length)throw invalid();return result}
