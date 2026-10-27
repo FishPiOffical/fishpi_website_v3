@@ -1,3 +1,5 @@
+import { decodeArticleListing, type ColumnOrder } from '@/api/v3-article-list'
+import type { ArticleFeedKind } from '@/api/fishpi'
 import { decodeRecentMembers } from '@/api/v3-discovery-extras'
 import type { RelationUser } from '@/api/v3-user-relations'
 import { decodePublicUser, type PublicUser } from '@/api/v3-public-user'
@@ -16,6 +18,7 @@ import type {
 } from '@/api/fishpi'
 
 export interface SsrPayload {
+  articleListing?: unknown
   recentMembers?: RelationUser[] | null
   statistics?: CommunityStatistics | null
   milestonePage?: MilestonePage | null
@@ -166,3 +169,8 @@ export function consumeRankingPayload(): RankingPage | null { return takeField('
 export function consumeHomeRankingPayload() { return { checkin: takeField('homeCheckinRanking') || null, online: takeField('homeOnlineRanking') || null } }
 
 export function consumeRecentMembersPayload(): RelationUser[] | null { const value = takeField('recentMembers'); if (value == null) return null; try { return decodeRecentMembers(value) } catch { return null } }
+
+export function consumeArticleListingPayload(kind: ArticleFeedKind, extra: string, order: ColumnOrder) {
+  const value = takeField('articleListing')
+  try { return decodeArticleListing(value, kind, extra, order) } catch { return null }
+}

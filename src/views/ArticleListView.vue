@@ -1,271 +1,112 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { storeToRefs } from 'pinia'
-import { fetchArticleFeed, fetchHomeColumns, type ArticleFeedKind, type ArticleSummary, type HomeColumnCard } from '@/api/fishpi'
-import { useAuthStore } from '@/stores/auth'
+import type { ArticleFeedKind } from '@/api/fishpi'
+import type { ColumnOrder } from '@/api/v3-article-list'
 import ContentRelationButton from '@/components/articles/ContentRelationButton.vue'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
 import SideBar from '@/components/SideBar.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
-import { consumeFeedPayload } from '@/seo/payload'
-import { SITE_DEFAULT_DESC, SITE_ORIGIN } from '@/seo/site'
+import { useArticleListing } from '@/composables/useArticleListing'
+import { consumeArticleListingPayload } from '@/seo/payload'
+import { SITE_DEFAULT_DESC } from '@/seo/site'
 import FpLoading from '@/components/FpLoading.vue'
-import { createSwrLoader, writeCache } from '@/utils/swr'
-import { articleTitle } from '@/utils/text'
-
+import { decodeEntities } from '@/utils/text'
 const route = useRoute()
-const auth = useAuthStore()
-const { apiKey, accessToken } = storeToRefs(auth)
-
-const items = ref<ArticleSummary[]>([])
-const columns = ref<{ recent: HomeColumnCard[]; hot: HomeColumnCard[] }>({ recent: [], hot: [] })
-const columnShelf = ref<'recent' | 'hot'>('recent')
-const loading = ref(false)
-const error = ref('')
-const page = ref(1)
-const DEFAULT_COLUMN_COVER = `${SITE_ORIGIN}/images/holiday/book-bg.jpg`
-
 const kind = computed(() => (route.meta.list as ArticleFeedKind) || 'recent')
-const title = computed(() => (route.meta.title as string) || '帖子')
-const keyword = computed(() => (typeof route.query.q === 'string' ? route.query.q : ''))
-const domainUri = computed(() => String(route.params.uri || ''))
-const extra = computed(() => {
-  if (kind.value === 'domain') return domainUri.value
-  if (kind.value === 'tag') return String(route.params.tag || '')
-  return keyword.value
-})
-const paged = computed(() => true)
-const heading = computed(() => (kind.value === 'tag' ? `#${extra.value}` : title.value))
-const RECENT_TABS = [
-  { to: '/recent', label: '默认' },
-  { to: '/recent/hot', label: '热议' },
-  { to: '/recent/good', label: '👍 好评' },
-  { to: '/recent/reply', label: '最近回帖' },
-]
-const showRecentTabs = computed(() => RECENT_TABS.some((t) => t.to === route.path))
+const title = computed(() => String(route.meta.title || '帖子'))
+const keyword = computed(() => typeof route.query.q === 'string' ? route.query.q : '')
+// Vue Router already decoded path parameters. API resolution performs its own single encoding.
+const extra = computed(() => kind.value === 'domain' ? String(route.params.uri || '') : kind.value === 'tag' ? String(route.params.tag || '') : kind.value === 'search' ? keyword.value : '')
+const columnShelf = ref<ColumnOrder>('recent')
+const { value, p, loading, error, read } = useArticleListing(kind, extra, columnShelf, consumeArticleListingPayload(kind.value, extra.value, columnShelf.value))
+const items = computed(() => value.value?.resource === 'articles' ? value.value.list : [])
+const columns = computed(() => value.value?.resource === 'columns' ? value.value.list : [])
 const isColumnPage = computed(() => kind.value === 'long')
-const visibleColumns = computed(() => {
-  const source = columns.value[columnShelf.value]
-  const articleById = new Map(items.value.map((item) => [item.oId, item]))
-  const found = new Set<string>()
-  const cards = source.map((column) => {
-    found.add(column.columnId)
-    const chapter = column.latestChapter?.articleId ? articleById.get(column.latestChapter.articleId) : undefined
-    return {
-      ...column,
-      preview: column.latestChapter?.preview || chapter?.articlePreviewContent || column.latestChapter?.title || '持续更新中',
-      latest: column.latestChapter,
-      authorName: chapter?.articleAuthorName,
-      authorId: chapter?.articleAuthorId,
-    }
-  })
-  const groups = new Map<string, ArticleSummary[]>()
-  for (const item of items.value) {
-    if (!item.columnId || found.has(item.columnId)) continue
-    const group = groups.get(item.columnId) || []
-    group.push(item)
-    groups.set(item.columnId, group)
-  }
-  for (const [id, chapters] of groups) {
-    const newest = chapters[0]
-    cards.push({
-      columnId: id,
-      columnTitle: newest.columnTitle || `专栏 ${id}`,
-      columnArticleCount: chapters.length,
-      columnCoverURL: '',
-      chapters: chapters.map((chapter) => ({ articleId: chapter.oId, permalink: `/article/${chapter.oId}`, chapterNo: '', title: articleTitle(chapter) })),
-      latestChapter: { articleId: newest.oId, permalink: `/article/${newest.oId}`, chapterNo: '', title: articleTitle(newest) },
-      preview: newest.articlePreviewContent || articleTitle(newest),
-      latest: { articleId: newest.oId, permalink: `/article/${newest.oId}`, chapterNo: '', title: articleTitle(newest) },
-      authorName: newest.articleAuthorName,
-      authorId: newest.articleAuthorId,
-    })
-  }
-  return cards
+const heading = computed(() => kind.value === 'tag' ? `#${extra.value}` : title.value)
+const RECENT_TABS = [{ to: '/recent', label: '默认' }, { to: '/recent/hot', label: '热议' }, { to: '/recent/good', label: '👍 好评' }, { to: '/recent/reply', label: '最近回帖' }]
+const showRecentTabs = computed(() => RECENT_TABS.some(tab => tab.to === route.path))
+const failedCovers = ref(new Set<string>()), panel = ref<HTMLElement | null>(null)
+let lastPage = 1
+watch(value, data => {
+  failedCovers.value = new Set()
+  if (!data) return
+  const moved = lastPage !== data.p; lastPage = data.p
+  if (moved) void nextTick(() => { if (value.value === data) panel.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) })
 })
-
-usePageSeo(() => ({
-  title: heading.value,
-  description: keyword.value
-    ? `搜索「${keyword.value}」相关帖子`
-    : `${heading.value} · ${SITE_DEFAULT_DESC}`,
-  path: route.path,
-  robots: String(route.meta.robots || 'index,follow'),
-}))
-
-const swr = createSwrLoader({ loading, error })
-
-async function load() {
-  const key = `feed:${kind.value}:${extra.value}:${page.value}`
-  const boot = page.value === 1 ? consumeFeedPayload(kind.value) : null
-  if (boot) {
-    items.value = boot
-    writeCache(key, boot)
-    if (kind.value === 'long') columns.value = await fetchHomeColumns()
-    return
-  }
-  await swr(
-    key,
-    async () => {
-      const [articles, columnData] = await Promise.all([
-        fetchArticleFeed(kind.value, apiKey.value, page.value, 30, extra.value),
-        kind.value === 'long' ? fetchHomeColumns() : Promise.resolve(null),
-      ])
-      return { articles, columnData }
-    },
-    (data) => {
-      items.value = data.articles
-      if (data.columnData) columns.value = data.columnData
-    },
-  )
-}
-
-watch(
-  () => [kind.value, extra.value],
-  () => {
-    page.value = 1
-  },
-)
-
-watch(accessToken, () => { items.value = []; columns.value = { recent: [], hot: [] } }, { flush: 'sync' })
-
-watch(
-  () => [kind.value, extra.value, accessToken.value, page.value],
-  () => {
-    void load()
-  },
-  { immediate: true },
-)
-
-function scrollToTop() {
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function prevPage() {
-  if (page.value > 1) {
-    page.value -= 1
-    scrollToTop()
-  }
-}
-
-function nextPage() {
-  page.value += 1
-  scrollToTop()
-}
+watch(error, message => { if (message) void nextTick(() => { if (error.value === message) panel.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }) })
+usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' && keyword.value ? `搜索「${keyword.value}」相关帖子` : `${heading.value} · ${SITE_DEFAULT_DESC}`, path: route.path, robots: String(route.meta.robots || 'index,follow') }))
 </script>
 
 <template>
   <div class="wrapper list-page-wrap">
     <div class="content">
-      <div class="module">
+      <div ref="panel" class="list-content">
         <section v-if="isColumnPage" class="column-intro">
-          <div class="column-intro-copy">
-            <div class="eyebrow"><span class="eyebrow-dot"></span> FISHPI · STORIES</div>
-            <h1>长篇专栏</h1>
-            <p>把故事慢慢写完，也把喜欢的章节一页页读下去。</p>
-          </div>
+          <div class="column-intro-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> FISHPI · STORIES</div><h1>长篇专栏</h1><p>把故事慢慢写完，也把喜欢的章节一页页读下去。</p></div>
           <div class="column-intro-mark" aria-hidden="true"><span>卷</span><i></i><b></b></div>
-          <div class="column-intro-footer"><span>专栏集 · {{ visibleColumns.length }} 部作品</span><span>每一次更新，都是故事的新一页</span></div>
+          <div class="column-intro-footer"><span v-if="value">共 {{ value.total }} 部可见作品</span><span v-else>专栏目录</span><span>每一次更新，都是故事的新一页</span></div>
         </section>
-
-        <div v-if="!isColumnPage" class="module-header list-page-head">
-          <div class="head-left">
-            <h2>{{ kind === 'tag' ? `#${extra}` : title }}</h2>
-            <ContentRelationButton v-if="kind==='tag'" kind="tag" :target="extra" />
-            <span v-if="keyword" class="search-tag">关键词：{{ keyword }}</span>
-          </div>
-          <div class="head-right">
-            <nav v-if="showRecentTabs" class="sort-tabs">
-              <RouterLink v-for="t in RECENT_TABS" :key="t.to" :to="t.to" :class="{ current: route.path === t.to }">
-                {{ t.label }}
-              </RouterLink>
-            </nav>
-            <span class="total-count">第 {{ page }} 页</span>
-          </div>
+        <div v-else class="module-header list-page-head">
+          <div class="head-left"><h1>{{ heading }}</h1><ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" /><span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span></div>
+          <div class="head-right"><nav v-if="showRecentTabs" class="sort-tabs"><RouterLink v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to" :class="{ current: route.path === tab.to }">{{ tab.label }}</RouterLink></nav><span v-if="value" class="total-count">共 {{ value.total }} 篇</span></div>
         </div>
-
         <div v-if="isColumnPage" class="column-shelf-head">
-          <div><strong>正在连载</strong><span>精选最近更新与热门故事</span></div>
-          <div class="column-switch" role="tablist" aria-label="专栏排序">
-            <button type="button" role="tab" :aria-selected="columnShelf === 'recent'" :class="{ selected: columnShelf === 'recent' }" @click="columnShelf = 'recent'">最近更新</button>
-            <button type="button" role="tab" :aria-selected="columnShelf === 'hot'" :class="{ selected: columnShelf === 'hot' }" @click="columnShelf = 'hot'">热门作品</button>
-          </div>
+          <div><strong>专栏目录</strong><span>按当前可见章节统计</span></div>
+          <div class="column-switch" role="tablist" aria-label="专栏排序"><button type="button" role="tab" :aria-selected="columnShelf === 'recent'" :class="{ selected: columnShelf === 'recent' }" @click="columnShelf = 'recent'">最近更新</button><button type="button" role="tab" :aria-selected="columnShelf === 'hot'" :class="{ selected: columnShelf === 'hot' }" @click="columnShelf = 'hot'">热门作品</button></div>
         </div>
+        <button type="button" class="btn refresh-list" :disabled="loading" @click="read()">刷新列表</button>
         <FpLoading v-if="loading" :rows="8" />
-        <p v-else-if="error" class="err">{{ error }}</p>
-
-        <div v-else-if="isColumnPage" class="column-grid">
-          <article v-for="column in visibleColumns" :key="column.columnId" class="column-card">
-            <RouterLink class="column-cover-link" :to="`/column/${column.columnId}`" :aria-label="`阅读《${column.columnTitle}》`">
-              <img :src="column.columnCoverURL || DEFAULT_COLUMN_COVER" alt="" loading="lazy">
-              <span class="cover-label">{{ columnShelf === 'hot' ? '人气连载' : '持续更新' }}</span>
-            </RouterLink>
-            <div class="column-card-copy">
-              <RouterLink class="column-title" :to="`/column/${column.columnId}`">{{ column.columnTitle }}</RouterLink>
-              <p class="column-preview">{{ column.preview }}</p>
-              <div class="column-author-row">
-                <RouterLink v-if="column.authorName" :to="`/member/${column.authorName}`" class="column-author">{{ column.authorName }}</RouterLink>
-                <span v-else class="column-author">摸鱼派作者</span>
-                <span class="chapter-count">{{ column.columnArticleCount }} 章</span>
+        <div v-else-if="error" class="err" role="alert"><p>{{ error }}</p><button type="button" class="btn" @click="read()">重试当前页</button><button v-if="p > 1" type="button" class="btn" @click="read(1)">返回第一页</button></div>
+        <template v-else-if="value">
+          <div v-if="value.resource === 'columns'" class="column-grid">
+            <article v-for="column in columns" :key="column.id" class="column-card">
+              <RouterLink class="column-cover-link" :to="`/column/${column.id}`" :aria-label="`阅读《${decodeEntities(column.title)}》`">
+                <img v-if="column.coverURL && !failedCovers.has(column.id)" :src="column.coverURL" alt="" loading="lazy" @error="failedCovers.add(column.id)"><span v-else class="cover-placeholder" aria-hidden="true">卷</span>
+                <span class="cover-label">{{ columnShelf === 'hot' ? '热门作品' : '最近更新' }}</span>
+              </RouterLink>
+              <div class="column-card-copy">
+                <RouterLink class="column-title" :to="`/column/${column.id}`">{{ decodeEntities(column.title) }}</RouterLink>
+                <p v-if="column.chapters[0]?.preview" class="column-preview">{{ decodeEntities(column.chapters[0]!.preview || '') }}</p>
+                <div class="column-author-row"><span class="chapter-count">{{ column.articleCount }} 章</span></div>
+                <div v-if="column.chapters[0]" class="latest-chapter"><span>最近更新</span><RouterLink :to="`/article/${column.chapters[0]!.id}`">第 {{ column.chapters[0]!.chapterNo }} 章 · {{ decodeEntities(column.chapters[0]!.title) }}</RouterLink></div>
+                <RouterLink class="read-column" :to="`/column/${column.id}`">进入专栏 <span aria-hidden="true">→</span></RouterLink>
               </div>
-              <div class="latest-chapter" v-if="column.latest">
-                <span>最近更新</span>
-                <RouterLink :to="column.latest.permalink || `/article/${column.latest.articleId}`">{{ column.latest.title }}</RouterLink>
-              </div>
-              <RouterLink class="read-column" :to="`/column/${column.columnId}`">进入专栏 <span aria-hidden="true">→</span></RouterLink>
-            </div>
-          </article>
-          <p v-if="!visibleColumns.length && !loading" class="column-empty">暂时还没有专栏，稍后再来看看吧。</p>
-        </div>
-        <ArticleFeed v-else :items="items" empty="该分类下暂无内容" />
-
-        <!-- 现网分页控件 -->
-        <div v-if="paged && (items.length > 0 || page > 1)" class="pagination-bar">
-          <button
-            type="button"
-            class="btn page-btn"
-            :disabled="page <= 1"
-            @click="prevPage"
-          >
-            ‹ 上一页
-          </button>
-          <span class="current-page-num">{{ page }}</span>
-          <button
-            type="button"
-            class="btn page-btn"
-            :disabled="items.length < 20"
-            @click="nextPage"
-          >
-            下一页 ›
-          </button>
-        </div>
+            </article>
+            <p v-if="!columns.length" class="column-empty">本页暂无可见专栏。</p>
+          </div>
+          <ArticleFeed v-else :items="items" empty="该分类下暂无内容" />
+          <nav class="pagination-bar" aria-label="列表分页"><button type="button" class="btn page-btn" :disabled="p <= 1" @click="read(p - 1)">‹ 上一页</button><span v-if="value.pageCount" class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span><span v-else>暂无分页</span><button type="button" class="btn page-btn" :disabled="p >= value.pageCount" @click="read(p + 1)">下一页 ›</button><button v-if="p > value.pageCount && p > 1" type="button" class="btn" @click="read(1)">返回第一页</button></nav>
+        </template>
+        <p v-else role="status">列表尚未读取。</p>
       </div>
     </div>
-
-    <!-- 侧边栏：结合本地登录态与现网社区模块 -->
-    <div class="side">
-      <SideBar />
-    </div>
+    <div class="side"><SideBar /></div>
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+.list-content { min-width: 0; scroll-margin-top: 80px; }
+.refresh-list { margin: 8px 16px 16px; }
 .list-page-wrap {
   padding-top: 4px;
 }
 
 .list-page-head {
+  flex-wrap: wrap;
+  gap: 10px;
   padding: 12px 18px;
 }
 
 .head-left {
+  min-width: 0;
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.head-left h2 {
+.head-left h1 {
   font-size: 16px;
   font-weight: 600;
   color: var(--fp-title);
@@ -312,15 +153,6 @@ function nextPage() {
   color: var(--fp-muted);
 }
 
-.mock-hint {
-  padding: 10px 18px;
-  margin: 0;
-  background: var(--fp-hover);
-  color: var(--fp-accent);
-  font-size: 12px;
-  border-bottom: 1px solid var(--fp-border);
-}
-
 .hint {
   padding: 30px 18px;
   text-align: center;
@@ -336,6 +168,7 @@ function nextPage() {
 }
 
 .pagination-bar {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -410,8 +243,10 @@ function nextPage() {
 .column-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--fp-accent) 40%, var(--fp-border)); box-shadow: 0 8px 24px rgba(60,45,30,.08); }
 .column-cover-link { position: relative; display: block; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 7px; background: linear-gradient(145deg,#ead6b6,#b38c61); box-shadow: 0 5px 14px rgba(50,35,20,.17); }
 .column-cover-link::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(255,255,255,.22); border-radius: inherit; }
+.cover-placeholder { display: grid; place-items: center; width: 100%; height: 100%; color: #fff8ec; font-size: 36px; background: repeating-linear-gradient(90deg, transparent 0 10px, rgba(255,255,255,.08) 10px 11px); }
 .column-cover-link img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
-.column-card:hover .column-cover-link img { transform: scale(1.035); }
+.column-card:hover .cover-placeholder { display: grid; place-items: center; width: 100%; height: 100%; color: #fff8ec; font-size: 36px; background: repeating-linear-gradient(90deg, transparent 0 10px, rgba(255,255,255,.08) 10px 11px); }
+.column-cover-link img { transform: scale(1.035); }
 .cover-label { position: absolute; z-index: 1; left: 6px; bottom: 6px; padding: 3px 6px; border-radius: 4px; color: #fff; background: rgba(43,35,29,.72); font-size: 9px; }
 .column-card-copy { min-width: 0; display: flex; flex-direction: column; }
 .column-title { color: var(--fp-title); font-size: 16px; font-weight: 700; line-height: 1.4; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

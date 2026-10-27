@@ -1,3 +1,4 @@
+import { fetchArticleListing } from './api/v3-article-list'
 import { fetchRecentMembers } from './api/v3-discovery-extras'
 import { fetchPublicUser } from './api/v3-public-user'
 import { fetchRanking, rankingTitles, type RankingType } from './api/v3-rankings'
@@ -103,22 +104,20 @@ async function prefetch(url: string): Promise<SsrPayload> {
     }
     if (listMap[path]) {
       const kind = listMap[path]
-      return { feed: await fetchArticleFeed(kind, null, 1, 40), feedKind: kind }
+      return { articleListing: await fetchArticleListing(kind) }
     }
 
     const domainMatch = path.match(/^\/domain\/([^/]+)$/)
     if (domainMatch) {
       return {
-        feed: await fetchArticleFeed('domain', null, 1, 40, decodeURIComponent(domainMatch[1])),
-        feedKind: 'domain',
+        articleListing: await fetchArticleListing('domain', decodeURIComponent(domainMatch[1])),
       }
     }
 
     const tagMatch = path.match(/^\/tag\/([^/]+)$/)
     if (tagMatch) {
       return {
-        feed: await fetchArticleFeed('tag', null, 1, 40, decodeURIComponent(tagMatch[1])),
-        feedKind: 'tag',
+        articleListing: await fetchArticleListing('tag', decodeURIComponent(tagMatch[1])),
       }
     }
   } catch {

@@ -17,7 +17,7 @@ function image(value: unknown) {
 }
 function chapter(value: unknown): PublicChapter { const data = row(value); return { id: articleId(data.id), title: text(data.title), chapterNo: number(data.chapterNo), createdAt: time(data.createdAt), ...(data.preview === undefined ? {} : { preview: text(data.preview) }) } }
 function chapters(value: unknown) { if (!Array.isArray(value)) throw invalid(); const list = value.map(chapter); if (new Set(list.map(x => x.id)).size !== list.length) throw invalid(); return list }
-function column(value: unknown): PublicColumn {
+export function decodePublicColumnCard(value: unknown): PublicColumn {
   const data = row(value), id = publicColumnId(text(data.id, 64)), latest = chapters(data.chapters)
   if (data.columnId !== undefined && data.columnId !== id || latest.length > 2) throw invalid()
   const articleCount = number(data.articleCount)
@@ -30,11 +30,11 @@ export async function fetchPublicColumnCards(kind: 'latest' | 'hot', p = 1, size
   paging(p, size); if (!['latest', 'hot'].includes(kind)) throw new ApiError('专栏排序不合法', 422)
   const page = decodeV3ContentPage(await data(`/api/v3/columns${kind === 'hot' ? '/hot' : ''}?p=${p}&size=${size}`))
   if (page.pagination.p !== p || page.pagination.size !== size) throw invalid()
-  const list = page.list.map(column); if (new Set(list.map(x => x.id)).size !== list.length) throw invalid()
+  const list = page.list.map(decodePublicColumnCard); if (new Set(list.map(x => x.id)).size !== list.length) throw invalid()
   return { ...page.pagination, list }
 }
 export async function fetchPublicColumnDetail(id: string) {
-  publicColumnId(id); const result = await data(`/api/v3/columns/${encodeURIComponent(id)}`), meta = column(result.column), list = chapters(result.chapters)
+  publicColumnId(id); const result = await data(`/api/v3/columns/${encodeURIComponent(id)}`), meta = decodePublicColumnCard(result.column), list = chapters(result.chapters)
   if (meta.id !== id || meta.articleCount !== list.length || list.some((item, index) => index > 0 && item.chapterNo < list[index - 1]!.chapterNo)) throw invalid()
   return { column: meta, first: list[0] || null, latest: list[list.length - 1] || null }
 }

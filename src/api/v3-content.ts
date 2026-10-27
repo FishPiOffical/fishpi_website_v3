@@ -26,7 +26,7 @@ function params(p: number, size: number) {
   return `p=${p}&size=${size}`
 }
 async function get(path: string): Promise<unknown> {
-  const envelope = row(await request(path))
+  const envelope = row(await request(path, { cache: 'no-store' }))
   if (envelope.code !== 0) throw new ApiError(typeof envelope.msg === 'string' ? envelope.msg : '内容加载失败', 400, String(envelope.code))
   return envelope.data
 }
@@ -109,20 +109,39 @@ async function resolveDirectoryId(kind: 'tags' | 'domains', value: string): Prom
   return pathId(id(matches[0]!.id))
 }
 export async function resolveV3TagId(value: string): Promise<string> { return resolveDirectoryId('tags', value) }
-export async function v3ArticleFeed(kind: ArticleFeedKind, page = 1, size = 40, extra = ''): Promise<ArticleSummary[]> {
+async function articleFeedPath(kind: ArticleFeedKind, page: number, size: number, extra: string): Promise<string | null> {
   const paging = params(page, size)
-  if (kind === 'search') return v3Search(extra, page, size)
+  if (kind === 'search') {
+    const q = extra.trim()
+    if (q.length > 100 || /[\u0000-\u001f\u007f-\u009f\p{Surrogate}]/u.test(q)) throw new ApiError('搜索关键词不合法（最多100个字符）', 422)
+    return q ? `/api/v3/search?${paging}&q=${encodeURIComponent(q)}&sort=latest&type=all` : null
+  }
   if (kind === 'domain' || kind === 'tag') {
     const plural = kind === 'domain' ? 'domains' : 'tags'
     const resolved = await resolveDirectoryId(plural, extra)
-    return articleList(`/api/v3/${plural}/${resolved}/articles?${paging}&sort=latest&type=all`)
+    return `/api/v3/${plural}/${resolved}/articles?${paging}&sort=latest&type=all`
   }
   const sort = kind === 'hot' ? 'month-comments' : kind === 'good' ? 'hot' : kind === 'reply' ? 'active' : 'latest'
   const type = kind === 'long' || kind === 'qna' || kind === 'perfect' ? kind : 'recent'
   if (!['recent', 'hot', 'long', 'good', 'reply', 'qna', 'perfect'].includes(kind)) {
     throw new ApiError('文章分类不合法', 422, 'invalid_request')
   }
-  return articleList(`/api/v3/articles?${paging}&sort=${sort}&type=${type}`)
+  return `/api/v3/articles?${paging}&sort=${sort}&type=${type}`
+}
+export async function v3ArticleFeed(kind: ArticleFeedKind, page = 1, size = 40, extra = ''): Promise<ArticleSummary[]> {
+  const path = await articleFeedPath(kind, page, size, extra)
+  return path ? articleList(path) : []
+}
+export type V3ArticleFeedPage = { list: ArticleSummary[]; p: number; size: number; total: number; pageCount: number }
+export async function v3ArticleFeedPage(kind: ArticleFeedKind, page = 1, size = 20, extra = ''): Promise<V3ArticleFeedPage> {
+  if (page > 42949672) throw new ApiError('页码不合法', 422)
+  const path = await articleFeedPath(kind, page, size, extra)
+  if (!path) throw new ApiError('请输入搜索关键词', 422)
+  const data = decodeV3ContentPage(await get(path))
+  if (data.pagination.p !== page || data.pagination.size !== size) throw invalid()
+  const list = data.list.map(adaptV3Article)
+  if (new Set(list.map(item => item.oId)).size !== list.length) throw invalid()
+  return { ...data.pagination, list }
 }
 export async function v3Domains(): Promise<DomainItem[]> { return (await directory('domains')).map(adaptV3Domain) }
 export async function v3Tags(page = 1, size = 50): Promise<{ tags: TagItem[]; total: number }> {
