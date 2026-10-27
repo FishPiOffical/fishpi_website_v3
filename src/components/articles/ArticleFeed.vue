@@ -45,9 +45,9 @@ function avatarOf(a: ArticleSummary) {
     <ol v-if="compact" class="feed compact">
       <li v-if="!rows.length" class="empty">{{ empty }}</li>
       <li v-for="item in rows" :key="item.oId" class="compact-item">
-        <span v-if="item.articleStick" class="cb-stick" title="置顶" />
+        <span v-if="item.stick?.active ?? Boolean(item.articleStick)" class="cb-stick" :title="item.stick?.permanent ? '永久置顶' : '置顶'" />
         <RouterLink
-          v-if="item.articleAuthorName"
+          v-if="item.articleAuthorName && item.articleAnonymous !== 1"
           :to="`/member/${item.articleAuthorName}`"
           class="compact-avatar-link"
         >
@@ -65,7 +65,7 @@ function avatarOf(a: ArticleSummary) {
     <ul v-else class="feed full">
       <li v-if="!rows.length" class="empty">{{ empty }}</li>
       <li v-for="item in rows" :key="item.oId" class="feed-item">
-        <span v-if="item.articleStick" class="cb-stick" title="置顶" />
+        <span v-if="item.stick?.active ?? Boolean(item.articleStick)" class="cb-stick" :title="item.stick?.permanent ? '永久置顶' : '置顶'" />
 
         <!-- 顶部标签与回帖/浏览统计行 -->
         <div class="item-header fn-clear">
@@ -105,7 +105,7 @@ function avatarOf(a: ArticleSummary) {
         <!-- 作者与时间行 -->
         <div class="item-author-row">
           <RouterLink
-            v-if="item.articleAuthorName"
+            v-if="item.articleAuthorName && item.articleAnonymous !== 1"
             :to="`/member/${item.articleAuthorName}`"
             class="author-avatar"
           >
@@ -118,13 +118,14 @@ function avatarOf(a: ArticleSummary) {
           <div class="author-meta fn-ellipsis">
             <div class="author-line">
               <RouterLink
-                v-if="item.articleAuthorName"
+                v-if="item.articleAuthorName && item.articleAnonymous !== 1"
                 :to="`/member/${item.articleAuthorName}`"
                 class="author-name"
               >
                 {{ item.articleAuthorName }}
               </RouterLink>
-              <span v-if="item.articleAuthorIntro" class="author-intro">
+              <span v-if="item.articleAnonymous === 1" class="author-name">匿名用户</span>
+              <span v-if="item.articleAuthorIntro && item.articleAnonymous !== 1" class="author-intro">
                 - {{ item.articleAuthorIntro }}
               </span>
             </div>

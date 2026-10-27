@@ -1,27 +1,34 @@
 <script setup lang="ts">
+import {getAuthContextVersion} from '@/api/http'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import ChatBubble from '@/components/ChatBubble.vue'
+import ChatRedPacketCard from '@/components/chat/ChatRedPacketCard.vue'
+import ChatCard from '@/components/ChatCard.vue'
 import ChatComposer from '@/components/ChatComposer.vue'
 import FpLoading from '@/components/FpLoading.vue'
+import ChatRevokeAction from '@/components/chat/ChatRevokeAction.vue'
+import ChatRevokeRecovery from '@/components/chat/ChatRevokeRecovery.vue'
+import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
+import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
+import V3PrivateMessages from '@/components/chat/V3PrivateMessages.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useChatFilterStore } from '@/stores/chatFilter'
-import { useWhisperStore } from '@/stores/whispers'
+import { usePrivateInboxStore } from '@/stores/privateInbox'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 
 const auth = useAuthStore()
-const chat = useChatStore()
+const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const chatFilter = useChatFilterStore()
-const whispers = useWhisperStore()
+const whispers = usePrivateInboxStore()
 const route = useRoute()
-const router = useRouter()
 const { account, apiKey } = storeToRefs(auth)
-const { list, listLoading, unreadBy, unreadTotal, messages, sending, loading, error, connected, connecting, hasMore, loadingMore, inboxPeer } =
-  storeToRefs(whispers)
+const {inboxPeer,inboxPeerId}=storeToRefs(whispers)
+const privateFullId=ref('')
 const {
   messages: roomMessages,
   connected: roomConnected,
@@ -34,15 +41,11 @@ const {
 } = storeToRefs(chat)
 const CHATROOM_PEER = '__fishpi_chatroom__'
 const CHATROOM_LABEL = '聊天室'
-const selectedPeer = ref('')
-const toUser = ref('')
+const selectedPeer = ref('__private__')
 const draft = ref('')
 const isChatroomSelected = computed(() => selectedPeer.value === CHATROOM_PEER)
 const visibleRoomMessages = computed(() => roomMessages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
-const canSend = computed(() => isChatroomSelected.value
-  ? Boolean(draft.value.trim()) && !roomSending.value && roomConnected.value
-  : Boolean(draft.value.trim()) && !sending.value && connected.value)
-const connectionLabel = computed(() => connected.value ? '已连接' : connecting.value ? '连接中' : '已断开')
+const canSend = computed(()=>Boolean(draft.value.trim())&&!roomSending.value&&!publication.pending)
 const roomConnectionLabel = computed(() => roomConnected.value ? '已连接' : roomConnecting.value ? '连接中' : '已断开')
 const scroller = ref<HTMLElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
@@ -96,14 +99,6 @@ let resizingPointer: number | null = null
 let resizeDirection: 'nw' | 'se' = 'se'
 let resizeStart = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0 }
 let panelResizeObserver: ResizeObserver | null = null
-
-function peerOf(msg: (typeof list.value)[number]) {
-  return whispers.peerOf(msg, account.value?.userName)
-}
-
-function peerAvatar(msg: (typeof list.value)[number]) {
-  return (msg.senderUserName === account.value?.userName ? msg.receiverAvatar : msg.senderAvatar) || '/favicon.svg'
-}
 
 function close() {
   emit('update:modelValue', false)
@@ -228,27 +223,12 @@ function stopResizing(e: PointerEvent) {
   if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId)
 }
 
-async function selectConversation(name: string) {
-  const peer = name.trim()
-  if (!peer || !apiKey.value) return
-  if (isChatroomSelected.value) {
-    chat.floatingChatroomOpen = false
-    if (route.path !== '/cr') chat.disconnect()
-  }
-  selectedPeer.value = peer
-  draft.value = ''
-  const opening = whispers.open(peer)
-  if (route.path === '/chat' || route.path.startsWith('/chat/')) {
-    const routePeer = String(route.params.userName || '')
-    if (routePeer !== peer) await router.replace(`/chat/${encodeURIComponent(peer)}`)
-  }
-  await opening
-  await nextTick()
-  if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
+function selectPrivate(){
+ selectedPeer.value='__private__';chat.floatingChatroomOpen=false
+ if(route.path!=='/cr'&&route.path!=='/')chat.disconnect()
 }
 
 async function selectChatroom() {
-  if (!apiKey.value) return
   selectedPeer.value = CHATROOM_PEER
   draft.value = ''
   chat.floatingChatroomOpen = true
@@ -257,25 +237,9 @@ async function selectChatroom() {
   if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
 }
 
-async function refreshInbox() {
-  await whispers.loadList()
-  const roomWasSelected = isChatroomSelected.value
-  const preferred = inboxPeer.value || (roomWasSelected ? '' : selectedPeer.value || (list.value[0] ? peerOf(list.value[0]) : ''))
-  inboxPeer.value = ''
-  if (preferred) await selectConversation(preferred)
-  else if (roomWasSelected) await selectChatroom()
-  else {
-    selectedPeer.value = ''
-    whispers.disconnect()
-    if (route.path !== '/cr' && !chat.floatingChatroomOpen) chat.disconnect()
-  }
-}
-
-function startConversation() {
-  const name = toUser.value.trim()
-  if (!name) return
-  toUser.value = ''
-  void selectConversation(name)
+function refreshInbox(){
+ if(inboxPeer.value||inboxPeerId.value||!isChatroomSelected.value){selectPrivate();privateFullId.value=inboxPeerId.value}
+ else void selectChatroom()
 }
 
 let stickToBottom = true
@@ -286,7 +250,7 @@ function onScroll() {
   const el = scroller.value
   if (el) stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
 }
-watch([messages, roomMessages], async () => {
+watch(roomMessages, async () => {
   await nextTick()
   if (stickToBottom) toBottom()
 }, { deep: true })
@@ -295,19 +259,19 @@ async function loadOlder() {
   const el = scroller.value
   const fromBottom = el ? el.scrollHeight - el.scrollTop : 0
   stickToBottom = false
-  if (isChatroomSelected.value) await chat.loadMore()
-  else await whispers.loadMore()
+  await chat.loadMore()
   await nextTick()
   if (el) el.scrollTop = el.scrollHeight - fromBottom
 }
 
 async function submit() {
   const text = draft.value
-  if (!text.trim() || sending.value) return
-  draft.value = ''
-  if (isChatroomSelected.value) await chat.send(text)
-  else await whispers.send(text)
+  if (!text.trim() || roomSending.value) return
+  const reader=JSON.stringify([getAuthContextVersion(),!!auth.accessToken,account.value?.oId||''])
+  if(await chat.send(text)&&reader===JSON.stringify([getAuthContextVersion(),!!auth.accessToken,account.value?.oId||'']))acceptRoomConfirmed(text.trim())
 }
+
+function acceptRoomConfirmed(content:string){if(draft.value.trim()===content)draft.value=''}
 
 async function observePanelWidth() {
   await nextTick()
@@ -340,19 +304,16 @@ watch(
       panelResizeObserver = null
       isCompactPanel.value = false
       draggingPointer = null
-      const routePeer = route.path.startsWith('/chat/') ? String(route.params.userName || '') : ''
-      if (routePeer && !whispers.isOpenWith(routePeer)) void whispers.open(routePeer)
-      else if (!routePeer) whispers.disconnect()
-      if (wasChatroomSelected && route.path !== '/cr') chat.disconnect()
+      if (wasChatroomSelected && route.path !== '/cr' && route.path !== '/') chat.disconnect()
     }
   },
 )
 
-watch(unreadTotal, (next, previous) => {
-  if (props.modelValue && !listLoading.value && next !== previous) void whispers.loadList(false)
-})
+watch(()=>account.value?.oId,()=>{draft.value='';privateFullId.value='';selectedPeer.value='__private__'})
 
 onUnmounted(() => {
+  chat.floatingChatroomOpen=false
+  if(isChatroomSelected.value&&route.path!=='/cr'&&route.path!=='/')chat.disconnect()
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('resize', keepPanelInView)
   panelResizeObserver?.disconnect()
@@ -383,7 +344,7 @@ onUnmounted(() => {
           <strong>聊天</strong>
           <RouterLink
             class="full-whisper-link"
-            :to="isChatroomSelected ? '/cr' : selectedPeer ? `/chat/${encodeURIComponent(selectedPeer)}` : '/chat'"
+            :to="isChatroomSelected?'/cr':privateFullId?{path:'/chat',query:{peerId:privateFullId}}:'/chat'"
             :aria-label="isChatroomSelected ? '打开完整聊天室' : '打开完整私信'"
             :title="isChatroomSelected ? '打开完整聊天室' : '打开完整私信'"
             @click="close"
@@ -394,146 +355,39 @@ onUnmounted(() => {
             </svg>
           </RouterLink>
           <div v-if="isCompactPanel && selectedPeer" class="compact-current" role="status" aria-live="polite">
-            <span class="compact-peer" :title="isChatroomSelected ? CHATROOM_LABEL : selectedPeer">{{ isChatroomSelected ? CHATROOM_LABEL : selectedPeer }}</span>
+            <span class="compact-peer" :title="isChatroomSelected ? CHATROOM_LABEL : '私信'">{{ isChatroomSelected ? CHATROOM_LABEL : '私信' }}</span>
             <span
-              class="compact-status"
-              :class="isChatroomSelected ? { connected: roomConnected, connecting: roomConnecting } : { connected, connecting }"
-            >{{ isChatroomSelected ? roomConnectionLabel : connectionLabel }}</span>
+              v-if="isChatroomSelected" class="compact-status"
+              :class="{ connected: roomConnected, connecting: roomConnecting }"
+            >{{ roomConnectionLabel }}</span>
           </div>
         </div>
         <button type="button" aria-label="关闭聊天" @click="close">✕</button>
       </header>
 
-        <div class="conversation-layout">
-          <nav class="conversation-list" aria-label="聊天列表">
-            <form class="start" @submit.prevent="startConversation">
-              <input v-model="toUser" placeholder="输入用户名发起聊天" aria-label="聊天用户名" />
-              <button type="submit" :disabled="!toUser.trim()">发起</button>
-            </form>
-            <button
-              type="button"
-              class="conversation chatroom-pinned"
-              :class="{ selected: isChatroomSelected }"
-              title="聊天室"
-              @click="selectChatroom"
-            >
-              <span class="conversation-avatar room-avatar" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 3v-3H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-                  <path d="M8 11.5h.01M12 11.5h.01M16 11.5h.01" />
-                </svg>
-              </span>
-              <span class="conversation-copy">
-                <b>聊天室</b>
-                <small>实时聊天室</small>
-              </span>
-            </button>
-            <FpLoading v-if="listLoading && !list.length" />
-            <p v-else-if="!list.length" class="empty-list">暂无用户会话</p>
-            <button
-              v-for="item in list"
-              :key="peerOf(item)"
-              type="button"
-              class="conversation"
-              :class="{ selected: selectedPeer === peerOf(item) }"
-              :title="unreadBy[peerOf(item)] ? `${peerOf(item)} 有未读消息` : peerOf(item)"
-              @click="selectConversation(peerOf(item))"
-            >
-              <span class="conversation-avatar">
-                <img :src="peerAvatar(item)" alt="" />
-                <span v-if="unreadBy[peerOf(item)]" class="conversation-unread-dot" aria-hidden="true" />
-              </span>
-              <span class="conversation-copy">
-                <b>{{ peerOf(item) }}</b>
-                <small>{{ item.preview || item.markdown || item.content || '…' }}</small>
-              </span>
-            </button>
-          </nav>
-
-          <section class="conversation-content">
-            <template v-if="selectedPeer">
-              <header v-if="!isCompactPanel" class="conversation-head">
-                <div>
-                  <strong>{{ isChatroomSelected ? CHATROOM_LABEL : selectedPeer }}</strong>
-                  <small
-                    class="connection-label"
-                    :class="isChatroomSelected ? { connected: roomConnected, connecting: roomConnecting } : { connected, connecting }"
-                  >{{ isChatroomSelected ? roomConnectionLabel : connectionLabel }}</small>
-                </div>
-              </header>
-              <p v-if="isChatroomSelected && roomError" class="error">{{ roomError }}</p>
-              <p v-if="!isChatroomSelected && error" class="error">{{ error }}</p>
-              <div ref="scroller" class="messages" @scroll.passive="onScroll">
-                <button
-                  v-if="isChatroomSelected ? roomHasMore && roomMessages.length : hasMore && messages.length"
-                  type="button"
-                  class="more"
-                  :disabled="isChatroomSelected ? roomLoadingMore : loadingMore"
-                  @click="loadOlder"
-                >
-                  {{ (isChatroomSelected ? roomLoadingMore : loadingMore) ? '加载中…' : '加载更早消息' }}
-                </button>
-                <FpLoading v-if="isChatroomSelected ? roomLoading && !roomMessages.length : loading && !messages.length" />
-                <p v-else-if="isChatroomSelected ? !visibleRoomMessages.length : !messages.length" class="empty-content">
-                  {{ isChatroomSelected ? '聊天室暂时没有消息' : '还没有消息，打个招呼吧。' }}
-                </p>
-                <template v-if="isChatroomSelected">
-                  <ChatBubble
-                    v-for="line in visibleRoomMessages"
-                    :key="line.oId"
-                    :user-name="line.userName"
-                    :avatar="line.userAvatarURL"
-                    :time="line.time"
-                    chatroom
-                    :html="line.html || (line.redPacket ? '[红包]' : line.card ? '[聊天室消息]' : '')"
-                    :self="line.userName === account?.userName"
-                  />
-                </template>
-                <ChatBubble
-                  v-else
-                  v-for="msg in messages"
-                  :key="msg.oId"
-                  :user-name="msg.senderUserName || ''"
-                  :avatar="msg.senderAvatar"
-                  :time="msg.time"
-                  :html="msg.content || msg.markdown || msg.preview || ''"
-                  :self="msg.senderUserName === account?.userName"
-                >
-                  <template v-if="msg.senderUserName === account?.userName" #actions>
-                    <button type="button" @click="whispers.revoke(msg.oId)">撤回</button>
-                  </template>
-                </ChatBubble>
-              </div>
-              <Transition name="composer-swap" mode="out-in">
-                <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit">
-                  <input
-                    v-model="draft"
-                    type="text"
-                    :aria-label="isChatroomSelected ? '聊天室消息' : '私信消息'"
-                    placeholder="说点什么吧…"
-                    :disabled="isChatroomSelected ? !roomConnected : !connected"
-                  />
-                  <button type="submit" :disabled="!canSend">{{ (isChatroomSelected ? roomSending : sending) ? '发送中' : '发送' }}</button>
-                </form>
-                <ChatComposer
-                  v-else
-                  :key="selectedPeer"
-                  v-model="draft"
-                  class="composer"
-                  :api-key="apiKey"
-                  :height="100"
-                  compact
-                  :cache-id="isChatroomSelected ? 'chatroom-drawer' : `whisper-drawer-${selectedPeer}`"
-                  :sending="isChatroomSelected ? roomSending : sending"
-                  :disabled="isChatroomSelected ? !roomConnected : !connected"
-                  placeholder="说点什么吧，友善第一哦。"
-                  @submit="submit"
-                />
-              </Transition>
-            </template>
-            <p v-else class="empty-content">选择聊天室或私信会话</p>
-          </section>
+        <nav class="conversation-modes" aria-label="聊天类型">
+          <button type="button" :aria-pressed="!isChatroomSelected" @click="selectPrivate">私信</button>
+          <button type="button" :aria-pressed="isChatroomSelected" @click="selectChatroom">聊天室</button>
+        </nav>
+        <div v-if="!isChatroomSelected" class="private-panel">
+          <V3PrivateMessages :initial-name="inboxPeer" :initial-id="inboxPeerId" @peer-selected="peer=>privateFullId=peer.id" />
         </div>
+        <section v-else class="conversation-content">
+          <header v-if="!isCompactPanel" class="conversation-head"><strong>{{ CHATROOM_LABEL }}</strong><small>{{ roomConnectionLabel }}</small></header>
+          <ChatPublicationRecovery @confirmed="acceptRoomConfirmed" />
+          <ChatRevokeRecovery />
+          <p v-if="roomError" class="error">{{ roomError }}</p>
+          <div ref="scroller" class="messages" @scroll.passive="onScroll">
+            <button v-if="roomHasMore&&roomMessages.length" type="button" class="more" :disabled="roomLoadingMore" @click="loadOlder">{{ roomLoadingMore?'加载中…':'加载更早消息' }}</button>
+            <FpLoading v-if="roomLoading&&!roomMessages.length" />
+            <p v-else-if="!visibleRoomMessages.length" class="empty-content">聊天室暂时没有消息</p>
+            <ChatBubble v-for="line in visibleRoomMessages" :key="line.oId" :user-name="line.userName" :avatar="line.userAvatarURL" :time="line.time" chatroom :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :self="line.userOId===account?.oId"><ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" /><ChatCard v-else-if="line.card" :card="line.card" /><template #actions><ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" /></template></ChatBubble>
+          </div>
+          <Transition name="composer-swap" mode="out-in">
+            <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit"><input v-model="draft" type="text" aria-label="聊天室消息" placeholder="说点什么吧…" :disabled="!!publication.pending" /><button type="submit" :disabled="!canSend">{{ roomSending?'发送中':'发送' }}</button></form>
+            <ChatComposer v-else v-model="draft" class="composer" :api-key="apiKey" :height="100" compact cache-id="chatroom-drawer" :sending="roomSending" :disabled="!!publication.pending" placeholder="说点什么吧，友善第一哦。" @submit="submit" />
+          </Transition>
+        </section>
       <button
         type="button"
         class="resize-handle resize-handle--nw"
@@ -558,7 +412,9 @@ onUnmounted(() => {
   </Teleport>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+.conversation-modes {flex:none;display:flex;gap:8px;padding:8px 12px;}
+.private-panel {flex:1;min-height:0;overflow:auto;padding:12px;}
 .whisper-panel {
   container-type: inline-size;
   container-name: whisper-panel;
@@ -889,6 +745,7 @@ onUnmounted(() => {
   font-size: 10px;
 }
 .conversation-content {
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;

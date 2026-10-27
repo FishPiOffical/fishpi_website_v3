@@ -40,10 +40,10 @@ function applyDom(state: AppearanceState) {
 }
 
 export const useAppearanceStore = defineStore('appearance', () => {
-  const state = ref(read())
+  const state = ref<AppearanceState>({theme:DEFAULT_THEME,bubble:DEFAULT_BUBBLE,frame:DEFAULT_FRAME})
   const notice = ref('')
 
-  applyDom(state.value)
+  function restore(){state.value=read();applyDom(state.value)}
 
   watch(
     state,
@@ -87,5 +87,5 @@ export const useAppearanceStore = defineStore('appearance', () => {
     if (frame?.vip) state.value.frame = DEFAULT_FRAME
   }
 
-  return { state, notice, canUse, apply, toggleTheme, enforceVip }
+  return { state, notice, restore, canUse, apply, toggleTheme, enforceVip }
 })

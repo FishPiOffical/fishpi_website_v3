@@ -4,9 +4,6 @@ import { createFishpiApp } from './app'
 import {
   fetchArticle,
   fetchArticleFeed,
-  fetchBreezemoons,
-  fetchChatHistory,
-  fetchChatOnlineUsers,
   fetchCheckinRank,
   fetchDomains,
   fetchOnlineRank,
@@ -17,7 +14,8 @@ import {
   fetchUserProfile,
   type ArticleFeedKind,
 } from './api/fishpi'
-import { clearSsrPayload, setSsrPayload, type SsrPayload } from './seo/payload'
+import { SSR_PAYLOAD_KEY, type SsrPayload } from './seo/payload'
+import { fetchV3Breezemoons } from './api/v3-breezemoons'
 import { shouldPrefetchSsr } from './seo/ssrRoutes'
 
 async function prefetch(url: string): Promise<SsrPayload> {
@@ -46,15 +44,13 @@ async function prefetch(url: string): Promise<SsrPayload> {
         fetchOnlineRank(null),
         fetchRecentRegister(null),
         fetchTags(null, 1, 24),
-        fetchBreezemoons(1, 8),
-        fetchChatHistory(null, 1),
+        fetchV3Breezemoons(1, 8),
         fetchRepeaterItems(null),
-        fetchChatOnlineUsers(null),
       ])
       const val = <T>(i: number, fallback: T): T =>
         settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
       const tagData = val(6, { tags: [], total: 0 })
-      const onlineSnap = val(10, {} as Awaited<ReturnType<typeof fetchChatOnlineUsers>>)
+
       return {
         feed: val(0, []),
         feedKind: 'recent',
@@ -65,10 +61,8 @@ async function prefetch(url: string): Promise<SsrPayload> {
         recentUsers: val(5, []),
         tags: tagData.tags,
         tagsTotal: tagData.total,
-        breezemoons: val(7, []),
-        chatFeed: val(8, []).slice(0, 12),
-        repeater: val(9, []),
-        chatOnline: onlineSnap,
+        homeBreezemoonPage: val(7, null),
+        repeater: val(8, []),
       }
     }
 
@@ -82,7 +76,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
     }
 
     if (path === '/breezemoons') {
-      return { breezemoons: await fetchBreezemoons(1, 30) }
+      return { breezemoonPage: await fetchV3Breezemoons(1, 20) }
     }
 
     if (
@@ -140,13 +134,12 @@ async function prefetch(url: string): Promise<SsrPayload> {
 }
 
 export async function render(url: string) {
-  clearSsrPayload()
   const payload = await prefetch(url)
   // Clone before render — views consume the live payload during SSR.
   const clientPayload = JSON.parse(JSON.stringify(payload)) as typeof payload
-  setSsrPayload(payload)
 
   const { app, router, head } = createFishpiApp()
+  app.provide(SSR_PAYLOAD_KEY, payload)
   await router.push(url)
   await router.isReady()
 
@@ -154,7 +147,6 @@ export async function render(url: string) {
   const appHtml = await renderToString(app, ctx)
   const headPayload = await renderSSRHead(head)
 
-  clearSsrPayload()
   return {
     appHtml,
     headPayload,

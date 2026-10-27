@@ -3,10 +3,11 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ensureMedalSession } from '@/utils/medalSession'
+import { useClientStartupStore } from '@/stores/clientStartup'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useNoticeStore } from '@/stores/notices'
-import { useWhisperStore } from '@/stores/whispers'
+import { usePrivateInboxStore } from '@/stores/privateInbox'
 import { useChatStore } from '@/stores/chat'
 import AdSlot from '@/components/ads/AdSlot.vue'
 import LogoMark from '@/components/LogoMark.vue'
@@ -16,6 +17,10 @@ import RiskCaptchaGate from '@/components/RiskCaptchaGate.vue'
 import SystemAlertDialog from '@/components/SystemAlertDialog.vue'
 import WarnBroadcastDialog from '@/components/WarnBroadcastDialog.vue'
 import CountToast from '@/components/count/CountToast.vue'
+import ChatRedPacketDialog from '@/components/chat/ChatRedPacketDialog.vue'
+import ChatRedPacketRecovery from '@/components/chat/ChatRedPacketRecovery.vue'
+import ReportRecovery from '@/components/ReportRecovery.vue'
+import ChatBarrageOverlay from '@/components/chat/ChatBarrageOverlay.vue'
 import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
 import UserHoverCard from '@/components/user/UserHoverCard.vue'
 import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
@@ -129,20 +134,22 @@ const legalLinks = [
 
 const route = useRoute()
 const openRhythm = (href: string) => openRhythmPage(href, auth.apiKey)
-/** 需登录页服务端只出空壳；客户端挂载前也保持空壳，hydration 才能对上，挂载后再渲染真实页面。 */
+/** 私有页面首帧保持 SSR 占位；挂载并恢复当前认证后才渲染子页面。 */
 const mounted = ref(false)
-const ssrAuthShell = computed(() => Boolean(route.meta.auth) && !mounted.value)
+const startup = useClientStartupStore()
+const ssrAuthShell = computed(() => Boolean(route.meta.auth) && (!mounted.value || !auth.isLoggedIn))
 const router = useRouter()
 const auth = useAuthStore()
 const appearance = useAppearanceStore()
 const notices = useNoticeStore()
-const whispers = useWhisperStore()
+const whispers = usePrivateInboxStore()
 const chat = useChatStore()
 const settingsDrawer = useSettingsDrawerStore()
 const { immersive } = storeToRefs(useLayoutStore())
-const { isLoggedIn, account, isVip } = storeToRefs(auth)
+const { isLoggedIn: authenticated, account, isVip } = storeToRefs(auth)
+const isLoggedIn = computed(() => mounted.value && authenticated.value)
 const { total: unreadTotal } = storeToRefs(notices)
-const { unreadTotal: whisperUnread } = storeToRefs(whispers)
+const { unreadTotal: whisperUnread,error: whisperUnreadError } = storeToRefs(whispers)
 
 const isModernChat = computed(() => route.path === '/cr' && chat.chatStyle === 'modern')
 
@@ -202,14 +209,8 @@ watch(
   () => auth.apiKey,
   (key) => {
     if (key) {
-      void notices.refresh()
-      notices.connect()
-      void whispers.refreshUnread()
       void ensureMedalSession(key)
     } else {
-      notices.disconnect()
-      notices.clear()
-      whispers.clear()
       chat.floatingChatroomOpen = false
       chat.disconnect()
     }
@@ -259,6 +260,8 @@ function onApiOffline() {
 
 onMounted(() => {
   mounted.value = true
+  appearance.restore()
+  chat.restoreStyle()
   document.addEventListener('click', onDocClick)
   window.addEventListener('fp:api-offline', onApiOffline)
 })
@@ -314,12 +317,12 @@ onUnmounted(() => {
           <RouterLink
             to="/chat"
             class="bar-icon count-link"
-            :class="{ 'has-msg': whisperUnread > 0 }"
+            :class="{ 'has-msg': (whisperUnread||0) > 0 }"
             title="私信"
-            :aria-label="whisperUnread > 0 ? `私信（${whisperUnread} 条未读）` : '私信'"
+            :aria-label="whisperUnreadError||((whisperUnread||0)>0?`私信（${whisperUnread} 条未读）`:'私信')"
           >
             <NavIcon name="message" />
-            <span v-if="whisperUnread > 0" class="unread-badge" aria-hidden="true">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</span>
+            <span v-if="(whisperUnread||0) > 0" class="unread-badge" aria-hidden="true">{{ (whisperUnread||0) > 99 ? '99+' : whisperUnread }}</span>
           </RouterLink>
           <RouterLink to="/pre-post" class="nav-pre-post" title="发帖" aria-label="发帖">
             <NavIcon name="write" />
@@ -385,11 +388,21 @@ onUnmounted(() => {
       </div>
     </header>
     <CountToast />
+    <ChatBarrageOverlay />
+    <ChatRedPacketDialog />
+    <ChatRedPacketRecovery />
+    <ReportRecovery />
     <SettingsDrawer />
     <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />
     <main :class="{ 'main--cr-modern': isModernChat, 'main--immersive': immersive }">
-      <div v-if="ssrAuthShell" class="auth-shell" />
+      <div v-if="ssrAuthShell" class="auth-shell">
+        <template v-if="startup.error">
+          <p role="alert">{{ startup.error }}</p>
+          <button type="button" :disabled="startup.pending" @click="startup.start(router)">重试恢复登录</button>
+        </template>
+        <p v-else role="status">正在恢复登录状态…</p>
+      </div>
       <RouterView v-else />
     </main>
     <footer v-if="!isModernChat && !immersive" class="foot">
@@ -1083,5 +1096,24 @@ main.main--cr-modern {
 }
 @media (prefers-reduced-motion: reduce) {
   .bar-icon, .nav-pre-post, .avatar { transition: none; }
+}
+</style>
+
+<style scoped lang="scss">
+.auth-shell {
+  max-width: 1200px;
+  min-height: 180px;
+  margin: 24px auto;
+  padding: 0 20px;
+  p { line-height: 1.6; }
+  button {
+    padding: 8px 14px;
+    color: var(--fp-text);
+    background: var(--fp-card);
+    border: 1px solid var(--fp-border);
+    border-radius: 6px;
+    cursor: pointer;
+    &:disabled { opacity: .5; cursor: default; }
+  }
 }
 </style>

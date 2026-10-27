@@ -1,116 +1,44 @@
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { fetchUnreadCount, type UnreadCount } from '@/api/fishpi'
-import type { WhisperMsg } from '@/api/fishpi'
-import { useAuthStore } from './auth'
-import { useWhisperStore } from './whispers'
+import type { UnreadCount } from '@/api/fishpi'
+import { getAccessToken, onAccessTokenChange } from '@/api/http'
+import { fetchV3UnreadCount } from '@/api/v3-notifications'
+import { subscribeNotificationChanges } from '@/api/v3-realtime'
 
 export const useNoticeStore = defineStore('notices', () => {
   const unread = ref<UnreadCount>({})
   const loading = ref(false)
-  /** 管理员 /admin/broadcast/warn 推送的紧急公告 */
+  const error = ref('')
+  const revision = ref(0)
+  /** Legacy urgent broadcast is not part of the notification invalidation protocol. */
   const warnBroadcast = ref<{ text: string; who: string } | null>(null)
-  let ws: WebSocket | null = null
-  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  let reconnectAttempts = 0
-  let lastChatCountPushAt = 0
-
+  let generation = 0, sequence = 0
+  let stopSubscription: (() => void) | null = null
   const total = computed(() => Number(unread.value.unreadNotificationCnt || 0))
 
   async function refresh() {
-    const auth = useAuthStore()
-    if (!auth.apiKey) {
-      unread.value = {}
-      return
-    }
+    const token = getAccessToken(), version = generation, id = ++sequence
+    if (!token) { unread.value = {}; loading.value = false; error.value = ''; return }
     loading.value = true
     try {
-      unread.value = await fetchUnreadCount(auth.apiKey)
-    } catch {
-      unread.value = {}
-    } finally {
-      loading.value = false
-    }
-  }
-
-  function applyCount(msg: Record<string, unknown>) {
-    const next = { ...unread.value }
-    for (const [k, v] of Object.entries(msg)) {
-      if (k.startsWith('unread') && typeof v === 'number') (next as Record<string, number>)[k] = v
-    }
-    unread.value = next
-  }
-
-  function connectSocket(apiKey: string) {
-    const auth = useAuthStore()
-    if (auth.apiKey !== apiKey || typeof WebSocket === 'undefined') return
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const socket = new WebSocket(`${proto}//${location.host}/user-channel?apiKey=${encodeURIComponent(apiKey)}`)
-    ws = socket
-    socket.onopen = () => {
-      reconnectAttempts = 0
-    }
-    socket.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data) as Record<string, unknown> & { command?: string }
-        if (msg.command === 'refreshNotification') {
-          applyCount(msg)
-        } else if (msg.command === 'chatUnreadCountRefresh') {
-          const whispers = useWhisperStore()
-          lastChatCountPushAt = Date.now()
-          if (msg.count !== undefined) whispers.applyUnreadCount(msg.count)
-          else void whispers.refreshUnread()
-        } else if (msg.command === 'newIdleChatMessage') {
-          const hasRecentCountPush = Date.now() - lastChatCountPushAt < 1500
-          useWhisperStore().noteIncomingMessage(msg as Partial<WhisperMsg>, !hasRecentCountPush)
-        } else if (msg.command === 'warnBroadcast') {
-          warnBroadcast.value = {
-            text: String(msg.warnBroadcastText ?? ''),
-            who: String(msg.who ?? ''),
-          }
-        }
-      } catch {
-        /* ignore */
+      const result = await fetchV3UnreadCount()
+      if (id === sequence && version === generation && getAccessToken() === token) { unread.value = result; error.value = '' }
+    } catch (failure) {
+      if (id === sequence && version === generation && getAccessToken() === token) {
+        unread.value = {}; error.value = failure instanceof Error ? failure.message : '未读数加载失败'
       }
-    }
-    socket.onerror = () => socket.close()
-    socket.onclose = () => {
-      if (ws !== socket) return
-      ws = null
-      if (reconnectTimer || auth.apiKey !== apiKey) return
-      const delay = Math.min(1000 * 2 ** reconnectAttempts, 30_000)
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null
-        reconnectAttempts += 1
-        connectSocket(apiKey)
-      }, delay)
-    }
+    } finally { if (id === sequence && version === generation) loading.value = false }
   }
-
-  function connect() {
-    const auth = useAuthStore()
-    disconnect()
-    if (import.meta.env.SSR || typeof WebSocket === 'undefined' || !auth.apiKey) return
-    connectSocket(auth.apiKey)
-  }
-
-  function disconnect() {
-    if (reconnectTimer) clearTimeout(reconnectTimer)
-    reconnectTimer = null
-    reconnectAttempts = 0
-    const socket = ws
-    ws = null
-    if (socket) {
-      socket.onclose = null
-      socket.onerror = null
-      socket.close()
-    }
-  }
-
+  function invalidate() { revision.value++; void refresh() }
+  function disconnect() { stopSubscription?.(); stopSubscription = null }
+  function connect() { disconnect(); stopSubscription = subscribeNotificationChanges(invalidate) }
   function clear() {
-    unread.value = {}
-    disconnect()
+    generation++; sequence++; unread.value = {}; error.value = ''; loading.value = false; warnBroadcast.value = null
+    revision.value++; disconnect()
   }
-
-  return { unread, loading, total, warnBroadcast, refresh, clear, connect, disconnect }
+  const unsubscribe = onAccessTokenChange((token) => { clear(); if (token) { void refresh(); connect() } })
+  const focus = () => { if (getAccessToken()) invalidate() }
+  if (!import.meta.env.SSR) window.addEventListener('focus', focus)
+  onScopeDispose(() => { unsubscribe(); clear(); if (!import.meta.env.SSR) window.removeEventListener('focus', focus) })
+  return { unread, loading, error, revision, total, warnBroadcast, refresh, invalidate, clear, connect, disconnect }
 })

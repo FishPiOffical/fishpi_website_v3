@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
@@ -8,12 +8,11 @@ const LAST_USER = 'fp.lastUser'
 const username = ref(typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_USER) || '' : '')
 const passwd = ref('')
 const mfa = ref('')
-const showKeyLogin = ref(false)
-const apiKeyInput = ref('')
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 const appearance = useAppearanceStore()
+const securityNotice = computed(() => route.query.reason === 'security-updated' ? '账号安全设置已更新，现有登录授权已失效，请重新登录。' : route.query.reason === 'security-unconfirmed' ? '安全设置请求结果未确认，请重新登录核实；修改密码时请尝试新密码，必要时再核对原密码。' : '')
 
 function redirectTarget() {
   return typeof route.query.redirect === 'string' ? route.query.redirect : '/'
@@ -37,39 +36,20 @@ async function submit() {
   }
 }
 
-async function submitKey() {
-  try {
-    await auth.loginWithApiKey(apiKeyInput.value)
-    await afterLogin()
-  } catch {
-    /* auth.error */
-  }
-}
 </script>
 
 <template>
-  <form class="card" @submit.prevent="showKeyLogin ? submitKey() : submit()">
+  <form class="card" @submit.prevent="submit">
     <h1>登录</h1>
-    <template v-if="!showKeyLogin">
-      <label>用户名或邮箱<input v-model="username" required autocomplete="username" /></label>
-      <label>密码<input v-model="passwd" type="password" required autocomplete="current-password" /></label>
-      <label>两步验证（可选）<input v-model="mfa" /></label>
-    </template>
-    <template v-else>
-      <label>
-        apiKey
-        <textarea v-model="apiKeyInput" rows="3" required placeholder="粘贴已有 apiKey，不会调用密码登录接口" />
-      </label>
-      <p class="hint">浏览器会把 apiKey 存到 localStorage（<code>fp.apiKey</code>），下次自动恢复，无需再输密码。</p>
-    </template>
+    <p v-if="securityNotice" role="status">{{ securityNotice }}</p>
+    <label>用户名或邮箱<input v-model="username" required autocomplete="username" /></label>
+    <label>密码<input v-model="passwd" type="password" required autocomplete="current-password" /></label>
+    <label>两步验证（可选）<input v-model="mfa" /></label>
     <p v-if="auth.error" class="err">{{ auth.error }}</p>
     <button type="submit" :disabled="auth.loading">
-      {{ auth.loading ? '登录中…' : showKeyLogin ? '使用 apiKey 进入' : '登录' }}
+      {{ auth.loading ? '登录中…' : '登录' }}
     </button>
     <p class="links">
-      <button type="button" class="linkish" @click="showKeyLogin = !showKeyLogin">
-        {{ showKeyLogin ? '改用账号密码' : '已有 apiKey？' }}
-      </button>
       <RouterLink to="/register">注册</RouterLink>
       <RouterLink to="/forget-pwd">忘记密码</RouterLink>
       <RouterLink to="/agreement">用户协议</RouterLink>

@@ -2,7 +2,9 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { ArticleComment } from '@/api/fishpi'
-import ReactionBar from '@/components/ReactionBar.vue'
+import ArticleInteraction from '@/components/articles/ArticleInteraction.vue'
+import RevisionHistory from '@/components/articles/RevisionHistory.vue'
+import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
@@ -15,7 +17,6 @@ const props = withDefaults(
     replyTo?: string
     loggedIn?: boolean
     own?: boolean
-    canAccept?: boolean
     /** 只展示，不提供任何操作（如优质回帖） */
     readonly?: boolean
     editing?: boolean
@@ -28,7 +29,6 @@ const props = withDefaults(
     replyTo: '',
     loggedIn: false,
     own: false,
-    canAccept: false,
     readonly: false,
     editing: false,
     apiKey: '',
@@ -38,12 +38,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   reply: []
-  vote: []
-  thank: []
   edit: []
   remove: []
-  accept: []
-  react: [value: string]
 }>()
 
 const zoomed = ref('')
@@ -52,13 +48,7 @@ const fullTime = computed(() => props.comment.commentCreateTimeStr || props.comm
 const shownTime = computed(() => (props.reply ? props.comment.timeAgo || fullTime.value : fullTime.value))
 const goodCnt = computed(() => Number(props.comment.commentGoodCnt || 0))
 const thankCnt = computed(() => Number(props.comment.commentThankCnt || 0))
-const voted = computed(() => props.comment.commentVote === 0)
 const interactive = computed(() => props.loggedIn && !props.readonly)
-const hasReactions = computed(() => (props.comment.reactionSummary || []).some((r) => r.count > 0))
-/** 没有任何计数/状态时，操作栏在桌面端悬浮到头部右侧，不额外占一行 */
-const quiet = computed(
-  () => !goodCnt.value && !thankCnt.value && !hasReactions.value && !voted.value && !props.comment.rewarded && !props.canAccept,
-)
 
 function onBodyClick(e: MouseEvent) {
   const img = (e.target as HTMLElement | null)?.closest('img')
@@ -68,55 +58,43 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="cmt" :class="{ reply }">
+  <div :id="`comment${comment.oId}`" class="cmt" :class="{ reply }">
     <div class="cmt-self">
-      <RouterLink :to="`/member/${author}`" class="avatar-link" :title="author">
+      <RouterLink v-if="comment.commentAuthorId" :to="`/member/${author}`" class="avatar-link" :title="author">
         <span
           class="avatar"
           :style="comment.commentAuthorThumbnailURL ? { backgroundImage: `url('${comment.commentAuthorThumbnailURL}')` } : undefined"
         />
       </RouterLink>
+      <span v-else class="avatar-link" :aria-label="author"><span class="avatar" /></span>
       <div class="cmt-main">
         <header class="cmt-head">
-          <RouterLink :to="`/member/${author}`" class="name">
+          <RouterLink v-if="comment.commentAuthorId" :to="`/member/${author}`" class="name">
             {{ author }}
           </RouterLink>
+          <span v-else class="name">{{ author }}</span>
           <MedalList v-if="!hideMedals" :items="comment.sysMetal" class="cmt-medals" />
           <span v-if="replyTo" class="reply-to">回复 @{{ replyTo }}</span>
           <time class="time" :title="fullTime">{{ shownTime }}</time>
         </header>
 
         <slot v-if="editing" name="editor" />
+        <p v-else-if="comment.commentContentVisible===false" class="cmt-body">此评论正文当前不可见</p>
         <div v-else class="cmt-body" @click="onBodyClick" v-html="comment.commentContent || ''" />
 
-        <footer v-if="interactive || goodCnt || thankCnt || hasReactions" class="cmt-ops" :class="{ quiet }">
-          <ReactionBar
-            :summary="comment.reactionSummary"
-            :current="comment.currentUserReaction"
-            :disabled="!interactive"
-            add-label="🙂"
-            @toggle="(v) => emit('react', v)"
-          />
+        <RevisionHistory kind="comment" :target-id="comment.oId" />
+
+        <footer class="cmt-ops">
+          <V3ReactionBar kind="comment" :target-id="comment.oId" :readonly="readonly" />
           <template v-if="interactive">
-            <button type="button" class="op" :class="{ idle: !goodCnt && !voted, on: voted }" title="赞" @click="emit('vote')">
-              👍<span v-if="goodCnt">{{ goodCnt }}</span>
-            </button>
-            <button
-              type="button"
-              class="op"
-              :class="{ idle: !thankCnt && !comment.rewarded, on: comment.rewarded }"
-              :disabled="comment.rewarded || own"
-              :title="comment.rewarded ? '已感谢' : '感谢'"
-              @click="emit('thank')"
-            >
-              ❤️<span v-if="thankCnt">{{ thankCnt }}</span>
-            </button>
+            <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" />
+            <ArticleInteraction resource="comments" kind="thanks" :article-id="comment.oId" />
+            <ArticleInteraction resource="comments" kind="accept" :article-id="comment.oId" />
             <button type="button" class="op idle" @click="emit('reply')">回复</button>
             <button v-if="own" type="button" class="op idle" @click="emit('edit')">编辑</button>
             <button v-if="own" type="button" class="op idle danger" @click="emit('remove')">删除</button>
-            <button v-if="canAccept" type="button" class="op accept" @click="emit('accept')">采纳</button>
             <span v-if="!own" class="op-report idle">
-              <ReportDialog :api-key="apiKey || ''" :data-id="comment.oId" :data-type="1" />
+              <ReportDialog :data-id="comment.oId" :data-type="1" />
             </span>
           </template>
           <template v-else>
@@ -134,7 +112,7 @@ function onBodyClick(e: MouseEvent) {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .cmt-self {
   position: relative;
   display: flex;
@@ -338,22 +316,7 @@ function onBodyClick(e: MouseEvent) {
   .cmt-self:focus-within .cmt-ops :deep(.rx.empty) {
     opacity: 1;
   }
-  .cmt-ops.quiet {
-    position: absolute;
-    top: 0;
-    right: 0;
-    margin: 0;
-    padding-left: 8px;
-    background: var(--fp-card);
-    pointer-events: none;
-  }
-  .cmt-self:hover .cmt-ops.quiet,
-  .cmt-self:focus-within .cmt-ops.quiet {
-    pointer-events: auto;
-  }
-  .cmt-ops.quiet .op-report {
-    margin-left: 0;
-  }
+
 }
 @media (max-width: 768px) {
   .replies {

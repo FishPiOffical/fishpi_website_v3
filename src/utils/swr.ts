@@ -6,6 +6,7 @@ import type { Ref } from 'vue'
  */
 const MAX_ENTRIES = 120
 const store = new Map<string, unknown>()
+let generation = 0
 
 export function readCache<T>(key: string): T | undefined {
   if (import.meta.env.SSR) return undefined
@@ -20,6 +21,7 @@ export function writeCache<T>(key: string, data: T) {
 }
 
 export function clearCache() {
+  generation++
   store.clear()
 }
 
@@ -41,6 +43,7 @@ export function createSwrLoader(state: LoadState) {
     errorText = '加载失败',
   ): Promise<T | undefined> {
     const id = ++seq
+    const startedGeneration = generation
     const hit = readCache<T>(key)
     if (state.error) state.error.value = ''
     if (hit !== undefined) {
@@ -51,12 +54,12 @@ export function createSwrLoader(state: LoadState) {
     }
     try {
       const data = await fetcher()
-      if (id !== seq) return undefined
+      if (id !== seq || startedGeneration !== generation) return undefined
       writeCache(key, data)
       apply(data, false)
       return data
     } catch (e) {
-      if (id === seq && hit === undefined && state.error) {
+      if (id === seq && startedGeneration === generation && hit === undefined && state.error) {
         state.error.value = e instanceof Error ? e.message : errorText
       }
       return undefined

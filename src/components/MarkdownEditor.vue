@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { fetchVditorEmoji, searchUsers, uploadFiles } from '@/api/fishpi'
 import { useAppearanceStore } from '@/stores/appearance'
 import FpLoading from '@/components/FpLoading.vue'
+import EmojiPicker from '@/components/EmojiPicker.vue'
+import { createMarkdownPreview } from '@/utils/markdownPreview'
+import { createEditorUpload } from '@/utils/editorUpload'
+import { createMentionHints } from '@/utils/mentionHints'
+import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
 
 const props = withDefaults(
   defineProps<{
@@ -25,25 +29,17 @@ const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
 const VDITOR_CDN = 'https://file.fishpi.cn/vditor/latest/dist'
 
 interface VditorInstance {
+  readonly vditor?: { lute?: { GetEmojis(): Record<string, unknown> } }
   focus(): void
   getValue(): string
   setValue(value: string, clearStack?: boolean): void
-  insertValue(value: string, render?: boolean): void
+  insertMD(value: string): void
   setTheme(theme: 'classic' | 'dark', contentTheme?: string, codeTheme?: string, contentThemePath?: string): void
   destroy(): void
 }
 type VditorCtor = new (el: HTMLElement, options: Record<string, unknown>) => VditorInstance
 
 let loader: Promise<VditorCtor> | null = null
-let emojiLoader: { key: string; p: Promise<Record<string, string>> } | null = null
-
-function loadEmoji(apiKey: string | null) {
-  if (!apiKey) return Promise.resolve({})
-  if (emojiLoader?.key !== apiKey) {
-    emojiLoader = { key: apiKey, p: fetchVditorEmoji(apiKey).catch(() => ({})) }
-  }
-  return emojiLoader.p
-}
 
 const MORE_TOOLS = ['outdent', 'indent', 'insert-before', 'insert-after', 'line', 'info', 'help']
 
@@ -123,44 +119,43 @@ function loadVditor(): Promise<VditorCtor> {
 }
 
 const host = ref<HTMLElement | null>(null)
+const emojiPicker = ref<InstanceType<typeof EmojiPicker> | null>(null)
+const nativeEmojis = ref<Record<string, string>>({})
 const fallback = ref(false)
 const ready = ref(false)
 let editor: VditorInstance | null = null
 let lastEmitted = props.modelValue
+const preview = createMarkdownPreview(() => editor?.getValue() ?? props.modelValue)
+const uploads = createEditorUpload(markdown => editor?.insertMD(markdown))
+const mentionError = ref('')
+const mentions = createMentionHints(message => { mentionError.value = message })
+function clearMentions() {
+  mentions.cancel()
+  host.value?.querySelectorAll<HTMLElement>('.vditor-hint').forEach(element => { element.replaceChildren(); element.style.display = 'none' })
+}
+let stopPreviewAuth: (() => void) | undefined
 
 const appearance = useAppearanceStore()
 const dark = computed(() => appearance.state.theme.includes('dark'))
 const CONTENT_THEME_PATH = `${VDITOR_CDN}/css/content-theme`
+
+function insertEmoji(markdown: string) { editor?.insertMD(markdown) }
 
 function applyTheme() {
   if (!editor || !ready.value) return
   editor.setTheme(dark.value ? 'dark' : 'classic', dark.value ? 'dark' : 'light', dark.value ? 'native' : 'github', CONTENT_THEME_PATH)
 }
 
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
-}
-
-async function mentionHints(key: string) {
-  if (!props.apiKey) return []
-  try {
-    const users = await searchUsers(props.apiKey, key)
-    const rows = users.slice(0, 8).map((u) => ({
-      value: `@${u.userName} `,
-      html: `${u.avatar ? `<img src="${escapeHtml(u.avatar)}"/>` : ''}${escapeHtml(u.userName)}`,
-    }))
-    if (!key) rows.push({ value: '@participants ', html: '参与者' })
-    return rows
-  } catch {
-    return []
-  }
-}
-
 onMounted(async () => {
+  let version = getAuthContextVersion()
+  stopPreviewAuth = onAccessTokenChange(token => {
+    const next = getAuthContextVersion()
+    if (!token || next !== version) { preview.reset(); uploads.cancel(); clearMentions() }
+    version = next
+  })
   let Vditor: VditorCtor
-  let emoji: Record<string, string>
   try {
-    ;[Vditor, emoji] = await Promise.all([loadVditor(), loadEmoji(props.apiKey)])
+    Vditor = await loadVditor()
   } catch {
     fallback.value = true
     return
@@ -171,6 +166,11 @@ onMounted(async () => {
   const toolbar = props.toolbarPreset === 'message'
     ? MESSAGE_TOOLBAR
     : narrow ? MOBILE_TOOLBAR : inline ? REPLY_TOOLBAR : POST_TOOLBAR
+  const resolvedToolbar = toolbar.map(item => item === 'emoji' ? {
+    name: 'v3-emoji', tip: '表情', hotkey: '⌘E',
+    icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><path d="M8 14q4 5 8 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+    click: () => emojiPicker.value?.toggle(),
+  } : item)
   editor = new Vditor(host.value, {
     value: props.modelValue,
     height: props.height,
@@ -180,41 +180,34 @@ onMounted(async () => {
     theme: dark.value ? 'dark' : 'classic',
     outline: { enable: props.outline, position: 'left' },
     resize: { enable: !narrow, position: 'bottom' },
-    preview: { delay: 500, mode: inline ? 'editor' : 'both', url: '/markdown' },
+    preview: { delay: 750, mode: inline ? 'editor' : 'both', transform: preview.transform, parse: preview.parse },
     counter: { enable: !inline },
-    toolbar,
+    toolbar: resolvedToolbar,
     toolbarConfig: { pin: !inline },
     ctrlEnter: () => emit('submit'),
     upload: {
       accept: 'image/*,.zip,.rar,.7z,.mp3,.mp4,.webm,.mov',
-      handler: async (files: File[]) => {
-        if (!props.apiKey) return '请先登录后再上传'
-        try {
-          const urls = await uploadFiles(props.apiKey, files)
-          const md = urls
-            .map((u, i) => {
-              const name = files[i]?.name || 'file'
-              return files[i]?.type.startsWith('image/') ? `![${name}](${u})` : `[${name}](${u})`
-            })
-            .join('\n')
-          editor?.insertValue(`\n${md}\n`)
-          return null
-        } catch (e) {
-          return e instanceof Error ? e.message : '上传失败'
-        }
-      },
+      handler: uploads.handler,
     },
     hint: {
       parse: false,
-      ...(Object.keys(emoji).length ? { emoji } : {}),
-      emojiTail: '<a href="/settings/function" target="_blank">设置常用表情</a>',
-      extend: [{ key: '@', hint: mentionHints }],
+      emoji: {},
+      emojiTail: '',
+      extend: [{ key: '@', hint: mentions.hint }],
     },
     input: (value: string) => {
+      preview.reset()
       lastEmitted = value
       emit('update:modelValue', value)
     },
     after: () => {
+      // Local display labels only; insertion remains the server-provided alias.
+      const labels: Record<string, string> = Object.create(null)
+      const local = editor?.vditor?.lute?.GetEmojis() || {}
+      for (const [alias, value] of Object.entries(local)) {
+        if (/^[A-Za-z0-9_+-]{1,64}$/.test(alias) && typeof value === 'string' && value.length <= 64 && /[^\u0000-\u007f]/u.test(value) && !/[A-Za-z_<>/:.\\\u0000-\u001f\u007f]/u.test(value)) labels[alias] = value
+      }
+      nativeEmojis.value = labels
       ready.value = true
       const cached = editor?.getValue().replace(/\n$/, '') || ''
       if (props.modelValue !== lastEmitted) editor?.setValue(props.modelValue, true)
@@ -233,12 +226,19 @@ watch(
   () => props.modelValue,
   (value) => {
     if (!editor || !ready.value || value === lastEmitted) return
+    preview.reset()
+    uploads.cancel()
+    clearMentions()
     lastEmitted = value
     editor.setValue(value, true)
   },
 )
 
 onBeforeUnmount(() => {
+  stopPreviewAuth?.()
+  preview.dispose()
+  uploads.dispose()
+  mentions.dispose()
   editor?.destroy()
   editor = null
 })
@@ -248,7 +248,7 @@ defineExpose({
     editor?.focus()
   },
   insert(text: string) {
-    if (editor && ready.value) editor.insertValue(text)
+    if (editor && ready.value) editor.insertMD(text)
     else emit('update:modelValue', props.modelValue + text)
   },
 })
@@ -263,8 +263,10 @@ defineExpose({
     :style="{ height: `${height}px` }"
     @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
   />
-  <div v-else class="md-editor" :class="`md-editor--${mode}`">
+  <div v-else class="md-editor" :class="`md-editor--${mode}`" @input.capture="clearMentions">
+    <EmojiPicker v-if="ready" ref="emojiPicker" :show-trigger="false" placement="below" :labels="nativeEmojis" @insert="insertEmoji" />
     <div ref="host" />
+    <p v-if="mentionError" role="status">{{ mentionError }}</p>
     <div v-if="!ready" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
   </div>
 </template>

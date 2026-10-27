@@ -6,6 +6,7 @@ export interface ConfirmDialogOptions {
   confirmText?: string
   cancelText?: string
   tone?: 'default' | 'danger'
+  signal?: AbortSignal
 }
 
 export interface PromptDialogOptions {
@@ -35,10 +36,18 @@ export function fpConfirm(options: string | ConfirmDialogOptions): Promise<boole
   if (typeof window === 'undefined') return Promise.resolve(false)
   const opts: ConfirmDialogOptions =
     typeof options === 'string' ? { message: options } : options
+  if (opts.signal?.aborted) return Promise.resolve(false)
   if (activeDialogState.value) {
     activeDialogState.value.resolve(activeDialogState.value.kind === 'confirm' ? false : null)
   }
   return new Promise<boolean>((resolve) => {
+    const abort = () => finish(false)
+    const finish = (value: boolean) => {
+      opts.signal?.removeEventListener('abort', abort)
+      if (activeDialogState.value?.resolve === finish) activeDialogState.value = null
+      resolve(value)
+    }
+    opts.signal?.addEventListener('abort', abort, { once: true })
     activeDialogState.value = {
       kind: 'confirm',
       title: opts.title || '操作确认',
@@ -48,7 +57,7 @@ export function fpConfirm(options: string | ConfirmDialogOptions): Promise<boole
       tone: opts.tone || 'default',
       inputValue: '',
       placeholder: '',
-      resolve,
+      resolve: finish,
     }
   })
 }

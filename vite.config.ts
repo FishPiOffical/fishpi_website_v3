@@ -51,6 +51,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: true,
       proxy: {
+        '/api/v3/realtime': { ...proxy, ws: true },
         '/api': proxy,
         '/rhypic-upload': {
           target: 'https://pic.fishpi.cn',

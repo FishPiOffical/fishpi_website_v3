@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useId } from 'vue'
+import { onMounted, ref, useId } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
@@ -19,6 +19,9 @@ const pageSidebar = usePageSidebarStore()
 const { visibleModules } = storeToRefs(pageSidebar)
 const drawer = useSettingsDrawerStore()
 const uid = useId()
+// Identity and locally saved module layout are browser state, unavailable to public SSR.
+const ready = ref(false)
+onMounted(() => { ready.value = true })
 
 const ICONS: Record<PageSidebarModuleId, string> = {
   profile: '👤',
@@ -60,58 +63,61 @@ function goDownload() {
       </button>
     </header>
 
-    <template v-for="mod in visibleModules" :key="mod.id">
-      <section
-        v-if="mod.id !== 'checkin' || isLoggedIn"
-        class="module side-module-card"
-        :class="{ 'is-collapsed': pageSidebar.isCollapsed(mod.id) }"
-      >
-        <header class="module-header side-module-head">
-          <button
-            type="button"
-            class="head-toggle"
-            :aria-expanded="!pageSidebar.isCollapsed(mod.id)"
-            :aria-controls="`${uid}-${mod.id}`"
-            @click="pageSidebar.toggleCollapsed(mod.id)"
-          >
-            <span class="mod-ico" aria-hidden="true">{{ ICONS[mod.id] }}</span>
-            <h2>{{ mod.title }}</h2>
-            <span class="chevron" aria-hidden="true">▾</span>
-          </button>
-          <RouterLink v-if="mod.id === 'breezemoons'" to="/breezemoons" class="more-link">更多</RouterLink>
-        </header>
-
-        <div
-          :id="`${uid}-${mod.id}`"
-          v-show="!pageSidebar.isCollapsed(mod.id)"
-          class="module-panel side-module-body"
+    <p v-if="!ready" class="empty-side" role="status">正在加载侧栏…</p>
+    <template v-else>
+      <template v-for="mod in visibleModules" :key="mod.id">
+        <section
+          v-if="mod.id !== 'checkin' || isLoggedIn"
+          class="module side-module-card"
+          :class="{ 'is-collapsed': pageSidebar.isCollapsed(mod.id) }"
         >
-          <PersonInfoCard v-if="mod.id === 'profile'" />
-          <CheckinPanel v-else-if="mod.id === 'checkin'" class="embedded-checkin" />
-          <div v-else-if="mod.id === 'download'" class="app-download">
-            <div class="app-left">
-              <img src="https://file.fishpi.cn/logo_app.png" width="36" height="36" alt="摸鱼派客户端" />
-              <div class="app-text">
-                <b>随时随地摸鱼？</b>
-                <p>下载摸鱼派客户端，想摸就摸！</p>
-              </div>
-            </div>
-            <button type="button" class="btn green small" @click="goDownload">下载</button>
-          </div>
-          <BreezemoonFeed v-else-if="mod.id === 'breezemoons'" />
-          <IncomeModule v-else-if="mod.id === 'income'" />
-          <AppearanceModule v-else-if="mod.id === 'appearance'" />
-          <BarrageModule v-else-if="mod.id === 'barrage'" />
-          <AdModule v-else-if="mod.id === 'ad'" />
-        </div>
-      </section>
-    </template>
+          <header class="module-header side-module-head">
+            <button
+              type="button"
+              class="head-toggle"
+              :aria-expanded="!pageSidebar.isCollapsed(mod.id)"
+              :aria-controls="`${uid}-${mod.id}`"
+              @click="pageSidebar.toggleCollapsed(mod.id)"
+            >
+              <span class="mod-ico" aria-hidden="true">{{ ICONS[mod.id] }}</span>
+              <h2>{{ mod.title }}</h2>
+              <span class="chevron" aria-hidden="true">▾</span>
+            </button>
+            <RouterLink v-if="mod.id === 'breezemoons'" to="/breezemoons" class="more-link">更多</RouterLink>
+          </header>
 
-    <p v-if="!visibleModules.length" class="empty-side">
-      暂未开启内页侧栏模块，点击上方
-      <button type="button" class="link-btn" @click="drawer.show('pageSidebar')">配置模块</button>
-      开启。
-    </p>
+          <div
+            :id="`${uid}-${mod.id}`"
+            v-show="!pageSidebar.isCollapsed(mod.id)"
+            class="module-panel side-module-body"
+          >
+            <PersonInfoCard v-if="mod.id === 'profile'" />
+            <CheckinPanel v-else-if="mod.id === 'checkin'" class="embedded-checkin" />
+            <div v-else-if="mod.id === 'download'" class="app-download">
+              <div class="app-left">
+                <img src="https://file.fishpi.cn/logo_app.png" width="36" height="36" alt="摸鱼派客户端" />
+                <div class="app-text">
+                  <b>随时随地摸鱼？</b>
+                  <p>下载摸鱼派客户端，想摸就摸！</p>
+                </div>
+              </div>
+              <button type="button" class="btn green small" @click="goDownload">下载</button>
+            </div>
+            <BreezemoonFeed v-else-if="mod.id === 'breezemoons'" />
+            <IncomeModule v-else-if="mod.id === 'income'" />
+            <AppearanceModule v-else-if="mod.id === 'appearance'" />
+            <BarrageModule v-else-if="mod.id === 'barrage'" />
+            <AdModule v-else-if="mod.id === 'ad'" />
+          </div>
+        </section>
+      </template>
+
+      <p v-if="!visibleModules.length" class="empty-side">
+        暂未开启内页侧栏模块，点击上方
+        <button type="button" class="link-btn" @click="drawer.show('pageSidebar')">配置模块</button>
+        开启。
+      </p>
+    </template>
   </aside>
 </template>
 

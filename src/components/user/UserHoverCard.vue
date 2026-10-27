@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import VipNickname from '@/components/user/VipNickname.vue'
+import UserFollowButton from '@/components/user/UserFollowButton.vue'
+import { getAuthContextVersion } from '@/api/http'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -36,7 +38,7 @@ const AVATAR_SELECTOR = [
 
 const auth = useAuthStore()
 const route = useRoute()
-const { apiKey, account, isLoggedIn } = storeToRefs(auth)
+const { apiKey, accessToken, account, isLoggedIn } = storeToRefs(auth)
 const mounted = ref(false)
 const cardEl = ref<HTMLElement | null>(null)
 const active = ref(false)
@@ -246,6 +248,13 @@ watch([apiKey, () => account.value?.userName, () => account.value?.oId], () => {
   cache.clear()
 }, { flush: 'sync' })
 
+let readerBoundary = `${getAuthContextVersion()}:${account.value?.oId || ''}:${!!accessToken.value}`
+watch([accessToken, () => account.value?.oId], () => {
+  const next = `${getAuthContextVersion()}:${account.value?.oId || ''}:${!!accessToken.value}`
+  if (next === readerBoundary) return
+  readerBoundary = next; hide(); cache.clear()
+}, {flush:'sync'})
+
 function onViewportChange() {
   if (active.value) positionCard()
 }
@@ -355,6 +364,7 @@ onUnmounted(() => {
               <span class="status" :class="{ online: profile.userOnlineFlag }">
                 {{ profile.userOnlineFlag ? '在线' : '离线' }}
               </span>
+              <UserFollowButton v-if="isLoggedIn && !isSelf" :user-name="profile.userName" />
               <RouterLink v-if="isLoggedIn && !isSelf" class="message" :to="`/chat?toUser=${profile.userName}`">
                 私信
               </RouterLink>

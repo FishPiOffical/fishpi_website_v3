@@ -1,25 +1,18 @@
 <script setup lang="ts">
 import VipNickname from '@/components/user/VipNickname.vue'
-import { computed, nextTick, ref, watch } from 'vue'
+import UserFollowButton from '@/components/user/UserFollowButton.vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
-  fetchFollowers,
-  fetchFollowingUsers,
   fetchMembership,
-  fetchPublicProfession,
   fetchUserArticles,
   fetchUserBreezemoons,
   fetchUserMedals,
   fetchUserProfile,
-  followUser,
-  transferPoints,
-  unfollowUser,
   type ArticleSummary,
   type Breezemoon,
   type MetalItem,
-  type PublicProfessionProfile,
-  type SimpleUser,
   type UserProfile,
 } from '@/api/fishpi'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
@@ -31,11 +24,18 @@ import { consumeMemberPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC } from '@/seo/site'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
+import PublicProfessions from '@/components/profession/PublicProfessions.vue'
+import PointTransfer from '@/components/settings/PointTransfer.vue'
 import { readCache, writeCache } from '@/utils/swr'
 
 const route = useRoute()
 const auth = useAuthStore()
 const { apiKey, account, isLoggedIn, isVip } = storeToRefs(auth)
+
+const mounted = ref(false)
+onMounted(() => { mounted.value = true })
+const viewLoggedIn = computed(() => mounted.value && isLoggedIn.value)
+const viewSelf = computed(() => mounted.value && isSelf.value)
 
 const userName = computed(() => String(route.params.userName || ''))
 
@@ -49,12 +49,8 @@ let bootConsumed = false
 const loading = ref(!bootProfile)
 const error = ref('')
 const actionMsg = ref('')
-const sendAmount = ref(10)
-const sendMemo = ref('请你吃鱼丸')
-const transferring = ref(false)
 const showTransfer = ref(false)
 const viewedVip = ref(false)
-const profession = ref<PublicProfessionProfile | null>(null)
 const extraMedals = ref<MetalItem[]>([])
 type MemberTab =
   | 'home'
@@ -94,11 +90,6 @@ const TAB_GROUP: Record<MemberTab, MemberGroup> = {
 const PENDING_API: Partial<Record<MemberTab, string>> = {
   long: 'GET /api/user/{userName}/long',
   comments: 'GET /api/user/{userName}/comments',
-  articlesAnonymous: 'GET /api/user/{userName}/articles/anonymous',
-  commentsAnonymous: 'GET /api/user/{userName}/comments/anonymous',
-  watchingArticles: 'GET /api/user/{userName}/watching/articles',
-  followingTags: 'GET /api/user/{userName}/following/tags',
-  followingArticles: 'GET /api/user/{userName}/following/articles',
   points: 'GET /api/user/{userName}/points',
 }
 
@@ -110,36 +101,12 @@ const pendingApi = computed(() => PENDING_API[activeTab.value] || '')
 const base = computed(() => `/member/${encodeURIComponent(userName.value)}`)
 const highlightMoonId = computed(() => String(route.params.breezemoonId || ''))
 
-const people = ref<SimpleUser[]>([])
-const peopleLoading = ref(false)
 
 watch(
   () => route.fullPath,
   () => {
     localTab.value = null
   },
-)
-
-async function loadPeople() {
-  const tab = activeTab.value
-  if (import.meta.env.SSR || (tab !== 'followingUsers' && tab !== 'followers')) return
-  peopleLoading.value = true
-  try {
-    people.value =
-      tab === 'followers'
-        ? await fetchFollowers(userName.value, apiKey.value)
-        : await fetchFollowingUsers(userName.value, apiKey.value)
-  } catch {
-    people.value = []
-  } finally {
-    peopleLoading.value = false
-  }
-}
-
-watch(
-  () => [activeTab.value, userName.value, apiKey.value],
-  () => void loadPeople(),
-  { immediate: true },
 )
 
 async function focusMoon() {
@@ -155,7 +122,6 @@ const moonFound = computed(
 )
 
 const isSelf = computed(() => Boolean(account.value && account.value.userName === userName.value))
-const following = computed(() => profile.value?.canFollow === 'no')
 
 const allMedals = computed(() => {
   const sys = profile.value?.sysMetal || []
@@ -196,11 +162,6 @@ async function loadExtras(p: UserProfile) {
     viewedVip.value = (await fetchMembership(p.oId)).isVip
   } catch {
     viewedVip.value = isSelf.value && isVip.value
-  }
-  try {
-    profession.value = await fetchPublicProfession(userName.value, apiKey.value)
-  } catch {
-    profession.value = null
   }
   if (!apiKey.value) {
     extraMedals.value = []
@@ -271,32 +232,6 @@ watch(
   { immediate: true },
 )
 
-async function toggleFollow() {
-  if (!apiKey.value || !profile.value || isSelf.value) return
-  actionMsg.value = ''
-  try {
-    if (following.value) await unfollowUser(apiKey.value, profile.value.oId)
-    else await followUser(apiKey.value, profile.value.oId)
-    await load()
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '操作失败'
-  }
-}
-
-async function sendPoints() {
-  if (!apiKey.value || !profile.value || isSelf.value) return
-  transferring.value = true
-  actionMsg.value = ''
-  try {
-    await transferPoints(apiKey.value, profile.value.userName, Number(sendAmount.value), sendMemo.value)
-    actionMsg.value = '转账成功'
-    showTransfer.value = false
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '转账失败'
-  } finally {
-    transferring.value = false
-  }
-}
 </script>
 
 <template>
@@ -324,10 +259,10 @@ async function sendPoints() {
           <RouterLink :to="`${base}/comments`" :class="{ current: activeTab === 'comments' }">
             回帖 <span class="count">{{ profile.userCommentCount ?? 0 }}</span>
           </RouterLink>
-          <RouterLink :to="`${base}/articles/anonymous`" :class="{ current: activeTab === 'articlesAnonymous' }">
+          <RouterLink v-if="viewSelf" :to="`${base}/articles/anonymous`" :class="{ current: activeTab === 'articlesAnonymous' }">
             匿贴
           </RouterLink>
-          <RouterLink :to="`${base}/comments/anonymous`" :class="{ current: activeTab === 'commentsAnonymous' }">
+          <RouterLink v-if="viewSelf" :to="`${base}/comments/anonymous`" :class="{ current: activeTab === 'commentsAnonymous' }">
             匿回
           </RouterLink>
         </nav>
@@ -356,7 +291,6 @@ async function sendPoints() {
             徽章 <span class="count">{{ allMedals.length }}</span>
           </a>
           <RouterLink
-            v-if="profession?.primaryProfession"
             :to="`${base}/profession`"
             :class="{ current: activeTab === 'profession' }"
             @click="localTab = null"
@@ -367,7 +301,7 @@ async function sendPoints() {
 
         <!-- 现网无 JSON 的标签页 -->
         <div v-if="pendingApi" class="tab-panel">
-          <p v-if="activeTab === 'points' && isSelf" class="hint-auth">
+          <p v-if="activeTab === 'points' && viewSelf" class="hint-auth">
             可在 <RouterLink to="/points">我的积分</RouterLink> 查看自己的积分流水。
           </p>
           <div class="empty-panel pending-panel">
@@ -376,25 +310,9 @@ async function sendPoints() {
           </div>
         </div>
 
-        <!-- 关注用户 / 关注者 -->
-        <div v-else-if="activeTab === 'followingUsers' || activeTab === 'followers'" class="tab-panel">
-          <FpLoading v-if="peopleLoading" />
-          <ul v-else-if="people.length" class="people-list">
-            <li v-for="u in people" :key="u.oId || u.userName">
-              <img v-if="u.userAvatarURL" class="people-avatar" :data-user-card="u.userName" :src="u.userAvatarURL" alt="" />
-              <RouterLink :to="`/member/${u.userName}`">{{ u.userNickname || u.userName }}</RouterLink>
-              <span v-if="u.userNickname" class="people-handle">@{{ u.userName }}</span>
-            </li>
-          </ul>
-          <div v-else class="empty-panel pending-panel">
-            <p>该列表现网只有服务端渲染页面，暂无 JSON 接口，等待后端开放。</p>
-            <code>GET /api/user/{userName}/{{ activeTab === 'followers' ? 'followers' : 'following/users' }}</code>
-          </div>
-        </div>
-
         <!-- 文章列表 -->
         <div v-else-if="activeTab === 'home'" class="tab-panel">
-          <p v-if="!isLoggedIn && !articles.length" class="hint-auth">
+          <p v-if="!viewLoggedIn && !articles.length" class="hint-auth">
             用户发帖列表需登录查看。
             <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">前往登录</RouterLink>
           </p>
@@ -404,7 +322,7 @@ async function sendPoints() {
 
         <!-- 清风明月动态 -->
         <div v-else-if="activeTab === 'breezemoons'" class="tab-panel">
-          <p v-if="!isLoggedIn" class="hint-auth">
+          <p v-if="!viewLoggedIn" class="hint-auth">
             清风明月列表需登录查看。
             <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">前往登录</RouterLink>
           </p>
@@ -444,30 +362,7 @@ async function sendPoints() {
           <p v-else class="empty-panel">暂未佩戴徽章</p>
         </div>
 
-        <!-- 职业资料卡片 (对齐现网 Rhythm profession.css) -->
-        <div v-else-if="activeTab === 'profession' && profession" class="tab-panel profession-panel">
-          <div class="profession-detail__summary">
-            <h3 class="profession-detail__title">
-              {{ profession.primaryProfession?.displayName || profession.primaryProfession?.shortName }}
-              <span v-if="profession.primaryProfession?.levelName" class="prof-level">
-                · {{ profession.primaryProfession.levelName }}
-              </span>
-            </h3>
-            <p v-if="profession.primaryProfession?.description">
-              {{ profession.primaryProfession.description }}
-            </p>
-            <div v-if="profession.professions?.length" class="professions-list">
-              <div
-                v-for="job in profession.professions"
-                :key="job.professionId || job.displayName"
-                class="job-chip"
-              >
-                <b>{{ job.displayName || job.shortName }}</b>
-                <span v-if="job.levelName">{{ job.levelName }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PublicProfessions v-else-if="activeTab === 'profession'" :user-name="userName" />
       </div>
     </div>
 
@@ -540,30 +435,23 @@ async function sendPoints() {
 
           <!-- 交互操作按钮 -->
           <div class="action-buttons">
-            <button
-              v-if="isLoggedIn && !isSelf && profile.canFollow !== 'hide'"
-              type="button"
-              class="btn green follow-btn"
-              @click="toggleFollow"
-            >
-              {{ following ? '取消关注' : '+ 关注' }}
-            </button>
+            <UserFollowButton v-if="viewLoggedIn && !viewSelf" :user-name="profile.userName" />
             <RouterLink
-              v-if="isLoggedIn && isSelf"
+              v-if="viewLoggedIn && viewSelf"
               class="btn green follow-btn"
               to="/settings"
             >
               编辑资料
             </RouterLink>
             <RouterLink
-              v-if="isLoggedIn && !isSelf"
+              v-if="viewLoggedIn && !viewSelf"
               class="btn small"
               :to="`/chat?toUser=${profile.userName}`"
             >
               发私信
             </RouterLink>
             <button
-              v-if="isLoggedIn && !isSelf"
+              v-if="viewLoggedIn && !viewSelf"
               type="button"
               class="btn small"
               @click="showTransfer = !showTransfer"
@@ -571,8 +459,7 @@ async function sendPoints() {
               转账
             </button>
             <ReportDialog
-              v-if="isLoggedIn && !isSelf"
-              :api-key="apiKey"
+              v-if="viewLoggedIn && !viewSelf"
               :data-id="profile.oId"
               :data-type="2"
             />
@@ -583,15 +470,7 @@ async function sendPoints() {
           </p>
 
           <!-- 快捷转账面板 -->
-          <form v-if="showTransfer && isLoggedIn && !isSelf" class="transfer-form" @submit.prevent="sendPoints">
-            <div class="transfer-inputs">
-              <input v-model.number="sendAmount" type="number" min="1" placeholder="积分数" />
-              <input v-model="sendMemo" placeholder="备注信息" />
-            </div>
-            <button type="submit" class="btn green small" :disabled="transferring">
-              {{ transferring ? '转账中…' : '确认转账' }}
-            </button>
-          </form>
+          <PointTransfer v-if="showTransfer && viewLoggedIn && !viewSelf" :initial-recipient="profile.userName" />
         </div>
 
         <!-- 详细个人资料列表 -->
@@ -859,47 +738,6 @@ async function sendPoints() {
   font-size: 12px;
   color: var(--fp-muted);
   line-height: 1.5;
-}
-
-/* 职业资料面板 */
-.profession-panel {
-  padding: 16px 18px;
-}
-
-.profession-detail__summary {
-  background: var(--fp-hover);
-  border-radius: 10px;
-  padding: 16px;
-  border: 1px solid var(--fp-border);
-}
-
-.profession-detail__title {
-  margin: 0 0 8px;
-  font-size: 18px;
-  color: var(--fp-title);
-}
-
-.prof-level {
-  font-size: 14px;
-  color: var(--fp-primary);
-  font-weight: normal;
-}
-
-.professions-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.job-chip {
-  display: flex;
-  gap: 6px;
-  padding: 4px 10px;
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 6px;
-  font-size: 12px;
 }
 
 /* 右侧用户卡片 */

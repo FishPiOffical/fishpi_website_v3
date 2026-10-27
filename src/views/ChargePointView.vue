@@ -1,165 +1,49 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { request } from '@/api/http'
+import { getAuthContextVersion } from '@/api/http'
+import { fetchV3DonationPage } from '@/api/v3-donation'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
-
-usePageSeo(() => ({
-  title: '捐助摸鱼派',
-  path: '/charge/point',
-  robots: 'noindex',
-}))
-
-const route = useRoute()
-const auth = useAuthStore()
-const { isLoggedIn } = storeToRefs(auth)
-
-const money = ref('6')
-const note = ref('支持摸鱼派')
-const busy = ref(false)
-const err = ref('')
-const qr = ref('')
-
-async function payWechat() {
-  err.value = ''
-  qr.value = ''
-  const amount = Number(money.value)
-  if (!note.value.trim()) {
-    err.value = '请填写捐助附言'
-    return
-  }
-  if (!Number.isFinite(amount) || amount < 1) {
-    err.value = '捐助金额需大于等于 1'
-    return
-  }
-  busy.value = true
+usePageSeo(() => ({ title: '捐助摸鱼派', path: '/charge/point', robots: 'noindex' }))
+const route = useRoute(), auth = useAuthStore(), { accessToken, account } = storeToRefs(auth)
+const mounted = ref(false), busy = ref(false), error = ref(''), url = ref('')
+let sequence = 0, owner = ''
+function identity() { return accessToken.value ? `${getAuthContextVersion()}:${account.value?.oId || ''}` : '' }
+function clear() { sequence++; url.value = error.value = ''; busy.value = false }
+async function load() {
+  if (busy.value || !mounted.value || !identity()) return
+  const current = ++sequence, bound = identity(); busy.value = true; error.value = ''; url.value = ''
   try {
-    const data = await request<{ QRcode_url?: string; code?: number; msg?: string }>(
-      `/pay/wechat?total_amount=${encodeURIComponent(String(amount))}&note=${encodeURIComponent(note.value.trim())}`,
-    )
-    if (data.QRcode_url) qr.value = data.QRcode_url
-    else throw new Error(data.msg || '未返回支付二维码')
-  } catch (e) {
-    err.value = e instanceof Error ? e.message : '发起支付失败'
-  } finally {
-    busy.value = false
-  }
+    const result = await fetchV3DonationPage()
+    if (mounted.value && current === sequence && identity() === bound) {
+      if (typeof window !== 'undefined' && result === new URL('/charge/point', window.location.origin).href) throw new Error('捐助地址指向当前页面，请联系站点管理员检查页面地址配置')
+      url.value = result
+    }
+  } catch (err) { if (mounted.value && current === sequence && identity() === bound) error.value = err instanceof Error ? err.message : '读取捐助页面失败' }
+  finally { if (mounted.value && current === sequence && identity() === bound) busy.value = false }
 }
+watch([accessToken, () => account.value?.oId], () => { const next = identity(); if (owner === next) return; owner = next; clear(); if (next) void load() }, { flush: 'sync' })
+onMounted(() => { mounted.value = true; owner = identity(); void load() })
+onBeforeUnmount(() => { mounted.value = false; clear() })
 </script>
-
 <template>
-  <section class="card">
+  <section class="donation-page">
     <h1>❤️ 捐助摸鱼派</h1>
-    <p>
-      摸鱼派是以「摸鱼」为社区精神的科技社区。捐助将用于社区运营。也可在设置里使用积分转账互赠鱼丸。
-    </p>
-    <p v-if="!isLoggedIn" class="hint">
-      <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
-      后可发起微信捐助。
-    </p>
+    <p>捐助用于社区运营。请打开站内捐助页面，按该页面提示继续操作。</p>
+    <p class="hint">浏览器未登录经典站点时，需要先在该页面登录。</p>
+    <p v-if="!mounted">正在准备捐助入口…</p>
+    <p v-else-if="!accessToken"><RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录后读取捐助入口</RouterLink></p>
     <template v-else>
-      <label>
-        捐助金额（元）
-        <input v-model="money" type="number" min="1" step="1" />
-      </label>
-      <label>
-        捐助附言（最多 32 字）
-        <input v-model="note" maxlength="32" />
-      </label>
-      <button type="button" class="primary" :disabled="busy" @click="payWechat">
-        {{ busy ? '请求中…' : '使用微信捐助' }}
-      </button>
-      <p v-if="err" class="err">{{ err }}</p>
-      <div v-if="qr" class="qr">
-        <img :src="qr" width="200" height="200" alt="微信支付二维码" />
-        <p class="hint">请使用微信扫码支付，完成后刷新本页即可。</p>
-        <button type="button" class="ghost" @click="qr = ''">关闭</button>
-      </div>
+      <p v-if="busy" role="status">正在读取捐助入口…</p>
+      <p v-if="error" role="alert" class="error">{{ error }}</p>
+      <template v-if="url"><a class="donation-link" :href="url" target="_blank" rel="noopener noreferrer">打开站内捐助页面</a><p class="address">{{ url }}</p></template>
+      <button type="button" :disabled="busy" @click="load">重新读取捐助入口</button>
     </template>
-    <p class="links">
-      <RouterLink to="/vips">开通 VIP</RouterLink>
-      <RouterLink to="/settings/point">积分转账</RouterLink>
-      <RouterLink to="/points">积分流水</RouterLink>
-    </p>
+    <nav aria-label="相关积分功能"><RouterLink to="/vips">开通 VIP</RouterLink><RouterLink to="/settings/point">积分转账</RouterLink><RouterLink to="/points">积分流水</RouterLink></nav>
   </section>
 </template>
-
-<style scoped>
-.card {
-  max-width: 520px;
-  margin: 24px auto;
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 12px;
-  padding: 22px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-h1 {
-  margin: 0;
-  font-size: 20px;
-  color: var(--fp-title);
-}
-p {
-  margin: 0;
-  line-height: 1.6;
-  color: var(--fp-text);
-  font-size: 14px;
-}
-.hint {
-  color: var(--fp-muted);
-  font-size: 13px;
-}
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--fp-muted);
-}
-input {
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  color: var(--fp-text);
-  border-radius: 6px;
-  padding: 8px 10px;
-}
-.primary {
-  align-self: flex-end;
-  border: 0;
-  background: #44b549;
-  color: #fff;
-  border-radius: 6px;
-  padding: 8px 16px;
-  cursor: pointer;
-}
-.ghost {
-  border: 1px solid var(--fp-border);
-  background: transparent;
-  color: var(--fp-muted);
-  border-radius: 6px;
-  padding: 6px 12px;
-  cursor: pointer;
-}
-.err {
-  color: #e07a5f;
-  font-size: 13px;
-}
-.qr {
-  text-align: center;
-  padding: 12px;
-  border: 1px solid var(--fp-border);
-  border-radius: 8px;
-}
-.links {
-  display: flex;
-  gap: 14px;
-  font-size: 13px;
-}
-.links a {
-  color: var(--fp-link);
-}
+<style scoped lang="scss">
+.donation-page { max-width: 560px; margin: 24px auto; padding: 22px 24px; display: grid; gap: 16px; } h1 { margin: 0; font-size: 20px; color: var(--fp-title); } p { margin: 0; line-height: 1.6; color: var(--fp-text); } .hint { color: var(--fp-muted); } .address { overflow-wrap: anywhere; font-size: 13px; } .error { color: #c34a36; } button { justify-self: start; padding: 8px 12px; background: transparent; color: var(--fp-text); border: 1px solid var(--fp-border); border-radius: 8px; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } a { color: var(--fp-link); } nav { display: flex; flex-wrap: wrap; gap: 14px; }
 </style>

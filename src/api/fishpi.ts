@@ -1,13 +1,13 @@
 import { md5 } from 'js-md5'
 import {
-  mockArticle,
   mockCheckin,
-  mockDomains,
-  mockFeed,
   mockOnline,
   type DomainItem,
 } from './catalog'
-import { ApiError, request, requestText, withKey } from './http'
+import { ApiError, request, withKey } from './http'
+import { fetchV3FrequentEmotions, fetchV3EmojiGroups, fetchV3GroupEmojis, createV3EmojiGroup, updateV3EmojiGroup, deleteV3EmojiGroup, addV3EmojiURL, removeV3GroupEmoji, emojiOperationKey } from './v3-emojis'
+import { fetchNotificationPage, fetchV3UnreadCount, markV3NotificationsRead, notificationReadKey } from './v3-notifications'
+import { v3RecentArticles, v3ArticleFeed, v3Search, v3Domains, v3Tags, v3Article } from './v3-content'
 
 export type { DomainItem }
 
@@ -62,6 +62,18 @@ export interface AccountInfo {
   userReplyWatchArticleStatus?: number
   userForwardPageStatus?: number
   chatRoomPictureStatus?: number
+}
+
+/** `/api/v3/me` 的最小公开账户表示，不包含联系方式、会话或旧 apiKey。 */
+export interface V3AccountInfo {
+  id: string
+  userName: string
+  userNickname?: string
+  userAvatarURL?: string
+  userPoint?: number
+  userIntro?: string
+  userURL?: string
+  userGuideStep?: number
 }
 
 /** 隐私可见性：checkbox checked = 公开（对应 status === 0）。 */
@@ -179,19 +191,11 @@ export interface SimpleUser {
   userAvatarURL?: string
 }
 
-export interface PointRecord {
-  oId?: string
-  balance?: number
-  sum?: number
-  type?: string
-  description?: string
-  time?: string
-  createTime?: string
-}
-
-export type NoticeType = 'commented' | 'reply' | 'at' | 'following' | 'point' | 'broadcast' | 'sys-announce'
+export type NoticeType = 'commented' | 'reply' | 'at' | 'following' | 'point' | 'broadcast' | 'sys-announce' | 'other'
 
 export interface NoticeItem {
+  notificationTitle?: string
+  contentAvailable?: boolean
   oId?: string
   hasRead?: boolean
   description?: string
@@ -215,6 +219,7 @@ export interface NoticeItem {
 }
 
 export interface UnreadCount {
+  unreadOtherNotificationCnt?: number
   unreadNotificationCnt?: number
   unreadReplyNotificationCnt?: number
   unreadPointNotificationCnt?: number
@@ -226,21 +231,17 @@ export interface UnreadCount {
   unreadCommentedNotificationCnt?: number
 }
 
-export interface WhisperMsg {
-  oId: string
-  toId?: string
-  fromId?: string
-  preview?: string
-  markdown?: string
-  content?: string
-  time?: string
-  senderUserName?: string
-  receiverUserName?: string
-  senderAvatar?: string
-  receiverAvatar?: string
+
+
+export interface ArticleStickState {
+  active: boolean
+  permanent: boolean
+  expiresAt: number | null
 }
 
 export interface ArticleSummary {
+  articleAnonymous?: number
+  stick?: ArticleStickState
   oId: string
   articleTitle: string
   articleTitleEmoj?: string
@@ -268,6 +269,7 @@ export interface ArticleSummary {
 }
 
 export interface ArticleComment {
+  commentContentVisible?: boolean
   oId: string
   commentAuthorName?: string
   commentAuthorThumbnailURL?: string
@@ -299,37 +301,6 @@ export interface ParagraphCommentPage {
   paragraphId?: string
   commentThreadParents?: ArticleComment[]
   pagination?: ArticleDetail['pagination']
-}
-
-export async function fetchParagraphCommentSummary(articleId: string) {
-  const res = await request<{ code?: number; msg?: string; paragraphComments?: ParagraphCommentSummary[] }>(
-    '/comment/paragraph/summary',
-    { method: 'POST', body: JSON.stringify({ articleId }) },
-  )
-  if (res.code) throw new Error(res.msg || '段评统计加载失败')
-  return res.paragraphComments || []
-}
-
-export async function fetchParagraphComments(
-  articleId: string,
-  paragraphId: string,
-  page = 1,
-  sort = '',
-  apiKey?: string | null,
-) {
-  const body: Record<string, unknown> = {
-    articleId,
-    paragraphId,
-    paginationCurrentPageNum: page,
-    sort,
-  }
-  if (apiKey) body.apiKey = apiKey
-  const res = await request<{ code?: number; msg?: string } & ParagraphCommentPage>(
-    '/comment/paragraph/thread/parents',
-    { method: 'POST', body: JSON.stringify(body) },
-  )
-  if (res.code) throw new Error(res.msg || '段评加载失败')
-  return res
 }
 
 export interface ArticleDetail extends ArticleSummary {
@@ -440,13 +411,7 @@ export const REACTION_EMOJIS: { value: string; emoji: string }[] = [
   { value: 'poop', emoji: '💩' },
 ]
 
-export function applyReactionPayload(
-  target: { reactionSummary?: ReactionSummary[]; currentUserReaction?: string },
-  payload: { reactionSummary?: ReactionSummary[]; currentUserReaction?: string; summary?: ReactionSummary[] },
-) {
-  target.reactionSummary = payload.reactionSummary || payload.summary || target.reactionSummary
-  if (payload.currentUserReaction != null) target.currentUserReaction = payload.currentUserReaction
-}
+
 
 export interface Breezemoon {
   oId: string
@@ -487,7 +452,7 @@ interface Envelope<T> {
 }
 
 export async function login(username: string, passwd: string, mfaCode = '') {
-  const res = await request<Envelope<never>>('/api/getKey', {
+  const res = await request<Envelope<{ accessToken?: string }>>('/api/v3/auth/login', {
     method: 'POST',
     body: JSON.stringify({
       nameOrEmail: username,
@@ -495,8 +460,10 @@ export async function login(username: string, passwd: string, mfaCode = '') {
       mfaCode,
     }),
   })
-  if (res.code !== 0 || !res.Key) throw new Error(res.msg || '登录失败')
-  return res.Key
+  if (res.code !== 0 || !res.data?.accessToken) {
+    throw new ApiError(res.msg || '登录失败', 401, String(res.code || 'login_failed'))
+  }
+  return res.data.accessToken
 }
 
 /** 通过极验结果解除 Rhythm IP 风控黑名单（对应现网 /validateCaptcha） */
@@ -542,20 +509,6 @@ export async function updateAvatar(apiKey: string, userAvatarURL: string) {
 }
 
 /** 修改密码：页面态 POST /settings/password（MD5 + CSRF）。 */
-export async function updatePassword(apiKey: string, oldPassword: string, newPassword: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/settings/password', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({
-      userPassword: md5(oldPassword),
-      userNewPassword: md5(newPassword),
-    }),
-  })
-  if (res.code) throw new Error(res.msg || '修改密码失败')
-}
-
 /** 地理位置公开状态：0 公开 / 1 私密。 */
 export async function updateGeoStatus(apiKey: string, userGeoStatus: 0 | 1) {
   const { ensureCsrfToken } = await import('./pageAuth')
@@ -606,71 +559,7 @@ export async function updatePrivacySettings(apiKey: string, data: PrivacySetting
   if (res.code) throw new Error(res.msg || '隐私设置失败')
 }
 
-/** 修改用户名：POST /settings/username。 */
-export async function updateUsername(apiKey: string, userName: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/settings/username', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ userName }),
-  })
-  if (res.code) throw new Error(res.msg || '修改用户名失败')
-}
 
-/** 发送绑定手机短信：GeeTest 结果作 captcha。 */
-export async function requestPhoneBindCode(apiKey: string, userPhone: string, captcha: unknown) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/settings/phone/vc', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ userPhone, captcha }),
-  })
-  if (res.code) throw new Error(res.msg || '发送短信失败')
-  return res.msg || '验证码已发送'
-}
-
-/** 提交绑定手机：captcha 为短信验证码。 */
-export async function bindPhone(apiKey: string, userPhone: string, captcha: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/settings/phone', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ userPhone, captcha }),
-  })
-  if (res.code) throw new Error(res.msg || '绑定手机失败')
-  return res.msg || '绑定成功'
-}
-
-/** 发送绑定邮箱验证码：GeeTest 结果作 captcha。 */
-export async function requestEmailBindCode(apiKey: string, userEmail: string, captcha: unknown) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/settings/email/vc', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ userEmail, captcha }),
-  })
-  if (res.code) throw new Error(res.msg || '发送邮件失败')
-  return res.msg || '验证码已发送'
-}
-
-/** 提交绑定邮箱：captcha 为邮件验证码。 */
-export async function bindEmail(apiKey: string, userEmail: string, captcha: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/settings/email', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ userEmail, captcha }),
-  })
-  if (res.code) throw new Error(res.msg || '绑定邮箱失败')
-  return res.msg || '绑定成功'
-}
-
-/** 国际化：页面态 POST /settings/i18n。 */
 export async function updateI18nSettings(
   apiKey: string,
   data: { userLanguage: string; userTimezone: string },
@@ -752,41 +641,8 @@ export async function queryInvitecode(apiKey: string, invitecode: string): Promi
   return { ok: res.code === 1, msg: res.msg || (res.code === 1 ? '可用' : '不可用') }
 }
 
-/** 导出帖子与评论压缩包。 */
-export async function exportPosts(apiKey: string): Promise<string> {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<{ url?: string }> & { url?: string }>('/export/posts', {
-    method: 'POST',
-    body: JSON.stringify({}),
-  })
-  if (res.code) throw new Error(res.msg || '导出失败')
-  const url = res.url || res.data?.url
-  if (!url) throw new Error('未返回导出地址')
-  return url
-}
-
-/** 官方身份认证提交。 */
-export async function submitIdentity(apiKey: string, data: {
-  type: string
-  idCert: string
-  idId?: string
-}) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/user/identify', {
-    method: 'POST',
-    body: JSON.stringify({
-      type: data.type,
-      idCert: data.idCert,
-      idId: data.idId || '',
-    }),
-  })
-  if (res.code) throw new Error(res.msg || '提交失败')
-  return res.msg || '已提交审核'
-}
-
 export interface EmojiItem {
+  emojiId?: string
   oId?: string
   name: string
   url?: string
@@ -801,117 +657,22 @@ export interface EmojiGroup {
   sort?: number
 }
 
-function mockEmotions(): EmojiItem[] {
-  return [
-    { name: 'doge', url: 'https://cdn.jsdelivr.net/npm/vditor@3.8.7/dist/images/emoji/doge.png' },
-    { name: 'huaji', url: 'https://cdn.jsdelivr.net/npm/vditor@3.8.7/dist/images/emoji/huaji.gif' },
-    { name: 'smile', text: '😄' },
-    { name: 'thumbsup', text: '👍' },
-  ]
-}
-
 export function emojiToMarkdown(item: EmojiItem) {
-  if (item.url) return `![${item.name}](${item.url})`
-  if (item.text) return item.text
-  return `:${item.name}:`
-}
-
-function parseEmotionValue(name: string, val: unknown): EmojiItem {
-  if (val && typeof val === 'object') {
-    const o = val as { url?: string; name?: string }
-    if (o.url) return { name: o.name || name, url: o.url }
-    return { name, text: `:${name}:` }
+  if (item.url) {
+    const name = item.name.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\[\]]/g, '\\$&')
+    const destination = item.url.replace(/</g, '%3C').replace(/>/g, '%3E').replace(/[()]/g, '\\$&')
+    return `![${name}](${destination})`
   }
-  const v = String(val ?? '')
-  if (v.startsWith('http')) return { name, url: v }
-  if (v) return { name, text: v }
-  return { name, text: `:${name}:` }
+  return item.text || `:${item.name}:`
 }
-
-function parseEmotionsPayload(data: unknown): EmojiItem[] {
-  if (Array.isArray(data)) {
-    return data.flatMap((entry) => {
-      if (typeof entry === 'string') {
-        if (entry.startsWith('http')) return [{ name: 'emoji', url: entry }]
-        return [{ name: entry, text: entry.startsWith(':') ? entry : `:${entry}:` }]
-      }
-      if (entry && typeof entry === 'object') {
-        const o = entry as { url?: string; name?: string; oId?: string; sort?: number }
-        if (typeof o.url === 'string' && o.url) {
-          return [{ oId: o.oId, name: o.name || 'emoji', url: o.url, sort: o.sort }]
-        }
-        return Object.entries(entry as Record<string, unknown>).map(([n, v]) => parseEmotionValue(n, v))
-      }
-      return []
-    })
-  }
-  if (data && typeof data === 'object') {
-    return Object.entries(data as Record<string, unknown>).map(([n, v]) => parseEmotionValue(n, v))
-  }
-  return []
-}
-
-export async function fetchFrequentEmotions(apiKey: string): Promise<EmojiItem[]> {
-  try {
-    const res = await request<Envelope<unknown>>(withKey('/users/emotions', apiKey))
-    if (res.code) throw new Error(res.msg || '表情失败')
-    const items = parseEmotionsPayload(res.data)
-    if (items.length) return items
-  } catch {
-    /* GET /users/emotions */
-  }
-  return mockEmotions()
-}
-
-export async function fetchEmojiGroups(apiKey: string): Promise<EmojiGroup[]> {
-  try {
-    const res = await request<Envelope<EmojiGroup[]>>(withKey('/api/emoji/groups', apiKey))
-    if (!res.code && Array.isArray(res.data)) return res.data
-  } catch {
-    /* GET /api/emoji/groups */
-  }
-  return []
-}
-
-export async function fetchGroupEmojis(apiKey: string, groupId: string): Promise<EmojiItem[]> {
-  try {
-    const res = await request<Envelope<unknown>>(
-      withKey(`/api/emoji/group/emojis?groupId=${encodeURIComponent(groupId)}`, apiKey),
-    )
-    if (!res.code) return parseEmotionsPayload(res.data)
-  } catch {
-    /* GET /api/emoji/group/emojis */
-  }
-  return []
-}
-
-async function emojiPost(path: string, apiKey: string, body: Record<string, unknown>) {
-  const res = await request<Envelope<unknown>>(path, {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, ...body }),
-  })
-  if (res.code) throw new Error(res.msg || '表情操作失败')
-}
-
-export async function createEmojiGroup(apiKey: string, name: string, sort = 0) {
-  await emojiPost('/api/emoji/group/create', apiKey, { name, sort })
-}
-
-export async function updateEmojiGroup(apiKey: string, groupId: string, name: string, sort = 0) {
-  await emojiPost('/api/emoji/group/update', apiKey, { groupId, name, sort })
-}
-
-export async function deleteEmojiGroup(apiKey: string, groupId: string) {
-  await emojiPost('/api/emoji/group/delete', apiKey, { groupId })
-}
-
-export async function addEmojiUrl(apiKey: string, groupId: string, url: string, sort = 0, name = '') {
-  await emojiPost('/api/emoji/group/add-url-emoji', apiKey, { groupId, url, sort, name })
-}
-
-export async function removeGroupEmoji(apiKey: string, groupId: string, emojiId: string) {
-  await emojiPost('/api/emoji/group/remove-emoji', apiKey, { groupId, emojiId })
-}
+export async function fetchFrequentEmotions(_apiKey: string): Promise<EmojiItem[]> { return fetchV3FrequentEmotions() }
+export async function fetchEmojiGroups(_apiKey: string, p = 1): Promise<EmojiGroup[]> { return (await fetchV3EmojiGroups(p)).list }
+export async function fetchGroupEmojis(_apiKey: string, groupId: string, p = 1): Promise<EmojiItem[]> { return (await fetchV3GroupEmojis(groupId, p)).list }
+export async function createEmojiGroup(_apiKey: string, name: string, sort = 0, key = emojiOperationKey()) { return createV3EmojiGroup(name, sort, key) }
+export async function updateEmojiGroup(_apiKey: string, groupId: string, name: string, sort = 0, key = emojiOperationKey()) { return updateV3EmojiGroup(groupId, name, sort, key) }
+export async function deleteEmojiGroup(_apiKey: string, groupId: string, key = emojiOperationKey()) { return deleteV3EmojiGroup(groupId, key) }
+export async function addEmojiUrl(_apiKey: string, groupId: string, url: string, sort = 0, name = '', key = emojiOperationKey()) { return addV3EmojiURL(groupId, url, sort, name, key) }
+export async function removeGroupEmoji(_apiKey: string, groupId: string, itemId: string, key = emojiOperationKey()) { return removeV3GroupEmoji(groupId, itemId, key) }
 
 export async function transferPoints(apiKey: string, userName: string, amount: number, memo: string) {
   const res = await request<Envelope<unknown>>('/point/transfer', {
@@ -919,80 +680,6 @@ export async function transferPoints(apiKey: string, userName: string, amount: n
     body: JSON.stringify({ apiKey, userName, amount, memo }),
   })
   if (res.code) throw new Error(res.msg || '转账失败')
-}
-
-function extractUploadUrls(json: unknown): string[] {
-  if (!json || typeof json !== 'object') return []
-  const o = json as Record<string, unknown>
-  if (o.succMap && typeof o.succMap === 'object') {
-    return Object.values(o.succMap as Record<string, string>).filter(Boolean)
-  }
-  const data = o.data
-  if (data && typeof data === 'object') {
-    const d = data as Record<string, unknown>
-    if (d.succMap && typeof d.succMap === 'object') {
-      return Object.values(d.succMap as Record<string, string>).filter(Boolean)
-    }
-    if (Array.isArray(d.files)) {
-      return d.files
-        .map((f) => (typeof f === 'string' ? f : String((f as { url?: string }).url || '')))
-        .filter(Boolean)
-    }
-    if (typeof d.url === 'string') return [d.url]
-  }
-  if (typeof o.url === 'string') return [o.url]
-  return []
-}
-
-/** RhyPic：先取一次性票据，再直传图床。不再使用旧版 POST /upload。 */
-export async function uploadFiles(apiKey: string, files: File[]): Promise<string[]> {
-  if (!files.length) return []
-  const ticketRes = await request<Envelope<{ ticket?: string; uploadURL?: string }>>(
-    withKey('/api/rhypic/upload-ticket', apiKey),
-    { method: 'POST' },
-  )
-  const ticket = ticketRes.data?.ticket
-  const uploadURL = ticketRes.data?.uploadURL
-  if (ticketRes.code || !ticket || !uploadURL) {
-    throw new Error(ticketRes.msg || '获取 RhyPic 上传票据失败')
-  }
-  let uploadOrigin: URL
-  try {
-    uploadOrigin = new URL(uploadURL)
-  } catch {
-    throw new Error('图床上传地址无效')
-  }
-  if (uploadOrigin.protocol !== 'https:' || uploadOrigin.hostname !== 'pic.fishpi.cn') {
-    throw new Error('图床返回了不支持的上传地址')
-  }
-  const body = new FormData()
-  files.forEach((f) => body.append('file', f, f.name))
-  // 通过同源代理上传，避免 pic.fishpi.cn 未开放浏览器跨域预检导致上传被拦截。
-  const res = await fetch('/rhypic-upload/api/v1/files', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${ticket}` },
-    body,
-  })
-  let json: unknown
-  try {
-    json = await res.json()
-  } catch {
-    throw new Error(res.ok ? '图床响应无法解析' : `图床上传失败（HTTP ${res.status}）`)
-  }
-  if (!res.ok) {
-    const msg =
-      json && typeof json === 'object' && 'msg' in json
-        ? String((json as { msg?: unknown }).msg || '')
-        : ''
-    throw new Error(msg || `图床上传失败（HTTP ${res.status}）`)
-  }
-  const envelope = json as { code?: number; msg?: string }
-  if (typeof envelope.code === 'number' && envelope.code !== 0) {
-    throw new Error(envelope.msg || '图床上传失败')
-  }
-  const urls = extractUploadUrls(json)
-  if (!urls.length) throw new Error('图床未返回文件地址')
-  return urls
 }
 
 /** 请求失败（401/404/code≠0）返回 null，与成功的空列表区分。 */
@@ -1016,10 +703,8 @@ async function unwrapArticles(path: string, apiKey?: string | null, fallback?: (
   return (await tryArticles(path, apiKey)) ?? (fallback ? fallback() : [])
 }
 
-export async function fetchRecentArticles(apiKey?: string | null, page = 1, size = 40) {
-  return unwrapArticles(`/api/articles/recent?p=${page}&size=${size}`, apiKey, () =>
-    mockFeed('recent', page, size),
-  )
+export async function fetchRecentArticles(_apiKey?: string | null, page = 1, size = 40) {
+  return v3RecentArticles(page, size)
 }
 
 export type ArticleFeedKind =
@@ -1036,93 +721,20 @@ export type ArticleFeedKind =
 
 export async function fetchArticleFeed(
   kind: ArticleFeedKind,
-  apiKey?: string | null,
+  _apiKey?: string | null,
   page = 1,
   size = 40,
   extra = '',
 ): Promise<ArticleSummary[]> {
-  if (kind === 'hot') {
-    return unwrapArticles(`/api/articles/recent/hot?p=${page}&size=${size}`, apiKey, () => mockFeed('hot', page, size))
-  }
-  if (kind === 'long') {
-    return unwrapArticles(`/api/articles/recent/long?p=${page}&size=${size}`, apiKey, () => mockFeed('long', page, size))
-  }
-  if (kind === 'good') {
-    return unwrapArticles(`/api/articles/recent/good?p=${page}&size=${size}`, apiKey, () => mockFeed('good', page, size))
-  }
-  if (kind === 'reply') {
-    return unwrapArticles(`/api/articles/recent/reply?p=${page}&size=${size}`, apiKey)
-  }
-  if (kind === 'qna') {
-    const fromQna = await tryArticles(`/api/articles/qna?p=${page}&size=${size}`, apiKey)
-    if (fromQna) return fromQna
-    return unwrapArticles(`/api/articles/tag/${encodeURIComponent('q&a')}?p=${page}&size=${size}`, apiKey, () =>
-      mockFeed('qna', page, size),
-    )
-  }
-  if (kind === 'perfect') {
-    return unwrapArticles(`/api/articles/perfect?p=${page}&size=${size}`, apiKey, () => mockFeed('perfect', page, size))
-  }
-  if (kind === 'tag') {
-    return unwrapArticles(`/api/articles/tag/${encodeURIComponent(extra)}?p=${page}&size=${size}`, apiKey, () =>
-      mockFeed('tag', page, size, extra),
-    )
-  }
-  if (kind === 'search') return fetchSearch(extra, apiKey, page, size)
-  if (kind === 'domain') {
-    return unwrapArticles(`/api/articles/domain/${encodeURIComponent(extra)}?p=${page}&size=${size}`, apiKey, () =>
-      mockFeed('domain', page, size, extra),
-    )
-  }
-  return fetchRecentArticles(apiKey, page, size)
+  return v3ArticleFeed(kind, page, size, extra)
 }
 
-export async function fetchSearch(q: string, apiKey?: string | null, page = 1, size = 40) {
-  const query = q.trim()
-  if (!query) return []
-  try {
-    // Rhythm 现网参数名为 key（非 q/keyword）；空结果也是合法响应，勿回退 mock。
-    const res = await request<Envelope<{ articles?: ArticleSummary[]; key?: string; total?: number }>>(
-      withKey(`/api/search?key=${encodeURIComponent(query)}&p=${page}&size=${size}`, apiKey),
-    )
-    if (res.code === 0 && res.data) {
-      return Array.isArray(res.data.articles) ? res.data.articles : []
-    }
-    if (res.code === -1) throw new Error(res.msg || '搜索请求过于频繁，请稍后再试')
-  } catch (e) {
-    if (e instanceof Error && (e.message.includes('频繁') || e.message.includes('搜索'))) throw e
-  }
-  throw new Error('搜索失败，请稍后再试')
+export async function fetchSearch(q: string, _apiKey?: string | null, page = 1, size = 40) {
+  return v3Search(q, page, size)
 }
 
-function normalizeDomain(raw: DomainItem): DomainItem | null {
-  const uri = String(raw.uri || raw.domainURI || '').trim()
-  if (!uri) return null
-  return {
-    ...raw,
-    uri,
-    domainTitle: raw.domainTitle || uri,
-    domainArticleCount: raw.domainArticleCount ?? raw.articleCnt ?? 0,
-    domainIconPath: raw.domainIconPath,
-  }
-}
-
-export async function fetchDomains(apiKey?: string | null): Promise<DomainItem[]> {
-  try {
-    const res = await request<Envelope<{ domains?: DomainItem[] } | DomainItem[]>>(withKey('/api/domains', apiKey))
-    if (res.code === 0) {
-      const data = res.data
-      const list = Array.isArray(data)
-        ? data
-        : data && 'domains' in data && Array.isArray(data.domains)
-          ? data.domains
-          : []
-      return list.map(normalizeDomain).filter((d): d is DomainItem => Boolean(d))
-    }
-  } catch {
-    /* GET /api/domains 尚未提供 */
-  }
-  return mockDomains()
+export async function fetchDomains(_apiKey?: string | null): Promise<DomainItem[]> {
+  return v3Domains()
 }
 
 export interface TagItem {
@@ -1133,121 +745,12 @@ export interface TagItem {
   tagDescription?: string
 }
 
-export async function fetchTags(apiKey?: string | null, page = 1, size = 50): Promise<{ tags: TagItem[]; total: number }> {
-  try {
-    const res = await request<Envelope<{ tags?: TagItem[]; total?: number }>>(
-      withKey(`/api/tags?p=${page}&size=${size}`, apiKey),
-    )
-    if (res.code === 0 && Array.isArray(res.data?.tags)) {
-      return { tags: res.data.tags, total: Number(res.data.total || res.data.tags.length) }
-    }
-  } catch {
-    /* tags wall unavailable */
-  }
-  return { tags: [], total: 0 }
+export async function fetchTags(_apiKey?: string | null, page = 1, size = 50): Promise<{ tags: TagItem[]; total: number }> {
+  return v3Tags(page, size)
 }
 
-export async function toggleReaction(
-  apiKey: string,
-  kind: 'article' | 'comment' | 'chat',
-  id: string,
-  value: string,
-) {
-  const path =
-    kind === 'article' ? '/article/reaction' : kind === 'comment' ? '/comment/reaction' : '/chat-room/reaction'
-  const body: Record<string, string> = { apiKey, groupType: 'emoji', value }
-  if (kind === 'article') body.articleId = id
-  else if (kind === 'comment') body.commentId = id
-  else body.oId = id
-  const res = await request<
-    Envelope<
-      | ReactionSummary[]
-      | { reactionSummary?: ReactionSummary[]; summary?: ReactionSummary[]; currentUserReaction?: string }
-    >
-  >(path, { method: 'POST', body: JSON.stringify(body) })
-  if (res.code) throw new Error(res.msg || '表情失败')
-  const data = res.data
-  if (Array.isArray(data)) return { reactionSummary: data, currentUserReaction: '' }
-  return {
-    reactionSummary: data?.reactionSummary || data?.summary || [],
-    currentUserReaction: data?.currentUserReaction || '',
-  }
-}
 
-export interface ArticleDraft {
-  oId?: string
-  articleDraftId?: string
-  articleDraftTitle?: string
-  articleDraftSummary?: string
-  articleDraftContent?: string
-  articleDraftTags?: string
-  articleDraftType?: number
-  articleDraftQnAOfferPoint?: number
-  articleDraftRewardContent?: string
-  articleDraftRewardPoint?: number
-  articleDraftAnonymous?: boolean
-  articleDraftCommentable?: boolean
-  articleDraftNotifyFollowers?: boolean
-  articleDraftShowInList?: number
-  articleDraftStatement?: number
-  articleDraftColumnId?: string
-  articleDraftColumnTitle?: string
-  articleDraftChapterNo?: string
-  articleDraftUpdatedTime?: number
-  articleTitle?: string
-  articleContent?: string
-  articleTags?: string
-  articleType?: number
-}
 
-export async function fetchArticleDrafts(apiKey: string) {
-  const res = await request<Envelope<{ drafts?: ArticleDraft[] }>>(withKey('/api/article-drafts', apiKey))
-  if (res.code) throw new Error(res.msg || '草稿列表失败')
-  return res.data?.drafts ?? []
-}
-
-export async function fetchArticleDraft(apiKey: string, id: string) {
-  const res = await request<Envelope<{ draft?: ArticleDraft }>>(
-    withKey(`/api/article-drafts/${encodeURIComponent(id)}`, apiKey),
-  )
-  if (res.code || !res.data?.draft) throw new Error(res.msg || '草稿不存在')
-  return res.data.draft
-}
-
-export async function saveArticleDraft(apiKey: string, payload: ArticlePayload & { articleDraftId?: string }) {
-  const res = await request<Envelope<{ draft?: ArticleDraft }>>('/api/article-drafts', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, ...payload }),
-  })
-  if (res.code) throw new Error(res.msg || '保存草稿失败')
-  return res.data?.draft
-}
-
-export async function removeArticleDraft(apiKey: string, id: string) {
-  const res = await request<Envelope<unknown>>(withKey(`/api/article-drafts/${encodeURIComponent(id)}`, apiKey), {
-    method: 'DELETE',
-  })
-  if (res.code) throw new Error(res.msg || '删除草稿失败')
-}
-
-export async function fetchArticleHeat(id: string, apiKey?: string | null) {
-  const res = await request<{ articleHeat?: number; code?: number; msg?: string }>(
-    withKey(`/api/article/heat/${encodeURIComponent(id)}`, apiKey),
-  )
-  if (res.code) throw new Error(res.msg || '热度失败')
-  return Number(res.articleHeat || 0)
-}
-
-export async function reportContent(
-  apiKey: string,
-  payload: { reportDataId: string; reportDataType: number; reportType: number; reportMemo: string },
-) {
-  const res = await request<Envelope<unknown>>('/report', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, ...payload }),
-  })
-  if (res.code) throw new Error(res.msg || '举报失败')
-}
 
 export interface RepeaterItem {
   oId: string
@@ -1276,74 +779,8 @@ export async function likeRepeater(apiKey: string, id: string) {
   return res.data
 }
 
-export async function fetchArticle(id: string, apiKey?: string | null, page = 1): Promise<ArticleDetail> {
-  let transient = false
-  try {
-    const res = await request<Envelope<{
-      article?: ArticleDetail
-      pagination?: ArticleDetail['pagination']
-      longArticleColumnView?: LongArticleColumnView
-    }>>(withKey(`/api/article/${id}?p=${page}`, apiKey))
-    if (res.code === 0 && res.data?.article) {
-      const { article, pagination, longArticleColumnView } = res.data
-      return { ...article, pagination: { ...pagination, paginationCurrentPageNum: page }, longArticleColumnView }
-    }
-  } catch (e) {
-    /* 匿名详情未开放时为 401/403；网络错误或 5xx 属于临时故障 */
-    transient = !(e instanceof ApiError) || e.status >= 500
-  }
-  const local = mockArticle(id)
-  if (local) return local
-  throw new Error(transient ? '网络异常，帖子加载失败' : '帖子不存在或需要登录')
-}
-
-export interface ArticleRevisionMeta {
-  revisionId: string
-  revisionTimeStr?: string
-  revisionTime?: number
-  revisionIndex?: number
-  revisionAuthorId?: string
-  current?: boolean
-}
-
-export interface ArticleRevisionDetail extends ArticleRevisionMeta {
-  revisionData?: {
-    articleTitle?: string
-    articleContent?: string
-  }
-}
-
-export async function fetchArticleRevisions(apiKey: string, id: string): Promise<ArticleRevisionMeta[]> {
-  const res = await request<{ code?: number; msg?: string; revisions?: ArticleRevisionMeta[] }>(
-    withKey(`/article/${encodeURIComponent(id)}/revisions/list`, apiKey),
-  )
-  if (res.code) throw new Error(res.msg || '修订历史加载失败')
-  return res.revisions ?? []
-}
-
-export async function fetchArticleRevision(apiKey: string, id: string, revisionId: string) {
-  const res = await request<{ code?: number; msg?: string; revision?: ArticleRevisionDetail }>(
-    withKey(`/article/${encodeURIComponent(id)}/revisions/${encodeURIComponent(revisionId)}`, apiKey),
-  )
-  if (res.code || !res.revision) throw new Error(res.msg || '修订内容加载失败')
-  return res.revision
-}
-
-export async function postComment(apiKey: string, articleId: string, content: string, replyId = '', paragraphId = '') {
-  const body: Record<string, unknown> = {
-    apiKey,
-    articleId,
-    commentContent: content,
-    commentAnonymous: false,
-    commentVisible: false,
-  }
-  if (replyId) body.commentOriginalCommentId = replyId
-  if (paragraphId) body.commentParagraphId = paragraphId
-  const res = await request<Envelope<unknown>>('/comment', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  })
-  if (res.code) throw new Error(res.msg || '评论失败')
+export async function fetchArticle(id: string, _apiKey?: string | null, page = 1): Promise<ArticleDetail> {
+  return v3Article(id, page)
 }
 
 export async function fetchBreezemoons(page = 1, size = 20) {
@@ -1360,27 +797,6 @@ export async function fetchBreezemoons(page = 1, size = 20) {
   return []
 }
 
-export async function postBreezemoon(apiKey: string, content: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/breezemoon', {
-    method: 'POST',
-    headers: { csrfToken },
-    // Page session cookie carries auth; apiKey kept as fallback for some Rhythm builds.
-    body: JSON.stringify({ apiKey, breezemoonContent: content }),
-  })
-  if (res.code) throw new Error(res.msg || '发布失败')
-}
-
-export async function removeBreezemoon(apiKey: string, id: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>(`/breezemoon/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
-    headers: { csrfToken },
-  })
-  if (res.code) throw new Error(res.msg || '删除失败')
-}
 
 type TopRankPayload = RankUser[] | { users?: RankUser[]; list?: RankUser[] }
 
@@ -1571,152 +987,6 @@ export async function fetchProfessionRanking(apiKey?: string | null, professionI
   return res.data ?? { entries: [], professions: [] }
 }
 
-export async function fetchBarrageCost(apiKey?: string | null) {
-  const res = await request<Envelope<string | { cost?: number }>>(withKey('/chat-room/barrager/get', apiKey))
-  if (typeof res.data === 'string' && res.data) return res.data
-  if (res.data && typeof res.data === 'object' && res.data.cost != null) return `${res.data.cost}积分`
-  return String(res.msg || '')
-}
-
-export async function fetchChatRaw(apiKey: string, oId: string) {
-  const text = await requestText(withKey(`/cr/raw/${encodeURIComponent(oId)}`, apiKey))
-  return text.split('<!--')[0].trim()
-}
-
-/** 0 帖子 / 1 机要 / 2 同城广播 / 5 问答 / 6 长文章 */
-export interface ArticlePayload {
-  articleTitle: string
-  articleContent: string
-  articleTags: string
-  articleType: number
-  articleQnAOfferPoint?: number
-  articleRewardContent?: string
-  articleRewardPoint?: number
-  articleAnonymous?: boolean
-  articleCommentable?: boolean
-  articleNotifyFollowers?: boolean
-  articleShowInList?: boolean
-  /** 0 无 / 1 AI 辅助 / 2 剧透 / 3 虚构 */
-  articleStatement?: number
-  /** 长文章专栏：'' 独立长文，'__NEW__' 新建（需 columnTitle），否则为已有专栏 ID */
-  columnId?: string
-  columnTitle?: string
-  /** 留空则排到专栏末尾 */
-  chapterNo?: string
-  columnCoverURL?: string
-}
-
-/** 字段取舍对齐现网 add-article.js：问答只带悬赏，其他类型带打赏与匿名。 */
-function articleBody(apiKey: string, p: ArticlePayload) {
-  const body: Record<string, unknown> = {
-    apiKey,
-    articleTitle: p.articleTitle,
-    articleContent: p.articleContent,
-    articleTags: p.articleTags,
-    articleType: p.articleType,
-    articleCommentable: p.articleCommentable ?? true,
-    articleNotifyFollowers: p.articleNotifyFollowers ?? false,
-    articleShowInList: p.articleShowInList === false ? 0 : 1,
-    articleStatement: p.articleStatement ?? 0,
-  }
-  if (p.articleType === 5) {
-    body.articleQnAOfferPoint = p.articleQnAOfferPoint || 0
-  } else {
-    body.articleRewardContent = p.articleRewardContent || ''
-    body.articleRewardPoint = p.articleRewardContent?.trim() ? p.articleRewardPoint || 0 : 0
-    body.articleAnonymous = p.articleAnonymous ?? false
-  }
-  if (p.articleType === 6) {
-    body.columnId = p.columnId || ''
-    body.columnTitle = p.columnId === '__NEW__' ? p.columnTitle || '' : ''
-    body.chapterNo = p.columnId ? p.chapterNo || '' : ''
-    body.columnCoverURL = p.columnCoverURL || ''
-  }
-  return body
-}
-
-export async function postArticle(apiKey: string, payload: ArticlePayload) {
-  const res = await request<Envelope<unknown> & { articleId?: string }>('/article', {
-    method: 'POST',
-    body: JSON.stringify(articleBody(apiKey, payload)),
-  })
-  if (res.code) throw new Error(res.msg || '发帖失败')
-  return String(res.articleId || (res.data as { oId?: string } | undefined)?.oId || '')
-}
-
-/** 编辑用：`/api/article/md/{id}` 现网返回 Markdown 纯文本，元数据取自帖子详情。 */
-export async function fetchArticleMd(apiKey: string, id: string): Promise<ArticlePayload> {
-  const [md, detail] = await Promise.all([
-    requestText(withKey(`/api/article/md/${encodeURIComponent(id)}`, apiKey)),
-    fetchArticle(id, apiKey),
-  ])
-  return {
-    articleTitle: String(detail.articleTitle || ''),
-    articleContent: md || String(detail.articleOriginalContent || ''),
-    articleTags: String(detail.articleTags || ''),
-    articleType: Number(detail.articleType || 0),
-    articleQnAOfferPoint: Number(detail.articleQnAOfferPoint || 0),
-    articleRewardContent: String(detail.articleRewardContent || ''),
-    articleRewardPoint: Number(detail.articleRewardPoint || 0),
-    articleAnonymous: Number(detail.articleAnonymous || 0) === 1,
-    articleCommentable: detail.articleCommentable !== false,
-    articleShowInList: Number(detail.articleShowInList ?? 1) !== 0,
-    articleStatement: Number(detail.articleStatement || 0),
-    columnId: detail.longArticleColumnView?.column.oId || '',
-    chapterNo: detail.longArticleColumnView?.chapterNo ? String(detail.longArticleColumnView.chapterNo) : '',
-    columnCoverURL: detail.longArticleColumnView?.column.columnCoverURL || '',
-  }
-}
-
-export async function updateArticle(apiKey: string, id: string, payload: ArticlePayload) {
-  const res = await request<Envelope<unknown> & { articleId?: string }>(`/article/${encodeURIComponent(id)}`, {
-    method: 'PUT',
-    body: JSON.stringify(articleBody(apiKey, payload)),
-  })
-  if (res.code) throw new Error(res.msg || '更新失败')
-  return String(res.articleId || id)
-}
-
-export async function removeComment(apiKey: string, id: string) {
-  const res = await request<Envelope<unknown>>(`/comment/${encodeURIComponent(id)}/remove`, {
-    method: 'POST',
-    body: JSON.stringify({ apiKey }),
-  })
-  if (res.code) throw new Error(res.msg || '删除评论失败')
-}
-
-export async function fetchCommentContent(apiKey: string, id: string) {
-  const res = await request<{ code?: number; msg?: string; commentContent?: string }>(
-    withKey(`/comment/${encodeURIComponent(id)}/content`, apiKey),
-  )
-  if (res.code) throw new Error(res.msg || '无法读取评论原文')
-  return String(res.commentContent || '')
-}
-
-export async function updateComment(apiKey: string, id: string, commentContent: string) {
-  const res = await request<Envelope<unknown> & { commentContent?: string }>(`/comment/${encodeURIComponent(id)}`, {
-    method: 'PUT',
-    body: JSON.stringify({ apiKey, commentContent, commentVisible: false }),
-  })
-  if (res.code) throw new Error(res.msg || '更新评论失败')
-  return res.commentContent
-}
-
-export async function acceptComment(apiKey: string, commentId: string) {
-  const res = await request<Envelope<unknown>>('/comment/accept', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, commentId }),
-  })
-  if (res.code) throw new Error(res.msg || '采纳失败')
-}
-
-export async function queryTags(apiKey: string, title: string) {
-  const res = await request<{ code?: number; tags?: string[] }>(
-    withKey(`/tags/query?title=${encodeURIComponent(title)}`, apiKey),
-  )
-  return res.tags ?? []
-}
-
 export async function fetchRandomArticles(size = 8, apiKey?: string | null) {
   try {
     const res = await request<{ articles?: ArticleSummary[] }>(withKey(`/article/random/${size}`, apiKey))
@@ -1726,14 +996,7 @@ export async function fetchRandomArticles(size = 8, apiKey?: string | null) {
   }
 }
 
-export async function previewMarkdown(markdownText: string) {
-  const res = await request<Envelope<string> & { html?: string }>('/markdown', {
-    method: 'POST',
-    body: JSON.stringify({ markdownText }),
-  })
-  if (typeof res.data === 'string' && res.data) return res.data
-  return String(res.html || '')
-}
+
 
 export interface PublicLog {
   oId?: string
@@ -1887,108 +1150,6 @@ export async function searchUserNames(apiKey: string, name: string): Promise<str
   return (await searchUsers(apiKey, name)).map((u) => u.userName)
 }
 
-/** Vditor `hint.emoji` 格式：`{ name: unicode 或图片 URL }`，即用户在设置里配置的常用表情。 */
-export async function fetchVditorEmoji(apiKey: string): Promise<Record<string, string>> {
-  const res = await request<Envelope<unknown>>(withKey('/users/emotions', apiKey))
-  if (res.code || !Array.isArray(res.data)) return {}
-  const out: Record<string, string> = {}
-  for (const item of res.data) {
-    if (item && typeof item === 'object') {
-      for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
-        if (typeof v === 'string') out[k] = v
-      }
-    }
-  }
-  return out
-}
-
-export async function revokeChat(apiKey: string, oId: string) {
-  const res = await request<Envelope<unknown>>('/chat-room/revoke', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, oId }),
-  })
-  if (res.code) throw new Error(res.msg || '撤回失败')
-}
-
-export async function voteArticle(apiKey: string, oId: string) {
-  const res = await request<Envelope<unknown> & { type?: number }>('/vote/up/article', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, dataId: oId }),
-  })
-  if (res.code) throw new Error(res.msg || '点赞失败')
-  return res.type
-}
-
-export async function thankArticle(apiKey: string, oId: string) {
-  const res = await request<Envelope<unknown>>(`/article/thank?articleId=${encodeURIComponent(oId)}`, {
-    method: 'POST',
-    body: JSON.stringify({ apiKey }),
-  })
-  if (res.code) throw new Error(res.msg || '感谢失败')
-}
-
-export async function followArticle(apiKey: string, followingId: string) {
-  const res = await request<Envelope<unknown>>('/follow/article', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, followingId }),
-  })
-  if (res.code) throw new Error(res.msg || '收藏失败')
-}
-
-export async function unfollowArticle(apiKey: string, followingId: string) {
-  const res = await request<Envelope<unknown>>('/unfollow/article', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, followingId }),
-  })
-  if (res.code) throw new Error(res.msg || '取消收藏失败')
-}
-
-export async function watchArticle(apiKey: string, followingId: string) {
-  const res = await request<Envelope<unknown>>('/follow/article-watch', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, followingId }),
-  })
-  if (res.code) throw new Error(res.msg || '关注帖子失败')
-}
-
-export async function unwatchArticle(apiKey: string, followingId: string) {
-  const res = await request<Envelope<unknown>>('/unfollow/article-watch', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, followingId }),
-  })
-  if (res.code) throw new Error(res.msg || '取消关注失败')
-}
-
-/** 成功后返回渲染好的打赏区 HTML */
-export async function rewardArticle(apiKey: string, oId: string): Promise<string> {
-  const res = await request<Envelope<unknown> & { articleRewardContent?: string }>(
-    `/article/reward?articleId=${encodeURIComponent(oId)}`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ apiKey }),
-    },
-  )
-  if (res.code) throw new Error(res.msg || '打赏失败')
-  return String(res.articleRewardContent || '')
-}
-
-export async function thankComment(apiKey: string, commentId: string) {
-  const res = await request<Envelope<unknown>>('/comment/thank', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, commentId }),
-  })
-  if (res.code) throw new Error(res.msg || '感谢评论失败')
-}
-
-export async function voteComment(apiKey: string, oId: string) {
-  const res = await request<Envelope<unknown> & { type?: number }>('/vote/up/comment', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, dataId: oId }),
-  })
-  if (res.code) throw new Error(res.msg || '点赞评论失败')
-  return res.type
-}
-
 export async function requestSms(payload: {
   userName: string
   userPhone: string
@@ -2058,37 +1219,6 @@ export async function fetchUserArticles(userName: string, apiKey?: string | null
   return unwrapArticles(`/api/user/${encodeURIComponent(userName)}/articles?p=${page}&size=${size}`, apiKey)
 }
 
-async function unwrapUsers(paths: string[], apiKey?: string | null): Promise<SimpleUser[]> {
-  for (const path of paths) {
-    try {
-      const res = await request<Envelope<SimpleUser[] | { users?: SimpleUser[]; followingUsers?: SimpleUser[] }>>(
-        withKey(path, apiKey),
-      )
-      const data = res.data
-      if (Array.isArray(data) && data.length) return data
-      if (data && !Array.isArray(data) && Array.isArray(data.users) && data.users.length) return data.users
-      if (data && !Array.isArray(data) && Array.isArray(data.followingUsers) && data.followingUsers.length) {
-        return data.followingUsers
-      }
-    } catch {
-      /* try next */
-    }
-  }
-  return []
-}
-
-export async function fetchCollectedArticles(apiKey?: string | null, page = 1, size = 40) {
-  if (!apiKey) return []
-  return unwrapArticles(`/api/articles/collected?p=${page}&size=${size}`, apiKey)
-}
-
-export async function fetchFollowingUsers(userName: string, apiKey?: string | null, page = 1) {
-  return unwrapUsers([`/api/user/${encodeURIComponent(userName)}/following/users?p=${page}`], apiKey)
-}
-
-export async function fetchFollowers(userName: string, apiKey?: string | null, page = 1) {
-  return unwrapUsers([`/api/user/${encodeURIComponent(userName)}/followers?p=${page}`], apiKey)
-}
 
 export async function fetchUserPoint(userName: string, apiKey?: string | null) {
   try {
@@ -2107,50 +1237,6 @@ export async function fetchUserPoint(userName: string, apiKey?: string | null) {
   return null
 }
 
-function parsePointNotice(description: string): { sum?: number; operation?: '+' | '-' } {
-  const text = description.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-  const m = text.match(/(-?\d+)\s*积分/)
-  if (!m) return {}
-  const n = Number(m[1])
-  if (!Number.isFinite(n)) return {}
-  if (text.includes('扣除') || text.includes('支付') || text.includes('转出') || n < 0) {
-    return { sum: Math.abs(n), operation: '-' }
-  }
-  return { sum: Math.abs(n), operation: '+' }
-}
-
-export async function fetchPointRecords(apiKey: string, page = 1): Promise<PointRecord[]> {
-  // Rhythm 暂无 apiKey 版独立积分流水 JSON；OpenID `/openid/user/points` 需 OAuth。
-  // apiKey 路径：积分通知列表（与现网客户端一致的可读流水来源）。
-  const notices = await fetchNotifications(apiKey, 'point', page)
-  return notices.map((n, i) => {
-    const description = n.description || n.content || '积分变动'
-    const parsed = parsePointNotice(description)
-    return {
-      oId: n.oId || `notice-${i}`,
-      description,
-      time: n.createTime,
-      sum: parsed.sum,
-      type: parsed.operation,
-    }
-  })
-}
-
-export async function followUser(apiKey: string, followingId: string) {
-  const res = await request<Envelope<unknown>>('/follow/user', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, followingId }),
-  })
-  if (res.code) throw new Error(res.msg || '关注失败')
-}
-
-export async function unfollowUser(apiKey: string, followingId: string) {
-  const res = await request<Envelope<unknown>>('/unfollow/user', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, followingId }),
-  })
-  if (res.code) throw new Error(res.msg || '取消关注失败')
-}
 
 export async function fetchCheckedIn(apiKey: string) {
   const res = await request<{ checkedIn?: boolean }>(withKey('/user/checkedIn', apiKey))
@@ -2245,86 +1331,15 @@ export async function rewardLiveness(apiKey: string) {
   return Number(res.sum ?? -1)
 }
 
-export async function fetchUnreadCount(apiKey: string): Promise<UnreadCount> {
-  try {
-    const res = await request<UnreadCount & Envelope<UnreadCount>>(withKey('/notifications/unread/count', apiKey))
-    if (typeof res.unreadNotificationCnt === 'number') return res
-    if (res.data && typeof res.data.unreadNotificationCnt === 'number') return res.data
-  } catch {
-    /* unread count unavailable */
-  }
-  return {}
+export async function fetchUnreadCount(_apiKey: string): Promise<UnreadCount> { return fetchV3UnreadCount() }
+export async function fetchNotifications(_apiKey: string, type: NoticeType, page = 1): Promise<NoticeItem[]> {
+  return (await fetchNotificationPage(type, page)).items
 }
-
-export async function fetchNotifications(apiKey: string, type: NoticeType, page = 1): Promise<NoticeItem[]> {
-  try {
-    const res = await request<Envelope<NoticeItem[]>>(
-      withKey(`/api/getNotifications?type=${encodeURIComponent(type)}&p=${page}`, apiKey),
-    )
-    if (res.code === 0 && Array.isArray(res.data)) return res.data
-  } catch {
-    /* GET /api/getNotifications 尚未提供 */
-  }
-  return []
+export async function markNoticeRead(_apiKey: string, type: NoticeType, key = notificationReadKey()) {
+  return markV3NotificationsRead(type, key)
 }
-
-export async function markNoticeRead(apiKey: string, type: NoticeType) {
-  await request<Envelope<unknown>>(withKey(`/notifications/make-read/${encodeURIComponent(type)}`, apiKey))
-}
-
-export async function markAllNoticesRead(apiKey: string) {
-  await request<Envelope<unknown>>(withKey('/notifications/all-read', apiKey))
-}
-
-function chatOk<T>(res: Envelope<T> & { result?: number }) {
-  return !res.code && (res.result === undefined || res.result === 0)
-}
-
-export async function fetchWhisperList(apiKey: string): Promise<WhisperMsg[]> {
-  try {
-    const res = await request<Envelope<WhisperMsg[]>>(withKey('/chat/get-list', apiKey))
-    if (chatOk(res) && Array.isArray(res.data)) return res.data
-  } catch {
-    /* GET /chat/get-list */
-  }
-  return []
-}
-
-export async function fetchWhisperMessages(apiKey: string, toUser: string, page = 1, size = 20): Promise<WhisperMsg[]> {
-  try {
-    const res = await request<Envelope<WhisperMsg[]>>(
-      withKey(
-        `/chat/get-message?toUser=${encodeURIComponent(toUser)}&page=${page}&pageSize=${size}`,
-        apiKey,
-      ),
-    )
-    if (chatOk(res) && Array.isArray(res.data)) return res.data
-  } catch {
-    /* GET /chat/get-message */
-  }
-  return []
-}
-
-export async function markWhisperRead(apiKey: string, fromUser: string) {
-  await request<Envelope<unknown>>(withKey(`/chat/mark-as-read?fromUser=${encodeURIComponent(fromUser)}`, apiKey))
-}
-
-export async function fetchWhisperUnread(apiKey: string): Promise<WhisperMsg[]> {
-  try {
-    const res = await request<Envelope<WhisperMsg[] | number>>(withKey('/chat/has-unread', apiKey))
-    if (Array.isArray(res.data)) return res.data
-    if (typeof res.data === 'number' && res.data > 0) {
-      return Array.from({ length: res.data }, (_, i) => ({ oId: `unread-${i}` }))
-    }
-  } catch {
-    /* GET /chat/has-unread */
-  }
-  return []
-}
-
-export async function revokeWhisper(apiKey: string, oId: string) {
-  const res = await request<Envelope<unknown>>(withKey(`/chat/revoke?oId=${encodeURIComponent(oId)}`, apiKey))
-  if (res.code) throw new Error(res.msg || '撤回失败')
+export async function markAllNoticesRead(_apiKey: string, key = notificationReadKey()) {
+  return markV3NotificationsRead('all', key)
 }
 
 export interface MembershipLevel {
@@ -2410,69 +1425,6 @@ export async function submitFishGame(
   return res.data
 }
 
-export async function fetchChatHistory(apiKey?: string | null, page = 1) {
-  const res = await request<Envelope<ChatHistoryItem[]>>(
-    withKey(`/chat-room/more?page=${page}&type=html`, apiKey),
-  )
-  if (res.code !== 0) throw new Error(res.msg || '聊天记录失败')
-  return res.data ?? []
-}
-
-export interface ChatOnlineSnapshot {
-  discussing?: string
-  onlineChatCnt?: number
-  users?: { userOId?: string; oId?: string; userName?: string; userNickname?: string; userAvatarURL?: string }[]
-}
-
-export async function fetchChatOnlineUsers(apiKey?: string | null): Promise<ChatOnlineSnapshot> {
-  try {
-    const res = await request<Envelope<ChatOnlineSnapshot>>(withKey('/chat-room/online-users', apiKey))
-    if (res.code !== 0) return {}
-    return res.data ?? {}
-  } catch {
-    return {}
-  }
-}
-
-/** mode: 0 context, 1 before, 2 after */
-export async function fetchChatAround(apiKey: string | null | undefined, oId: string, mode: 0 | 1 | 2 = 0, size = 16) {
-  const res = await request<Envelope<ChatHistoryItem[]>>(
-    withKey(
-      `/chat-room/getMessage?oId=${encodeURIComponent(oId)}&mode=${mode}&size=${size}&type=html`,
-      apiKey,
-    ),
-  )
-  if (res.code !== 0) throw new Error(res.msg || '附近消息失败')
-  return res.data ?? []
-}
-
-export async function sendChat(apiKey: string, content: string) {
-  const res = await request<Envelope<unknown>>('/chat-room/send', {
-    method: 'POST',
-    body: JSON.stringify({
-      content,
-      client: 'Web/v3',
-      apiKey,
-    }),
-  })
-  if (res.code) throw new Error(res.msg || '发送失败')
-}
-
-export async function openRedPacket(apiKey: string, oId: string, gesture?: number) {
-  const res = await request<Envelope<Record<string, unknown>>>('/chat-room/red-packet/open', {
-    method: 'POST',
-    body: JSON.stringify({ oId, gesture, apiKey }),
-  })
-  if (res.code) throw new Error(res.msg || '领取失败')
-  return res
-}
-
-export async function fetchMutes() {
-  const res = await request<Envelope<MuteItem[]>>('/chat-room/si-guo-list')
-  if (res.code) return []
-  return res.data ?? []
-}
-
 export interface ChatNodeOption {
   node: string
   name: string
@@ -2514,106 +1466,12 @@ export async function fetchChatNode(apiKey: string) {
   return bundle.data
 }
 
-export async function fetchMfaEnabled(apiKey: string): Promise<boolean> {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/mfa/enabled')
-  return res.code === 0
-}
-
-export async function fetchMfaSetup(apiKey: string): Promise<{ qrCodeLink: string; secret: string }> {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown> & { qrCodeLink?: string; secret?: string }>('/mfa')
-  if (res.code || !res.qrCodeLink) throw new Error(res.msg || '获取两步验证信息失败')
-  return { qrCodeLink: res.qrCodeLink, secret: res.secret || '' }
-}
-
-export async function verifyMfa(apiKey: string, code: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>(`/mfa/verify?code=${encodeURIComponent(code)}`)
-  if (res.code) throw new Error(res.msg || '验证失败')
-  return res.msg || '绑定成功'
-}
-
-export async function removeMfa(apiKey: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/mfa/remove')
-  if (res.code) throw new Error(res.msg || '解绑失败')
-  return res.msg || '已解绑'
-}
-
-/** 官方 APP 扫码登录：页面会话下 GET /getApiKeyInWeb → QR data `login:{apiKey}` */
 export async function fetchAppLoginQr(apiKey: string): Promise<string> {
   const { ensureCsrfToken } = await import('./pageAuth')
   await ensureCsrfToken(apiKey)
   const res = await request<Envelope<unknown> & { apiKey?: string }>('/getApiKeyInWeb')
   if (res.code || !res.apiKey) throw new Error(res.msg || '获取 APP 登录码失败')
   return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`login:${res.apiKey}`)}`
-}
-
-export interface UserBag {
-  checkin1day?: number
-  checkin2days?: number
-  nameCard?: number
-  metalTicket?: number
-  patchCheckinCard?: number
-  patchStart?: string
-  sysCheckinRemain?: number
-  [key: string]: unknown
-}
-
-/**
- * 用户背包。现网无读 JSON（见 docs/MISSING_APIS.md），使用假数据。
- * 建议后端：GET /api/user/bag?apiKey=
- */
-export async function fetchUserBag(apiKey: string): Promise<UserBag> {
-  if (!apiKey) return {}
-  try {
-    const res = await request<Envelope<UserBag>>(withKey('/api/user/bag', apiKey))
-    if (!res.code && res.data && typeof res.data === 'object') return res.data
-  } catch {
-    /* 接口未开放 */
-  }
-  const { mockUserBag } = await import('./gaps.mock')
-  return { ...mockUserBag }
-}
-
-async function bagGet(apiKey: string, path: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>(path, {
-    method: 'GET',
-    headers: { csrfToken },
-  })
-  if (res.code) throw new Error(res.msg || '使用失败')
-  return res.msg || '已使用'
-}
-
-export async function useBag1dayCheckin(apiKey: string) {
-  return bagGet(apiKey, '/bag/1dayCheckin')
-}
-
-export async function useBag2dayCheckin(apiKey: string) {
-  return bagGet(apiKey, '/bag/2dayCheckin')
-}
-
-export async function useBagPatchCheckin(apiKey: string) {
-  return bagGet(apiKey, '/bag/patchCheckin')
-}
-
-export async function useBagNameCard(apiKey: string, userName: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/bag/nameCard', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ userName }),
-  })
-  if (res.code) throw new Error(res.msg || '改名失败')
-  return res.msg || '改名成功'
 }
 
 export interface MyMedal {
@@ -2702,6 +1560,7 @@ export interface HomeColumnChapter {
   chapterNo: string
   title: string
   preview?: string
+  createdAt?: string
 }
 
 export interface HomeColumnCard {
@@ -2713,21 +1572,27 @@ export interface HomeColumnCard {
   latestChapter?: HomeColumnChapter | null
 }
 
-/** 首页专栏货架，接口不可用时以 gaps.mock.ts 兜底。 */
 interface RawColumnChapter {
+  id?: string
   articleId?: string
   chapterNo?: number | string
-  articleTitle?: string
   title?: string
+  articleTitle?: string
   articlePermalink?: string
   permalink?: string
   articlePreviewContent?: string
+  preview?: string
+  createdAt?: string
 }
 
 interface RawColumnCard {
+  id?: string
   columnId?: string
   oId?: string
+  title?: string
   columnTitle?: string
+  coverURL?: string
+  articleCount?: number
   columnArticleCount?: number
   columnCoverURL?: string
   chapters?: RawColumnChapter[]
@@ -2738,44 +1603,50 @@ interface RawColumnCard {
 function normalizeChapter(ch: RawColumnChapter): HomeColumnChapter {
   const no = ch.chapterNo
   return {
-    articleId: String(ch.articleId || ''),
+    articleId: String(ch.id || ch.articleId || ''),
     permalink: ch.articlePermalink || ch.permalink || (ch.articleId ? `/article/${ch.articleId}` : ''),
     chapterNo: typeof no === 'number' ? `第 ${no} 章` : String(no ?? ''),
-    title: ch.articleTitle || ch.title || '',
-    preview: ch.articlePreviewContent || '',
+    title: ch.title || ch.articleTitle || '',
+    preview: ch.preview || ch.articlePreviewContent || '',
+    createdAt: ch.createdAt || '',
   }
 }
 
-/** 现网 /api/columns/* 只给 latestChapter / secondLatestChapter，没有 chapters 数组。 */
 function normalizeColumnCard(c: RawColumnCard): HomeColumnCard {
   const raw = c.chapters?.length ? c.chapters : [c.latestChapter, c.secondLatestChapter]
   const chapters = raw.filter((ch): ch is RawColumnChapter => Boolean(ch)).map(normalizeChapter)
   return {
-    columnId: String(c.columnId || c.oId || ''),
-    columnTitle: c.columnTitle || '',
-    columnArticleCount: Number(c.columnArticleCount || 0),
-    columnCoverURL: c.columnCoverURL || '',
+    columnId: String(c.id || c.columnId || c.oId || ''),
+    columnTitle: c.title || c.columnTitle || '',
+    columnArticleCount: Number(c.articleCount ?? c.columnArticleCount ?? 0),
+    columnCoverURL: c.coverURL || c.columnCoverURL || '',
     chapters,
     latestChapter: chapters[0] || null,
   }
 }
 
+interface RawColumnDetail {
+  column?: RawColumnCard
+  chapters?: RawColumnChapter[]
+}
+
+export async function fetchColumnDetail(columnId: string): Promise<HomeColumnCard> {
+  const res = await request<Envelope<RawColumnDetail>>(`/api/v3/columns/${encodeURIComponent(columnId)}`)
+  if (res.code !== 0 || !res.data?.column) throw new Error(res.msg || '专栏不存在')
+  const column = normalizeColumnCard({ ...res.data.column, chapters: res.data.chapters || [] })
+  if (!column.columnArticleCount) column.columnArticleCount = column.chapters.length
+  return column
+}
+
 export async function fetchHomeColumns(): Promise<{ recent: HomeColumnCard[]; hot: HomeColumnCard[] }> {
-  try {
-    const [latest, hot] = await Promise.all([
-      request<Envelope<RawColumnCard[]>>('/api/columns/latest?size=12'),
-      request<Envelope<RawColumnCard[]>>('/api/columns/hot?size=12'),
-    ])
-    if (!latest.code && !hot.code && Array.isArray(latest.data) && Array.isArray(hot.data)) {
-      return { recent: latest.data.map(normalizeColumnCard), hot: hot.data.map(normalizeColumnCard) }
-    }
-  } catch {
-    /* 接口未开放 */
-  }
-  const { mockHomeColumns } = await import('./gaps.mock')
+  const [latest, hot] = await Promise.all([
+    request<Envelope<{ list?: RawColumnCard[] }>>('/api/v3/columns?size=12'),
+    request<Envelope<{ list?: RawColumnCard[] }>>('/api/v3/columns/hot?size=12'),
+  ])
+  if (latest.code !== 0 || hot.code !== 0) throw new Error('加载专栏失败')
   return {
-    recent: mockHomeColumns.recent.map((c) => ({ ...c, chapters: [...c.chapters] })),
-    hot: mockHomeColumns.hot.map((c) => ({ ...c, chapters: [...c.chapters] })),
+    recent: (latest.data?.list || []).map(normalizeColumnCard),
+    hot: (hot.data?.list || []).map(normalizeColumnCard),
   }
 }
 

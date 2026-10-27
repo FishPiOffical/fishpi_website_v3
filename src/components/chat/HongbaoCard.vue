@@ -4,13 +4,14 @@ import type { RedPacketContent } from '@/api/fishpi'
 
 const props = withDefaults(
   defineProps<{
+    detailsOnly?: boolean
     packet: RedPacketContent
     /** 当前用户是否为发红包的人 */
     isSender?: boolean
     /** 当前用户 id（用于判断是否已参与猜拳） */
     userId?: string
   }>(),
-  { isSender: false, userId: '' },
+  { isSender: false, userId: '',detailsOnly:false },
 )
 
 const emit = defineEmits<{
@@ -46,7 +47,7 @@ const typeLabel = computed(() => {
 /** 与现网一致：他人未领完且本人未参与的猜拳红包，手势直接挂在卡片上 */
 const showGestures = computed(
   () =>
-    props.packet.type === 'rockPaperScissors' &&
+    !props.detailsOnly && props.packet.type === 'rockPaperScissors' &&
     !props.isSender &&
     !empty.value &&
     !alreadyJoined.value,
@@ -133,7 +134,7 @@ function onKeydown(e: KeyboardEvent) {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .hongbao__item {
   position: relative;
   display: inline-grid;

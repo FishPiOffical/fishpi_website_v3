@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
-  fetchNotifications,
-  markAllNoticesRead,
-  markNoticeRead,
   type NoticeItem,
   type NoticeType,
   type UnreadCount,
 } from '@/api/fishpi'
+import { fetchNotificationPage, markV3NotificationsRead, notificationReadKey } from '@/api/v3-notifications'
 import { useAuthStore } from '@/stores/auth'
 import { useNoticeStore } from '@/stores/notices'
 import FpLoading from '@/components/FpLoading.vue'
-import { createSwrLoader } from '@/utils/swr'
 import { DEFAULT_AVATAR } from '@/utils/avatar'
 import NoticeIcon from '@/components/notifications/NoticeIcon.vue'
 
@@ -25,11 +22,12 @@ const tabs: { id: NoticeType; label: string; hint: string; unreadKey: keyof Unre
   { id: 'point', label: '积分', hint: '积分收支与奖励通知', unreadKey: 'unreadPointNotificationCnt' },
   { id: 'broadcast', label: '同城', hint: '来自同城鱼油的消息', unreadKey: 'unreadBroadcastNotificationCnt' },
   { id: 'sys-announce', label: '系统', hint: '站点公告与系统消息', unreadKey: 'unreadSysAnnounceNotificationCnt' },
+  { id: 'other', label: '其他', hint: '其他类型的站内通知', unreadKey: 'unreadOtherNotificationCnt' },
 ]
 
 const auth = useAuthStore()
 const notices = useNoticeStore()
-const { apiKey } = storeToRefs(auth)
+const { accessToken } = storeToRefs(auth)
 const { unread } = storeToRefs(notices)
 
 function firstUnread(u: UnreadCount): NoticeType {
@@ -39,6 +37,9 @@ function firstUnread(u: UnreadCount): NoticeType {
 const type = ref<NoticeType>(firstUnread(unread.value))
 const items = ref<NoticeItem[]>([])
 const page = ref(1)
+const pageCount = ref(0)
+let requestVersion = 0
+const pendingReadKeys = new Map<string, string>()
 const loading = ref(false)
 const error = ref('')
 const marking = ref(false)
@@ -58,26 +59,31 @@ function selectType(next: NoticeType) {
   page.value = 1
   type.value = next
 }
-const usingMock = computed(() => items.value.some((n) => String(n.commentSharpURL || n.url || '').includes('mock-')))
-
-const swr = createSwrLoader({ loading, error })
 
 async function load() {
-  const key = apiKey.value
-  if (!key) return
-  await swr(
-    `notices:${type.value}:${page.value}`,
-    () => fetchNotifications(key, type.value, page.value),
-    (data) => (items.value = data),
-    '通知加载失败',
-  )
+  const token = accessToken.value, category = type.value, p = page.value
+  const version = ++requestVersion
+  if (!token) { items.value = []; pageCount.value = 0; loading.value = false; return }
+  loading.value = true
+  error.value = ''
+  const current = () => version === requestVersion && accessToken.value === token
+  try {
+    const data = await fetchNotificationPage(category, p)
+    if (current()) { items.value = data.items; pageCount.value = data.pageCount }
+  } catch (failure) {
+    if (current()) { items.value = []; pageCount.value = 0; error.value = failure instanceof Error ? failure.message : '通知加载失败' }
+  } finally { if (current()) loading.value = false }
 }
 
+watch(accessToken, () => {
+  requestVersion++; pendingReadKeys.clear(); marking.value = false; items.value = []; pageCount.value = 0; page.value = 1; error.value = ''
+}, { flush: 'sync' })
 watch(
-  () => [apiKey.value, type.value, page.value],
-  () => void load(),
+  () => [accessToken.value, type.value, page.value, notices.revision],
+  () => { items.value = []; void load() },
   { immediate: true },
 )
+onBeforeUnmount(() => { requestVersion++ })
 
 const router = useRouter()
 const SITE = /^https?:\/\/fishpi\.cn(?=\/|$)/
@@ -135,33 +141,24 @@ function noticeTime(n: NoticeItem) {
   return `${m[4]}-${mm}-${m[2]} ${m[3]}`
 }
 
-async function readType() {
-  if (!apiKey.value || marking.value) return
+async function mark(type: NoticeType | 'all') {
+  const token = accessToken.value
+  if (!token || marking.value) return
   marking.value = true
   try {
-    await markNoticeRead(apiKey.value, type.value)
-    await notices.refresh()
-    await load()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '标记已读失败'
-  } finally {
-    marking.value = false
-  }
+    let key = pendingReadKeys.get(type)
+    if (!key) { key = notificationReadKey(); pendingReadKeys.set(type, key) }
+    await markV3NotificationsRead(type, key)
+    if (accessToken.value !== token) return
+    pendingReadKeys.delete(type)
+    notices.invalidate()
+  } catch (failure) {
+    if (accessToken.value === token) error.value = failure instanceof Error ? failure.message : '标记已读失败'
+  } finally { if (accessToken.value === token) marking.value = false }
 }
+function readType() { return mark(type.value) }
+function readAll() { return mark('all') }
 
-async function readAll() {
-  if (!apiKey.value || marking.value) return
-  marking.value = true
-  try {
-    await markAllNoticesRead(apiKey.value)
-    await notices.refresh()
-    await load()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '标记已读失败'
-  } finally {
-    marking.value = false
-  }
-}
 </script>
 
 <template>
@@ -170,7 +167,9 @@ async function readAll() {
       <div>
         <h1 id="notifications-title">通知</h1>
         <p class="page-summary" role="status">
-          <template v-if="notices.total > 0">你有 <strong>{{ notices.total }}</strong> 条未读通知</template>
+          <template v-if="notices.loading">正在更新未读数</template>
+          <template v-else-if="notices.error">未读数暂不可用</template>
+          <template v-else-if="notices.total > 0">你有 <strong>{{ notices.total }}</strong> 条未读通知</template>
           <template v-else>暂时没有未读通知</template>
         </p>
       </div>
@@ -211,7 +210,6 @@ async function readAll() {
             <button type="button" class="refresh-button" aria-label="刷新通知" title="刷新通知" :disabled="loading || marking" @click="load"><NoticeIcon name="refresh" /></button>
           </div>
         </header>
-        <p v-if="usingMock" class="hint data-hint">通知数据异常，请刷新重试。</p>
         <FpLoading v-if="loading" :rows="5" />
         <div v-else-if="error" class="empty-state error-state" role="alert">
           <span class="empty-icon"><NoticeIcon name="inbox" /></span>
@@ -224,14 +222,14 @@ async function readAll() {
         </div>
         <ol v-else class="notice-list">
           <li v-for="(n, i) in items" :key="n.oId || i" class="notice" :class="{ unread: n.hasRead === false }">
-            <RouterLink v-if="noticeAuthor(n)" :to="`/member/${noticeAuthor(n)}`" class="avatar" :data-user-card="noticeAuthor(n)" :aria-label="`查看 ${noticeAuthor(n)} 的主页`">
+            <RouterLink v-if="noticeAuthor(n)" :to="`/member/${encodeURIComponent(noticeAuthor(n))}`" class="avatar" :data-user-card="noticeAuthor(n)" :aria-label="`查看 ${noticeAuthor(n)} 的主页`">
               <img :src="noticeAvatar(n)" alt="" loading="lazy" @error="($event.target as HTMLImageElement).src = DEFAULT_AVATAR" />
             </RouterLink>
             <span v-else class="notice-symbol"><NoticeIcon :name="type" /></span>
             <div class="notice-content">
               <div class="notice-meta">
-                <RouterLink v-if="noticeAuthor(n)" :to="`/member/${noticeAuthor(n)}`" class="author">{{ noticeAuthor(n) }}</RouterLink>
-                <span v-else class="author">{{ currentTab.label }}消息</span>
+                <RouterLink v-if="noticeAuthor(n)" :to="`/member/${encodeURIComponent(noticeAuthor(n))}`" class="author">{{ noticeAuthor(n) }}</RouterLink>
+                <span v-else class="author">{{ n.notificationTitle || `${currentTab.label}消息` }}</span>
                 <span v-if="String(n.dataType) === '38'" class="source-label">聊天室</span>
                 <span v-if="n.hasRead === false" class="unread-dot" aria-label="未读" />
                 <time>{{ noticeTime(n) }}</time>
@@ -239,7 +237,7 @@ async function readAll() {
               <RouterLink v-if="noticeHref(n) && noticeTitle(n)" :to="noticeHref(n)" class="notice-title">{{ noticeTitle(n) }}</RouterLink>
               <div v-if="isPlain(n)" class="notice-body plain">{{ plainText(n) }}</div>
               <div v-else class="notice-body" @click="onBodyClick" v-html="noticeHtml(n)" />
-              <RouterLink v-if="String(n.dataType) === '38'" to="/cr" class="context-link">前往聊天室<NoticeIcon name="chevron" /></RouterLink>
+              <RouterLink v-if="n.contentAvailable !== false && String(n.dataType) === '38'" to="/cr" class="context-link">前往聊天室<NoticeIcon name="chevron" /></RouterLink>
             </div>
           </li>
         </ol>
@@ -247,7 +245,7 @@ async function readAll() {
           <span class="page-number">第 {{ page }} 页</span>
           <div class="page-buttons">
             <button type="button" :disabled="page <= 1 || marking" @click="page -= 1">上一页</button>
-            <button type="button" :disabled="items.length < 10 || marking" @click="page += 1">下一页</button>
+            <button type="button" :disabled="page >= pageCount || marking" @click="page += 1">下一页</button>
           </div>
         </footer>
       </div>

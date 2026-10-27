@@ -3,7 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import ChatBubble from '@/components/ChatBubble.vue'
 import ChatCard from '@/components/ChatCard.vue'
-import HongbaoCard from '@/components/chat/HongbaoCard.vue'
+import ChatRedPacketCard from '@/components/chat/ChatRedPacketCard.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useChatFilterStore } from '@/stores/chatFilter'
@@ -143,13 +143,7 @@ function preview(line: (typeof messages.value)[number]) {
                   chatroom
                   :standalone="Boolean(line.redPacket)"
                 >
-                  <HongbaoCard
-                    v-if="line.redPacket"
-                    :packet="line.redPacket"
-                    :is-sender="line.userName === account?.userName"
-                    :user-id="account?.oId"
-                    @open="(gesture) => chat.openPacket(line.oId, gesture)"
-                  />
+                  <ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" />
                   <ChatCard v-else-if="line.card" :card="line.card" />
                 </ChatBubble>
               </div>

@@ -92,7 +92,7 @@ export const useChatFilterStore = defineStore('chatFilter', () => {
     userNickname?: string
     html?: string
     redPacket?: { msg?: string }
-    card?: Record<string, unknown>
+    card?: object
   }): ChatLineFilterMode {
     if (!pref.value.enabled) return 'show'
     const messageText = [

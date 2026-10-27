@@ -3,6 +3,7 @@ import type { NoticeType } from '@/api/fishpi'
 
 defineProps<{ name: NoticeType | 'inbox' | 'check' | 'refresh' | 'chevron' }>()
 const paths = {
+  other: 'M4 4h16l2 12v4H2v-4L4 4ZM2 14h6l2 3h4l2-3h6',
   commented: 'M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM7 9h10M7 13h6',
   reply: 'm9 5-6 6 6 6M3 11h10a7 7 0 0 1 7 7',
   at: 'M16 8v6a2 2 0 0 0 4 0v-2a8 8 0 1 0-3 6.2M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',

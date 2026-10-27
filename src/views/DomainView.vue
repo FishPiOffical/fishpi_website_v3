@@ -13,7 +13,7 @@ import { createSwrLoader } from '@/utils/swr'
 usePageSeo(() => ({ title: '领域', path: '/domains', description: '摸鱼派领域列表' }))
 
 const auth = useAuthStore()
-const { apiKey } = storeToRefs(auth)
+const { apiKey, accessToken } = storeToRefs(auth)
 const domains = ref<DomainItem[]>([])
 const error = ref('')
 const loading = ref(true)
@@ -32,7 +32,7 @@ async function load() {
   )
 }
 
-watch(apiKey, () => void load(), { immediate: true })
+watch(accessToken, () => { domains.value = []; void load() }, { immediate: true, flush: 'sync' })
 </script>
 
 <template>
@@ -60,7 +60,7 @@ watch(apiKey, () => void load(), { immediate: true })
                 <strong>{{ item.domainTitle }}</strong>
                 <span v-if="item.domainDescription">{{ item.domainDescription }}</span>
               </div>
-              <em class="domain-count">{{ item.domainArticleCount ?? 0 }} 帖</em>
+              <em v-if="typeof item.domainArticleCount === 'number'" class="domain-count">{{ item.domainArticleCount }} 帖</em>
             </RouterLink>
           </li>
         </ul>

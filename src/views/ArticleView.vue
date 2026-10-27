@@ -1,47 +1,33 @@
 <script setup lang="ts">
 import { articleTitle } from '@/utils/text'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   fetchArticle,
-  fetchArticleHeat,
-  fetchArticleRevision,
-  fetchArticleRevisions,
-  fetchCommentContent,
   fetchRandomArticles,
-  followArticle,
-  postComment,
-  previewMarkdown,
-  removeComment,
-  rewardArticle,
-  thankArticle,
-  thankComment,
-  toggleReaction,
-  unfollowArticle,
-  unwatchArticle,
-  updateComment,
-  acceptComment,
-  voteArticle,
-  voteComment,
-  watchArticle,
-  applyReactionPayload,
   type ArticleComment,
   type ArticleDetail,
-  type ArticleRevisionMeta,
   type ArticleSummary,
-  type ReactionSummary,
 } from '@/api/fishpi'
-import ChatComposer from '@/components/ChatComposer.vue'
+import ContentRelationButton from '@/components/articles/ContentRelationButton.vue'
+import ArticleInteraction from '@/components/articles/ArticleInteraction.vue'
+import RevisionHistory from '@/components/articles/RevisionHistory.vue'
+import {articleHeat} from '@/api/v3-article-heat'
+import {subscribeArticleChanges} from '@/api/v3-realtime'
+import ArticleOwnerActions from '@/components/articles/ArticleOwnerActions.vue'
+import { ApiError,getAuthContextVersion } from '@/api/http'
+import CommentComposer from '@/components/articles/CommentComposer.vue'
+import { useV3CommentsStore } from '@/stores/v3Comments'
+import { clearCache } from '@/utils/swr'
 import MedalList from '@/components/medal/MedalList.vue'
-import ReactionBar from '@/components/ReactionBar.vue'
+import V3ReactionBar from '@/components/V3ReactionBar.vue'
+import { useV3ReactionsStore } from '@/stores/v3Reactions'
 import ReportDialog from '@/components/ReportDialog.vue'
-import { fpConfirm } from '@/composables/useDialog'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeArticlePayload } from '@/seo/payload'
 import { absoluteUrl, SITE_DEFAULT_DESC, stripHtml } from '@/seo/site'
 import { useAuthStore } from '@/stores/auth'
-import FpLoading from '@/components/FpLoading.vue'
 import ArticleSkeleton from '@/components/ArticleSkeleton.vue'
 import CommentItem from '@/components/CommentItem.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
@@ -50,39 +36,31 @@ import { useLayoutStore } from '@/stores/layout'
 import { createReusableTemplate } from '@/utils/reusableTemplate'
 import { readCache, writeCache } from '@/utils/swr'
 
-const route = useRoute()
+const reactionEvents=useV3ReactionsStore()
+const route = useRoute(), router = useRouter()
 const auth = useAuthStore()
-const { apiKey, isLoggedIn, account } = storeToRefs(auth)
+const commentWrites=useV3CommentsStore(),commandOrigin=Symbol('article-comment-delete'),commentRefreshError=ref('')
+const { apiKey, accessToken, isLoggedIn, account } = storeToRefs(auth)
 
 const article = ref<ArticleDetail | null>(null)
 const loading = ref(true)
 const error = ref('')
-const draft = ref('')
-const sending = ref(false)
-const sendError = ref('')
 const actionMsg = ref('')
-const rewarding = ref(false)
-const rewardError = ref('')
+const ownerRefreshError=ref(''),ownerDeletedId=ref('')
 const zoomed = ref('')
 const replyId = ref('')
 const replyComment = ref<ArticleComment | null>(null)
 const paragraphIdForReply = ref('')
 const commentPage = ref(1)
-const heat = ref(0)
+const heat = ref<number|null>(null),heatError=ref(''),articleChanged=ref(false),realtimeReadError=ref(''),realtimeReading=ref(false)
 const editingId = ref('')
-const editDraft = ref('')
-const editSaving = ref(false)
 const bodyEl = ref<HTMLElement | null>(null)
 const toc = ref<{ id: string; text: string; level: number }[]>([])
 const showRevisions = ref(false)
-const revisions = ref<ArticleRevisionMeta[]>([])
-const revisionLoading = ref(false)
-const revisionError = ref('')
-const activeRevisionId = ref('')
-const revisionTitle = ref('')
-const revisionHtml = ref('')
-const revisionBusy = ref(false)
-let heatWs: WebSocket | null = null
+const historyRef=ref<InstanceType<typeof RevisionHistory>|null>(null)
+const viewerIdentity=computed(()=>`${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}`)
+let stopArticle:(()=>void)|null=null,subscriptionKey='',heatRequest:AbortController|null=null,heatSequence=0,changeRevision=0,liveReadVersion=0
+let readVersion = 0
 
 const id = computed(() => String(route.params.id || ''))
 const tocReady = ref(false)
@@ -113,42 +91,10 @@ function jumpToc(anchor: string) {
   document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-async function toggleRevisions() {
-  showRevisions.value = !showRevisions.value
-  if (!showRevisions.value || !apiKey.value || !id.value) return
-  if (revisions.value.length) return
-  revisionLoading.value = true
-  revisionError.value = ''
-  try {
-    revisions.value = await fetchArticleRevisions(apiKey.value, id.value)
-  } catch (e) {
-    revisionError.value = e instanceof Error ? e.message : '修订历史加载失败'
-  } finally {
-    revisionLoading.value = false
-  }
-}
-
-async function openRevision(revisionId: string) {
-  if (!apiKey.value || !id.value) return
-  revisionBusy.value = true
-  revisionError.value = ''
-  activeRevisionId.value = revisionId
-  try {
-    const rev = await fetchArticleRevision(apiKey.value, id.value, revisionId)
-    revisionTitle.value = rev.revisionData?.articleTitle || ''
-    const md = rev.revisionData?.articleContent || ''
-    revisionHtml.value = md ? await previewMarkdown(md) : '<p>（无正文）</p>'
-  } catch (e) {
-    revisionError.value = e instanceof Error ? e.message : '修订内容加载失败'
-    revisionHtml.value = ''
-  } finally {
-    revisionBusy.value = false
-  }
-}
+function toggleRevisions(){historyRef.value?.toggle()}
 
 const comments = computed<ArticleComment[]>(() => article.value?.articleComments || [])
 const replyAuthor = computed(() => replyComment.value?.commentAuthorName || comments.value.find((c) => c.oId === replyId.value)?.commentAuthorName || replyId.value)
-const replyPreview = computed(() => stripHtml(replyComment.value?.commentContent || '', 180))
 const nice = computed(() => article.value?.articleNiceComments || [])
 /** 一级评论 + 其下全部回复（多级回复拍平到根评论下，按原顺序）。 */
 const threads = computed(() => {
@@ -181,7 +127,7 @@ const tagList = computed(() =>
 )
 const metals = computed(() => article.value?.sysMetal || article.value?.articleAuthor?.sysMetal || [])
 const canEdit = computed(
-  () => article.value?.isMyArticle || article.value?.articleAuthorName === account.value?.userName,
+  () => !!isLoggedIn.value && !!account.value?.oId && !!article.value?.articleAuthorId && article.value.articleAuthorId === account.value.oId,
 )
 const isQnA = computed(() => Number(article.value?.articleType) === 5)
 const isLong = computed(() => Number(article.value?.articleType) === 6)
@@ -198,8 +144,10 @@ const typeBadge = computed(() => TYPE_BADGES[Number(article.value?.articleType)]
 const statementLabel = computed(() => STATEMENT_LABELS[Number(article.value?.articleStatement)] || '')
 
 const randomArticles = ref<ArticleSummary[]>([])
-const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
+const composerRef = ref<InstanceType<typeof CommentComposer> | null>(null)
 const readerRef = ref<InstanceType<typeof LongArticleReader> | null>(null)
+const [DefineOwnerActions, ReuseOwnerActions] = createReusableTemplate()
+const [DefineLiveStatus,ReuseLiveStatus]=createReusableTemplate()
 const [DefineReward, ReuseReward] = createReusableTemplate()
 const [DefineRevisions, ReuseRevisions] = createReusableTemplate()
 const [DefineComments, ReuseComments] = createReusableTemplate()
@@ -272,98 +220,66 @@ usePageSeo(() => {
 })
 
 function isOwnComment(c: ArticleComment) {
-  return Boolean(account.value && (c.commentAuthorName === account.value.userName || c.commentAuthorId === account.value.oId))
+  return Boolean(account.value && c.commentAuthorId && c.commentAuthorId === account.value.oId)
 }
 
 function disconnectHeat() {
-  heatWs?.close()
-  heatWs = null
+ stopArticle?.();stopArticle=null;subscriptionKey='';heatSequence++;heatRequest?.abort();heatRequest=null;heat.value=null;heatError.value='';articleChanged.value=false;liveReadVersion++;realtimeReading.value=false
 }
-
-function commentFromWs(msg: Record<string, unknown>): ArticleComment | null {
-  const oId = String(msg.oId || msg.commentId || '')
-  if (!oId) return null
-  return {
-    oId,
-    commentAuthorName: String(msg.commentAuthorName || ''),
-    commentAuthorThumbnailURL: String(msg.commentAuthorThumbnailURL || ''),
-    commentContent: String(msg.commentContent || ''),
-    commentCreateTimeStr: String(msg.commentCreateTimeStr || ''),
-    timeAgo: String(msg.timeAgo || ''),
-    commentThankCnt: Number(msg.commentThankCnt || 0),
-    commentOriginalCommentId: String(msg.commentOriginalCommentId || ''),
-    commentGoodCnt: Number(msg.commentGoodCnt || 0),
-    commentVote: Number(msg.commentVote ?? -1),
-    rewarded: Boolean(msg.rewarded),
-    commentAuthorId: String(msg.commentAuthorId || ''),
-  }
-}
-
 function connectHeat() {
-  disconnectHeat()
-  if (import.meta.env.SSR || typeof WebSocket === 'undefined') return
-  if (!id.value || String(id.value).startsWith('mock-')) return
-  const params = new URLSearchParams({
-    articleId: id.value,
-    articleType: String(article.value?.articleType ?? 0),
-  })
-  if (apiKey.value) params.set('apiKey', apiKey.value)
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  heatWs = new WebSocket(`${proto}//${location.host}/article-channel?${params}`)
-  heatWs.onmessage = (ev) => {
-    try {
-      const msg = JSON.parse(ev.data) as Record<string, unknown>
-      const type = String(msg.type || '')
-      if (type === 'articleHeat') {
-        if (typeof msg.articleHeat === 'number') heat.value = msg.articleHeat
-        else if (msg.operation === '+') heat.value += 1
-        else if (msg.operation === '-' && heat.value > 0) heat.value -= 1
-      } else if (type === 'comment' && article.value) {
-        const c = commentFromWs(msg)
-        if (!c || article.value.articleComments?.some((x) => x.oId === c.oId)) return
-        article.value.articleComments = [...(article.value.articleComments || []), c]
-        article.value.articleCommentCount = Number(article.value.articleCommentCount || 0) + 1
-      } else if ((type === 'articleReaction' || type === 'commentReaction') && article.value) {
-        const summary = (msg.summary || msg.reactionSummary) as ReactionSummary[] | undefined
-        const current = String(msg.actorReaction ?? msg.currentUserReaction ?? '')
-        if (type === 'articleReaction') {
-          applyReactionPayload(article.value, { summary, currentUserReaction: current })
-        } else {
-          const cid = String(msg.targetId || msg.commentId || '')
-          const c = article.value.articleComments?.find((x) => x.oId === cid)
-          if (c) applyReactionPayload(c, { summary, currentUserReaction: current })
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-  }
+ if(import.meta.env.SSR||!accessToken.value||!article.value||article.value.oId!==id.value)return
+ const target=id.value,reader=viewerIdentity.value,key=JSON.stringify([target,reader,accessToken.value])
+ if(subscriptionKey===key)return
+ stopArticle?.();subscriptionKey=key
+ stopArticle=subscribeArticleChanges(target,()=>{
+  if(subscriptionKey!==key||reader!==viewerIdentity.value||target!==id.value)return
+  changeRevision++;articleChanged.value=true
+  reactionEvents.invalidate('article',target)
+  for(const comment of article.value?.articleComments||[])reactionEvents.invalidate('comment',comment.oId)
+  if(!heatRequest)void refreshHeat()
+ })
 }
-
+async function readArticleChanges(){
+ if(realtimeReading.value)return
+ const target=id.value,reader=viewerIdentity.value,revision=changeRevision,run=++liveReadVersion
+ realtimeReading.value=true
+ try{await load(true,'realtime')
+  if(run===liveReadVersion&&target===id.value&&reader===viewerIdentity.value&&revision===changeRevision&&!realtimeReadError.value)articleChanged.value=false
+ }finally{if(run===liveReadVersion)realtimeReading.value=false}
+}
+async function ownerChanged(target:string){if(target===id.value)await load(true,'owner')}
+async function ownerDeleted(target:string){
+ if(target!==id.value)return
+ ++readVersion;disconnectHeat();clearCache();article.value=null;loading.value=false;ownerDeletedId.value=target;error.value='文章已删除'
+ try{await router.replace('/')}catch{if(id.value===target)error.value='文章已删除，返回首页失败，请点击返回首页。'}
+}
 async function refreshHeat() {
-  if (import.meta.env.SSR) return
-  if (!id.value || String(id.value).startsWith('mock-')) return
-  try {
-    heat.value = await fetchArticleHeat(id.value, apiKey.value)
-  } catch {
-    heat.value = Number(article.value?.articleHeat || 0)
-  }
+ heatRequest?.abort();const run=++heatSequence,reader=viewerIdentity.value,target=id.value
+ heat.value=null;heatError.value=''
+ if(import.meta.env.SSR||!accessToken.value||!article.value||article.value.oId!==target)return
+ const abort=new AbortController();heatRequest=abort
+ const valid=()=>run===heatSequence&&reader===viewerIdentity.value&&target===id.value&&!abort.signal.aborted
+ try{const value=await articleHeat(target,abort.signal);if(valid())heat.value=value}
+ catch{if(valid())heatError.value='热度暂不可用'}
+ finally{if(valid())heatRequest=null}
 }
 
-async function load() {
+async function load(force=false,reason:'comments'|'owner'|'realtime'='comments') {
   if (!id.value) return
-  const cached = commentPage.value === 1 ? consumeArticlePayload(id.value) : null
+  const version = ++readVersion
+  const viewer = viewerIdentity.value
+  const cached = !force && commentPage.value === 1 ? consumeArticlePayload(id.value) : null
   if (cached) {
     article.value = cached
     loading.value = false
     error.value = ''
-    heat.value = Number(cached.articleHeat || 0)
+    heat.value = null
     void buildToc()
-    // SSR 不带登录态，rewarded / thanked / isFollowing 等需要用 apiKey 再取一次
-    if (import.meta.env.SSR || !apiKey.value) {
+    // SSR is anonymous; authenticated readers must refresh their viewer-dependent content.
+    if (import.meta.env.SSR || !accessToken.value) {
       writeCache(`article:${id.value}:1`, cached)
       if (!import.meta.env.SSR) {
-        await refreshHeat()
+        void refreshHeat()
         connectHeat()
       }
       return
@@ -372,10 +288,10 @@ async function load() {
   const reqId = id.value
   const cacheKey = `article:${reqId}:${commentPage.value}`
   const paging = article.value?.oId === reqId
-  const hit = cached || readCache<ArticleDetail>(cacheKey)
+  const hit = force ? null : cached || readCache<ArticleDetail>(cacheKey)
   if (hit) {
     article.value = hit
-    heat.value = Number(hit.articleHeat || 0)
+    heat.value = null
     loading.value = false
     void buildToc()
   } else if (!paging) {
@@ -383,23 +299,27 @@ async function load() {
     article.value = null
   }
   error.value = ''
+  if(force){if(reason==='owner')ownerRefreshError.value='';else if(reason==='realtime')realtimeReadError.value='';else commentRefreshError.value=''}
   try {
     const data = await fetchArticle(reqId, apiKey.value, commentPage.value)
-    if (reqId !== id.value) return
+    if (reqId !== id.value || version !== readVersion || viewer !== viewerIdentity.value) return
     writeCache(cacheKey, data)
     article.value = data
-    heat.value = Number(data.articleHeat || 0)
+    heat.value = null
     loading.value = false
     void buildToc()
-    await refreshHeat()
+    void refreshHeat()
     connectHeat()
   } catch (e) {
-    if (reqId !== id.value || hit) return
+    if (reqId !== id.value || version !== readVersion || viewer !== viewerIdentity.value) return
+    if(reason==='realtime'&&e instanceof ApiError&&[401,403,404].includes(e.status)){article.value=null;error.value='文章不存在或当前已无权阅读';clearCache();disconnectHeat();return}
+    if(force){if(reason==='owner')ownerRefreshError.value='置顶已确认，文章状态重新读取失败，请重试读取。';else if(reason==='realtime')realtimeReadError.value='文章变更读取失败，请重试。';else commentRefreshError.value='操作已确认，评论重新读取失败：'+(e instanceof Error?e.message:'请重试');return}
+    if(hit)return
     error.value = e instanceof Error ? e.message : '帖子加载失败'
     disconnectHeat()
     toc.value = []
   } finally {
-    if (reqId === id.value) loading.value = false
+    if (reqId === id.value && version === readVersion && viewer === viewerIdentity.value) loading.value = false
   }
 }
 
@@ -408,6 +328,7 @@ if (!import.meta.env.SSR) {
   watch(isLong, (v) => (layout.immersive = v), { immediate: true })
 }
 onUnmounted(() => {
+  commentWrites.cancelConfirmation(commandOrigin)
   disconnectHeat()
   layout.immersive = false
 })
@@ -415,38 +336,35 @@ onUnmounted(() => {
 watch(
   () => id.value,
   () => {
+    disconnectHeat()
     commentPage.value = 1
+    ownerRefreshError.value='';ownerDeletedId.value='';realtimeReadError.value=''
+    editingId.value='';replyId.value='';replyComment.value=null;paragraphIdForReply.value='';commentRefreshError.value=''
+    commentWrites.cancelConfirmation(commandOrigin)
     void loadRandom()
   },
   { immediate: true },
 )
 
+watch(accessToken,()=>{if(!import.meta.env.SSR){stopArticle?.();stopArticle=null;subscriptionKey='';connectHeat();void refreshHeat()}},{flush:'post'})
+
+watch(viewerIdentity, () => {
+  ownerRefreshError.value='';ownerDeletedId.value='';realtimeReadError.value=''
+  ++readVersion
+  article.value = null
+  editingId.value='';replyId.value='';replyComment.value=null;paragraphIdForReply.value='';commentRefreshError.value=''
+  showRevisions.value=false
+  commentPage.value = 1
+  disconnectHeat()
+}, { flush: 'sync' })
+
 watch(
-  () => [id.value, apiKey.value, commentPage.value],
+  () => [id.value, viewerIdentity.value, commentPage.value],
   () => {
     void load()
   },
   { immediate: true },
 )
-
-async function submit() {
-  if (!apiKey.value || !draft.value.trim()) return
-  sending.value = true
-  sendError.value = ''
-  try {
-    await postComment(apiKey.value, id.value, draft.value.trim(), replyId.value, paragraphIdForReply.value)
-    draft.value = ''
-    replyId.value = ''
-    replyComment.value = null
-    paragraphIdForReply.value = ''
-    await load()
-    readerRef.value?.refreshParagraphComments()
-  } catch (e) {
-    sendError.value = e instanceof Error ? e.message : '评论失败'
-  } finally {
-    sending.value = false
-  }
-}
 
 function onParagraphReply(paragraphId: string, commentId: string, comment?: ArticleComment) {
   paragraphIdForReply.value = paragraphId
@@ -454,145 +372,27 @@ function onParagraphReply(paragraphId: string, commentId: string, comment?: Arti
   replyComment.value = comment || (commentId ? comments.value.find((c) => c.oId === commentId) || null : null)
 }
 
+function cancelReply(){replyId.value='';replyComment.value=null}
 function clearReplyTarget() {
   replyId.value = ''
   replyComment.value = null
   paragraphIdForReply.value = ''
 }
 
-async function vote() {
-  if (!apiKey.value) return
-  try {
-    const type = await voteArticle(apiKey.value, id.value)
-    actionMsg.value = type === 0 ? '已取消点赞' : '点赞成功'
-    await load()
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '点赞失败'
-  }
-}
-
-async function thank() {
-  if (!apiKey.value) return
-  try {
-    await thankArticle(apiKey.value, id.value)
-    actionMsg.value = '已感谢作者'
-    await load()
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '感谢失败'
-  }
-}
-
-async function toggleCollect() {
-  if (!apiKey.value || !article.value) return
-  try {
-    if (article.value.isFollowing) await unfollowArticle(apiKey.value, id.value)
-    else await followArticle(apiKey.value, id.value)
-    await load()
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '收藏失败'
-  }
-}
-
-async function toggleWatch() {
-  if (!apiKey.value || !article.value) return
-  try {
-    if (article.value.isWatching) await unwatchArticle(apiKey.value, id.value)
-    else await watchArticle(apiKey.value, id.value)
-    await load()
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '关注失败'
-  }
-}
-
-async function reward() {
-  const a = article.value
-  if (!apiKey.value || !a || rewarding.value) return
-  const confirmed = await fpConfirm({
-    title: '打赏确认',
-    message: `确定打赏 ${a.articleRewardPoint} 积分查看打赏区内容？`,
-    confirmText: '确认打赏',
-  })
-  if (!confirmed) return
-  rewarding.value = true
-  rewardError.value = ''
-  try {
-    const html = await rewardArticle(apiKey.value, id.value)
-    a.rewarded = true
-    a.rewardedCnt = Number(a.rewardedCnt || 0) + 1
-    if (html) a.articleRewardContent = html
-    void load()
-  } catch (e) {
-    rewardError.value = e instanceof Error ? e.message : '打赏失败'
-  } finally {
-    rewarding.value = false
-  }
-}
-
-async function onThankComment(c: ArticleComment) {
-  if (!apiKey.value) return
-  try {
-    await thankComment(apiKey.value, c.oId)
-    await load()
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '感谢评论失败'
-  }
-}
-
-async function onVoteComment(c: ArticleComment) {
-  if (!apiKey.value) return
-  try {
-    await voteComment(apiKey.value, c.oId)
-    await load()
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '点赞评论失败'
-  }
-}
+watch(()=>commentWrites.revision,()=>{
+  const command=commentWrites.completed
+  if(!command||command.articleId!==id.value||!accessToken.value)return
+  clearCache();editingId.value=''
+  if(command.operation==='create'&&(command.input.parentId||'')===replyId.value&&(command.input.paragraphId||'')===paragraphIdForReply.value)cancelReply()
+  void load(true)
+  readerRef.value?.refreshParagraphComments()
+},{flush:'sync'})
 
 async function onRemoveComment(c: ArticleComment) {
-  if (!apiKey.value) return
-  try {
-    await removeComment(apiKey.value, c.oId)
-    await load()
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '删除失败'
-  }
+  if(!isOwnComment(c)||!accessToken.value)return
+  await commentWrites.remove(id.value,c.oId,commandOrigin)
 }
-
-async function startEdit(c: ArticleComment) {
-  if (!apiKey.value) return
-  try {
-    editDraft.value = await fetchCommentContent(apiKey.value, c.oId)
-    editingId.value = c.oId
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '无法读取评论原文'
-  }
-}
-
-async function saveEdit() {
-  if (!apiKey.value || !editingId.value || !editDraft.value.trim()) return
-  editSaving.value = true
-  try {
-    await updateComment(apiKey.value, editingId.value, editDraft.value.trim())
-    editingId.value = ''
-    editDraft.value = ''
-    await load()
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '更新评论失败'
-  } finally {
-    editSaving.value = false
-  }
-}
-
-async function onAccept(c: ArticleComment) {
-  if (!apiKey.value) return
-  try {
-    await acceptComment(apiKey.value, c.oId)
-    await load()
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '采纳失败'
-  }
-}
-
+function startEdit(c:ArticleComment){if(isOwnComment(c)&&accessToken.value&&!commentWrites.pending&&!commentWrites.busy&&!commentWrites.confirming)editingId.value=c.oId}
 function who(c: ArticleComment) {
   return c.commentAuthorName || '匿名'
 }
@@ -626,7 +426,6 @@ function itemProps(c: ArticleComment) {
     comment: c,
     loggedIn: isLoggedIn.value,
     own,
-    canAccept: isLoggedIn.value && canEdit.value && isQnA.value && !c.commentQnAOffered && !own,
     editing: editingId.value === c.oId,
     apiKey: apiKey.value,
     hideMedals: isLong.value,
@@ -636,102 +435,43 @@ function itemProps(c: ArticleComment) {
 function itemHandlers(c: ArticleComment) {
   return {
     reply: () => startReply(c),
-    vote: () => onVoteComment(c),
-    thank: () => onThankComment(c),
     edit: () => startEdit(c),
     remove: () => onRemoveComment(c),
-    accept: () => onAccept(c),
-    react: (v: string) => onReactComment(c, v),
   }
 }
 
-async function onReactArticle(value: string) {
-  if (!apiKey.value || !article.value) return
-  try {
-    const data = await toggleReaction(apiKey.value, 'article', id.value, value)
-    applyReactionPayload(article.value, data)
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '表情失败'
-  }
-}
-
-async function onReactComment(c: ArticleComment, value: string) {
-  if (!apiKey.value) return
-  try {
-    const data = await toggleReaction(apiKey.value, 'comment', c.oId, value)
-    applyReactionPayload(c, data)
-  } catch (e) {
-    actionMsg.value = e instanceof Error ? e.message : '表情失败'
-  }
-}
 </script>
 
 <template>
   <ArticleSkeleton v-if="loading" />
   <article v-else-if="error" class="card load-error">
     <p class="err">{{ error }}</p>
-    <p class="retry"><button type="button" class="btn" @click="load()">重新加载</button></p>
+    <p class="retry"><RouterLink v-if="ownerDeletedId" to="/">返回首页</RouterLink><button v-else type="button" class="btn" @click="load()">重新加载</button></p>
     <p v-if="!isLoggedIn" class="hint">
       <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
       后可查看需要权限的帖子。
     </p>
   </article>
   <template v-else-if="article">
+    <DefineLiveStatus>
+      <p v-if="articleChanged" role="status">文章或评论有更新 <button type="button"  :disabled="realtimeReading" @click="readArticleChanges">读取最新内容</button></p>
+      <p v-if="realtimeReadError" role="alert">{{ realtimeReadError }}</p>
+    </DefineLiveStatus>
+    <ReuseLiveStatus v-if="!isLong" />
+    <DefineOwnerActions>
+      <ArticleOwnerActions :article-id="article.oId" :author-id="article.articleAuthorId||''" :anonymous="Number(article.articleAnonymous)===1" :permanent="article.stick?.permanent||false" @changed="ownerChanged" @deleted="ownerDeleted" />
+      <p v-if="ownerRefreshError" role="alert">{{ ownerRefreshError }} <button type="button" @click="load(true,'owner')">重读文章状态</button></p>
+    </DefineOwnerActions>
     <DefineReward>
-      <section v-if="Number(article.articleRewardPoint) > 0" class="reward-box" :class="{ unlocked: article.rewarded }">
-        <header class="reward-head">
-          <span class="reward-title">🎁 打赏区</span>
-          <span class="reward-meta">
-            {{ article.articleRewardPoint }} 积分<template v-if="Number(article.rewardedCnt) > 0"> · {{ article.rewardedCnt }} 人已打赏</template>
-          </span>
-        </header>
-        <div
-          v-if="article.rewarded"
-          class="body reward-body"
-          @click="onContentClick"
-          v-html="article.articleRewardContent || '<p>打赏区暂无内容</p>'"
-        />
-        <div v-else class="reward-locked">
-          <p>作者设置了打赏区，打赏 <b>{{ article.articleRewardPoint }}</b> 积分后可见</p>
-          <button v-if="isLoggedIn" type="button" class="btn orange small" :disabled="rewarding" @click="reward">
-            {{ rewarding ? '打赏中…' : `打赏 ${article.articleRewardPoint} 积分` }}
-          </button>
-          <RouterLink v-else :to="{ path: '/login', query: { redirect: route.fullPath } }" class="btn orange small">
-            登录后打赏
-          </RouterLink>
-          <p v-if="rewardError" class="err-tip">{{ rewardError }}</p>
-        </div>
-      </section>
+      <ArticleInteraction kind="reward" :article-id="article.oId" :initial-price="Number(article.articleRewardPoint || 0)" @content-click="onContentClick" />
     </DefineReward>
     <DefineRevisions>
-      <!-- 修订历史展开卡片 -->
-      <section v-if="showRevisions" class="revisions">
-        <h3>修订历史</h3>
-        <FpLoading v-if="revisionLoading" />
-        <p v-else-if="revisionError" class="err">{{ revisionError }}</p>
-        <ol v-else class="rev-list">
-          <li v-for="rev in revisions" :key="rev.revisionId">
-            <button
-              type="button"
-              class="btn small"
-              :class="{ on: activeRevisionId === rev.revisionId }"
-              :disabled="revisionBusy"
-              @click="openRevision(rev.revisionId)"
-            >
-              #{{ rev.revisionIndex ?? '' }}
-              {{ rev.revisionTimeStr || rev.revisionId }}
-              <em v-if="rev.current">当前</em>
-            </button>
-          </li>
-        </ol>
-        <div v-if="activeRevisionId" class="rev-preview">
-          <h4>{{ revisionTitle || '修订预览' }}</h4>
-          <p v-if="revisionBusy" class="hint">渲染中…</p>
-          <div v-else class="body" v-html="revisionHtml" />
-        </div>
-      </section>
+      <RevisionHistory ref="historyRef" kind="article" :target-id="article.oId" :trigger="false" @open-change="showRevisions=$event" />
     </DefineRevisions>
     <DefineComments>
+      <p v-if="commentRefreshError" role="alert">{{ commentRefreshError }}<button type="button" @click="load(true)">重读评论</button></p>
+      <p v-if="commentWrites.error" role="alert">{{ commentWrites.error }}</p>
+      <p v-if="commentWrites.message" role="status">{{ commentWrites.message }}</p>
       <div class="comments-list">
         <CommentItem
           v-for="t in threads"
@@ -741,13 +481,7 @@ async function onReactComment(c: ArticleComment, value: string) {
           v-on="itemHandlers(t.c)"
         >
           <template #editor>
-            <div class="edit-box">
-              <textarea v-model="editDraft" rows="3" />
-              <div class="edit-box-btns">
-                <button type="button" class="btn small" :disabled="editSaving || !editDraft.trim()" @click="saveEdit">保存</button>
-                <button type="button" class="btn small ghost" @click="editingId = ''">取消</button>
-              </div>
-            </div>
+            <CommentComposer :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
           </template>
           <template v-if="t.replies.length" #default>
             <CommentItem
@@ -759,13 +493,7 @@ async function onReactComment(c: ArticleComment, value: string) {
               v-on="itemHandlers(r)"
             >
               <template #editor>
-                <div class="edit-box">
-                  <textarea v-model="editDraft" rows="3" />
-                  <div class="edit-box-btns">
-                    <button type="button" class="btn small" :disabled="editSaving || !editDraft.trim()" @click="saveEdit">保存</button>
-                    <button type="button" class="btn small ghost" @click="editingId = ''">取消</button>
-                  </div>
-                </div>
+                <CommentComposer :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
               </template>
             </CommentItem>
           </template>
@@ -783,29 +511,7 @@ async function onReactComment(c: ArticleComment, value: string) {
       <div class="composer-inner">
         <p v-if="article.articleCommentable === false" class="hint-login">作者已关闭回帖。</p>
         <template v-else-if="isLoggedIn">
-          <ChatComposer
-            ref="composerRef"
-            v-model="draft"
-            :api-key="apiKey"
-            :height="180"
-            :sending="sending"
-            submit-text="发表评论"
-            placeholder="请友善发言，支持 Markdown、@用户、拖拽上传图片…Ctrl+Enter 发送"
-            @submit="submit"
-          >
-            <template #top>
-              <div v-if="replyId" class="reply-quote-box">
-                <div class="reply-quote-info">
-                  <span class="reply-quote-label">回复 @{{ replyAuthor }}</span>
-                  <div v-if="replyPreview" class="reply-quote-text">{{ replyPreview }}</div>
-                </div>
-                <button type="button" class="reply-quote-cancel" title="取消回复" aria-label="取消回复" @click="clearReplyTarget">✕</button>
-              </div>
-            </template>
-            <template #actions>
-              <span v-if="sendError" class="err-tip">{{ sendError }}</span>
-            </template>
-          </ChatComposer>
+          <CommentComposer ref="composerRef" :article-id="article.oId" :parent-id="replyId" :paragraph-id="paragraphIdForReply" :reply-label="replyAuthor" @clear-reply="cancelReply" />
         </template>
         <p v-else class="hint-login">
           <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }" class="login-link">登录</RouterLink>
@@ -824,16 +530,13 @@ async function onReactComment(c: ArticleComment, value: string) {
       :api-key="apiKey"
       :statement="statementLabel"
       :action-msg="actionMsg"
-      @vote="vote"
-      @thank="thank"
-      @collect="toggleCollect"
-      @watch="toggleWatch"
       @revisions="toggleRevisions"
-      @react="onReactArticle"
       @content-click="onContentClick"
       @reply="clearReplyTarget"
       @paragraph-reply="onParagraphReply"
     >
+      <template #owner-actions><ReuseOwnerActions /></template>
+      <template #live-status><ReuseLiveStatus /><span v-if="heat!==null">本节点约 {{ heat }} 个连接</span><span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span></template>
       <template #reward><ReuseReward /></template>
       <template #extra><ReuseRevisions /></template>
       <template #comments><ReuseComments /></template>
@@ -870,6 +573,7 @@ async function onReactComment(c: ArticleComment, value: string) {
         </div>
 
         <div class="meta">
+          <span v-if="article.stick?.active">{{ article.stick.permanent ? '永久置顶' : '置顶' }} •</span>
           <RouterLink
             v-if="article.articleAuthorName"
             :to="`/member/${article.articleAuthorName}`"
@@ -888,7 +592,8 @@ async function onReactComment(c: ArticleComment, value: string) {
           <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
           <span>•</span>
           <span>{{ commentTotal }} 评论</span>
-          <span v-if="heat">（{{ heat }} 在看）</span>
+          <span v-if="heat!==null">（本节点约 {{ heat }} 个连接）</span>
+          <span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span>
         </div>
 
         <div v-if="tagList.length" class="tags">
@@ -902,9 +607,6 @@ async function onReactComment(c: ArticleComment, value: string) {
           <MedalList :items="metals" />
         </div>
 
-        <p v-if="String(article.oId).startsWith('mock-')" class="hint">
-          匿名详情接口未开放，当前为 mock 正文。
-        </p>
 
         <p v-if="statementLabel" class="statement">创作声明：{{ statementLabel }}</p>
 
@@ -926,22 +628,17 @@ async function onReactComment(c: ArticleComment, value: string) {
 
         <!-- 文章底部互动操作栏 -->
         <div class="article-tail-bar">
+          <ContentRelationButton kind="collection" :target="article.oId" />
+          <ContentRelationButton kind="subscription" :target="article.oId" />
           <div v-if="isLoggedIn" class="actions">
-            <button type="button" class="btn small" @click="vote">👍 点赞</button>
-            <button type="button" class="btn small" :disabled="article.thanked" @click="thank">
-              {{ article.thanked ? '❤️ 已感谢' : '❤️ 感谢' }}
-            </button>
-            <button type="button" class="btn small" @click="toggleCollect">
-              {{ article.isFollowing ? '★ 取消收藏' : '☆ 收藏' }}
-            </button>
-            <button type="button" class="btn small" @click="toggleWatch">
-              {{ article.isWatching ? '取消关注' : '+ 关注帖子' }}
-            </button>
+            <ArticleInteraction kind="vote" :article-id="article.oId" />
+            <ArticleInteraction kind="thanks" :article-id="article.oId" />
+            <ReuseOwnerActions />
             <RouterLink v-if="canEdit" class="btn small edit-btn" :to="`/post/${article.oId}`">编辑</RouterLink>
-            <button v-if="Number(article.articleRevisionCount ?? 2) > 1" type="button" class="btn small" @click="toggleRevisions">
+            <button type="button" class="btn small" @click="toggleRevisions">
               {{ showRevisions ? '收起历史' : '修订历史' }}
             </button>
-            <ReportDialog :api-key="apiKey" :data-id="article.oId" :data-type="0" />
+            <ReportDialog :data-id="article.oId" :data-type="0" />
           </div>
           <div class="share-row">
             <span class="share-label">分享</span>
@@ -956,12 +653,7 @@ async function onReactComment(c: ArticleComment, value: string) {
 
         <!-- 表情回应栏 -->
         <div class="reaction-wrap">
-          <ReactionBar
-            :summary="article.reactionSummary"
-            :current="article.currentUserReaction"
-            :disabled="!isLoggedIn"
-            @toggle="onReactArticle"
-          />
+          <V3ReactionBar kind="article" :target-id="article.oId" />
         </div>
 
         <!-- 作者信息卡片 (对齐现网 Rhythm .article__meta) -->
@@ -982,10 +674,10 @@ async function onReactComment(c: ArticleComment, value: string) {
               </span>
             </div>
             <div class="summary-counts">
-              <span>获赞 {{ article.articleGoodCnt ?? 0 }}</span>
-              <span>•</span>
-              <span>被收藏 {{ article.articleCollectCnt ?? 0 }}</span>
-              <span>•</span>
+              <span v-if="typeof article.articleGoodCnt === 'number'">获赞 {{ article.articleGoodCnt }}</span>
+              <span v-if="typeof article.articleGoodCnt === 'number'">•</span>
+              <span v-if="typeof article.articleCollectCnt === 'number'">被收藏 {{ article.articleCollectCnt }}</span>
+              <span v-if="typeof article.articleCollectCnt === 'number'">•</span>
               <span>回帖 {{ commentTotal }}</span>
             </div>
           </div>
@@ -1038,7 +730,7 @@ async function onReactComment(c: ArticleComment, value: string) {
   </template>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .wrap {
   display: flex;
   flex-direction: column;
@@ -1330,48 +1022,6 @@ h1 {
   font-size: 13px;
   color: var(--fp-accent);
   margin-top: 8px;
-}
-
-.revisions {
-  margin-top: 16px;
-  padding: 14px;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  border-radius: 6px;
-}
-.revisions h3 {
-  margin: 0 0 10px;
-  font-size: 14px;
-  color: var(--fp-head);
-}
-.rev-list {
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-height: 160px;
-  overflow-y: auto;
-}
-.rev-list .btn.on {
-  border-color: var(--fp-accent);
-  color: var(--fp-accent);
-}
-.rev-list em {
-  font-style: normal;
-  margin-left: 4px;
-  color: var(--fp-green);
-  font-size: 11px;
-}
-.rev-preview {
-  border-top: 1px dashed var(--fp-border);
-  padding-top: 10px;
-}
-.rev-preview h4 {
-  margin: 0 0 8px;
-  font-size: 14px;
-  color: var(--fp-title);
 }
 
 .reaction-wrap {

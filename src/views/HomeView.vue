@@ -1,14 +1,15 @@
 <script setup lang="ts">
+import {getAuthContextVersion} from '@/api/http'
 import VipNickname from '@/components/user/VipNickname.vue'
+import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
+import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
+import BreezemoonPanel from '@/components/breezemoons/BreezemoonPanel.vue'
 import { articleTitle } from '@/utils/text'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   fetchArticleFeed,
-  fetchBreezemoons,
-  fetchChatHistory,
-  fetchChatOnlineUsers,
   fetchCheckinRank,
   fetchHomeColumns,
   fetchOnlineRank,
@@ -16,10 +17,7 @@ import {
   fetchRecentRegister,
   fetchRepeaterItems,
   fetchTags,
-  postBreezemoon,
-  sendChat,
   type ArticleSummary,
-  type Breezemoon,
   type ChatHistoryItem,
   type HomeColumnCard,
   type LiteUser,
@@ -43,10 +41,10 @@ import { readCache, writeCache } from '@/utils/swr'
 import { avatarStyle, avatarUrl } from '@/utils/avatar'
 
 const auth = useAuthStore()
-const chat = useChatStore()
+const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const layout = useHomeLayoutStore()
 const router = useRouter()
-const { apiKey, isLoggedIn } = storeToRefs(auth)
+const { apiKey, accessToken, isLoggedIn } = storeToRefs(auth)
 const left = ref<ArticleSummary[]>([])
 const right = ref<ArticleSummary[]>([])
 const hot = ref<ArticleSummary[]>([])
@@ -55,17 +53,14 @@ const checkin = ref<RankUser[]>([])
 const online = ref<RankUser[]>([])
 const recentUsers = ref<LiteUser[]>([])
 const tags = ref<TagItem[]>([])
-const moons = ref<Breezemoon[]>([])
 const chatLines = ref<ChatHistoryItem[]>([])
 const repeaterItems = ref<RepeaterItem[]>([])
-const onlineChatCnt = ref<number | null>(null)
-const discussing = ref('')
+const onlineChatCnt=computed(()=>chat.onlineTotal)
+const discussing = computed(()=>chat.discuss)
 const chatDraft = ref('')
+watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,auth.account?.oId||'']),()=>{chatDraft.value=''},{flush:'sync'})
 const chatBusy = ref(false)
 const chatMsg = ref('')
-const moonDraft = ref('')
-const moonBusy = ref(false)
-const moonMsg = ref('')
 const hotMode = ref<'hot' | 'column'>('hot')
 const error = ref('')
 const loading = ref(true)
@@ -88,7 +83,7 @@ let longShelfTimer: ReturnType<typeof setInterval> | undefined
 const activeLongShelf = ref<'recent' | 'hot'>('recent')
 
 function syncLiveChatMessages() {
-  if (!liveChatMessages.value.length) return
+  if (!liveChatMessages.value.length){chatLines.value=[];return}
   chatLines.value = liveChatMessages.value.slice(-10).reverse().map((line) => ({
     oId: line.oId,
     userOId: line.userOId,
@@ -100,10 +95,10 @@ function syncLiveChatMessages() {
   }))
 }
 
-watch(() => liveChatMessages.value.length, syncLiveChatMessages)
+watch(liveChatMessages, syncLiveChatMessages)
 onMounted(() => {
   homeMounted = true
-  if (apiKey.value) void chat.connect()
+  if (accessToken.value) void chat.connect()
   longShelfTimer = setInterval(() => {
     scrollShelf('long-active', 1)
   }, 6000)
@@ -162,15 +157,8 @@ if (bootExtra) {
   if (bootExtra.online?.length) online.value = bootExtra.online.slice(0, 8)
   if (bootExtra.recentUsers?.length) recentUsers.value = bootExtra.recentUsers.slice(0, 20)
   if (bootExtra.tags?.length) tags.value = bootExtra.tags.slice(0, 24)
-  if (bootExtra.breezemoons?.length) moons.value = bootExtra.breezemoons.slice(0, 8)
-  if (bootExtra.chatFeed?.length) chatLines.value = bootExtra.chatFeed.slice(0, 10)
   if (bootExtra.repeater?.length) repeaterItems.value = bootExtra.repeater
-  if (bootExtra.chatOnline) {
-    if (typeof bootExtra.chatOnline.onlineChatCnt === 'number') {
-      onlineChatCnt.value = bootExtra.chatOnline.onlineChatCnt
-    }
-    if (bootExtra.chatOnline.discussing) discussing.value = bootExtra.chatOnline.discussing
-  }
+
 }
 
 async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
@@ -189,7 +177,6 @@ interface HomeSnapshot {
   long: ArticleSummary[]
   recentUsers: LiteUser[]
   tags: TagItem[]
-  moons: Breezemoon[]
   chatLines: ChatHistoryItem[]
   repeater: RepeaterItem[]
   onlineChatCnt: number | null
@@ -207,11 +194,8 @@ function applySnapshot(s: HomeSnapshot) {
   longArticles.value = s.long
   recentUsers.value = s.recentUsers
   tags.value = s.tags
-  moons.value = s.moons
-  chatLines.value = s.chatLines
+  syncLiveChatMessages()
   repeaterItems.value = s.repeater
-  onlineChatCnt.value = s.onlineChatCnt
-  discussing.value = s.discussing
   homeColumnsRecent.value = s.columnsRecent
   homeColumnsHot.value = s.columnsHot
 }
@@ -222,7 +206,10 @@ if (homeCached) {
   loading.value = false
 }
 
+let loadVersion = 0
 async function load() {
+  const version = ++loadVersion
+  const token = accessToken.value
   error.value = ''
   const needArticles = left.value.length === 0 || Boolean(homeCached)
   if (left.value.length === 0) loading.value = true
@@ -235,10 +222,7 @@ async function load() {
       longList,
       regs,
       tagData,
-      breezes,
-      chats,
       reps,
-      onlineSnap,
       columns,
     ] = await Promise.all([
       needArticles
@@ -250,12 +234,10 @@ async function load() {
       safe(fetchArticleFeed('long', apiKey.value, 1, 12), []),
       safe(fetchRecentRegister(apiKey.value), []),
       safe(fetchTags(apiKey.value, 1, 24), { tags: [], total: 0 }),
-      safe(fetchBreezemoons(1, 8), []),
-      safe(fetchChatHistory(apiKey.value, 1), []),
       safe(fetchRepeaterItems(apiKey.value), []),
-      safe(fetchChatOnlineUsers(apiKey.value), {}),
       safe(fetchHomeColumns(), { recent: [], hot: [] }),
     ])
+    if (version !== loadVersion || token !== accessToken.value) return
     const snap: HomeSnapshot = {
       articles,
       checkin: checkinRank.slice(0, 8),
@@ -264,27 +246,27 @@ async function load() {
       long: longList.slice(0, 12),
       recentUsers: regs.slice(0, 20),
       tags: tagData.tags.slice(0, 24),
-      moons: breezes.slice(0, 8),
-      chatLines: chats.slice(0, 10),
+      chatLines: [],
       repeater: reps,
-      onlineChatCnt: typeof onlineSnap.onlineChatCnt === 'number' ? onlineSnap.onlineChatCnt : null,
-      discussing: onlineSnap.discussing || '',
+      onlineChatCnt: null,
+      discussing: '',
       columnsRecent: columns.recent || [],
       columnsHot: columns.hot || [],
     }
     applySnapshot(snap)
     writeCache(HOME_CACHE_KEY, snap)
   } catch (e) {
-    if (!left.value.length) error.value = e instanceof Error ? e.message : '首页加载失败'
+    if (version === loadVersion && token === accessToken.value && !left.value.length) error.value = e instanceof Error ? e.message : '首页加载失败'
   } finally {
-    loading.value = false
+    if (version === loadVersion && token === accessToken.value) loading.value = false
   }
 }
 
-watch(apiKey, () => {
+watch(accessToken, (token, previous) => {
+  if (token !== previous) { ++loadVersion; left.value = []; right.value = []; hot.value = []; longArticles.value = [] }
   void load()
   if (homeMounted) {
-    if (apiKey.value) void chat.connect()
+    if (accessToken.value) void chat.connect()
     else chat.disconnect()
   }
 }, { immediate: true })
@@ -333,44 +315,13 @@ function chatAvatar(item: ChatHistoryItem) {
   return avatarUrl(item)
 }
 
-async function postChat() {
-  const content = chatDraft.value.trim()
-  if (!content || !apiKey.value || chatBusy.value) return
-  chatBusy.value = true
-  chatMsg.value = ''
-  try {
-    await sendChat(apiKey.value, content)
-    chatDraft.value = ''
-    const [chats, onlineSnap] = await Promise.all([
-      safe(fetchChatHistory(apiKey.value, 1), []),
-      safe(fetchChatOnlineUsers(apiKey.value), {}),
-    ])
-    chatLines.value = chats.slice(0, 10)
-    onlineChatCnt.value = typeof onlineSnap.onlineChatCnt === 'number' ? onlineSnap.onlineChatCnt : onlineChatCnt.value
-    discussing.value = onlineSnap.discussing || discussing.value
-  } catch (e) {
-    chatMsg.value = e instanceof Error ? e.message : '发送失败'
-  } finally {
-    chatBusy.value = false
-  }
+async function postChat(){
+ const content=chatDraft.value.trim()
+ if(!content||!accessToken.value||chatBusy.value||publication.pending)return
+ chatBusy.value=true;chatMsg.value='';const reader=JSON.stringify([getAuthContextVersion(),!!accessToken.value,auth.account?.oId||''])
+ try{if(await chat.send(content)&&reader===JSON.stringify([getAuthContextVersion(),!!accessToken.value,auth.account?.oId||'']))acceptHomeChat(content)}finally{chatBusy.value=false}
 }
-
-async function postMoon() {
-  const content = moonDraft.value.trim()
-  if (!content || !apiKey.value || moonBusy.value) return
-  moonBusy.value = true
-  moonMsg.value = ''
-  try {
-    await postBreezemoon(apiKey.value, content)
-    moonDraft.value = ''
-    moons.value = (await safe(fetchBreezemoons(1, 8), [])).slice(0, 8)
-    moonMsg.value = '已发布'
-  } catch (e) {
-    moonMsg.value = e instanceof Error ? e.message : '发布失败'
-  } finally {
-    moonBusy.value = false
-  }
-}
+function acceptHomeChat(content:string){if(chatDraft.value.trim()===content)chatDraft.value=''}
 
 function scrollShelf(id: string, dir: -1 | 1) {
   const el = document.getElementById(id)
@@ -591,7 +542,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <div class="index-head">
                 <b>
                   聊天室
-                  <span v-if="onlineChatCnt != null" class="online">({{ onlineChatCnt }}人在线)</span>
+                  <span v-if="onlineChatCnt != null" class="online">(本次可见{{ onlineChatCnt }}人)</span>
                 </b>
                 <RouterLink to="/cr">进入完整版聊天室</RouterLink>
               </div>
@@ -602,14 +553,16 @@ function scrollShelf(id: string, dir: -1 | 1) {
                   type="text"
                   maxlength="512"
                   :placeholder="isLoggedIn ? '说点什么...' : '登录后发言'"
-                  :disabled="!isLoggedIn || chatBusy"
+                  :disabled="!isLoggedIn || chatBusy || !!publication.pending"
                   @keydown.enter.prevent="postChat"
                 />
-                <button v-if="isLoggedIn" type="button" class="green" :disabled="chatBusy || !chatDraft.trim()" @click="postChat">
+                <button v-if="isLoggedIn" type="button" class="green" :disabled="chatBusy || !!publication.pending || !chatDraft.trim()" @click="postChat">
                   发送
                 </button>
                 <RouterLink v-else class="green-link" to="/login">登录</RouterLink>
               </div>
+              <ChatPublicationRecovery @confirmed="acceptHomeChat" />
+              <p v-if="chat.error" role="alert">{{ chat.error }} <button type="button" :disabled="chat.loading" @click="chat.refreshMessages">重读聊天室消息</button></p>
               <p v-if="chatMsg" class="hint">{{ chatMsg }}</p>
               <ol class="module-list chat-list">
                 <li v-for="m in chatLines" :key="m.oId" class="chat-item">
@@ -628,7 +581,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                     <div class="chat-text">{{ chatPreview(m) }}</div>
                   </div>
                 </li>
-                <li v-if="!chatLines.length && !loading" class="hint-li">暂无消息，去聊天室看看</li>
+                <li v-if="!chatLines.length&&!loading&&!chat.error" class="hint-li">{{ isLoggedIn?'暂无消息，去聊天室看看':'登录后可读取聊天室消息' }}</li>
               </ol>
             </section>
 
@@ -698,30 +651,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <b>清风明月</b>
               <RouterLink to="/breezemoons" title="清风明月是什么？">更多</RouterLink>
             </div>
-            <div class="moon-form">
-              <input
-                v-model="moonDraft"
-                type="text"
-                maxlength="128"
-                :placeholder="isLoggedIn ? '清风明月' : '登录后发布清风明月'"
-                :disabled="!isLoggedIn || moonBusy"
-                @keydown.enter.prevent="postMoon"
-              />
-              <button v-if="isLoggedIn" type="button" class="green" :disabled="moonBusy || !moonDraft.trim()" @click="postMoon">
-                发布
-              </button>
-              <RouterLink v-else class="green-link" to="/login">登录</RouterLink>
-            </div>
-            <p v-if="moonMsg" class="hint moon-msg">{{ moonMsg }}</p>
-            <ul class="moons">
-              <li v-for="m in moons" :key="m.oId">
-                <RouterLink v-if="m.breezemoonAuthorName" class="who" :to="`/member/${m.breezemoonAuthorName}`">
-                  {{ m.breezemoonAuthorName }}
-                </RouterLink>
-                <span>{{ stripHtml(m.breezemoonContent || '') }}</span>
-              </li>
-              <li v-if="!moons.length && !loading" class="hint-li">暂无动态</li>
-            </ul>
+            <BreezemoonPanel :size="8" compact ssr-scope="home" />
             </aside>
             <HomeSideWidgets v-else-if="mod.sidebarId" :modules="[mod]" />
           </div>

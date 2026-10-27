@@ -2,29 +2,21 @@
 import { articleTitle } from '@/utils/text'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { storeToRefs } from 'pinia'
 import {
-  fetchArticle,
-  fetchArticleFeed,
-  fetchHomeColumns,
+  fetchColumnDetail,
   type ArticleSummary,
   type HomeColumnCard,
 } from '@/api/fishpi'
 import { usePageSeo } from '@/composables/usePageSeo'
-import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
 import { createSwrLoader } from '@/utils/swr'
 
 const route = useRoute()
-const auth = useAuthStore()
-const { apiKey } = storeToRefs(auth)
-
 const columnId = computed(() => String(route.params.columnId || ''))
 const meta = ref<HomeColumnCard | null>(null)
 const chapters = ref<ArticleSummary[]>([])
 const loading = ref(true)
 const err = ref('')
-const usingMock = ref(false)
 
 const title = computed(() => meta.value?.columnTitle || `专栏 ${columnId.value}`)
 const firstChapter = computed(() => chapters.value[chapters.value.length - 1] || chapters.value[0] || null)
@@ -46,70 +38,24 @@ async function load() {
   await swr(
     `column:${id}`,
     async () => {
-      const cols = await fetchHomeColumns()
-      const all = [...cols.recent, ...cols.hot]
-      let m: HomeColumnCard = all.find((c) => c.columnId === id) || {
-        columnId: id,
-        columnTitle: `专栏 ${id}`,
-        columnArticleCount: 0,
-        chapters: [],
-        latestChapter: null,
-      }
-      const longList = await fetchArticleFeed('long', apiKey.value, 1, 50)
-      const matched = longList.filter((a) => String(a.columnId || '') === id || a.columnTitle === m.columnTitle)
-      let list: ArticleSummary[] = matched.length
-        ? matched
-        : (m.chapters || []).map((ch, i) => ({
-            oId: ch.articleId || `mock-ch-${i}`,
-            articleTitle: ch.title,
-            articleTitleEmoj: ch.title,
-            columnTitle: m.columnTitle,
-            columnId: id,
-            articleCreateTimeStr: ch.chapterNo,
-          }))
-
-      // 专栏卡片接口只附带最新两章；文章详情的 longArticleColumnView 才包含完整目录。
-      const latestArticleId = m.latestChapter?.articleId || matched[0]?.oId
-      if (latestArticleId) {
-        try {
-          const detail = await fetchArticle(latestArticleId, apiKey.value)
-          const columnView = detail.longArticleColumnView
-          if (columnView?.column.oId === id && columnView.chapters.length) {
-            const summaries = new Map(matched.map((item) => [item.oId, item]))
-            list = [...columnView.chapters]
-              .sort((a, b) => b.chapterNo - a.chapterNo)
-              .map((chapter) => {
-                const existing = summaries.get(chapter.articleId)
-                return {
-                  ...existing,
-                  oId: chapter.articleId,
-                  articleTitle: chapter.articleTitle,
-                  articleTitleEmoj: chapter.articleTitleEmoj || chapter.articleTitle,
-                  columnTitle: columnView.column.columnTitle,
-                  columnId: columnView.column.oId,
-                  articleCreateTimeStr: chapter.articleCreateTime || existing?.articleCreateTimeStr,
-                  articlePreviewContent: chapter.articlePreviewContent || existing?.articlePreviewContent,
-                }
-              })
-            m = {
-              ...m,
-              columnId: columnView.column.oId,
-              columnTitle: columnView.column.columnTitle,
-              columnArticleCount: columnView.column.columnArticleCount || columnView.chapters.length,
-              columnCoverURL: columnView.column.columnCoverURL || m.columnCoverURL,
-            }
-          }
-        } catch {
-          // 文章详情不可用时保留专栏卡片/长篇列表中的可用章节。
-        }
-      }
-      if (!m.columnArticleCount) m = { ...m, columnArticleCount: list.length }
-      return { meta: m, chapters: list }
+      const m = await fetchColumnDetail(id)
+      const list: ArticleSummary[] = (m.chapters || [])
+        .slice()
+        .sort((a, b) => Number(b.chapterNo.replace(/\D/g, '')) - Number(a.chapterNo.replace(/\D/g, '')))
+        .map((chapter) => ({
+          oId: chapter.articleId,
+          articleTitle: chapter.title,
+          articleTitleEmoj: chapter.title,
+          columnTitle: m.columnTitle,
+          columnId: m.columnId,
+          articleCreateTimeStr: chapter.createdAt || chapter.chapterNo,
+          articlePreviewContent: chapter.preview,
+        }))
+      return { meta: { ...m, columnArticleCount: m.columnArticleCount || list.length }, chapters: list }
     },
     (data) => {
       meta.value = data.meta
       chapters.value = data.chapters
-      usingMock.value = String(data.meta.columnId).startsWith('mock-') || data.meta.columnTitle.includes('假数据')
     },
   )
 }
@@ -138,8 +84,6 @@ watch(columnId, () => void load(), { immediate: true })
         </div>
         <div class="hero-stamp" aria-hidden="true"><span>连载</span><i>Pi</i></div>
       </section>
-
-      <p v-if="usingMock" class="hint">专栏详情 JSON 暂未开放，章节目录由长篇文章列表整理展示。</p>
 
       <div class="column-body">
         <section class="chapter-panel">

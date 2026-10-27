@@ -1,9 +1,9 @@
+import { getCurrentInstance, inject, type InjectionKey } from 'vue'
+import type { BreezemoonPage } from '@/api/v3-breezemoons'
 import type {
   ArticleDetail,
   ArticleSummary,
-  Breezemoon,
   ChatHistoryItem,
-  ChatOnlineSnapshot,
   DomainItem,
   LiteUser,
   RankUser,
@@ -13,6 +13,8 @@ import type {
 } from '@/api/fishpi'
 
 export interface SsrPayload {
+  breezemoonPage?: BreezemoonPage | null
+  homeBreezemoonPage?: BreezemoonPage | null
   article?: ArticleDetail | null
   member?: UserProfile | null
   feed?: ArticleSummary[]
@@ -22,27 +24,28 @@ export interface SsrPayload {
   domains?: DomainItem[]
   tags?: TagItem[]
   tagsTotal?: number
-  breezemoons?: Breezemoon[]
   checkinRank?: RankUser[]
   onlineRank?: RankUser[]
   recentUsers?: LiteUser[]
   repeater?: RepeaterItem[]
   chatFeed?: ChatHistoryItem[]
-  chatOnline?: ChatOnlineSnapshot
 }
+
+export const SSR_PAYLOAD_KEY: InjectionKey<SsrPayload> = Symbol('public-ssr-payload')
 
 const g = globalThis as typeof globalThis & { __FP_SSR_PAYLOAD__?: SsrPayload }
 
 export function setSsrPayload(payload: SsrPayload) {
-  g.__FP_SSR_PAYLOAD__ = payload
+  if (!import.meta.env.SSR) g.__FP_SSR_PAYLOAD__ = payload
 }
 
 export function getSsrPayload(): SsrPayload {
+  if (import.meta.env.SSR) return getCurrentInstance() ? inject(SSR_PAYLOAD_KEY, {}) : {}
   return g.__FP_SSR_PAYLOAD__ || {}
 }
 
 export function clearSsrPayload() {
-  delete g.__FP_SSR_PAYLOAD__
+  if (!import.meta.env.SSR) delete g.__FP_SSR_PAYLOAD__
 }
 
 export function takeClientPayload(): SsrPayload {
@@ -110,9 +113,8 @@ export function consumeTagsPayload(): { tags: TagItem[]; total: number } | null 
   return { tags, total: typeof total === 'number' ? total : tags.length }
 }
 
-export function consumeBreezemoonsPayload(): Breezemoon[] | null {
-  const v = takeField('breezemoons')
-  return Array.isArray(v) ? v : null
+export function consumeBreezemoonPagePayload(scope: 'global' | 'home'): BreezemoonPage | null {
+  return takeField(scope === 'global' ? 'breezemoonPage' : 'homeBreezemoonPage') || null
 }
 
 export function consumeRanksPayload(): { checkin: RankUser[]; online: RankUser[] } | null {
@@ -134,10 +136,8 @@ export function consumeHomeExtrasPayload(): {
   online?: RankUser[]
   recentUsers?: LiteUser[]
   tags?: TagItem[]
-  breezemoons?: Breezemoon[]
   chatFeed?: ChatHistoryItem[]
   repeater?: RepeaterItem[]
-  chatOnline?: ChatOnlineSnapshot
 } | null {
   const hot = takeField('hotFeed')
   const long = takeField('longFeed')
@@ -145,10 +145,8 @@ export function consumeHomeExtrasPayload(): {
   const online = takeField('onlineRank')
   const recentUsers = takeField('recentUsers')
   const tags = takeField('tags')
-  const breezemoons = takeField('breezemoons')
   const chatFeed = takeField('chatFeed')
   const repeater = takeField('repeater')
-  const chatOnline = takeField('chatOnline')
   if (
     !Array.isArray(hot) &&
     !Array.isArray(long) &&
@@ -156,10 +154,8 @@ export function consumeHomeExtrasPayload(): {
     !Array.isArray(online) &&
     !Array.isArray(recentUsers) &&
     !Array.isArray(tags) &&
-    !Array.isArray(breezemoons) &&
     !Array.isArray(chatFeed) &&
-    !Array.isArray(repeater) &&
-    !chatOnline
+    !Array.isArray(repeater)
   ) {
     return null
   }
@@ -170,9 +166,7 @@ export function consumeHomeExtrasPayload(): {
     online: Array.isArray(online) ? online : undefined,
     recentUsers: Array.isArray(recentUsers) ? recentUsers : undefined,
     tags: Array.isArray(tags) ? tags : undefined,
-    breezemoons: Array.isArray(breezemoons) ? breezemoons : undefined,
     chatFeed: Array.isArray(chatFeed) ? chatFeed : undefined,
     repeater: Array.isArray(repeater) ? repeater : undefined,
-    chatOnline: chatOnline || undefined,
   }
 }

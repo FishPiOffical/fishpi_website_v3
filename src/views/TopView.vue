@@ -7,12 +7,10 @@ import {
   fetchCheckinRank,
   fetchConsumptionRank,
   fetchOnlineRank,
-  fetchProfessionRanking,
   fetchDonateRank,
   fetchPerfectRank,
   fetchInviteRank,
   fetchGameRank,
-  type ProfessionRankEntry,
   type RankUser,
   type DonateRankData,
   type CountRankEntry,
@@ -23,6 +21,7 @@ import { consumeRanksPayload } from '@/seo/payload'
 import { useAuthStore } from '@/stores/auth'
 import SideBar from '@/components/SideBar.vue'
 import FpLoading from '@/components/FpLoading.vue'
+import ProfessionRanking from '@/components/profession/ProfessionRanking.vue'
 import { createSwrLoader, readCache, writeCache } from '@/utils/swr'
 
 const route = useRoute()
@@ -37,10 +36,6 @@ const donateData = ref<DonateRankData>({ totalAmount: 0, donateMakeDays: 0, data
 const perfectList = ref<CountRankEntry[]>([])
 const inviteList = ref<CountRankEntry[]>([])
 const gameList = ref<GameRankEntry[]>([])
-const jobs = ref<{ professionId?: string; displayName?: string; professionName?: string }[]>([])
-const jobId = ref('')
-const jobEntries = ref<ProfessionRankEntry[]>([])
-const jobError = ref('')
 const error = ref('')
 const loading = ref(false)
 const wealthHint = ref('')
@@ -150,6 +145,7 @@ function applyTop(s: TopSnapshot) {
 const swr = createSwrLoader({ loading, error })
 
 async function load() {
+  if (currentTab.value === 'profession') return
   await swr(
     'top',
     async (): Promise<TopSnapshot> => {
@@ -170,7 +166,6 @@ async function load() {
     '排行榜加载失败',
   )
   if (!import.meta.env.SSR) {
-    await loadJobs()
     if (currentTab.value === 'game') await loadGameRank()
   }
 }
@@ -186,34 +181,12 @@ async function loadGameRank() {
   }
 }
 
-async function loadJobs() {
-  jobError.value = ''
-  const key = `top:jobs:${jobId.value}`
-  const hit = readCache<{ professions?: typeof jobs.value; entries?: ProfessionRankEntry[] }>(key)
-  if (hit) {
-    jobs.value = hit.professions || []
-    jobEntries.value = hit.entries || []
-  }
-  try {
-    const data = await fetchProfessionRanking(apiKey.value, jobId.value || undefined)
-    writeCache(key, data)
-    jobs.value = data.professions || []
-    jobEntries.value = data.entries || []
-    const selected = data.selectedProfession?.professionId
-    if (!jobId.value && selected) jobId.value = selected
-  } catch (e) {
-    if (!hit) {
-      jobError.value = e instanceof Error ? e.message : '职业榜加载失败'
-      jobEntries.value = []
-    }
-  }
-}
-
 watch(apiKey, () => void load(), { immediate: true })
 watch(
   () => route.path,
-  (p) => {
-    if (gameTabs.some((g) => g.path === p)) void loadGameRank()
+  (p, previous) => {
+    if (previous === '/top/profession' && p !== previous) void load()
+    else if (gameTabs.some((g) => g.path === p)) void loadGameRank()
   },
 )
 
@@ -381,6 +354,7 @@ const topCatalog = [
         </nav>
 
         <!-- 状态提示 -->
+        <template v-if="currentTab !== 'profession'">
         <FpLoading v-if="loading" :rows="8" />
         <div v-else-if="error" class="err-bar">{{ error }}</div>
         <div v-else-if="wealthHint" class="warn-bar">
@@ -392,6 +366,8 @@ const topCatalog = [
         <div v-else-if="usingMock && !apiKey" class="warn-bar">
           匿名排行榜接口未全部开放，部分展示演示对齐数据。
         </div>
+
+        </template>
 
         <!-- 1. 连签榜 -->
         <section v-if="currentTab === 'checkin'" class="rank-section">
@@ -652,82 +628,7 @@ const topCatalog = [
         </section>
 
         <!-- 5. 职业榜 -->
-        <section v-else-if="currentTab === 'profession'" class="rank-section">
-          <div class="rank-head">
-            <div class="rank-head-left">
-              <h2><span class="icon-star">✦</span> 职业排行</h2>
-              <p class="rank-slogan">按公开职业经验与技能成长排序</p>
-            </div>
-            <!-- 职业切换选项卡 -->
-            <div v-if="jobs.length" class="job-tabs">
-              <button
-                v-for="job in jobs"
-                :key="job.professionId || job.displayName"
-                type="button"
-                class="job-btn"
-                :class="{ on: jobId === job.professionId }"
-                @click="jobId = job.professionId || ''; void loadJobs()"
-              >
-                {{ job.displayName || job.professionName }}
-              </button>
-            </div>
-          </div>
-
-          <p v-if="jobError" class="err-tip">{{ jobError }}</p>
-
-          <div class="rank-list">
-            <div
-              v-for="(u, i) in jobEntries"
-              :key="(u.userName || '') + i"
-              class="rank-row"
-            >
-              <div class="rank-num-col">
-                <span class="rank-badge" :class="'top-' + (u.rank || i + 1)">{{ u.rank || i + 1 }}</span>
-              </div>
-
-              <div class="rank-avatar-col">
-                <RouterLink v-if="u.userName" :to="`/member/${u.userName}`" class="avatar-link">
-                  <span
-                    class="avatar-img"
-                    :style="
-                      u.userAvatarURL48 || u.userAvatarURL
-                        ? { backgroundImage: `url('${u.userAvatarURL48 || u.userAvatarURL}')` }
-                        : undefined
-                    "
-                  />
-                </RouterLink>
-                <span v-else class="avatar-img fallback">?</span>
-              </div>
-
-              <div class="rank-info-col">
-                <div class="user-line">
-                  <RouterLink v-if="u.userName" :to="`/member/${u.userName}`" class="uname">
-                    {{ u.userNickname || u.userName }}
-                  </RouterLink>
-                  <span v-else class="uname anonymous">匿名鱼油</span>
-                  <span v-if="u.userName && u.userNickname && u.userNickname !== u.userName" class="handle">
-                    @{{ u.userName }}
-                  </span>
-                </div>
-                <div class="meta-line">
-                  <span class="role-tag profession-tag">
-                    {{ u.professionName || u.displayName || '职业进阶' }}
-                  </span>
-                  <span v-if="u.levelName" class="level-badge">{{ u.levelName }}</span>
-                </div>
-              </div>
-
-              <div class="rank-metric-col">
-                <div class="metric-pill">
-                  <span class="metric-val exp">{{ u.totalExperience != null ? Number(u.totalExperience).toLocaleString() : 0 }}</span>
-                  <span class="metric-unit">经验</span>
-                </div>
-              </div>
-            </div>
-
-            <p v-if="!jobError && !jobEntries.length && !loading" class="empty-tip">暂无职业排行记录</p>
-          </div>
-        </section>
+        <ProfessionRanking v-else-if="currentTab === 'profession'" />
 
         <!-- 6. 鱼排续命师 (对齐现网 Rhythm top/donate.ftl) -->
         <section v-else-if="currentTab === 'donate'" class="rank-section">

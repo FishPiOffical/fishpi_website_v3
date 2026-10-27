@@ -1,136 +1,79 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { fetchPointRecords, fetchUserPoint, type PointRecord } from '@/api/fishpi'
+import { getAuthContextVersion } from '@/api/http'
+import { fetchV3PointBalance, fetchV3PointPage, pointChange, pointTime, type PointEntry } from '@/api/v3-points'
 import { useAuthStore } from '@/stores/auth'
 import { usePageSeo } from '@/composables/usePageSeo'
 import FpLoading from '@/components/FpLoading.vue'
-import { createSwrLoader } from '@/utils/swr'
-
-const auth = useAuthStore()
-const { apiKey, account, isLoggedIn } = storeToRefs(auth)
-const items = ref<PointRecord[]>([])
-const balance = ref<number | null>(null)
-const page = ref(1)
-const loading = ref(false)
-const error = ref('')
-
+const { accessToken, account } = storeToRefs(useAuthStore())
+const mounted = ref(false), items = ref<PointEntry[]>([]), balance = ref<number | null>(null)
+const page = ref(1), pageCount = ref(0), total = ref(0), loading = ref(false), balanceLoading = ref(false), error = ref(''), balanceError = ref('')
+const loggedIn = computed(() => mounted.value && !!accessToken.value && !!account.value)
+let sequence = 0, balanceSequence = 0, boundary = getAuthContextVersion(), owner = account.value?.oId
 usePageSeo(() => ({ title: '积分流水', path: '/points', robots: 'noindex' }))
-
-const userName = computed(() => account.value?.userName || '')
-
-const swr = createSwrLoader({ loading, error })
-
-async function load() {
-  const key = apiKey.value
-  const name = userName.value
-  if (!key || !name) return
-  await swr(
-    `points:${page.value}`,
-    async () => {
-      const [records, point] = await Promise.all([fetchPointRecords(key, page.value), fetchUserPoint(name, key)])
-      return { records, point: point ? point.userPoint : (account.value?.userPoint ?? null) }
-    },
-    (data) => {
-      items.value = data.records
-      balance.value = data.point
-    },
-    '积分流水失败',
-  )
+function clear() { sequence++; balanceSequence++; items.value = []; balance.value = null; pageCount.value = total.value = 0; error.value = balanceError.value = ''; loading.value = balanceLoading.value = false }
+function capture(current: number, balanceRead = false) { const context = getAuthContextVersion(), id = account.value?.oId; return () => loggedIn.value && context === getAuthContextVersion() && id === account.value?.oId && current === (balanceRead ? balanceSequence : sequence) }
+async function loadRecords() {
+  const valid = capture(++sequence), requested = page.value
+  if (!valid()) return
+  items.value = []; pageCount.value = total.value = 0; loading.value = true; error.value = ''
+  try { const result = await fetchV3PointPage(requested); if (valid()) { items.value = result.list; pageCount.value = result.pageCount; total.value = result.total } }
+  catch (e) { if (valid()) error.value = e instanceof Error ? e.message : '积分流水读取失败' }
+  finally { if (valid()) loading.value = false }
 }
-
-watch(
-  () => [apiKey.value, userName.value, page.value],
-  () => void load(),
-  { immediate: true },
-)
-
-function sumClass(r: PointRecord) {
-  if (r.type === '-') return 'out'
-  if (r.type === '+') return 'in'
-  return ''
+async function loadBalance() {
+  const valid = capture(++balanceSequence, true)
+  if (!valid()) return
+  balance.value = null; balanceLoading.value = true; balanceError.value = ''
+  try { const value = await fetchV3PointBalance(); if (valid()) balance.value = value }
+  catch (e) { if (valid()) balanceError.value = e instanceof Error ? e.message : '当前余额读取失败' }
+  finally { if (valid()) balanceLoading.value = false }
 }
-
-function sumText(r: PointRecord) {
-  if (r.sum == null) return ''
-  const n = Number(r.sum)
-  if (r.type === '-') return `-${n}`
-  if (r.type === '+') return `+${n}`
-  return String(n)
-}
+watch([accessToken, () => account.value?.oId], () => {
+  const context = getAuthContextVersion(), id = account.value?.oId
+  if (!accessToken.value || context !== boundary || id !== owner) { const changedPage = page.value !== 1; clear(); page.value = 1; if (loggedIn.value) { if (!changedPage) void loadRecords(); void loadBalance() } }
+  boundary = context; owner = id
+}, { flush: 'sync' })
+watch(page, () => { if (loggedIn.value) void loadRecords() })
+onMounted(() => { mounted.value = true; if (loggedIn.value) { void loadRecords(); void loadBalance() } })
+onBeforeUnmount(() => { mounted.value = false; clear() })
+function refresh() { void loadRecords(); void loadBalance() }
 </script>
 
 <template>
   <div class="points-view">
-    <section v-if="!isLoggedIn" class="card empty-state">
-      <h1>积分流水</h1>
-      <p class="hint">
-        请先 <RouterLink to="/login">登录</RouterLink> 后查看积分余额与变动。
-      </p>
+    <section v-if="!loggedIn" class="card empty-state">
+      <h1>积分流水</h1><p class="hint">请先 <RouterLink to="/login?redirect=/points">登录</RouterLink> 后查看积分余额与变动。</p>
     </section>
-
     <template v-else>
-      <!-- 资产概览卡片 -->
       <section class="balance-card">
-        <div class="balance-info">
-          <span class="balance-label">当前可用积分</span>
-          <div class="balance-value">
-            <span class="currency-icon">💠</span>
-            <strong>{{ balance != null ? balance.toLocaleString() : '...' }}</strong>
-          </div>
-        </div>
-        <div class="balance-actions">
-          <RouterLink to="/charge/point" class="action-btn primary">
-            <span class="icon">💰</span> 充值积分
-          </RouterLink>
-          <RouterLink to="/settings/point" class="action-btn">
-            <span class="icon">💸</span> 积分转账
-          </RouterLink>
-          <RouterLink to="/activity" class="action-btn">
-            <span class="icon">📅</span> 活动签到
-          </RouterLink>
-        </div>
+        <div class="balance-info"><span class="balance-label">当前可用积分</span><div class="balance-value"><span class="currency-icon">💠</span><strong>{{ balance !== null ? balance.toLocaleString() : balanceLoading ? '读取中…' : '—' }}</strong></div><p v-if="balanceError" role="alert" class="err">{{ balanceError }} <button type="button" @click="loadBalance">重试余额读取</button></p></div>
+        <div class="balance-actions"><RouterLink to="/charge/point" class="action-btn primary">💰 充值积分</RouterLink><RouterLink to="/settings/point" class="action-btn">💸 积分转账</RouterLink><RouterLink to="/activity" class="action-btn">📅 活动签到</RouterLink></div>
       </section>
-
-      <!-- 流水列表 -->
       <section class="card records-section">
-        <header class="section-header">
-          <h2>积分流水</h2>
-          <span class="api-hint">
-            流水：<code>GET /api/getNotifications?type=point</code>
-          </span>
-        </header>
-
+        <header class="section-header"><h2>积分流水</h2><button type="button" :disabled="loading || balanceLoading" @click="refresh">刷新余额与流水</button></header>
         <FpLoading v-if="loading" class="loading-wrap" />
-        <p v-else-if="error" class="err">{{ error }}</p>
-        <div v-else class="records-list">
-          <div v-if="!items.length" class="empty-list">暂无记录</div>
-          <div v-for="(r, i) in items" :key="r.oId || i" class="record-item">
-            <div class="record-icon" :class="sumClass(r)">
-              {{ r.type === '+' ? '+' : '-' }}
-            </div>
-            <div class="record-main">
-              <div class="record-desc" v-html="r.description || r.type || '积分变动'" />
-              <div class="record-time">{{ r.time || r.createTime }}</div>
-            </div>
-            <div class="record-amount" :class="sumClass(r)">
-              {{ sumText(r) }}
+        <div v-else-if="error" role="alert" class="err">{{ error }} <button type="button" @click="loadRecords">重试流水读取</button></div>
+        <template v-else>
+          <p>共 {{ total }} 条记录</p>
+          <div class="records-list">
+            <div v-if="!items.length" class="empty-list">{{ total ? '本页暂无记录，请返回已有页码' : '暂无记录' }}</div>
+            <div v-for="(row, index) in items" :key="`${page}-${index}`" class="record-item">
+              <div class="record-icon" :class="row.operation === '-' ? 'out' : 'in'">{{ row.operation }}</div>
+              <div class="record-main"><div class="record-desc" v-html="row.descriptionHtml" /><div>{{ row.displayType }}</div><div class="record-time">{{ pointTime(row.time) }}</div><div>交易后余额：{{ row.balance.toLocaleString() }}</div></div>
+              <div class="record-amount" :class="row.operation === '-' ? 'out' : 'in'">{{ pointChange(row) }}</div>
             </div>
           </div>
-        </div>
-
-        <footer class="pager" v-if="items.length || page > 1">
-          <button type="button" class="pager-btn" :disabled="page <= 1" @click="page -= 1">上一页</button>
-          <span class="page-num">{{ page }}</span>
-          <button type="button" class="pager-btn" :disabled="items.length < 10" @click="page += 1">下一页</button>
-        </footer>
+          <footer v-if="total || page > 1" class="pager"><button type="button" class="pager-btn" :disabled="page <= 1" @click="page--">上一页</button><span class="page-num">{{ page }} / {{ pageCount }}</span><button type="button" class="pager-btn" :disabled="page >= Math.min(pageCount, 42949672)" @click="page++">下一页</button></footer>
+        </template>
       </section>
     </template>
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .points-view {
   display: flex;
   flex-direction: column;

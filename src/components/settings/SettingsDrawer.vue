@@ -8,7 +8,7 @@ import { usePageSidebarStore, type PageSidebarModuleId } from '@/stores/pageSide
 import { useChatSidebarStore } from '@/stores/chatSidebar'
 import { useChatFilterStore, type ChatBlockMatch, type ChatBlockMode } from '@/stores/chatFilter'
 import { useAuthStore } from '@/stores/auth'
-import { useWhisperStore } from '@/stores/whispers'
+import { usePrivateInboxStore } from '@/stores/privateInbox'
 import { useCountStore } from '@/stores/count'
 import IncomeCard from '@/components/count/IncomeCard.vue'
 import HiddenChatConversations from '@/components/chat/HiddenChatConversations.vue'
@@ -21,7 +21,7 @@ const pageSidebar = usePageSidebarStore()
 const sidebar = useChatSidebarStore()
 const chatFilter = useChatFilterStore()
 const auth = useAuthStore()
-const whispers = useWhisperStore()
+const whispers = usePrivateInboxStore()
 const count = useCountStore()
 const route = useRoute()
 const router = useRouter()
@@ -29,7 +29,7 @@ const router = useRouter()
 const mounted = ref(false)
 const hiddenChatsOpen = ref(false)
 const { isLoggedIn } = storeToRefs(auth)
-const { unreadTotal: whisperUnread, inboxOpen: whisperInboxOpen } = storeToRefs(whispers)
+const { unreadTotal: whisperUnread,error: whisperUnreadError, inboxOpen: whisperInboxOpen } = storeToRefs(whispers)
 const draggedSidebarId = ref('')
 const overSidebarId = ref('')
 const draggedPageSidebarId = ref<PageSidebarModuleId | ''>('')
@@ -129,7 +129,7 @@ function addChatBlockRule() {
 
 function openWhisperInbox() {
   const currentPeer = route.path.startsWith('/chat/') ? String(route.params.userName || '') : ''
-  whispers.showInbox(currentPeer)
+  whispers.showInbox(currentPeer||String(route.query.toUser||''),String(route.query.peerId||''))
 }
 
 async function startHomeEdit() {
@@ -226,13 +226,13 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
       class="fp-whisper-handle"
       :class="{ 'after-hidden': showHiddenHandle }"
       aria-label="打开聊天"
-      :title="whisperUnread ? `聊天（${whisperUnread} 条未读）` : '聊天'"
+      :title="whisperUnreadError||(whisperUnread?`聊天（${whisperUnread} 条未读）`:'聊天')"
       @click="openWhisperInbox"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 3v-3H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
       </svg>
-      <span v-if="whisperUnread" class="unread-badge">{{ whisperUnread > 99 ? '99+' : whisperUnread }}</span>
+      <span v-if="whisperUnread" class="unread-badge">{{ (whisperUnread||0) > 99 ? '99+' : whisperUnread }}</span>
     </button>
     <HiddenChatConversations v-model="hiddenChatsOpen" />
     <WhisperConversations v-model="whisperInboxOpen" />

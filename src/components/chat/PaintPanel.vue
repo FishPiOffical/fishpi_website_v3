@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
-import { uploadFiles } from '@/api/fishpi'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { getAuthContextVersion } from '@/api/http'
+import { uploadV3Files, uploadedMarkdown } from '@/api/v3-uploads'
 import { useAuthStore } from '@/stores/auth'
 
 const emit = defineEmits<{ insert: [md: string]; close: [] }>()
@@ -11,6 +12,9 @@ const color = ref('#222222')
 const size = ref(3)
 const busy = ref(false)
 const err = ref('')
+const loggedIn = computed(() => !!auth.accessToken && !!auth.account?.oId)
+let upload: AbortController | null = null, disposed = false
+function cancelUpload() { upload?.abort(); upload = null; busy.value = false }
 
 type Stroke = { color: string; size: number; points: { x: number; y: number }[] }
 const strokes = ref<Stroke[]>([])
@@ -50,7 +54,7 @@ function pos(e: PointerEvent) {
 
 function onDown(e: PointerEvent) {
   const c = canvasRef.value
-  if (!c) return
+  if (!c || busy.value || !loggedIn.value) return
   c.setPointerCapture(e.pointerId)
   drawing = true
   current = { color: color.value, size: size.value, points: [pos(e)] }
@@ -58,7 +62,7 @@ function onDown(e: PointerEvent) {
 }
 
 function onMove(e: PointerEvent) {
-  if (!drawing || !current) return
+  if (!drawing || !current || busy.value || !loggedIn.value) return
   current.points.push(pos(e))
   redraw()
 }
@@ -69,36 +73,54 @@ function onUp() {
 }
 
 function undo() {
+  if (busy.value) return
   strokes.value.pop()
   redraw()
 }
 
 function clearAll() {
+  if (busy.value) return
+  onUp()
   strokes.value = []
   redraw()
 }
 
+function close() { cancelUpload(); onUp(); emit('close') }
+
 async function submit() {
   const c = canvasRef.value
-  if (!c || !auth.apiKey || !strokes.value.length) return
+  if (!c || busy.value || !loggedIn.value || !strokes.value.length || disposed) return
+  onUp()
+  const abort = new AbortController(), context = getAuthContextVersion(), owner = auth.account!.oId
+  upload = abort
   busy.value = true
   err.value = ''
+  const currentUpload = () => !disposed && upload === abort && !abort.signal.aborted && loggedIn.value && owner === auth.account?.oId && context === getAuthContextVersion()
   try {
     const blob = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, 'image/png'))
-    if (!blob) throw new Error('无法导出画布')
+    if (!currentUpload()) return
+    if (!blob || blob.type !== 'image/png' || !blob.size) throw new Error('无法导出PNG画布，请重试')
     const file = new File([blob], `paint-${Date.now()}.png`, { type: 'image/png' })
-    const urls = await uploadFiles(auth.apiKey, [file])
-    const url = urls[0]
-    if (!url) throw new Error('上传未返回地址')
-    emit('insert', `![涂鸦](${url})`)
+    const results = await uploadV3Files([file], abort.signal)
+    if (!currentUpload()) return
+    const result = results[0]
+    if (results.length !== 1 || !result?.url || !result.image) throw new Error('图片上传未返回地址，请保留画布后重试')
+    const markdown = uploadedMarkdown({ ...result, name: '涂鸦' })
+    emit('insert', markdown)
+    // Upload is complete before clearing; failure always preserves the drawing.
+    busy.value = false
     clearAll()
     emit('close')
   } catch (e) {
-    err.value = e instanceof Error ? e.message : '上传失败'
+    if (currentUpload()) err.value = e instanceof Error ? e.message : '上传失败'
   } finally {
-    busy.value = false
+    if (upload === abort) { upload = null; busy.value = false }
   }
 }
+
+watch(() => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || '']), () => {
+  cancelUpload(); onUp(); strokes.value = []; err.value = ''; redraw()
+}, { flush: 'sync' })
 
 onMounted(() => {
   const c = canvasRef.value
@@ -111,21 +133,23 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  drawing = false
+  disposed = true
+  cancelUpload()
+  onUp()
 })
 </script>
 
 <template>
   <div class="paint">
     <div class="tools">
-      <label>颜色 <input v-model="color" type="color" /></label>
-      <label>粗细 <input v-model.number="size" type="range" min="1" max="16" /></label>
-      <button type="button" class="ghost" :disabled="!strokes.length" @click="undo">撤销</button>
-      <button type="button" class="ghost" :disabled="!strokes.length" @click="clearAll">清空</button>
-      <button type="button" class="green" :disabled="busy || !strokes.length" @click="submit">
+      <label>颜色 <input v-model="color" type="color" :disabled="busy" /></label>
+      <label>粗细 <input v-model.number="size" type="range" min="1" max="16" :disabled="busy" /></label>
+      <button type="button" class="ghost" :disabled="busy || !strokes.length" @click="undo">撤销</button>
+      <button type="button" class="ghost" :disabled="busy || !strokes.length" @click="clearAll">清空</button>
+      <button type="button" class="green" :disabled="busy || !loggedIn || !strokes.length" @click="submit">
         {{ busy ? '上传中…' : '插入涂鸦' }}
       </button>
-      <button type="button" class="ghost" @click="emit('close')">关闭</button>
+      <button type="button" class="ghost" @click="close">关闭</button>
     </div>
     <canvas
       ref="canvasRef"
@@ -136,17 +160,15 @@ onUnmounted(() => {
       @pointerup="onUp"
       @pointercancel="onUp"
     />
-    <p v-if="err" class="err">{{ err }}</p>
+    <p v-if="!loggedIn">登录后可上传涂鸦。</p>
+    <p v-if="err" class="err" role="alert">{{ err }}</p>
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .paint {
   margin-top: 10px;
-  padding: 10px;
-  border: 1px solid var(--fp-border);
-  border-radius: 8px;
-  background: var(--fp-bg);
+  padding: 8px 0;
 }
 .tools {
   display: flex;

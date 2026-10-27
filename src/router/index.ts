@@ -1,10 +1,12 @@
 import {
+  START_LOCATION,
   createMemoryHistory,
   createRouter,
   createWebHistory,
   type RouteLocation,
   type RouterHistory,
 } from 'vue-router'
+import { useClientStartupStore } from '@/stores/clientStartup'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 
@@ -254,7 +256,13 @@ const routes = [
     ] as const
   ).map(([sub, memberTab]) => ({
     path: `/member/:userName/${sub}`,
-    component: () => import('@/views/MemberView.vue'),
+    component: memberTab === 'articlesAnonymous' || memberTab === 'commentsAnonymous'
+      ? () => import('@/views/AnonymousContentView.vue')
+      : memberTab === 'followingUsers' || memberTab === 'followers'
+        ? () => import('@/views/UserRelationsView.vue')
+        : memberTab === 'followingTags' || memberTab === 'followingArticles' || memberTab === 'watchingArticles'
+          ? () => import('@/views/SavedContentView.vue')
+          : () => import('@/views/MemberView.vue'),
     meta: { memberTab },
   })),
   {
@@ -415,11 +423,14 @@ export function createAppRouter(history?: RouterHistory) {
     },
   })
 
-  router.beforeEach(async (to) => {
+  router.beforeEach(async (to, from) => {
     // SSR 不知道登录态：需登录页由 AppShell 输出空占位，客户端再决定渲染或跳登录。
     if (import.meta.env.SSR) return true
+    // The first client tree must match credential-free SSR. AppShell gates private routes.
+    if (from === START_LOCATION) return true
+    useClientStartupStore().navigationStarted()
     const auth = useAuthStore()
-    if (!auth.account && auth.apiKey) {
+    if (!auth.initialized || (auth.accessToken && !auth.account)) {
       await auth.restore()
       useAppearanceStore().enforceVip()
     }

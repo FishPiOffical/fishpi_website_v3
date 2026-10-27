@@ -5,7 +5,7 @@ import {
   loadVipName,
   vipNameClass,
   vipNameStyle,
-  type VipNameConfig,
+  vipNameRevision,
 } from '@/composables/useVipNickname'
 
 const props = withDefaults(
@@ -20,24 +20,14 @@ const props = withDefaults(
 )
 
 const root = ref<HTMLElement | null>(null)
-const config = ref<VipNameConfig>()
-const currentConfig = computed(() => cachedVipName(props.userId, props.userName) || config.value)
+const currentConfig = computed(() => cachedVipName(props.userId, props.userName))
 let observer: IntersectionObserver | undefined
-let token = 0
-
-async function load() {
-  const id = ++token
-  const cached = cachedVipName(props.userId, props.userName)
-  if (cached) {
-    config.value = cached
-    return
-  }
-  const value = await loadVipName(props.userId, props.userName)
-  if (id === token) config.value = value
-}
+let mounted = false
+function load() { if (mounted) void loadVipName(props.userId, props.userName) }
 
 function observe() {
   observer?.disconnect()
+  if (!mounted) return
   if (!props.lazy || typeof IntersectionObserver === 'undefined') {
     void load()
     return
@@ -53,26 +43,16 @@ function observe() {
   if (root.value) observer.observe(root.value)
 }
 
-onMounted(observe)
+onMounted(() => { mounted = true; observe() })
 onUnmounted(() => {
-  token++
+  mounted = false
   observer?.disconnect()
 })
 
 watch(
-  () => [props.userId, props.userName],
-  () => {
-    token++
-    config.value = cachedVipName(props.userId, props.userName)
-    observe()
-  },
-)
-
-watch(
-  () => cachedVipName(props.userId, props.userName),
-  (value, previous) => {
-    if (!value && previous) void load()
-  },
+  () => [props.userId, props.userName, vipNameRevision.value],
+  observe,
+  { flush: 'sync' },
 )
 </script>
 

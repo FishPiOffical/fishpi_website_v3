@@ -14,6 +14,87 @@ export class ApiError extends Error {
   }
 }
 
+// Browser-only transport state. SSR requests never read or mutate a shared identity.
+let accessToken: string | null = null
+let authVersion = 0
+let refreshRejected = false
+let refreshFlight: { version: number; promise: Promise<boolean> } | null = null
+let credentialQueue: Promise<unknown> = Promise.resolve()
+const tokenListeners = new Set<(token: string | null) => void>()
+
+function publishToken(token: string | null) {
+  if (import.meta.env.SSR) return
+  accessToken = token
+  for (const listener of tokenListeners) listener(token)
+}
+
+/** Start a new identity boundary before login/logout, invalidating older refreshes. */
+export function setAccessToken(token: string | null) {
+  if (import.meta.env.SSR) return
+  authVersion++
+  refreshRejected = false
+  publishToken(token)
+}
+
+/** Stable identity boundary: ordinary access-token refresh does not change this revision. */
+export function getAuthContextVersion() { return import.meta.env.SSR ? 0 : authVersion }
+
+export function getAccessToken() {
+  return import.meta.env.SSR ? null : accessToken
+}
+
+export function wasRefreshRejected() {
+  return !import.meta.env.SSR && refreshRejected
+}
+
+export function onAccessTokenChange(listener: (token: string | null) => void) {
+  if (import.meta.env.SSR) return () => {}
+  tokenListeners.add(listener)
+  listener(accessToken)
+  return () => { tokenListeners.delete(listener) }
+}
+
+function isV3Path(path: string) {
+  return /^\/api\/v3(?:\/|$)/.test(path)
+}
+
+function isCredentialPath(path: string) {
+  return /^\/api\/v3\/auth\/(?:login|refresh|logout)(?:\?|$)/.test(path)
+}
+
+// Cookie rotations must complete in order, including logout followed immediately by login.
+function queueCredentialRequest<T>(run: () => Promise<T>): Promise<T> {
+  const next = credentialQueue.then(run, run)
+  credentialQueue = next.catch(() => {})
+  return next
+}
+
+export async function refreshAccessToken(): Promise<boolean> {
+  if (import.meta.env.SSR) return false
+  const version = authVersion
+  if (refreshFlight?.version === version) return refreshFlight.promise
+  const promise = request<{ code: number; data?: { accessToken?: string } }>('/api/v3/auth/refresh', {
+    method: 'POST', __authVersion: version,
+  }).then((body) => {
+    if (version !== authVersion) return false
+    const token = body.code === 0 && typeof body.data?.accessToken === 'string' ? body.data.accessToken : null
+    if (!token) throw new ApiError('刷新响应缺少访问凭据', 502, 'invalid_response')
+    publishToken(token)
+    return true
+  }).catch((error: unknown) => {
+    // A temporary transport or captcha failure must not erase a usable identity.
+    if (version === authVersion && error instanceof ApiError && error.status === 401) {
+      refreshRejected = true
+      publishToken(null)
+    }
+    return false
+  }).finally(() => {
+    if (refreshFlight?.promise === promise) refreshFlight = null
+  })
+  refreshFlight = { version, promise }
+  return promise
+}
+
 export function isCaptchaRequired(e: unknown) {
   return e instanceof ApiError && e.code === 'captcha'
 }
@@ -60,6 +141,10 @@ export async function pingApi(timeoutMs = 8000): Promise<boolean> {
 type RequestInitExtra = RequestInit & {
   /** 内部：人机验证通过后已重试过，避免死循环 */
   __captchaRetried?: boolean
+  /** Internal: an expired v3 access token has already been refreshed once. */
+  __v3Retried?: boolean
+  __authVersion?: number
+  __zip?: boolean
 }
 
 function apiBase() {
@@ -95,8 +180,11 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {
   if (init.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
+  if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && accessToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${accessToken}`)
+  }
 
-  const { __captchaRetried: _, ...fetchInit } = init
+  const { __captchaRetried: _, __v3Retried: __, __authVersion: ___, __zip: ____, ...fetchInit } = init
   let res: Response
   try {
     res = await fetch(resolveUrl(path), {
@@ -105,6 +193,7 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {
       headers,
     })
   } catch (e) {
+    if (init.signal?.aborted) throw new ApiError('请求已取消', 0, 'aborted')
     asNetworkError(e)
   }
 
@@ -116,6 +205,18 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {
     }
   } catch (e) {
     if (e instanceof ApiError) throw e
+  }
+
+  if (init.__zip && res.ok && res.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() === 'application/zip') {
+    const declared = res.headers.get('content-length')
+    if (declared && (!/^[0-9]+$/.test(declared) || Number(declared) > MAX_PRIVATE_ZIP_BYTES)) { await res.body?.cancel(); throw new ApiError('导出文件大小异常', 502, 'invalid_response') }
+    const reader = res.body?.getReader()
+    if (!reader) throw new ApiError('导出文件为空', 502, 'invalid_response')
+    const parts: ArrayBuffer[] = []; let bytes = 0
+    try { while (true) { const { done, value } = await reader.read(); if (done) break; bytes += value.byteLength; if (bytes > MAX_PRIVATE_ZIP_BYTES) { await reader.cancel(); throw new ApiError('导出文件大小异常', 502, 'invalid_response') } parts.push(new Uint8Array(value).buffer) } }
+    finally { reader.releaseLock() }
+    if (!bytes) throw new ApiError('导出文件为空', 502, 'invalid_response')
+    return new Blob(parts, { type: 'application/zip' }) as T
   }
 
   const text = await res.text()
@@ -133,24 +234,45 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {
 
   if (!res.ok) {
     const msg = typeof data === 'object' && data && 'msg' in data ? String((data as { msg?: string }).msg) : res.statusText
-    throw new ApiError(msg || '请求失败', res.status)
+    const code = typeof data === 'object' && data && 'code' in data ? String((data as { code?: string | number }).code) : undefined
+    throw new ApiError(msg || '请求失败', res.status, code)
   }
+
+  if (init.__zip) throw new ApiError('接口未返回ZIP文件', 502, 'invalid_response')
 
   return data
 }
 
+/** Bound to the current private export service's ZIP budget. */
+export const MAX_PRIVATE_ZIP_BYTES = 32 * 1024 * 1024
+export function requestZip(path: string, init: RequestInit = {}): Promise<Blob> { return request<Blob>(path, { ...init, __zip: true }) }
+
 export async function request<T = unknown>(path: string, init: RequestInitExtra = {}): Promise<T> {
+  const version = authVersion
+  const sentToken = getAccessToken()
+  const explicitAuthorization = new Headers(init.headers).has('Authorization')
+  const run = () => {
+    if (init.__authVersion !== undefined && init.__authVersion !== authVersion) {
+      throw new ApiError('登录状态已变更', 401, 'stale_session')
+    }
+    return requestOnce<T>(path, init)
+  }
   try {
-    return await requestOnce<T>(path, init)
+    return await (!import.meta.env.SSR && isCredentialPath(path) ? queueCredentialRequest(run) : run())
   } catch (e) {
-    if (
-      !import.meta.env.SSR &&
-      isCaptchaRequired(e) &&
-      !init.__captchaRetried &&
-      !isRiskCaptchaPath(path)
-    ) {
+    if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && !explicitAuthorization &&
+      e instanceof ApiError && e.status === 401 && !init.__v3Retried && version === authVersion) {
+      // A late 401 may belong to the token that another request has already rotated.
+      const refreshed = getAccessToken() !== sentToken && Boolean(getAccessToken()) || await refreshAccessToken()
+      if (refreshed && version === authVersion) return request<T>(path, { ...init, __v3Retried: true })
+    }
+    if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && !explicitAuthorization &&
+      init.__v3Retried && version === authVersion && sentToken === getAccessToken() &&
+      e instanceof ApiError && e.status === 401) publishToken(null)
+    if (!import.meta.env.SSR && isCaptchaRequired(e) && !init.__captchaRetried && !isRiskCaptchaPath(path)) {
       await ensureRiskCaptcha()
-      return requestOnce<T>(path, { ...init, __captchaRetried: true })
+      if (version !== authVersion) throw e
+      return request<T>(path, { ...init, __captchaRetried: true })
     }
     throw e
   }

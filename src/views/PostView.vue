@@ -1,30 +1,24 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed,onMounted,onBeforeUnmount,ref,watch } from 'vue'
+import { RouterLink,useRoute,useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import {
-  fetchArticleDraft,
-  fetchArticleDrafts,
-  fetchArticleMd,
-  postArticle,
-  queryTags,
-  removeArticleDraft,
-  saveArticleDraft,
-  updateArticle,
-  type ArticleDraft,
-  type ArticlePayload,
-} from '@/api/fishpi'
+import { postSource,draftPage,draftSource,postInput,emptyPost,type PostFields,type PostSource,type PostCommand,type PostReceipt,type DraftSummary } from '@/api/v3-posts'
+import { getAuthContextVersion } from '@/api/http'
+import { useV3PostsStore } from '@/stores/v3Posts'
+import { fpConfirm } from '@/composables/useDialog'
+import { clearCache } from '@/utils/swr'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import AuthorColumnPicker from '@/components/posts/AuthorColumnPicker.vue'
+import TagInput from '@/components/posts/TagInput.vue'
 import { useAuthStore } from '@/stores/auth'
-
 const TYPES = [
   { value: 0, label: '帖子', tip: '分享对别人有帮助的经验与见解' },
   { value: 1, label: '机要', tip: '邀请好友在私密空间中进行交流' },
   { value: 2, label: '同城广播', tip: '发起你所在城市的招聘、Meetup 等，需消耗积分' },
   { value: 5, label: '问答', tip: '总有一个人知道这个问题的答案' },
 ]
-const TYPE_LABELS: Record<number, string> = { 0: '帖子', 1: '机要', 2: '同城广播', 3: '思绪', 5: '问答', 6: '长文章' }
+const TYPE_LABELS: Record<number, string> = { 0: '帖子', 1: '机要', 2: '同城广播', 3: '思绪', 4: '历史类型（4）', 5: '问答', 6: '长文章' }
 const STATEMENTS = [
   { value: 0, label: '无声明' },
   { value: 1, label: '包含 AI 辅助创作' },
@@ -32,272 +26,100 @@ const STATEMENTS = [
   { value: 3, label: '虚构演绎，仅供娱乐' },
 ]
 
-const auth = useAuthStore()
-const { apiKey, isLoggedIn } = storeToRefs(auth)
-const router = useRouter()
-const route = useRoute()
-const editId = computed(() => (typeof route.params.id === 'string' ? route.params.id : ''))
-const title = ref('')
-const tags = ref('')
-const content = ref('')
-const type = ref(0)
-const offer = ref(0)
-const rewardOpen = ref(false)
-const rewardContent = ref('')
-const rewardPoint = ref<number | null>(null)
-const anonymous = ref(false)
-const commentable = ref(true)
-const notifyFollowers = ref(false)
-const showInList = ref(true)
-const statement = ref(0)
-/** '' 独立长文 / '__NEW__' 新建 / 'existing' 已有专栏（无专栏列表接口，手填 ID） */
-const columnMode = ref<'' | '__NEW__' | 'existing'>('')
-const columnId = ref('')
-const columnTitle = ref('')
-const chapterNo = ref('')
-const columnCoverURL = ref('')
-const error = ref('')
-const sending = ref(false)
-const savingDraft = ref(false)
-const drafts = ref<ArticleDraft[]>([])
-const draftId = ref('')
-const tagHints = ref<string[]>([])
-const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
-let tagTimer = 0
-
-const typeTip = computed(() => TYPES.find((t) => t.value === type.value)?.tip || '')
-const isLong = computed(() => type.value === 6)
-const allowAnonymous = computed(() => type.value !== 2 && type.value !== 5 && !isLong.value)
-const heading = computed(() => {
-  if (isLong.value) return editId.value ? '编辑长文章' : '发布长文章'
-  return editId.value ? '编辑帖子' : '发帖'
-})
-
-function applyColumn(id: string, titleText: string, no: string, cover = '') {
-  columnMode.value = id === '__NEW__' ? '__NEW__' : id ? 'existing' : ''
-  columnId.value = id === '__NEW__' ? '' : id
-  columnTitle.value = titleText
-  chapterNo.value = no
-  columnCoverURL.value = cover
+const OP_LABELS={'publish':'发布文章','edit':'编辑文章','draft-save':'保存草稿','draft-delete':'删除草稿'}
+const auth=useAuthStore(),{accessToken,account,isLoggedIn}=storeToRefs(auth),operations=useV3PostsStore(),router=useRouter(),route=useRoute()
+const editId=computed(()=>typeof route.params.id==='string'?route.params.id:'')
+const title=ref(''),tags=ref(''),content=ref(''),type=ref(0),offer=ref(0),rewardOpen=ref(false),rewardContent=ref(''),rewardPoint=ref<number|null>(0)
+const anonymous=ref(false),commentable=ref(true),notifyFollowers=ref(false),showInList=ref(true),statement=ref(0)
+const columnMode=ref<''|'__NEW__'|'existing'>(''),columnId=ref(''),columnTitle=ref(''),chapterNo=ref(''),columnCoverURL=ref(''),thoughtContent=ref('')
+const drafts=ref<DraftSummary[]>([]),draftPagination=ref({p:1,size:20,total:0,pageCount:0}),draftPageNo=ref(1),draftId=ref(''),draftsError=ref(''),draftsLoading=ref(false)
+const source=ref<PostSource|null>(null),sourceLoading=ref(false),sourceError=ref(''),error=ref(''),mounted=ref(false),initialDraftResolved=ref(false),sourceTarget=ref(''),loadConfirming=ref(false),published=ref(false),needsReload=ref(false)
+const editorRef=ref<InstanceType<typeof MarkdownEditor>|null>(null),commandOrigin=Symbol('post-view')
+const typeTip=computed(()=>TYPES.find(t=>t.value===type.value)?.tip||''),isLong=computed(()=>type.value===6),allowAnonymous=computed(()=>![2,5,6].includes(type.value))
+const heading=computed(()=>isLong.value?(editId.value?'编辑长文章':'发布长文章'):(editId.value?'编辑帖子':'发帖'))
+const ready=computed(()=>mounted.value&&isLoggedIn.value&&!sourceLoading.value&&!sourceError.value&&(editId.value?source.value?.id===editId.value:initialDraftResolved.value))
+const locked=computed(()=>operations.busy||operations.confirming||!!operations.pending||loadConfirming.value)
+const retainedReward=computed(()=>!!editId.value&&!!source.value&&source.value.rewardPoint>0)
+let generation=0,listSequence=0,sourceSequence=0,boundary='',initialForm='',localKey='',loadConfirmation:AbortController|null=null
+function identity(){return`${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${route.fullPath}`}
+function current(reader:string,version:number){return mounted.value&&isLoggedIn.value&&reader===identity()&&version===generation}
+function snapshot():PostFields{
+  const reward=editId.value?retainedReward.value||rewardOpen.value:rewardOpen.value&&!isLong.value&&type.value!==5
+  return{title:title.value,content:content.value,tags:tags.value,type:type.value,rewardContent:reward?rewardContent.value:'',rewardPoint:reward?Number(rewardPoint.value??0):0,qnaOfferPoint:editId.value?Number(offer.value):type.value===5?Number(offer.value):0,commentable:commentable.value,showInList:showInList.value?1:0,statement:statement.value,anonymous:editId.value?anonymous.value:allowAnonymous.value&&anonymous.value,notifyFollowers:notifyFollowers.value,columnId:columnMode.value==='existing'?columnId.value.trim():'',columnTitle:columnMode.value?columnTitle.value:'',chapterNo:columnMode.value?chapterNo.value:'',columnCoverURL:columnCoverURL.value,thoughtContent:thoughtContent.value}
 }
-
-function draftKey(d: ArticleDraft) {
-  return String(d.oId || d.articleDraftId || '')
+function apply(value:PostFields){title.value=value.title;tags.value=value.tags;content.value=value.content;type.value=value.type;offer.value=value.qnaOfferPoint;rewardContent.value=value.rewardContent;rewardPoint.value=value.rewardPoint;rewardOpen.value=value.rewardPoint>0||!!value.rewardContent;anonymous.value=value.anonymous;commentable.value=value.commentable;showInList.value=value.showInList===1;statement.value=value.statement;notifyFollowers.value=value.notifyFollowers;columnId.value=value.columnId;columnTitle.value=value.columnTitle;columnMode.value=value.columnId?'existing':value.columnTitle?'__NEW__':'';chapterNo.value=value.chapterNo;columnCoverURL.value=value.columnCoverURL;thoughtContent.value=value.thoughtContent}
+function reset(){generation++;sourceSequence++;listSequence++;loadConfirmation?.abort();loadConfirmation=null;loadConfirming.value=false;sourceTarget.value='';operations.cancelConfirmation(commandOrigin);source.value=null;sourceLoading.value=false;sourceError.value='';error.value='';draftsError.value='';drafts.value=[];draftPagination.value={p:1,size:20,total:0,pageCount:0};draftPageNo.value=1;draftsLoading.value=false;draftId.value='';localKey='';initialDraftResolved.value=false;published.value=false;needsReload.value=false;apply(emptyPost());initialForm=''}
+async function loadDrafts(p=draftPageNo.value){
+  if(!mounted.value||!isLoggedIn.value||editId.value)return
+  const reader=identity(),version=generation,sequence=++listSequence;draftsLoading.value=true;draftsError.value='';draftPageNo.value=p
+  try{const result=await draftPage(p);if(current(reader,version)&&sequence===listSequence){drafts.value=result.list;draftPagination.value=result.pagination}}
+  catch(reason){if(current(reader,version)&&sequence===listSequence){drafts.value=[];draftsError.value=reason instanceof Error?reason.message:'草稿列表读取失败'}}
+  finally{if(current(reader,version)&&sequence===listSequence)draftsLoading.value=false}
 }
-
-async function loadDrafts() {
-  if (!apiKey.value || editId.value) {
-    drafts.value = []
-    return
-  }
-  try {
-    drafts.value = await fetchArticleDrafts(apiKey.value)
-  } catch {
-    drafts.value = []
-  }
+async function loadDraft(id:string,initial=false){
+  if(!mounted.value||!isLoggedIn.value||editId.value||((locked.value||sourceLoading.value)&&!initial))return
+  const reader=identity(),version=generation,sequence=++sourceSequence
+  loadConfirmation?.abort();loadConfirmation=null
+  if(!initial&&JSON.stringify(snapshot())!==initialForm){const controller=new AbortController();loadConfirmation=controller;loadConfirming.value=true;let accepted=false;try{accepted=await fpConfirm({signal:controller.signal,title:'载入草稿',message:'载入会替换当前输入，是否继续？',confirmText:'载入'})}catch(reason){if(current(reader,version))error.value=reason instanceof Error?reason.message:'载入已取消';return}finally{if(loadConfirmation===controller){loadConfirmation=null;loadConfirming.value=false}}if(operations.pending||operations.busy||operations.confirming||!accepted||controller.signal.aborted||!current(reader,version)||sequence!==sourceSequence)return}
+  sourceLoading.value=true;sourceError.value='';sourceTarget.value=id
+  try{const result=await draftSource(id);if(current(reader,version)&&sequence===sourceSequence){apply(result);draftId.value=result.id;published.value=false;initialDraftResolved.value=true;initialForm=JSON.stringify(snapshot())}}
+  catch(reason){if(current(reader,version)&&sequence===sourceSequence)sourceError.value=reason instanceof Error?reason.message:'草稿读取失败'}
+  finally{if(current(reader,version)&&sequence===sourceSequence)sourceLoading.value=false}
 }
-
-function applyDraft(d: ArticleDraft) {
-  title.value = d.articleDraftTitle || d.articleTitle || ''
-  tags.value = d.articleDraftTags || d.articleTags || ''
-  content.value = d.articleDraftContent || d.articleContent || ''
-  type.value = Number(d.articleDraftType ?? d.articleType ?? 0)
-  offer.value = Number(d.articleDraftQnAOfferPoint || 0)
-  rewardContent.value = d.articleDraftRewardContent || ''
-  rewardPoint.value = d.articleDraftRewardPoint || null
-  rewardOpen.value = Boolean(rewardContent.value)
-  anonymous.value = d.articleDraftAnonymous === true
-  commentable.value = d.articleDraftCommentable !== false
-  notifyFollowers.value = d.articleDraftNotifyFollowers === true
-  showInList.value = Number(d.articleDraftShowInList ?? 1) !== 0
-  statement.value = Number(d.articleDraftStatement || 0)
-  applyColumn(d.articleDraftColumnId || '', d.articleDraftColumnTitle || '', String(d.articleDraftChapterNo || ''))
-  draftId.value = draftKey(d)
+async function loadEdit(){
+  if(!mounted.value||!isLoggedIn.value||!editId.value)return
+  const reader=identity(),version=generation,sequence=++sourceSequence;sourceLoading.value=true;sourceError.value=''
+  try{const result=await postSource(editId.value);if(current(reader,version)&&sequence===sourceSequence){source.value=result;apply(result);needsReload.value=false;initialDraftResolved.value=true;initialForm=JSON.stringify(snapshot())}}
+  catch(reason){if(current(reader,version)&&sequence===sourceSequence)sourceError.value=reason instanceof Error?reason.message:'原文读取失败'}
+  finally{if(current(reader,version)&&sequence===sourceSequence)sourceLoading.value=false}
 }
-
-function applyPayload(p: ArticlePayload) {
-  title.value = p.articleTitle
-  tags.value = p.articleTags
-  content.value = p.articleContent
-  type.value = p.articleType
-  offer.value = p.articleQnAOfferPoint || 0
-  rewardContent.value = p.articleRewardContent || ''
-  rewardPoint.value = p.articleRewardPoint || null
-  rewardOpen.value = Boolean(rewardContent.value)
-  anonymous.value = Boolean(p.articleAnonymous)
-  commentable.value = p.articleCommentable !== false
-  showInList.value = p.articleShowInList !== false
-  statement.value = p.articleStatement || 0
-  applyColumn(p.columnId || '', '', p.chapterNo || '', p.columnCoverURL || '')
+async function initialize(skipDraft=false){
+  reset();if(!mounted.value||!isLoggedIn.value)return
+  if(editId.value){await loadEdit();return}
+  if(route.meta.long)type.value=6;else{const q=Number(route.query.type);if(TYPES.some(t=>t.value===q))type.value=q}
+  if(typeof route.query.tags==='string')tags.value=route.query.tags
+  const q=!skipDraft&&typeof route.query.draft==='string'?route.query.draft:'';initialDraftResolved.value=!q;initialForm=JSON.stringify(snapshot())
+  if(q)void loadDraft(q,true)
+  void loadDrafts(1)
 }
-
-async function loadDraft(id: string) {
-  if (!apiKey.value) return
-  try {
-    applyDraft(await fetchArticleDraft(apiKey.value, id))
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '无法加载草稿'
-  }
-}
-
-async function loadEdit() {
-  if (!apiKey.value || !editId.value) return
-  error.value = ''
-  draftId.value = ''
-  try {
-    applyPayload(await fetchArticleMd(apiKey.value, editId.value))
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '无法加载原文'
-  }
-}
-
-onMounted(async () => {
-  const qType = Number(route.query.type)
-  if (!editId.value && route.meta.long) type.value = 6
-  else if (!editId.value && TYPES.some((t) => t.value === qType)) type.value = qType
-  if (!editId.value && typeof route.query.tags === 'string') tags.value = route.query.tags
+async function reloadEdit(){
+  if(locked.value||sourceLoading.value)return
+  const reader=identity(),version=generation
+  if(JSON.stringify(snapshot())!==initialForm){const controller=new AbortController();loadConfirmation=controller;loadConfirming.value=true;let accepted=false;try{accepted=await fpConfirm({signal:controller.signal,title:'重新读取原文',message:'重新读取将替换当前输入，是否继续？',confirmText:'重新读取'})}finally{if(loadConfirmation===controller){loadConfirmation=null;loadConfirming.value=false}}if(!accepted||controller.signal.aborted||!current(reader,version)||operations.pending||operations.busy)return}
   await loadEdit()
-  await loadDrafts()
-  const q = typeof route.query.draft === 'string' ? route.query.draft : ''
-  if (q) await loadDraft(q)
-})
-watch(editId, () => {
-  void loadEdit()
-  void loadDrafts()
-})
-watch(
-  () => route.meta.long,
-  (long) => {
-    if (!editId.value) type.value = long ? 6 : 0
-  },
-)
-
-watch(tags, (value) => {
-  window.clearTimeout(tagTimer)
-  const last = value.split(/[,，]/).pop()?.trim() || ''
-  if (!apiKey.value || last.length < 1) {
-    tagHints.value = []
-    return
-  }
-  tagTimer = window.setTimeout(async () => {
-    try {
-      tagHints.value = await queryTags(apiKey.value!, last)
-    } catch {
-      tagHints.value = []
-    }
-  }, 250)
-})
-
-function pickTag(name: string) {
-  const parts = tags.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
-  parts.pop()
-  if (!parts.includes(name)) parts.push(name)
-  tags.value = parts.join(',')
-  tagHints.value = []
 }
-
-function payload(): ArticlePayload {
-  const reward = rewardOpen.value ? rewardContent.value : ''
-  return {
-    articleTitle: title.value,
-    articleContent: content.value,
-    articleTags: tags.value,
-    articleType: type.value,
-    articleQnAOfferPoint: type.value === 5 ? offer.value : 0,
-    articleRewardContent: reward,
-    articleRewardPoint: reward.trim() ? Number(rewardPoint.value || 0) : 0,
-    articleAnonymous: allowAnonymous.value && anonymous.value,
-    articleCommentable: commentable.value,
-    articleNotifyFollowers: notifyFollowers.value,
-    articleShowInList: showInList.value,
-    articleStatement: statement.value,
-    ...(isLong.value
-      ? {
-          columnId: columnMode.value === '__NEW__' ? '__NEW__' : columnMode.value === 'existing' ? columnId.value.trim() : '',
-          columnTitle: columnTitle.value.trim(),
-          chapterNo: chapterNo.value.trim(),
-          columnCoverURL: columnCoverURL.value,
-        }
-      : {}),
+function retrySource(){if(editId.value)void loadEdit();else{const q=sourceTarget.value||draftId.value||String(route.query.draft||'');if(q)void loadDraft(q,true)}}
+async function after(result:PostReceipt|null,command:PostCommand|null,reader:string,version:number,owned:boolean){
+  if(!result||!command||!current(reader,version))return
+  clearCache()
+  if(result.op==='draft-save'){
+    if(owned&&draftId.value===command.id){draftId.value=result.id;try{if(JSON.stringify(postInput('draft-save',snapshot(),null))===JSON.stringify(command.input))initialForm=JSON.stringify(snapshot())}catch{}}
+    await loadDrafts();return
   }
+  if(result.op==='draft-delete'){if(draftId.value===command.id)draftId.value='';await loadDrafts();return}
+  let matches=false;try{matches=JSON.stringify(postInput(command.op,snapshot(),source.value,draftId.value))===JSON.stringify(command.input)}catch{}
+  if(result.op==='publish'&&owned){published.value=true;if(draftId.value===command.input.draftId)draftId.value=''}
+  if(result.op==='edit'&&editId.value===result.id)needsReload.value=true
+  if(owned&&matches&&current(reader,version))await router.replace('/article/'+result.id)
 }
-
-async function submit() {
-  if (!apiKey.value) return
-  error.value = ''
-  if (!content.value.trim()) {
-    error.value = '正文不能为空'
-    return
-  }
-  if (isLong.value) {
-    if (columnMode.value === '__NEW__' && !columnTitle.value.trim()) {
-      error.value = '请输入新专栏名称'
-      return
-    }
-    if (columnMode.value === 'existing' && !/^\d+$/.test(columnId.value.trim())) {
-      error.value = '请填写正确的专栏 ID'
-      return
-    }
-    if (columnMode.value && chapterNo.value.trim() && !/^[1-9]\d*$/.test(chapterNo.value.trim())) {
-      error.value = '章节号必须是正整数'
-      return
-    }
-  } else if (type.value !== 5 && rewardOpen.value && rewardContent.value.trim()) {
-    if (!Number.isInteger(Number(rewardPoint.value)) || Number(rewardPoint.value) < 1) {
-      error.value = '打赏积分必须是正整数'
-      return
-    }
-  }
-  sending.value = true
-  try {
-    const id = editId.value
-      ? await updateArticle(apiKey.value, editId.value, payload())
-      : await postArticle(apiKey.value, payload())
-    if (draftId.value) {
-      try {
-        await removeArticleDraft(apiKey.value, draftId.value)
-      } catch {
-        /* published anyway */
-      }
-    }
-    await router.replace(id ? `/article/${id}` : '/')
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : editId.value ? '更新失败' : '发帖失败'
-  } finally {
-    sending.value = false
-  }
+async function run(op:PostCommand['op'],id:string){
+  if(!ready.value||locked.value||(op==='publish'&&published.value)||(op==='edit'&&needsReload.value)||op==='draft-save'&&!!editId.value)return
+  error.value='';const reader=identity(),version=generation
+  try{const input=postInput(op,snapshot(),source.value,draftId.value);const result=await operations.start(op,id,input,commandOrigin);if(!current(reader,version))return;localKey=operations.pending?.key||'';await after(result,operations.completed,reader,version,true)}
+  catch(reason){if(current(reader,version))error.value=reason instanceof Error?reason.message:'操作失败'}
 }
-
-async function saveDraft() {
-  if (!apiKey.value) return
-  error.value = ''
-  savingDraft.value = true
-  try {
-    const saved = await saveArticleDraft(apiKey.value, {
-      ...payload(),
-      articleDraftId: draftId.value || undefined,
-    })
-    // 保存接口返回的草稿不含正文/打赏内容，回填会清空编辑器，只记下 ID。
-    if (saved && !draftId.value) draftId.value = draftKey(saved)
-    await loadDrafts()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '保存草稿失败'
-  } finally {
-    savingDraft.value = false
-  }
+function submit(){void run(editId.value?'edit':'publish',editId.value)}
+function saveDraft(){void run('draft-save',draftId.value)}
+async function dropDraft(id:string){
+  if(locked.value||sourceLoading.value||!mounted.value||!isLoggedIn.value)return
+  const reader=identity(),version=generation
+  try{const result=await operations.start('draft-delete',id,{},commandOrigin);if(!current(reader,version))return;localKey=operations.pending?.key||'';await after(result,operations.completed,reader,version,true)}catch(reason){if(current(reader,version))error.value=reason instanceof Error?reason.message:'删除失败'}
 }
-
-async function dropDraft(id: string) {
-  if (!apiKey.value) return
-  try {
-    await removeArticleDraft(apiKey.value, id)
-    if (draftId.value === id) draftId.value = ''
-    await loadDrafts()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : '删除草稿失败'
-  }
-}
-
+async function restore(){const command=operations.pending;if(!command||operations.busy)return;const owned=localKey===command.key,reader=identity(),version=generation;const result=await operations.retry();await after(result,operations.completed,reader,version,owned)}
+async function blank(){if(locked.value)return;const reader=identity();const query={...route.query};delete query.draft;await router.replace({path:route.path,query});if(mounted.value&&reader===identity())await initialize(true)}
+watch([accessToken,()=>account.value?.oId,()=>route.fullPath],()=>{const next=identity();if(next===boundary)return;boundary=next;void initialize()},{flush:'sync'})
+onMounted(()=>{mounted.value=true;boundary=identity();void initialize()})
+onBeforeUnmount(()=>{mounted.value=false;reset()})
 </script>
 
 <template>
@@ -305,19 +127,26 @@ async function dropDraft(id: string) {
     <h1>{{ heading }}</h1>
     <p v-if="!isLoggedIn" class="hint">请先登录。</p>
     <template v-else>
-      <section v-if="!editId && drafts.length" class="drafts">
-        <h2>草稿</h2>
-        <button
-          v-for="d in drafts"
-          :key="draftKey(d)"
-          type="button"
-          class="ghost"
-          @click="loadDraft(draftKey(d))"
-        >
-          {{ d.articleDraftTitle || '无标题' }}
-          <span @click.stop="dropDraft(draftKey(d))">删除</span>
-        </button>
+      <template v-if="operations.pending">
+        <p role="status">上次{{ OP_LABELS[operations.pending.op] }}结果待确认，目标 {{ operations.pending.id||'新内容' }}；恢复仍提交原先的内容。</p>
+        <button type="button" :aria-disabled="operations.busy" @click="restore()">恢复本次操作</button>
+      </template>
+      <p v-if="operations.message" role="status">{{ operations.message }}</p><p v-if="operations.error" role="alert">{{ operations.error }}</p>
+      <p v-if="operations.receipt&&(operations.receipt.op==='publish'||operations.receipt.op==='edit')">文章 {{ operations.receipt.id }} 已确认。<RouterLink :to="'/article/'+operations.receipt.id">查看文章</RouterLink></p>
+      <button v-if="operations.receipt?.op==='draft-save'&&!editId" type="button" :aria-disabled="locked" @click="loadDraft(operations.receipt.id)">载入已保存草稿 {{ operations.receipt.id }}</button>
+      <section v-if="!editId" class="drafts">
+        <h2>草稿</h2><p v-if="draftsLoading" role="status">正在读取草稿…</p><p v-if="draftsError" role="alert">{{ draftsError }}</p>
+        <button type="button" :aria-disabled="draftsLoading" @click="!draftsLoading&&loadDrafts()">{{ draftsError?'重试草稿列表':'刷新草稿列表' }}</button>
+        <div v-for="d in drafts" :key="d.id"><button type="button" class="ghost" :aria-disabled="locked||sourceLoading" @click="loadDraft(d.id)">{{ d.title||'无标题' }}</button><button type="button" class="ghost" :aria-disabled="locked||sourceLoading" @click="dropDraft(d.id)">删除草稿 {{ d.id }}</button></div>
+        <p v-if="!draftsLoading&&!draftsError&&!drafts.length">{{ draftPagination.total===0?'暂无草稿':'本页无草稿' }}</p>
+        <nav v-if="draftPagination.pageCount>1||draftPageNo>1"><button type="button" :aria-disabled="draftsLoading||draftPageNo<=1" @click="!draftsLoading&&draftPageNo>1&&loadDrafts(draftPageNo-1)">上一页草稿</button><span>第 {{ draftPageNo }} 页<span v-if="!draftsError&&!draftsLoading"> · 共 {{ draftPagination.total }}份</span></span><button type="button" :aria-disabled="draftsLoading||draftPageNo>=draftPagination.pageCount" @click="!draftsLoading&&draftPageNo<draftPagination.pageCount&&loadDrafts(draftPageNo+1)">下一页草稿</button></nav>
       </section>
+      <p v-if="sourceLoading" role="status">正在读取原文…</p><p v-if="sourceError" role="alert">{{ sourceError }}</p>
+      <button v-if="sourceError" type="button" @click="retrySource()">重试原文</button><button v-if="!editId&&sourceError&&initialDraftResolved" type="button" @click="sourceError=''">保留当前输入</button><button v-if="!editId&&sourceError" type="button" @click="blank()">新建空白文章</button>
+      <template v-if="ready">
+      <p v-if="published" role="status">本次文章已发布。<button type="button" @click="published=false">将当前输入作为新文章</button></p>
+      <p v-if="needsReload" role="status">编辑已确认，继续编辑前请重新读取原文。<button type="button" @click="reloadEdit()">重新读取原文后继续编辑</button></p>
+      <p v-if="source&&source.status!==0" role="status">当前文章不可编辑，可查看源码。</p>
       <p class="type-tip">
         <b>{{ TYPE_LABELS[type] || '帖子' }}</b>
         <span v-if="typeTip">{{ typeTip }}</span>
@@ -325,10 +154,11 @@ async function dropDraft(id: string) {
       </p>
 
       <input v-model="title" class="title-input" required placeholder="标题" />
-      <MarkdownEditor
+      <textarea v-if="type===3" v-model="content" aria-label="思绪回放记录" rows="12" /><p v-if="type===3" class="hint">思绪回放记录修改需保留原格式，不能作为普通 Markdown 发布。</p>
+      <MarkdownEditor v-else
         ref="editorRef"
         v-model="content"
-        :api-key="apiKey"
+        :api-key="null"
         :height="500"
         outline
         :placeholder="type === 1 ? '机要内容仅被 @ 的用户可见' : '支持 Markdown，可直接粘贴或拖拽上传图片'"
@@ -347,10 +177,7 @@ async function dropDraft(id: string) {
             <option value="__NEW__">+ 新建专栏</option>
           </select>
         </label>
-        <label v-if="columnMode === 'existing'" class="inline-field">
-          专栏 ID
-          <input v-model="columnId" inputmode="numeric" placeholder="专栏页地址 /column/ 后的数字" />
-        </label>
+        <AuthorColumnPicker v-if="columnMode === 'existing'" :model-value="columnId" :current-title="columnTitle" :disabled="locked" @select="column => { columnId=column.id; columnTitle=column.title }" />
         <label v-if="columnMode === '__NEW__'" class="inline-field">
           新专栏名称
           <input v-model="columnTitle" maxlength="64" placeholder="请输入专栏名称（例如：《三体》）" />
@@ -363,28 +190,21 @@ async function dropDraft(id: string) {
       </section>
 
       <template v-if="!isLong">
-      <label>
-        标签（逗号分隔）
-        <input v-model="tags" required placeholder="前端,摸鱼" />
-      </label>
-      <div v-if="tagHints.length" class="hints">
-        <button v-for="t in tagHints" :key="t" type="button" class="ghost" @click="pickTag(t)">{{ t }}</button>
-      </div>
-
+      <TagInput v-model="tags" />
       <label v-if="type === 5" class="inline-field">
         悬赏积分
-        <input v-model.number="offer" type="number" min="0" placeholder="采纳答案时奖励给回答者" />
+        <input v-model.number="offer" type="number" min="20" max="2147483647" placeholder="采纳答案时奖励给回答者" />
       </label>
       <section v-else class="reward">
         <button type="button" class="ghost reward-toggle" @click="rewardOpen = !rewardOpen">
-          {{ rewardOpen ? '取消打赏' : '打赏' }}
+          {{ rewardOpen ? retainedReward ? '收起打赏设置' : '取消打赏' : '打赏' }}
         </button>
         <template v-if="rewardOpen">
           <p class="type-tip">打赏内容仅对打赏过的用户可见。</p>
-          <MarkdownEditor v-model="rewardContent" :api-key="apiKey" :height="200" placeholder="打赏后可见的内容" />
+          <MarkdownEditor v-model="rewardContent" :api-key="null" :height="200" placeholder="打赏后可见的内容" />
           <label class="inline-field">
             打赏积分
-            <input v-model.number="rewardPoint" type="number" min="1" placeholder="打赏积分" />
+            <input v-model.number="rewardPoint" type="number" min="1" max="2147483647" placeholder="打赏积分" />
           </label>
         </template>
       </section>
@@ -407,18 +227,19 @@ async function dropDraft(id: string) {
 
       <p v-if="error" class="err">{{ error }}</p>
       <div class="tools">
-        <button v-if="!editId" type="button" class="ghost" :disabled="savingDraft || !title.trim()" @click="saveDraft">
-          {{ savingDraft ? '保存中…' : '存草稿' }}
+        <button v-if="!editId" type="button" class="ghost" :aria-disabled="locked||!ready" @click="saveDraft">
+          {{ operations.busy ? '保存中…' : '存草稿' }}
         </button>
-        <button type="submit" :disabled="sending">
-          {{ sending ? (editId ? '保存中…' : '发布中…') : editId ? '保存' : '发布' }}
+        <button type="submit" :aria-disabled="locked||!ready||published||needsReload||!!source&&source.status!==0">
+          {{ operations.busy ? '提交中…' : editId ? '保存' : '发布' }}
         </button>
       </div>
+      </template>
     </template>
   </form>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .card {
   width: 100%;
   max-width: 960px;
@@ -478,7 +299,7 @@ button:hover:not(:disabled) {
   border-color: var(--fp-primary-hover, var(--fp-primary));
   box-shadow: 0 4px 12px color-mix(in srgb, var(--fp-primary) 28%, transparent);
 }
-button:disabled {
+button:disabled,button[aria-disabled='true'] {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -555,9 +376,8 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px 14px;
-  border: 1px dashed var(--fp-border);
-  border-radius: 8px;
+  padding: 12px 0;
+  border-top: 1px dashed var(--fp-border);
 }
 .column-form .inline-field input {
   width: 280px;
@@ -571,9 +391,8 @@ button:disabled {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 18px;
-  padding: 12px 14px;
-  border: 1px dashed var(--fp-border);
-  border-radius: 8px;
+  padding: 12px 0;
+  border-top: 1px dashed var(--fp-border);
 }
 .check {
   flex-direction: row;
@@ -583,4 +402,8 @@ button:disabled {
   cursor: pointer;
   user-select: none;
 }
+.card { min-width: 0; overflow-wrap: anywhere; }
+.drafts { min-width: 0; nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } }
+.tools { flex-wrap: wrap; }
+@media (max-width: 600px) { .card { padding: 16px; } .inline-field { flex-wrap: wrap; } .column-form .inline-field input { max-width: 100%; min-width: 0; box-sizing: border-box; } }
 </style>

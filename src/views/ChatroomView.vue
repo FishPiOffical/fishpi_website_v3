@@ -1,16 +1,31 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink,useRoute,useRouter } from 'vue-router'
+import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
 import { storeToRefs } from 'pinia'
-import { fetchBarrageCost, fetchChatRaw } from '@/api/fishpi'
+import ChatWeatherEditor from '@/components/chat/ChatWeatherEditor.vue'
+import ChatWeatherRecovery from '@/components/chat/ChatWeatherRecovery.vue'
+import ChatMusicEditor from '@/components/chat/ChatMusicEditor.vue'
+import ChatMusicRecovery from '@/components/chat/ChatMusicRecovery.vue'
+import ChatBarrageEditor from '@/components/chat/ChatBarrageEditor.vue'
+import ChatBarrageRecovery from '@/components/chat/ChatBarrageRecovery.vue'
+import {useChatMessageSource} from '@/composables/useChatMessageSource'
+import {getAuthContextVersion} from '@/api/http'
+import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
+import ChatRevokeAction from '@/components/chat/ChatRevokeAction.vue'
+import ChatRevokeRecovery from '@/components/chat/ChatRevokeRecovery.vue'
+import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
+import ChatTopicEditor from '@/components/chat/ChatTopicEditor.vue'
+import ChatTopicRecovery from '@/components/chat/ChatTopicRecovery.vue'
+import ChatOnlineList from '@/components/chat/ChatOnlineList.vue'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
 import PaintPanel from '@/components/chat/PaintPanel.vue'
-import HongbaoCard from '@/components/chat/HongbaoCard.vue'
+import ChatRedPacketCard from '@/components/chat/ChatRedPacketCard.vue'
+import ChatRedPacketEditor from '@/components/chat/ChatRedPacketEditor.vue'
 import ChatBubble from '@/components/ChatBubble.vue'
 import ChatCard from '@/components/ChatCard.vue'
 import ChatComposer from '@/components/ChatComposer.vue'
-import type { ChatCardData } from '@/utils/chatCard'
-import ReactionBar from '@/components/ReactionBar.vue'
+import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -18,12 +33,11 @@ import { useChatFilterStore } from '@/stores/chatFilter'
 import type { ChatNodeOption } from '@/api/fishpi'
 import FpLoading from '@/components/FpLoading.vue'
 import FpDialog from '@/components/FpDialog.vue'
-import VipNickname from '@/components/user/VipNickname.vue'
 
 const auth = useAuthStore()
-const chat = useChatStore()
+const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const chatFilter = useChatFilterStore()
-const { account, isLoggedIn, apiKey } = storeToRefs(auth)
+const { account, isLoggedIn, apiKey, accessToken } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 const composerReady = ref(false)
 const {
@@ -33,11 +47,10 @@ const {
   loadingMore,
   hasMore,
   error,
-  lastPacket,
-  packetDetail,
   connected,
+  connecting,
   discuss,
-  onlines,
+  onlineTotal,
   nodeName,
   nodeOptions,
   chatStyle,
@@ -45,66 +58,38 @@ const {
 const visibleMessages = computed(() => messages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
 
 const draft = ref('')
+watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{draft.value=''},{flush:'sync'})
 const scroller = ref<HTMLElement | null>(null)
-const packetMoney = ref(32)
-const packetCount = ref(2)
-const packetMsg = ref('摸鱼者，人品好！')
-const packetType = ref('random')
-const packetTo = ref('')
-const gesture = ref(0)
 const showPacket = ref(false)
+const showWeather=ref(false)
+const showMusic=ref(false)
 const showBarrage = ref(false)
 const showPaint = ref(false)
 
-function togglePanel(panel: 'packet' | 'barrage' | 'paint') {
+function togglePanel(panel: 'packet' | 'barrage' | 'paint' | 'music' | 'weather') {
   showPacket.value = panel === 'packet' && !showPacket.value
   showBarrage.value = panel === 'barrage' && !showBarrage.value
   showPaint.value = panel === 'paint' && !showPaint.value
+  showMusic.value = panel === 'music' && !showMusic.value
+  showWeather.value = panel === 'weather' && !showWeather.value
 }
 
-watch(packetType, (type) => {
-  if (type === 'rockPaperScissors') {
-    packetCount.value = 1
-    packetMoney.value = 256
-    packetMsg.value = '石头剪刀布！'
-  } else if (type === 'heartbeat') {
-    packetCount.value = 3
-    packetMoney.value = 32
-    packetMsg.value = '玩的就是心跳！'
-  } else if (type === 'average') {
-    packetCount.value = 5
-    packetMsg.value = '平分红包，人人有份！'
-  } else if (type === 'specify') {
-    packetCount.value = 1
-    packetMsg.value = '试试看，这是给你的红包吗？'
-  } else {
-    packetMsg.value = '摸鱼者，事竟成！'
-  }
-})
 const showNodes = ref(false)
 const showClassicOnlines = ref(false)
-const barrageText = ref('')
-const barrageCost = ref('')
-const rawText = ref('')
-const rawLoading = ref(false)
-const topicDraft = ref('')
+const {quote,quoteBusy,quoteErr,rawText,rawError,rawLoading,rawOpen,quoteMessage:readQuote,showRaw,clearQuote,closeRaw,buildQuoteSuffix}=useChatMessageSource()
 const editingTopic = ref(false)
-const quote = ref<{ userName: string; messageId: string; content: string; html: string; label: string } | null>(null)
-const quoteBusy = ref('')
-const quoteErr = ref('')
 
 const me = computed(() => account.value?.userName)
 
 // 经典版：最新消息排在最上面！
 const classicMessages = computed(() => [...visibleMessages.value].reverse())
 
-function scrollToHash() {
-  if (typeof location === 'undefined') return
-  const id = location.hash.replace(/^#/, '')
-  if (!id.startsWith('chatroom')) return
-  const el = document.getElementById(id)
-  el?.scrollIntoView({ block: 'center' })
-}
+const route=useRoute(),router=useRouter(),contextId=ref('')
+function syncContextHash(){const match=/^#chatroom(\d{1,32})$/.exec(route.hash);contextId.value=accessToken.value&&account.value?.oId&&match?match[1]!:''}
+watch(()=>JSON.stringify([route.hash,!!accessToken.value,account.value?.oId||'']),syncContextHash,{immediate:true})
+function openContext(id:string){void router.push({hash:'#chatroom'+id})}
+function closeContext(){contextId.value='';if(/^#chatroom\d{1,32}$/.test(route.hash))void router.replace({hash:''})}
+async function latestFromContext(){closeContext();await chat.refreshMessages();await nextTick();if(chatStyle.value==='modern')scrollBottom()}
 
 onMounted(async () => {
   composerReady.value = true
@@ -113,14 +98,7 @@ onMounted(async () => {
   if (chatStyle.value === 'modern') {
     scrollBottom()
   }
-  scrollToHash()
-  if (auth.apiKey) {
-    try {
-      barrageCost.value = await fetchBarrageCost(auth.apiKey)
-    } catch {
-      barrageCost.value = ''
-    }
-  }
+
 })
 
 onUnmounted(() => {
@@ -154,48 +132,24 @@ function scrollBottom() {
   }
 }
 
-function buildQuoteSuffix() {
-  const q = quote.value
-  if (!q?.userName || !q.content) return ''
-  const quoteMd = q.content.replace(/\n/g, '\n> ')
-  return `\n\n##### 引用 @${q.userName} [↩](/cr#chatroom${q.messageId} "跳转至原消息")  \n> ${quoteMd}\n`
-}
-
 async function submit() {
   const text = draft.value
   if (!text.trim() && !quote.value) return
-  const content = `${text}${buildQuoteSuffix()}`
-  draft.value = ''
-  quote.value = null
-  await chat.send(content)
+  const content = `${text}${buildQuoteSuffix()}`,reader=JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])
+  if(await chat.send(content)&&reader===JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']))acceptConfirmed(content.trim())
   if (chatStyle.value === 'modern') {
     await nextTick()
     scrollBottom()
   }
 }
 
-async function quoteMessage(msg: { oId: string; userName: string; html?: string; card?: ChatCardData }) {
-  if (!auth.apiKey) return
-  quoteBusy.value = msg.oId
-  quoteErr.value = ''
-  try {
-    const content = await fetchChatRaw(auth.apiKey, msg.oId)
-    quote.value = { userName: msg.userName, messageId: msg.oId, content: content.trim(), html: msg.card ? '' : msg.html || '', label: msg.card ? cardLabel(msg.card) : '' }
-    await nextTick()
-    composerRef.value?.reveal()
-  } catch (e) {
-    quoteErr.value = e instanceof Error ? e.message : '读取原文失败'
-  } finally {
-    quoteBusy.value = ''
-  }
-}
+function acceptConfirmed(content:string){if(`${draft.value}${buildQuoteSuffix()}`.trim()===content){draft.value='';clearQuote()}}
 
-function cardLabel(card: ChatCardData) {
-  return card.msgType === 'music' ? `🎵 ${card.title || '音乐'}` : `🌤 ${card.t || '天气'}`
-}
-
-function clearQuote() {
-  quote.value = null
+async function quoteMessage(msg:{oId:string}){
+ await readQuote(msg.oId)
+ if(quote.value?.messageId!==msg.oId)return
+ await nextTick()
+ if(quote.value?.messageId===msg.oId)composerRef.value?.reveal()
 }
 
 function insertPaint(md: string) {
@@ -223,52 +177,6 @@ async function onModernScroll() {
   el.scrollTop = el.scrollHeight - prev
 }
 
-async function sendPacket() {
-  await chat.sendRedPacket({
-    money: packetMoney.value,
-    count: packetType.value === 'specify' ? 1 : packetCount.value,
-    msg: packetMsg.value,
-    type: packetType.value,
-    recivers: packetType.value === 'specify' ? packetTo.value.split(/[,，\s]+/).filter(Boolean) : undefined,
-    gesture: packetType.value === 'rockPaperScissors' ? gesture.value : undefined,
-  })
-  showPacket.value = false
-  if (chatStyle.value === 'modern') {
-    await nextTick()
-    scrollBottom()
-  }
-}
-
-async function sendBarrage() {
-  await chat.sendBarrage(barrageText.value)
-  barrageText.value = ''
-  showBarrage.value = false
-}
-
-async function claim(oId: string, gesture?: number) {
-  await chat.openPacket(oId, gesture)
-}
-
-async function showRaw(oId: string) {
-  if (!auth.apiKey) return
-  rawLoading.value = true
-  rawText.value = ''
-  try {
-    rawText.value = await fetchChatRaw(auth.apiKey, oId)
-  } catch (e) {
-    rawText.value = e instanceof Error ? e.message : '无法读取原文'
-  } finally {
-    rawLoading.value = false
-  }
-}
-
-async function saveTopic() {
-  if (!topicDraft.value.trim()) return
-  await chat.setDiscuss(topicDraft.value.trim())
-  editingTopic.value = false
-  topicDraft.value = ''
-}
-
 function useTopic() {
   draft.value += ` # ${discuss.value} # `
 }
@@ -280,6 +188,16 @@ function clearScreen() {
 
 <template>
   <div class="cr-page" :class="`theme-${chatStyle}`">
+    <ChatPublicationRecovery @confirmed="acceptConfirmed" />
+    <ChatRevokeRecovery />
+    <ChatTopicRecovery />
+    <ChatBarrageRecovery />
+    <ChatMusicRecovery />
+    <ChatWeatherRecovery />
+    <ChatContextPanel :message-id="contextId" @close="closeContext" @latest="latestFromContext" />
+    <p v-if="isLoggedIn" class="timeline-controls"><button type="button" :disabled="loading" @click="chat.refreshMessages">重读当前消息</button><span v-if="chat.topicError" role="alert">{{ chat.topicError }}</span></p>
+    <p v-else>登录后可读取聊天室消息。</p>
+    <p v-if="quoteErr" role="alert">{{ quoteErr }}</p>
     <!-- ==================== 版本 A: 经典版本 (Classic，对齐现网 chat-room.ftl) ==================== -->
     <div v-if="chatStyle === 'classic'" class="cr-classic-layout">
       <main class="cr-classic-main">
@@ -292,9 +210,10 @@ function clearScreen() {
               ref="composerRef"
               v-model="draft"
               :api-key="apiKey"
-              cache-id="chatContent"
+              :cache-id="account?.oId?`chatContent:${account.oId}`:''"
               placeholder="说点什么吧！"
               :sending="sending"
+              :disabled="!!publication.pending"
               :allow-empty="Boolean(quote)"
               @submit="submit"
             >
@@ -312,6 +231,8 @@ function clearScreen() {
                 <button type="button" class="classic-tool-btn" title="发放红包" @click="togglePanel('packet')">🧧 红包</button>
                 <button type="button" class="classic-tool-btn" title="涂鸦画板" @click="togglePanel('paint')">🎨 涂鸦</button>
                 <button type="button" class="classic-tool-btn" title="发送弹幕" @click="togglePanel('barrage')">💬 弹幕</button>
+                <button type="button" class="classic-tool-btn" title="分享音乐" @click="togglePanel('music')">♫ 音乐</button>
+                <button type="button" class="classic-tool-btn" title="分享天气" @click="togglePanel('weather')">☀ 天气</button>
                 <div class="classic-topic-pill" :title="discuss">
                   <span class="topic-label">话题：</span>
                   <span class="topic-text"># {{ discuss }} #</span>
@@ -320,7 +241,7 @@ function clearScreen() {
                 </div>
               </template>
               <template #actions>
-                <button type="button" class="classic-btn" :title="nodeName || '选择大区'" @click="openNodePicker">
+                <button type="button" v-if="nodeOptions.length" class="classic-btn" :title="nodeName || '选择大区'" @click="openNodePicker">
                   🌐 {{ nodeName ? `大区: ${nodeName}` : '选择大区' }}
                 </button>
                 <button type="button" class="classic-btn style-toggle" title="切换到简约气泡版本（输入框吸底）" @click="chat.toggleChatStyle()">
@@ -335,41 +256,15 @@ function clearScreen() {
             </div>
 
             <!-- 话题编辑展开表单 -->
-            <form v-if="editingTopic" class="pop-sub-form" @submit.prevent="saveTopic">
-              <input v-model="topicDraft" :placeholder="discuss || '输入新话题…'" />
-              <button type="submit" class="pop-btn green">保存</button>
-              <button type="button" class="pop-btn ghost" @click="editingTopic = false">取消</button>
-            </form>
+            <ChatTopicEditor v-if="editingTopic" @close="editingTopic=false" />
 
             <!-- 发红包展开表单 -->
-            <form v-if="showPacket" class="pop-sub-form packet-sub-form" @submit.prevent="sendPacket">
-              <select v-model="packetType">
-                <option value="random">拼手气红包</option>
-                <option value="average">普通红包</option>
-                <option value="specify">专属红包</option>
-                <option value="heartbeat">心跳红包</option>
-                <option value="rockPaperScissors">猜拳红包</option>
-              </select>
-              <label>积分: <input v-model.number="packetMoney" type="number" min="1" /></label>
-              <label v-if="packetType !== 'specify'">个数: <input v-model.number="packetCount" type="number" min="1" /></label>
-              <input v-if="packetType === 'specify'" v-model="packetTo" placeholder="指定接收用户名" />
-              <select v-if="packetType === 'rockPaperScissors'" v-model.number="gesture">
-                <option :value="0">✊ 石头</option>
-                <option :value="1">✌️ 剪刀</option>
-                <option :value="2">✋ 布</option>
-              </select>
-              <input v-model="packetMsg" placeholder="祝福语 (摸鱼者，人品好！)" />
-              <button type="submit" class="pop-btn green" :disabled="sending">塞积分</button>
-              <button type="button" class="pop-btn ghost" @click="showPacket = false">取消</button>
-            </form>
+            <ChatRedPacketEditor v-if="showPacket" @close="showPacket=false" />
 
             <!-- 弹幕展开表单 -->
-            <form v-if="showBarrage" class="pop-sub-form barrage-sub-form" @submit.prevent="sendBarrage">
-              <input v-model="barrageText" maxlength="32" placeholder="友善弹幕，最多32个字" />
-              <button type="submit" class="pop-btn green" :disabled="sending || !barrageText.trim()">发射!</button>
-              <button type="button" class="pop-btn ghost" @click="showBarrage = false">取消</button>
-              <span v-if="barrageCost" class="barrage-cost-hint">花费 {{ barrageCost }}</span>
-            </form>
+            <ChatBarrageEditor v-if="showBarrage" @close="showBarrage=false" />
+            <ChatMusicEditor v-if="showMusic" @close="showMusic=false" />
+            <ChatWeatherEditor v-if="showWeather" @close="showWeather=false" />
 
             <!-- 涂鸦面板 -->
             <div v-if="showPaint" class="paint-box-wrap">
@@ -379,7 +274,7 @@ function clearScreen() {
             <!-- 在线人数条与折叠面板 -->
             <div class="classic-online-bar">
               <div class="online-stat">
-                <span>在线人数: <b>{{ onlines.length }}</b></span>
+                <span>本次可见人数: <b>{{ onlineTotal===null?'—':onlineTotal }}</b></span>
                 <button
                   type="button"
                   class="online-toggle-btn"
@@ -388,29 +283,10 @@ function clearScreen() {
                   {{ showClassicOnlines ? '收起在线列表 ▲' : '展开在线列表 ▼' }}
                 </button>
               </div>
-              <span v-if="lastPacket" class="top-packet-tip">{{ lastPacket }}</span>
               <span v-if="error" class="top-error-tip">{{ error }}</span>
             </div>
 
-            <div v-if="showClassicOnlines" class="classic-online-grid">
-              <RouterLink
-                v-for="u in onlines"
-                :key="u.userName"
-                :to="`/member/${u.userName}`"
-                class="classic-online-user"
-                :title="u.userNickname || u.userName"
-              >
-                <span
-                  class="avatar-tiny"
-                  :style="u.userAvatarURL ? { backgroundImage: `url('${u.userAvatarURL}')` } : undefined"
-                />
-                <span class="user-name">
-                  <VipNickname :user-id="u.userOId || u.oId" :user-name="u.userName">
-                    {{ u.userNickname || u.userName }}
-                  </VipNickname>
-                </span>
-              </RouterLink>
-            </div>
+            <div v-if="showClassicOnlines"><ChatOnlineList /></div>
           </section>
 
           <!-- 2. 下方消息列表：与输入区在同一个卡片中，自上而下阅读，最新在最上方 -->
@@ -435,31 +311,21 @@ function clearScreen() {
               :html="msg.html || ''"
               :self="msg.userName === me"
             >
-              <HongbaoCard
-                v-if="msg.redPacket"
-                :packet="msg.redPacket"
-                :is-sender="msg.userName === me"
-                :user-id="account?.oId"
-                @open="(g) => claim(msg.oId, g)"
-              />
+              <ChatRedPacketCard v-if="msg.redPacket" :packet="msg.redPacket" :packet-id="msg.oId" />
               <ChatCard v-else-if="msg.card" :card="msg.card" />
               <template #reactions>
-                <ReactionBar
-                  :summary="msg.reactionSummary"
-                  :current="msg.currentUserReaction"
-                  :disabled="!auth.apiKey"
-                  @toggle="(v) => chat.react(msg.oId, v)"
-                />
+                <V3ReactionBar kind="chat" :target-id="msg.oId" />
               </template>
               <template #actions>
-                <button v-if="msg.userName === me" type="button" title="撤回发言" @click="chat.revoke(msg.oId)">撤回</button>
-                <template v-if="!msg.redPacket && auth.apiKey">
+                <button type="button" @click="openContext(msg.oId)">上下文</button>
+                <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
+                <template v-if="!msg.redPacket && accessToken">
                   <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
                     {{ quoteBusy === msg.oId ? '…' : '引用' }}
                   </button>
                   <button type="button" title="查看原文" @click="showRaw(msg.oId)">原文</button>
                 </template>
-                <ReportDialog v-if="msg.userName !== me && auth.apiKey" :api-key="auth.apiKey" :data-id="msg.oId" :data-type="3" />
+                <ReportDialog v-if="msg.userOId !== auth.account?.oId && auth.accessToken" :data-id="msg.oId" :data-type="3" />
               </template>
             </ChatBubble>
 
@@ -493,9 +359,8 @@ function clearScreen() {
         <header class="cr-header">
           <div class="cr-header-left">
             <button
-              v-if="isLoggedIn"
-              type="button"
-              class="cr-top-btn node-select-btn"
+              v-if="isLoggedIn&&nodeOptions.length"
+              type="button" class="cr-top-btn node-select-btn"
               :title="nodeName || '选择大区'"
               @click="openNodePicker"
             >
@@ -503,13 +368,12 @@ function clearScreen() {
             </button>
             <span class="cr-status-tag" :class="{ on: connected }">
               <span class="status-dot" />
-              {{ connected ? '已连接' : isLoggedIn ? '连接中' : '访客浏览' }}
+              {{ connected?'已连接':connecting?'连接中':'未连接' }}
             </span>
           </div>
 
           <div class="cr-header-right">
             <span v-if="error" class="top-error-tip">{{ error }}</span>
-            <span v-if="lastPacket" class="top-packet-tip">{{ lastPacket }}</span>
             <button
               type="button"
               class="cr-top-btn style-toggle"
@@ -521,7 +385,7 @@ function clearScreen() {
             <button v-if="isLoggedIn" type="button" class="cr-top-btn" @click="clearScreen">
               清屏置底
             </button>
-            <span class="online-indicator">在线 <b>{{ onlines.length }}</b></span>
+            <span class="online-indicator">可见 <b>{{ onlineTotal===null?'—':onlineTotal }}</b></span>
           </div>
         </header>
 
@@ -558,31 +422,21 @@ function clearScreen() {
               :html="msg.html || ''"
               :self="msg.userName === me"
             >
-              <HongbaoCard
-                v-if="msg.redPacket"
-                :packet="msg.redPacket"
-                :is-sender="msg.userName === me"
-                :user-id="account?.oId"
-                @open="(g) => claim(msg.oId, g)"
-              />
+              <ChatRedPacketCard v-if="msg.redPacket" :packet="msg.redPacket" :packet-id="msg.oId" />
               <ChatCard v-else-if="msg.card" :card="msg.card" />
               <template #reactions>
-                <ReactionBar
-                  :summary="msg.reactionSummary"
-                  :current="msg.currentUserReaction"
-                  :disabled="!auth.apiKey"
-                  @toggle="(v) => chat.react(msg.oId, v)"
-                />
+                <V3ReactionBar kind="chat" :target-id="msg.oId" />
               </template>
               <template #actions>
-                <button v-if="msg.userName === me" type="button" title="撤回发言" @click="chat.revoke(msg.oId)">撤回</button>
-                <template v-if="!msg.redPacket && auth.apiKey">
+                <button type="button" @click="openContext(msg.oId)">上下文</button>
+                <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
+                <template v-if="!msg.redPacket && accessToken">
                   <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
                     {{ quoteBusy === msg.oId ? '…' : '引用' }}
                   </button>
                   <button type="button" title="查看原文" @click="showRaw(msg.oId)">原文</button>
                 </template>
-                <ReportDialog v-if="msg.userName !== me && auth.apiKey" :api-key="auth.apiKey" :data-id="msg.oId" :data-type="3" />
+                <ReportDialog v-if="msg.userOId !== auth.account?.oId && auth.accessToken" :data-id="msg.oId" :data-type="3" />
               </template>
             </ChatBubble>
           </div>
@@ -599,9 +453,10 @@ function clearScreen() {
               ref="composerRef"
               v-model="draft"
               :api-key="apiKey"
-              cache-id="chatContent"
+              :cache-id="account?.oId?`chatContent:${account.oId}`:''"
               placeholder="说点什么吧！"
               :sending="sending"
+              :disabled="!!publication.pending"
               :allow-empty="Boolean(quote)"
               @submit="submit"
             >
@@ -619,6 +474,8 @@ function clearScreen() {
                 <button type="button" class="tool-btn" title="插入涂鸦图片" @click="togglePanel('paint')">🎨 涂鸦</button>
                 <button type="button" class="tool-btn" title="发放积分红包" @click="togglePanel('packet')">🧧 红包</button>
                 <button type="button" class="tool-btn" title="发射全屏弹幕" @click="togglePanel('barrage')">💬 弹幕</button>
+                <button type="button" class="tool-btn" title="分享音乐" @click="togglePanel('music')">♫ 音乐</button>
+                <button type="button" class="tool-btn" title="分享天气" @click="togglePanel('weather')">☀ 天气</button>
               </template>
               <template #actions>
                 <div class="classic-topic-pill" :title="discuss">
@@ -631,41 +488,15 @@ function clearScreen() {
             </ChatComposer>
 
             <!-- 话题编辑表单 -->
-            <form v-if="editingTopic" class="pop-sub-form" @submit.prevent="saveTopic">
-              <input v-model="topicDraft" :placeholder="discuss || '输入新话题…'" />
-              <button type="submit" class="pop-btn green">保存</button>
-              <button type="button" class="pop-btn ghost" @click="editingTopic = false">取消</button>
-            </form>
+            <ChatTopicEditor v-if="editingTopic" @close="editingTopic=false" />
 
             <!-- 发红包表单 -->
-            <form v-if="showPacket" class="pop-sub-form packet-sub-form" @submit.prevent="sendPacket">
-              <select v-model="packetType">
-                <option value="random">拼手气红包</option>
-                <option value="average">普通红包</option>
-                <option value="specify">专属红包</option>
-                <option value="heartbeat">心跳红包</option>
-                <option value="rockPaperScissors">猜拳红包</option>
-              </select>
-              <label>积分: <input v-model.number="packetMoney" type="number" min="1" /></label>
-              <label v-if="packetType !== 'specify'">个数: <input v-model.number="packetCount" type="number" min="1" /></label>
-              <input v-if="packetType === 'specify'" v-model="packetTo" placeholder="指定接收用户名" />
-              <select v-if="packetType === 'rockPaperScissors'" v-model.number="gesture">
-                <option :value="0">✊ 石头</option>
-                <option :value="1">✌️ 剪刀</option>
-                <option :value="2">✋ 布</option>
-              </select>
-              <input v-model="packetMsg" placeholder="祝福语 (摸鱼者，人品好！)" />
-              <button type="submit" class="pop-btn green" :disabled="sending">塞积分</button>
-              <button type="button" class="pop-btn ghost" @click="showPacket = false">取消</button>
-            </form>
+            <ChatRedPacketEditor v-if="showPacket" @close="showPacket=false" />
 
             <!-- 弹幕表单 -->
-            <form v-if="showBarrage" class="pop-sub-form barrage-sub-form" @submit.prevent="sendBarrage">
-              <input v-model="barrageText" maxlength="32" placeholder="友善弹幕，最多32个字" />
-              <button type="submit" class="pop-btn green" :disabled="sending || !barrageText.trim()">发射!</button>
-              <button type="button" class="pop-btn ghost" @click="showBarrage = false">取消</button>
-              <span v-if="barrageCost" class="barrage-cost-hint">花费 {{ barrageCost }}</span>
-            </form>
+            <ChatBarrageEditor v-if="showBarrage" @close="showBarrage=false" />
+            <ChatMusicEditor v-if="showMusic" @close="showMusic=false" />
+            <ChatWeatherEditor v-if="showWeather" @close="showWeather=false" />
 
             <!-- 涂鸦面板 -->
             <div v-if="showPaint" class="paint-box-wrap">
@@ -705,20 +536,12 @@ function clearScreen() {
     </FpDialog>
 
     <!-- Markdown 原文弹窗 -->
-    <FpDialog :open="!!rawText || rawLoading" title="Markdown 原文" :width="560" @close="rawText = ''">
+    <FpDialog :open="rawOpen" title="消息原文 / 卡片公开摘要" :width="560" @close="closeRaw">
       <FpLoading v-if="rawLoading" small />
-      <pre v-else class="raw-pre">{{ rawText }}</pre>
+      <p v-else-if="rawError" role="alert">{{ rawError }}</p>
+      <pre v-else class="raw-pre">{{ rawText||'当前消息原文为空。' }}</pre>
     </FpDialog>
 
-    <!-- 红包明细弹窗 -->
-    <FpDialog :open="!!packetDetail" :title="packetDetail?.msg || '红包领取明细'" @close="chat.closePacketDetail()">
-      <ul v-if="packetDetail" class="packet-detail-list">
-        <li v-for="(r, i) in packetDetail.recivers" :key="i">
-          <span class="user">{{ r.userName }}</span>
-          <span class="money">{{ r.money }} 积分</span>
-        </li>
-      </ul>
-    </FpDialog>
 
   </div>
 </template>

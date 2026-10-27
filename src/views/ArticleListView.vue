@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchArticleFeed, fetchHomeColumns, type ArticleFeedKind, type ArticleSummary, type HomeColumnCard } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
+import ContentRelationButton from '@/components/articles/ContentRelationButton.vue'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
 import SideBar from '@/components/SideBar.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
@@ -15,7 +16,7 @@ import { articleTitle } from '@/utils/text'
 
 const route = useRoute()
 const auth = useAuthStore()
-const { apiKey } = storeToRefs(auth)
+const { apiKey, accessToken } = storeToRefs(auth)
 
 const items = ref<ArticleSummary[]>([])
 const columns = ref<{ recent: HomeColumnCard[]; hot: HomeColumnCard[] }>({ recent: [], hot: [] })
@@ -34,7 +35,6 @@ const extra = computed(() => {
   if (kind.value === 'tag') return String(route.params.tag || '')
   return keyword.value
 })
-const usingMock = computed(() => items.value.some((a) => String(a.oId).startsWith('mock-')))
 const paged = computed(() => true)
 const heading = computed(() => (kind.value === 'tag' ? `#${extra.value}` : title.value))
 const RECENT_TABS = [
@@ -128,8 +128,10 @@ watch(
   },
 )
 
+watch(accessToken, () => { items.value = []; columns.value = { recent: [], hot: [] } }, { flush: 'sync' })
+
 watch(
-  () => [kind.value, extra.value, apiKey.value, page.value],
+  () => [kind.value, extra.value, accessToken.value, page.value],
   () => {
     void load()
   },
@@ -170,6 +172,7 @@ function nextPage() {
         <div v-if="!isColumnPage" class="module-header list-page-head">
           <div class="head-left">
             <h2>{{ kind === 'tag' ? `#${extra}` : title }}</h2>
+            <ContentRelationButton v-if="kind==='tag'" kind="tag" :target="extra" />
             <span v-if="keyword" class="search-tag">关键词：{{ keyword }}</span>
           </div>
           <div class="head-right">
@@ -189,9 +192,6 @@ function nextPage() {
             <button type="button" role="tab" :aria-selected="columnShelf === 'hot'" :class="{ selected: columnShelf === 'hot' }" @click="columnShelf = 'hot'">热门作品</button>
           </div>
         </div>
-        <p v-if="usingMock" class="mock-hint">
-          对应 JSON 接口尚未对游客开放，当前为字段对齐的社区帖子展示。
-        </p>
         <FpLoading v-if="loading" :rows="8" />
         <p v-else-if="error" class="err">{{ error }}</p>
 

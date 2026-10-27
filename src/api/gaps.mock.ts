@@ -3,17 +3,7 @@
  * 正式契约见 docs/MISSING_APIS.md；有接口后应删除此处回退。
  */
 
-import type { HomeColumnCard, UserBag } from '@/api/fishpi'
-
-export const mockUserBag: UserBag = {
-  checkin1day: 1,
-  checkin2days: 0,
-  nameCard: 1,
-  metalTicket: 0,
-  patchCheckinCard: 1,
-  patchStart: '2026-10-01',
-  sysCheckinRemain: 0,
-}
+import type { HomeColumnCard } from '@/api/fishpi'
 
 function chapter(articleId: string, no: string, title: string) {
   return {

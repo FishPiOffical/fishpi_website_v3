@@ -1,130 +1,141 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
-import { ApiError } from '@/api/http'
+import { computed, onScopeDispose, ref } from 'vue'
+import { ApiError, getAccessToken, onAccessTokenChange, refreshAccessToken, wasRefreshRejected, request, setAccessToken } from '@/api/http'
 import { clearCache } from '@/utils/swr'
-import { fetchAccount, fetchMembership, login as loginApi, type AccountInfo } from '@/api/fishpi'
-
-const KEY = 'fp.apiKey'
-
-function readStoredKey() {
-  if (import.meta.env.SSR || typeof localStorage === 'undefined') return null
-  return localStorage.getItem(KEY)
-}
-
-function persistKey(key: string | null) {
-  if (import.meta.env.SSR || typeof localStorage === 'undefined') return
-  if (key) localStorage.setItem(KEY, key)
-  else localStorage.removeItem(KEY)
-}
-
-function isInvalidKeyError(e: unknown) {
-  if (e instanceof ApiError) {
-    if (e.status === 401) return true
-    const msg = e.message || ''
-    return /api\s*key|密钥|未登录|登录|auth/i.test(msg)
-  }
-  if (e instanceof Error) {
-    return /api\s*key|密钥|Invalid|未登录/i.test(e.message)
-  }
-  return false
-}
+import { login as loginApi, type AccountInfo, type V3AccountInfo } from '@/api/fishpi'
 
 export const useAuthStore = defineStore('auth', () => {
-  const apiKey = ref<string | null>(readStoredKey())
+  const accessToken = ref<string | null>(null)
+  // Kept only for modules awaiting migration; never put a Bearer token in this field.
+  const apiKey = ref<string | null>(null)
   const account = ref<AccountInfo | null>(null)
   const isVip = ref(false)
   const loading = ref(false)
   const error = ref('')
+  const initialized = ref(false)
+  let version = 0
+  let restoreFlight: Promise<void> | null = null
+  let loginFlight: Promise<void> | null = null
 
-  const isLoggedIn = computed(() => Boolean(apiKey.value && account.value))
-
-  watch(apiKey, () => clearCache())
-
-  async function restore() {
-    if (import.meta.env.SSR || !apiKey.value) return
-    try {
-      account.value = await fetchAccount(apiKey.value)
-      await refreshMembership()
-    } catch (e) {
-      // Keep cached apiKey on transient/network failures; only clear when key is rejected.
-      if (isInvalidKeyError(e)) logout()
+  const isLoggedIn = computed(() => Boolean(accessToken.value && account.value))
+  const unsubscribe = onAccessTokenChange((token) => {
+    if (accessToken.value !== token) clearCache()
+    accessToken.value = token
+    if (!token) {
+      account.value = null
+      isVip.value = false
     }
+  })
+  onScopeDispose(unsubscribe)
+
+  function toAccount(data: V3AccountInfo): AccountInfo {
+    return { ...data, oId: data.id }
+  }
+
+  function assertCurrent(expected: number) {
+    if (expected !== version) throw new ApiError('登录状态已变更', 401, 'stale_session')
+  }
+
+  async function loadAccount(expected: number) {
+    const res = await request<{ code: number; msg?: string; data?: V3AccountInfo }>('/api/v3/me')
+    assertCurrent(expected)
+    if (res.code !== 0 || !res.data) throw new ApiError(res.msg || '登录状态已失效', 401)
+    account.value = toAccount(res.data)
+    await refreshMembership()
+    assertCurrent(expected)
+  }
+
+  function restore(): Promise<void> {
+    if (import.meta.env.SSR) return Promise.resolve()
+    if (loginFlight) return loginFlight
+    if (restoreFlight) return restoreFlight
+    if (initialized.value && (isLoggedIn.value || !accessToken.value)) return Promise.resolve()
+    const expected = version
+    const operation = (async () => {
+      try {
+        if (!getAccessToken() && !await refreshAccessToken()) {
+          // Definitive absence is cached; transient failures may be retried on a later navigation.
+          initialized.value = wasRefreshRejected()
+          return
+        }
+        assertCurrent(expected)
+        await loadAccount(expected)
+        initialized.value = true
+      } catch (e) {
+        if (expected === version && e instanceof ApiError && e.status === 401) {
+          setAccessToken(null)
+          initialized.value = true
+        }
+      }
+    })().finally(() => {
+      if (restoreFlight === operation) restoreFlight = null
+    })
+    restoreFlight = operation
+    return operation
   }
 
   async function refreshMembership() {
-    if (!account.value?.oId) {
+    const expected = version
+    const id = account.value?.oId
+    if (!id) {
       isVip.value = false
       return
     }
     try {
-      const m = await fetchMembership(account.value.oId)
-      isVip.value = m.isVip
+      const m = await request<{ code: number; data?: { active?: boolean } }>('/api/v3/me/membership')
+      if (m.code !== 0 || typeof m.data?.active !== 'boolean') throw new ApiError('会员状态响应无效', 502)
+      if (expected === version && account.value?.oId === id) isVip.value = m.data.active
     } catch {
-      isVip.value = false
+      if (expected === version && account.value?.oId === id) isVip.value = false
     }
   }
 
-  async function applyApiKey(key: string) {
-    apiKey.value = key
-    persistKey(key)
-    account.value = await fetchAccount(key)
-    await refreshMembership()
-  }
-
-  /** Password login → getKey once, then persist apiKey for subsequent sessions. */
-  async function login(username: string, passwd: string, mfaCode = '') {
+  function login(username: string, passwd: string, mfaCode = ''): Promise<void> {
+    const expected = ++version
+    setAccessToken(null)
+    initialized.value = false
     loading.value = true
     error.value = ''
-    try {
-      const key = await loginApi(username, passwd, mfaCode)
-      await applyApiKey(key)
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : '登录失败'
-      throw e
-    } finally {
-      loading.value = false
-    }
+    const operation = (async () => {
+      try {
+        const token = await loginApi(username, passwd, mfaCode)
+        assertCurrent(expected)
+        // Publish synchronously before /me, rather than relying on Vue's deferred watch queue.
+        setAccessToken(token)
+        await loadAccount(expected)
+        initialized.value = true
+      } catch (e) {
+        if (expected === version) {
+          setAccessToken(null)
+          error.value = e instanceof Error ? e.message : '登录失败'
+        }
+        throw e
+      } finally {
+        if (expected === version) loading.value = false
+      }
+    })().finally(() => {
+      if (loginFlight === operation) loginFlight = null
+    })
+    loginFlight = operation
+    return operation
   }
 
-  /** Reuse an existing apiKey (no /api/getKey). */
-  async function loginWithApiKey(key: string) {
-    loading.value = true
-    error.value = ''
-    try {
-      await applyApiKey(key.trim())
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'apiKey 无效'
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  function logout() {
+  async function logout() {
+    ++version
+    setAccessToken(null)
     apiKey.value = null
-    account.value = null
-    isVip.value = false
-    persistKey(null)
-    void import('@/api/pageAuth').then((m) => m.clearPageAuthCache()).catch(() => {})
+    initialized.value = true
+    loading.value = false
+    error.value = ''
+    // The transport serializes this cookie mutation after any pending rotation/login.
+    await request('/api/v3/auth/logout', { method: 'POST' }).catch(() => {})
   }
 
   async function reloadAccount() {
-    if (!apiKey.value) return
-    account.value = await fetchAccount(apiKey.value)
+    if (!accessToken.value) return
+    await loadAccount(version)
   }
 
-  return {
-    apiKey,
-    account,
-    isVip,
-    loading,
-    error,
-    isLoggedIn,
-    restore,
-    login,
-    loginWithApiKey,
-    logout,
-    refreshMembership,
-    reloadAccount,
-  }
+  return { accessToken, apiKey, account, isVip, loading, error, initialized, isLoggedIn,
+    restore, login, logout, refreshMembership, reloadAccount }
 })

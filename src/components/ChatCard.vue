@@ -3,28 +3,35 @@ import { ref } from 'vue'
 
 let audio: HTMLAudioElement | null = null
 const playing = ref('')
+const failedSource=ref('')
+let playSequence=0,currentSource=''
 
 function toggle(src: string) {
   if (!src) return
+  const run=++playSequence
+  failedSource.value=''
   if (!audio) {
     audio = new Audio()
     audio.addEventListener('ended', () => (playing.value = ''))
     audio.addEventListener('pause', () => (playing.value = ''))
+    audio.addEventListener('error',()=>{playSequence++;playing.value='';failedSource.value=currentSource})
   }
   if (playing.value === src) {
     audio.pause()
     return
   }
+  currentSource=src
   audio.src = src
   void audio.play().then(
-    () => (playing.value = src),
-    () => (playing.value = ''),
+    () => {if(run===playSequence)playing.value=src},
+    () => {if(run===playSequence){playing.value='';failedSource.value=src}},
   )
 }
 </script>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import {musicDestination} from '@/api/v3-chat-music'
 import { SITE_ORIGIN } from '@/seo/site'
 import type { ChatCardData } from '@/utils/chatCard'
 
@@ -59,6 +66,7 @@ function list(v: unknown): string[] {
 }
 
 const music = computed(() => (props.card.msgType === 'music' ? props.card : null))
+const destination=computed(()=>musicDestination(music.value?.source||''))
 
 const weather = computed(() => {
   if (props.card.msgType !== 'weather') return null
@@ -87,9 +95,11 @@ const weather = computed(() => {
     <div class="info">
       <div class="title" :title="music.title">{{ music.title || '未知歌曲' }}</div>
       <div v-if="music.from" class="from">{{ music.from }}</div>
-      <button type="button" class="play" :disabled="!music.source" @click="toggle(music.source || '')">
+      <a v-if="destination.page" class="play" :href="destination.page" target="_blank" rel="noopener noreferrer">在网易云打开</a>
+      <button v-else type="button" class="play" :disabled="!destination.audio" @click="toggle(destination.audio)">
         {{ playing && playing === music.source ? '❚❚ 暂停' : '▶ 播放' }}
       </button>
+      <p v-if="failedSource===music.source" role="alert">音频无法播放，请检查地址、来源限制或浏览器支持。</p>
     </div>
   </div>
   <div v-else-if="weather" class="card weather">
@@ -110,7 +120,7 @@ const weather = computed(() => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .card {
   margin: 4px 0;
   border-radius: 8px;

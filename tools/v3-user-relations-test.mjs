@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import ts from 'typescript'
+import { parse, compileScript } from '@vue/compiler-sfc'
+import { createRenderer, createSSRApp, h, nextTick, ref, reactive } from 'vue'
+import { createPinia, defineStore } from 'pinia'
+import { renderToString } from '@vue/server-renderer'
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
+globalThis.__relations={context:1,requests:[],responses:[]};const state=__relations
+const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__relations.context}export async function request(path,init){globalThis.__relations.requests.push({path,init});const value=globalThis.__relations.responses.shift();if(value instanceof Error)throw value;return value}`)
+const api=await import(url(compile(await fs.readFile('src/api/v3-user-relations.ts','utf8')).replace("from './http'",`from '${http}'`)))
+const {ApiError}=await import(http), user={id:'101',userName:'valid_user',userNickname:'<b>昵称文本</b>',userAvatarURL:'https://example.org/a.png?x=1'},env=data=>({code:0,data}),page=(list,p=1,total=list.length)=>({list,pagination:{p,size:20,total,pageCount:Math.ceil(total/20)}})
+state.responses.push(env(page([{...user,userPassword:'private'}])));assert.deepEqual((await api.fetchV3UserRelations('owner','following')).list,[user]);assert.deepEqual(state.requests[0],{path:'/api/v3/users/owner/following/users?p=1&size=20',init:{cache:'no-store'}})
+state.responses.push(env(page([])));assert.equal((await api.fetchV3UserRelations('owner','followers')).total,0);assert.match(state.requests[1].path,/owner\/followers/)
+for(const args of [['bad/name','following'],['owner','bad'],['owner','followers',0],['owner','following',1,51]])await assert.rejects(api.fetchV3UserRelations(...args),e=>e.status===422)
+for(const bad of [null,{code:1},env(page([user,user])),env(page([{...user,id:'x'}])),env(page([{...user,userName:'../bad'}])),env({list:[],pagination:{p:1,size:20,total:21,pageCount:1}})]){state.responses.push(bad);await assert.rejects(api.fetchV3UserRelations('owner','followers'),e=>e.status===502)}
+state.responses.push(env(page([{...user,userAvatarURL:'javascript:alert(1)'}])));assert.equal((await api.fetchV3UserRelations('owner','following')).list[0].userAvatarURL,'')
+console.log('PASS relations 1 exact v3 paths, real pagination and response projection; invalid params/responses and unsafe avatar schemes rejected')
+const auth=defineStore('relations-auth',()=>({accessToken:ref('A'),account:ref({oId:'1',userName:'owner'})}));globalThis.__relationsAuth=auth;globalThis.__relationsAPI={...api};globalThis.__relationsRoute=reactive({fullPath:'/member/owner/following/users',path:'/member/owner/following/users',params:{userName:'owner'},meta:{memberTab:'followingUsers'}})
+const apiURL=url(`export const fetchV3UserRelations=(...args)=>globalThis.__relationsAPI.fetchV3UserRelations(...args)`),authURL=url('export const useAuthStore=globalThis.__relationsAuth'),seoURL=url('export function usePageSeo(){}'),routerURL=url(`import{h}from'${import.meta.resolve('vue')}';export function useRoute(){return globalThis.__relationsRoute};export const RouterLink={props:['to'],setup:(p,{slots})=>()=>h('a',{href:typeof p.to==='string'?p.to:p.to.path},slots.default?.())}`),avatarURL=url(compile(await fs.readFile('src/utils/avatar.ts','utf8'))),vipURL=url(`import{h}from'${import.meta.resolve('vue')}';export default{props:['text'],setup:p=>()=>h('span',p.text)}`)
+const source=await fs.readFile('src/views/UserRelationsView.vue','utf8'),descriptor=parse(source).descriptor
+let code=compile(compileScript(descriptor,{id:'relations-test',inlineTemplate:true}).content)
+for(const [from,to]of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['vue-router',routerURL],['@/api/http',http],['@/api/v3-user-relations',apiURL],['@/stores/auth',authURL],['@/composables/usePageSeo',seoURL],['@/utils/avatar',avatarURL],['@/components/user/VipNickname.vue',vipURL]])code=code.replace(new RegExp(`from ['"]${from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}['"]`,'g'),`from '${to}'`)
+const component=(await import(url(code))).default
+const insert=(node,parent,anchor)=>{if(node.parent){const i=node.parent.children.indexOf(node);if(i>=0)node.parent.children.splice(i,1)}const i=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(i<0?parent.children.length:i,0,node);node.parent=parent}
+const renderer=createRenderer({patchProp(el,k,old,v){el.props[k]=v},insert,remove(node){if(node.parent){const i=node.parent.children.indexOf(node);if(i>=0)node.parent.children.splice(i,1)}},createElement(tag){return{tag,children:[],props:{}}},createText(text){return{text,children:[]}},createComment(){return{children:[]}},setText(n,t){n.text=t},setElementText(n,t){n.children=[{text:t,children:[]}]},parentNode:n=>n.parent,nextSibling(n){const s=n.parent?.children||[];return s[s.indexOf(n)+1]||null},insertStaticContent(text,parent,anchor){const n={text,children:[]};insert(n,parent,anchor);return[n,n]}})
+const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' ')
+const find=(n,fn)=>fn(n)?n:(n.children||[]).map(c=>find(c,fn)).find(Boolean)
+const tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()}
+function mount(){const pinia=createPinia(),root={children:[]},app=renderer.createApp(component);app.use(pinia);const user=auth(pinia);app.mount(root);return{root,app,user,text:()=>text(root),click:()=>find(root,n=>n.tag==='button').props.onClick()}}
+
+const click=(view,label)=>{const button=find(view.root,n=>n.tag==='button'&&text(n).trim()===label);assert.ok(button,'Missing '+label);button.props.onClick()}
+let reads=[];__relationsAPI.fetchV3UserRelations=async(name,kind,p)=>{reads.push({name,kind,p});return{list:[{...user,userNickname:p===1?'FIRST':'SECOND'}],p,size:20,total:21,pageCount:2}}
+let view=mount();await tick();assert.match(view.text(),/FIRST/);click(view,'下一页');await tick();assert.match(view.text(),/SECOND/);assert.equal(find(view.root,n=>n.tag==='button'&&text(n).trim()==='下一页').props.disabled,true);view.user.accessToken='B';await tick();assert.equal(reads.length,2);view.app.unmount()
+console.log('PASS relations 2 actual Vue true last page and ordinary token refresh retains current page')
+__relationsAPI.fetchV3UserRelations=async(name,kind,p)=>{if(p===2)throw new ApiError('临时不可用503',503);return{list:[user],p,size:20,total:21,pageCount:2}}
+view=mount();await tick();assert.match(view.text(),/<b>昵称文本<\/b>/);assert.ok(!find(view.root,n=>n.tag==='b'));assert.equal(find(view.root,n=>n.tag==='img').props['data-user-card'],'valid_user');click(view,'下一页');await tick();assert.match(view.text(),/503/);assert.ok(!view.text().includes('暂无用户'));click(view,'返回第一页');await tick();assert.match(view.text(),/昵称文本/);view.app.unmount()
+__relationsAPI.fetchV3UserRelations=async()=>{throw new ApiError('private',403)};view=mount();await tick();assert.match(view.text(),/无权查看/);assert.ok(!view.text().includes('共 0'));view.app.unmount()
+__relationsAPI.fetchV3UserRelations=async()=>({list:[],p:1,size:20,total:0,pageCount:0});view=mount();await tick();assert.match(view.text(),/暂无用户/);view.app.unmount()
+console.log('PASS relations 3 retry/home, explicit privacy rejection vs legitimate empty state; names remain text and avatar connects hover card')
+let releases=[];__relationsAPI.fetchV3UserRelations=async(name,kind)=>new Promise(resolve=>releases.push({name,kind,resolve}));view=mount();await tick();__relationsRoute.params.userName='other';await tick();assert.equal(releases.length,2);releases[1].resolve({list:[{...user,userNickname:'NEW_TARGET'}],p:1,size:20,total:1,pageCount:1});await tick();releases[0].resolve({list:[{...user,userNickname:'OLD_TARGET'}],p:1,size:20,total:1,pageCount:1});await tick();assert.match(view.text(),/NEW_TARGET/);assert.ok(!view.text().includes('OLD_TARGET'));view.app.unmount()
+releases=[];view=mount();await tick();view.user.accessToken=null;view.user.account=null;await tick();assert.equal(releases.length,3);releases[0].resolve({list:[{...user,userNickname:'OLD_PRIVATE'}],p:1,size:20,total:1,pageCount:1});releases[2].resolve({list:[],p:1,size:20,total:0,pageCount:0});await tick();assert.ok(!view.text().includes('OLD_PRIVATE'));assert.match(view.text(),/暂无用户/);view.app.unmount()
+console.log('PASS relations 4 target and reader changes clear old list and discard delayed private results; anonymous re-read supported')
+let ssrReads=0;__relationsAPI.fetchV3UserRelations=async()=>{ssrReads++;throw Error('SSR')};const ssr=createSSRApp(component);ssr.use(createPinia());const html=await renderToString(ssr);assert.equal(ssrReads,0);assert.match(html,/正在准备用户列表/)
+const routes=await fs.readFile('src/router/index.ts','utf8'),legacy=await fs.readFile('src/api/fishpi.ts','utf8');assert.ok(routes.includes("import('@/views/UserRelationsView.vue')"));assert.ok(!legacy.includes('function fetchFollowers(')&&!legacy.includes('function fetchFollowingUsers('));assert.ok(!source.includes('fetchUserProfile')&&!source.includes('apiKey')&&!source.includes('v-html'))
+console.log('PASS relations 5 SSR has no reader requests and two existing routes avoid old profile/list dependencies')

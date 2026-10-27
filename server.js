@@ -20,7 +20,7 @@ const FISHPI_UA =
 
 /**
  * Vite middlewareMode 没有 httpServer，server.proxy 的 ws: true 不生效；
- * 开发时由这里把 /*-channel 的 WebSocket 升级请求隧道到 Rhythm（生产由 nginx 处理）。
+ * 开发时由这里把 /*-channel 与 v3 realtime 的 WebSocket 升级请求隧道到 Rhythm（生产由 nginx 处理）。
  */
 function proxyWsUpgrade(req, socket, head) {
   const target = new URL(req.url, apiTarget)
@@ -327,7 +327,7 @@ async function createServer() {
   })
   if (!isProd) {
     server.on('upgrade', (req, socket, head) => {
-      if (/^\/[\w-]+-channel(\?|$)/.test(req.url || '')) proxyWsUpgrade(req, socket, head)
+      if (req.url === '/api/v3/realtime' || /^\/[\w-]+-channel(\?|$)/.test(req.url || '')) proxyWsUpgrade(req, socket, head)
     })
   }
 }

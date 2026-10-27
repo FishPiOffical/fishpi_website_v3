@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import ts from 'typescript'
+import {ref,computed} from 'vue'
+import {createPinia,defineStore,setActivePinia} from 'pinia'
+import {createMemoryHistory} from 'vue-router'
+const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`,compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+const replace=(s,pairs)=>{for(const [a,b] of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`);return s}
+let restoreCalls=0,enforced=0,restoreWork=async auth=>{auth.initialized=true;auth.accessToken='A';auth.account={oId:'1'}}
+const useAuthStore=defineStore('startup-test-auth',()=>{const initialized=ref(false),accessToken=ref(null),account=ref(null),isLoggedIn=computed(()=>!!accessToken.value&&!!account.value);return{initialized,accessToken,account,isLoggedIn,async restore(){restoreCalls++;await restoreWork(useAuthStore())}}})
+globalThis.__startupTest={useAuthStore,enforce:()=>enforced++}
+const authURL=url('export const useAuthStore=globalThis.__startupTest.useAuthStore'),appearanceURL=url('export function useAppearanceStore(){return{enforceVip:globalThis.__startupTest.enforce}}'),base=[['pinia',import.meta.resolve('pinia')],['vue',import.meta.resolve('vue')],['./auth',authURL],['./appearance',appearanceURL]]
+const startupSource=await fs.readFile('src/stores/clientStartup.ts','utf8'),startupURL=url(replace(compile(startupSource.replaceAll('import.meta.env.SSR','false')),base)),{useClientStartupStore}=await import(startupURL)
+let routerSource=await fs.readFile('src/router/index.ts','utf8');routerSource=routerSource.replaceAll('import.meta.env.SSR','false').replaceAll(/import\('@\/[^']+\.vue'\)/g,"Promise.resolve({default:{render(){return null}}})")
+const {createAppRouter}=await import(url(replace(compile(routerSource),[['vue-router',import.meta.resolve('vue-router')],['@/stores/auth',authURL],['@/stores/appearance',appearanceURL],['@/stores/clientStartup',startupURL]])))
+const next=()=>new Promise(resolve=>setImmediate(resolve)),deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve}}
+async function fixture(path){setActivePinia(createPinia());restoreCalls=0;enforced=0;const router=createAppRouter(createMemoryHistory()),auth=useAuthStore(),startup=useClientStartupStore();await router.push(path);await router.isReady();return{router,auth,startup}}
+let f=await fixture('/article/1');assert.equal(restoreCalls,0);assert.equal(f.auth.isLoggedIn,false);await f.startup.start(f.router);assert.equal(restoreCalls,1);assert.equal(f.auth.isLoggedIn,true);assert.equal(f.startup.ready,true);assert.equal(f.router.currentRoute.value.fullPath,'/article/1');assert.equal(enforced,1)
+console.log('PASS startup 1 actual initial public router resolves with guest identity; startup restores only after explicit mounted entry and preserves URL')
+let gate=deferred();restoreWork=async auth=>{await gate.promise;auth.initialized=true};f=await fixture('/notifications?type=reply#latest');assert.equal(restoreCalls,0);assert.equal(f.router.currentRoute.value.meta.auth,true);const guestStart=f.startup.start(f.router);await next();assert.equal(f.startup.pending,true);assert.equal(f.router.currentRoute.value.path,'/notifications');gate.resolve();await guestStart;assert.equal(f.router.currentRoute.value.path,'/login');assert.equal(f.router.currentRoute.value.query.redirect,'/notifications?type=reply#latest');assert.equal(f.startup.ready,true)
+console.log('PASS startup 2 initial private route stays at SSR placeholder until definitive guest result then redirects with exact original URL')
+restoreWork=async auth=>{auth.initialized=true;auth.accessToken='A';auth.account={oId:'1'}};f=await fixture('/notifications');await f.startup.start(f.router);assert.equal(f.router.currentRoute.value.path,'/notifications');assert.equal(f.auth.isLoggedIn,true)
+console.log('PASS startup 3 authenticated initial private route keeps target and only current restored identity can pass shell gate')
+restoreWork=async auth=>{auth.initialized=true};f=await fixture('/article/1');await f.router.push('/notifications?type=reply');assert.equal(restoreCalls,1);assert.equal(f.router.currentRoute.value.path,'/login');assert.equal(f.router.currentRoute.value.query.redirect,'/notifications?type=reply')
+console.log('PASS startup 4 subsequent real SPA navigation still restores/checks auth and rejects private route for guest')
+restoreWork=async()=>{};f=await fixture('/notifications');await f.startup.start(f.router);assert.equal(f.startup.ready,false);assert.match(f.startup.error,/暂时无法恢复/);assert.equal(f.router.currentRoute.value.path,'/notifications');restoreWork=async auth=>{auth.initialized=true;auth.accessToken='B';auth.account={oId:'2'}};await f.startup.start(f.router);assert.equal(f.startup.ready,true);assert.equal(f.startup.error,'');assert.equal(f.auth.account.oId,'2');assert.equal(restoreCalls,2)
+console.log('PASS startup 5 transient auth recovery failure stays explicit/retryable without false login redirect, retry can restore valid identity')
+gate=deferred();restoreWork=async auth=>{await gate.promise;auth.initialized=true};f=await fixture('/notifications');const first=f.startup.start(f.router),second=f.startup.start(f.router);assert.equal(restoreCalls,1);const navigation=f.router.push('/article/2');await next();gate.resolve();await Promise.all([first,second,navigation]);assert.equal(f.router.currentRoute.value.path,'/article/2');assert.equal(f.startup.ready,true)
+console.log('PASS startup 6 startup retries share one flight and delayed initial result cannot replace a newer SPA navigation')
+const ssrURL=url(replace(compile(startupSource.replaceAll('import.meta.env.SSR','true')),base)),{useClientStartupStore:ssrStartup}=await import(ssrURL);setActivePinia(createPinia());const before=restoreCalls;const ssr=ssrStartup();await ssr.start(f.router);assert.equal(restoreCalls,before);assert.equal(ssr.ready,false);assert.equal(ssr.pending,false)
+console.log('PASS startup 7 SSR startup is inert, retains guest shape and never restores browser credentials')
+const entry=await fs.readFile('src/entry-client.ts','utf8'),shell=await fs.readFile('src/layouts/AppShell.vue','utf8');assert.ok(entry.indexOf("app.mount('#app', true)")<entry.indexOf('useClientStartupStore(pinia).start(router)'));assert.ok(!entry.includes('.restore()'));assert.ok(shell.includes('Boolean(route.meta.auth) && (!mounted.value || !auth.isLoggedIn)')&&shell.includes('startup.error')&&shell.includes('startup.start(router)'));assert.ok(routerSource.includes('from === START_LOCATION'))
+console.log('PASS startup 8 actual entry mounts first; actual private shell never mounts guest child and exposes pending/error retry; initial router alone skips restore')
+
+restoreWork=async auth=>{auth.initialized=true;auth.accessToken='A';auth.account={oId:'1'}};f=await fixture('/login?redirect=%2Fnotifications%3Ftype%3Dreply');assert.equal(restoreCalls,0);await f.startup.start(f.router);assert.equal(f.router.currentRoute.value.fullPath,'/notifications?type=reply');
+console.log('PASS startup 9 authenticated initial login page retains redirect behavior after hydration instead of before it')
