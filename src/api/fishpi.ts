@@ -719,16 +719,6 @@ export interface LiteUser {
   userAvatarURL48?: string
 }
 
-export async function fetchRecentRegister(apiKey?: string | null) {
-  try {
-    const res = await request<Envelope<LiteUser[]>>(withKey('/api/user/recentReg', apiKey))
-    const list = Array.isArray(res.data) ? res.data : []
-    return list.filter((u) => u?.userName).slice(0, 20)
-  } catch {
-    return []
-  }
-}
-
 export interface ProfessionRankEntry {
   rank?: number
   userName?: string
@@ -756,33 +746,6 @@ export async function fetchProfessionRanking(apiKey?: string | null, professionI
   const res = await request<Envelope<ProfessionRanking>>(withKey(`/api/profession/ranking?${q}`, apiKey))
   if (res.code) throw new Error(res.msg || '职业榜加载失败')
   return res.data ?? { entries: [], professions: [] }
-}
-
-export async function fetchRandomArticles(size = 8, apiKey?: string | null) {
-  try {
-    const res = await request<{ articles?: ArticleSummary[] }>(withKey(`/article/random/${size}`, apiKey))
-    return res.articles ?? []
-  } catch {
-    return []
-  }
-}
-
-
-
-export interface PublicLog {
-  oId?: string
-  key1?: string
-  key2?: string
-  key3?: string
-  data?: string
-}
-
-export async function fetchPublicLogs(apiKey: string, page = 1, pageSize = 20) {
-  const res = await request<Envelope<PublicLog[]>>(
-    withKey(`/logs/more?page=${page}&pageSize=${pageSize}`, apiKey),
-  )
-  if (res.code) throw new Error(res.msg || '日志加载失败')
-  return Array.isArray(res.data) ? res.data : []
 }
 
 export interface ProfessionProgress {

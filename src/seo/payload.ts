@@ -1,3 +1,5 @@
+import { decodeRecentMembers } from '@/api/v3-discovery-extras'
+import type { RelationUser } from '@/api/v3-user-relations'
 import { decodePublicUser, type PublicUser } from '@/api/v3-public-user'
 import type { RankingPage } from '@/api/v3-rankings'
 import type { CommunityStatistics } from '@/api/v3-statistics'
@@ -9,12 +11,12 @@ import type {
   ArticleSummary,
   ChatHistoryItem,
   DomainItem,
-  LiteUser,
   RepeaterItem,
   TagItem,
 } from '@/api/fishpi'
 
 export interface SsrPayload {
+  recentMembers?: RelationUser[] | null
   statistics?: CommunityStatistics | null
   milestonePage?: MilestonePage | null
   breezemoonPage?: BreezemoonPage | null
@@ -31,7 +33,6 @@ export interface SsrPayload {
   rankingPage?: RankingPage | null
   homeCheckinRanking?: RankingPage | null
   homeOnlineRanking?: RankingPage | null
-  recentUsers?: LiteUser[]
   repeater?: RepeaterItem[]
   chatFeed?: ChatHistoryItem[]
 }
@@ -130,21 +131,18 @@ export function consumeRepeaterPayload(): RepeaterItem[] | null {
 export function consumeHomeExtrasPayload(): {
   hot?: ArticleSummary[]
   long?: ArticleSummary[]
-  recentUsers?: LiteUser[]
   tags?: TagItem[]
   chatFeed?: ChatHistoryItem[]
   repeater?: RepeaterItem[]
 } | null {
   const hot = takeField('hotFeed')
   const long = takeField('longFeed')
-  const recentUsers = takeField('recentUsers')
   const tags = takeField('tags')
   const chatFeed = takeField('chatFeed')
   const repeater = takeField('repeater')
   if (
     !Array.isArray(hot) &&
     !Array.isArray(long) &&
-    !Array.isArray(recentUsers) &&
     !Array.isArray(tags) &&
     !Array.isArray(chatFeed) &&
     !Array.isArray(repeater)
@@ -154,7 +152,6 @@ export function consumeHomeExtrasPayload(): {
   return {
     hot: Array.isArray(hot) ? hot : undefined,
     long: Array.isArray(long) ? long : undefined,
-    recentUsers: Array.isArray(recentUsers) ? recentUsers : undefined,
     tags: Array.isArray(tags) ? tags : undefined,
     chatFeed: Array.isArray(chatFeed) ? chatFeed : undefined,
     repeater: Array.isArray(repeater) ? repeater : undefined,
@@ -167,3 +164,5 @@ export function consumeStatisticsPayload(): CommunityStatistics | null { return 
 
 export function consumeRankingPayload(): RankingPage | null { return takeField('rankingPage') || null }
 export function consumeHomeRankingPayload() { return { checkin: takeField('homeCheckinRanking') || null, online: takeField('homeOnlineRanking') || null } }
+
+export function consumeRecentMembersPayload(): RelationUser[] | null { const value = takeField('recentMembers'); if (value == null) return null; try { return decodeRecentMembers(value) } catch { return null } }

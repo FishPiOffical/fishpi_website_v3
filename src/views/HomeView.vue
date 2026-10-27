@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RecentMembers from '@/components/discovery/RecentMembers.vue'
 import RankingBoard from '@/components/RankingBoard.vue'
 import { consumeHomeRankingPayload } from '@/seo/payload'
 import {getAuthContextVersion} from '@/api/http'
@@ -14,13 +15,11 @@ import {
   fetchArticleFeed,
   fetchHomeColumns,
   fetchRecentArticles,
-  fetchRecentRegister,
   fetchRepeaterItems,
   fetchTags,
   type ArticleSummary,
   type ChatHistoryItem,
   type HomeColumnCard,
-  type LiteUser,
   type RepeaterItem,
   type TagItem,
 } from '@/api/fishpi'
@@ -48,7 +47,6 @@ const left = ref<ArticleSummary[]>([])
 const right = ref<ArticleSummary[]>([])
 const hot = ref<ArticleSummary[]>([])
 const longArticles = ref<ArticleSummary[]>([])
-const recentUsers = ref<LiteUser[]>([])
 const tags = ref<TagItem[]>([])
 const chatLines = ref<ChatHistoryItem[]>([])
 const repeaterItems = ref<RepeaterItem[]>([])
@@ -64,13 +62,6 @@ const loading = ref(true)
 
 const usingMock = computed(() => left.value.some((a) => String(a.oId).startsWith('mock-')))
 const hotPanel = computed(() => (hotMode.value === 'hot' ? hot.value : longArticles.value))
-const welcomeUser = computed(() => recentUsers.value[0] || null)
-const REG_PER_ROW = 10
-const regGrid = computed(() => {
-  const list = recentUsers.value
-  const full = Math.floor(list.length / REG_PER_ROW) * REG_PER_ROW
-  return full ? list.slice(0, full) : list
-})
 const { editing } = storeToRefs(layout)
 const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive } = useHomeDrag()
 onUnmounted(() => (editing.value = false))
@@ -152,7 +143,6 @@ const bootExtra = consumeHomeExtrasPayload()
 if (bootExtra) {
   if (bootExtra.hot?.length) hot.value = bootExtra.hot.slice(0, 12)
   if (bootExtra.long?.length) longArticles.value = bootExtra.long.slice(0, 12)
-  if (bootExtra.recentUsers?.length) recentUsers.value = bootExtra.recentUsers.slice(0, 20)
   if (bootExtra.tags?.length) tags.value = bootExtra.tags.slice(0, 24)
   if (bootExtra.repeater?.length) repeaterItems.value = bootExtra.repeater
 
@@ -170,7 +160,6 @@ interface HomeSnapshot {
   articles: ArticleSummary[]
   hot: ArticleSummary[]
   long: ArticleSummary[]
-  recentUsers: LiteUser[]
   tags: TagItem[]
   chatLines: ChatHistoryItem[]
   repeater: RepeaterItem[]
@@ -185,7 +174,6 @@ function applySnapshot(s: HomeSnapshot) {
   splitArticles(s.articles)
   hot.value = s.hot
   longArticles.value = s.long
-  recentUsers.value = s.recentUsers
   tags.value = s.tags
   syncLiveChatMessages()
   repeaterItems.value = s.repeater
@@ -211,7 +199,6 @@ async function load() {
       articles,
       hotList,
       longList,
-      regs,
       tagData,
       reps,
       columns,
@@ -221,7 +208,6 @@ async function load() {
         : Promise.resolve(left.value.concat(right.value)),
       safe(fetchArticleFeed('hot', apiKey.value, 1, 12), []),
       safe(fetchArticleFeed('long', apiKey.value, 1, 12), []),
-      safe(fetchRecentRegister(apiKey.value), []),
       safe(fetchTags(apiKey.value, 1, 24), { tags: [], total: 0 }),
       safe(fetchRepeaterItems(apiKey.value, 'joke'), []),
       safe(fetchHomeColumns(), { recent: [], hot: [] }),
@@ -231,7 +217,6 @@ async function load() {
       articles,
       hot: hotList.slice(0, 12),
       long: longList.slice(0, 12),
-      recentUsers: regs.slice(0, 20),
       tags: tagData.tags.slice(0, 24),
       chatLines: [],
       repeater: reps,
@@ -264,10 +249,6 @@ function views(a: ArticleSummary) {
 
 function heat(a: ArticleSummary) {
   return a.articleHeat ?? a.articleCommentCount ?? views(a)
-}
-
-function avatarOf(u: LiteUser) {
-  return avatarUrl(u)
 }
 
 function tagPath(tag: TagItem) {
@@ -573,27 +554,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             <aside v-else-if="mod.id === 'community'" class="mod-body">
               <HomeRepeaterStation :initial="repeaterItems" />
 
-              <div class="index-head spaced-sm">
-                <b>最新注册</b>
-                <RouterLink v-if="welcomeUser" :to="`/member/${welcomeUser.userName}`" class="welcome">
-                  欢迎新人 <b>{{ welcomeUser.userNickname || welcomeUser.userName }}</b>
-                </RouterLink>
-              </div>
-              <div class="recent-reg-avatars">
-                <RouterLink
-                  v-for="u in regGrid"
-                  :key="u.oId || u.userName"
-                  :to="`/member/${u.userName}`"
-                  class="reg-avatar-link"
-                  :title="u.userNickname ? `${u.userNickname} (@${u.userName})` : u.userName"
-                >
-                  <span
-                    class="avatar-tile"
-                    :style="avatarStyle(avatarOf(u))"
-                  />
-                </RouterLink>
-                <span v-if="!recentUsers.length && !loading" class="hint">暂无最新注册</span>
-              </div>
+              <RecentMembers />
 
               <div class="index-head spaced">
                 <b>标签</b>

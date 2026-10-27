@@ -1,14 +1,13 @@
 <script setup lang="ts">
+import RandomArticles from '@/components/discovery/RandomArticles.vue'
 import { articleTitle } from '@/utils/text'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   fetchArticle,
-  fetchRandomArticles,
   type ArticleComment,
   type ArticleDetail,
-  type ArticleSummary,
 } from '@/api/fishpi'
 import ContentRelationButton from '@/components/articles/ContentRelationButton.vue'
 import ArticleInteraction from '@/components/articles/ArticleInteraction.vue'
@@ -143,7 +142,6 @@ const STATEMENT_LABELS: Record<number, string> = {
 const typeBadge = computed(() => TYPE_BADGES[Number(article.value?.articleType)] || '')
 const statementLabel = computed(() => STATEMENT_LABELS[Number(article.value?.articleStatement)] || '')
 
-const randomArticles = ref<ArticleSummary[]>([])
 const composerRef = ref<InstanceType<typeof CommentComposer> | null>(null)
 const readerRef = ref<InstanceType<typeof LongArticleReader> | null>(null)
 const [DefineOwnerActions, ReuseOwnerActions] = createReusableTemplate()
@@ -180,11 +178,6 @@ function gotoCommentPage(page: number) {
   commentPage.value = page
   if (isLong.value) readerRef.value?.scrollCommentsTop()
   else document.getElementById('articleCommentsPanel')?.scrollIntoView({ block: 'start' })
-}
-
-async function loadRandom() {
-  if (import.meta.env.SSR) return
-  randomArticles.value = (await fetchRandomArticles(10, apiKey.value)).filter((a) => a.oId !== id.value)
 }
 
 const articleDesc = computed(() => {
@@ -341,7 +334,6 @@ watch(
     ownerRefreshError.value='';ownerDeletedId.value='';realtimeReadError.value=''
     editingId.value='';replyId.value='';replyComment.value=null;paragraphIdForReply.value='';commentRefreshError.value=''
     commentWrites.cancelConfirmation(commandOrigin)
-    void loadRandom()
   },
   { immediate: true },
 )
@@ -709,22 +701,7 @@ function itemHandlers(c: ArticleComment) {
         <ReuseComposer />
       </section>
 
-      <section v-if="!isLong && randomArticles.length" class="card random-card">
-        <div class="module-header">
-          <span><b>随便看看</b></span>
-          <button type="button" class="btn-text" @click="loadRandom">换一批</button>
-        </div>
-        <ul class="random-list">
-          <li v-for="a in randomArticles" :key="a.oId">
-            <span
-              class="avatar-mini"
-              :data-user-card="a.articleAuthorName"
-              :style="a.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${a.articleAuthorThumbnailURL48}')` } : undefined"
-            />
-            <RouterLink :to="`/article/${a.oId}`">{{ articleTitle(a) }}</RouterLink>
-          </li>
-        </ul>
-      </section>
+      <section v-if="!isLong" class="card random-card"><RandomArticles :size="10" :exclude-id="id" /></section>
     </div>
     <ImageLightbox v-model="zoomed" />
   </template>

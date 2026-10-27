@@ -1,3 +1,4 @@
+import { fetchRecentMembers } from './api/v3-discovery-extras'
 import { fetchPublicUser } from './api/v3-public-user'
 import { fetchRanking, rankingTitles, type RankingType } from './api/v3-rankings'
 import { fetchStatistics } from './api/v3-statistics'
@@ -9,7 +10,6 @@ import {
   fetchArticleFeed,
   fetchDomains,
   fetchRecentArticles,
-  fetchRecentRegister,
   fetchRepeaterItems,
   fetchTags,
   type ArticleFeedKind,
@@ -45,7 +45,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
         fetchArticleFeed('long', null, 1, 12),
         fetchRanking('checkin', 1, undefined, 8),
         fetchRanking('online', 1, undefined, 8),
-        fetchRecentRegister(null),
+        fetchRecentMembers(),
         fetchTags(null, 1, 24),
         fetchV3Breezemoons(1, 8),
         fetchRepeaterItems(null, 'joke'),
@@ -61,7 +61,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
         longFeed: val(2, []),
         homeCheckinRanking: val(3, null),
         homeOnlineRanking: val(4, null),
-        recentUsers: val(5, []),
+        recentMembers: val(5, null),
         tags: tagData.tags,
         tagsTotal: tagData.total,
         homeBreezemoonPage: val(7, null),

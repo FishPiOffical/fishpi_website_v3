@@ -1,108 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
-import { fetchPublicLogs, type PublicLog } from '@/api/fishpi'
+import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import FpLoading from '@/components/FpLoading.vue'
-import { createSwrLoader } from '@/utils/swr'
-
-const auth = useAuthStore()
-const { apiKey } = storeToRefs(auth)
-const items = ref<PublicLog[]>([])
-const page = ref(1)
-const loading = ref(true)
-const error = ref('')
-const swr = createSwrLoader({ loading, error })
-
-async function load() {
-  if (!apiKey.value) {
-    loading.value = false
-    return
-  }
-  const key = apiKey.value
-  await swr(
-    `logs:${page.value}`,
-    () => fetchPublicLogs(key, page.value, 20),
-    (data) => (items.value = data),
-  )
-}
-
-onMounted(() => void load())
-watch([apiKey, page], () => void load())
+import { useDiscoveryExtras } from '@/composables/useDiscoveryExtras'
+import { usePageSeo } from '@/composables/usePageSeo'
+const auth = useAuthStore(), { value, p, loading, error, read } = useDiscoveryExtras('logs')
+const records = computed(() => value.value?.kind === 'logs' ? value.value : null)
+usePageSeo(() => ({ title: '公开日志', path: '/logs', robots: 'noindex' }))
 </script>
-
-<template>
-  <section class="card">
-    <h1>公开日志</h1>
-    <p class="hint">来自 <code>GET /logs/more</code> 的公开操作记录。</p>
-    <FpLoading v-if="loading" />
-    <p v-else-if="error" class="err">{{ error }}</p>
-    <ol v-else>
-      <li v-for="(item, i) in items" :key="item.oId || i">
-        <header>
-          <b>{{ item.key3 || '操作' }}</b>
-          <time>{{ item.key1 }}</time>
-        </header>
-        <p>{{ item.data }}</p>
-      </li>
-    </ol>
-    <p v-if="!loading && !error && !items.length" class="hint">暂无公开日志。</p>
-    <footer class="pager">
-      <button type="button" :disabled="page <= 1" @click="page -= 1">上一页</button>
-      <span>{{ page }}</span>
-      <button type="button" :disabled="items.length < 10" @click="page += 1">下一页</button>
-    </footer>
-  </section>
-</template>
-
-<style scoped>
-.card {
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: 12px;
-  padding: 18px 20px;
-}
-h1 {
-  margin: 0 0 8px;
-  font-size: 18px;
-}
-.hint {
-  color: var(--fp-muted);
-  font-size: 13px;
-}
-.err {
-  color: #e07a5f;
-}
-ol {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
-}
-li {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--fp-border);
-}
-header {
-  display: flex;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--fp-muted);
-}
-p {
-  margin: 6px 0 0;
-}
-.pager {
-  display: flex;
-  gap: 12px;
-  margin-top: 12px;
-  align-items: center;
-}
-.pager button {
-  border: 1px solid var(--fp-border);
-  background: transparent;
-  color: var(--fp-text);
-  border-radius: 8px;
-  padding: 4px 12px;
-  cursor: pointer;
-}
+<template><section class="public-logs"><h1>公开日志</h1><p>展示公开操作的记录时间与类别。</p><p v-if="!auth.isLoggedIn"><RouterLink :to="{ path: '/login', query: { redirect: '/logs' } }">登录后查看</RouterLink></p><template v-else><button type="button" :disabled="loading" @click="read()">刷新公开日志</button><p v-if="loading" role="status">正在读取公开日志…</p><div v-else-if="error" role="alert"><p>{{ error }}</p><button type="button" @click="read()">重试公开日志</button><button v-if="p > 1" type="button" @click="read(1)">返回日志首页</button></div><template v-else-if="records"><p>共 {{ records.total }} 条</p><ol><li v-for="item in records.list" :key="item.id"><b>{{ item.category }}</b><time :datetime="item.time.replace(' ', 'T')">{{ item.time }}</time><small>记录 {{ item.id }}</small></li></ol><p v-if="!records.list.length">本页没有公开日志。</p><nav><button type="button" :disabled="p <= 1" @click="read(p - 1)">上一页日志</button><span>第 {{ p }} 页 / 共 {{ records.pageCount }} 页</span><button type="button" :disabled="p >= records.pageCount" @click="read(p + 1)">下一页日志</button><button v-if="p > records.pageCount" type="button" @click="read(1)">返回日志首页</button></nav></template><p v-else role="status">公开日志尚未读取。</p></template></section></template>
+<style scoped lang="scss">
+.public-logs { padding: 20px; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 10px; color: var(--fp-text); } h1 { font-size: 23px; } p, time, small { color: var(--fp-muted); } ol { list-style: none; padding: 0; } li { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--fp-border); overflow-wrap: anywhere; } nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } button { padding: 7px 10px; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-card); color: var(--fp-text); margin: 4px; cursor: pointer; &:disabled { opacity: .5; } } [role=alert] p { color: #bd503c; } a { color: var(--fp-link); } @media(max-width:600px) { .public-logs { padding: 14px; } li { flex-direction: column; gap: 6px; } }
 </style>

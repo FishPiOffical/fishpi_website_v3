@@ -385,3 +385,6 @@ MarkdownEditor去旧apiKey上传门禁，接既有v3票据与专用票据直传�
 
 
 第九十九轮（2026-10-27）：用户批准专栏四GET按当前可读/可列出署名长篇与有效作者过滤，SQL先过滤再数量/最新/热门/分页，无可见章404、SQL失败503，optionalContent/原匿名盾及no-store。旧经典保持。客户端资料/章节独立GET/错误/原页重试、20项分页、原章号/首最新阅读、身份迟到隔离和封面CSS占位；首页架共用严格卡片解码。Java25/SQLite8+接线源码1及既有写核心4通过；客户端14专项、73脚本811组、独立exit0双构建、72JS版本0/无map通过。IAB1280合成20/总21→p2故障→末页重试/占位最终重载通过。285保持，无SQL迁移/FTL/Maven/APP；Java已提醒IDEA重编/重启，真实IoC/MySQL/权限/风控/390px待验。最近注册/随机发现/仅时间类别日志规则已确认、待下一批实现。两仓提交，见[公开专栏记录](api-v3-public-columns-work.md)。
+
+
+第100轮（2026-10-28）：最近注册/随机发现/日志元数据三GET总接线，288（287HTTP+WS1），GET145/POST72/PUT46/DELETE24。当前有效四字段/随机起点回绕及匿名保护/固定日志类别先过滤再分页，绝不返回data/key2；客户端Home/Activity/Article/Logs及SSR迁移，独立错误与原页重试，删三旧包装。Java25实际服务/SQLite10+源码接线1组及DTO/共享门禁回归通过；客户端74脚本831组、独立exit0双构建、75JS版本0/无map通过。IAB1280合成19人完整/两模块503独立重试、日志p2故障→末页和首页真实入口通过。无SQL/FTL/Maven/APP；Java需IDEA重编重启，真实IoC/MySQL/新路HTTP/权限/反漏扫/390px待验。两仓分别提交，见[本批记录](api-v3-discovery-extras-work.md)。

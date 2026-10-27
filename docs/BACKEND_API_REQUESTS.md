@@ -300,7 +300,7 @@ GET /api/city/{cityName}?p=1&size=20
 - `relevantArticles`：`[{ oId, articleTitle, articleTitleEmoj, articlePermalink, articleAuthorName, articleAuthorThumbnailURL20 }]`
 - `previous` / `next`：`{ oId, articleTitle, articleTitleEmojUnicode, articlePermalink }`
 
-长文章的上一章/下一章已由 `longArticleColumnView.previous/next` 提供，前端已接入。随机帖子用的是现有 `GET /article/random/{size}`。
+长文章的上一章/下一章已由 `longArticleColumnView.previous/next` 提供，前端已接入。随机发现已迁移 `GET /api/v3/articles/random`，支持size与excludeId；本批没有新增相关帖或上一帖/下一帖契约。
 
 ## 16. 评论排序参数（P2，调整）
 

@@ -49,9 +49,9 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - 表情反应（帖子/评论/聊天室）`POST /article/reaction` 等
 - 发帖草稿 `GET/POST/DELETE /api/article-drafts`
 - 评论编辑/问答采纳、标签联想、Markdown 预览
-- 首页随机帖 `GET /article/random/{size}`、公开日志；通知已改v3票据实时订阅，旧紧急广播与私信推送仍待迁移
+- 随机发现 `GET /api/v3/articles/random`、元数据公开日志 `GET /api/v3/logs`；通知已改v3票据实时订阅，旧紧急广播与私信推送仍待迁移
 - 评论楼中楼、聊天室附近消息、公开职业/勋章列表
-- 职业成长榜、最近注册、弹幕花费、聊天室消息原文
+- 职业成长榜、最近注册 `GET /api/v3/recent-members`、弹幕花费、聊天室消息原文
 - 设置页表情分组（GET 列表，增删走现网 JSON，验证时不提交）
 - 匿名可读：帖子列表/详情/搜索/领域/标签墙/问答 `GET /api/articles/qna`、优选 `GET /api/articles/perfect`
 - 帖子正文目录（从正文 h1–h3 生成）
