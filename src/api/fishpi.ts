@@ -94,7 +94,7 @@ export interface PrivacySettings {
 }
 
 export interface MetalItem {
-  /** 勋章定义 ID，现网用 `/gen?id=` 渲染勋章图 */
+  /** 勋章定义 ID；v3图片仅在明确的本人或公开展示上下文中读取 */
   id?: string
   name?: string
   description?: string
@@ -990,12 +990,6 @@ export interface MyMedal {
   display: boolean
   displayOrder: number
   expireTime: number
-}
-
-/** 现网勋章图（需页面会话，未登录时返回 0×0 空图）；mini 为聊天室用的无文字小图 */
-export function medalImageUrl(medalId: string, mini = false) {
-  if (!medalId) return ''
-  return `/gen?${mini ? 'mini=yes&' : ''}id=${encodeURIComponent(medalId)}`
 }
 
 export async function fetchMyMedals(apiKey: string): Promise<MyMedal[]> {

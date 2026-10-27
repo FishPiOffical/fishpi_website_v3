@@ -66,7 +66,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
     <ul v-if="ready && medals.length" class="medals">
       <li v-for="medal in medals" :key="medal.id">
         <div class="info">
-          <MedalIcon :medal="{ id: medal.id, name: medal.name, type: medal.type, description: medal.description }" :tooltip="false" />
+          <MedalIcon owner :medal="{ id: medal.id, name: medal.name, type: medal.type, description: medal.description }" :tooltip="false" />
           <strong>{{ medal.name }}</strong>
           <span v-if="medal.type">{{ medal.type }}</span>
           <span v-if="medal.description">{{ medal.description }}</span>

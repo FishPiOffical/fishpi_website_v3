@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { medalImageUrl, type MetalItem } from '@/api/fishpi'
-import { medalSessionEpoch } from '@/utils/medalSession'
+import { computed, ref } from 'vue'
+import type { MetalItem } from '@/api/fishpi'
+import V3MedalImage from './V3MedalImage.vue'
 
 const props = withDefaults(
   defineProps<{
     medal: MetalItem
+    owner?: boolean
+    userName?: string
     /** 聊天室用的无文字小图 */
     mini?: boolean
     /** 悬停显示「[稀有度] 名称 - 描述」 */
@@ -23,9 +25,6 @@ const TYPE_CLASS: Record<string, string> = {
   限定: 'limited',
 }
 
-const imgEl = ref<HTMLImageElement | null>(null)
-const failed = ref(false)
-const retry = ref(0)
 const tipPos = ref<{ left: number; top: number } | null>(null)
 
 function showTip(e: MouseEvent) {
@@ -34,11 +33,6 @@ function showTip(e: MouseEvent) {
   tipPos.value = { left: r.left + r.width / 2, top: r.top }
 }
 
-const src = computed(() => {
-  const base = medalImageUrl(props.medal.id || '', props.mini)
-  return base && retry.value ? `${base}&r=${retry.value}` : base
-})
-const showImage = computed(() => Boolean(src.value) && !failed.value)
 const typeClass = computed(() => TYPE_CLASS[props.medal.type || ''] || 'common')
 const tipText = computed(() => {
   const m = props.medal
@@ -46,18 +40,6 @@ const tipText = computed(() => {
 })
 const label = computed(() => (props.medal.type ? `[${props.medal.type}] ${tipText.value}` : tipText.value))
 
-/** 未登录或会话失效时 `/gen` 返回 0×0 空图 */
-function check(img: HTMLImageElement | null) {
-  if (img && img.complete && img.naturalWidth === 0) failed.value = true
-}
-
-onMounted(() => check(imgEl.value))
-
-watch(medalSessionEpoch, () => {
-  if (!failed.value) return
-  failed.value = false
-  retry.value = medalSessionEpoch.value
-})
 </script>
 
 <template>
@@ -68,24 +50,7 @@ watch(medalSessionEpoch, () => {
     @mouseenter="showTip"
     @mouseleave="tipPos = null"
   >
-    <img
-      v-if="showImage"
-      ref="imgEl"
-      class="medal-img"
-      :src="src"
-      :alt="medal.name || '勋章'"
-      @load="check($event.target as HTMLImageElement)"
-      @error="failed = true"
-    />
-    <img v-else-if="mini && medal.url" class="medal-fallback-icon" :src="medal.url" :alt="medal.name || '勋章'" />
-    <span
-      v-else
-      class="medal-fallback"
-      :style="{ background: medal.backcolor || undefined, color: medal.fontcolor || undefined }"
-    >
-      <img v-if="medal.url" :src="medal.url" alt="" />
-      <template v-if="!mini">{{ medal.name }}</template>
-    </span>
+    <V3MedalImage :id="medal.id || ''" :name="medal.name || ''" :owner="owner" :user-name="userName" :mini="mini" />
     <Teleport v-if="tipPos" to="body">
       <span class="medal-tip" role="tooltip" :style="{ left: `${tipPos.left}px`, top: `${tipPos.top}px` }">
         <span v-if="medal.type" class="medal-type" :class="`medal-type--${typeClass}`">[{{ medal.type }}]</span>
@@ -95,7 +60,7 @@ watch(medalSessionEpoch, () => {
   </span>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .medal {
   position: relative;
   display: inline-flex;

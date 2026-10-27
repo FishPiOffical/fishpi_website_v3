@@ -144,6 +144,7 @@ type RequestInitExtra = RequestInit & {
   /** Internal: an expired v3 access token has already been refreshed once. */
   __v3Retried?: boolean
   __authVersion?: number
+  __svg?: boolean
   __zip?: boolean
 }
 
@@ -184,7 +185,7 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {
     headers.set('Authorization', `Bearer ${accessToken}`)
   }
 
-  const { __captchaRetried: _, __v3Retried: __, __authVersion: ___, __zip: ____, ...fetchInit } = init
+  const { __captchaRetried: _, __v3Retried: __, __authVersion: ___, __zip: ____, __svg: _____, ...fetchInit } = init
   let res: Response
   try {
     res = await fetch(resolveUrl(path), {
@@ -207,16 +208,18 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {
     if (e instanceof ApiError) throw e
   }
 
-  if (init.__zip && res.ok && res.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() === 'application/zip') {
+  const binaryType = init.__svg ? 'image/svg+xml' : 'application/zip'
+  const binaryLimit = init.__svg ? 512 * 1024 : MAX_PRIVATE_ZIP_BYTES
+  if ((init.__zip || init.__svg) && res.ok && res.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() === binaryType) {
     const declared = res.headers.get('content-length')
-    if (declared && (!/^[0-9]+$/.test(declared) || Number(declared) > MAX_PRIVATE_ZIP_BYTES)) { await res.body?.cancel(); throw new ApiError('导出文件大小异常', 502, 'invalid_response') }
+    if (declared && (!/^[0-9]+$/.test(declared) || Number(declared) > binaryLimit)) { await res.body?.cancel(); throw new ApiError('文件大小异常', 502, 'invalid_response') }
     const reader = res.body?.getReader()
-    if (!reader) throw new ApiError('导出文件为空', 502, 'invalid_response')
+    if (!reader) throw new ApiError('文件为空', 502, 'invalid_response')
     const parts: ArrayBuffer[] = []; let bytes = 0
-    try { while (true) { const { done, value } = await reader.read(); if (done) break; bytes += value.byteLength; if (bytes > MAX_PRIVATE_ZIP_BYTES) { await reader.cancel(); throw new ApiError('导出文件大小异常', 502, 'invalid_response') } parts.push(new Uint8Array(value).buffer) } }
+    try { while (true) { const { done, value } = await reader.read(); if (done) break; bytes += value.byteLength; if (bytes > binaryLimit) { await reader.cancel(); throw new ApiError('文件大小异常', 502, 'invalid_response') } parts.push(new Uint8Array(value).buffer) } }
     finally { reader.releaseLock() }
-    if (!bytes) throw new ApiError('导出文件为空', 502, 'invalid_response')
-    return new Blob(parts, { type: 'application/zip' }) as T
+    if (!bytes) throw new ApiError('文件为空', 502, 'invalid_response')
+    return new Blob(parts, { type: binaryType }) as T
   }
 
   const text = await res.text()
@@ -238,13 +241,14 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {
     throw new ApiError(msg || '请求失败', res.status, code)
   }
 
-  if (init.__zip) throw new ApiError('接口未返回ZIP文件', 502, 'invalid_response')
+  if (init.__zip || init.__svg) throw new ApiError('接口未返回预期文件', 502, 'invalid_response')
 
   return data
 }
 
 /** Bound to the current private export service's ZIP budget. */
 export const MAX_PRIVATE_ZIP_BYTES = 32 * 1024 * 1024
+export function requestSvg(path: string, init: RequestInit = {}): Promise<Blob> { return request<Blob>(path, { ...init, __svg: true, cache: 'no-store' }) }
 export function requestZip(path: string, init: RequestInit = {}): Promise<Blob> { return request<Blob>(path, { ...init, __zip: true }) }
 
 export async function request<T = unknown>(path: string, init: RequestInitExtra = {}): Promise<T> {

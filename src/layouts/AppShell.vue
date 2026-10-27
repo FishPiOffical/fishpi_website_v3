@@ -2,7 +2,6 @@
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ensureMedalSession } from '@/utils/medalSession'
 import { useClientStartupStore } from '@/stores/clientStartup'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
@@ -211,11 +210,9 @@ const accountMenuBottom = computed(() => [
 ])
 
 watch(
-  () => auth.apiKey,
+  () => auth.accessToken,
   (key) => {
-    if (key) {
-      void ensureMedalSession(key)
-    } else {
+    if (!key) {
       chat.floatingChatroomOpen = false
       chat.disconnect()
     }

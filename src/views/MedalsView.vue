@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import V3MedalImage from '@/components/medal/V3MedalImage.vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { usePublicMedals } from '@/composables/usePublicMedals'
@@ -18,7 +19,7 @@ usePageSeo(() => ({ title: `${userName.value} 的公开勋章`, path: `/member/$
     <div v-else-if="error" role="alert"><p>{{ error }}</p><button type="button" @click="read()">重试公开勋章</button><button v-if="p > 1" type="button" @click="read(1)">返回第一页</button></div>
     <template v-else-if="value">
       <p>共 {{ value.total }} 枚公开勋章</p>
-      <ul class="medal-list"><li v-for="(medal, i) in value.list" :key="`${p}:${i}:${medal.id}`"><strong>{{ medal.name }}</strong><span v-if="medal.type" class="medal-type">{{ medal.type }}</span><p>{{ medal.description }}</p><small>{{ medal.expiresAt === 0 ? '永久有效' : `有效至 ${new Date(medal.expiresAt).toLocaleString('zh-CN')}` }}</small></li></ul>
+      <ul class="medal-list"><li v-for="(medal, i) in value.list" :key="`${p}:${i}:${medal.id}`"><V3MedalImage :id="medal.id" :name="medal.name" :user-name="userName" /><strong>{{ medal.name }}</strong><span v-if="medal.type" class="medal-type">{{ medal.type }}</span><p>{{ medal.description }}</p><small>{{ medal.expiresAt === 0 ? '永久有效' : `有效至 ${new Date(medal.expiresAt).toLocaleString('zh-CN')}` }}</small></li></ul>
       <p v-if="!value.list.length">本页没有公开勋章。</p>
       <div class="medal-pager"><button type="button" :disabled="p <= 1" @click="read(p - 1)">上一页勋章</button><span>第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span><button type="button" :disabled="p >= value.pageCount" @click="read(p + 1)">下一页勋章</button></div>
     </template>
