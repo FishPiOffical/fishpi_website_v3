@@ -36,7 +36,7 @@ const renderer=createRenderer({patchProp(el,k,old,v){el.props[k]=v},insert,remov
 const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' ')
 const find=(n,fn)=>fn(n)?n:(n.children||[]).map(c=>find(c,fn)).find(Boolean)
 const tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()}
-function mount(pinia=createPinia(),userName="other"){const root={children:[]},app=renderer.createApp(component,{userName});app.use(pinia);const user=auth(pinia);app.mount(root);return{root,app,user,text:()=>text(root),click:()=>find(root,n=>n.tag==='button').props.onClick()}}
+function mount(pinia=createPinia(),userName="other",userId){const root={children:[]},app=renderer.createApp(component,{userName,userId});app.use(pinia);const user=auth(pinia);app.mount(root);return{root,app,user,text:()=>text(root),click:()=>find(root,n=>n.tag==='button').props.onClick()}}
 
 const click=(view,label)=>{const button=find(view.root,n=>n.tag==='button'&&text(n).trim()===label);assert.ok(button,'Missing '+label);button.props.onClick()}
 let actual=false,writes=[],lose=true,readFail=false;state.dispatch=async(path,init)=>{if(init?.method){writes.push({method:init.method,key:init.headers['Idempotency-Key']});if(lose){lose=false;actual=true;throw Error('响应丢失')}return env({following:init.method==='PUT',changed:true})}if(readFail)throw Error('状态读取503');return env({targetId:path.endsWith('/2')?'2':'3',following:actual})}
@@ -51,3 +51,6 @@ console.log('PASS user follow 6 SSR and self render no follow requests/actions')
 
 pinia=createPinia();store=useV3UserFollowStore(pinia);let releaseRead,readCalls=0;state.dispatch=(path,init)=>{if(init?.method)return env({following:true,changed:true});readCalls++;if(readCalls===1)return new Promise(resolve=>releaseRead=resolve);return env({targetId:'2',following:false})};view=mount(pinia);await tick();assert.ok(releaseRead);await store.set('2',true);await tick();assert.equal(readCalls,2);releaseRead(env({targetId:'2',following:true}));await tick();assert.ok(!view.text().includes('取消关注'));assert.match(view.text(),/\+ 关注/);view.app.unmount();
 console.log('PASS user follow 7 commit from another component invalidates earlier in-flight GET and rejects its delayed relationship snapshot')
+
+state.dispatch=(path,init)=>init?.method?env({following:true,changed:true}):env({targetId:path.split('/').at(-1),following:false});let beforeKnown=state.requests.length;view=mount(createPinia(),'name-may-change','9');await tick();assert.equal(state.requests.at(-1).path,'/api/v3/me/follows/users/9');click(view,'+ 关注');await tick();assert.ok(state.requests.slice(beforeKnown).some(r=>r.path==='/api/v3/me/follows/users/9'&&r.init?.method==='PUT'));view.app.unmount();beforeKnown=state.requests.length;view=mount(createPinia(),'different-snapshot','1');await tick();assert.equal(state.requests.length,beforeKnown);view.app.unmount();
+console.log('PASS user follow 8 known public ID binds relationship reads/writes without name re-resolution; self ID remains hidden')

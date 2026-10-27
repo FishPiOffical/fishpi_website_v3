@@ -5,17 +5,14 @@ import { getAuthContextVersion } from '@/api/http'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { fetchUserProfile, type UserProfile } from '@/api/fishpi'
-import MedalList from '@/components/medal/MedalList.vue'
+import { fetchPublicUser, type PublicUser } from '@/api/v3-public-user'
 import { useAuthStore } from '@/stores/auth'
-import { avatarUrl } from '@/utils/avatar'
 
 const CARD_WIDTH = 400
 const GAP = 10
 const VIEWPORT_PADDING = 12
 const SHOW_DELAY = 260
 const HIDE_DELAY = 160
-const CACHE_LIMIT = 100
 const AVATAR_SELECTOR = [
   '[data-user-card]',
   '.avatar-small',
@@ -38,38 +35,24 @@ const AVATAR_SELECTOR = [
 
 const auth = useAuthStore()
 const route = useRoute()
-const { apiKey, accessToken, account, isLoggedIn } = storeToRefs(auth)
+const { accessToken, account, isLoggedIn } = storeToRefs(auth)
 const mounted = ref(false)
 const cardEl = ref<HTMLElement | null>(null)
 const active = ref(false)
 const loading = ref(false)
 const failed = ref(false)
 const currentUserName = ref('')
-const profile = ref<UserProfile | null>(null)
+const profile = ref<PublicUser | null>(null)
 const anchor = ref<HTMLElement | null>(null)
 const position = ref({ left: VIEWPORT_PADDING, top: VIEWPORT_PADDING, side: 'right' as 'left' | 'right' })
-const cache = new Map<string, UserProfile>()
 
 let showTimer: ReturnType<typeof setTimeout> | undefined
 let hideTimer: ReturnType<typeof setTimeout> | undefined
 let requestId = 0
 let lastPointerType = ''
 
-const isSelf = computed(() => account.value?.userName === profile.value?.userName)
-const memberDescription = computed(() => {
-  const p = profile.value
-  if (!p) return ''
-  if (p.userIntro?.trim()) return p.userIntro.trim()
-  const role = Number(p.userAppRole) === 1 ? '画家' : '黑客'
-  return p.userNo ? `摸鱼派 ${p.userNo} 号成员，${role}` : `摸鱼派成员，${role}`
-})
-const roleBadge = computed(() => {
-  const role = profile.value?.userRole || ''
-  if (/admin|管理员/i.test(role)) return 'https://file.fishpi.cn/adminRole.png'
-  if (/^op$|运营/i.test(role)) return 'https://file.fishpi.cn/opRole.png'
-  if (/police|纪律委员/i.test(role)) return 'https://file.fishpi.cn/policeRole.png'
-  return ''
-})
+const isSelf = computed(() => account.value?.oId === profile.value?.id)
+const memberDescription = computed(() => profile.value?.userIntro || '')
 
 function usernameFrom(target: EventTarget | null): { userName: string; element: HTMLElement } | null {
   if (/^\/chat(?:\/|$)/.test(route.path)) return null
@@ -155,42 +138,25 @@ async function show(userName: string, element: HTMLElement) {
   cancelHide()
   if (active.value && anchor.value === element && currentUserName.value === userName) return
   const id = ++requestId
-  const key = apiKey.value
   anchor.value = element
   currentUserName.value = userName
   failed.value = false
   active.value = true
   positionCard()
 
-  const cached = cache.get(userName)
-  if (cached) {
-    cache.delete(userName)
-    cache.set(userName, cached)
-    profile.value = cached
-    loading.value = false
-    await nextTick()
-    if (id === requestId) positionCard()
-    return
-  }
-
-  profile.value = null
-  loading.value = true
-  try {
-    const data = await fetchUserProfile(userName, key)
-    if (id !== requestId || !active.value) return
-    cache.set(userName, data)
-    if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!)
-    profile.value = data
-  } catch {
-    if (id === requestId && active.value) failed.value = true
-  } finally {
-    if (id === requestId) {
-      loading.value = false
-      await nextTick()
-      if (id === requestId) positionCard()
-    }
-  }
+  await loadProfile(id)
 }
+
+async function loadProfile(id = ++requestId) {
+  const name = currentUserName.value, element = anchor.value, token = accessToken.value, boundary = getAuthContextVersion(), owner = account.value?.oId
+  const valid = () => mounted.value && id === requestId && active.value && name === currentUserName.value && element === anchor.value && token === accessToken.value && boundary === getAuthContextVersion() && owner === account.value?.oId
+  profile.value = null; failed.value = false; loading.value = true
+  try { const data = await fetchPublicUser(name); if (valid()) profile.value = data }
+  catch { if (valid()) failed.value = true }
+  finally { if (valid()) { loading.value = false; await nextTick(); if (valid()) positionCard() } }
+}
+
+function retry() { if (active.value && !loading.value) void loadProfile() }
 
 function onPointerOver(e: PointerEvent) {
   if (!canHover(e)) return
@@ -243,17 +209,12 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 watch(() => route.fullPath, hide, { flush: 'sync' })
-watch([apiKey, () => account.value?.userName, () => account.value?.oId], () => {
-  hide()
-  cache.clear()
-}, { flush: 'sync' })
-
 let readerBoundary = `${getAuthContextVersion()}:${account.value?.oId || ''}:${!!accessToken.value}`
-watch([accessToken, () => account.value?.oId], () => {
+watch([accessToken, () => account.value?.oId, () => account.value?.userName], () => {
   const next = `${getAuthContextVersion()}:${account.value?.oId || ''}:${!!accessToken.value}`
-  if (next === readerBoundary) return
-  readerBoundary = next; hide(); cache.clear()
-}, {flush:'sync'})
+  if (next !== readerBoundary) { readerBoundary = next; hide() }
+  else if (active.value) void loadProfile()
+}, { flush: 'sync' })
 
 function onViewportChange() {
   if (active.value) positionCard()
@@ -273,7 +234,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   hide()
-  cache.clear()
   document.removeEventListener('pointerover', onPointerOver)
   document.removeEventListener('pointerout', onPointerOut)
   document.removeEventListener('focusin', onFocusIn)
@@ -311,61 +271,36 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="failed" class="card-error" role="status">
-          <p>用户资料加载失败，请稍后再试。</p>
+          <p>用户资料加载失败。</p><button type="button" @click="retry()">重试用户资料</button>
           <RouterLink :to="`/member/${encodeURIComponent(currentUserName)}`">查看用户主页</RouterLink>
         </div>
 
         <template v-else-if="profile">
-          <div v-if="profile.cardBg" class="card-cover" :style="{ backgroundImage: `url('${profile.cardBg}')` }" />
-          <div class="card-main" :class="{ 'card-main--cover': profile.cardBg }">
-            <RouterLink class="avatar-link" :to="`/member/${profile.userName}`">
-              <img class="card-avatar" :src="avatarUrl(profile, 'large')" :alt="profile.userName" />
+          <div class="card-main">
+            <RouterLink class="avatar-link" :to="`/member/${encodeURIComponent(profile.userName)}`">
+              <img v-if="profile.userAvatarURL" class="card-avatar" :src="profile.userAvatarURL" :alt="profile.userName" referrerpolicy="no-referrer" />
             </RouterLink>
 
             <div class="card-meta">
               <div class="name-line">
-                <RouterLink class="nickname" :to="`/member/${profile.userName}`">
-                  <VipNickname :user-name="profile.userName">{{ profile.userNickname || profile.userName }}</VipNickname>
+                <RouterLink class="nickname" :to="`/member/${encodeURIComponent(profile.userName)}`">
+                  <VipNickname :user-id="profile.id" :user-name="profile.userName">{{ profile.userNickname || profile.userName }}</VipNickname>
                 </RouterLink>
-                <span v-if="profile.mbti" class="mbti">{{ profile.mbti }}</span>
               </div>
-              <RouterLink class="username" :to="`/member/${profile.userName}`">@{{ profile.userName }}</RouterLink>
+              <RouterLink class="username" :to="`/member/${encodeURIComponent(profile.userName)}`">@{{ profile.userName }}</RouterLink>
               <p class="intro">{{ memberDescription }}</p>
             </div>
           </div>
 
-          <div v-if="profile.sysMetal?.length" class="medals">
-            <MedalList :items="profile.sysMetal.slice(0, 5)" variant="mini" />
-          </div>
-
           <div class="card-footer">
             <div class="facts">
-              <img v-if="roleBadge" class="role-badge" :src="roleBadge" :alt="profile.userRole || '身份'" />
-              <span v-if="profile.userNo" class="fact" :title="`${profile.userNo} 号成员`">№ {{ profile.userNo }}</span>
-              <RouterLink
-                v-if="profile.userPoint != null && isLoggedIn"
-                class="fact fact-link"
-                :to="`/settings/point?to=${profile.userName}`"
-                :title="`${Number(profile.userPoint).toLocaleString()} 积分（点击转账）`"
-              >
-                ◈ {{ Number(profile.userPoint).toLocaleString() }}
-              </RouterLink>
-              <span v-else-if="profile.userPoint != null" class="fact" :title="`${Number(profile.userPoint).toLocaleString()} 积分`">
-                ◈ {{ Number(profile.userPoint).toLocaleString() }}
-              </span>
-              <RouterLink v-if="profile.userCity" class="fact fact-link" :to="`/city/${encodeURIComponent(profile.userCity)}`">
-                ⌖ {{ profile.userCity }}
-              </RouterLink>
-              <a v-if="profile.userURL" class="fact fact-link external" :href="profile.userURL" target="_blank" rel="noopener noreferrer">
+              <a v-if="profile.userURL" class="fact fact-link external" aria-label="访问个人网址" :href="profile.userURL" target="_blank" rel="noopener noreferrer">
                 ↗
               </a>
             </div>
             <div class="actions">
-              <span class="status" :class="{ online: profile.userOnlineFlag }">
-                {{ profile.userOnlineFlag ? '在线' : '离线' }}
-              </span>
-              <UserFollowButton v-if="isLoggedIn && !isSelf" :user-name="profile.userName" />
-              <RouterLink v-if="isLoggedIn && !isSelf" class="message" :to="`/chat?toUser=${profile.userName}`">
+              <UserFollowButton v-if="isLoggedIn && !isSelf" :user-name="profile.userName" :user-id="profile.id" />
+              <RouterLink v-if="isLoggedIn && !isSelf" class="message" :to="`/chat?toUser=${encodeURIComponent(profile.userName)}`">
                 私信
               </RouterLink>
             </div>
@@ -376,7 +311,7 @@ onUnmounted(() => {
   </Teleport>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .global-user-card {
   position: fixed;
   z-index: 1450;
@@ -389,19 +324,11 @@ onUnmounted(() => {
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
   color: var(--fp-text);
 }
-.card-cover {
-  height: 86px;
-  background-position: center;
-  background-size: cover;
-}
 .card-main {
   display: flex;
   gap: 12px;
   min-width: 0;
   padding: 16px 16px 10px;
-}
-.card-main--cover {
-  margin-top: -30px;
 }
 .avatar-link {
   align-self: flex-start;
@@ -449,14 +376,6 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mbti {
-  flex: 0 0 auto;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #8b87d9;
-  color: #fff;
-  font-size: 10px;
-}
 .intro {
   display: -webkit-box;
   margin: 8px 0 0;
@@ -467,11 +386,6 @@ onUnmounted(() => {
   word-break: break-word;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-}
-.medals {
-  min-height: 25px;
-  padding: 0 16px 10px 100px;
-  --medal-mini-h: 24px;
 }
 .card-footer {
   display: flex;
@@ -489,11 +403,6 @@ onUnmounted(() => {
   min-width: 0;
   flex: 1;
   overflow: hidden;
-}
-.role-badge {
-  width: auto;
-  height: 20px;
-  flex: 0 0 auto;
 }
 .fact {
   flex: 0 0 auto;
@@ -521,7 +430,6 @@ onUnmounted(() => {
   gap: 6px;
   flex: 0 0 auto;
 }
-.status,
 .message {
   box-sizing: border-box;
   height: 24px;
@@ -529,14 +437,6 @@ onUnmounted(() => {
   border-radius: 4px;
   font-size: 11px;
   line-height: 24px;
-}
-.status {
-  background: var(--fp-border);
-  color: var(--fp-muted);
-}
-.status.online {
-  background: var(--fp-accent);
-  color: #fff;
 }
 .message {
   background: var(--fp-primary);
@@ -556,6 +456,7 @@ onUnmounted(() => {
 .card-error p {
   margin: 0 0 10px;
 }
+.card-error button { font: inherit; color: var(--fp-text); background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 6px; padding: 6px 9px; margin-right: 8px; cursor: pointer; }
 .card-error a {
   color: var(--fp-link);
 }

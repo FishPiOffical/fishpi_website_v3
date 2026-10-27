@@ -6,14 +6,14 @@ import { readV3UserFollow } from '@/api/v3-user-follow'
 import { resolveV3NicknameUser } from '@/api/v3-membership-styles'
 import { useAuthStore } from '@/stores/auth'
 import { useV3UserFollowStore } from '@/stores/v3UserFollow'
-const props = defineProps<{ userName: string }>()
+const props = defineProps<{ userName: string; userId?: string }>()
 const { accessToken, account } = storeToRefs(useAuthStore()), operations = useV3UserFollowStore()
 const mounted = ref(false), targetId = ref(''), following = ref<boolean | null>(null), loading = ref(false), error = ref('')
-const visible = computed(() => mounted.value && !!accessToken.value && !!account.value && account.value.userName.toLowerCase() !== props.userName.toLowerCase())
+const visible = computed(() => mounted.value && !!accessToken.value && !!account.value && (props.userId ? account.value.oId !== props.userId : account.value.userName.toLowerCase() !== props.userName.toLowerCase()))
 const pending = computed(() => operations.commands[targetId.value])
 const label = computed(() => pending.value ? pending.value.busy ? '正在提交…' : pending.value.following ? '重试本次关注' : '重试本次取消关注' : following.value !== null ? following.value ? '取消关注' : '+ 关注' : loading.value ? '读取关注状态…' : '重读关注状态')
 let sequence = 0, boundary = ''
-function identity() { return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId || ''}:${props.userName}` }
+function identity() { return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId || ''}:${props.userName}:${props.userId || ''}` }
 function clear() { sequence++; targetId.value = ''; following.value = null; loading.value = false; error.value = '' }
 async function load(afterWrite = false) {
   if (!visible.value || loading.value) return
@@ -21,7 +21,7 @@ async function load(afterWrite = false) {
   loading.value = true; error.value = ''; following.value = null
   const valid = () => mounted.value && visible.value && current === sequence && reader === identity()
   try {
-    const target = await resolveV3NicknameUser(name)
+    const target = props.userId ? { id: props.userId } : await resolveV3NicknameUser(name)
     if (!valid()) return
     targetId.value = target.id
     if (target.id === account.value?.oId) return
@@ -38,7 +38,7 @@ async function submit() {
   catch (err) { if (mounted.value && reader === identity()) error.value = err instanceof Error ? err.message : '关注操作失败' }
 }
 function activate() { if (loading.value || pending.value?.busy) return; if (pending.value || following.value !== null) void submit(); else void load() }
-watch([accessToken, () => account.value?.oId, () => props.userName], () => { const next = identity(); if (next === boundary) return; boundary = next; clear(); void load() }, {flush:'sync'})
+watch([accessToken, () => account.value?.oId, () => props.userName, () => props.userId], () => { const next = identity(); if (next === boundary) return; boundary = next; clear(); void load() }, {flush:'sync'})
 watch(() => operations.lastChange, change => { if (change.targetId && change.targetId === targetId.value) { clear(); void load(true) } }, {flush:'sync'})
 onMounted(() => { mounted.value = true; boundary = identity(); void load() })
 onBeforeUnmount(() => { mounted.value = false; clear() })
