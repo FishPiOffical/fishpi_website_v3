@@ -76,18 +76,11 @@
 
 ---
 
-## 3. 重置密码校验元数据 — 缺失
+## 3. 注册与密码找回 — 已接 v3
 
-忘记密码短信成功后，现网靠 `GET /reset-pwd?code=` **HTML** 注入 `userId`。SPA 需要 JSON：
+客户端已接 `/api/v3/auth/registration-options`、`captcha-options`、`registration/request`、`registration/complete`、`password-reset/request`、`password-reset/complete`。重置直接提交手机号、6位短信码和密码摘要，不依赖旧元数据接口，也不再使用假userId。
 
-| 建议契约 | 说明 |
-|----------|------|
-| `GET /api/reset-pwd/meta?code=` | `{ userId, code }`，无效码非 0 |
-
-已有写入：`POST /forget-pwd`、`POST /reset-pwd`（MD5 密码）。
-
-| 现状 | `fetchResetPwdMeta()` 返回假 `userId`（仅通 UI；提交现网会失败） |
-|------|------------------------------------------------------------------|
+当前源码与验收限制见 [账号入口迁移记录](api-v3-client-account-access-work.md)。真实短信、极验、凭据撤销和移动设备验收仍待完成。
 
 ---
 
@@ -211,7 +204,6 @@ SPA `/vips` 已对接。管理端 VIP 不在本站范围。
 |------|------|
 | 首页专栏 | `src/api/gaps.mock.ts` → `mockHomeColumns` |
 | 背包读取 | `src/api/gaps.mock.ts` → `mockUserBag` |
-| 重置密码 meta | `src/api/gaps.mock.ts` → `mockResetPwdMeta` |
 | 匿名列表/详情、领域、连签/在线榜（仅请求失败时） | `src/api/catalog.mock.json`（既有） |
 
 用户资料、搜索失败时直接报错，不使用假数据。

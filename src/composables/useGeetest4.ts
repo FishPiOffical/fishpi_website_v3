@@ -38,7 +38,7 @@ export function useGeetest4(container: Ref<HTMLElement | null>, onSuccess: (vali
   let generation = 0
   const timers = new Set<ReturnType<typeof setTimeout>>()
 
-  async function mount(product: 'float' | 'popup' = 'float') {
+  async function mount(product: 'float' | 'popup' = 'float', captchaId = FISHPI_GEETEST_ID) {
     destroy()
     const current = ++generation, target = container.value
     error.value = ''
@@ -51,7 +51,7 @@ export function useGeetest4(container: Ref<HTMLElement | null>, onSuccess: (vali
       if (current !== generation || container.value !== target) return
       target.innerHTML = ''
       ready.value = false
-      init({ captchaId: FISHPI_GEETEST_ID, product }, (instance) => {
+      init({ captchaId, product }, (instance) => {
         if (current !== generation || container.value !== target) { instance.destroy?.(); return }
         gt = instance
         instance.appendTo(target).onSuccess(() => {

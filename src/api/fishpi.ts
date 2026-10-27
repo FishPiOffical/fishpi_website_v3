@@ -573,48 +573,6 @@ export async function updateI18nSettings(
   if (res.code) throw new Error(res.msg || '国际化设置失败')
 }
 
-/** 忘记密码：发送短信（GeeTest4 校验结果作 captcha）。 */
-export async function requestForgetPwd(userPhone: string, captcha: unknown) {
-  const res = await request<Envelope<unknown>>('/forget-pwd', {
-    method: 'POST',
-    body: JSON.stringify({ userPhone, captcha }),
-  })
-  if (res.code) throw new Error(res.msg || '发送失败')
-  return res.msg || '验证码已发送'
-}
-
-/**
- * 重置密码元数据。现网无 JSON（见 docs/MISSING_APIS.md），使用假数据通 UI。
- * 建议后端：GET /api/reset-pwd/meta?code=
- */
-export async function fetchResetPwdMeta(code: string): Promise<{ userId: string; code: string }> {
-  try {
-    const res = await request<Envelope<{ userId?: string; code?: string }>>(
-      `/api/reset-pwd/meta?code=${encodeURIComponent(code)}`,
-    )
-    if (!res.code && res.data?.userId) {
-      return { userId: res.data.userId, code: res.data.code || code }
-    }
-  } catch {
-    /* 接口未开放 */
-  }
-  const { mockResetPwdMeta } = await import('./gaps.mock')
-  return mockResetPwdMeta(code)
-}
-
-/** 重置密码：POST /reset-pwd（MD5）。 */
-export async function resetPassword(userId: string, code: string, passwd: string) {
-  const res = await request<Envelope<unknown>>('/reset-pwd', {
-    method: 'POST',
-    body: JSON.stringify({
-      userId,
-      code,
-      userPassword: md5(passwd),
-    }),
-  })
-  if (res.code) throw new Error(res.msg || '重置失败')
-}
-
 /** 积分兑换邀请码。 */
 export async function buyInvitecode(apiKey: string): Promise<string> {
   const { ensureCsrfToken } = await import('./pageAuth')
@@ -679,27 +637,6 @@ export async function transferPoints(apiKey: string, userName: string, amount: n
     body: JSON.stringify({ apiKey, userName, amount, memo }),
   })
   if (res.code) throw new Error(res.msg || '转账失败')
-}
-
-/** 请求失败（401/404/code≠0）返回 null，与成功的空列表区分。 */
-async function tryArticles(path: string, apiKey?: string | null): Promise<ArticleSummary[] | null> {
-  try {
-    const res = await request<Envelope<{ articles?: ArticleSummary[] } | ArticleSummary[]>>(withKey(path, apiKey))
-    if (res.code === 0) {
-      const data = res.data
-      if (Array.isArray(data)) return data
-      if (data && 'articles' in data && Array.isArray(data.articles)) return data.articles
-      return []
-    }
-  } catch {
-    /* 401/404 */
-  }
-  return null
-}
-
-/** 匿名读未开放或接口 404 时可选回退 mock；成功但空列表不再当成失败。 */
-async function unwrapArticles(path: string, apiKey?: string | null, fallback?: () => ArticleSummary[]) {
-  return (await tryArticles(path, apiKey)) ?? (fallback ? fallback() : [])
 }
 
 export async function fetchRecentArticles(_apiKey?: string | null, page = 1, size = 40) {
@@ -944,52 +881,6 @@ export async function searchUsers(apiKey: string, name: string): Promise<UserNam
 
 export async function searchUserNames(apiKey: string, name: string): Promise<string[]> {
   return (await searchUsers(apiKey, name)).map((u) => u.userName)
-}
-
-export async function requestSms(payload: {
-  userName: string
-  userPhone: string
-  captcha: string
-  invitecode?: string
-}) {
-  const res = await request<Envelope<unknown>>('/register', {
-    method: 'POST',
-    body: JSON.stringify({
-      userName: payload.userName,
-      userPhone: payload.userPhone,
-      captcha: payload.captcha,
-      invitecode: payload.invitecode || '',
-    }),
-  })
-  if (res.code) throw new Error(res.msg || '发送验证码失败')
-}
-
-export async function verifySms(code: string) {
-  const res = await request<Envelope<{ userId?: string }> & { userId?: string }>(
-    `/verify?code=${encodeURIComponent(code)}`,
-  )
-  const userId = res.userId || res.data?.userId
-  if (res.code !== 0 || !userId) throw new Error(res.msg || '短信验证失败')
-  return String(userId)
-}
-
-export async function finishRegister(payload: {
-  userId: string
-  passwd: string
-  userAppRole: number
-  referrer?: string
-}) {
-  const r = payload.referrer ? `?r=${encodeURIComponent(payload.referrer)}` : ''
-  const res = await request<Envelope<unknown>>(`/register2${r}`, {
-    method: 'POST',
-    body: JSON.stringify({
-      userId: payload.userId,
-      userPassword: md5(payload.passwd),
-      userAppRole: payload.userAppRole,
-      r: payload.referrer || '',
-    }),
-  })
-  if (res.code) throw new Error(res.msg || '注册失败')
 }
 
 

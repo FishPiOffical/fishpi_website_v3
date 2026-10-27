@@ -80,11 +80,3 @@ export const mockHomeColumns: { recent: HomeColumnCard[]; hot: HomeColumnCard[] 
     },
   ],
 }
-
-/** 重置密码页缺少 JSON；本地用假 userId 走通 UI（提交现网会失败）。 */
-export function mockResetPwdMeta(code: string) {
-  return {
-    userId: 'mock-reset-user-id',
-    code: code || '000000',
-  }
-}

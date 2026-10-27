@@ -9,7 +9,7 @@
 
 | # | 优先级 | 类型 | 接口 | 说明 |
 |---|--------|------|------|------|
-| 1 | P0 | 新增 | `GET /api/reset-pwd/meta` | 重置密码校验码换 userId（当前功能不可用） |
+| 1 | 已迁移 | v3 | `POST /api/v3/auth/password-reset/complete` | 已改手机号/验证码直提，不依赖旧元数据 |
 | 2 | P0 | 新增 | `GET /api/user/bag` | 读取用户背包 |
 | 3 | P1 | 调整 | `GET /activity/daily-checkin-api` / 新增 `GET /api/checkin/status` | 自动签到需要 JSON |
 | 4 | P1 | 调整 | `GET /api/top/*` | 排行榜匿名可读 + 返回结构统一 |
@@ -31,24 +31,9 @@
 
 ---
 
-## 1. 重置密码元数据（P0，新增）
+## 1. 注册与密码找回（已迁移）
 
-**背景**：忘记密码短信验证后，现网 `GET /reset-pwd?code=` 通过 HTML 注入 `userId`，SPA 拿不到，导致 `POST /reset-pwd` 无法提交。
-
-```
-GET /api/reset-pwd/meta?code={code}
-```
-
-响应：
-
-```json
-{ "code": 0, "msg": "", "data": { "userId": "1630000000000", "code": "xxxx" } }
-```
-
-- 校验码无效/过期：`code` 非 0，`msg` 给出原因。
-- 后续沿用已有 `POST /reset-pwd`（MD5 密码）。
-
-前端替换点：`src/api/fishpi.ts` → `fetchResetPwdMeta()`。
+旧元数据方案已由 v3 账号入口替代。客户端通过注册选项和账号验证组件申请短信，直接使用手机号、短信验证码及密码摘要完成注册或重置，不再查询userId或使用假元数据。见 [迁移及人工验收记录](api-v3-client-account-access-work.md)。下列其他章节仍包含历史需求，应以V3_MIGRATION与实际源码为准。
 
 ---
 
