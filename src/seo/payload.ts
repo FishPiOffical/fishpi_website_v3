@@ -1,3 +1,4 @@
+import { decodeHomeBootstrap } from '@/api/v3-home-reads'
 import { decodeArticleListing, type ColumnOrder } from '@/api/v3-article-list'
 import type { ArticleFeedKind } from '@/api/fishpi'
 import { decodeRecentMembers } from '@/api/v3-discovery-extras'
@@ -18,6 +19,7 @@ import type {
 } from '@/api/fishpi'
 
 export interface SsrPayload {
+  homeReads?: unknown
   articleListing?: unknown
   recentMembers?: RelationUser[] | null
   statistics?: CommunityStatistics | null
@@ -174,3 +176,5 @@ export function consumeArticleListingPayload(kind: ArticleFeedKind, extra: strin
   const value = takeField('articleListing')
   try { return decodeArticleListing(value, kind, extra, order) } catch { return null }
 }
+
+export function consumeHomeReadsPayload() { return decodeHomeBootstrap(takeField('homeReads')) }

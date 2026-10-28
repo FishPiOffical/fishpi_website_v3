@@ -1,3 +1,4 @@
+import { fetchHomeBootstrap } from './api/v3-home-reads'
 import { fetchArticleListing } from './api/v3-article-list'
 import { fetchRecentMembers } from './api/v3-discovery-extras'
 import { fetchPublicUser } from './api/v3-public-user'
@@ -8,9 +9,7 @@ import { renderSSRHead } from '@unhead/vue/server'
 import { createFishpiApp } from './app'
 import {
   fetchArticle,
-  fetchArticleFeed,
   fetchDomains,
-  fetchRecentArticles,
   fetchRepeaterItems,
   fetchTags,
   type ArticleFeedKind,
@@ -41,32 +40,22 @@ async function prefetch(url: string): Promise<SsrPayload> {
 
     if (path === '/') {
       const settled = await Promise.allSettled([
-        fetchRecentArticles(null, 1, 40),
-        fetchArticleFeed('hot', null, 1, 12),
-        fetchArticleFeed('long', null, 1, 12),
+        fetchHomeBootstrap(),
         fetchRanking('checkin', 1, undefined, 8),
         fetchRanking('online', 1, undefined, 8),
         fetchRecentMembers(),
-        fetchTags(null, 1, 24),
         fetchV3Breezemoons(1, 8),
         fetchRepeaterItems(null, 'joke'),
       ])
       const val = <T>(i: number, fallback: T): T =>
         settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
-      const tagData = val(6, { tags: [], total: 0 })
-
       return {
-        feed: val(0, []),
-        feedKind: 'recent',
-        hotFeed: val(1, []),
-        longFeed: val(2, []),
-        homeCheckinRanking: val(3, null),
-        homeOnlineRanking: val(4, null),
-        recentMembers: val(5, null),
-        tags: tagData.tags,
-        tagsTotal: tagData.total,
-        homeBreezemoonPage: val(7, null),
-        repeater: val(8, []),
+        homeReads: val(0, null),
+        homeCheckinRanking: val(1, null),
+        homeOnlineRanking: val(2, null),
+        recentMembers: val(3, null),
+        homeBreezemoonPage: val(4, null),
+        repeater: val(5, undefined),
       }
     }
 

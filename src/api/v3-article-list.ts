@@ -10,7 +10,7 @@ const invalid = () => new ApiError('文章列表响应格式不正确', 502)
 function row(value: unknown): Record<string, unknown> { if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid(); return value as Record<string, unknown> }
 function integer(value: unknown): number { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw invalid(); return value }
 /** Reproject an already adapted public SSR article. Never serialize arbitrary legacy aliases. */
-function article(value: unknown): ArticleSummary {
+export function decodePublicArticleSummary(value: unknown): ArticleSummary {
   const r = row(value)
   if (r.articleAnonymous !== 0 && r.articleAnonymous !== 1 || typeof r.articleCreateTimeStr !== 'string') throw invalid()
   if (!Number.isFinite(Date.parse(r.articleCreateTimeStr)) || new Date(r.articleCreateTimeStr).toISOString() !== r.articleCreateTimeStr) throw invalid()
@@ -32,7 +32,7 @@ export function decodeArticleListing(value: unknown, kind: ArticleFeedKind, extr
     return { ...meta, resource: 'columns', list }
   }
   if (r.resource !== 'articles') throw invalid()
-  const list = r.list.map(article); if (new Set(list.map(x => x.oId)).size !== list.length) throw invalid()
+  const list = r.list.map(decodePublicArticleSummary); if (new Set(list.map(x => x.oId)).size !== list.length) throw invalid()
   return { ...meta, resource: 'articles', list }
 }
 export async function fetchArticleListing(kind: ArticleFeedKind, extra = '', order: ColumnOrder = 'recent', p = 1): Promise<ArticleListing> {

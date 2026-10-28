@@ -1,28 +1,19 @@
 <script setup lang="ts">
 import RecentMembers from '@/components/discovery/RecentMembers.vue'
 import RankingBoard from '@/components/RankingBoard.vue'
-import { consumeHomeRankingPayload } from '@/seo/payload'
-import {getAuthContextVersion} from '@/api/http'
+import HomeReadStatus from '@/components/home/HomeReadStatus.vue'
+import { consumeHomeRankingPayload, consumeHomeReadsPayload, consumeRepeaterPayload } from '@/seo/payload'
+import { getAuthContextVersion } from '@/api/http'
+import { useHomeRead } from '@/composables/useHomeRead'
 import VipNickname from '@/components/user/VipNickname.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
-import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
+import { useV3ChatPublicationStore } from '@/stores/v3ChatPublication'
 import BreezemoonPanel from '@/components/breezemoons/BreezemoonPanel.vue'
-import { articleTitle } from '@/utils/text'
+import { articleTitle, decodeEntities } from '@/utils/text'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import {
-  fetchArticleFeed,
-  fetchHomeColumns,
-  fetchRecentArticles,
-  fetchRepeaterItems,
-  fetchTags,
-  type ArticleSummary,
-  type ChatHistoryItem,
-  type HomeColumnCard,
-  type RepeaterItem,
-  type TagItem,
-} from '@/api/fishpi'
+import type { ArticleSummary, ChatHistoryItem, TagItem } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useHomeLayoutStore, type HomeRowView } from '@/stores/homeLayout'
@@ -32,223 +23,48 @@ import CheckinPanel from '@/components/home/CheckinPanel.vue'
 import HomeSideWidgets from '@/components/home/HomeSideWidgets.vue'
 import HomeRepeaterStation from '@/components/home/HomeRepeaterStation.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
-import { consumeFeedPayload, consumeHomeExtrasPayload } from '@/seo/payload'
-import { SITE_DEFAULT_DESC, SITE_NAME, SITE_ORIGIN } from '@/seo/site'
-import FpLoading from '@/components/FpLoading.vue'
-import { readCache, writeCache } from '@/utils/swr'
+import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
 import { avatarStyle, avatarUrl } from '@/utils/avatar'
 
-const auth = useAuthStore()
-const chat = useChatStore(),publication=useV3ChatPublicationStore()
-const layout = useHomeLayoutStore()
-const router = useRouter()
-const { apiKey, accessToken, isLoggedIn } = storeToRefs(auth)
-const left = ref<ArticleSummary[]>([])
-const right = ref<ArticleSummary[]>([])
-const hot = ref<ArticleSummary[]>([])
-const longArticles = ref<ArticleSummary[]>([])
-const tags = ref<TagItem[]>([])
-const chatLines = ref<ChatHistoryItem[]>([])
-const repeaterItems = ref<RepeaterItem[]>([])
-const onlineChatCnt=computed(()=>chat.onlineTotal)
-const discussing = computed(()=>chat.discuss)
-const chatDraft = ref('')
-watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,auth.account?.oId||'']),()=>{chatDraft.value=''},{flush:'sync'})
-const chatBusy = ref(false)
-const chatMsg = ref('')
-const hotMode = ref<'hot' | 'column'>('hot')
-const error = ref('')
-const loading = ref(true)
-
-const usingMock = computed(() => left.value.some((a) => String(a.oId).startsWith('mock-')))
-const hotPanel = computed(() => (hotMode.value === 'hot' ? hot.value : longArticles.value))
+const auth = useAuthStore(), chat = useChatStore(), publication = useV3ChatPublicationStore(), layout = useHomeLayoutStore(), router = useRouter()
+const { accessToken, isLoggedIn } = storeToRefs(auth)
+const boot = consumeHomeReadsPayload()
+const recentRead = useHomeRead('recent', boot.recent), hotRead = useHomeRead('hot', boot.hot), tagsRead = useHomeRead('tags', boot.tags)
+const columnsRecentRead = useHomeRead('columnsRecent', boot.columnsRecent), columnsHotRead = useHomeRead('columnsHot', boot.columnsHot)
+const left = computed(() => { const rows = recentRead.data || []; return rows.slice(0, Math.ceil(rows.length / 2)) })
+const right = computed(() => { const rows = recentRead.data || []; return rows.slice(Math.ceil(rows.length / 2)) })
+const hot = computed(() => hotRead.data || []), tags = computed(() => tagsRead.data || [])
+const repeaterItems = ref(consumeRepeaterPayload() || undefined)
+const homeRanks = ref(consumeHomeRankingPayload())
+onMounted(() => { homeRanks.value = { checkin: null, online: null }; repeaterItems.value = undefined })
+const chatLines = ref<ChatHistoryItem[]>([]), chatDraft = ref(''), chatBusy = ref(false), chatMsg = ref('')
+const onlineChatCnt = computed(() => chat.onlineTotal), discussing = computed(() => chat.discuss)
+const hotMode = ref<'hot' | 'column'>('hot'), activeLongShelf = ref<'recent' | 'hot'>('recent')
+const hotState = computed(() => hotMode.value === 'hot' ? hotRead : columnsRecentRead)
+const activeColumnsRead = computed(() => activeLongShelf.value === 'recent' ? columnsRecentRead : columnsHotRead)
+const activeColumnsShelf = computed(() => activeColumnsRead.value.data || [])
+const failedCovers = ref(new Set<string>())
+watch(() => [columnsRecentRead.data, columnsHotRead.data], () => { failedCovers.value = new Set() })
 const { editing } = storeToRefs(layout)
 const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive } = useHomeDrag()
-onUnmounted(() => (editing.value = false))
 const { messages: liveChatMessages } = storeToRefs(chat)
-let homeMounted = false
-let longShelfTimer: ReturnType<typeof setInterval> | undefined
-const activeLongShelf = ref<'recent' | 'hot'>('recent')
-
+let homeMounted = false, longShelfTimer: ReturnType<typeof setInterval> | undefined
 function syncLiveChatMessages() {
-  if (!liveChatMessages.value.length){chatLines.value=[];return}
-  chatLines.value = liveChatMessages.value.slice(-10).reverse().map((line) => ({
-    oId: line.oId,
-    userOId: line.userOId,
-    userName: line.userName,
-    userNickname: line.userNickname,
-    userAvatarURL: line.userAvatarURL,
-    content: line.redPacket || (line.card?.msgType === 'music' ? line.card.title || '音乐分享' : line.card ? '天气信息' : line.html || ''),
-    time: line.time,
-  }))
+  chatLines.value = liveChatMessages.value.slice(-10).reverse().map(line => ({ oId: line.oId, userOId: line.userOId, userName: line.userName,
+    userNickname: line.userNickname, userAvatarURL: line.userAvatarURL,
+    content: line.redPacket || (line.card?.msgType === 'music' ? line.card.title || '音乐分享' : line.card ? '天气信息' : line.html || ''), time: line.time }))
 }
-
-watch(liveChatMessages, syncLiveChatMessages)
-onMounted(() => {
-  homeMounted = true
-  if (accessToken.value) void chat.connect()
-  longShelfTimer = setInterval(() => {
-    scrollShelf('long-active', 1)
-  }, 6000)
-})
-onUnmounted(() => {
-  homeMounted = false
-  if (longShelfTimer) clearInterval(longShelfTimer)
-  if (!chat.floatingChatroomOpen) chat.disconnect()
-})
-/** 长篇专区自带卡片样式，独占一行时不再套外框 */
-function isBareRow(row: HomeRowView) {
-  return row.cells.length === 1 && row.cells[0].modules.every((m) => m.id === 'long')
-}
-/** 专栏货架：优先 /api/columns/*，否则 gaps.mock；再否则长篇帖近似. */
-const homeColumnsRecent = ref<HomeColumnCard[]>([])
-const homeColumnsHot = ref<HomeColumnCard[]>([])
-const longRecentShelf = computed(() => longArticles.value.slice(0, 8))
-const defaultColumnCover = `${SITE_ORIGIN}/images/holiday/book-bg.jpg`
-const longHotShelf = computed(() => {
-  const withCol = hot.value.filter((a) => a.columnTitle)
-  if (withCol.length) return withCol.slice(0, 8)
-  return (hot.value.length ? hot.value : longArticles.value).slice(0, 8)
-})
-const activeColumnsShelf = computed(() =>
-  (activeLongShelf.value === 'recent' ? homeColumnsRecent.value : homeColumnsHot.value).slice(0, 8),
-)
-const activeArticlesShelf = computed(() =>
-  activeLongShelf.value === 'recent' ? longRecentShelf.value : longHotShelf.value,
-)
-watch(activeLongShelf, async () => {
-  await nextTick()
-  document.getElementById('long-active')?.scrollTo({ left: 0 })
-})
-usePageSeo(() => ({
-  title: SITE_NAME,
-  description: SITE_DEFAULT_DESC,
-  path: '/',
-}))
-
-function splitArticles(articles: ArticleSummary[]) {
-  const mid = Math.ceil(articles.length / 2)
-  left.value = articles.slice(0, mid)
-  right.value = articles.slice(mid)
-}
-
-const bootFeed = consumeFeedPayload('recent')
-if (bootFeed?.length) {
-  splitArticles(bootFeed)
-  loading.value = false
-}
-const homeRanks = ref(consumeHomeRankingPayload())
-onMounted(() => { homeRanks.value = { checkin: null, online: null } })
-const bootExtra = consumeHomeExtrasPayload()
-if (bootExtra) {
-  if (bootExtra.hot?.length) hot.value = bootExtra.hot.slice(0, 12)
-  if (bootExtra.long?.length) longArticles.value = bootExtra.long.slice(0, 12)
-  if (bootExtra.tags?.length) tags.value = bootExtra.tags.slice(0, 24)
-  if (bootExtra.repeater?.length) repeaterItems.value = bootExtra.repeater
-
-}
-
-async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await p
-  } catch {
-    return fallback
-  }
-}
-
-interface HomeSnapshot {
-  articles: ArticleSummary[]
-  hot: ArticleSummary[]
-  long: ArticleSummary[]
-  tags: TagItem[]
-  chatLines: ChatHistoryItem[]
-  repeater: RepeaterItem[]
-  onlineChatCnt: number | null
-  discussing: string
-  columnsRecent: HomeColumnCard[]
-  columnsHot: HomeColumnCard[]
-}
-const HOME_CACHE_KEY = 'home'
-
-function applySnapshot(s: HomeSnapshot) {
-  splitArticles(s.articles)
-  hot.value = s.hot
-  longArticles.value = s.long
-  tags.value = s.tags
-  syncLiveChatMessages()
-  repeaterItems.value = s.repeater
-  homeColumnsRecent.value = s.columnsRecent
-  homeColumnsHot.value = s.columnsHot
-}
-
-const homeCached = !bootFeed?.length ? readCache<HomeSnapshot>(HOME_CACHE_KEY) : undefined
-if (homeCached) {
-  applySnapshot(homeCached)
-  loading.value = false
-}
-
-let loadVersion = 0
-async function load() {
-  const version = ++loadVersion
-  const token = accessToken.value
-  error.value = ''
-  const needArticles = left.value.length === 0 || Boolean(homeCached)
-  if (left.value.length === 0) loading.value = true
-  try {
-    const [
-      articles,
-      hotList,
-      longList,
-      tagData,
-      reps,
-      columns,
-    ] = await Promise.all([
-      needArticles
-        ? fetchRecentArticles(apiKey.value, 1, 40)
-        : Promise.resolve(left.value.concat(right.value)),
-      safe(fetchArticleFeed('hot', apiKey.value, 1, 12), []),
-      safe(fetchArticleFeed('long', apiKey.value, 1, 12), []),
-      safe(fetchTags(apiKey.value, 1, 24), { tags: [], total: 0 }),
-      safe(fetchRepeaterItems(apiKey.value, 'joke'), []),
-      safe(fetchHomeColumns(), { recent: [], hot: [] }),
-    ])
-    if (version !== loadVersion || token !== accessToken.value) return
-    const snap: HomeSnapshot = {
-      articles,
-      hot: hotList.slice(0, 12),
-      long: longList.slice(0, 12),
-      tags: tagData.tags.slice(0, 24),
-      chatLines: [],
-      repeater: reps,
-      onlineChatCnt: null,
-      discussing: '',
-      columnsRecent: columns.recent || [],
-      columnsHot: columns.hot || [],
-    }
-    applySnapshot(snap)
-    writeCache(HOME_CACHE_KEY, snap)
-  } catch (e) {
-    if (version === loadVersion && token === accessToken.value && !left.value.length) error.value = e instanceof Error ? e.message : '首页加载失败'
-  } finally {
-    if (version === loadVersion && token === accessToken.value) loading.value = false
-  }
-}
-
-watch(accessToken, (token, previous) => {
-  if (token !== previous) { ++loadVersion; left.value = []; right.value = []; hot.value = []; longArticles.value = [] }
-  void load()
-  if (homeMounted) {
-    if (accessToken.value) void chat.connect()
-    else chat.disconnect()
-  }
-}, { immediate: true })
+watch(liveChatMessages, syncLiveChatMessages, { immediate: true })
+watch(() => JSON.stringify([getAuthContextVersion(), !!accessToken.value, auth.account?.oId || '']), () => { chatDraft.value = ''; chatLines.value = []; chatMsg.value = '' }, { flush: 'sync' })
+watch(accessToken, () => { chatLines.value = []; if (homeMounted) { if (accessToken.value) void chat.connect(); else chat.disconnect() } }, { flush: 'sync' })
+onMounted(() => { homeMounted = true; if (accessToken.value) void chat.connect(); longShelfTimer = setInterval(() => scrollShelf('long-active', 1), 6000) })
+onUnmounted(() => { homeMounted = false; editing.value = false; if (longShelfTimer) clearInterval(longShelfTimer); if (!chat.floatingChatroomOpen) chat.disconnect() })
+function isBareRow(row: HomeRowView) { return row.cells.length === 1 && row.cells[0].modules.every(m => m.id === 'long') }
+watch(activeLongShelf, async () => { await nextTick(); document.getElementById('long-active')?.scrollTo({ left: 0 }) })
+usePageSeo(() => ({ title: SITE_NAME, description: SITE_DEFAULT_DESC, path: '/' }))
 
 function views(a: ArticleSummary) {
-  return a.articleViewCntDisplayFormat || a.articleViewCount || ''
-}
-
-function heat(a: ArticleSummary) {
-  return a.articleHeat ?? a.articleCommentCount ?? views(a)
+  return a.articleViewCntDisplayFormat ?? a.articleViewCount ?? ''
 }
 
 function tagPath(tag: TagItem) {
@@ -309,13 +125,6 @@ function scrollShelf(id: string, dir: -1 | 1) {
       <button type="button" @click="layout.resetPositions()">恢复默认位置</button>
       <button type="button" class="green" @click="editing = false">完成</button>
     </div>
-    <p v-if="usingMock" class="banner">
-      匿名列表接口尚未开放，当前展示与 <code>GET /api/articles/recent</code> 对齐的 mock。
-      <RouterLink v-if="!isLoggedIn" to="/login">登录</RouterLink>
-      后走真实数据。
-    </p>
-    <p v-else-if="error" class="err">{{ error }}</p>
-
     <template v-for="row in layout.visibleRows" :key="row.key">
       <div
         v-if="editing"
@@ -344,11 +153,11 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <div class="index-head">
                 <b>最新</b>
               </div>
-              <FpLoading v-if="loading && !left.length" :rows="6" />
+              <HomeReadStatus label="最新文章" :loading="recentRead.loading" :error="recentRead.error" :ready="recentRead.data !== null" :empty="!left.length" empty-text="暂无可见文章。" @retry="recentRead.read" />
               <ol class="module-list">
                 <li v-for="item in left" :key="item.oId">
-                  <span v-if="item.articleStick" class="cb-stick" title="置顶" />
-                  <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                  <span v-if="item.stick?.active" class="cb-stick" title="置顶" />
+                  <RouterLink v-if="item.articleAnonymous !== 1 && item.articleAuthorId && item.articleAuthorName" :to="`/member/${encodeURIComponent(item.articleAuthorName)}`">
                     <span
                       class="avatar-small"
                       :style="avatarStyle(item.articleAuthorThumbnailURL48)"
@@ -368,10 +177,11 @@ function scrollShelf(id: string, dir: -1 | 1) {
                 <b>&nbsp;</b>
                 <RouterLink to="/recent">更多</RouterLink>
               </div>
-              <FpLoading v-if="loading && !right.length" :rows="6" />
+              <HomeReadStatus label="最新文章（续）" :loading="recentRead.loading" :error="recentRead.error" :ready="recentRead.data !== null" :empty="!right.length" :empty-text="left.length ? '本列暂无文章。' : '暂无可见文章。'" @retry="recentRead.read" />
               <ol class="module-list">
                 <li v-for="item in right" :key="item.oId">
-                  <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
+                  <span v-if="item.stick?.active" class="cb-stick" title="置顶" />
+                  <RouterLink v-if="item.articleAnonymous !== 1 && item.articleAuthorId && item.articleAuthorName" :to="`/member/${encodeURIComponent(item.articleAuthorName)}`">
                     <span
                       class="avatar-small"
                       :style="avatarStyle(item.articleAuthorThumbnailURL48)"
@@ -434,48 +244,22 @@ function scrollShelf(id: string, dir: -1 | 1) {
                   @click="activeLongShelf = 'hot'"
                 >热门专栏</button>
                 <div class="long-nav">
-                  <button type="button" aria-label="向左滚动专栏" @click="scrollShelf('long-active', -1)">‹</button>
-                  <button type="button" aria-label="向右滚动专栏" @click="scrollShelf('long-active', 1)">›</button>
+                  <button type="button" aria-label="向左滚动专栏" :disabled="!activeColumnsShelf.length || activeColumnsRead.loading" @click="scrollShelf('long-active', -1)">‹</button>
+                  <button type="button" aria-label="向右滚动专栏" :disabled="!activeColumnsShelf.length || activeColumnsRead.loading" @click="scrollShelf('long-active', 1)">›</button>
                 </div>
               </div>
+              <div class="long-read-state"><HomeReadStatus :label="activeLongShelf === 'recent' ? '最近更新专栏' : '热门专栏'" :loading="activeColumnsRead.loading" :error="activeColumnsRead.error" :ready="activeColumnsRead.data !== null" :empty="!activeColumnsShelf.length" empty-text="暂无可见专栏。" @retry="activeColumnsRead.read" /></div>
               <div id="long-active" class="long-shelf">
-                <template v-if="activeColumnsShelf.length">
-                  <article v-for="col in activeColumnsShelf" :key="activeLongShelf + '-' + col.columnId" class="long-card column">
-                    <RouterLink class="long-cover" :to="`/column/${col.columnId}`" :aria-label="`阅读专栏：${col.columnTitle}`">
-                      <img :src="col.columnCoverURL || defaultColumnCover" alt="" loading="lazy">
-                    </RouterLink>
-                    <div class="long-copy">
-                      <RouterLink class="long-title" :to="`/column/${col.columnId}`">{{ col.columnTitle }}</RouterLink>
-                      <RouterLink
-                        v-if="col.latestChapter?.articleId"
-                        class="long-summary"
-                        :to="`/article/${col.latestChapter.articleId}`"
-                      >{{ col.latestChapter.preview || col.latestChapter.title }}</RouterLink>
-                      <p v-else class="long-summary">{{ col.latestChapter?.title || '持续更新中' }}</p>
-                      <div class="long-meta">
-                        <span>{{ activeLongShelf === 'recent' ? '最近更新' : '热门连载' }}</span>
-                        <span>{{ col.columnArticleCount }} 章</span>
-                      </div>
-                    </div>
-                  </article>
-                </template>
-                <template v-else>
-                  <article v-for="item in activeArticlesShelf" :key="activeLongShelf + '-' + item.oId" class="long-card">
-                    <RouterLink class="long-cover" :to="`/article/${item.oId}`" :aria-label="`阅读：${articleTitle(item)}`">
-                      <img :src="defaultColumnCover" alt="" loading="lazy">
-                    </RouterLink>
-                    <div class="long-copy">
-                      <RouterLink class="long-title" :to="`/article/${item.oId}`">{{ articleTitle(item) }}</RouterLink>
-                      <p class="long-summary">{{ item.articlePreviewContent || item.articleTitle }}</p>
-                      <div class="long-meta">
-                        <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">{{ item.articleAuthorName }}</RouterLink>
-                        <span v-else>长篇连载</span>
-                        <span>{{ activeLongShelf === 'hot' ? `热度 ${heat(item)}` : item.timeAgo || '最近更新' }}</span>
-                      </div>
-                    </div>
-                  </article>
-                </template>
-                <p v-if="!activeColumnsShelf.length && !activeArticlesShelf.length && !loading" class="hint long-empty">暂无内容</p>
+                <article v-for="col in activeColumnsShelf" :key="activeLongShelf + '-' + col.id" class="long-card column">
+                  <RouterLink class="long-cover" :to="`/column/${col.id}`" :aria-label="`阅读专栏：${decodeEntities(col.title)}`">
+                    <img v-if="col.coverURL && !failedCovers.has(col.id)" :src="col.coverURL" alt="" loading="lazy" @error="failedCovers.add(col.id)"><span v-else class="column-cover-placeholder" aria-hidden="true">卷</span>
+                  </RouterLink>
+                  <div class="long-copy">
+                    <RouterLink class="long-title" :to="`/column/${col.id}`">{{ decodeEntities(col.title) }}</RouterLink>
+                    <RouterLink v-if="col.chapters[0]" class="long-summary" :to="`/article/${col.chapters[0]!.id}`">{{ decodeEntities(col.chapters[0]!.preview || col.chapters[0]!.title) }}</RouterLink>
+                    <div class="long-meta"><span>{{ activeLongShelf === 'recent' ? '最近更新' : '热门专栏' }}</span><span>{{ col.articleCount }} 章</span></div>
+                  </div>
+                </article>
               </div>
             </section>
             <section v-else-if="mod.id === 'chat'" class="mod-body">
@@ -521,7 +305,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                     <div class="chat-text">{{ chatPreview(m) }}</div>
                   </div>
                 </li>
-                <li v-if="!chatLines.length&&!loading&&!chat.error" class="hint-li">{{ isLoggedIn?'暂无消息，去聊天室看看':'登录后可读取聊天室消息' }}</li>
+                <li v-if="!chatLines.length&&!chat.loading&&!chat.error" class="hint-li">{{ isLoggedIn?'暂无消息，去聊天室看看':'登录后可读取聊天室消息' }}</li>
               </ol>
             </section>
 
@@ -534,21 +318,14 @@ function scrollShelf(id: string, dir: -1 | 1) {
                 </b>
                 <RouterLink :to="hotMode === 'hot' ? '/hot' : '/column'">更多</RouterLink>
               </div>
-              <ol class="module-list">
-                <li v-for="item in hotPanel" :key="item.oId">
-                  <RouterLink v-if="item.articleAuthorName" :to="`/member/${item.articleAuthorName}`">
-                    <span
-                      class="avatar-small"
-                      :style="avatarStyle(item.articleAuthorThumbnailURL48)"
-                    />
-                  </RouterLink>
-                  <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
-                    articleTitle(item)
-                  }}</RouterLink>
-                  <span class="count heat">🔥 {{ heat(item) }}</span>
+              <HomeReadStatus :label="hotMode === 'hot' ? '热议文章' : '专栏列表'" :loading="hotState.loading" :error="hotState.error" :ready="hotState.data !== null" :empty="!hotState.data?.length" :empty-text="hotMode === 'hot' ? '暂无可见热议文章。' : '暂无可见专栏。'" @retry="hotState.read" />
+              <ol v-if="hotMode === 'hot'" class="module-list">
+                <li v-for="item in hot" :key="item.oId">
+                  <RouterLink v-if="item.articleAnonymous !== 1 && item.articleAuthorId && item.articleAuthorName" :to="`/member/${encodeURIComponent(item.articleAuthorName)}`"><span class="avatar-small" :style="avatarStyle(item.articleAuthorThumbnailURL48)" /></RouterLink>
+                  <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{ articleTitle(item) }}</RouterLink><span class="count">{{ item.articleCommentCount }} 回帖</span>
                 </li>
-                <li v-if="!hotPanel.length && !loading" class="hint-li">暂无内容</li>
               </ol>
+              <ol v-else class="module-list"><li v-for="col in columnsRecentRead.data || []" :key="col.id"><RouterLink class="title fn-ellipsis" :to="`/column/${col.id}`">{{ decodeEntities(col.title) }}</RouterLink><span class="count">{{ col.articleCount }} 章</span></li></ol>
             </section>
 
             <aside v-else-if="mod.id === 'community'" class="mod-body">
@@ -560,11 +337,11 @@ function scrollShelf(id: string, dir: -1 | 1) {
                 <b>标签</b>
                 <RouterLink to="/tags">更多</RouterLink>
               </div>
+              <HomeReadStatus label="标签" :loading="tagsRead.loading" :error="tagsRead.error" :ready="tagsRead.data !== null" :empty="!tags.length" empty-text="暂无标签。" @retry="tagsRead.read" />
               <div class="tags">
                 <RouterLink v-for="t in tags" :key="t.tagURI || t.tagTitle" :to="tagPath(t)">
                   {{ t.tagTitle }}
                 </RouterLink>
-                <span v-if="!tags.length && !loading" class="hint">暂无标签</span>
               </div>
 
             <div class="index-head spaced">
@@ -584,7 +361,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .banner,
 .hint {
   color: var(--fp-muted);
@@ -639,11 +416,18 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .board {
   display: grid;
-  background: var(--fp-card);
-  box-shadow: var(--fp-card-shadow);
-  border: 1px solid var(--fp-border);
+  gap: 16px;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  padding: 0;
+}
+.mod-body {
   padding: 16px 14px 20px;
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
   border-radius: 8px;
+  box-shadow: var(--fp-card-shadow);
 }
 .board.bare {
   display: block;
@@ -657,13 +441,13 @@ function scrollShelf(id: string, dir: -1 | 1) {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  padding: 0 10px;
+  padding: 0;
 }
 .board.bare .cell {
   padding: 0;
 }
 .cell:not(:last-child) {
-  border-right: 1px solid var(--fp-border);
+  border-right: 0;
 }
 .mod {
   position: relative;
@@ -1001,6 +785,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
   font-size: 12px;
 }
 
+.long-read-state { margin: 0 var(--long-gutter); }
+.column-cover-placeholder { width: 100%; height: 100%; display: grid; place-items: center; font-size: 30px; color: #fff8ec; background: linear-gradient(145deg, #b38c61, #695039); }
 .long-zone {
   --long-gutter: 20px;
   background: var(--fp-card);
@@ -1249,7 +1035,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 @media (max-width: 960px) {
   .board {
     grid-template-columns: minmax(0, 1fr) !important;
-    padding: 12px 10px;
+    padding: 0;
     gap: 12px;
   }
   .cell {
@@ -1257,9 +1043,9 @@ function scrollShelf(id: string, dir: -1 | 1) {
   }
   .cell:not(:last-child) {
     border-right: none;
-    border-bottom: 1px solid var(--fp-border);
-    padding-bottom: 14px;
-    margin-bottom: 8px;
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
   }
   .long-zone {
     --long-gutter: 14px;
