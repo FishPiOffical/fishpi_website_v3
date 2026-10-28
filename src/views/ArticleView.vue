@@ -18,7 +18,6 @@ import ArticleOwnerActions from '@/components/articles/ArticleOwnerActions.vue'
 import { ApiError,getAuthContextVersion } from '@/api/http'
 import CommentComposer from '@/components/articles/CommentComposer.vue'
 import { useV3CommentsStore } from '@/stores/v3Comments'
-import { clearCache } from '@/utils/swr'
 import MedalList from '@/components/medal/MedalList.vue'
 import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import { useV3ReactionsStore } from '@/stores/v3Reactions'
@@ -33,7 +32,6 @@ import ImageLightbox from '@/components/ImageLightbox.vue'
 import LongArticleReader from '@/components/articles/LongArticleReader.vue'
 import { useLayoutStore } from '@/stores/layout'
 import { createReusableTemplate } from '@/utils/reusableTemplate'
-import { readCache, writeCache } from '@/utils/swr'
 
 const reactionEvents=useV3ReactionsStore()
 const route = useRoute(), router = useRouter()
@@ -42,7 +40,7 @@ const commentWrites=useV3CommentsStore(),commandOrigin=Symbol('article-comment-d
 const { apiKey, accessToken, isLoggedIn, account } = storeToRefs(auth)
 
 const article = ref<ArticleDetail | null>(null)
-const loading = ref(true)
+const loading = ref(true), articleReading = ref(false)
 const error = ref('')
 const actionMsg = ref('')
 const ownerRefreshError=ref(''),ownerDeletedId=ref('')
@@ -59,7 +57,7 @@ const showRevisions = ref(false)
 const historyRef=ref<InstanceType<typeof RevisionHistory>|null>(null)
 const viewerIdentity=computed(()=>`${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}`)
 let stopArticle:(()=>void)|null=null,subscriptionKey='',heatRequest:AbortController|null=null,heatSequence=0,changeRevision=0,liveReadVersion=0
-let readVersion = 0
+let readVersion = 0, disposed = false
 
 const id = computed(() => String(route.params.id || ''))
 const tocReady = ref(false)
@@ -243,7 +241,7 @@ async function readArticleChanges(){
 async function ownerChanged(target:string){if(target===id.value)await load(true,'owner')}
 async function ownerDeleted(target:string){
  if(target!==id.value)return
- ++readVersion;disconnectHeat();clearCache();article.value=null;loading.value=false;ownerDeletedId.value=target;error.value='文章已删除'
+ ++readVersion;disconnectHeat();article.value=null;loading.value=false;ownerDeletedId.value=target;error.value='文章已删除'
  try{await router.replace('/')}catch{if(id.value===target)error.value='文章已删除，返回首页失败，请点击返回首页。'}
 }
 async function refreshHeat() {
@@ -259,61 +257,36 @@ async function refreshHeat() {
 
 async function load(force=false,reason:'comments'|'owner'|'realtime'='comments') {
   if (!id.value) return
-  const version = ++readVersion
-  const viewer = viewerIdentity.value
-  const cached = !force && commentPage.value === 1 ? consumeArticlePayload(id.value) : null
-  if (cached) {
-    article.value = cached
-    loading.value = false
-    error.value = ''
-    heat.value = null
+  const version = ++readVersion, viewer = viewerIdentity.value, reqId = id.value, requestedPage = commentPage.value
+  const current = () => !disposed && reqId === id.value && requestedPage === commentPage.value && version === readVersion && viewer === viewerIdentity.value
+  const preload = !force && requestedPage === 1 ? consumeArticlePayload(reqId) : null
+  if (preload && (!accessToken.value || import.meta.env.SSR)) {
+    article.value = preload; loading.value = false; error.value = ''; heat.value = null
     void buildToc()
-    // SSR is anonymous; authenticated readers must refresh their viewer-dependent content.
-    if (import.meta.env.SSR || !accessToken.value) {
-      writeCache(`article:${id.value}:1`, cached)
-      if (!import.meta.env.SSR) {
-        void refreshHeat()
-        connectHeat()
-      }
-      return
-    }
+    return
   }
-  const reqId = id.value
-  const cacheKey = `article:${reqId}:${commentPage.value}`
-  const paging = article.value?.oId === reqId
-  const hit = force ? null : cached || readCache<ArticleDetail>(cacheKey)
-  if (hit) {
-    article.value = hit
-    heat.value = null
-    loading.value = false
-    void buildToc()
-  } else if (!paging) {
-    loading.value = true
-    article.value = null
-  }
+  // A failed SSR preload must remain a shell; current-reader HTTP starts after hydration.
+  if (import.meta.env.SSR) { article.value = null; loading.value = true; return }
+  const paging = article.value?.oId === reqId, refreshing = force && paging
+  articleReading.value = true
+  if (!paging) { article.value = null; loading.value = true }
   error.value = ''
   if(force){if(reason==='owner')ownerRefreshError.value='';else if(reason==='realtime')realtimeReadError.value='';else commentRefreshError.value=''}
   try {
-    const data = await fetchArticle(reqId, apiKey.value, commentPage.value)
-    if (reqId !== id.value || version !== readVersion || viewer !== viewerIdentity.value) return
-    writeCache(cacheKey, data)
-    article.value = data
-    heat.value = null
-    loading.value = false
-    void buildToc()
-    void refreshHeat()
-    connectHeat()
+    const data = await fetchArticle(reqId, null, requestedPage)
+    if (!current()) return
+    article.value = data; heat.value = null; loading.value = false
+    void buildToc(); void refreshHeat(); connectHeat()
   } catch (e) {
-    if (reqId !== id.value || version !== readVersion || viewer !== viewerIdentity.value) return
-    if(reason==='realtime'&&e instanceof ApiError&&[401,403,404].includes(e.status)){article.value=null;error.value='文章不存在或当前已无权阅读';clearCache();disconnectHeat();return}
-    if(force){if(reason==='owner')ownerRefreshError.value='置顶已确认，文章状态重新读取失败，请重试读取。';else if(reason==='realtime')realtimeReadError.value='文章变更读取失败，请重试。';else commentRefreshError.value='操作已确认，评论重新读取失败：'+(e instanceof Error?e.message:'请重试');return}
-    if(hit)return
-    error.value = e instanceof Error ? e.message : '帖子加载失败'
-    disconnectHeat()
-    toc.value = []
-  } finally {
-    if (reqId === id.value && version === readVersion && viewer === viewerIdentity.value) loading.value = false
-  }
+    if (!current()) return
+    if(e instanceof ApiError&&[401,403,404].includes(e.status)) {
+      article.value=null; error.value='文章不存在或当前已无权阅读'; disconnectHeat(); toc.value=[]; zoomed.value=''
+      editingId.value=''; replyId.value=''; replyComment.value=null; paragraphIdForReply.value=''; showRevisions.value=false
+      return
+    }
+    if(refreshing){if(reason==='owner')ownerRefreshError.value='置顶已确认，文章状态重新读取失败，请重试读取。';else if(reason==='realtime')realtimeReadError.value='文章变更读取失败，请重试。';else commentRefreshError.value='操作已确认，评论重新读取失败：'+(e instanceof Error?e.message:'请重试');return}
+    article.value=null; error.value=e instanceof Error?e.message:'帖子加载失败'; disconnectHeat(); toc.value=[]
+  } finally { if (current()) { loading.value = false; articleReading.value = false } }
 }
 
 const layout = useLayoutStore()
@@ -321,6 +294,7 @@ if (!import.meta.env.SSR) {
   watch(isLong, (v) => (layout.immersive = v), { immediate: true })
 }
 onUnmounted(() => {
+  disposed = true; ++readVersion
   commentWrites.cancelConfirmation(commandOrigin)
   disconnectHeat()
   layout.immersive = false
@@ -338,12 +312,12 @@ watch(
   { immediate: true },
 )
 
-watch(accessToken,()=>{if(!import.meta.env.SSR){stopArticle?.();stopArticle=null;subscriptionKey='';connectHeat();void refreshHeat()}},{flush:'post'})
+watch(accessToken,(token,old)=>{if(!import.meta.env.SSR){stopArticle?.();stopArticle=null;subscriptionKey='';if(token&&old)void load(true,'realtime');else{connectHeat();void refreshHeat()}}},{flush:'post'})
 
 watch(viewerIdentity, () => {
   ownerRefreshError.value='';ownerDeletedId.value='';realtimeReadError.value=''
   ++readVersion
-  article.value = null
+  article.value = null; articleReading.value = false
   editingId.value='';replyId.value='';replyComment.value=null;paragraphIdForReply.value='';commentRefreshError.value=''
   showRevisions.value=false
   commentPage.value = 1
@@ -374,7 +348,7 @@ function clearReplyTarget() {
 watch(()=>commentWrites.revision,()=>{
   const command=commentWrites.completed
   if(!command||command.articleId!==id.value||!accessToken.value)return
-  clearCache();editingId.value=''
+  editingId.value=''
   if(command.operation==='create'&&(command.input.parentId||'')===replyId.value&&(command.input.paragraphId||'')===paragraphIdForReply.value)cancelReply()
   void load(true)
   readerRef.value?.refreshParagraphComments()
@@ -461,6 +435,7 @@ function itemHandlers(c: ArticleComment) {
       <RevisionHistory ref="historyRef" kind="article" :target-id="article.oId" :trigger="false" @open-change="showRevisions=$event" />
     </DefineRevisions>
     <DefineComments>
+      <p v-if="articleReading" role="status">正在读取第 {{ commentPage }} 页评论，当前内容尚未更新。</p>
       <p v-if="commentRefreshError" role="alert">{{ commentRefreshError }}<button type="button" @click="load(true)">重读评论</button></p>
       <p v-if="commentWrites.error" role="alert">{{ commentWrites.error }}</p>
       <p v-if="commentWrites.message" role="status">{{ commentWrites.message }}</p>
@@ -494,9 +469,9 @@ function itemHandlers(c: ArticleComment) {
 
       <p v-if="!comments.length" class="empty-hint">暂无回帖，快来抢沙发吧～</p>
       <footer v-if="commentPages > 1" class="pager">
-        <button type="button" class="btn small" :disabled="commentPage <= 1" @click="gotoCommentPage(commentPage - 1)">上一页</button>
+        <button type="button" class="btn small" :disabled="articleReading || commentPage <= 1" @click="gotoCommentPage(commentPage - 1)">上一页</button>
         <span class="pager-info">{{ commentPage }} / {{ commentPages }}</span>
-        <button type="button" class="btn small" :disabled="commentPage >= commentPages" @click="gotoCommentPage(commentPage + 1)">下一页</button>
+        <button type="button" class="btn small" :disabled="articleReading || commentPage >= commentPages" @click="gotoCommentPage(commentPage + 1)">下一页</button>
       </footer>
     </DefineComments>
     <DefineComposer>
