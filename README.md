@@ -43,32 +43,15 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - 主题、对话框、头像框：`src/packs` 目录包
 - 广告位：仅保留 `AdSlot` 入口（`home.top` / `home.sidebar` / `footer.sponsors`），暂不拉取素材
 - 聊天室侧边栏模块化
-- 帖子热度 `GET /api/article/heat/{id}` 与 `article-channel` 实时在看/新评
-- 举报 `POST /report`（帖子/评论/用户）
-- 复读机 `GET /api/repeater/items`、点赞
-- 表情反应（帖子/评论/聊天室）`POST /article/reaction` 等
-- 发帖草稿 `GET/POST/DELETE /api/article-drafts`
-- 评论编辑/问答采纳、标签联想、Markdown 预览
-- 随机发现 `GET /api/v3/articles/random`、元数据公开日志 `GET /api/v3/logs`；通知已改v3票据实时订阅，旧紧急广播与私信推送仍待迁移
-- 评论楼中楼、聊天室附近消息、公开职业/勋章列表
-- 职业成长榜、最近注册 `GET /api/v3/recent-members`、弹幕花费、聊天室消息原文
-- 设置页表情分组（GET 列表，增删走现网 JSON，验证时不提交）
-- 匿名可读：帖子列表/详情/搜索/领域/标签墙/问答 `GET /api/articles/qna`、优选 `GET /api/articles/perfect`
-- 帖子正文目录（从正文 h1–h3 生成）
-- 帖子修订历史 `GET /article/{id}/revisions/list|/{revisionId}`（需登录）
-- 设置页职业主职/隐私 UI → `POST /api/profession/me/primary|privacy`（读 `GET /api/profession/me`；写操作经 `POST /__fp/page-auth` 换取 `sym-ce` + `csrfToken`）
-- 积分余额 `GET /user/:name/point`；流水走 `GET /api/getNotifications?type=point`（现网无 apiKey 独立流水 JSON，OpenID 除外）
-- 聊天室进房前预拉 `GET /chat-room/online-users`（在线列表/话题）
-- 用户主页清风明月 `GET /api/user/{name}/breezemoons`（需登录）
-- 首页长篇双货架（最近更新 / 热门专栏）与社区清风明月发布（`POST /breezemoon` + page-auth CSRF）
-- 搜索对齐现网 `GET /api/search?key=`；路由别名 `/column`、`/recent`、`/top/checkin|online|balance|consumption`
-- 开发代理 SPA bypass：`/activity`、`/following`、`/breezemoons`、`/settings` 页面不再被 API 前缀吃掉
-- 设置页侧栏对齐现网（资料/个性化/头像/账号/功能/积分/隐私/职业）；密码、地理位置、功能偏好走 page-auth CSRF
-- 聊天室 UI：上方输入区（话题/红包/弹幕/清屏）+ 下方消息流；游客可浏览历史/在线
+- 帖子当前读取、评论分页/写入、修订历史、热度和表态均接 v3；权限变化不恢复旧缓存正文
+- 复读机、举报、草稿、职业/会员/勋章、积分、表情、账号设置等用户能力已分批接 v3，具体源码与验收限制见 docs/V3_MIGRATION.md
+- 首页五资源及领域/标签目录使用当前 v3 数据，独立错误和重试；目录按真实元数据分页
+- 通知/私信/聊天室使用 v3 HTTP 与票据订阅；经典功能链接直接导航，目标页面可能要求独立登录
+- 已移除网站内部旧 apiKey → sym-ce/CSRF 桥接及无调用旧包装，不再提供 POST /__fp/page-auth；已有集成改用 v3 登录
 
 闲聊室 `/idle-talk` 现网 404，**明确不做**。管理后台不在本站范围（继续用 Rhythm FTL `/admin`）。
-游戏入口：`/games`（官方小游戏跳转 Rhythm + 鱼游投稿）；VIP：`/vips`（积分开通 `/api/membership/*`）。
-用户发帖列表 / 收藏 / 关注粉丝 / 通知 / 私信：接口失败时返回空列表（不再塞 mock）。
+游戏入口：`/games`（官方小游戏跳转 Rhythm + 鱼游投稿）；VIP：`/vips`（v3 本人会员及原子积分开通）。
+用户列表/内容读取失败明确显示错误和重试，合法空结果单独展示，不用 mock 冒充。
 SSR 另 prefetch：`/domains`、`/tags`、`/breezemoons`、`/top`、`/repeater`。
 补齐页面：`/download`、`/agreement`、`/privacy`、`/activity`、`/following`、`/settings/point`、`/member/:name/medals`、`/city/:city`、`/charge/point`、`/column/:id`。
 

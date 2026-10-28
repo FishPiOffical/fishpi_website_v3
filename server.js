@@ -54,77 +54,6 @@ function proxyWsUpgrade(req, socket, head) {
   upstream.end()
 }
 
-function extractCsrfToken(html) {
-  const m = String(html).match(/csrfToken\s*:\s*['"]([^'"]+)['"]/)
-  return m?.[1]?.trim() || ''
-}
-
-function parseSetCookie(res) {
-  const raw =
-    typeof res.headers.getSetCookie === 'function'
-      ? res.headers.getSetCookie()
-      : res.headers.get('set-cookie')
-        ? [res.headers.get('set-cookie')]
-        : []
-  const out = {}
-  for (const line of raw || []) {
-    const m = String(line).match(/^([^=]+)=([^;]+)/)
-    if (m) out[m[1]] = m[2]
-  }
-  return out
-}
-
-function parseRequestCookie(header) {
-  const out = {}
-  for (const part of String(header || '').split(';')) {
-    const i = part.indexOf('=')
-    if (i <= 0) continue
-    out[part.slice(0, i).trim()] = part.slice(i + 1).trim()
-  }
-  return out
-}
-
-async function csrfFromSymCe(symCe) {
-  const settingsRes = await fetch(`${apiTarget}/settings`, {
-    headers: {
-      'User-Agent': FISHPI_UA,
-      Referer: `${apiTarget}/`,
-      Cookie: `sym-ce=${symCe}`,
-    },
-  })
-  if (!settingsRes.ok) return ''
-  const html = await settingsRes.text()
-  return extractCsrfToken(html)
-}
-
-/** apiKey → sym-ce cookie + csrfToken (Rhythm page POSTs, e.g. profession). */
-async function exchangePageAuth(apiKey, existingSymCe = '') {
-  // Reuse browser cookie when still valid — avoids loginWebInApiKey roundtrip.
-  if (existingSymCe) {
-    const csrfToken = await csrfFromSymCe(existingSymCe)
-    if (csrfToken) return { csrfToken, symCe: existingSymCe, reused: true }
-  }
-
-  const loginRes = await fetch(`${apiTarget}/loginWebInApiKey?apiKey=${encodeURIComponent(apiKey)}`, {
-    method: 'GET',
-    redirect: 'manual',
-    headers: {
-      'User-Agent': FISHPI_UA,
-      Referer: `${apiTarget}/login`,
-    },
-  })
-  const cookies = parseSetCookie(loginRes)
-  const symCe = cookies['sym-ce']
-  if (!symCe) {
-    throw new Error('无法换取页面会话，请检查 apiKey')
-  }
-  const csrfToken = await csrfFromSymCe(symCe)
-  if (!csrfToken) {
-    throw new Error('设置页未返回 csrfToken')
-  }
-  return { csrfToken, symCe, reused: false }
-}
-
 function injectHtml(template, { appHtml, headPayload, payload, cssLinks }) {
   const head = [cssLinks || '', headPayload.headTags || '', headPayload.bodyTagsOpen || '']
     .filter(Boolean)
@@ -224,30 +153,7 @@ async function createServer() {
   /** @type {Record<string, string[]> | null} */
   let ssrManifest = null
 
-  // 仅 page-auth 解析 JSON。全局 express.json 会吃掉 body，导致 Vite 代理 POST（勋章/发帖等）一直挂起。
-  app.post('/__fp/page-auth', express.json({ limit: '32kb' }), async (req, res) => {
-    try {
-      const apiKey = String(req.body?.apiKey || '')
-      if (!apiKey) {
-        res.status(400).json({ code: -1, msg: '缺少 apiKey' })
-        return
-      }
-      const existingSymCe = parseRequestCookie(req.headers.cookie)['sym-ce'] || ''
-      const { csrfToken, symCe, reused } = await exchangePageAuth(apiKey, existingSymCe)
-      // Same cookie name as Rhythm so Vite/nginx proxy forwards it upstream.
-      if (!reused || symCe !== existingSymCe) {
-        res.setHeader(
-          'Set-Cookie',
-          `sym-ce=${symCe}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`,
-        )
-      }
-      res.status(200).json({ code: 0, csrfToken, reused: Boolean(reused) })
-    } catch (e) {
-      res.status(502).json({ code: -1, msg: e instanceof Error ? e.message : 'page-auth 失败' })
-    }
-  })
-
-  // 缺失 JSON 用前端 gaps.mock，不再 HTML 抓取现网。清单见 docs/MISSING_APIS.md。
+  // Keep request bodies untouched for Vite proxies; authentication uses existing v3 endpoints.
 
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite')

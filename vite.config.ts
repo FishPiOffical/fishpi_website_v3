@@ -59,8 +59,6 @@ export default defineConfig(({ mode }) => {
           secure: true,
           rewrite: (path) => path.replace(/^\/rhypic-upload/, ''),
         },
-        // apiKey → web session (sym-ce); used by server page-auth and direct clients.
-        '/loginWebInApiKey': proxy,
         '/chat-room': { ...proxy, ws: true },
         '/chat-room-channel': { ...proxy, ws: true },
         '/captcha': proxy,

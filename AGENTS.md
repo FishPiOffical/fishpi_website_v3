@@ -21,7 +21,7 @@
 - 用户悬浮卡片加载失败应展示错误状态，不回退到模拟用户资料。
 - v3浏览器只用内存Bearer与HttpOnly刷新Cookie，不写localStorage；旧脚本缓存/FP_API_KEY仅用于旧接口，禁止把Bearer传入旧apiKey参数。当前分批状态见docs/V3_MIGRATION.md。
 - 不反复调用密码登录接口；不要把密码、API Key、Cookie 写入源码或日志。
-- 需要页面认证的写操作沿用现有 page-auth、sym-ce 与 csrfToken 链路。
+- 用户能力只走既有v3认证；旧page-auth换Cookie桥接已退役，经典链接直接导航，由目标页面认证。
 - 浏览器验证默认只读；不要为测试随意发帖、转账或修改真实账号资料。
 
 ## 首页布局

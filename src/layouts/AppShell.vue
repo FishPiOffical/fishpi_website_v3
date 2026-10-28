@@ -29,7 +29,6 @@ import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
 import UserHoverCard from '@/components/user/UserHoverCard.vue'
 import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import { useLayoutStore } from '@/stores/layout'
-import { openRhythmPage } from '@/api/pageAuth'
 
 const baseNav = [
   { to: '/', label: '最新' },
@@ -137,7 +136,6 @@ const legalLinks = [
 ]
 
 const route = useRoute()
-const openRhythm = (href: string) => openRhythmPage(href, auth.apiKey)
 /** 私有页面首帧保持 SSR 占位；挂载并恢复当前认证后才渲染子页面。 */
 const mounted = ref(false)
 const startup = useClientStartupStore()
@@ -460,7 +458,6 @@ onUnmounted(() => {
             <div class="foot-links">
               <template v-for="s in exploreLinks" :key="s.href">
                 <a v-if="s.external" :href="s.href" target="_blank" rel="noopener">{{ s.label }}</a>
-                <a v-else-if="'rhythm' in s" :href="s.href" @click.prevent="openRhythm(s.href)">{{ s.label }}</a>
                 <RouterLink v-else :to="s.href">{{ s.label }}</RouterLink>
               </template>
             </div>
@@ -479,7 +476,6 @@ onUnmounted(() => {
             <div class="foot-links">
               <template v-for="item in legalLinks" :key="item.href">
                 <a v-if="item.external" :href="item.href" target="_blank" rel="noopener">{{ item.label }}</a>
-                <a v-else-if="'rhythm' in item" :href="item.href" @click.prevent="openRhythm(item.href)">{{ item.label }}</a>
                 <RouterLink v-else :to="item.href">{{ item.label }}</RouterLink>
               </template>
             </div>

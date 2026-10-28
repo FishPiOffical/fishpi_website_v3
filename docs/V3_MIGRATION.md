@@ -406,3 +406,6 @@ MarkdownEditor去旧apiKey上传门禁，接既有v3票据与专用票据直传�
 
 
 第106轮（2026-10-28）：v3Article详情ID/评论articleId/请求页与size20绑定及重复评论拒绝，参数先验避免半发请求，长篇坏响应不继续取段落正文。新增8组及完整组件0页返回第23组、79脚本911组、认证12组、exit0类型双构建、76JS版本0/无map通过；IAB1280合成错误归属p2→明确错误→原页重试正确末项及收缩0页返回第一页通过。290保持，无Java/FTL/SQL/Maven/APP/外部契约变更，真实权限/风控/长篇/390px待验，见[响应绑定记录](api-v3-client-article-binding-work.md)。
+
+
+第107轮（2026-10-28）：用户批准网站旧page-auth桥接退役；删除Node转换/HTML抓取/Cookie签发、前端sessionStorage helper及Vite/nginx旧登录转发，Rhythm经典入口保持。fishpi删除47个无调用包装，仅六当前helper。实际生产/开发Node六组桥接404/零上游/无Cookie、现有v3与验证码POST正文保留；80脚本917组、认证12组、exit0双构建、77JS版本0/无map，IAB1280首页→v3登录表单通过。290保持，无Java/FTL/SQL/Maven/APP；需部署重启Node/同步nginx，真实登录/风控/390px待验，见[桥接退役记录](api-v3-retired-bridge-work.md)。

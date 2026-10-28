@@ -1,13 +1,10 @@
-import { fetchPublicColumnCards, type PublicColumn } from './v3-public-columns'
 import {repeaterList,type RepeaterEntry} from './v3-repeater'
 import { md5 } from 'js-md5'
 import {
   type DomainItem,
 } from './catalog'
-import { ApiError, request, withKey } from './http'
-import { fetchV3FrequentEmotions, fetchV3EmojiGroups, fetchV3GroupEmojis, createV3EmojiGroup, updateV3EmojiGroup, deleteV3EmojiGroup, addV3EmojiURL, removeV3GroupEmoji, emojiOperationKey } from './v3-emojis'
-import { fetchNotificationPage, fetchV3UnreadCount, markV3NotificationsRead, notificationReadKey } from './v3-notifications'
-import { v3RecentArticles, v3ArticleFeed, v3Search, v3Domains, v3Tags, v3Article } from './v3-content'
+import { ApiError, request } from './http'
+import { v3Article } from './v3-content'
 
 export type { DomainItem }
 
@@ -31,7 +28,7 @@ export interface AccountInfo {
   userCommentCount?: number
   userPhone?: string
   userEmail?: string
-  /** 待后端在 /api/user 提供：未绑手机 / 管理组未开两步验证，对应现网首页的安全弹窗。 */
+  /** v3本人账号提供的引导状态；不从旧完整用户对象补值。 */
   needBindPhone?: boolean
   need2fa?: boolean
   /** 0 公开 / 1 私密 */
@@ -475,14 +472,6 @@ export async function validateRiskCaptcha(captcha: unknown) {
   if (res.code) throw new Error(res.msg || '人机验证失败，请重试')
 }
 
-export async function fetchAccount(apiKey: string) {
-  const res = await request<Envelope<AccountInfo & { userTag?: string; mbti?: string }>>(withKey('/api/user', apiKey))
-  if (res.code !== 0 || !res.data) throw new Error(res.msg || '密钥无效')
-  const data = res.data
-  if (!data.userTags && data.userTag) data.userTags = data.userTag
-  return data
-}
-
 export interface ProfileUpdate {
   userNickname?: string
   userURL?: string
@@ -490,35 +479,6 @@ export interface ProfileUpdate {
   userTag?: string
   mbti?: string
   userQQ?: string
-}
-
-export async function updateProfile(apiKey: string, data: ProfileUpdate) {
-  const res = await request<Envelope<unknown>>('/api/settings/profiles', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, ...data }),
-  })
-  if (res.code) throw new Error(res.msg || '保存资料失败')
-}
-
-export async function updateAvatar(apiKey: string, userAvatarURL: string) {
-  const res = await request<Envelope<unknown>>('/api/settings/avatar', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, userAvatarURL }),
-  })
-  if (res.code) throw new Error(res.msg || '更新头像失败')
-}
-
-/** 修改密码：页面态 POST /settings/password（MD5 + CSRF）。 */
-/** 地理位置公开状态：0 公开 / 1 私密。 */
-export async function updateGeoStatus(apiKey: string, userGeoStatus: 0 | 1) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/settings/geo/status', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ userGeoStatus }),
-  })
-  if (res.code) throw new Error(res.msg || '地理位置设置失败')
 }
 
 export interface FunctionSettings {
@@ -533,70 +493,6 @@ export interface FunctionSettings {
   userReplyWatchArticleStatus: boolean
   userForwardPageStatus: boolean
   chatRoomPictureStatus: boolean
-}
-
-/** 功能偏好：页面态 POST /settings/function。 */
-export async function updateFunctionSettings(apiKey: string, data: FunctionSettings) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/settings/function', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify(data),
-  })
-  if (res.code) throw new Error(res.msg || '功能设置失败')
-}
-
-/** 隐私可见性：页面态 POST /settings/privacy（boolean = 是否公开）。 */
-export async function updatePrivacySettings(apiKey: string, data: PrivacySettings) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/settings/privacy', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify(data),
-  })
-  if (res.code) throw new Error(res.msg || '隐私设置失败')
-}
-
-
-export async function updateI18nSettings(
-  apiKey: string,
-  data: { userLanguage: string; userTimezone: string },
-) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/settings/i18n', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify(data),
-  })
-  if (res.code) throw new Error(res.msg || '国际化设置失败')
-}
-
-/** 积分兑换邀请码。 */
-export async function buyInvitecode(apiKey: string): Promise<string> {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/point/buy-invitecode', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({}),
-  })
-  if (res.code) throw new Error(res.msg || '兑换失败')
-  return res.msg || '兑换成功'
-}
-
-/** 查询邀请码状态。code 1=可用，其它多为不可用/错误。 */
-export async function queryInvitecode(apiKey: string, invitecode: string): Promise<{ ok: boolean; msg: string }> {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/invitecode/state', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ invitecode }),
-  })
-  return { ok: res.code === 1, msg: res.msg || (res.code === 1 ? '可用' : '不可用') }
 }
 
 export interface EmojiItem {
@@ -623,26 +519,6 @@ export function emojiToMarkdown(item: EmojiItem) {
   }
   return item.text || `:${item.name}:`
 }
-export async function fetchFrequentEmotions(_apiKey: string): Promise<EmojiItem[]> { return fetchV3FrequentEmotions() }
-export async function fetchEmojiGroups(_apiKey: string, p = 1): Promise<EmojiGroup[]> { return (await fetchV3EmojiGroups(p)).list }
-export async function fetchGroupEmojis(_apiKey: string, groupId: string, p = 1): Promise<EmojiItem[]> { return (await fetchV3GroupEmojis(groupId, p)).list }
-export async function createEmojiGroup(_apiKey: string, name: string, sort = 0, key = emojiOperationKey()) { return createV3EmojiGroup(name, sort, key) }
-export async function updateEmojiGroup(_apiKey: string, groupId: string, name: string, sort = 0, key = emojiOperationKey()) { return updateV3EmojiGroup(groupId, name, sort, key) }
-export async function deleteEmojiGroup(_apiKey: string, groupId: string, key = emojiOperationKey()) { return deleteV3EmojiGroup(groupId, key) }
-export async function addEmojiUrl(_apiKey: string, groupId: string, url: string, sort = 0, name = '', key = emojiOperationKey()) { return addV3EmojiURL(groupId, url, sort, name, key) }
-export async function removeGroupEmoji(_apiKey: string, groupId: string, itemId: string, key = emojiOperationKey()) { return removeV3GroupEmoji(groupId, itemId, key) }
-
-export async function transferPoints(apiKey: string, userName: string, amount: number, memo: string) {
-  const res = await request<Envelope<unknown>>('/point/transfer', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, userName, amount, memo }),
-  })
-  if (res.code) throw new Error(res.msg || '转账失败')
-}
-
-export async function fetchRecentArticles(_apiKey?: string | null, page = 1, size = 40) {
-  return v3RecentArticles(page, size)
-}
 
 export type ArticleFeedKind =
   | 'recent'
@@ -656,34 +532,12 @@ export type ArticleFeedKind =
   | 'domain'
   | 'tag'
 
-export async function fetchArticleFeed(
-  kind: ArticleFeedKind,
-  _apiKey?: string | null,
-  page = 1,
-  size = 40,
-  extra = '',
-): Promise<ArticleSummary[]> {
-  return v3ArticleFeed(kind, page, size, extra)
-}
-
-export async function fetchSearch(q: string, _apiKey?: string | null, page = 1, size = 40) {
-  return v3Search(q, page, size)
-}
-
-export async function fetchDomains(_apiKey?: string | null): Promise<DomainItem[]> {
-  return v3Domains()
-}
-
 export interface TagItem {
   tagTitle: string
   tagURI: string
   tagIconPath?: string
   tagReferenceCount?: number
   tagDescription?: string
-}
-
-export async function fetchTags(_apiKey?: string | null, page = 1, size = 50): Promise<{ tags: TagItem[]; total: number }> {
-  return v3Tags(page, size)
 }
 
 
@@ -694,20 +548,6 @@ export function fetchRepeaterItems(_apiKey?: string | null, type = '') { return 
 
 export async function fetchArticle(id: string, _apiKey?: string | null, page = 1): Promise<ArticleDetail> {
   return v3Article(id, page)
-}
-
-export async function fetchBreezemoons(page = 1, size = 20) {
-  const res = await request<{
-    code: number
-    msg?: string
-    breezemoons?: Breezemoon[]
-    data?: { breezemoons?: Breezemoon[] } | Breezemoon[]
-  }>(`/api/breezemoons?p=${page}&size=${size}`)
-  if (res.code !== 0) throw new Error(res.msg || '清风明月失败')
-  if (Array.isArray(res.breezemoons)) return res.breezemoons
-  if (Array.isArray(res.data)) return res.data
-  if (res.data && Array.isArray(res.data.breezemoons)) return res.data.breezemoons
-  return []
 }
 
 
@@ -740,14 +580,6 @@ export interface ProfessionRanking {
   entries?: ProfessionRankEntry[]
 }
 
-export async function fetchProfessionRanking(apiKey?: string | null, professionId?: string) {
-  const q = new URLSearchParams({ dark: 'false' })
-  if (professionId) q.set('professionId', professionId)
-  const res = await request<Envelope<ProfessionRanking>>(withKey(`/api/profession/ranking?${q}`, apiKey))
-  if (res.code) throw new Error(res.msg || '职业榜加载失败')
-  return res.data ?? { entries: [], professions: [] }
-}
-
 export interface ProfessionProgress {
   professionId?: string
   displayName?: string
@@ -762,23 +594,6 @@ export interface PublicProfessionProfile {
   professions?: ProfessionProgress[]
 }
 
-export async function fetchPublicProfession(userName: string, apiKey?: string | null) {
-  const paths = [
-    `/api/user/${encodeURIComponent(userName)}/profession?position=profile&dark=false`,
-    `/api/user/${encodeURIComponent(userName)}/profession`,
-  ]
-  for (const path of paths) {
-    try {
-      const res = await request<Envelope<PublicProfessionProfile>>(withKey(path, apiKey))
-      if (res.code) continue
-      if (res.data) return res.data
-    } catch {
-      /* try next */
-    }
-  }
-  return null
-}
-
 export interface ProfessionMe {
   primaryProfessionId?: string
   progress?: ProfessionProgress[]
@@ -787,94 +602,9 @@ export interface ProfessionMe {
   onboardingState?: string
 }
 
-export async function fetchProfessionMe(apiKey: string): Promise<ProfessionMe | null> {
-  try {
-    const res = await request<Envelope<ProfessionMe>>(withKey('/api/profession/me', apiKey))
-    if (res.code) return null
-    return res.data ?? null
-  } catch {
-    return null
-  }
-}
-
-export async function setProfessionPrimary(apiKey: string, professionId: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<ProfessionMe>>('/api/profession/me/primary', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ professionId }),
-  })
-  if (res.code) throw new Error(res.msg || '设置主职业失败')
-  return res.data ?? null
-}
-
-export async function setProfessionPrivacy(apiKey: string, preset: string) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  const csrfToken = await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<ProfessionMe>>('/api/profession/me/privacy', {
-    method: 'POST',
-    headers: { csrfToken },
-    body: JSON.stringify({ preset }),
-  })
-  if (res.code) throw new Error(res.msg || '设置职业隐私失败')
-  return res.data ?? null
-}
-
 export interface UserNameHit {
   userName: string
   avatar?: string
-}
-
-export async function searchUsers(apiKey: string, name: string): Promise<UserNameHit[]> {
-  const res = await request<Envelope<unknown[] | { userNames?: unknown[] }>>('/users/names', {
-    method: 'POST',
-    body: JSON.stringify({ apiKey, name }),
-  })
-  if (res.code) return []
-  const data = res.data
-  const rows = Array.isArray(data) ? data : data && Array.isArray(data.userNames) ? data.userNames : []
-  return rows
-    .map((r) => {
-      if (typeof r === 'string') return { userName: r }
-      const o = r as { userName?: string; userAvatarURL48?: string; userAvatarURL20?: string; userAvatarURL?: string }
-      return { userName: o.userName || '', avatar: o.userAvatarURL48 || o.userAvatarURL20 || o.userAvatarURL }
-    })
-    .filter((u) => u.userName)
-}
-
-export async function searchUserNames(apiKey: string, name: string): Promise<string[]> {
-  return (await searchUsers(apiKey, name)).map((u) => u.userName)
-}
-
-
-export async function fetchUserPoint(userName: string, apiKey?: string | null) {
-  try {
-    const res = await request<Envelope<{ userPoint?: number; userName?: string }>>(
-      withKey(`/user/${encodeURIComponent(userName)}/point`, apiKey),
-    )
-    if (res.code === 0 && res.data) {
-      return {
-        userName: res.data.userName || userName,
-        userPoint: Number(res.data.userPoint || 0),
-      }
-    }
-  } catch {
-    /* optional */
-  }
-  return null
-}
-
-
-export async function fetchUnreadCount(_apiKey: string): Promise<UnreadCount> { return fetchV3UnreadCount() }
-export async function fetchNotifications(_apiKey: string, type: NoticeType, page = 1): Promise<NoticeItem[]> {
-  return (await fetchNotificationPage(type, page)).items
-}
-export async function markNoticeRead(_apiKey: string, type: NoticeType, key = notificationReadKey()) {
-  return markV3NotificationsRead(type, key)
-}
-export async function markAllNoticesRead(_apiKey: string, key = notificationReadKey()) {
-  return markV3NotificationsRead('all', key)
 }
 
 export interface MembershipLevel {
@@ -896,50 +626,6 @@ export interface MembershipStatus {
   isVip: boolean
 }
 
-export async function fetchMembershipLevels(): Promise<MembershipLevel[]> {
-  const res = await request<Envelope<MembershipLevel[]>>('/api/membership/levels')
-  if (res.code !== 0) throw new Error(res.msg || '获取会员等级失败')
-  return Array.isArray(res.data) ? res.data : []
-}
-
-export async function fetchMembershipDetail(userId: string): Promise<MembershipStatus> {
-  const res = await request<Envelope<Omit<MembershipStatus, 'isVip'> & { isActive?: boolean }>>(
-    `/api/membership/${userId}`,
-  )
-  if (res.code !== 0) return { isVip: false }
-  const data = res.data || {}
-  const expiresAt = Number(data.expiresAt || 0)
-  const isVip =
-    Number(data.state) === 1 || Boolean(data.isActive) || (expiresAt > Date.now() && expiresAt > 0)
-  return {
-    state: data.state,
-    expiresAt: expiresAt || undefined,
-    lvCode: data.lvCode,
-    configJson: data.configJson,
-    isVip,
-  }
-}
-
-/** @deprecated 使用 fetchMembershipDetail；保留兼容 auth store */
-export async function fetchMembership(userId: string) {
-  return fetchMembershipDetail(userId)
-}
-
-/** 积分开通 VIP：`POST /api/membership/open`（body 含 apiKey） */
-export async function openMembership(apiKey: string, levelOId: string, couponCode = '') {
-  const res = await request<Envelope<unknown>>('/api/membership/open', {
-    method: 'POST',
-    body: JSON.stringify({
-      apiKey,
-      oId: levelOId,
-      couponCode: couponCode || '',
-      configJson: '',
-    }),
-  })
-  if (res.code) throw new Error(res.msg || '开通失败')
-  return res.data
-}
-
 export interface ChatNodeOption {
   node: string
   name: string
@@ -957,30 +643,6 @@ export interface ChatNodeBundle {
   avaliable: ChatNodeOption[]
 }
 
-/** 聊天室节点：推荐 WS + 可选列表。 */
-export async function fetchChatNodeBundle(apiKey: string): Promise<ChatNodeBundle> {
-  const res = await request<{
-    code: number
-    msg?: string
-    data?: string
-    apiKey?: string
-    avaliable?: ChatNodeOption[]
-  }>('/chat-room/node/get?apiKey=' + encodeURIComponent(apiKey))
-  if (res.code !== 0 || !res.data) throw new Error(res.msg || '获取节点失败')
-  return {
-    data: res.data,
-    msg: res.msg || '默认节点',
-    apiKey: res.apiKey || '',
-    avaliable: Array.isArray(res.avaliable) ? res.avaliable : [],
-  }
-}
-
-/** @deprecated 使用 fetchChatNodeBundle；保留兼容旧调用。 */
-export async function fetchChatNode(apiKey: string) {
-  const bundle = await fetchChatNodeBundle(apiKey)
-  return bundle.data
-}
-
 
 export interface MyMedal {
   medalId: string
@@ -990,70 +652,6 @@ export interface MyMedal {
   display: boolean
   displayOrder: number
   expireTime: number
-}
-
-export async function fetchMyMedals(apiKey: string): Promise<MyMedal[]> {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/api/medal/my/list', {
-    method: 'POST',
-    body: JSON.stringify({}),
-  })
-  if (res.code) throw new Error(res.msg || '加载勋章失败')
-  const raw = res.data
-  const list = Array.isArray(raw)
-    ? raw
-    : raw && typeof raw === 'object' && Array.isArray((raw as { list?: unknown[] }).list)
-      ? (raw as { list: unknown[] }).list
-      : []
-  const medals: MyMedal[] = []
-  for (const item of list) {
-    if (!item || typeof item !== 'object') continue
-    const row = item as Record<string, unknown>
-    const medalId = String(row.medal_id || row.medalId || '')
-    if (!medalId) continue
-    medals.push({
-      medalId,
-      name: String(row.medal_name || row.name || ''),
-      description: String(row.medal_description || row.description || ''),
-      type: String(row.medal_type || row.type || '普通'),
-      display: typeof row.display === 'boolean' ? row.display : true,
-      displayOrder: typeof row.display_order === 'number' ? row.display_order : Number(row.displayOrder || 0),
-      expireTime: Number(row.expire_time || row.expireTime || 0),
-    })
-  }
-  medals.sort((a, b) => a.displayOrder - b.displayOrder)
-  return medals
-}
-
-export async function setMyMedalDisplay(apiKey: string, medalId: string, display: boolean) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/api/medal/my/display', {
-    method: 'POST',
-    body: JSON.stringify({ medalId, display }),
-  })
-  if (res.code) throw new Error(res.msg || '操作失败')
-}
-
-export async function reorderMyMedal(apiKey: string, medalId: string, direction: 'up' | 'down') {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/api/medal/my/reorder', {
-    method: 'POST',
-    body: JSON.stringify({ medalId, direction }),
-  })
-  if (res.code) throw new Error(res.msg || '排序失败')
-}
-
-export async function saveVipConfigApi(apiKey: string, config: { bold?: boolean; underline?: boolean; color?: string }) {
-  const { ensureCsrfToken } = await import('./pageAuth')
-  await ensureCsrfToken(apiKey)
-  const res = await request<Envelope<unknown>>('/api/membership/config', {
-    method: 'POST',
-    body: JSON.stringify(config),
-  })
-  if (res.code) throw new Error(res.msg || '保存配置失败')
 }
 
 export interface HomeColumnChapter {
@@ -1072,15 +670,6 @@ export interface HomeColumnCard {
   columnCoverURL?: string
   chapters: HomeColumnChapter[]
   latestChapter?: HomeColumnChapter | null
-}
-
-export async function fetchHomeColumns(): Promise<{ recent: HomeColumnCard[]; hot: HomeColumnCard[] }> {
-  const [latest, hot] = await Promise.all([fetchPublicColumnCards('latest'), fetchPublicColumnCards('hot')])
-  function adapt(value: PublicColumn): HomeColumnCard {
-    const chapters = value.chapters.map(ch => ({ articleId: ch.id, permalink: '/article/' + ch.id, chapterNo: '第 ' + ch.chapterNo + ' 章', title: ch.title, preview: ch.preview || '', createdAt: ch.createdAt ? new Date(ch.createdAt).toISOString() : '' }))
-    return { columnId: value.id, columnTitle: value.title, columnArticleCount: value.articleCount, columnCoverURL: value.coverURL, chapters, latestChapter: chapters[0] || null }
-  }
-  return { recent: latest.list.map(adapt), hot: hot.list.map(adapt) }
 }
 
 export interface ChatHistoryItem {
