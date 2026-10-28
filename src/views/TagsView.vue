@@ -1,97 +1,45 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { storeToRefs } from 'pinia'
-import { fetchTags, type TagItem } from '@/api/fishpi'
+import { useDirectory } from '@/composables/useDirectory'
+import { consumeDirectoryPayload } from '@/seo/payload'
 import { usePageSeo } from '@/composables/usePageSeo'
-import { consumeTagsPayload } from '@/seo/payload'
-import { useAuthStore } from '@/stores/auth'
+import type { TagItem } from '@/api/fishpi'
 import FpLoading from '@/components/FpLoading.vue'
 import SideBar from '@/components/SideBar.vue'
-import { createSwrLoader } from '@/utils/swr'
-
-usePageSeo(() => ({ title: '标签', path: '/tags', description: '摸鱼派标签墙' }))
-
-const auth = useAuthStore()
-const { apiKey } = storeToRefs(auth)
-const tags = ref<TagItem[]>([])
-const total = ref(0)
-const page = ref(1)
-const loading = ref(false)
-const error = ref('')
-
-const swr = createSwrLoader({ loading, error })
-
-async function load() {
-  await swr(
-    `tags:${page.value}`,
-    async () => (page.value === 1 && consumeTagsPayload()) || fetchTags(apiKey.value, page.value, 50),
-    (data) => {
-      tags.value = data.tags
-      total.value = data.total
-      error.value = data.tags.length ? '' : '暂无标签数据'
-    },
-    '标签加载失败',
-  )
-}
-
-watch([apiKey, page], () => void load(), { immediate: true })
-
-function tagPath(tag: TagItem) {
-  const uri = tag.tagURI || tag.tagTitle
-  try {
-    return `/tag/${encodeURIComponent(decodeURIComponent(uri))}`
-  } catch {
-    return `/tag/${encodeURIComponent(uri)}`
-  }
-}
+const kind = 'tags'
+const label = '标签'
+usePageSeo(() => ({ title: label, path: '/' + kind, description: '摸鱼派' + label + '目录' }))
+const { value, p, loading, error, read } = useDirectory(kind, consumeDirectoryPayload(kind))
+const tags = computed(() => value.value?.list as TagItem[] || [])
+async function page(next: number) { await read(next); document.getElementById('directory-list')?.scrollIntoView({ block: 'start' }) }
 </script>
 
 <template>
   <div class="wrapper list-page-wrap">
-    <div class="content">
-      <div class="module">
-        <div class="module-header list-page-head">
-          <div class="head-left">
-            <h2>标签墙</h2>
-            <span v-if="total" class="sub-tag">共 {{ total }} 个标签</span>
-          </div>
-          <div class="head-right">
-            <span class="total-count">第 {{ page }} 页</span>
-          </div>
-        </div>
-
-        <FpLoading v-if="loading" :rows="6" />
-        <p v-else-if="error" class="err">{{ error }}</p>
-        <ul v-else class="tag-grid">
-          <li v-for="tag in tags" :key="tag.tagURI || tag.tagTitle">
-            <RouterLink :to="tagPath(tag)" class="tag-card">
-              <img v-if="tag.tagIconPath" :src="tag.tagIconPath" alt="" />
-              <strong>{{ tag.tagTitle }}</strong>
-              <em>{{ tag.tagReferenceCount ?? 0 }}</em>
-            </RouterLink>
-          </li>
-        </ul>
-
-        <div class="pagination-bar">
-          <button type="button" class="btn page-btn" :disabled="page <= 1 || loading" @click="page -= 1">
-            ‹ 上一页
-          </button>
-          <span class="current-page-num">{{ page }}</span>
-          <button type="button" class="btn page-btn" :disabled="tags.length < 50 || loading" @click="page += 1">
-            下一页 ›
-          </button>
-        </div>
+    <div class="content directory-content" id="directory-list">
+      <div class="module-header list-page-head">
+        <div class="head-left"><h2>{{ label }}目录</h2><span v-if="value" class="sub-tag">共 {{ value.total }} 个{{ label }}</span></div>
+        <button type="button" class="btn" :disabled="loading" @click="read()">刷新目录</button>
       </div>
+      <FpLoading v-if="loading" :rows="6" />
+      <div v-else-if="error" class="err" role="alert">{{ error }} <button type="button" class="btn" @click="read()">重试当前页</button></div>
+      <p v-else-if="!value" class="err">{{ label }}尚未读取</p>
+      <template v-else>
+        <p v-if="!value.list.length" class="err">本页暂无{{ label }}</p>
+        <ul v-if="tags.length" class="tag-grid"><li v-for="tag in tags" :key="tag.tagURI"><RouterLink :to="'/tag/' + tag.tagURI" class="tag-card"><img v-if="tag.tagIconPath" :src="tag.tagIconPath" alt="" /><strong>{{ tag.tagTitle }}</strong><em>{{ tag.tagReferenceCount }}</em></RouterLink></li></ul>
+        <div class="pagination-bar">
+          <button type="button" class="btn page-btn" :disabled="p <= 1" @click="page(p - 1)">‹ 上一页</button>
+          <span class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span>
+          <button type="button" class="btn page-btn" :disabled="p >= value.pageCount" @click="page(p + 1)">下一页 ›</button>
+          <button v-if="p > 1 && p > value.pageCount" type="button" class="btn" @click="page(1)">返回第一页</button>
+        </div>
+      </template>
     </div>
-
-    <div class="side">
-      <SideBar />
-    </div>
+    <div class="side"><SideBar /></div>
   </div>
 </template>
-
-<style scoped>
+<style scoped lang="scss">
 .list-page-wrap {
   padding-top: 4px;
 }
@@ -206,4 +154,6 @@ function tagPath(tag: TagItem) {
   min-width: 24px;
   text-align: center;
 }
+.directory-content { scroll-margin-top: 80px; background:transparent; border:0; box-shadow:none; }
+.pagination-bar { flex-wrap:wrap; }
 </style>

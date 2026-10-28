@@ -1,79 +1,45 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { storeToRefs } from 'pinia'
-import { fetchDomains, type DomainItem } from '@/api/fishpi'
+import { useDirectory } from '@/composables/useDirectory'
+import { consumeDirectoryPayload } from '@/seo/payload'
 import { usePageSeo } from '@/composables/usePageSeo'
-import { consumeDomainsPayload } from '@/seo/payload'
-import { useAuthStore } from '@/stores/auth'
+import type { DomainItem } from '@/api/fishpi'
 import FpLoading from '@/components/FpLoading.vue'
 import SideBar from '@/components/SideBar.vue'
-import { createSwrLoader } from '@/utils/swr'
-
-usePageSeo(() => ({ title: '领域', path: '/domains', description: '摸鱼派领域列表' }))
-
-const auth = useAuthStore()
-const { apiKey, accessToken } = storeToRefs(auth)
-const domains = ref<DomainItem[]>([])
-const error = ref('')
-const loading = ref(true)
-
-const swr = createSwrLoader({ loading, error })
-
-async function load() {
-  await swr(
-    'domains',
-    async () => consumeDomainsPayload() || fetchDomains(apiKey.value),
-    (data) => {
-      domains.value = data
-      error.value = data.length ? '' : '暂无领域'
-    },
-    '领域加载失败',
-  )
-}
-
-watch(accessToken, () => { domains.value = []; void load() }, { immediate: true, flush: 'sync' })
+const kind = 'domains'
+const label = '领域'
+usePageSeo(() => ({ title: label, path: '/' + kind, description: '摸鱼派' + label + '目录' }))
+const { value, p, loading, error, read } = useDirectory(kind, consumeDirectoryPayload(kind))
+const domains = computed(() => value.value?.list as DomainItem[] || [])
+async function page(next: number) { await read(next); document.getElementById('directory-list')?.scrollIntoView({ block: 'start' }) }
 </script>
 
 <template>
   <div class="wrapper list-page-wrap">
-    <div class="content">
-      <div class="module">
-        <div class="module-header list-page-head">
-          <div class="head-left">
-            <h2>领域</h2>
-            <span class="sub-tag">探索感兴趣的社区专题</span>
-          </div>
-          <div class="head-right">
-            <span v-if="domains.length" class="total-count">共 {{ domains.length }} 个领域</span>
-          </div>
-        </div>
-
-        <FpLoading v-if="loading" :rows="6" />
-        <p v-else-if="error" class="err">{{ error }}</p>
-        <ul v-else class="domain-list">
-          <li v-for="item in domains" :key="item.uri">
-            <RouterLink :to="`/domain/${item.uri}`" class="domain-item">
-              <img v-if="item.domainIconPath" :src="item.domainIconPath" alt="" />
-              <span v-else class="domain-fallback">{{ (item.domainTitle || '域').slice(0, 1) }}</span>
-              <div class="domain-info">
-                <strong>{{ item.domainTitle }}</strong>
-                <span v-if="item.domainDescription">{{ item.domainDescription }}</span>
-              </div>
-              <em v-if="typeof item.domainArticleCount === 'number'" class="domain-count">{{ item.domainArticleCount }} 帖</em>
-            </RouterLink>
-          </li>
-        </ul>
+    <div class="content directory-content" id="directory-list">
+      <div class="module-header list-page-head">
+        <div class="head-left"><h2>{{ label }}目录</h2><span v-if="value" class="sub-tag">共 {{ value.total }} 个{{ label }}</span></div>
+        <button type="button" class="btn" :disabled="loading" @click="read()">刷新目录</button>
       </div>
+      <FpLoading v-if="loading" :rows="6" />
+      <div v-else-if="error" class="err" role="alert">{{ error }} <button type="button" class="btn" @click="read()">重试当前页</button></div>
+      <p v-else-if="!value" class="err">{{ label }}尚未读取</p>
+      <template v-else>
+        <p v-if="!value.list.length" class="err">本页暂无{{ label }}</p>
+        <ul v-if="domains.length" class="domain-list"><li v-for="item in domains" :key="item.uri"><RouterLink :to="'/domain/' + item.uri" class="domain-item"><img v-if="item.domainIconPath" :src="item.domainIconPath" alt="" /><span v-else class="domain-fallback">{{ (item.domainTitle || '域').slice(0, 1) }}</span><div class="domain-info"><strong>{{ item.domainTitle }}</strong><span v-if="item.domainDescription">{{ item.domainDescription }}</span></div></RouterLink></li></ul>
+        <div class="pagination-bar">
+          <button type="button" class="btn page-btn" :disabled="p <= 1" @click="page(p - 1)">‹ 上一页</button>
+          <span class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span>
+          <button type="button" class="btn page-btn" :disabled="p >= value.pageCount" @click="page(p + 1)">下一页 ›</button>
+          <button v-if="p > 1 && p > value.pageCount" type="button" class="btn" @click="page(1)">返回第一页</button>
+        </div>
+      </template>
     </div>
-
-    <div class="side">
-      <SideBar />
-    </div>
+    <div class="side"><SideBar /></div>
   </div>
 </template>
-
-<style scoped>
+<style scoped lang="scss">
 .list-page-wrap {
   padding-top: 4px;
 }
@@ -200,4 +166,7 @@ watch(accessToken, () => { domains.value = []; void load() }, { immediate: true,
     grid-template-columns: 1fr;
   }
 }
+.pagination-bar { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:16px; padding:18px 0; }
+.directory-content { scroll-margin-top: 80px; background:transparent; border:0; box-shadow:none; }
+.pagination-bar { flex-wrap:wrap; }
 </style>

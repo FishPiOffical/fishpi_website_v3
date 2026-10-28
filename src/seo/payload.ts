@@ -1,3 +1,4 @@
+import { decodeDirectoryPage, type DirectoryKind } from '@/api/v3-directory'
 import { decodeHomeBootstrap } from '@/api/v3-home-reads'
 import { decodeArticleListing, type ColumnOrder } from '@/api/v3-article-list'
 import type { ArticleFeedKind } from '@/api/fishpi'
@@ -19,6 +20,7 @@ import type {
 } from '@/api/fishpi'
 
 export interface SsrPayload {
+  directoryPage?: unknown
   homeReads?: unknown
   articleListing?: unknown
   recentMembers?: RelationUser[] | null
@@ -178,3 +180,7 @@ export function consumeArticleListingPayload(kind: ArticleFeedKind, extra: strin
 }
 
 export function consumeHomeReadsPayload() { return decodeHomeBootstrap(takeField('homeReads')) }
+
+export function consumeDirectoryPayload(kind: DirectoryKind) {
+  try { return decodeDirectoryPage(takeField('directoryPage'), kind) } catch { return null }
+}

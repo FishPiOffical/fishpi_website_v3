@@ -1,3 +1,4 @@
+import { fetchDirectoryPage } from './api/v3-directory'
 import { fetchHomeBootstrap } from './api/v3-home-reads'
 import { fetchArticleListing } from './api/v3-article-list'
 import { fetchRecentMembers } from './api/v3-discovery-extras'
@@ -9,9 +10,7 @@ import { renderSSRHead } from '@unhead/vue/server'
 import { createFishpiApp } from './app'
 import {
   fetchArticle,
-  fetchDomains,
   fetchRepeaterItems,
-  fetchTags,
   type ArticleFeedKind,
 } from './api/fishpi'
 import { SSR_PAYLOAD_KEY, type SsrPayload } from './seo/payload'
@@ -60,12 +59,11 @@ async function prefetch(url: string): Promise<SsrPayload> {
     }
 
     if (path === '/domains') {
-      return { domains: await fetchDomains(null) }
+      return { directoryPage: await fetchDirectoryPage('domains') }
     }
 
     if (path === '/tags') {
-      const data = await fetchTags(null, 1, 50)
-      return { tags: data.tags, tagsTotal: data.total }
+      return { directoryPage: await fetchDirectoryPage('tags') }
     }
 
     if (path === '/breezemoons') {
