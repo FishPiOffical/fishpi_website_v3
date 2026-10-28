@@ -1,8 +1,6 @@
 import {repeaterList,type RepeaterEntry} from './v3-repeater'
 import { md5 } from 'js-md5'
-import {
-  type DomainItem,
-} from './catalog'
+import type { DomainItem } from './content-types'
 import { ApiError, request } from './http'
 import { v3Article } from './v3-content'
 

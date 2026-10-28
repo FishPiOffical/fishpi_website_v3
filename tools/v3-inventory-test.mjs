@@ -49,4 +49,4 @@ const view=(await import(url(component))).default,app=createSSRApp(view);app.use
 const settings=await fs.readFile('src/views/SettingsView.vue','utf8');for(const obsolete of ['useBagNameCard','useBag1dayCheckin','useBag2dayCheckin','useBagPatchCheckin','updateUsername','fetchUserBag'])assert.ok(!settings.includes(obsolete));assert.match(settings,/<OwnerInventory/)
 console.log('PASS inventory 6 complete Vue template compiles/SSR does not invent empty bag and settings has no old card/rename API fallback')
 
-const fishpi=await fs.readFile('src/api/fishpi.ts','utf8'),gaps=await fs.readFile('src/api/gaps.mock.ts','utf8');assert.ok(!fishpi.includes('mockUserBag')&&!gaps.includes('mockUserBag')&&!fishpi.includes('export async function useBag')&&!fishpi.includes('export async function updateUsername'));
+const fishpi=await fs.readFile('src/api/fishpi.ts','utf8');await assert.rejects(fs.access('src/api/gaps.mock.ts'));assert.ok(!fishpi.includes('mockUserBag')&&!fishpi.includes('export async function useBag')&&!fishpi.includes('export async function updateUsername'));

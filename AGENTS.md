@@ -15,9 +15,8 @@
 ## 接口与认证
 
 - 优先使用 Rhythm JSON 接口，不在运行时抓取现网 HTML 拼装数据。
-- 缺失接口先查 docs/MISSING_APIS.md；已有占位数据集中在 gaps.mock.ts。
-- 用户发帖、收藏、关注、粉丝、通知、私信等列表接口失败时返回空列表，
-  不用模拟记录冒充真实数据。
+- 当前覆盖以docs/V3_MIGRATION.md为准；MISSING_APIS仅历史来源，不恢复已删mock或旧包装。
+- 列表读取失败明确报错与重试，合法空结果单独展示，不以空列表吞错或模拟记录冒充。
 - 用户悬浮卡片加载失败应展示错误状态，不回退到模拟用户资料。
 - v3浏览器只用内存Bearer与HttpOnly刷新Cookie，不写localStorage；旧脚本缓存/FP_API_KEY仅用于旧接口，禁止把Bearer传入旧apiKey参数。当前分批状态见docs/V3_MIGRATION.md。
 - 不反复调用密码登录接口；不要把密码、API Key、Cookie 写入源码或日志。
@@ -272,3 +271,5 @@
 - 领域/标签目录页共用`v3-directory`/`useDirectory`，固定50项真实分页、SSR kind/第一页绑定和响应白名单；条目链接使用数字ID，不二次解码名称。不能恢复目录整库聚合SWR或按条数猜下一页。
 
 - ArticleView正文/评论不进通用SWR；所有来源当前401/403/404清内容与引用，确认写入后503仅GET重试。普通Token轮换重读须保留挂载评论草稿/历史，卸载与页号迟到检查不可移除；v3Article须核对详情ID/逐条comment.articleId/页与size20并拒重复，参数先验后发请求；评论后页缩减为0页仍须保留返回第一页入口。
+
+- 客户端边界复核用website_v3的`tools/v3-client-boundary-audit.mjs`，仅AST字面量/静态导入，动态表达式单列，不当运行覆盖。DomainItem在content-types，catalog/gaps假数据已删；离线ping只用v3，任意HTTP响应仅代表可达。

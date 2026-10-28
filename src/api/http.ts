@@ -123,7 +123,7 @@ export async function pingApi(timeoutMs = 8000): Promise<boolean> {
   const ctrl = new AbortController()
   const timer = window.setTimeout(() => ctrl.abort(), timeoutMs)
   try {
-    const res = await fetch(resolveUrl('/api/articles/recent?p=1&size=1'), {
+    const res = await fetch(resolveUrl('/api/v3/auth/captcha-options'), {
       method: 'GET',
       credentials: 'include',
       headers: { 'User-Agent': FISHPI_UA },
@@ -324,10 +324,4 @@ async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
   const text = await res.text()
   if (!res.ok) throw new ApiError(text.slice(0, 120) || '请求失败', res.status)
   return text
-}
-
-export function withKey(path: string, apiKey?: string | null) {
-  if (!apiKey) return path
-  const join = path.includes('?') ? '&' : '?'
-  return `${path}${join}apiKey=${encodeURIComponent(apiKey)}`
 }

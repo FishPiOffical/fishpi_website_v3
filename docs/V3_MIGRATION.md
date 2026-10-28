@@ -409,3 +409,6 @@ MarkdownEditor去旧apiKey上传门禁，接既有v3票据与专用票据直传�
 
 
 第107轮（2026-10-28）：用户批准网站旧page-auth桥接退役；删除Node转换/HTML抓取/Cookie签发、前端sessionStorage helper及Vite/nginx旧登录转发，Rhythm经典入口保持。fishpi删除47个无调用包装，仅六当前helper。实际生产/开发Node六组桥接404/零上游/无Cookie、现有v3与验证码POST正文保留；80脚本917组、认证12组、exit0双构建、77JS版本0/无map，IAB1280首页→v3登录表单通过。290保持，无Java/FTL/SQL/Maven/APP；需部署重启Node/同步nginx，真实登录/风控/390px待验，见[桥接退役记录](api-v3-retired-bridge-work.md)。
+
+
+第108轮（2026-10-28）：删除孤立catalog/gaps假数据、移纯DomainItem类型、删除无用withKey；静态AST复核找出离线旧ping并改既有v3 captcha-options。330文件165 API字面量/47动态表达式/2 RhyPic校验单列、0发现，报告不等于运行覆盖。80脚本917组、认证13组、exit0双构建、77JS版本0/无map；IAB1280合成离线一次v3探测→原登录页通过。用户确认部署后本机8080仍拒绝，随后明确暂不做真实联调；继续源码/隔离，不等待地址。290保持，无Java/FTL/SQL/Maven/APP/外部契约变化，真实权限/风控/390px待验，见[边界记录](api-v3-client-boundary-work.md)。

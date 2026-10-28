@@ -132,3 +132,5 @@ QQ已接独立第一方本人GET/PUT，空值清除、1至12位数字保留前�
 发帖/本人编辑/草稿主链已接v3，含typed部分PATCH、原付费源码、草稿分页、原key恢复及draftId消费；27组实际API/Pinia/完整表单与双构建通过。真实Vditor/账款/权限/事务和浏览器仍待验，预览/上传/@/标签联想另迁移。详见Rhythm docs/api-v3-client-posts-work.md。
 
 注册/找回密码/重置页已接既有v3账号入口，按服务端注册选项与验证组件发起短信，验证码直接绑定手机号；结果不明时先登录核实，不自动重发或重复完成。移除假重置元数据；密码不裁剪并沿6至128字符规则。实际文件、人工步骤与真实短信/极验等未验项见[账号入口迁移记录](docs/api-v3-client-account-access-work.md)。
+
+客户端边界静态审计：`node tools/v3-client-boundary-audit.mjs --json /tmp/v3-client-boundary.json`。检查src内API字面量和退役导入，动态调用单列；这不替代运行时、权限及全功能验收。孤立catalog/gaps假数据已删除。

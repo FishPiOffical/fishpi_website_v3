@@ -211,4 +211,15 @@ await check('login membership refresh uses only current-owner v3 resource', asyn
   assert.ok(paths.every(path => path.startsWith('/api/v3/')))
   assert.ok(paths.includes('/api/v3/me/membership'))
 })
+await check('offline reconnect probes existing v3 without refresh, login or credential publication', async () => {
+  const { url } = await transport(); const http = await import(url), originalWindow=globalThis.window
+  globalThis.window={setTimeout,dispatchEvent(){}}
+  try {
+    const calls=[];globalThis.fetch=async(path,init)=>{calls.push({path,init});return new Response('',{status:403})}
+    assert.equal(await http.pingApi(),true);assert.equal(calls.length,1);assert.equal(calls[0].path,'/api/v3/auth/captcha-options');assert.equal(calls[0].init.method,'GET');assert.equal(calls[0].init.headers.Authorization,undefined)
+    globalThis.fetch=async()=>new Response('',{status:503});assert.equal(await http.pingApi(),true)
+    globalThis.fetch=async()=>{throw Error('offline')};assert.equal(await http.pingApi(),false)
+    const ssr=await transport(true),server=await import(ssr.url);assert.equal(await server.pingApi(),true)
+  } finally {globalThis.window=originalWindow}
+})
 console.log(`${groups} auth transport groups passed; only mocked fetch was used.`)
