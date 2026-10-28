@@ -412,3 +412,6 @@ MarkdownEditor去旧apiKey上传门禁，接既有v3票据与专用票据直传�
 
 
 第108轮（2026-10-28）：删除孤立catalog/gaps假数据、移纯DomainItem类型、删除无用withKey；静态AST复核找出离线旧ping并改既有v3 captcha-options。330文件165 API字面量/47动态表达式/2 RhyPic校验单列、0发现，报告不等于运行覆盖。80脚本917组、认证13组、exit0双构建、77JS版本0/无map；IAB1280合成离线一次v3探测→原登录页通过。用户确认部署后本机8080仍拒绝，随后明确暂不做真实联调；继续源码/隔离，不等待地址。290保持，无Java/FTL/SQL/Maven/APP/外部契约变化，真实权限/风控/390px待验，见[边界记录](api-v3-client-boundary-work.md)。
+
+
+第109轮（2026-10-28）：新增Router.requestMapping→registerProcessors→ApiV3/helper注册链审计，与API.md按METHOD/path核对；114方法/290路由/文档290，差集/重复0。9组正反例与node --check通过；全仓837/398口径保持。仅工具/文档，无业务Java/FTL/SQL/客户端/Maven/APP改动，未重复构建或全量客户端测试。真实联调按用户要求暂缓；风险红包经典衔接/停用发送者结算两规则待答，不据源码契约齐全宣称业务完成，见[收尾检查](api-v3-contract-audit-work.md)。
