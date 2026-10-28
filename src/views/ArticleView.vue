@@ -115,7 +115,7 @@ const threads = computed(() => {
   }
   return roots.map((c) => ({ c, replies: replies.get(c.oId) || [] }))
 })
-const commentPages = computed(() => Number(article.value?.pagination?.paginationPageCount || 1))
+const commentPages = computed(() => Number(article.value?.pagination?.paginationPageCount ?? 0))
 const tagList = computed(() =>
   String(article.value?.articleTags || '')
     .split(',')
@@ -468,9 +468,10 @@ function itemHandlers(c: ArticleComment) {
       </div>
 
       <p v-if="!comments.length" class="empty-hint">暂无回帖，快来抢沙发吧～</p>
-      <footer v-if="commentPages > 1" class="pager">
+      <footer v-if="commentPages > 1 || commentPage > 1" class="pager">
         <button type="button" class="btn small" :disabled="articleReading || commentPage <= 1" @click="gotoCommentPage(commentPage - 1)">上一页</button>
         <span class="pager-info">{{ commentPage }} / {{ commentPages }}</span>
+        <button v-if="commentPage > commentPages" type="button" class="btn small" :disabled="articleReading" @click="gotoCommentPage(1)">返回第一页</button>
         <button type="button" class="btn small" :disabled="articleReading || commentPage >= commentPages" @click="gotoCommentPage(commentPage + 1)">下一页</button>
       </footer>
     </DefineComments>

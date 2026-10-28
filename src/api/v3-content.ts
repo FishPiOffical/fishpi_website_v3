@@ -149,12 +149,22 @@ export async function v3Tags(page = 1, size = 50): Promise<{ tags: TagItem[]; to
   return { tags: data.list.map(adaptV3Tag), total: data.pagination.total }
 }
 export async function v3Article(articleId: string, page = 1): Promise<ArticleDetail> {
-  const path = pathId(articleId)
+  const path = pathId(articleId), paging = params(page, 20)
+  if (page > 42949672) throw new ApiError('页码不合法', 422)
   const [raw, rawComments] = await Promise.all([
     get(`/api/v3/articles/${path}`),
-    get(`/api/v3/articles/${path}/comments?${params(page, 20)}&sort=oldest`),
+    get(`/api/v3/articles/${path}/comments?${paging}&sort=oldest`),
   ])
   const detail = row(raw), comments = decodeV3ContentPage(rawComments)
+  if (detail.id !== articleId || comments.pagination.p !== page || comments.pagination.size !== 20) throw invalid()
+  const seen = new Set<string>()
+  const commentList = comments.list.map(item => {
+    if (item.articleId !== articleId) throw invalid()
+    const result = adaptV3Comment(item)
+    if (seen.has(result.oId)) throw invalid()
+    seen.add(result.oId)
+    return result
+  })
   const format = text(detail.contentFormat)
   if (format !== 'markdown' && format !== 'thought') throw invalid()
   const rewarded = bool(detail.rewarded)
@@ -164,7 +174,7 @@ export async function v3Article(articleId: string, page = 1): Promise<ArticleDet
     articleContent: contentHtml, articleOriginalContent: text(detail.content),
     articleRewardPoint: number(detail.rewardPoint), rewarded,
     articleRewardContent: rewarded ? text(detail.rewardContentHtml) : '',
-    articleComments: comments.list.map(adaptV3Comment),
+    articleComments: commentList,
     pagination: { paginationCurrentPageNum: comments.pagination.p, paginationPageCount: comments.pagination.pageCount },
   }
 }

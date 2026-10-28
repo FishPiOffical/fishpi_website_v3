@@ -8,7 +8,7 @@ const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarg
 const api = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`)
 const author = { id: '3', userName: 'reader', userNickname: '昵称', userAvatarURL: 'https://example.test/a.png' }
 const article = { id: '101', title: '<title>', preview: '真实摘要', tags: 'a,b', type: 0, anonymous: false, author, createdAt: 1, viewCount: 8, commentCount: 2 }
-const comment = { id: '201', parentId: '', content: 'private', contentHtml: '<b>private</b>', contentVisible: false, anonymous: true, author, createdAt: 2 }
+const comment = { id: '201', articleId: '101', parentId: '', content: 'private', contentHtml: '<b>private</b>', contentVisible: false, anonymous: true, author, createdAt: 2 }
 const page = (list, p = 1, total = list.length, size = 20) => ({ list, pagination: { p, size, total, pageCount: Math.ceil(total / size) } })
 const reset = (...responses) => { globalThis.__v3Responses = responses.map(data => data instanceof Error ? data : ({ code: 0, data })); globalThis.__v3Paths = [] }
 const adapted = api.adaptV3Article(article)
@@ -39,3 +39,13 @@ assert.equal(api.adaptV3Article({ ...article, stick: { active: false, permanent:
 assert.throws(() => api.adaptV3Article({ ...article, stick: { active: true, permanent: true, expiresAt: 123 } }), /格式/)
 assert.throws(() => api.adaptV3Article({ ...article, stick: { active: true, permanent: false, expiresAt: Number.MAX_SAFE_INTEGER + 1 } }), /格式/)
 console.log('PASS v3 content: DTO whitelist, hidden content, empty/error, actual paths, directory IDs, pagination')
+
+const currentDetail={...article,contentFormat:'markdown',content:'source',contentHtml:'<p>source</p>',rewardPoint:0,rewarded:false,rewardContentHtml:''}
+for(const p of [0,-1,1.5,NaN,42949673]){reset();await assert.rejects(api.v3Article('101',p),e=>e.status===422);assert.equal(globalThis.__v3Paths.length,0)}console.log('PASS article binding 1 malformed/oversized page rejected before either network request')
+reset({...currentDetail,id:'102'},page([comment]));await assert.rejects(api.v3Article('101'),e=>e.status===502);console.log('PASS article binding 2 detail must match exact requested article ID')
+for(const comments of [page([comment],2,21),page([comment],1,1,10)]){reset(currentDetail,comments);await assert.rejects(api.v3Article('101'),e=>e.status===502)}console.log('PASS article binding 3 comment response page and size bind to current request')
+for(const row of [{...comment,articleId:'102'},{...comment,articleId:undefined},{...comment,articleId:101}]){reset(currentDetail,page([row]));await assert.rejects(api.v3Article('101'),e=>e.status===502)}console.log('PASS article binding 4 each comment must belong to exact requested article, missing/numeric binding rejected')
+reset(currentDetail,page([comment,comment]));await assert.rejects(api.v3Article('101'),e=>e.status===502);console.log('PASS article binding 5 duplicate comment IDs cannot become duplicate threaded UI entries')
+reset(currentDetail,page([],2,0));const empty=await api.v3Article('101',2);assert.equal(empty.pagination.paginationCurrentPageNum,2);assert.equal(empty.pagination.paginationPageCount,0);assert.deepEqual(empty.articleComments,[]);console.log('PASS article binding 6 empty/shrunk comments retain actual page metadata for caller recovery')
+reset({...currentDetail,type:6},page([{...comment,articleId:'other'}]));await assert.rejects(api.v3Article('101'),e=>e.status===502);assert.equal(globalThis.__v3Paths.length,2);console.log('PASS article binding 7 invalid long-article comments fail before any paragraph-content fetch')
+reset(currentDetail,page([{...comment,userPhone:'PRIVATE',commentIP:'PRIVATE'}]));const safe=await api.v3Article('101');assert.equal(safe.articleComments[0].commentContent,'');assert.equal(safe.articleComments[0].commentAuthorId,'');assert.ok(!JSON.stringify(safe).includes('PRIVATE'));console.log('PASS article binding 8 validated current binding retains private/anonymous projection and drops unknown fields')
