@@ -123,8 +123,10 @@ const emojiPicker = ref<InstanceType<typeof EmojiPicker> | null>(null)
 const nativeEmojis = ref<Record<string, string>>({})
 const fallback = ref(false)
 const ready = ref(false)
+const fallbackInput = ref<HTMLTextAreaElement | null>(null)
 let editor: VditorInstance | null = null
 let lastEmitted = props.modelValue
+let lastRenderedValue: string | undefined
 const preview = createMarkdownPreview(() => editor?.getValue() ?? props.modelValue)
 const uploads = createEditorUpload(markdown => editor?.insertMD(markdown))
 const mentionError = ref('')
@@ -198,6 +200,7 @@ onMounted(async () => {
     input: (value: string) => {
       preview.reset()
       lastEmitted = value
+      lastRenderedValue = value
       emit('update:modelValue', value)
     },
     after: () => {
@@ -215,6 +218,7 @@ onMounted(async () => {
         lastEmitted = cached
         emit('update:modelValue', cached)
       }
+      lastRenderedValue = editor?.getValue()
       if (dark.value) applyTheme()
     },
   })
@@ -231,6 +235,7 @@ watch(
     clearMentions()
     lastEmitted = value
     editor.setValue(value, true)
+    lastRenderedValue = editor.getValue()
   },
 )
 
@@ -244,6 +249,15 @@ onBeforeUnmount(() => {
 })
 
 defineExpose({
+  flush() {
+    if (!fallback.value && (!editor || !ready.value)) throw new Error('编辑器仍在加载，请稍后再试')
+    const value = fallback.value ? fallbackInput.value?.value ?? props.modelValue : editor!.getValue()
+    if (!fallback.value && value === lastRenderedValue) return lastEmitted
+    lastEmitted = value
+    lastRenderedValue = value
+    emit('update:modelValue', value)
+    return value
+  },
   focus() {
     editor?.focus()
   },
@@ -257,6 +271,7 @@ defineExpose({
 <template>
   <textarea
     v-if="fallback"
+    ref="fallbackInput"
     class="md-fallback"
     :value="modelValue"
     :placeholder="placeholder"

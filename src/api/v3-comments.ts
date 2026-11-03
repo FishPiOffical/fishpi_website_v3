@@ -47,10 +47,11 @@ export async function fetchV3ParagraphSummary(articleId:string){
     if(p>=value.pagination.pageCount){if(result.length!==value.pagination.total)throw new ApiError('段落目录数量不一致',502);return result}
   }
 }
-export async function fetchV3ParagraphComments(articleId:string,paragraphId:string,p=1,sort='oldest'){
+export async function fetchV3ParagraphComments(articleId:string,paragraphId:string,p=1,sort='oldest',state:'active'|'orphaned'='active'){
+  if(!['active','orphaned'].includes(state))throw new ApiError('段评状态不合法',422)
   if(!['oldest','latest','hot'].includes(sort))throw new ApiError('段评排序不合法',422)
-  const value=decodeV3ContentPage(await data(`/api/v3/articles/${id(articleId)}/paragraph-comments?paragraphId=${paragraph(paragraphId)}&state=active&sort=${sort}&${paging(p,20)}`,{cache:'no-store'}))
+  const value=decodeV3ContentPage(await data(`/api/v3/articles/${id(articleId)}/paragraph-comments?paragraphId=${paragraph(paragraphId)}&state=${state}&sort=${sort}&${paging(p,20)}`,{cache:'no-store'}))
   if(value.pagination.p!==p||value.pagination.size!==20)throw new ApiError('段评页码响应不一致',502)
-  const seen=new Set<string>();const list:ArticleComment[]=value.list.map(item=>{const link=row(item.paragraph);if(item.articleId!==articleId||item.type!==1||link.id!==paragraphId||link.state!=='active'||typeof item.id!=='string'||seen.has(item.id))throw new ApiError('段评归属响应不一致',502);seen.add(item.id);return{...adaptV3Comment(item),commentParagraphId:paragraphId}})
-  return{commentThreadParents:list,pagination:{paginationCurrentPageNum:p,paginationPageCount:value.pagination.pageCount}}
+  const seen=new Set<string>();const list:ArticleComment[]=value.list.map(item=>{const link=row(item.paragraph);if(item.articleId!==articleId||item.type!==1||link.id!==paragraphId||link.state!==state||typeof item.id!=='string'||seen.has(item.id))throw new ApiError('段评归属响应不一致',502);seen.add(item.id);return{...adaptV3Comment(item),commentParagraphId:paragraphId}})
+  return{commentThreadParents:list,pagination:{paginationCurrentPageNum:p,paginationPageCount:value.pagination.pageCount,paginationRecordCount:value.pagination.total}}
 }

@@ -6,7 +6,7 @@ import { readV3CommentSource, type CommentInput } from '@/api/v3-comments'
 import { useAuthStore } from '@/stores/auth'
 import { useV3CommentsStore } from '@/stores/v3Comments'
 import ChatComposer from '@/components/ChatComposer.vue'
-const props=withDefaults(defineProps<{articleId:string;editId?:string;parentId?:string;paragraphId?:string;replyLabel?:string}>(),{editId:'',parentId:'',paragraphId:'',replyLabel:''})
+const props=withDefaults(defineProps<{articleId:string;editId?:string;parentId?:string;paragraphId?:string;replyLabel?:string;writable?:boolean}>(),{writable:true,editId:'',parentId:'',paragraphId:'',replyLabel:''})
 const emit=defineEmits<{cancel:[];saved:[];clearReply:[]}>()
 const {accessToken,account}=storeToRefs(useAuthStore()),operations=useV3CommentsStore(),mounted=ref(false),draft=ref(''),anonymous=ref(false),visible=ref(false),editVisibility=ref('preserve'),sourceLoading=ref(false),sourceReady=ref(false),localError=ref('')
 const editor=ref<InstanceType<typeof ChatComposer>|null>(null),origin=Symbol('comment-composer')
@@ -15,21 +15,29 @@ const applicable=computed(()=>operations.pending?.articleId===props.articleId)
 let sequence=0,boundary='',submitted:{key:string;draft:string}|null=null
 function identity(){return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${props.articleId}:${props.editId}`}
 function clear(){sequence++;operations.cancelConfirmation(origin);draft.value='';anonymous.value=false;visible.value=false;editVisibility.value='preserve';localError.value='';sourceLoading.value=false;sourceReady.value=false;submitted=null}
-async function source(){if(!ready.value||!props.editId)return;const current=++sequence,reader=identity();sourceLoading.value=true;sourceReady.value=false;localError.value='';draft.value='';try{const text=await readV3CommentSource(props.editId,props.articleId);if(mounted.value&&reader===identity()&&current===sequence){draft.value=text;sourceReady.value=true}}catch(err){if(mounted.value&&reader===identity()&&current===sequence)localError.value=err instanceof Error?err.message:'原文读取失败'}finally{if(mounted.value&&reader===identity()&&current===sequence)sourceLoading.value=false}}
-async function save(){if(!ready.value||locked.value||props.editId&&!sourceReady.value)return;const reader=identity();localError.value='';const input:CommentInput={content:draft.value};if(props.editId){if(editVisibility.value!=='preserve')input.visible=editVisibility.value==='author'}else{input.anonymous=anonymous.value;input.visible=visible.value;if(props.parentId)input.parentId=props.parentId;if(props.paragraphId)input.paragraphId=props.paragraphId}try{await operations.save(props.articleId,input,props.editId,origin)}catch(err){if(mounted.value&&reader===identity())localError.value=err instanceof Error?err.message:'评论参数不合法'}}
+async function source(){if(!ready.value||!props.writable||!props.editId)return;const current=++sequence,reader=identity();sourceLoading.value=true;sourceReady.value=false;localError.value='';draft.value='';try{const text=await readV3CommentSource(props.editId,props.articleId);if(mounted.value&&reader===identity()&&current===sequence){draft.value=text;sourceReady.value=true}}catch(err){if(mounted.value&&reader===identity()&&current===sequence)localError.value=err instanceof Error?err.message:'原文读取失败'}finally{if(mounted.value&&reader===identity()&&current===sequence)sourceLoading.value=false}}
+async function save(){if(!ready.value||!props.writable||locked.value||props.editId&&!sourceReady.value)return;const reader=identity();localError.value='';const input:CommentInput={content:draft.value};if(props.editId){if(editVisibility.value!=='preserve')input.visible=editVisibility.value==='author'}else{input.anonymous=anonymous.value;input.visible=visible.value;if(props.parentId)input.parentId=props.parentId;if(props.paragraphId)input.paragraphId=props.paragraphId}try{await operations.save(props.articleId,input,props.editId,origin)}catch(err){if(mounted.value&&reader===identity())localError.value=err instanceof Error?err.message:'评论参数不合法'}}
 watch([accessToken,()=>account.value?.oId,()=>props.articleId,()=>props.editId],()=>{const next=identity();if(next===boundary)return;boundary=next;clear();void source()},{flush:'sync'})
+watch(()=>props.writable,enabled=>{
+  sequence++
+  operations.cancelConfirmation(origin)
+  if(!enabled){const buffered=editor.value?.flush();if(typeof buffered==='string')draft.value=buffered}
+  sourceLoading.value=false
+  if(enabled&&!sourceReady.value)void source()
+},{flush:'sync'})
 watch([()=>props.parentId,()=>props.paragraphId],()=>operations.cancelConfirmation(origin),{flush:'sync'})
 watch(()=>operations.pending,command=>{if(command&&command.articleId===props.articleId&&command.operation!=='delete'&&command.id===props.editId&&command.input.content===draft.value)submitted={key:command.key,draft:draft.value}},{flush:'sync'})
 watch(()=>operations.completed,command=>{if(command&&submitted?.key===command.key){if(draft.value===submitted.draft)draft.value='';submitted=null;emit('saved')}},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity();void source()})
 onBeforeUnmount(()=>{mounted.value=false;clear()})
-defineExpose({reveal:()=>editor.value?.reveal()})
+defineExpose({reveal:()=>props.writable&&editor.value?.reveal()})
 </script>
 <template>
   <div class="comment-composer">
     <p v-if="!ready">正在准备评论…</p>
     <template v-else>
       <template v-if="operations.pending"><p>上次{{ operations.pending.operation==='delete'?'删除':operations.pending.operation==='update'?'编辑':'发布' }}评论结果待确认，所属文章 {{ operations.pending.articleId }}。请恢复同一次操作。</p><p v-if="operations.pending.input.content" class="pending-content">{{ operations.pending.input.content }}</p><button type="button" :disabled="operations.busy" @click="operations.retry()">{{ operations.busy?'正在确认…':'恢复本次评论操作' }}</button><p v-if="!applicable">恢复成功后请返回原文章核对，当前文章不会套用原结果。</p></template>
+      <p v-else-if="!writable">当前不可发布或编辑评论，已有操作仍可恢复。</p>
       <template v-else-if="editId&&!sourceReady"><p v-if="sourceLoading">正在读取评论原文…</p><button v-else type="button" @click="source()">重读评论原文</button></template>
       <template v-else>
         <p v-if="parentId">回复 {{ replyLabel || `评论 ${parentId}` }}<button type="button" :disabled="locked" @click="emit('clearReply')">取消回复</button></p>

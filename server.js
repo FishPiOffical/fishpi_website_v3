@@ -26,7 +26,7 @@ function proxyWsUpgrade(req, socket, head) {
   const target = new URL(req.url, apiTarget)
   const secure = target.protocol === 'https:'
   const upstream = (secure ? https : http).request({
-    hostname: target.hostname,
+    hostname: target.hostname.startsWith('[') ? target.hostname.slice(1, -1) : target.hostname,
     port: target.port || (secure ? 443 : 80),
     path: target.pathname + target.search,
     method: 'GET',

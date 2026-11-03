@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { ApiError } from '@/api/http'
+import { ApiError, getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { fpConfirm } from '@/composables/useDialog'
 import { invalidateVipName, parseVipNameConfig, vipNameClass, vipNameStyle } from '@/composables/useVipNickname'
@@ -18,6 +18,8 @@ const draft = ref<{ bold: boolean | ''; underline: boolean | ''; color: string }
 type Intent = { key: string } & ({ kind: 'open'; input: MembershipOpening } | { kind: 'config'; changes: MembershipDisplay })
 const pending = ref<Intent | null>(null)
 let generation = 0, stateSequence = 0, levelsSequence = 0
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
+let boundary = identity()
 const support = computed(() => {
   if (!levelsReady.value || !state.value) return { fields: [] as (keyof MembershipDisplay)[], error: '' }
   try { return { fields: membershipDisplayFields(levels.value, state.value), error: '' } }
@@ -34,7 +36,7 @@ function reset() {
   draft.value = { bold: '', underline: '', color: '' }; coupon.value = ''; pending.value = null
   levelsError.value = stateError.value = error.value = message.value = ''; levelsLoading.value = stateLoading.value = busy.value = confirming.value = false
 }
-function guard() { const token = accessToken.value, current = generation; return () => mounted.value && !!token && token === accessToken.value && current === generation }
+function guard() { const owner = identity(), current = generation; return () => mounted.value && !!accessToken.value && owner === identity() && current === generation }
 async function loadState() {
   if (!accessToken.value) return
   const valid = guard(), sequence = ++stateSequence
@@ -104,7 +106,12 @@ async function save() {
 }
 function retry() { if (pending.value && !busy.value) void execute(pending.value) }
 onMounted(() => { mounted.value = true; void loadLevels(); void loadState() })
-watch(accessToken, () => { reset(); if (mounted.value) { void loadLevels(); void loadState() } }, { flush: 'sync' })
+watch([accessToken, () => account.value?.oId], () => {
+  const current = identity()
+  if (current === boundary) return
+  boundary = current; reset()
+  if (mounted.value) { void loadLevels(); void loadState() }
+}, { flush: 'sync' })
 onBeforeUnmount(() => { mounted.value = false; reset() })
 </script>
 

@@ -49,3 +49,27 @@ reset(currentDetail,page([comment,comment]));await assert.rejects(api.v3Article(
 reset(currentDetail,page([],2,0));const empty=await api.v3Article('101',2);assert.equal(empty.pagination.paginationCurrentPageNum,2);assert.equal(empty.pagination.paginationPageCount,0);assert.deepEqual(empty.articleComments,[]);console.log('PASS article binding 6 empty/shrunk comments retain actual page metadata for caller recovery')
 reset({...currentDetail,type:6},page([{...comment,articleId:'other'}]));await assert.rejects(api.v3Article('101'),e=>e.status===502);assert.equal(globalThis.__v3Paths.length,2);console.log('PASS article binding 7 invalid long-article comments fail before any paragraph-content fetch')
 reset(currentDetail,page([{...comment,userPhone:'PRIVATE',commentIP:'PRIVATE'}]));const safe=await api.v3Article('101');assert.equal(safe.articleComments[0].commentContent,'');assert.equal(safe.articleComments[0].commentAuthorId,'');assert.ok(!JSON.stringify(safe).includes('PRIVATE'));console.log('PASS article binding 8 validated current binding retains private/anonymous projection and drops unknown fields')
+
+for(const accepted of [false,true]){
+ reset({...currentDetail,type:5,qna:{offerPoint:20,accepted,answerId:'PRIVATE_ANSWER',author:'PRIVATE_AUTHOR'}},page([]))
+ const question=await api.v3Article('101');assert.equal(question.articleQnAOfferPoint,20);assert.equal(question.offered,accepted);assert.ok(!JSON.stringify(question).includes('PRIVATE_'))
+}
+reset({...currentDetail,qna:null},page([]));const ordinaryQuestion=await api.v3Article('101');assert.equal(ordinaryQuestion.articleQnAOfferPoint,undefined);assert.equal(ordinaryQuestion.offered,undefined)
+console.log('PASS question projection 1 additive question state maps amount/accepted only, drops hidden answer identifiers and keeps non-question null')
+for(const qna of [null,[],{}, {offerPoint:-1,accepted:false},{offerPoint:'20',accepted:false},{offerPoint:20,accepted:1},{offerPoint:20,accepted:null}]){
+ reset({...currentDetail,type:5,qna},page([]));await assert.rejects(api.v3Article('101'),e=>e.status===502)
+}
+reset({...currentDetail,qna:{offerPoint:20,accepted:true}},page([]));await assert.rejects(api.v3Article('101'),e=>e.status===502)
+reset({...currentDetail,type:5},page([]));const oldQuestion=await api.v3Article('101');assert.equal(oldQuestion.articleQnAOfferPoint,undefined);assert.equal(oldQuestion.offered,undefined)
+console.log('PASS question projection 2 malformed question state rejects explicitly; older omitted state stays unknown instead of invented zero or unresolved')
+
+assert.equal(api.adaptV3Article({...article,perfect:true}).articlePerfect,1)
+assert.equal(api.adaptV3Article({...article,perfect:false}).articlePerfect,0)
+assert.equal(api.adaptV3Article(article).articlePerfect,undefined)
+for(const perfect of [0,1,'true',null,{}])assert.throws(()=>api.adaptV3Article({...article,perfect}),e=>e.status===502)
+console.log('PASS perfect projection 1 strict boolean flag is preserved and older missing metadata stays absent')
+
+for(const commentable of [true,false,null])for(const statement of [0,1,2,3,null]){reset({...currentDetail,commentable,statement},page([]));const d=await api.v3Article('101');assert.equal(d.articleCommentable,commentable);assert.equal(d.articleStatement,statement)}
+reset(currentDetail,page([]));const missingPolicy=await api.v3Article('101');assert.equal(missingPolicy.articleCommentable,null);assert.equal(missingPolicy.articleStatement,null);
+for(const policy of [{commentable:'true'},{commentable:1},{statement:'1'},{statement:4},{statement:-1}]){reset({...currentDetail,...policy},page([]));await assert.rejects(api.v3Article('101'),e=>e.status===502)}
+console.log('PASS article policy strict current Boolean and declaration enum, explicit/missing unknown never becomes allowed or no declaration')

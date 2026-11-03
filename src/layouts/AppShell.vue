@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useClientStartupStore } from '@/stores/clientStartup'
 import { useAuthStore } from '@/stores/auth'
+import { getAuthContextVersion } from '@/api/http'
 import { useAppearanceStore } from '@/stores/appearance'
 import { useNoticeStore } from '@/stores/notices'
 import { usePrivateInboxStore } from '@/stores/privateInbox'
@@ -157,6 +158,15 @@ const isModernChat = computed(() => route.path === '/cr' && chat.chatStyle === '
 
 const memberPath = computed(() => (account.value?.userName ? `/member/${account.value.userName}` : '/login'))
 const avatarUrl = computed(() => account.value?.userAvatarURL || '')
+const failedAvatarUrl = ref('')
+const visibleAvatarUrl = computed(() => avatarUrl.value === failedAvatarUrl.value ? '' : avatarUrl.value)
+watch([avatarUrl, () => account.value?.oId], () => { failedAvatarUrl.value = '' })
+function onAvatarError(event: Event) {
+  const image = event.currentTarget as HTMLImageElement | null
+  // Ignore an error from an old URL after the account or avatar has changed.
+  const source = image?.getAttribute('src')
+  if (source && source === avatarUrl.value) failedAvatarUrl.value = source
+}
 const displayName = computed(() => account.value?.userNickname || account.value?.userName || '')
 const userCity = computed(() => (account.value?.userCity || '').trim())
 const menuOpen = ref(false)
@@ -252,6 +262,12 @@ function onDocClick(e: MouseEvent) {
 }
 
 const apiOffline = ref(false)
+let offlineBoundary = getAuthContextVersion(), offlineActor = auth.account?.oId, offlineHasToken = Boolean(auth.accessToken)
+watch([() => auth.accessToken, () => auth.account?.oId], () => {
+  const next = getAuthContextVersion(), actor = auth.account?.oId, hasToken = Boolean(auth.accessToken)
+  if (next !== offlineBoundary || actor !== offlineActor || hasToken !== offlineHasToken) apiOffline.value = false
+  offlineBoundary = next; offlineActor = actor; offlineHasToken = hasToken
+}, { flush: 'sync' })
 
 function onApiOffline() {
   if (route.name === 'offline') return
@@ -338,13 +354,13 @@ onUnmounted(() => {
               :aria-expanded="menuOpen"
               @click="toggleMenu"
             >
-              <img v-if="avatarUrl" class="avatar" :src="avatarUrl" alt="" />
+              <img v-if="visibleAvatarUrl" class="avatar" :src="visibleAvatarUrl" alt="" @error="onAvatarError" />
               <span v-else class="avatar fallback">{{ (account?.userName || '?').slice(0, 1) }}</span>
             </button>
             <div class="menu" role="menu">
               <div class="menu-head">
                 <RouterLink :to="memberPath" class="menu-user" @click="menuOpen = false">
-                  <img v-if="avatarUrl" :src="avatarUrl" alt="" />
+                  <img v-if="visibleAvatarUrl" :src="visibleAvatarUrl" alt="" @error="onAvatarError" />
                   <div>
                     <b>{{ displayName }}</b>
                     <span>@{{ account?.userName }}</span>

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { fetchV3Profile, saveV3Profile, fetchV3Personality, fetchV3PersonalityOptions, saveV3Personality,
   fetchV3Avatar, saveV3Avatar, displayAvatar, uploadV3Avatar, profileOperationKey, fetchV3Qq, saveV3Qq, fetchV3ProfileTags, saveV3ProfileTags } from '@/api/v3-profile'
 
 const props = defineProps<{ mode: 'profile' | 'avatar' }>()
-const auth = useAuthStore(), { accessToken } = storeToRefs(auth)
+const auth = useAuthStore(), { accessToken, account } = storeToRefs(auth)
 const nickname = ref(''), intro = ref(''), website = ref(''), mbti = ref(''), options = ref<string[]>([])
 const avatar = ref(''), avatarDraft = ref(''), busy = ref(false), loading = ref(false)
 const qq = ref('')
@@ -15,6 +16,8 @@ const loaded = ref({ profile: false, personality: false, avatar: false, qq: fals
 const errors = ref({ profile: '', personality: '', avatar: '', qq: '', tags: '' }), messages = ref({ profile: '', personality: '', avatar: '', qq: '', tags: '' })
 type Resource = keyof typeof loaded.value
 let mounted = false, generation = 0, uploadAbort: AbortController | null = null
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
+let boundary = identity()
 const intentions = new Map<Resource, { fingerprint: string; key: string }>()
 const errorText = (error: unknown) => error instanceof Error ? error.message : '设置操作失败，请重试'
 function reset() {
@@ -26,10 +29,10 @@ function reset() {
   busy.value = loading.value = false
 }
 async function load() {
-  const token = accessToken.value, current = ++generation
-  if (!token) return
+  const owner = identity(), current = ++generation
+  if (!accessToken.value) return
   loading.value = true
-  const valid = () => mounted && current === generation && token === accessToken.value
+  const valid = () => mounted && current === generation && owner === identity()
   async function read<T>(group: Resource, fetcher: () => Promise<T>, apply: (value: T) => void) {
     loaded.value[group] = false; errors.value[group] = ''; messages.value[group] = ''
     try { const value = await fetcher(); if (valid()) { apply(value); loaded.value[group] = true } }
@@ -48,8 +51,8 @@ async function load() {
 }
 async function write<T>(group: Resource, body: unknown, action: (key: string) => Promise<T>, apply: (value: T) => void) {
   if (busy.value || loading.value || !accessToken.value || !loaded.value[group]) return
-  const token = accessToken.value, current = generation, fingerprint = JSON.stringify(body)
-  const valid = () => mounted && current === generation && token === accessToken.value
+  const owner = identity(), current = generation, fingerprint = JSON.stringify(body)
+  const valid = () => mounted && current === generation && owner === identity()
   busy.value = true; errors.value[group] = ''; messages.value[group] = ''
   try {
     let intent = intentions.get(group)
@@ -89,8 +92,8 @@ async function onUpload(event: Event) {
   const input = event.target as HTMLInputElement, file = input.files?.[0]
   input.value = ''
   if (!file || busy.value || loading.value || !loaded.value.avatar || !accessToken.value) return
-  const token = accessToken.value, current = generation, controller = new AbortController()
-  const valid = () => mounted && current === generation && token === accessToken.value
+  const owner = identity(), current = generation, controller = new AbortController()
+  const valid = () => mounted && current === generation && owner === identity()
   uploadAbort = controller; busy.value = true; errors.value.avatar = messages.value.avatar = ''
   let url: string | undefined
   try { url = await uploadV3Avatar(file, controller.signal); if (valid()) avatarDraft.value = url }
@@ -100,7 +103,12 @@ async function onUpload(event: Event) {
   if (url && valid()) await persistAvatar(url)
 }
 onMounted(() => { mounted = true; void load() })
-watch(accessToken, () => { reset(); if (mounted) void load() }, { flush: 'sync' })
+watch([accessToken, () => account.value?.oId], () => {
+  const current = identity()
+  if (current === boundary) return
+  boundary = current; reset()
+  if (mounted) { void load() }
+}, { flush: 'sync' })
 onBeforeUnmount(() => { mounted = false; reset() })
 </script>
 

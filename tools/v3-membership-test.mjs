@@ -5,8 +5,8 @@ import { createRenderer, nextTick, ref } from 'vue'
 import { createPinia, defineStore, setActivePinia } from 'pinia'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
-globalThis.__membershipRequests=[];globalThis.__membershipResponses=[]
-const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}} export async function request(path,init){globalThis.__membershipRequests.push({path,init});const result=globalThis.__membershipResponses.shift();if(result instanceof Error)throw result;if(result===undefined)throw Error('Unexpected '+path);return result}`)
+globalThis.__membershipContext=0;globalThis.__membershipRequests=[];globalThis.__membershipResponses=[]
+const http=url(`export const getAuthContextVersion=()=>globalThis.__membershipContext; export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}} export async function request(path,init){globalThis.__membershipRequests.push({path,init});const result=globalThis.__membershipResponses.shift();if(result instanceof Error)throw result;if(result===undefined)throw Error('Unexpected '+path);return result}`)
 const {ApiError}=await import(http)
 const api=await import(url(compile(await fs.readFile('src/api/v3-membership.ts','utf8')).replace("from './http'",`from '${http}'`)))
 const plan={id:'10',code:'VIP4_MONTH',name:'至尊会员',price:1000,durationType:'月卡',durationValue:30,benefits:{bold:false,underline:false,color:'#AABBCC',autoCheckin:false,checkinCard:0}}
@@ -44,7 +44,7 @@ const tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick
 async function component(){let source=(await fs.readFile('src/components/settings/OwnerMembership.vue','utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1];let js=compile(source).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-membership'",`from '${apiURL}'`).replace("from '@/api/v3-profile'",`from '${keyURL}'`).replace("from '@/composables/useDialog'",`from '${dialogURL}'`).replace("from '@/composables/useVipNickname'",`from '${nicknameURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`);const imports=[...js.matchAll(/^import .+;$/gm)].map(m=>m[0]).join('\n');js=js.replace(/^import .+;$/gm,'');const mod=await import(url(`${imports}\nexport default{setup(){${js}\nreturn{levels,state,support,advanced,draft,coupon,busy,pending,error,message,stateError,buy,save,retry,loadState,loadLevels}},render(){return null}}`));const app=renderer.createApp(mod.default);app.use(createPinia());return{app,vm:app.mount({})}}
 let releaseOld;const old=new Promise(resolve=>releaseOld=resolve)
 Object.assign(__membershipAPI,{fetchV3MembershipLevels:async()=>[plan],fetchV3Membership:async()=>auth.accessToken==='A'?old:active})
-let view=await component();await tick();auth.accessToken='B';await tick();releaseOld({...active,levelCode:'PRIVATE-A'});await tick();assert.equal(view.vm.state.levelCode,'VIP4_MONTH');assert.equal(view.vm.draft.bold,'');assert.equal(view.vm.advanced,true);auth.accessToken=null;assert.equal(view.vm.state,null);assert.deepEqual(view.vm.levels,[]);assert.equal(view.vm.coupon,'');view.app.unmount()
+let view=await component();await tick();__membershipContext++;auth.accessToken='B';await tick();releaseOld({...active,levelCode:'PRIVATE-A'});await tick();assert.equal(view.vm.state.levelCode,'VIP4_MONTH');assert.equal(view.vm.draft.bold,'');assert.equal(view.vm.advanced,true);auth.accessToken=null;assert.equal(view.vm.state,null);assert.deepEqual(view.vm.levels,[]);assert.equal(view.vm.coupon,'');view.app.unmount()
 console.log('PASS membership 4 actual Vue/Pinia isolates late reads and clears account state, coupon, catalog and drafts across credentials')
 auth.accessToken='C';let confirmed,resolveConfirm,writes=0
 __membershipAPI.fetchV3Membership=async()=>inactive;__membershipAPI.openV3Membership=async()=>{writes++;return receipt};__membershipConfirm=async options=>{confirmed=options;return new Promise(resolve=>resolveConfirm=resolve)}
@@ -63,4 +63,22 @@ auth.accessToken='F';let count=0;__membershipAPI.fetchV3MembershipLevels=async()
 view=await component();await tick();await view.vm.buy(plan);assert.match(view.vm.message,/800/);assert.match(view.vm.stateError,/read failed/);assert.equal(view.vm.pending,null);assert.equal(view.vm.state,null)
 __membershipAPI.fetchV3Membership=async()=>inactive;await view.vm.loadState();__membershipAPI.openV3Membership=async()=>{throw new ApiError('coupon invalid',422)};await view.vm.buy(plan);assert.equal(view.vm.pending,null);assert.match(view.vm.error,/coupon invalid/);view.app.unmount()
 console.log('PASS membership 8 confirmed opening survives follow-up read failure, retryable reads never rebuy and definitive coupon rejection clears intent')
+// A refreshed credential for the same identity must not discard an unresolved paid operation.
+auth.accessToken='rotation-start';__membershipConfirm=async()=>true;__membershipAPI.fetchV3Membership=async()=>inactive
+const rotatedPurchases=[];let rotateFail=true
+__membershipAPI.openV3Membership=async(input,key)=>{rotatedPurchases.push({input:JSON.parse(JSON.stringify(input)),key});if(rotateFail){rotateFail=false;throw new ApiError('lost ACK',0)}return receipt}
+view=await component();await tick();view.vm.coupon='COUPON12';await view.vm.buy(plan);const unresolved=JSON.parse(JSON.stringify(view.vm.pending))
+auth.accessToken='rotation-next';await tick();assert.deepEqual(view.vm.pending,unresolved,'ordinary refresh lost the paid-operation recovery key');assert.equal(view.vm.coupon,'COUPON12');view.vm.retry();await tick();assert.deepEqual(rotatedPurchases[0],rotatedPurchases[1]);assert.match(view.vm.message,/800/);view.app.unmount()
+console.log('PASS membership 9 normal token rotation preserves unresolved opening and recovers the original body/key')
+let releaseRotation;__membershipAPI.fetchV3Membership=async()=>inactive
+__membershipAPI.openV3Membership=async()=>{auth.accessToken='rotation-during-write';return new Promise(resolve=>releaseRotation=resolve)}
+view=await component();await tick();const rotatingWrite=view.vm.buy(plan);await tick();assert.equal(view.vm.busy,true);releaseRotation(receipt);await rotatingWrite;assert.match(view.vm.message,/800/);assert.equal(view.vm.pending,null);assert.equal(view.vm.busy,false);view.app.unmount()
+console.log('PASS membership 10 rotation during a write keeps its confirmed receipt and finishes the current operation')
+__membershipAPI.fetchV3Membership=async()=>active;view=await component();await tick();view.vm.draft.color='#123456';auth.accessToken='rotation-draft';await tick();assert.equal(view.vm.draft.color,'#123456');auth.account={oId:'2',userName:'other',userNickname:'Other'};assert.equal(view.vm.draft.color,'');assert.equal(view.vm.pending,null);assert.equal(view.vm.state,null);await tick();view.app.unmount()
+console.log('PASS membership 11 same-account rotation preserves drafts while an actor change with the same token clears private state')
+let confirmRotation;let confirmWrites=0;__membershipAPI.fetchV3Membership=async()=>inactive
+__membershipConfirm=async()=>new Promise(resolve=>confirmRotation=resolve);__membershipAPI.openV3Membership=async()=>{confirmWrites++;return receipt}
+view=await component();await tick();const rotatedConfirm=view.vm.buy(plan);await tick();auth.accessToken='rotation-during-confirm';confirmRotation(true);await rotatedConfirm;assert.equal(confirmWrites,1);assert.match(view.vm.message,/800/);view.app.unmount()
+view=await component();await tick();const boundaryConfirm=view.vm.buy(plan);await tick();__membershipContext++;auth.accessToken='new-session-same-actor';confirmRotation(true);await boundaryConfirm;assert.equal(confirmWrites,1);assert.equal(view.vm.message,'');view.app.unmount()
+console.log('PASS membership 12 ordinary refresh keeps confirmation valid, a new session for the same actor invalidates the old confirmation')
 const vip=await fs.readFile('src/views/VipView.vue','utf8');assert.match(vip,/<OwnerMembership/);assert.ok(!vip.includes('apiKey')&&!vip.includes('fetchMembershipDetail'))

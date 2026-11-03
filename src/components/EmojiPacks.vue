@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { ApiError } from '@/api/http'
+import { ApiError, getAuthContextVersion } from '@/api/http'
 import type { EmojiGroup, EmojiItem } from '@/api/fishpi'
 import { addV3EmojiURL, createV3EmojiGroup, deleteV3EmojiGroup, fetchV3EmojiGroups, fetchV3GroupEmojis,
   fetchV3FrequentAliases, fetchV3EmotionOptions, saveV3FrequentEmotions, removeV3GroupEmoji, emojiOperationKey, updateV3EmojiGroup, updateV3EmojiItem, shareV3EmojiGroup, importV3EmojiGroup, migrateV3LegacyEmojis } from '@/api/v3-emojis'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
 
-const { accessToken } = storeToRefs(useAuthStore())
+const { accessToken, account } = storeToRefs(useAuthStore())
 const groups = ref<EmojiGroup[]>([]), items = ref<EmojiItem[]>([]), groupId = ref('')
 const loading = ref(false), busy = ref(false), error = ref(''), frequencyLoading = ref(false), catalogLoaded = ref(false)
 const newGroup = ref(''), newUrl = ref(''), newName = ref(''), frequency = ref('')
@@ -19,15 +19,17 @@ const groupPage = ref(0), groupPages = ref(0), groupTotal = ref(0), itemPage = r
 const selectedGroup = computed(() => groups.value.find(g => g.oId === groupId.value))
 watch(selectedGroup, group => { editGroupName.value = group?.name || ''; editGroupSort.value = group?.sort ?? 0; editItemId.value = ''; sharedCode.value = '' })
 let epoch = 0, sequence = 0, frequencySequence = 0, mounted = false
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
+let boundary = identity()
 const intentions = new Map<string, { fingerprint: string; key: string }>()
 function mergeGroups(values: EmojiGroup[]) {
   return Array.from(new Map(values.map(g => [g.oId, g])).values()).sort((a,b) => (a.sort ?? 0) - (b.sort ?? 0) || (a.oId < b.oId ? -1 : a.oId > b.oId ? 1 : 0))
 }
 async function read<T>(fetcher: () => Promise<T>, apply: (value: T) => void, failed?: (error: unknown) => void) {
-  const token = accessToken.value, currentEpoch = epoch, request = ++sequence
-  if (!token) return false
+  const owner = identity(), currentEpoch = epoch, request = ++sequence
+  if (!accessToken.value) return false
   loading.value = true; error.value = ''
-  const current = () => mounted && currentEpoch === epoch && request === sequence && token === accessToken.value
+  const current = () => mounted && currentEpoch === epoch && request === sequence && owner === identity()
   try { const result = await fetcher(); if (current()) { apply(result); return true } }
   catch (failure) { if (current()) { items.value = []; error.value = failure instanceof Error ? failure.message : '表情加载失败'; failed?.(failure) } }
   finally { if (current()) loading.value = false }
@@ -45,16 +47,16 @@ function loadItems(more = false) {
   })
 }
 async function loadGroups(preferred?: EmojiGroup) {
-  const keep = preferred ?? selectedGroup.value, token = accessToken.value, currentEpoch = epoch
+  const keep = preferred ?? selectedGroup.value, owner = identity(), currentEpoch = epoch
   const applied = await read(() => fetchV3EmojiGroups(), page => {
     groups.value = mergeGroups(keep && !page.list.some(g => g.oId === keep.oId) ? [...page.list, keep] : page.list)
     groupPage.value = page.p; groupPages.value = page.pageCount; groupTotal.value = page.total
     groupId.value = keep && groups.value.some(g => g.oId === keep.oId) ? keep.oId : groups.value[0]?.oId || ''
   })
-  if (applied && token === accessToken.value && currentEpoch === epoch) await loadItems()
+  if (applied && owner === identity() && currentEpoch === epoch) await loadItems()
 }
 async function loadTransferredGroup(id: string) {
-  const token = accessToken.value, currentEpoch = epoch
+  const owner = identity(), currentEpoch = epoch
   const applied = await read(async () => {
     const first = await fetchV3EmojiGroups()
     let found = first.list.find(group => group.oId === id)
@@ -63,7 +65,7 @@ async function loadTransferredGroup(id: string) {
     const pages = first.pageCount > 1 ? [first.pageCount, ...Array.from({ length: Math.max(0, first.pageCount - 2) }, (_, i) => i + 2)] : []
     for (const p of pages) {
       if (found) break
-      if (!mounted || token !== accessToken.value || currentEpoch !== epoch) return { first, found: undefined }
+      if (!mounted || owner !== identity() || currentEpoch !== epoch) return { first, found: undefined }
       const page = await fetchV3EmojiGroups(p)
       found = page.list.find(group => group.oId === id)
     }
@@ -74,7 +76,7 @@ async function loadTransferredGroup(id: string) {
     groups.value = mergeGroups([...first.list, found]); groupId.value = found.oId
     groupPage.value = first.p; groupPages.value = first.pageCount; groupTotal.value = first.total
   })
-  if (applied && token === accessToken.value && currentEpoch === epoch) await loadItems()
+  if (applied && owner === identity() && currentEpoch === epoch) await loadItems()
 }
 function moreGroups() {
   return read(() => fetchV3EmojiGroups(groupPage.value + 1), page => {
@@ -83,10 +85,10 @@ function moreGroups() {
 }
 function selectGroup(id: string) { groupId.value = id; void loadItems() }
 async function loadFrequency() {
-  const token = accessToken.value, currentEpoch = epoch, request = ++frequencySequence
-  if (!token) return
+  const owner = identity(), currentEpoch = epoch, request = ++frequencySequence
+  if (!accessToken.value) return
   frequencyLoading.value = true
-  const current = () => mounted && token === accessToken.value && currentEpoch === epoch && request === frequencySequence
+  const current = () => mounted && owner === identity() && currentEpoch === epoch && request === frequencySequence
   try {
     const [aliases, options] = await Promise.all([fetchV3FrequentAliases(), fetchV3EmotionOptions()])
     if (current()) { frequency.value = aliases.join(','); catalog.value = options.groups; catalogLoaded.value = true }
@@ -102,20 +104,25 @@ function reset() {
   loading.value = frequencyLoading.value = busy.value = false
 }
 onMounted(() => { mounted = true; if (accessToken.value) { void loadGroups(); void loadFrequency() } })
-watch(accessToken, token => { reset(); if (mounted && token) { void loadGroups(); void loadFrequency() } }, { flush: 'sync' })
+watch([accessToken, () => account.value?.oId], () => {
+  const current = identity()
+  if (current === boundary) return
+  boundary = current; reset()
+  if (mounted && accessToken.value) { void loadGroups(); void loadFrequency() }
+}, { flush: 'sync' })
 onBeforeUnmount(() => { mounted = false; reset() })
 async function mutate<T>(operation: string, payload: unknown, action: (key: string) => Promise<T>, done: (result: T) => Promise<unknown> | void) {
-  const token = accessToken.value, currentEpoch = epoch
-  if (!token || busy.value) return
+  const owner = identity(), currentEpoch = epoch
+  if (!accessToken.value || busy.value) return
   busy.value = true; error.value = ''
   try {
     const fingerprint = JSON.stringify(payload)
     let intent = intentions.get(operation)
     if (!intent || intent.fingerprint !== fingerprint) { intent = { fingerprint, key: emojiOperationKey() }; intentions.set(operation, intent) }
     const result = await action(intent.key)
-    if (mounted && token === accessToken.value && currentEpoch === epoch) { intentions.delete(operation); await done(result) }
-  } catch (failure) { if (mounted && token === accessToken.value && currentEpoch === epoch) error.value = failure instanceof Error ? failure.message : '表情操作失败' }
-  finally { if (currentEpoch === epoch && token === accessToken.value) busy.value = false }
+    if (mounted && owner === identity() && currentEpoch === epoch) { intentions.delete(operation); await done(result) }
+  } catch (failure) { if (mounted && owner === identity() && currentEpoch === epoch) error.value = failure instanceof Error ? failure.message : '表情操作失败' }
+  finally { if (currentEpoch === epoch && owner === identity()) busy.value = false }
 }
 function onCreate() {
   const name = newGroup.value.trim(), sort = groupTotal.value

@@ -18,5 +18,7 @@ export function avatarUrl(u: AvatarFields | null | undefined, prefer: 'small' | 
 }
 
 export function avatarStyle(url: string | undefined | null) {
-  return { backgroundImage: `url('${url || DEFAULT_AVATAR}')` }
+  // CSS string escaping preserves URL bytes instead of percent-encoding signed addresses.
+  const value = (url || DEFAULT_AVATAR).replace(/[\u0000-\u001f\u007f"\\]/g, char => `\\${char.charCodeAt(0).toString(16)} `)
+  return { backgroundImage: `url("${value}")` }
 }

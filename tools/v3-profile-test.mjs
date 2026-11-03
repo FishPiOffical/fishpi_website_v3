@@ -6,7 +6,7 @@ import { createPinia, defineStore, setActivePinia } from 'pinia'
 const transpile = source => ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const moduleURL = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 globalThis.__profileRequests=[];globalThis.__profileResponses=[]
-const shim=moduleURL('export class ApiError extends Error{constructor(message,status,code){super(message);this.status=status;this.code=code}} export async function request(path,init){globalThis.__profileRequests.push({path,init});const value=globalThis.__profileResponses.shift();if(value instanceof Error)throw value;if(typeof value==="function")return value();if(value===undefined)throw Error("Unexpected "+path);return value}')
+const shim=moduleURL('export const getAuthContextVersion=()=>globalThis.__profileContext||0; export class ApiError extends Error{constructor(message,status,code){super(message);this.status=status;this.code=code}} export async function request(path,init){globalThis.__profileRequests.push({path,init});const value=globalThis.__profileResponses.shift();if(value instanceof Error)throw value;if(typeof value==="function")return value();if(value===undefined)throw Error("Unexpected "+path);return value}')
 const api=await import(moduleURL(transpile(await fs.readFile('src/api/v3-profile.ts','utf8')).replace("from './http'",`from '${shim}'`)))
 const envelope=data=>({code:0,data}), profile={userNickname:'owner',userIntro:'intro',userURL:'https://example.com/'}
 __profileResponses.push(envelope(profile));assert.deepEqual(await api.fetchV3Profile(),profile)
@@ -42,7 +42,7 @@ globalThis.fetch=originalFetch
 console.log('PASS profile 3 magic-based named multipart upload uses only short ticket, no cookies/redirects; invalid targets/aborted identity cannot upload')
 
 const renderer=createRenderer({patchProp(){},insert(){},remove(){},createElement(){return{}},createText(){return{}},createComment(){return{}},setText(){},setElementText(){},parentNode(){return null},nextSibling(){return null}})
-setActivePinia(createPinia());const auth=defineStore('profile-auth-test',()=>({accessToken:ref('A'),reloadAccount:async()=>{}}))()
+setActivePinia(createPinia());const auth=defineStore('profile-auth-test',()=>({accessToken:ref('A'),account:ref({oId:'1'}),reloadAccount:async()=>{}}))()
 globalThis.__profileAuth=()=>auth
 const authURL=moduleURL('export const useAuthStore=globalThis.__profileAuth')
 const names=['fetchV3Profile','saveV3Profile','fetchV3Personality','fetchV3PersonalityOptions','saveV3Personality','fetchV3Avatar','saveV3Avatar','displayAvatar','uploadV3Avatar','profileOperationKey','fetchV3Qq','saveV3Qq','fetchV3ProfileTags','saveV3ProfileTags']
@@ -51,7 +51,7 @@ const tick=async()=>{for(let i=0;i<20;i++)await Promise.resolve();await nextTick
 async function component(mode,exposed){
   globalThis.__profileProps={mode}
   let source=(await fs.readFile('src/components/settings/OwnerProfileSettings.vue','utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
-  let js=transpile(source).replace("from '@/api/v3-profile'",`from '${apiURL}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`).replace('const props = defineProps();','const props = globalThis.__profileProps;')
+  let js=transpile(source).replace("from '@/api/v3-profile'",`from '${apiURL}'`).replace("from '@/api/http'",`from '${shim}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`).replace('const props = defineProps();','const props = globalThis.__profileProps;')
   const imports=[...js.matchAll(/^import .+;$/gm)].map(m=>m[0]).join('\n');js=js.replace(/^import .+;$/gm,'')
   const loaded=await import(moduleURL(`${imports}\nexport default{setup(){${js}\nreturn{${exposed.join(',')}}},render(){return null}}`))
   const app=renderer.createApp(loaded.default);app.use(createPinia());return{app,vm:app.mount({})}
@@ -66,7 +66,7 @@ globalThis.__profileAPI={...api,
   fetchV3ProfileTags:async()=>'',saveV3ProfileTags:async value=>value,
 }
 const owner=await component('profile',['nickname','intro','website','mbti','errors','messages','loaded','busy','saveProfile','savePersonality'])
-await tick();auth.accessToken='B';await tick();resolveOld({...profile,userNickname:'PRIVATE-A'});await tick();assert.equal(owner.vm.nickname,'CURRENT-B')
+await tick();globalThis.__profileContext=(globalThis.__profileContext||0)+1;auth.accessToken='B';await tick();resolveOld({...profile,userNickname:'PRIVATE-A'});await tick();assert.equal(owner.vm.nickname,'CURRENT-B')
 owner.vm.nickname='new-name';await owner.vm.saveProfile();assert.match(owner.vm.errors.profile,/lost acknowledgement/);await owner.vm.saveProfile();assert.equal(keys[0],keys[1]);assert.equal(owner.vm.messages.profile,'已保存')
 owner.vm.mbti='bad';await owner.vm.savePersonality();assert.match(owner.vm.errors.personality,/请选择/)
 owner.vm.mbti=' enfp-a ';await owner.vm.savePersonality();assert.equal(owner.vm.mbti,'ENFP-A')
@@ -99,3 +99,11 @@ auth.accessToken='T';const tagKeys=[];let failTags=true
 globalThis.__profileAPI.saveV3ProfileTags=async(value,key)=>{tagKeys.push(key);if(failTags){failTags=false;throw Error('uncertain tags')}return 'JavaScript'}
 const tagOwner=await component('profile',['tags','errors','messages','saveTags']);await tick();tagOwner.vm.tags='JS';await tagOwner.vm.saveTags();assert.match(tagOwner.vm.errors.tags,/uncertain/);assert.equal(tagOwner.vm.tags,'JS');await tagOwner.vm.saveTags();assert.equal(tagKeys[0],tagKeys[1]);assert.equal(tagOwner.vm.tags,'JavaScript');auth.accessToken=null;assert.equal(tagOwner.vm.tags,'');tagOwner.app.unmount()
 console.log('PASS profile 7 dedicated tags contract, canonical result, uncertain same-key retry and private state clearing')
+
+auth.accessToken='profile-rotation-start';let refreshFail=true;const refreshKeys=[]
+Object.assign(__profileAPI,{fetchV3Profile:async()=>profile,saveV3Profile:async(body,key)=>{refreshKeys.push({body:JSON.parse(JSON.stringify(body)),key});if(refreshFail){refreshFail=false;throw Error('lost profile ACK')}return body}})
+const rotationProfile=await component('profile',['nickname','errors','messages','saveProfile']);await tick();rotationProfile.vm.nickname='unsaved-rotation';await rotationProfile.vm.saveProfile();auth.accessToken='profile-rotation-end';await tick();assert.equal(rotationProfile.vm.nickname,'unsaved-rotation','refresh discarded profile draft');await rotationProfile.vm.saveProfile();assert.deepEqual(refreshKeys[0],refreshKeys[1]);assert.equal(rotationProfile.vm.messages.profile,'已保存');auth.account={oId:'2'};assert.equal(rotationProfile.vm.nickname,'');rotationProfile.app.unmount()
+console.log('PASS profile refresh preserves uncertain profile body/key while same-token actor changes clear private input')
+let finishRotatedUpload,rotationSignal;Object.assign(__profileAPI,{fetchV3Avatar:async()=>'',uploadV3Avatar:async(file,signal)=>{rotationSignal=signal;return new Promise(resolve=>finishRotatedUpload=resolve)},saveV3Avatar:async value=>value})
+const rotatingAvatar=await component('avatar',['avatarDraft','messages','onUpload']);await tick();const rotationUpload=rotatingAvatar.vm.onUpload({target:{files:[png],value:''}});await tick();auth.accessToken='avatar-normal-refresh';await tick();assert.equal(rotationSignal.aborted,false);finishRotatedUpload('https://images.example/rotation.png');await rotationUpload;assert.equal(rotatingAvatar.vm.avatarDraft,'https://images.example/rotation.png');assert.equal(rotatingAvatar.vm.messages.avatar,'已保存');rotatingAvatar.app.unmount()
+console.log('PASS profile normal refresh does not abort an authorized avatar upload or discard its saved result')

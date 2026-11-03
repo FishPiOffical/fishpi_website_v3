@@ -2,43 +2,57 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { fetchV3Professions, fetchV3ProfessionRanking, type Page, type Profession, type ProfessionRank } from '@/api/v3-professions'
 import { displayAvatar } from '@/api/v3-profile'
 import ProfessionGuide from './ProfessionGuide.vue'
-const { accessToken } = storeToRefs(useAuthStore())
+const { accessToken, account } = storeToRefs(useAuthStore())
 const catalog = ref<Page<Profession> | null>(null), ranking = ref<Page<ProfessionRank> | null>(null)
 const selected = ref<Profession | null>(null), showGuide = ref(false)
 const catalogLoading = ref(false), rankingLoading = ref(false), catalogError = ref(''), rankingError = ref('')
 const mounted = ref(false), active = computed(() => mounted.value && !!accessToken.value)
-let generation = 0, catalogSequence = 0, rankingSequence = 0
-function reset() { generation++; catalogSequence++; rankingSequence++; catalog.value = ranking.value = null; selected.value = null; showGuide.value = false; catalogLoading.value = rankingLoading.value = false; catalogError.value = rankingError.value = '' }
-function guard() { const token = accessToken.value, current = generation; return () => mounted.value && !!token && token === accessToken.value && current === generation }
-async function loadCatalog(p = catalog.value?.pagination.p || 1) {
+let generation = 0, catalogSequence = 0, rankingSequence = 0, catalogTargetPage = 1, rankingTargetPage = 1
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
+let boundary = identity()
+function reset() { catalogTargetPage = rankingTargetPage = 1; generation++; catalogSequence++; rankingSequence++; catalog.value = ranking.value = null; selected.value = null; showGuide.value = false; catalogLoading.value = rankingLoading.value = false; catalogError.value = rankingError.value = '' }
+function guard() { const owner = identity(), current = generation; return () => mounted.value && !!accessToken.value && owner === identity() && current === generation }
+async function loadCatalog(p = catalogTargetPage) {
   if (!accessToken.value) return
+  catalogTargetPage = p
   const valid = guard(), sequence = ++catalogSequence
   catalogLoading.value = true; catalogError.value = ''; catalog.value = null
   try {
     let value = await fetchV3Professions(p)
     if (value.pagination.pageCount > 0 && p > value.pagination.pageCount) value = await fetchV3Professions(value.pagination.pageCount)
-    if (valid() && sequence === catalogSequence) { catalog.value = value; if (!selected.value && value.list[0]) choose(value.list[0]) }
+    if (valid() && sequence === catalogSequence) { catalogTargetPage = value.pagination.p; catalog.value = value; if (!selected.value && value.list[0]) choose(value.list[0]) }
   } catch (failure) { if (valid() && sequence === catalogSequence) catalogError.value = failure instanceof Error ? failure.message : '职业目录读取失败' }
   finally { if (valid() && sequence === catalogSequence) catalogLoading.value = false }
 }
 function choose(job: Profession) { selected.value = { ...job }; showGuide.value = false; void loadRanking(1) }
-async function loadRanking(p = ranking.value?.pagination.p || 1) {
+async function loadRanking(p = rankingTargetPage) {
   if (!accessToken.value || !selected.value) return
+  rankingTargetPage = p
   const id = selected.value.professionId, valid = guard(), sequence = ++rankingSequence
   rankingLoading.value = true; rankingError.value = ''; ranking.value = null
   try {
     let value = await fetchV3ProfessionRanking(id, p)
     if (value.pagination.pageCount > 0 && p > value.pagination.pageCount) value = await fetchV3ProfessionRanking(id, value.pagination.pageCount)
-    if (valid() && sequence === rankingSequence && id === selected.value?.professionId) ranking.value = value
+    if (valid() && sequence === rankingSequence && id === selected.value?.professionId) { rankingTargetPage = value.pagination.p; ranking.value = value }
   } catch (failure) { if (valid() && sequence === rankingSequence) rankingError.value = failure instanceof Error ? failure.message : '职业排行读取失败' }
   finally { if (valid() && sequence === rankingSequence) rankingLoading.value = false }
 }
 onMounted(() => { mounted.value = true; void loadCatalog(1) })
-watch(accessToken, () => { reset(); if (mounted.value) void loadCatalog(1) }, { flush: 'sync' })
+watch([accessToken, () => account.value?.oId], () => {
+  const current = identity()
+  if (current !== boundary) {
+    boundary = current; reset()
+    if (mounted.value) void loadCatalog(1)
+  } else if (mounted.value && accessToken.value) {
+    void loadCatalog(catalogTargetPage)
+    if (selected.value) void loadRanking(rankingTargetPage)
+  }
+}, { flush: 'sync' })
 onBeforeUnmount(() => { mounted.value = false; reset() })
 </script>
 

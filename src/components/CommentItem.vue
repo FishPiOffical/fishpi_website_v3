@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { avatarStyle } from '@/utils/avatar'
 import { RouterLink } from 'vue-router'
 import type { ArticleComment } from '@/api/fishpi'
 import ArticleInteraction from '@/components/articles/ArticleInteraction.vue'
+import VipNickname from '@/components/user/VipNickname.vue'
 import RevisionHistory from '@/components/articles/RevisionHistory.vue'
 import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -16,6 +18,7 @@ const props = withDefaults(
     reply?: boolean
     replyTo?: string
     loggedIn?: boolean
+    commentingEnabled?: boolean
     own?: boolean
     /** 只展示，不提供任何操作（如优质回帖） */
     readonly?: boolean
@@ -28,6 +31,7 @@ const props = withDefaults(
     reply: false,
     replyTo: '',
     loggedIn: false,
+    commentingEnabled: true,
     own: false,
     readonly: false,
     editing: false,
@@ -40,10 +44,11 @@ const emit = defineEmits<{
   reply: []
   edit: []
   remove: []
+  accepted: []
 }>()
 
 const zoomed = ref('')
-const author = computed(() => props.comment.commentAuthorName || '匿名')
+const author = computed(() => props.comment.commentAuthorNickname || props.comment.commentAuthorName || '匿名')
 const fullTime = computed(() => props.comment.commentCreateTimeStr || props.comment.timeAgo || '')
 const shownTime = computed(() => (props.reply ? props.comment.timeAgo || fullTime.value : fullTime.value))
 const goodCnt = computed(() => Number(props.comment.commentGoodCnt || 0))
@@ -60,17 +65,17 @@ function onBodyClick(e: MouseEvent) {
 <template>
   <div :id="`comment${comment.oId}`" class="cmt" :class="{ reply }">
     <div class="cmt-self">
-      <RouterLink v-if="comment.commentAuthorId" :to="`/member/${author}`" class="avatar-link" :title="author">
+      <RouterLink v-if="comment.commentAuthorId" :to="`/member/${comment.commentAuthorName}`" class="avatar-link" :title="author">
         <span
           class="avatar"
-          :style="comment.commentAuthorThumbnailURL ? { backgroundImage: `url('${comment.commentAuthorThumbnailURL}')` } : undefined"
+          :style="comment.commentAuthorThumbnailURL ? avatarStyle(comment.commentAuthorThumbnailURL) : undefined"
         />
       </RouterLink>
       <span v-else class="avatar-link" :aria-label="author"><span class="avatar" /></span>
       <div class="cmt-main">
         <header class="cmt-head">
-          <RouterLink v-if="comment.commentAuthorId" :to="`/member/${author}`" class="name">
-            {{ author }}
+          <RouterLink v-if="comment.commentAuthorId" :to="`/member/${comment.commentAuthorName}`" class="name">
+            <VipNickname :user-id="comment.commentAuthorId" :user-name="comment.commentAuthorName" :text="author" />
           </RouterLink>
           <span v-else class="name">{{ author }}</span>
           <MedalList v-if="!hideMedals" :items="comment.sysMetal" class="cmt-medals" />
@@ -89,9 +94,9 @@ function onBodyClick(e: MouseEvent) {
           <template v-if="interactive">
             <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" />
             <ArticleInteraction resource="comments" kind="thanks" :article-id="comment.oId" />
-            <ArticleInteraction resource="comments" kind="accept" :article-id="comment.oId" />
-            <button type="button" class="op idle" @click="emit('reply')">回复</button>
-            <button v-if="own" type="button" class="op idle" @click="emit('edit')">编辑</button>
+            <ArticleInteraction resource="comments" kind="accept" :article-id="comment.oId" @accepted="emit('accepted')" />
+            <button v-if="commentingEnabled" type="button" class="op idle" @click="commentingEnabled && emit('reply')">回复</button>
+            <button v-if="own && commentingEnabled" type="button" class="op idle" @click="commentingEnabled && emit('edit')">编辑</button>
             <button v-if="own" type="button" class="op idle danger" @click="emit('remove')">删除</button>
             <span v-if="!own" class="op-report idle">
               <ReportDialog :data-id="comment.oId" :data-type="1" />

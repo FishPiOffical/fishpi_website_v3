@@ -80,3 +80,41 @@ console.log('PASS interactions 14 delayed authorized body cannot render after lo
 
 state.dispatch=null;pinia=createPinia();store=useV3ArticleInteractionsStore(pinia);state.responses.push(new ApiError('积分不足',422));await assert.rejects(store.set('thanks','2',null));assert.equal(store.commands['thanks:2'],undefined);const rejectedKey=state.requests.at(-1).init.headers['Idempotency-Key'];state.responses.push(env({id:'2',thanked:true}));await store.set('thanks','2',null);assert.notEqual(state.requests.at(-1).init.headers['Idempotency-Key'],rejectedKey)
 console.log('PASS interactions 15 a definitive fresh validation failure permits a later new request; unknown recovery remains a separate case')
+
+// Acceptance uses the same component/store but has a per-question winner and a zero-fee anonymous case.
+function acceptance(id='2',accepted=false,canAccept=!accepted,offerPoint=20){return{id,accepted,canAccept,offerPoint}}
+function mountAcceptance(pinia=createPinia(),id='2'){const root={children:[]},app=renderer.createApp(component,{kind:'accept',articleId:id,resource:'comments'});app.use(pinia);const user=auth(pinia);app.mount(root);return{root,app,user,text:()=>text(root)}}
+let winner='',acceptanceReads=[],acceptanceWrites=[],acceptanceLose=true
+state.confirmations=[];state.confirmWork=async()=>true
+state.dispatch=async(path,init)=>{
+ const id=path.split('/')[4];assert.match(path,/^\/api\/v3\/comments\/[23]\/accept$/)
+ if(init?.method){acceptanceWrites.push({id,key:init.headers['Idempotency-Key'],method:init.method,body:init.body});assert.equal(id,'2');winner='2';if(acceptanceLose){acceptanceLose=false;throw new ApiError('response lost',0,'offline')}return env({id,accepted:true})}
+ acceptanceReads.push(id);return env(acceptance(id,winner===id,!winner))
+}
+pinia=createPinia();view=mountAcceptance(pinia);const competingView=mountAcceptance(pinia,'3');await tick()
+click(view,'采纳（20积分）');await tick();assert.match(view.text(),/重试本次采纳/);const acceptanceKey=acceptanceWrites[0].key
+view.app.unmount();view=mountAcceptance(pinia);await tick();assert.match(view.text(),/已采纳/);view.user.accessToken='acceptance-normal-refresh';await tick()
+const competingReadCount=acceptanceReads.filter(id=>id==='3').length
+click(view,'重试本次采纳');await tick();assert.equal(acceptanceWrites.length,2);assert.equal(acceptanceWrites[1].key,acceptanceKey);assert.equal(acceptanceWrites[1].method,'POST');assert.equal(acceptanceWrites[1].body,undefined)
+assert.equal(state.confirmations.length,1);assert.ok(acceptanceReads.filter(id=>id==='3').length>competingReadCount);assert.ok(!competingView.text().includes('采纳（20积分）'));assert.match(view.text(),/已采纳/)
+view.app.unmount();competingView.app.unmount()
+console.log('PASS interactions 16 acceptance lost ACK preserves original comment/key across remount and token refresh, GET accepted state does not discard recovery, confirmation is not repeated and competing answer refreshes')
+
+for(const point of [0,20]){
+ winner='';acceptanceWrites=[];state.confirmations=[];state.confirmWork=async()=>false
+ state.dispatch=async(path,init)=>{if(init?.method){acceptanceWrites.push(init);winner='2';return env({id:'2',accepted:true})}return env(acceptance('2',winner==='2',!winner,point))}
+ view=mountAcceptance();await tick();click(view,`采纳（${point}积分）`);await tick();assert.equal(acceptanceWrites.length,0);assert.match(state.confirmations[0].message,new RegExp(`${point} 积分`))
+ state.confirmWork=async()=>true;click(view,`采纳（${point}积分）`);await tick();assert.equal(acceptanceWrites.length,1);assert.match(view.text(),/已采纳/);assert.ok(!view.text().includes(`采纳（${point}积分）`));view.app.unmount()
+}
+console.log('PASS interactions 17 public and anonymous acceptance confirm current 20/0 fee, cancelling sends nothing, success uses current GET and removes the action')
+
+acceptanceWrites=[];state.confirmations=[];let acceptConfirmation
+state.confirmWork=options=>new Promise(resolve=>{acceptConfirmation=resolve;options.signal.addEventListener('abort',()=>resolve(false),{once:true})})
+state.dispatch=async(path,init)=>{if(init?.method){acceptanceWrites.push(init);return env({id:'2',accepted:true})}return env(acceptance())}
+view=mountAcceptance();await tick();click(view,'采纳（20积分）');await tick();const oldAcceptanceDialog=state.confirmations.at(-1)
+state.context++;view.user.account={oId:'99',userName:'new-reader'};view.user.accessToken='new-accept-reader';await tick();assert.equal(oldAcceptanceDialog.signal.aborted,true);acceptConfirmation(true);await tick();assert.equal(acceptanceWrites.length,0);view.app.unmount();state.confirmWork=async()=>true
+console.log('PASS interactions 18 changing reader while acceptance confirmation waits aborts that dialog and late confirmation cannot submit as the new account')
+
+acceptanceWrites=[];state.dispatch=async(path,init)=>{if(init?.method){acceptanceWrites.push(init);throw new ApiError('仅支持至少20积分问答',422,'invalid_question')}return env(acceptance())}
+view=mountAcceptance();await tick();click(view,'采纳（20积分）');await tick();assert.equal(acceptanceWrites.length,1);assert.ok(!view.text().includes('重试本次采纳'));assert.match(view.text(),/仅支持至少20积分问答/);assert.equal(useV3ArticleInteractionsStore().commands['comments:accept:2'],undefined);view.app.unmount()
+console.log('PASS interactions 19 definitive fresh question-eligibility failure shows validation and leaves no unresolved paid acceptance command')

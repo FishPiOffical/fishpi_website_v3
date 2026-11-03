@@ -6,7 +6,7 @@ import { createPinia, defineStore, setActivePinia } from 'pinia'
 const transpile = source => ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const url = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 globalThis.__prefRequests=[];globalThis.__prefResponses=[]
-const shim=url('export class ApiError extends Error{constructor(message,status){super(message);this.status=status}} export async function request(path,init){globalThis.__prefRequests.push({path,init});const value=globalThis.__prefResponses.shift();if(value instanceof Error)throw value;if(value===undefined)throw Error("Unexpected "+path);return value}')
+const shim=url('export const getAuthContextVersion=()=>globalThis.__prefContext||0; export class ApiError extends Error{constructor(message,status){super(message);this.status=status}} export async function request(path,init){globalThis.__prefRequests.push({path,init});const value=globalThis.__prefResponses.shift();if(value instanceof Error)throw value;if(value===undefined)throw Error("Unexpected "+path);return value}')
 const api=await import(url(transpile(await fs.readFile('src/api/v3-preferences.ts','utf8')).replace("from './http'",`from '${shim}'`)))
 const envelope=data=>({code:0,data})
 const functions={listPageSize:20,listViewMode:1,indexRedirectURL:'',notifications:true,subscriptionEmail:false,keyboardShortcuts:true,autoSubscribeOnReply:true,externalLinkConfirmation:true,chatImageBlur:false}
@@ -30,7 +30,7 @@ __prefResponses.push(envelope({languages:['zh_CN'],timezones:[{id:'Asia/Tokyo'}]
 console.log('PASS preferences 3 actual locale/skin catalogs map by server ids and device, reject missing metadata')
 
 const renderer=createRenderer({patchProp(){},insert(){},remove(){},createElement(){return{}},createText(){return{}},createComment(){return{}},setText(){},setElementText(){},parentNode(){return null},nextSibling(){return null}})
-setActivePinia(createPinia());const auth=defineStore('pref-auth-test',()=>({accessToken:ref('A'),reloadAccount:async()=>{}}))()
+setActivePinia(createPinia());const auth=defineStore('pref-auth-test',()=>({accessToken:ref('A'),account:ref({oId:'1'}),reloadAccount:async()=>{}}))()
 globalThis.__prefAuth=()=>auth
 const authURL=url('export const useAuthStore=globalThis.__prefAuth')
 let keyId=0;globalThis.__prefKey=()=>`pref:${++keyId}`
@@ -41,7 +41,7 @@ const tick=async()=>{for(let i=0;i<20;i++)await Promise.resolve();await nextTick
 async function component(resource,fields){
  globalThis.__prefProps={resource,title:resource,fields}
  let source=(await fs.readFile('src/components/settings/OwnerPreferences.vue','utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
- let js=transpile(source).replace("from '@/api/v3-preferences'",`from '${apiURL}'`).replace("from '@/api/v3-profile'",`from '${keyURL}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`).replace('const props = defineProps();','const props = globalThis.__prefProps;')
+ let js=transpile(source).replace("from '@/api/v3-preferences'",`from '${apiURL}'`).replace("from '@/api/v3-profile'",`from '${keyURL}'`).replace("from '@/api/http'",`from '${shim}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`).replace('const props = defineProps();','const props = globalThis.__prefProps;')
  const imports=[...js.matchAll(/^import .+;$/gm)].map(m=>m[0]).join('\n');js=js.replace(/^import .+;$/gm,'')
  const module=await import(url(`${imports}\nexport default{setup(){${js}\nreturn{values,original,options,ready,error,message,busy,save,load}},render(){return null}}`))
  const app=renderer.createApp(module.default);app.use(createPinia());return{app,vm:app.mount({})}
@@ -51,7 +51,7 @@ Object.assign(globalThis.__prefAPI,{
  fetchV3Preferences:async()=>auth.accessToken==='A'?late:{...functions,indexRedirectURL:'/CURRENT-B'},
  saveV3Preferences:async(resource,changes,key)=>{saved.push(changes);keys.push(key);if(failOnce){failOnce=false;throw Error('lost acknowledgement')}return{...functions,indexRedirectURL:'/CURRENT-B',...changes}},
 })
-const owner=await component('functions');await tick();auth.accessToken='B';await tick();resolveA({...functions,indexRedirectURL:'/PRIVATE-A'});await tick();assert.equal(owner.vm.values.indexRedirectURL,'/CURRENT-B')
+const owner=await component('functions');await tick();globalThis.__prefContext=(globalThis.__prefContext||0)+1;auth.accessToken='B';await tick();resolveA({...functions,indexRedirectURL:'/PRIVATE-A'});await tick();assert.equal(owner.vm.values.indexRedirectURL,'/CURRENT-B')
 await owner.vm.save();assert.equal(saved.length,0);assert.match(owner.vm.message,/没有/)
 owner.vm.values.listPageSize=40;await owner.vm.save();assert.match(owner.vm.error,/lost acknowledgement/);await owner.vm.save();assert.equal(keys[0],keys[1]);assert.deepEqual(saved[1],{listPageSize:40});assert.equal(owner.vm.message,'已保存')
 auth.accessToken=null;assert.deepEqual(owner.vm.values,{});assert.equal(owner.vm.ready,false);assert.equal(owner.vm.message,'');owner.app.unmount()
@@ -79,7 +79,12 @@ Object.assign(globalThis.__prefAPI,{
  saveV3Preferences:async()=>new Promise(resolve=>releaseWrite=resolve),
 })
 const delayed=await component('functions');await tick();delayed.vm.values.listPageSize=60;const pending=delayed.vm.save();await tick()
-auth.accessToken='E';await tick();releaseWrite({...functions,indexRedirectURL:'/PRIVATE-D',listPageSize:60});await pending
+globalThis.__prefContext++;auth.accessToken='E';await tick();releaseWrite({...functions,indexRedirectURL:'/PRIVATE-D',listPageSize:60});await pending
 assert.equal(delayed.vm.values.indexRedirectURL,'/CURRENT-E');assert.equal(delayed.vm.values.listPageSize,20);assert.equal(delayed.vm.message,'');assert.equal(delayed.vm.busy,false)
 delayed.app.unmount()
 console.log('PASS preferences 7 late prior-owner save response cannot overwrite the new account or report a new-account success')
+
+auth.accessToken='pref-rotation-start';const rotationWrites=[];let rotationFailure=true
+Object.assign(__prefAPI,{fetchV3Preferences:async()=>({...functions}),saveV3Preferences:async(resource,body,key)=>{rotationWrites.push({body:JSON.parse(JSON.stringify(body)),key});if(rotationFailure){rotationFailure=false;throw Error('lost preference ACK')}return{...functions,...body}}})
+const rotationPrefs=await component('functions');await tick();rotationPrefs.vm.values.listPageSize=60;await rotationPrefs.vm.save();auth.accessToken='pref-rotation-end';await tick();assert.equal(rotationPrefs.vm.values.listPageSize,60,'refresh discarded preference draft');await rotationPrefs.vm.save();assert.deepEqual(rotationWrites[0],rotationWrites[1]);assert.equal(rotationPrefs.vm.message,'已保存');auth.account={oId:'2'};assert.deepEqual(rotationPrefs.vm.values,{});rotationPrefs.app.unmount()
+console.log('PASS preferences normal refresh retains unknown save key/draft; same-token account changes clear state')

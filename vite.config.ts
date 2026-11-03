@@ -52,6 +52,12 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/api/v3/realtime': { ...proxy, ws: true },
+        '^/api/v3/auth/(?:login|refresh|logout)(?:\\?|$)': {
+          ...proxy,
+          changeOrigin: false,
+          // Keep the browser Host/Origin/Referer tuple for credential-origin checks.
+          headers: { 'User-Agent': FISHPI_UA },
+        },
         '/api': proxy,
         '/rhypic-upload': {
           target: 'https://pic.fishpi.cn',

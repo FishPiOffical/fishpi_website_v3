@@ -1,3 +1,4 @@
+import { nicknameFixtureURL } from './helpers/v3-nickname-fixture.mjs'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import ts from 'typescript'
@@ -7,6 +8,7 @@ import { createPinia, defineStore } from 'pinia'
 import { renderToString } from '@vue/server-renderer'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
+const avatarStyleURL=url(compile(await fs.readFile('src/utils/avatar.ts','utf8')))
 globalThis.__watch={context:1,requests:[],responses:[]};const state=__watch
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__watch.context}export async function request(path,init){globalThis.__watch.requests.push({path,init});const value=globalThis.__watch.responses.shift();if(value instanceof Error)throw value;return value}`)
 const rewrite=(source,pairs)=>{for(const[from,to]of pairs)source=source.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`);return source}
@@ -23,7 +25,7 @@ state.responses.push(Error('not fallback'));const before=state.requests.length;a
 console.log('PASS watch 1 exact user/tag aggregation and owner moon paths, strict pages/author projection; missing cleaned HTML and errors never fall back to raw/global feeds')
 const auth=defineStore('watch-auth',()=>({accessToken:ref('A'),account:ref({oId:'1',userName:'owner'})}));globalThis.__watchAuth=auth;globalThis.__watchAPI={...api};globalThis.__watchRoute=reactive({fullPath:'/watch',path:'/watch',meta:{watchTab:'tags'}})
 const authURL=url('export const useAuthStore=globalThis.__watchAuth'),apiURL=url(`export const fetchV3FollowingFeed=(...args)=>globalThis.__watchAPI.fetchV3FollowingFeed(...args)`),seoURL=url('export function usePageSeo(){}'),routerURL=url(`import{h}from'${import.meta.resolve('vue')}';export function useRoute(){return globalThis.__watchRoute};export const RouterLink={props:['to'],setup:(p,{slots})=>()=>h('a',{href:typeof p.to==='string'?p.to:p.to.path},slots.default?.())}`),textURL=url(compile(await fs.readFile('src/utils/text.ts','utf8'))),avatarURL=url(compile(await fs.readFile('src/utils/avatar.ts','utf8'))),vipURL=url(`import{h}from'${import.meta.resolve('vue')}';export default{props:['text'],setup:p=>()=>h('span',p.text)}`),sideURL=url(`import{h}from'${import.meta.resolve('vue')}';export default{setup:()=>()=>h('aside')}`)
-function sfc(source,pairs){return url(rewrite(compile(compileScript(parse(source).descriptor,{id:'watch-child',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['vue-router',routerURL],...pairs]))}
+function sfc(source,pairs){return url(rewrite(compile(compileScript(parse(source).descriptor,{id:'watch-child',inlineTemplate:true}).content),[['@/utils/avatar',avatarStyleURL],['vue',import.meta.resolve('vue')],['@/components/user/VipNickname.vue',nicknameFixtureURL],['vue-router',routerURL],...pairs]))}
 const feedURL=sfc(await fs.readFile('src/components/articles/ArticleFeed.vue','utf8'),[['@/utils/text',textURL]]),moonURL=sfc(await fs.readFile('src/components/breezemoons/BreezemoonList.vue','utf8'),[['@/components/user/VipNickname.vue',vipURL],['@/utils/avatar',avatarURL]])
 const source=await fs.readFile('src/views/WatchView.vue','utf8'),component=(await import(sfc(source,[['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-following-feed',apiURL],['@/stores/auth',authURL],['@/composables/usePageSeo',seoURL],['@/components/articles/ArticleFeed.vue',feedURL],['@/components/breezemoons/BreezemoonList.vue',moonURL],['@/components/SideBar.vue',sideURL]]))).default
 const insert=(node,parent,anchor)=>{if(node.parent){const i=node.parent.children.indexOf(node);if(i>=0)node.parent.children.splice(i,1)}const i=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(i<0?parent.children.length:i,0,node);node.parent=parent}

@@ -7,6 +7,7 @@ import { getAuthContextVersion } from '@/api/http'
 import { useV3PostsStore } from '@/stores/v3Posts'
 import { fpConfirm } from '@/composables/useDialog'
 import { clearCache } from '@/utils/swr'
+import { usePageSeo } from '@/composables/usePageSeo'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import AuthorColumnPicker from '@/components/posts/AuthorColumnPicker.vue'
@@ -34,15 +35,25 @@ const anonymous=ref(false),commentable=ref(true),notifyFollowers=ref(false),show
 const columnMode=ref<''|'__NEW__'|'existing'>(''),columnId=ref(''),columnTitle=ref(''),chapterNo=ref(''),columnCoverURL=ref(''),thoughtContent=ref('')
 const drafts=ref<DraftSummary[]>([]),draftPagination=ref({p:1,size:20,total:0,pageCount:0}),draftPageNo=ref(1),draftId=ref(''),draftsError=ref(''),draftsLoading=ref(false)
 const source=ref<PostSource|null>(null),sourceLoading=ref(false),sourceError=ref(''),error=ref(''),mounted=ref(false),initialDraftResolved=ref(false),sourceTarget=ref(''),loadConfirming=ref(false),published=ref(false),needsReload=ref(false)
-const editorRef=ref<InstanceType<typeof MarkdownEditor>|null>(null),commandOrigin=Symbol('post-view')
+const editorRef=ref<InstanceType<typeof MarkdownEditor>|null>(null),rewardEditorRef=ref<InstanceType<typeof MarkdownEditor>|null>(null),commandOrigin=Symbol('post-view')
 const typeTip=computed(()=>TYPES.find(t=>t.value===type.value)?.tip||''),isLong=computed(()=>type.value===6),allowAnonymous=computed(()=>![2,5,6].includes(type.value))
 const heading=computed(()=>isLong.value?(editId.value?'编辑长文章':'发布长文章'):(editId.value?'编辑帖子':'发帖'))
+usePageSeo(()=>({title:heading.value,path:route.path,robots:'noindex'}))
 const ready=computed(()=>mounted.value&&isLoggedIn.value&&!sourceLoading.value&&!sourceError.value&&(editId.value?source.value?.id===editId.value:initialDraftResolved.value))
 const locked=computed(()=>operations.busy||operations.confirming||!!operations.pending||loadConfirming.value)
 const retainedReward=computed(()=>!!editId.value&&!!source.value&&source.value.rewardPoint>0)
 let generation=0,listSequence=0,sourceSequence=0,boundary='',initialForm='',localKey='',loadConfirmation:AbortController|null=null
 function identity(){return`${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${route.fullPath}`}
 function current(reader:string,version:number){return mounted.value&&isLoggedIn.value&&reader===identity()&&version===generation}
+function syncEditors(){
+  if(type.value!==3&&editorRef.value)content.value=editorRef.value.flush()
+  if(rewardOpen.value&&rewardEditorRef.value)rewardContent.value=rewardEditorRef.value.flush()
+}
+function toggleReward(){
+  error.value=''
+  try{if(rewardOpen.value&&rewardEditorRef.value)rewardContent.value=rewardEditorRef.value.flush();rewardOpen.value=!rewardOpen.value}
+  catch(reason){error.value=reason instanceof Error?reason.message:'编辑器内容暂不可读取'}
+}
 function snapshot():PostFields{
   const reward=editId.value?retainedReward.value||rewardOpen.value:rewardOpen.value&&!isLong.value&&type.value!==5
   return{title:title.value,content:content.value,tags:tags.value,type:type.value,rewardContent:reward?rewardContent.value:'',rewardPoint:reward?Number(rewardPoint.value??0):0,qnaOfferPoint:editId.value?Number(offer.value):type.value===5?Number(offer.value):0,commentable:commentable.value,showInList:showInList.value?1:0,statement:statement.value,anonymous:editId.value?anonymous.value:allowAnonymous.value&&anonymous.value,notifyFollowers:notifyFollowers.value,columnId:columnMode.value==='existing'?columnId.value.trim():'',columnTitle:columnMode.value?columnTitle.value:'',chapterNo:columnMode.value?chapterNo.value:'',columnCoverURL:columnCoverURL.value,thoughtContent:thoughtContent.value}
@@ -58,6 +69,7 @@ async function loadDrafts(p=draftPageNo.value){
 }
 async function loadDraft(id:string,initial=false){
   if(!mounted.value||!isLoggedIn.value||editId.value||((locked.value||sourceLoading.value)&&!initial))return
+  if(!initial)try{syncEditors()}catch(reason){error.value=reason instanceof Error?reason.message:'编辑器内容暂不可读取';return}
   const reader=identity(),version=generation,sequence=++sourceSequence
   loadConfirmation?.abort();loadConfirmation=null
   if(!initial&&JSON.stringify(snapshot())!==initialForm){const controller=new AbortController();loadConfirmation=controller;loadConfirming.value=true;let accepted=false;try{accepted=await fpConfirm({signal:controller.signal,title:'载入草稿',message:'载入会替换当前输入，是否继续？',confirmText:'载入'})}catch(reason){if(current(reader,version))error.value=reason instanceof Error?reason.message:'载入已取消';return}finally{if(loadConfirmation===controller){loadConfirmation=null;loadConfirming.value=false}}if(operations.pending||operations.busy||operations.confirming||!accepted||controller.signal.aborted||!current(reader,version)||sequence!==sourceSequence)return}
@@ -84,6 +96,7 @@ async function initialize(skipDraft=false){
 }
 async function reloadEdit(){
   if(locked.value||sourceLoading.value)return
+  try{syncEditors()}catch(reason){error.value=reason instanceof Error?reason.message:'编辑器内容暂不可读取';return}
   const reader=identity(),version=generation
   if(JSON.stringify(snapshot())!==initialForm){const controller=new AbortController();loadConfirmation=controller;loadConfirming.value=true;let accepted=false;try{accepted=await fpConfirm({signal:controller.signal,title:'重新读取原文',message:'重新读取将替换当前输入，是否继续？',confirmText:'重新读取'})}finally{if(loadConfirmation===controller){loadConfirmation=null;loadConfirming.value=false}}if(!accepted||controller.signal.aborted||!current(reader,version)||operations.pending||operations.busy)return}
   await loadEdit()
@@ -105,7 +118,7 @@ async function after(result:PostReceipt|null,command:PostCommand|null,reader:str
 async function run(op:PostCommand['op'],id:string){
   if(!ready.value||locked.value||(op==='publish'&&published.value)||(op==='edit'&&needsReload.value)||op==='draft-save'&&!!editId.value)return
   error.value='';const reader=identity(),version=generation
-  try{const input=postInput(op,snapshot(),source.value,draftId.value);const result=await operations.start(op,id,input,commandOrigin);if(!current(reader,version))return;localKey=operations.pending?.key||'';await after(result,operations.completed,reader,version,true)}
+  try{syncEditors();const input=postInput(op,snapshot(),source.value,draftId.value);const result=await operations.start(op,id,input,commandOrigin);if(!current(reader,version))return;localKey=operations.pending?.key||'';await after(result,operations.completed,reader,version,true)}
   catch(reason){if(current(reader,version))error.value=reason instanceof Error?reason.message:'操作失败'}
 }
 function submit(){void run(editId.value?'edit':'publish',editId.value)}
@@ -196,12 +209,12 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
         <input v-model.number="offer" type="number" min="20" max="2147483647" placeholder="采纳答案时奖励给回答者" />
       </label>
       <section v-else class="reward">
-        <button type="button" class="ghost reward-toggle" @click="rewardOpen = !rewardOpen">
+        <button type="button" class="ghost reward-toggle" @click="toggleReward">
           {{ rewardOpen ? retainedReward ? '收起打赏设置' : '取消打赏' : '打赏' }}
         </button>
         <template v-if="rewardOpen">
           <p class="type-tip">打赏内容仅对打赏过的用户可见。</p>
-          <MarkdownEditor v-model="rewardContent" :api-key="null" :height="200" placeholder="打赏后可见的内容" />
+          <MarkdownEditor ref="rewardEditorRef" v-model="rewardContent" :api-key="null" :height="200" placeholder="打赏后可见的内容" />
           <label class="inline-field">
             打赏积分
             <input v-model.number="rewardPoint" type="number" min="1" max="2147483647" placeholder="打赏积分" />

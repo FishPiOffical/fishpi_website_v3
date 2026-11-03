@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import VipNickname from '@/components/user/VipNickname.vue'
+import type {CommentLocation} from '@/api/v3-comment-location'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
@@ -11,6 +13,8 @@ import { fetchV3ParagraphSummary, fetchV3ParagraphComments } from '@/api/v3-comm
 import { useAuthStore } from '@/stores/auth'
 import { useV3CommentsStore } from '@/stores/v3Comments'
 import RevisionHistory from './RevisionHistory.vue'
+import ArticleColumnNavigation from './ArticleColumnNavigation.vue'
+import ArticleReadRegistration from './ArticleReadRegistration.vue'
 import CommentComposer from './CommentComposer.vue'
 import { getAuthContextVersion } from '@/api/http'
 import ContentRelationButton from './ContentRelationButton.vue'
@@ -29,7 +33,10 @@ const props = defineProps<{
   apiKey?: string | null
   statement?: string
   actionMsg?: string
+  targetLocation?: CommentLocation | null
 }>()
+
+const commentingEnabled = computed(() => props.article.articleCommentable === true)
 
 const emit = defineEmits<{
   revisions: []
@@ -73,14 +80,24 @@ const paragraphComments = ref<ArticleComment[]>([])
 const paragraphLoading = ref(false)
 const paragraphError = ref('')
 const paragraphPage = ref(1)
-const paragraphPages = ref(1)
+const paragraphPages = ref(0)
+const paragraphTotal = ref<number | null>(null)
 const paragraphSort = ref('')
+const readerMounted=ref(false)
+const paragraphState=ref<'active'|'orphaned'>('active'),paragraphLocationId=ref(''),paragraphLocationError=ref('')
 let paragraphRequest = 0, paragraphSummaryRequest=0
 
 const chapters = computed(() => props.column?.chapters || [])
 const currentChapterId = computed(() => props.article.oId)
+const paragraphCountLabel = computed(() => {
+  if (paragraphTotal.value !== null) return `${paragraphTotal.value} 条`
+  if (paragraphLoading.value) return '读取中'
+  if (paragraphError.value || paragraphSummaryError.value) return '数量暂不可用'
+  const count = paragraphCounts.value[activeParagraphId.value]
+  return typeof count === 'number' ? `${count} 条` : '数量暂不可用'
+})
 const authorLabel = computed(
-  () => props.article.articleAuthor?.userNickname || props.article.articleAuthorName || '匿名用户',
+  () => props.article.articleAnonymous === 1 ? '匿名用户' : props.article.articleAuthorNickname || props.article.articleAuthor?.userNickname || props.article.articleAuthorName || '匿名用户',
 )
 
 function clampFont(size: unknown, min: number, max: number, fallback: number) {
@@ -192,11 +209,14 @@ function openComments() {
   if (activeParagraphId.value) emit('paragraphReply', '', '')
   activeParagraphId.value = ''
   activeSnapshot.value = ''
+  paragraphState.value='active';paragraphLocationId.value='';paragraphLocationError.value=''
   commentsOpen.value = true
 }
 
 function paragraphSnapshot(el: Element) {
-  const text = (el.textContent || '').replace(/\s+/g, ' ').trim()
+  const copy = el.cloneNode(true) as Element
+  copy.querySelectorAll('.la-paragraph-comment-btn').forEach(button => button.remove())
+  const text = (copy.textContent || '').replace(/\s+/g, ' ').trim()
   return text.length > 160 ? `${text.slice(0, 159)}…` : text
 }
 
@@ -219,7 +239,7 @@ function updateParagraphButtons() {
       badge.textContent = count > 0 ? String(count) : ''
       badge.hidden = count <= 0
     }
-    button.setAttribute('aria-label', !known ? '查看段评（统计暂不可用）' : count > 0 ? `查看段评 ${count}` : '写段评')
+    button.setAttribute('aria-label', !known ? '查看段评（统计暂不可用）' : count > 0 ? `查看段评 ${count}` : commentingEnabled.value ? '写段评' : '查看段评')
   })
 }
 
@@ -233,8 +253,8 @@ function decorateParagraphs() {
     button.type = 'button'
     button.className = 'la-paragraph-comment-btn'
     button.dataset.openParagraphComments = paragraph.dataset.longParagraphId || ''
-    button.setAttribute('aria-label', '写段评')
-    button.title = '查看 / 写段评'
+    button.setAttribute('aria-label', commentingEnabled.value ? '写段评' : '查看段评')
+    button.title = commentingEnabled.value ? '查看 / 写段评' : '查看段评'
     button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg><span class="la-paragraph-comment-count" hidden></span>'
     button.addEventListener('click', (event) => {
       event.preventDefault()
@@ -264,17 +284,24 @@ async function loadParagraphSummary() {
 
 async function loadParagraphComments(page = 1) {
   const articleId = props.article.oId
-  const paragraphId = activeParagraphId.value
+  const paragraphId = activeParagraphId.value, state=paragraphState.value
   if (!articleId || !paragraphId) return
   const requestId = ++paragraphRequest, reader=getAuthContextVersion(), owner=auth.account?.oId
   paragraphLoading.value = true
+  paragraphTotal.value = null
   paragraphError.value = ''
   paragraphPage.value = page
   try {
-    const data = await fetchV3ParagraphComments(articleId, paragraphId, page, paragraphSort.value || 'oldest')
-    if (requestId !== paragraphRequest || activeParagraphId.value !== paragraphId || props.article.oId !== articleId || reader!==getAuthContextVersion() || owner!==auth.account?.oId) return
+    const data = await fetchV3ParagraphComments(articleId, paragraphId, page, paragraphSort.value || 'oldest',state)
+    if (requestId !== paragraphRequest || activeParagraphId.value !== paragraphId || paragraphState.value!==state || props.article.oId !== articleId || reader!==getAuthContextVersion() || owner!==auth.account?.oId) return
     paragraphComments.value = data.commentThreadParents || []
-    paragraphPages.value = Math.max(1, Number(data.pagination?.paginationPageCount || 1))
+    paragraphPages.value = data.pagination.paginationPageCount
+    paragraphTotal.value = data.pagination.paginationRecordCount
+    paragraphLocationError.value=''
+    if(paragraphLocationId.value){
+      const target=paragraphLocationId.value
+      if(!paragraphComments.value.some(c=>c.oId===target))paragraphLocationError.value='评论位置已变化或本页暂不可见，请使用上方的重新定位评论。'
+    }
   } catch (error) {
     if (requestId !== paragraphRequest || reader!==getAuthContextVersion() || owner!==auth.account?.oId) return
     paragraphError.value = error instanceof Error ? error.message : '段评加载失败'
@@ -282,9 +309,20 @@ async function loadParagraphComments(page = 1) {
   } finally {
     if (requestId === paragraphRequest) paragraphLoading.value = false
   }
+  const target=paragraphLocationId.value
+  if(!target||paragraphError.value||!paragraphComments.value.some(c=>c.oId===target))return
+  // The loading branch hides the list: finish it before waiting for the actual comment DOM.
+  await nextTick()
+  if(requestId!==paragraphRequest||!commentsOpen.value||activeParagraphId.value!==paragraphId
+      ||paragraphState.value!==state||props.article.oId!==articleId||reader!==getAuthContextVersion()
+      ||owner!==auth.account?.oId||paragraphLocationId.value!==target)return
+  const element=document.getElementById('comment'+target)
+  if(element)element.scrollIntoView({block:'center'})
+  else paragraphLocationError.value='评论当前无法在页面中定位，请使用上方的重新定位评论。'
 }
 
 function openParagraph(paragraphId: string) {
+  paragraphState.value='active';paragraphLocationId.value='';paragraphLocationError.value=''
   const paragraph = contentEl.value?.querySelector<HTMLElement>(`[data-long-paragraph-id="${CSS.escape(paragraphId)}"]`)
   if (!paragraph) return
   if (activeParagraphId.value === paragraphId && commentsOpen.value) {
@@ -299,6 +337,7 @@ function openParagraph(paragraphId: string) {
   paragraphComments.value = []
   paragraphSort.value = ''
   paragraphPage.value = 1
+  paragraphTotal.value = null
   commentsOpen.value = true
   contentEl.value?.querySelectorAll('.is-commenting').forEach((item) => item.classList.remove('is-commenting'))
   paragraph.classList.add('is-commenting')
@@ -336,6 +375,7 @@ function toggleComments() {
 }
 
 function openComposer() {
+  if (!commentingEnabled.value) return
   if (activeParagraphId.value) {
     activeParagraphId.value = ''
     activeSnapshot.value = ''
@@ -356,6 +396,7 @@ function toTop() {
 }
 
 function onReplyTrigger() {
+  if (!commentingEnabled.value || activeParagraphId.value && paragraphState.value==='orphaned') return
   composerOpen.value = true
   if (activeParagraphId.value) emit('paragraphReply', activeParagraphId.value, '')
   else emit('reply')
@@ -364,9 +405,22 @@ function onReplyTrigger() {
 function ownParagraphComment(comment:ArticleComment){return !!auth.accessToken&&!!comment.commentAuthorId&&comment.commentAuthorId===auth.account?.oId}
 function removeParagraphComment(comment:ArticleComment){if(ownParagraphComment(comment))void commentWrites.remove(props.article.oId,comment.oId,commentOrigin)}
 function replyToParagraphComment(comment: ArticleComment) {
-  if (!activeParagraphId.value) return
+  if (!commentingEnabled.value || paragraphState.value==='orphaned' || !activeParagraphId.value) return
   composerOpen.value = true
   emit('paragraphReply', activeParagraphId.value, comment.oId, comment)
+}
+
+function locateComment(value:CommentLocation){
+  if(value.articleId!==props.article.oId)return
+  if(value.type===0){openComments();return}
+  if(!value.paragraph)return
+  catalogOpen.value=false;closeFloating();composerOpen.value=false
+  activeParagraphId.value=value.paragraph.id;paragraphState.value=value.paragraph.state
+  paragraphLocationId.value=value.id;paragraphLocationError.value='';paragraphSort.value=''
+  const element=contentEl.value?.querySelector<HTMLElement>(`[data-long-paragraph-id="${CSS.escape(value.paragraph.id)}"]`)
+  activeSnapshot.value=element?paragraphSnapshot(element):value.paragraph.state==='orphaned'?'原段落已移除；以下为仍可读取的段评。':'当前段落无法高亮；以下为该段评列表。'
+  commentsOpen.value=true;emit('paragraphReply','','')
+  void loadParagraphComments(value.page)
 }
 
 function refreshParagraphComments() {
@@ -459,7 +513,10 @@ watch(
 
 watch(()=>commentWrites.completed,command=>{if(command?.articleId===props.article.oId)paragraphEditingId.value=''},{flush:'sync'})
 
+watch(()=>props.targetLocation,value=>{if(value)void nextTick(()=>{if(props.targetLocation===value)locateComment(value)});else paragraphLocationId.value=''},{flush:'post'})
+
 onMounted(() => {
+  readerMounted.value=true
   loadSettings()
   onResize()
   onScroll()
@@ -471,7 +528,8 @@ onMounted(() => {
   window.addEventListener('keydown', onKey)
   document.addEventListener('click', onDocClick)
   const initialParagraph = new URLSearchParams(location.search).get('paragraph')
-  if (initialParagraph) openParagraph(initialParagraph)
+  if(props.targetLocation)locateComment(props.targetLocation)
+  else if (initialParagraph) openParagraph(initialParagraph)
   else if (/(?:^|&)(?:p|m|sort|author)=/.test(location.search.slice(1)) || location.hash.startsWith('#comments')) openComments()
 })
 
@@ -484,6 +542,7 @@ onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
 })
 
+watch(commentingEnabled,()=>updateParagraphButtons())
 defineExpose({ openComments, openComposer, scrollCommentsTop, refreshParagraphComments })
 
 function chapterTitle(c: LongArticleChapter) {
@@ -514,8 +573,9 @@ function chapterTitle(c: LongArticleChapter) {
         </h1>
 
         <div class="la-meta">
-          <RouterLink v-if="article.articleAuthorName" :to="`/member/${article.articleAuthorName}`" class="la-author">
-            {{ authorLabel }}
+          <span v-if="article.stick?.active">{{ article.stick.permanent ? '永久置顶' : '置顶中' }}</span>
+          <RouterLink v-if="article.articleAnonymous !== 1 && article.articleAuthorId && article.articleAuthorName" :to="`/member/${article.articleAuthorName}`" class="la-author">
+            <VipNickname :user-id="article.articleAuthorId" :user-name="article.articleAuthorName" :text="authorLabel" />
           </RouterLink>
           <span v-else class="la-author">{{ authorLabel }}</span>
           <span>{{ article.timeAgo || article.articleCreateTimeStr }}</span>
@@ -527,6 +587,7 @@ function chapterTitle(c: LongArticleChapter) {
           </template>
         </div>
 
+        <ArticleColumnNavigation :key="article.oId" :article-id="article.oId" />
         <slot name="live-status" />
         <p v-if="statement" class="la-statement">创作声明：{{ statement }}</p>
 
@@ -539,6 +600,7 @@ function chapterTitle(c: LongArticleChapter) {
           v-html="article.articleContent || ''"
         />
 
+        <ArticleReadRegistration v-if="article.articleContent" :key="article.oId" :article-id="article.oId" :author-id="article.articleAuthorId || ''" />
         <slot name="reward" />
 
         <nav v-if="column && (column.previous || column.next)" class="la-adjacent" aria-label="章节导航">
@@ -604,7 +666,7 @@ function chapterTitle(c: LongArticleChapter) {
     <!-- 评论抽屉 -->
     <aside id="articleCommentsPanel" class="la-drawer" :aria-hidden="!commentsOpen">
       <header class="la-drawer-head">
-        <span class="la-drawer-title">{{ activeParagraphId ? '段评' : '评论' }} <em>{{ activeParagraphId ? `${paragraphCounts[activeParagraphId] || 0} 条` : `${commentTotal} 条` }}</em></span>
+        <span class="la-drawer-title">{{ activeParagraphId ? '段评' : '评论' }} <em>{{ activeParagraphId ? paragraphCountLabel : `${commentTotal} 条` }}</em></span>
         <button type="button" class="la-round-btn" aria-label="关闭评论" title="关闭评论" @click="closeComments">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
@@ -615,12 +677,14 @@ function chapterTitle(c: LongArticleChapter) {
         </button>
       </header>
       <div ref="drawerScrollEl" class="la-drawer-scroll">
-        <template v-if="activeParagraphId">
-          <div class="la-paragraph-context">{{ activeSnapshot || '此段落' }}</div>
           <template v-if="loggedIn">
             <p v-if="commentWrites.pending">上次评论操作结果待确认（文章 {{ commentWrites.pending.articleId }}）。<button type="button" :disabled="commentWrites.busy" @click="commentWrites.retry()">恢复本次评论操作</button></p>
             <p v-if="commentWrites.error" role="alert">{{ commentWrites.error }}</p><p v-if="commentWrites.message" role="status">{{ commentWrites.message }}</p>
           </template>
+
+        <template v-if="activeParagraphId">
+          <div class="la-paragraph-context">{{ activeSnapshot || '此段落' }}</div>
+          <p v-if="paragraphLocationError" role="status">{{ paragraphLocationError }}</p>
           <p v-if="paragraphSummaryError" role="status">{{ paragraphSummaryError }}<button type="button" @click="loadParagraphSummary()">重读统计</button></p>
           <div class="la-paragraph-sort" role="tablist" aria-label="段评排序">
             <button type="button" :class="{ active: paragraphSort === '' }" @click="paragraphSort = ''; loadParagraphComments(1)">正序</button>
@@ -629,9 +693,9 @@ function chapterTitle(c: LongArticleChapter) {
           <p v-if="paragraphLoading" class="la-paragraph-state">段评加载中…</p>
           <p v-else-if="paragraphError" class="la-paragraph-state error">{{ paragraphError }}<button type="button" @click="loadParagraphComments(paragraphPage)">重读段评</button></p>
           <div v-else-if="paragraphComments.length" class="la-paragraph-list">
-            <article v-for="comment in paragraphComments" :key="comment.oId" class="la-paragraph-comment">
+            <article v-for="comment in paragraphComments" :id="'comment'+comment.oId" :key="comment.oId" class="la-paragraph-comment">
               <div class="la-paragraph-comment-head">
-                <RouterLink v-if="comment.commentAuthorId" :to="`/member/${comment.commentAuthorName}`">{{ comment.commentAuthorName }}</RouterLink>
+                <RouterLink v-if="comment.commentAuthorId" :to="`/member/${comment.commentAuthorName}`"><VipNickname :user-id="comment.commentAuthorId" :user-name="comment.commentAuthorName" :text="comment.commentAuthorNickname || comment.commentAuthorName" /></RouterLink>
                 <span v-else>匿名用户</span>
                 <time>{{ comment.commentCreateTimeStr || '' }}</time>
               </div>
@@ -643,26 +707,26 @@ function chapterTitle(c: LongArticleChapter) {
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="vote" :article-id="comment.oId" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="thanks" :article-id="comment.oId" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="accept" :article-id="comment.oId" />
-              <button v-if="loggedIn" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
+              <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
               <template v-if="ownParagraphComment(comment)">
-                <button type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="paragraphEditingId=comment.oId">编辑</button>
+                <button v-if="commentingEnabled" type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="commentingEnabled && (paragraphEditingId=comment.oId)">编辑</button>
                 <button type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="removeParagraphComment(comment)">删除</button>
-                <CommentComposer v-if="paragraphEditingId===comment.oId" :article-id="article.oId" :edit-id="comment.oId" @cancel="paragraphEditingId=''" @saved="paragraphEditingId=''" />
+                <CommentComposer :writable="commentingEnabled" v-if="paragraphEditingId===comment.oId" :article-id="article.oId" :edit-id="comment.oId" @cancel="paragraphEditingId=''" @saved="paragraphEditingId=''" />
               </template>
               <div v-for="reply in comment.commentThreadReplies || []" :key="reply.oId" class="la-paragraph-reply-item">
-                <RouterLink v-if="reply.commentAuthorId" :to="`/member/${reply.commentAuthorName}`">{{ reply.commentAuthorName }}</RouterLink>
+                <RouterLink v-if="reply.commentAuthorId" :to="`/member/${reply.commentAuthorName}`"><VipNickname :user-id="reply.commentAuthorId" :user-name="reply.commentAuthorName" :text="reply.commentAuthorNickname || reply.commentAuthorName" /></RouterLink>
                 <span v-else>匿名用户</span><span class="reply-colon">：</span>
                 <span class="reply-content" v-html="reply.commentContent || ''" />
-                <button v-if="loggedIn" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
+                <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
               <template v-if="ownParagraphComment(comment)">
-                <button type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="paragraphEditingId=comment.oId">编辑</button>
+                <button v-if="commentingEnabled" type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="commentingEnabled && (paragraphEditingId=comment.oId)">编辑</button>
                 <button type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="removeParagraphComment(comment)">删除</button>
-                <CommentComposer v-if="paragraphEditingId===comment.oId" :article-id="article.oId" :edit-id="comment.oId" @cancel="paragraphEditingId=''" @saved="paragraphEditingId=''" />
+                <CommentComposer :writable="commentingEnabled" v-if="paragraphEditingId===comment.oId" :article-id="article.oId" :edit-id="comment.oId" @cancel="paragraphEditingId=''" @saved="paragraphEditingId=''" />
               </template>
               </div>
             </article>
           </div>
-          <p v-else class="la-paragraph-state">暂无段评</p>
+          <p v-else class="la-paragraph-state">暂无段评 <button v-if="paragraphPage > 1" type="button" @click="loadParagraphComments(1)">返回段评首页</button></p>
           <div v-if="paragraphPages > 1" class="la-paragraph-pager">
             <button type="button" :disabled="paragraphPage <= 1 || paragraphLoading" @click="loadParagraphComments(paragraphPage - 1)">上一页</button>
             <span>{{ paragraphPage }} / {{ paragraphPages }}</span>
@@ -672,8 +736,10 @@ function chapterTitle(c: LongArticleChapter) {
         <slot v-else name="comments" />
       </div>
       <div class="la-drawer-reply">
-        <button v-if="loggedIn" type="button" class="la-reply-trigger" @click="onReplyTrigger">{{ activeParagraphId ? '写段评 ...' : '请输入回帖内容 ...' }}</button>
-        <RouterLink v-else :to="{ path: '/login', query: { redirect: $route.fullPath } }" class="la-reply-trigger">
+        <p v-if="!commentingEnabled">{{ article.articleCommentable === false ? '作者已关闭回帖。' : '评论状态暂不可用。' }}</p>
+        <p v-else-if="activeParagraphId && paragraphState==='orphaned'">原段落已移除，不能新增段评回复。</p>
+        <button v-else-if="loggedIn" type="button" class="la-reply-trigger" @click="onReplyTrigger">{{ activeParagraphId ? '写段评 ...' : '请输入回帖内容 ...' }}</button>
+        <RouterLink v-else :to="{ path: '/login', query: { redirect: readerMounted ? $route.fullPath : $route.fullPath.split('#')[0] } }" class="la-reply-trigger">
           登录参与讨论 ...
         </RouterLink>
       </div>
@@ -838,7 +904,7 @@ function chapterTitle(c: LongArticleChapter) {
               🚩 <ReportDialog :data-id="article.oId" :data-type="0" />
             </span>
           </template>
-          <RouterLink v-else :to="{ path: '/login', query: { redirect: $route.fullPath } }" class="la-more-item wide">
+          <RouterLink v-else :to="{ path: '/login', query: { redirect: readerMounted ? $route.fullPath : $route.fullPath.split('#')[0] } }" class="la-more-item wide">
             登录后可感谢、收藏
           </RouterLink>
         </div>

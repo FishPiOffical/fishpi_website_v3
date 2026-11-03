@@ -422,7 +422,9 @@ export function createAppRouter(history?: RouterHistory) {
       if (savedPosition) return savedPosition
       if (to.hash) {
         const navH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fp-nav-h')) || 58
-        const el = document.getElementById(decodeURIComponent(to.hash.slice(1)))
+        let anchor = ''
+        try { anchor = decodeURIComponent(to.hash.slice(1)) } catch { /* Malformed fragments must not abort navigation. */ }
+        const el = anchor ? document.getElementById(anchor) : null
         if (el) return { el, top: navH + 12 }
       }
       if (to.path === from.path && to.hash !== from.hash) return false

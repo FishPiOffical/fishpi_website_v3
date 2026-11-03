@@ -153,6 +153,7 @@ async function quoteMessage(msg:{oId:string}){
 }
 
 function insertPaint(md: string) {
+  if (!syncComposer()) return
   draft.value += (draft.value && !draft.value.endsWith('\n') ? '\n' : '') + md
   showPaint.value = false
 }
@@ -178,7 +179,20 @@ async function onModernScroll() {
 }
 
 function useTopic() {
+  if (!syncComposer()) return
   draft.value += ` # ${discuss.value} # `
+}
+
+function syncComposer() {
+  const value = composerRef.value?.flush()
+  if (value === null) return false
+  if (value !== undefined) draft.value = value
+  return true
+}
+
+function toggleChatStyle() {
+  if (!syncComposer()) return
+  chat.toggleChatStyle()
 }
 
 function clearScreen() {
@@ -244,7 +258,7 @@ function clearScreen() {
                 <button type="button" v-if="nodeOptions.length" class="classic-btn" :title="nodeName || '选择大区'" @click="openNodePicker">
                   🌐 {{ nodeName ? `大区: ${nodeName}` : '选择大区' }}
                 </button>
-                <button type="button" class="classic-btn style-toggle" title="切换到简约气泡版本（输入框吸底）" @click="chat.toggleChatStyle()">
+                <button type="button" class="classic-btn style-toggle" title="切换到简约气泡版本（输入框吸底）" @click="toggleChatStyle">
                   切换样式：简约
                 </button>
                 <button type="button" class="classic-btn" @click="clearScreen">清屏</button>
@@ -252,7 +266,7 @@ function clearScreen() {
             </ChatComposer>
             <div v-else-if="composerReady" class="comment-login-hint">
               <RouterLink to="/login" class="login-link">登录</RouterLink>后参与讨论与收发消息
-              <button type="button" class="classic-btn style-toggle" @click="chat.toggleChatStyle()">切换样式：简约</button>
+              <button type="button" class="classic-btn style-toggle" @click="toggleChatStyle">切换样式：简约</button>
             </div>
 
             <!-- 话题编辑展开表单 -->
@@ -378,7 +392,7 @@ function clearScreen() {
               type="button"
               class="cr-top-btn style-toggle"
               title="切换到经典版本（输入框在顶部，新消息在最上）"
-              @click="chat.toggleChatStyle()"
+              @click="toggleChatStyle"
             >
               切换样式：经典
             </button>

@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { getAuthContextVersion } from '@/api/http'
 import {
   type NoticeItem,
   type NoticeType,
@@ -27,7 +28,7 @@ const tabs: { id: NoticeType; label: string; hint: string; unreadKey: keyof Unre
 
 const auth = useAuthStore()
 const notices = useNoticeStore()
-const { accessToken } = storeToRefs(auth)
+const { accessToken, account } = storeToRefs(auth)
 const { unread } = storeToRefs(notices)
 
 function firstUnread(u: UnreadCount): NoticeType {
@@ -38,7 +39,9 @@ const type = ref<NoticeType>(firstUnread(unread.value))
 const items = ref<NoticeItem[]>([])
 const page = ref(1)
 const pageCount = ref(0)
-let requestVersion = 0
+let requestVersion = 0, active = true
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
+let boundary = identity()
 const pendingReadKeys = new Map<string, string>()
 const loading = ref(false)
 const error = ref('')
@@ -61,12 +64,12 @@ function selectType(next: NoticeType) {
 }
 
 async function load() {
-  const token = accessToken.value, category = type.value, p = page.value
+  const token = accessToken.value, owner = identity(), category = type.value, p = page.value
   const version = ++requestVersion
   if (!token) { items.value = []; pageCount.value = 0; loading.value = false; return }
   loading.value = true
   error.value = ''
-  const current = () => version === requestVersion && accessToken.value === token
+  const current = () => active && version === requestVersion && owner === identity()
   try {
     const data = await fetchNotificationPage(category, p)
     if (current()) { items.value = data.items; pageCount.value = data.pageCount }
@@ -75,15 +78,18 @@ async function load() {
   } finally { if (current()) loading.value = false }
 }
 
-watch(accessToken, () => {
+watch([accessToken, () => account.value?.oId], () => {
+  const current = identity()
+  if (current === boundary) return
+  boundary = current
   requestVersion++; pendingReadKeys.clear(); marking.value = false; items.value = []; pageCount.value = 0; page.value = 1; error.value = ''
 }, { flush: 'sync' })
 watch(
-  () => [accessToken.value, type.value, page.value, notices.revision],
+  () => [accessToken.value, account.value?.oId, type.value, page.value, notices.revision],
   () => { items.value = []; void load() },
   { immediate: true },
 )
-onBeforeUnmount(() => { requestVersion++ })
+onBeforeUnmount(() => { active = false; requestVersion++; pendingReadKeys.clear() })
 
 const router = useRouter()
 const SITE = /^https?:\/\/fishpi\.cn(?=\/|$)/
@@ -142,19 +148,20 @@ function noticeTime(n: NoticeItem) {
 }
 
 async function mark(type: NoticeType | 'all') {
-  const token = accessToken.value
+  const token = accessToken.value, owner = identity()
   if (!token || marking.value) return
+  const current = () => active && owner === identity()
   marking.value = true
   try {
     let key = pendingReadKeys.get(type)
     if (!key) { key = notificationReadKey(); pendingReadKeys.set(type, key) }
     await markV3NotificationsRead(type, key)
-    if (accessToken.value !== token) return
+    if (!current()) return
     pendingReadKeys.delete(type)
     notices.invalidate()
   } catch (failure) {
-    if (accessToken.value === token) error.value = failure instanceof Error ? failure.message : '标记已读失败'
-  } finally { if (accessToken.value === token) marking.value = false }
+    if (current()) error.value = failure instanceof Error ? failure.message : '标记已读失败'
+  } finally { if (current()) marking.value = false }
 }
 function readType() { return mark(type.value) }
 function readAll() { return mark('all') }

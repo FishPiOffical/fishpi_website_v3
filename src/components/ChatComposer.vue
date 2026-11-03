@@ -32,14 +32,27 @@ const props = withDefaults(
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
 
+const sendError = ref('')
 const root = ref<HTMLElement | null>(null)
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const canSend = computed(
   () => !props.sending && !props.disabled && (props.allowEmpty || Boolean(props.modelValue.trim())),
 )
 
+function flush() {
+  sendError.value = ''
+  try {
+    return editor.value?.flush() ?? props.modelValue
+  } catch (reason) {
+    sendError.value = reason instanceof Error ? reason.message : '编辑器内容暂不可读取'
+    return null
+  }
+}
+
 function submit() {
-  if (canSend.value) emit('submit')
+  if (props.sending || props.disabled) return
+  const value = flush()
+  if (value !== null && (props.allowEmpty || value.trim())) emit('submit')
 }
 
 function reveal() {
@@ -48,6 +61,7 @@ function reveal() {
 }
 
 defineExpose({
+  flush,
   focus: () => editor.value?.focus(),
   reveal,
   insert: (text: string) => editor.value?.insert(text),
@@ -69,6 +83,7 @@ defineExpose({
       @update:model-value="(v: string) => emit('update:modelValue', v)"
       @submit="submit"
     />
+    <p v-if="sendError" role="alert">{{ sendError }}</p>
     <div class="bar">
       <div class="tools">
         <EmojiPicker v-if="!compact" @insert="(md) => editor?.insert(md)" />

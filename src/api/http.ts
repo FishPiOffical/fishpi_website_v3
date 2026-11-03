@@ -103,15 +103,20 @@ export function isOfflineError(e: unknown) {
   return e instanceof ApiError && (e.code === 'offline' || e.status === 0)
 }
 
-function notifyOffline() {
-  if (import.meta.env.SSR || typeof window === 'undefined') return
+type RequestIdentity = { version: number; authenticated: boolean }
+function requestIdentity(): RequestIdentity {
+  return { version: getAuthContextVersion(), authenticated: Boolean(getAccessToken()) }
+}
+function notifyOffline(identity: RequestIdentity) {
+  if (import.meta.env.SSR || typeof window === 'undefined' || identity.version !== authVersion ||
+    identity.authenticated !== Boolean(accessToken)) return
   window.dispatchEvent(new CustomEvent('fp:api-offline'))
 }
 
-function asNetworkError(e: unknown): never {
+function asNetworkError(e: unknown, identity: RequestIdentity): never {
   const msg = e instanceof Error ? e.message : String(e)
   if (/Failed to fetch|NetworkError|Load failed|network|ECONNREFUSED|ETIMEDOUT|fetch|aborted/i.test(msg)) {
-    notifyOffline()
+    notifyOffline(identity)
     throw new ApiError('无法连接摸鱼派接口，请检查网络或稍后重试', 0, 'offline')
   }
   throw e instanceof Error ? e : new Error(msg)
@@ -167,6 +172,17 @@ function resolveUrl(path: string) {
   return base ? `${base}${path.startsWith('/') ? path : `/${path}`}` : path
 }
 
+/** Headers may arrive before the connection fails; never accept a partial response body. */
+async function readNetworkBody<T>(read: () => Promise<T>, signal: AbortSignal | null | undefined, identity: RequestIdentity): Promise<T> {
+  try {
+    return await read()
+  } catch {
+    if (signal?.aborted) throw new ApiError('请求已取消', 0, 'aborted')
+    notifyOffline(identity)
+    throw new ApiError('接口响应读取中断，请检查网络或稍后重试', 0, 'offline')
+  }
+}
+
 function isJsonContentType(value: string | null) {
   return Boolean(value && value.includes('application/json'))
 }
@@ -175,7 +191,7 @@ function isRiskCaptchaPath(path: string) {
   return path.includes('/validateCaptcha') || /(^|\/)test(\?|$)/.test(path)
 }
 
-async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {}): Promise<T> {
+async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, identity: RequestIdentity): Promise<T> {
   const headers = new Headers(init.headers)
   if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
   if (init.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
@@ -195,7 +211,7 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {
     })
   } catch (e) {
     if (init.signal?.aborted) throw new ApiError('请求已取消', 0, 'aborted')
-    asNetworkError(e)
+    asNetworkError(e, identity)
   }
 
   // Rhythm BeforeRequestHandler：IP 进入验证码黑名单时 302 → /test
@@ -216,13 +232,13 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra = {
     const reader = res.body?.getReader()
     if (!reader) throw new ApiError('文件为空', 502, 'invalid_response')
     const parts: ArrayBuffer[] = []; let bytes = 0
-    try { while (true) { const { done, value } = await reader.read(); if (done) break; bytes += value.byteLength; if (bytes > binaryLimit) { await reader.cancel(); throw new ApiError('文件大小异常', 502, 'invalid_response') } parts.push(new Uint8Array(value).buffer) } }
+    try { while (true) { const { done, value } = await readNetworkBody(() => reader.read(), init.signal, identity); if (done) break; bytes += value.byteLength; if (bytes > binaryLimit) { await reader.cancel(); throw new ApiError('文件大小异常', 502, 'invalid_response') } parts.push(new Uint8Array(value).buffer) } }
     finally { reader.releaseLock() }
     if (!bytes) throw new ApiError('文件为空', 502, 'invalid_response')
     return new Blob(parts, { type: binaryType }) as T
   }
 
-  const text = await res.text()
+  const text = await readNetworkBody(() => res.text(), init.signal, identity)
   const looksJson = isJsonContentType(res.headers.get('content-type')) || text.startsWith('{') || text.startsWith('[')
   if (!looksJson) {
     throw new ApiError(res.status === 401 ? '需要登录或完成验证码后才能调用接口' : '接口返回了非 JSON', res.status)
@@ -252,14 +268,15 @@ export function requestSvg(path: string, init: RequestInit = {}): Promise<Blob> 
 export function requestZip(path: string, init: RequestInit = {}): Promise<Blob> { return request<Blob>(path, { ...init, __zip: true }) }
 
 export async function request<T = unknown>(path: string, init: RequestInitExtra = {}): Promise<T> {
-  const version = authVersion
+  const identity = requestIdentity()
+  const version = identity.version
   const sentToken = getAccessToken()
   const explicitAuthorization = new Headers(init.headers).has('Authorization')
   const run = () => {
     if (init.__authVersion !== undefined && init.__authVersion !== authVersion) {
       throw new ApiError('登录状态已变更', 401, 'stale_session')
     }
-    return requestOnce<T>(path, init)
+    return requestOnce<T>(path, init, identity)
   }
   try {
     return await (!import.meta.env.SSR && isCredentialPath(path) ? queueCredentialRequest(run) : run())
@@ -300,6 +317,7 @@ export async function requestText(path: string, init: RequestInitExtra = {}): Pr
 }
 
 async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
+  const identity = requestIdentity()
   const headers = new Headers(init.headers)
   if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
   const { __captchaRetried: _, ...fetchInit } = init
@@ -311,7 +329,7 @@ async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
       headers,
     })
   } catch (e) {
-    asNetworkError(e)
+    asNetworkError(e, identity)
   }
   try {
     const pathname = new URL(res.url).pathname
@@ -321,7 +339,7 @@ async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
   } catch (e) {
     if (e instanceof ApiError) throw e
   }
-  const text = await res.text()
+  const text = await readNetworkBody(() => res.text(), init.signal, identity)
   if (!res.ok) throw new ApiError(text.slice(0, 120) || '请求失败', res.status)
   return text
 }

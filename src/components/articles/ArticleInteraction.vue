@@ -8,7 +8,7 @@ import { fpConfirm } from '@/composables/useDialog'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ArticleInteractionsStore } from '@/stores/v3ArticleInteractions'
 const props = withDefaults(defineProps<{ kind:ArticleInteractionKind; articleId:string; initialPrice?:number; resource?:InteractionResource }>(),{initialPrice:0,resource:'articles'})
-const emit = defineEmits<{ contentClick:[event:MouseEvent] }>()
+const emit = defineEmits<{ contentClick:[event:MouseEvent]; accepted:[] }>()
 const route = useRoute(), { accessToken, account } = storeToRefs(useAuthStore()), operations = useV3ArticleInteractionsStore()
 const mounted=ref(false), state=ref<ArticleInteractionState|null>(null), loading=ref(false), confirming=ref(false), error=ref(''), html=ref('')
 const loggedIn=computed(()=>mounted.value && !!accessToken.value && !!account.value)
@@ -58,7 +58,7 @@ async function submit(choice:VoteChoice=null,recover=false){
   finally { if(valid()) confirming.value=false }
 }
 watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.articleId,()=>props.resource],()=>{ const next=identity(); if(next === boundary)return; boundary=next; clear(); void load() },{flush:'sync'})
-watch(()=>operations.lastChange,change=>{if(change.resource === props.resource && change.kind === props.kind && (change.targetId === props.articleId || change.kind === 'accept' && change.resource === 'comments')){clear(true);void load(true)}},{flush:'sync'})
+watch(()=>operations.lastChange,change=>{if(change.resource === props.resource && change.kind === props.kind && (change.targetId === props.articleId || change.kind === 'accept' && change.resource === 'comments')){clear(true);void load(true);if(change.kind === 'accept' && change.targetId === props.articleId)emit('accepted')}},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity();void load()})
 onBeforeUnmount(()=>{mounted.value=false;clear()})
 </script>
@@ -91,7 +91,7 @@ onBeforeUnmount(()=>{mounted.value=false;clear()})
       <p v-if="error || pending?.error" role="alert">{{ error || pending?.error }}</p>
       <p v-if="kind !== 'vote' && operations.balanceError" role="status">{{ operations.balanceError }}</p>
     </template>
-    <RouterLink v-else :to="{path:'/login',query:{redirect:route.fullPath}}">登录后打赏</RouterLink>
+    <RouterLink v-else :to="{path:'/login',query:{redirect:mounted?route.fullPath:route.fullPath.split('#')[0]}}">登录后打赏</RouterLink>
   </section>
 </template>
 <style scoped lang="scss">

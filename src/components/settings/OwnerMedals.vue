@@ -2,22 +2,24 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
-import { ApiError } from '@/api/http'
+import { ApiError, getAuthContextVersion } from '@/api/http'
 import { profileOperationKey } from '@/api/v3-profile'
 import { fetchV3OwnerMedals, setV3MedalDisplayed, moveV3Medal, type OwnerMedal } from '@/api/v3-medals'
 import MedalIcon from '@/components/medal/MedalIcon.vue'
 
 type Operation = { id: string; name: string; key: string } & ({ kind: 'display'; displayed: boolean } | { kind: 'move'; direction: 'up' | 'down' })
-const { accessToken } = storeToRefs(useAuthStore())
+const { accessToken, account } = storeToRefs(useAuthStore())
 const medals = ref<OwnerMedal[]>([]), page = ref(1), total = ref(0), pageCount = ref(0)
 const loading = ref(false), busy = ref(false), ready = ref(false), readError = ref(''), error = ref(''), message = ref('')
 const pending = ref<Operation | null>(null)
 let mounted = false, generation = 0, readSequence = 0
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
+let boundary = identity()
 function reset() { generation++; readSequence++; medals.value = []; page.value = 1; total.value = pageCount.value = 0; pending.value = null; ready.value = loading.value = busy.value = false; readError.value = error.value = message.value = '' }
 async function load(target = page.value) {
   if (!accessToken.value) return
-  const token = accessToken.value, current = generation, sequence = ++readSequence
-  const valid = () => mounted && token === accessToken.value && current === generation && sequence === readSequence
+  const owner = identity(), current = generation, sequence = ++readSequence
+  const valid = () => mounted && owner === identity() && current === generation && sequence === readSequence
   loading.value = true; ready.value = false; medals.value = []; readError.value = ''
   try {
     let result = await fetchV3OwnerMedals(target)
@@ -29,8 +31,8 @@ async function load(target = page.value) {
 }
 async function execute(operation: Operation) {
   if (busy.value || !accessToken.value) return
-  const token = accessToken.value, current = generation
-  const valid = () => mounted && token === accessToken.value && current === generation
+  const owner = identity(), current = generation
+  const valid = () => mounted && owner === identity() && current === generation
   pending.value = operation; busy.value = true; error.value = message.value = ''
   try {
     if (operation.kind === 'display') await setV3MedalDisplayed(operation.id, operation.displayed, operation.key)
@@ -52,7 +54,12 @@ function move(medal: OwnerMedal, direction: 'up' | 'down') { if (ready.value && 
 function retry() { if (pending.value && !loading.value) void execute(pending.value) }
 function expires(value: number) { if (value <= 0) return '永久'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '到期时间异常' : date.toLocaleDateString() }
 onMounted(() => { mounted = true; void load(1) })
-watch(accessToken, () => { reset(); if (mounted) void load(1) }, { flush: 'sync' })
+watch([accessToken, () => account.value?.oId], () => {
+  const current = identity()
+  if (current === boundary) return
+  boundary = current; reset()
+  if (mounted) { void load(1) }
+}, { flush: 'sync' })
 onBeforeUnmount(() => { mounted = false; reset() })
 </script>
 

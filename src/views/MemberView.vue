@@ -5,13 +5,18 @@ import { useAuthStore } from '@/stores/auth'
 import { useMemberPage } from '@/composables/useMemberPage'
 import { usePageSeo } from '@/composables/usePageSeo'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
+import { commentLink } from '@/api/v3-comment-location'
 import BreezemoonList from '@/components/breezemoons/BreezemoonList.vue'
 import PublicProfessions from '@/components/profession/PublicProfessions.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
 import UserFollowButton from '@/components/user/UserFollowButton.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import PointTransfer from '@/components/settings/PointTransfer.vue'
-import { avatarUrl } from '@/utils/avatar'
+import { avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
+function onAvatarError(event: Event) {
+  const image = event.currentTarget as HTMLImageElement | null
+  if (image && image.getAttribute('src') !== DEFAULT_AVATAR) image.src = DEFAULT_AVATAR
+}
 const route = useRoute(), auth = useAuthStore(), userName = computed(() => String(route.params.userName || ''))
 const activeTab = computed(() => String(route.meta.memberTab || 'home')), moonId = computed(() => String(route.params.breezemoonId || ''))
 const { profile, profileError, profileLoading, content, moon, contentError, contentLoading, p, readProfile, readContent } = useMemberPage(userName, activeTab, moonId)
@@ -29,7 +34,7 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
       <p v-if="profileLoading" role="status">正在读取用户资料…</p>
       <div v-if="profileError" role="alert"><p>{{ profileError }}</p><button type="button" @click="readProfile">重试用户资料</button></div>
       <template v-else-if="profile">
-        <img class="member-avatar" :src="avatarUrl(profile)" alt="" :data-user-card="profile.userName" />
+        <img :key="avatarUrl(profile)" class="member-avatar" :src="avatarUrl(profile)" alt="" :data-user-card="profile.userName" @error="onAvatarError" />
         <h1><VipNickname :user-id="profile.id" :user-name="profile.userName" :text="profile.userNickname || profile.userName" /></h1>
         <p>@{{ profile.userName }}</p><p class="intro">{{ profile.userIntro }}</p>
         <a v-if="profile.userURL" :href="profile.userURL" target="_blank" rel="noopener noreferrer">个人主页</a>
@@ -60,7 +65,7 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
           <p>共 {{ content.total }} 条</p>
           <ArticleFeed v-if="activeTab === 'home' || activeTab === 'long'" :items="content.articles" empty="本页没有可见文章" />
           <BreezemoonList v-else-if="activeTab === 'breezemoons'" :items="content.moons"><template #actions="{ item }"><RouterLink :to="`${base}/breezemoons/${item.id}`">查看这条清风</RouterLink></template></BreezemoonList>
-          <ul v-else class="member-comments"><li v-for="item in content.comments" :key="item.id"><RouterLink :to="`/article/${item.articleId}#comment-${item.id}`">{{ item.article.articleTitle }}</RouterLink><time :datetime="item.comment.commentCreateTimeStr">{{ item.comment.commentCreateTimeStr }}</time><div v-if="item.comment.commentContentVisible" class="comment-body" v-html="item.comment.commentContent" /><p v-else>私密评论正文不可见。</p></li></ul>
+          <ul v-else class="member-comments"><li v-for="item in content.comments" :key="item.id"><RouterLink :to="commentLink(item.articleId,item.id)">{{ item.article.articleTitle }}</RouterLink><time :datetime="item.comment.commentCreateTimeStr">{{ item.comment.commentCreateTimeStr }}</time><div v-if="item.comment.commentContentVisible" class="comment-body" v-html="item.comment.commentContent" /><p v-else>私密评论正文不可见。</p></li></ul>
           <p v-if="!content.total && activeTab !== 'home' && activeTab !== 'long'">没有可见记录。</p>
           <div class="member-pager"><button type="button" :disabled="p <= 1" @click="readContent(p - 1)">上一页用户内容</button><span>第 {{ p }} 页 / 共 {{ content.pageCount }} 页</span><button type="button" :disabled="p >= content.pageCount" @click="readContent(p + 1)">下一页用户内容</button></div>
         </template>

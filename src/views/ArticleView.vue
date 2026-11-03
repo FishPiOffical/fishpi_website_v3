@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import RandomArticles from '@/components/discovery/RandomArticles.vue'
 import { articleTitle } from '@/utils/text'
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { avatarStyle } from '@/utils/avatar'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
@@ -11,12 +12,15 @@ import {
 } from '@/api/fishpi'
 import ContentRelationButton from '@/components/articles/ContentRelationButton.vue'
 import ArticleInteraction from '@/components/articles/ArticleInteraction.vue'
+import VipNickname from '@/components/user/VipNickname.vue'
 import RevisionHistory from '@/components/articles/RevisionHistory.vue'
 import {articleHeat} from '@/api/v3-article-heat'
 import {subscribeArticleChanges} from '@/api/v3-realtime'
 import ArticleOwnerActions from '@/components/articles/ArticleOwnerActions.vue'
 import { ApiError,getAuthContextVersion } from '@/api/http'
 import CommentComposer from '@/components/articles/CommentComposer.vue'
+import ArticleCommentLocation from '@/components/articles/ArticleCommentLocation.vue'
+import type {CommentLocation} from '@/api/v3-comment-location'
 import { useV3CommentsStore } from '@/stores/v3Comments'
 import MedalList from '@/components/medal/MedalList.vue'
 import V3ReactionBar from '@/components/V3ReactionBar.vue'
@@ -35,6 +39,9 @@ import { createReusableTemplate } from '@/utils/reusableTemplate'
 
 const reactionEvents=useV3ReactionsStore()
 const route = useRoute(), router = useRouter()
+const routeMounted=ref(false)
+const loginRedirect=computed(()=>routeMounted.value?route.fullPath:route.fullPath.split('#')[0])
+onMounted(()=>{routeMounted.value=true})
 const auth = useAuthStore()
 const commentWrites=useV3CommentsStore(),commandOrigin=Symbol('article-comment-delete'),commentRefreshError=ref('')
 const { apiKey, accessToken, isLoggedIn, account } = storeToRefs(auth)
@@ -49,6 +56,8 @@ const replyId = ref('')
 const replyComment = ref<ArticleComment | null>(null)
 const paragraphIdForReply = ref('')
 const commentPage = ref(1)
+const locatedComment=ref<CommentLocation|null>(null)
+function positionComment(value:CommentLocation){locatedComment.value=value;if(value.type===0){commentPage.value=value.page;readerRef.value?.openComments()}}
 const heat = ref<number|null>(null),heatError=ref(''),articleChanged=ref(false),realtimeReadError=ref(''),realtimeReading=ref(false)
 const editingId = ref('')
 const bodyEl = ref<HTMLElement | null>(null)
@@ -138,7 +147,8 @@ const STATEMENT_LABELS: Record<number, string> = {
   3: '虚构演绎，仅供娱乐',
 }
 const typeBadge = computed(() => TYPE_BADGES[Number(article.value?.articleType)] || '')
-const statementLabel = computed(() => STATEMENT_LABELS[Number(article.value?.articleStatement)] || '')
+const commentingEnabled = computed(() => article.value?.articleCommentable === true)
+const statementLabel = computed(() => article.value?.articleStatement == null ? '状态暂不可用' : STATEMENT_LABELS[article.value.articleStatement] || '')
 
 const composerRef = ref<InstanceType<typeof CommentComposer> | null>(null)
 const readerRef = ref<InstanceType<typeof LongArticleReader> | null>(null)
@@ -188,7 +198,7 @@ usePageSeo(() => {
   if (!a) {
     return { title: '帖子', path: route.fullPath, robots: 'index,follow' }
   }
-  const author = a.articleAuthorName || a.articleAuthor?.userName || ''
+  const author = a.articleAnonymous === 1 ? '' : a.articleAuthorName || a.articleAuthor?.userName || ''
   return {
     title: articleTitle(a),
     description: articleDesc.value,
@@ -201,7 +211,7 @@ usePageSeo(() => {
       headline: articleTitle(a),
       description: articleDesc.value,
       author: author
-        ? { '@type': 'Person', name: author, url: absoluteUrl(`/member/${author}`) }
+        ? { '@type': 'Person', name: a.articleAuthorNickname || author, url: absoluteUrl(`/member/${author}`) }
         : undefined,
       datePublished: a.articleCreateTimeStr || undefined,
       mainEntityOfPage: absoluteUrl(`/article/${a.oId}`),
@@ -217,6 +227,11 @@ function isOwnComment(c: ArticleComment) {
 function disconnectHeat() {
  stopArticle?.();stopArticle=null;subscriptionKey='';heatSequence++;heatRequest?.abort();heatRequest=null;heat.value=null;heatError.value='';articleChanged.value=false;liveReadVersion++;realtimeReading.value=false
 }
+function articleUnavailable(target:string,reader:string) {
+ if(disposed||target!==id.value||reader!==viewerIdentity.value)return
+ ++readVersion;article.value=null;loading.value=false;articleReading.value=false
+ error.value='文章不存在或当前已无权阅读';disconnectHeat();toc.value=[];zoomed.value=''
+}
 function connectHeat() {
  if(import.meta.env.SSR||!accessToken.value||!article.value||article.value.oId!==id.value)return
  const target=id.value,reader=viewerIdentity.value,key=JSON.stringify([target,reader,accessToken.value])
@@ -228,7 +243,7 @@ function connectHeat() {
   reactionEvents.invalidate('article',target)
   for(const comment of article.value?.articleComments||[])reactionEvents.invalidate('comment',comment.oId)
   if(!heatRequest)void refreshHeat()
- })
+ },()=>articleUnavailable(target,reader))
 }
 async function readArticleChanges(){
  if(realtimeReading.value)return
@@ -305,6 +320,7 @@ watch(
   () => {
     disconnectHeat()
     commentPage.value = 1
+    locatedComment.value=null
     ownerRefreshError.value='';ownerDeletedId.value='';realtimeReadError.value=''
     editingId.value='';replyId.value='';replyComment.value=null;paragraphIdForReply.value='';commentRefreshError.value=''
     commentWrites.cancelConfirmation(commandOrigin)
@@ -358,9 +374,9 @@ async function onRemoveComment(c: ArticleComment) {
   if(!isOwnComment(c)||!accessToken.value)return
   await commentWrites.remove(id.value,c.oId,commandOrigin)
 }
-function startEdit(c:ArticleComment){if(isOwnComment(c)&&accessToken.value&&!commentWrites.pending&&!commentWrites.busy&&!commentWrites.confirming)editingId.value=c.oId}
+function startEdit(c:ArticleComment){if(commentingEnabled.value&&isOwnComment(c)&&accessToken.value&&!commentWrites.pending&&!commentWrites.busy&&!commentWrites.confirming)editingId.value=c.oId}
 function who(c: ArticleComment) {
-  return c.commentAuthorName || '匿名'
+  return c.commentAuthorNickname || c.commentAuthorName || '匿名'
 }
 
 function parentAuthor(c: ArticleComment) {
@@ -369,6 +385,7 @@ function parentAuthor(c: ArticleComment) {
 }
 
 function startReply(c: ArticleComment) {
+  if (!commentingEnabled.value) return
   replyId.value = c.oId
   replyComment.value = c
   if (isLong.value) {
@@ -391,6 +408,7 @@ function itemProps(c: ArticleComment) {
   return {
     comment: c,
     loggedIn: isLoggedIn.value,
+    commentingEnabled: commentingEnabled.value,
     own,
     editing: editingId.value === c.oId,
     apiKey: apiKey.value,
@@ -403,18 +421,20 @@ function itemHandlers(c: ArticleComment) {
     reply: () => startReply(c),
     edit: () => startEdit(c),
     remove: () => onRemoveComment(c),
+    accepted: () => { if (isQnA.value && accessToken.value) void load(true) },
   }
 }
 
 </script>
 
 <template>
+  <ArticleCommentLocation :article-id="id" :article="article" :comment-page="commentPage" @located="positionComment" @reset="locatedComment=null" />
   <ArticleSkeleton v-if="loading" />
   <article v-else-if="error" class="card load-error">
     <p class="err">{{ error }}</p>
     <p class="retry"><RouterLink v-if="ownerDeletedId" to="/">返回首页</RouterLink><button v-else type="button" class="btn" @click="load()">重新加载</button></p>
     <p v-if="!isLoggedIn" class="hint">
-      <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
+      <RouterLink :to="{ path: '/login', query: { redirect: loginRedirect } }">登录</RouterLink>
       后可查看需要权限的帖子。
     </p>
   </article>
@@ -448,7 +468,7 @@ function itemHandlers(c: ArticleComment) {
           v-on="itemHandlers(t.c)"
         >
           <template #editor>
-            <CommentComposer :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
+            <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
           </template>
           <template v-if="t.replies.length" #default>
             <CommentItem
@@ -460,7 +480,7 @@ function itemHandlers(c: ArticleComment) {
               v-on="itemHandlers(r)"
             >
               <template #editor>
-                <CommentComposer :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
+                <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
               </template>
             </CommentItem>
           </template>
@@ -478,11 +498,12 @@ function itemHandlers(c: ArticleComment) {
     <DefineComposer>
       <div class="composer-inner">
         <p v-if="article.articleCommentable === false" class="hint-login">作者已关闭回帖。</p>
-        <template v-else-if="isLoggedIn">
-          <CommentComposer ref="composerRef" :article-id="article.oId" :parent-id="replyId" :paragraph-id="paragraphIdForReply" :reply-label="replyAuthor" @clear-reply="cancelReply" />
+        <p v-else-if="!commentingEnabled" class="hint-login">评论状态暂不可用。</p>
+        <template v-if="isLoggedIn">
+          <CommentComposer :writable="commentingEnabled" ref="composerRef" :article-id="article.oId" :parent-id="replyId" :paragraph-id="paragraphIdForReply" :reply-label="replyAuthor" @clear-reply="cancelReply" />
         </template>
-        <p v-else class="hint-login">
-          <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }" class="login-link">登录</RouterLink>
+        <p v-else-if="commentingEnabled" class="hint-login">
+          <RouterLink :to="{ path: '/login', query: { redirect: loginRedirect } }" class="login-link">登录</RouterLink>
           后即可参与讨论。
         </p>
       </div>
@@ -491,6 +512,7 @@ function itemHandlers(c: ArticleComment) {
       v-if="isLong"
       ref="readerRef"
       :article="article"
+      :target-location="locatedComment"
       :column="column"
       :comment-total="commentTotal"
       :logged-in="isLoggedIn"
@@ -527,13 +549,13 @@ function itemHandlers(c: ArticleComment) {
           <h1>{{ articleTitle(article) }}</h1>
         </div>
 
-        <div v-if="typeBadge || Number(article.articleStickRemains) > 0 || column" class="badges">
+        <div v-if="typeBadge || article.stick?.active || column" class="badges">
           <span v-if="typeBadge" class="badge">{{ typeBadge }}</span>
-          <span v-if="isQnA && Number(article.articleQnAOfferPoint) > 0" class="badge offer">
-            {{ article.offered ? '已采纳' : `悬赏 ${article.articleQnAOfferPoint} 积分` }}
+          <span v-if="isQnA" class="badge offer">
+            {{ article.offered === true ? '已采纳' : typeof article.articleQnAOfferPoint === 'number' && typeof article.offered === 'boolean' ? `悬赏 ${article.articleQnAOfferPoint} 积分` : '问答状态暂不可用' }}
           </span>
-          <span v-if="Number(article.articleStickRemains) > 0" class="badge stick">
-            📌 置顶中 · 剩余 {{ article.articleStickRemains }} 分钟
+          <span v-if="article.stick?.active" class="badge stick">
+            📌 {{ article.stick?.permanent ? '永久置顶' : '置顶中' }}
           </span>
           <RouterLink v-if="column" :to="`/column/${column.column.oId}`" class="badge column-link">
             《{{ column.column.columnTitle }}》第 {{ column.chapterNo }} 章 / 共 {{ column.chapters.length }} 章
@@ -541,17 +563,16 @@ function itemHandlers(c: ArticleComment) {
         </div>
 
         <div class="meta">
-          <span v-if="article.stick?.active">{{ article.stick.permanent ? '永久置顶' : '置顶' }} •</span>
           <RouterLink
-            v-if="article.articleAuthorName"
+            v-if="article.articleAnonymous !== 1 && article.articleAuthorId && article.articleAuthorName"
             :to="`/member/${article.articleAuthorName}`"
             class="meta-author"
           >
             <span
               class="avatar-small"
-              :style="article.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${article.articleAuthorThumbnailURL48}')` } : undefined"
+              :style="article.articleAuthorThumbnailURL48 ? avatarStyle(article.articleAuthorThumbnailURL48) : undefined"
             />
-            <b>{{ article.articleAuthorName }}</b>
+            <b><VipNickname :user-id="article.articleAuthorId" :user-name="article.articleAuthorName" :text="article.articleAuthorNickname || article.articleAuthorName" /></b>
           </RouterLink>
           <span v-else class="meta-author">匿名用户</span>
           <span>•</span>
@@ -625,17 +646,17 @@ function itemHandlers(c: ArticleComment) {
         </div>
 
         <!-- 作者信息卡片 (对齐现网 Rhythm .article__meta) -->
-        <div v-if="article.articleAuthorName" class="author-summary-card">
+        <div v-if="article.articleAnonymous !== 1 && article.articleAuthorId && article.articleAuthorName" class="author-summary-card">
           <RouterLink :to="`/member/${article.articleAuthorName}`" class="summary-avatar-link">
             <span
               class="summary-avatar"
-              :style="article.articleAuthorThumbnailURL48 ? { backgroundImage: `url('${article.articleAuthorThumbnailURL48}')` } : undefined"
+              :style="article.articleAuthorThumbnailURL48 ? avatarStyle(article.articleAuthorThumbnailURL48) : undefined"
             />
           </RouterLink>
           <div class="summary-meta">
             <div class="summary-name-row">
               <RouterLink :to="`/member/${article.articleAuthorName}`" class="summary-name">
-                {{ article.articleAuthorName }}
+                <VipNickname :user-id="article.articleAuthorId" :user-name="article.articleAuthorName" :text="article.articleAuthorNickname || article.articleAuthorName" />
               </RouterLink>
               <span v-if="article.articleCity" class="summary-city">
                 📍 {{ article.articleCity }}

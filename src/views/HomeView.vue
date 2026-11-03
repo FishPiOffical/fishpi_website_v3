@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import HomePreferenceRedirect from '@/components/home/HomePreferenceRedirect.vue'
 import RecentMembers from '@/components/discovery/RecentMembers.vue'
 import RankingBoard from '@/components/RankingBoard.vue'
 import HomeReadStatus from '@/components/home/HomeReadStatus.vue'
@@ -120,6 +121,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
 <template>
   <div class="home" :class="{ editing }">
+    <HomePreferenceRedirect />
     <div v-if="editing" class="edit-bar" role="toolbar" aria-label="首页布局编辑">
       <span>拖动模块到任意位置：模块上下半部插入同一列，左右边缘新开一列，行间空隙新起一行</span>
       <button type="button" @click="layout.resetPositions()">恢复默认位置</button>

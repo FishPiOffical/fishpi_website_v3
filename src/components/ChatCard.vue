@@ -109,7 +109,13 @@ const weather = computed(() => {
     </div>
     <ol class="days">
       <li v-for="d in weather.days" :key="d.date">
-        <span class="date">{{ d.date }}</span>
+        <time class="date" :datetime="d.date" :aria-label="d.date" :title="d.date">
+          <template v-if="/^\d{4}-\d{2}-\d{2}$/.test(d.date)">
+            <span>{{ d.date.slice(0, 4) }}</span>
+            <span>{{ d.date.slice(5) }}</span>
+          </template>
+          <span v-else>{{ d.date }}</span>
+        </time>
         <img v-if="d.code" :src="`${SITE_ORIGIN}/images/weather/svg/${d.code}.svg`" :alt="d.name" />
         <span class="name">{{ d.name }}</span>
         <span class="temp">
@@ -218,7 +224,19 @@ const weather = computed(() => {
 }
 .date,
 .name {
+  max-width: 100%;
   color: var(--fp-muted);
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.date {
+  display: flex;
+  flex-direction: column;
+}
+.temp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   white-space: nowrap;
 }
 .temp b {
@@ -226,7 +244,6 @@ const weather = computed(() => {
   color: #e07a5f;
 }
 .temp i {
-  margin-left: 3px;
   font-style: normal;
   color: #4a90d9;
 }

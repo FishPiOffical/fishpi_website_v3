@@ -2,12 +2,12 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import ProfessionGuide from '@/components/profession/ProfessionGuide.vue'
-import { ApiError } from '@/api/http'
+import { ApiError, getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { profileOperationKey } from '@/api/v3-profile'
 import { professionModules, professionPresets, professionScopes, fetchV3OwnerProfessions, fetchV3Professions, fetchV3ProfessionDetail, fetchV3ProfessionRecords, writeV3Profession,
   type Mine, type Page, type Profession, type Detail, type ExperienceRecord, type Preset, type Visibility, type ProfessionCommand } from '@/api/v3-professions'
-const { accessToken } = storeToRefs(useAuthStore())
+const { accessToken, account } = storeToRefs(useAuthStore())
 const guideId = ref(''), guideName = ref('')
 const mine = ref<Mine | null>(null), catalog = ref<Page<Profession> | null>(null)
 const mineLoading = ref(false), catalogLoading = ref(false), mineError = ref(''), catalogError = ref('')
@@ -17,6 +17,8 @@ const detail = ref<Detail | null>(null), records = ref<Page<ExperienceRecord> | 
 const detailLoading = ref(false), recordsLoading = ref(false), detailError = ref(''), recordsError = ref('')
 const busy = ref(false), error = ref(''), message = ref(''), pending = ref<{ command: ProfessionCommand; key: string } | null>(null)
 let mounted = false, generation = 0, mineSequence = 0, catalogSequence = 0, detailSequence = 0, recordsSequence = 0
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
+let boundary = identity()
 const primaryLabel = computed(() => {
   if (!mine.value) return ''
   const state = mine.value.state, id = state.primaryProfessionId
@@ -31,7 +33,7 @@ function reset() {
   mineError.value = catalogError.value = detailError.value = recordsError.value = error.value = message.value = ''
   mineLoading.value = catalogLoading.value = detailLoading.value = recordsLoading.value = busy.value = false
 }
-function guard() { const token = accessToken.value, current = generation; return () => mounted && !!token && token === accessToken.value && current === generation }
+function guard() { const owner = identity(), current = generation; return () => mounted && !!accessToken.value && owner === identity() && current === generation }
 async function loadMine(p = mine.value?.pagination.p || 1, syncDraft = true) {
   if (!accessToken.value) return
   const valid = guard(), sequence = ++mineSequence
@@ -100,7 +102,12 @@ function savePrivacy() { if (preset.value && modules.value) start({ kind: 'priva
 function retry() { if (pending.value) void execute(pending.value) }
 function date(value: number) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '时间异常' : d.toLocaleString() }
 onMounted(() => { mounted = true; void loadMine(1); void loadCatalog(1) })
-watch(accessToken, () => { reset(); if (mounted) { void loadMine(1); void loadCatalog(1) } }, { flush: 'sync' })
+watch([accessToken, () => account.value?.oId], () => {
+  const current = identity()
+  if (current === boundary) return
+  boundary = current; reset()
+  if (mounted) { void loadMine(1); void loadCatalog(1) }
+}, { flush: 'sync' })
 onBeforeUnmount(() => { mounted = false; reset() })
 </script>
 

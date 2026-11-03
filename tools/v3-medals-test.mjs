@@ -6,7 +6,7 @@ import { createPinia, defineStore, setActivePinia } from 'pinia'
 const compile = source => ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
 const url = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 globalThis.__medalRequests = []; globalThis.__medalResponses = []
-const http = url(`export class ApiError extends Error {constructor(message,status=0,code){super(message);this.status=status;this.code=code}} export async function request(path,init){globalThis.__medalRequests.push({path,init}); const result=globalThis.__medalResponses.shift();if(result instanceof Error)throw result;if(result===undefined)throw Error('Unexpected '+path);return result}`)
+const http = url(`export const getAuthContextVersion=()=>globalThis.__medalContext||0; export class ApiError extends Error {constructor(message,status=0,code){super(message);this.status=status;this.code=code}} export async function request(path,init){globalThis.__medalRequests.push({path,init}); const result=globalThis.__medalResponses.shift();if(result instanceof Error)throw result;if(result===undefined)throw Error('Unexpected '+path);return result}`)
 const { ApiError } = await import(http)
 const api = await import(url(compile(await fs.readFile('src/api/v3-medals.ts','utf8')).replace("from './http'", `from '${http}'`)))
 const medal = { id: 'A /中文', name: '纪念章', type: '稀有', description: '参与活动', order: 0, expiresAt: -1, displayed: false }
@@ -28,7 +28,7 @@ await assert.rejects(api.moveV3Medal(medal.id,'side','bad-direction'),/方向/)
 assert.ok(__medalRequests.every(r=>!r.path.includes('apiKey') && !r.init?.body?.includes('userId')))
 console.log('PASS medals 2 exact explicit display/move contracts, encoded original ID and stable header keys; no legacy identity inputs')
 const renderer=createRenderer({patchProp(){},insert(){},remove(){},createElement(){return{}},createText(){return{}},createComment(){return{}},setText(){},setElementText(){},parentNode(){return null},nextSibling(){return null}})
-setActivePinia(createPinia());const auth=defineStore('medal-test-auth',()=>({accessToken:ref('A')}))()
+setActivePinia(createPinia());const auth=defineStore('medal-test-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}))()
 globalThis.__medalAuth=()=>auth;globalThis.__medalKey=0
 const authURL=url('export const useAuthStore=globalThis.__medalAuth')
 const keyURL=url('export const profileOperationKey=()=>"medal-key-"+(++globalThis.__medalKey)')
@@ -44,9 +44,9 @@ async function component(){
 let releaseOld
 const old=new Promise(resolve=>releaseOld=resolve)
 globalThis.__medalAPI={fetchV3OwnerMedals:async()=>auth.accessToken==='A'?old:page([{...medal,name:'B-only'}]),setV3MedalDisplayed:async()=>{},moveV3Medal:async()=>{}}
-let view=await component();await tick();auth.accessToken='B';await tick();releaseOld(page([{...medal,name:'A-private'}]));await tick();assert.equal(view.vm.medals[0].name,'B-only')
+let view=await component();await tick();globalThis.__medalContext=(globalThis.__medalContext||0)+1;auth.accessToken='B';await tick();releaseOld(page([{...medal,name:'A-private'}]));await tick();assert.equal(view.vm.medals[0].name,'B-only')
 let releaseWrite;__medalAPI.setV3MedalDisplayed=async()=>new Promise(resolve=>releaseWrite=resolve)
-view.vm.display(view.vm.medals[0]);await tick();auth.accessToken='C';await tick();releaseWrite({id:medal.id,displayed:true});await tick();assert.equal(view.vm.message,'');assert.equal(view.vm.pending,null);auth.accessToken=null;assert.deepEqual(view.vm.medals,[]);assert.equal(view.vm.total,0);view.app.unmount()
+view.vm.display(view.vm.medals[0]);await tick();globalThis.__medalContext++;auth.accessToken='C';await tick();releaseWrite({id:medal.id,displayed:true});await tick();assert.equal(view.vm.message,'');assert.equal(view.vm.pending,null);auth.accessToken=null;assert.deepEqual(view.vm.medals,[]);assert.equal(view.vm.total,0);view.app.unmount()
 console.log('PASS medals 3 actual Vue/Pinia isolates late owner reads and committed write responses across credentials/logout')
 auth.accessToken='D';let fail=true;const commands=[]
 __medalAPI.fetchV3OwnerMedals=async()=>page()
@@ -67,3 +67,8 @@ __medalAPI.fetchV3OwnerMedals=async p=>{p??=1;pages.push(p);return page(p===1?[m
 view=await component();await tick();await view.vm.load(2);assert.deepEqual(pages,[1,2,1]);assert.equal(view.vm.page,1);assert.equal(view.vm.total,1)
 let releaseUnmount;__medalAPI.fetchV3OwnerMedals=async()=>new Promise(resolve=>releaseUnmount=resolve);const reading=view.vm.load();await tick();view.app.unmount();releaseUnmount(page());await reading;assert.deepEqual(view.vm.medals,[])
 console.log('PASS medals 6 collapsed final page reloaded from authoritative pagination and unmounted reads cannot restore private state')
+
+auth.accessToken='medal-rotation-start';let rotationFailed=true;const rotationCommands=[]
+Object.assign(__medalAPI,{fetchV3OwnerMedals:async()=>page(),moveV3Medal:async(...args)=>{rotationCommands.push(args);if(rotationFailed){rotationFailed=false;throw new ApiError('lost medal ACK',0)}return{id:medal.id,direction:'up',order:0}}})
+view=await component();await tick();view.vm.move(view.vm.medals[0],'up');await tick();const savedPending=JSON.parse(JSON.stringify(view.vm.pending));auth.accessToken='medal-rotation-end';await tick();assert.deepEqual(view.vm.pending,savedPending,'refresh discarded medal movement');view.vm.retry();await tick();assert.deepEqual(rotationCommands[0],rotationCommands[1]);assert.equal(view.vm.message,'移动已完成');auth.account={oId:'2'};assert.deepEqual(view.vm.medals,[]);assert.equal(view.vm.pending,null);view.app.unmount()
+console.log('PASS medals normal refresh retains uncertain relative move key; actor change clears prior medals')

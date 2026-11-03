@@ -253,6 +253,7 @@ export interface ArticleSummary {
   columnId?: string
   articleAuthorId?: string
   articleAuthorName?: string
+  articleAuthorNickname?: string
   articleAuthorThumbnailURL48?: string
   articleAuthorThumbnailURL20?: string
   articleAuthorIntro?: string
@@ -267,6 +268,7 @@ export interface ArticleComment {
   commentContentVisible?: boolean
   oId: string
   commentAuthorName?: string
+  commentAuthorNickname?: string
   commentAuthorThumbnailURL?: string
   commentContent?: string
   commentCreateTimeStr?: string
@@ -302,7 +304,7 @@ export interface ArticleDetail extends ArticleSummary {
   articleContent?: string
   articleOriginalContent?: string
   articleToC?: string
-  articleCommentable?: boolean
+  articleCommentable?: boolean | null
   articleComments?: ArticleComment[]
   articleNiceComments?: ArticleComment[]
   pagination?: { paginationPageCount?: number; paginationCurrentPageNum?: number }
@@ -321,7 +323,7 @@ export interface ArticleDetail extends ArticleSummary {
   articleQnAOfferPoint?: number
   articleAnonymous?: number
   articleShowInList?: number
-  articleStatement?: number
+  articleStatement?: number | null
   rewardedCnt?: number
   sysMetal?: MetalItem[]
   articleAuthor?: { sysMetal?: MetalItem[]; userName?: string; userNickname?: string }

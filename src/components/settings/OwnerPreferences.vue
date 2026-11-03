@@ -1,23 +1,26 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { profileOperationKey } from '@/api/v3-profile'
 import { preferenceFields, fetchV3Preferences, saveV3Preferences, fetchV3LocaleOptions, fetchV3SkinOptions,
   type PreferenceResource, type PreferenceValue, type PreferenceOption } from '@/api/v3-preferences'
 
 const props = defineProps<{ resource: PreferenceResource; title: string; fields?: string[] }>()
-const auth = useAuthStore(), { accessToken } = storeToRefs(auth)
+const auth = useAuthStore(), { accessToken, account } = storeToRefs(auth)
 const schema = computed(() => preferenceFields[props.resource].filter(field => !props.fields || props.fields.includes(field.key)))
 const values = ref<Record<string, PreferenceValue>>({}), original = ref<Record<string, PreferenceValue>>({})
 const options = ref<Record<string, PreferenceOption[]>>({})
 const ready = ref(false), loading = ref(false), busy = ref(false), error = ref(''), message = ref('')
 let mounted = false, generation = 0, intent: { fingerprint: string; key: string; fields: string[] } | null = null
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
+let boundary = identity()
 function reset() { generation++; intent = null; values.value = {}; original.value = {}; options.value = {}; ready.value = loading.value = busy.value = false; error.value = message.value = '' }
 async function load() {
   if (!accessToken.value) return
-  const token = accessToken.value, current = ++generation
-  const valid = () => mounted && token === accessToken.value && current === generation
+  const owner = identity(), current = ++generation
+  const valid = () => mounted && owner === identity() && current === generation
   ready.value = false; loading.value = true; error.value = message.value = ''
   try {
     const [data, choices] = await Promise.all([
@@ -36,8 +39,8 @@ async function save() {
     if (value !== original.value[field.key] || intent?.fields.includes(field.key)) changes[field.key] = value
   }
   if (!Object.keys(changes).length) { message.value = '没有需要保存的更改'; error.value = ''; return }
-  const token = accessToken.value, current = generation, fingerprint = JSON.stringify(changes)
-  const valid = () => mounted && token === accessToken.value && current === generation
+  const owner = identity(), current = generation, fingerprint = JSON.stringify(changes)
+  const valid = () => mounted && owner === identity() && current === generation
   busy.value = true; message.value = error.value = ''
   try {
     if (!intent || intent.fingerprint !== fingerprint) intent = { fingerprint, key: profileOperationKey(), fields: Object.keys(changes) }
@@ -51,7 +54,12 @@ function setBoolean(key: string, event: Event) { values.value[key] = (event.targ
 function setString(key: string, event: Event) { values.value[key] = (event.target as HTMLInputElement).value }
 function setChoice(key: string, event: Event) { values.value[key] = Number((event.target as HTMLSelectElement).value) }
 onMounted(() => { mounted = true; void load() })
-watch(accessToken, () => { reset(); if (mounted) void load() }, { flush: 'sync' })
+watch([accessToken, () => account.value?.oId], () => {
+  const current = identity()
+  if (current === boundary) return
+  boundary = current; reset()
+  if (mounted) { void load() }
+}, { flush: 'sync' })
 onBeforeUnmount(() => { mounted = false; reset() })
 </script>
 

@@ -4,9 +4,9 @@ import { ApiError, getAccessToken, request } from './http'
 export function subscribeNotificationChanges(changed: () => void): () => void {
   return subscribeChanges('notifications','/api/v3/realtime/tickets',changed)
 }
-export function subscribeArticleChanges(articleId:string,changed:()=>void):()=>void {
+export function subscribeArticleChanges(articleId:string,changed:()=>void,unavailable?:()=>void):()=>void {
   if(!/^[0-9]{1,32}$/.test(articleId))throw new ApiError('文章ID不合法',422)
-  return subscribeChanges('article',`/api/v3/articles/${articleId}/realtime-ticket`,changed,articleId)
+  return subscribeChanges('article',`/api/v3/articles/${articleId}/realtime-ticket`,changed,articleId,undefined,undefined,unavailable)
 }
 export function subscribeMessageChanges(changed:()=>void):()=>void {return subscribeChanges('messages','/api/v3/me/messages/realtime-ticket',changed)}
 export interface ChatBarrageEvent{id:string;content:string;color:string;createdAt:number;author:{id:string;userName:string;userNickname:string;userAvatarURL:string}}
@@ -23,7 +23,7 @@ export type ChatRealtimeState='connecting'|'ready'|'closed'|'blocked'
 export function subscribeChatChanges(event:(value:ChatRealtimeEvent)=>void,state:(value:ChatRealtimeState)=>void):()=>void{
  return subscribeChanges('chat','/api/v3/chat/realtime-ticket',()=>event({type:'sync'}),undefined,event,state)
 }
-function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',path:string,changed:()=>void,articleId?:string,chatEvent?:(value:ChatRealtimeEvent)=>void,connectionState?:(value:ChatRealtimeState)=>void):()=>void {
+function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',path:string,changed:()=>void,articleId?:string,chatEvent?:(value:ChatRealtimeEvent)=>void,connectionState?:(value:ChatRealtimeState)=>void,unavailable?:()=>void):()=>void {
   if (import.meta.env.SSR || typeof WebSocket === 'undefined') return () => {}
   const token = getAccessToken()
   if (!token) return () => {}
@@ -101,6 +101,11 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
       transport.onclose = () => { if (valid()) reconnect() }
     } catch (error) {
       if (!current() || turn !== sequence) return
+      if (channel === 'article' && error instanceof ApiError && error.code !== 'captcha' && [403,404].includes(error.status)) {
+        retire()
+        unavailable?.()
+        return
+      }
       if (error instanceof ApiError && ([401, 403].includes(error.status) || error.code === 'captcha')) { retire(); connectionState?.('blocked'); return }
       reconnect()
     }

@@ -67,7 +67,7 @@ globalThis.__emojiAPI={
 }
 const tick=async()=>{for(let i=0;i<15;i++)await Promise.resolve();await nextTick()}
 const {app,vm}=await component('src/components/EmojiPacks.vue',['groups','items','groupId','error','busy','newGroup','onCreate'])
-await tick();auth.accessToken='B';await tick();resolveA(valuePage([{oId:'1',name:'PRIVATE-A',type:0,sort:0}]));await tick()
+await tick();globalThis.__emojiContext=1;auth.accessToken='B';await tick();resolveA(valuePage([{oId:'1',name:'PRIVATE-A',type:0,sort:0}]));await tick()
 assert.equal(vm.groups[0].name,'B-group');assert.equal(calls.filter(x=>x[0]==='items'&&x[1]==='B').length,1)
 vm.newGroup='new';await vm.onCreate();assert.match(vm.error,/lost acknowledgement/);assert.equal(vm.newGroup,'new');await vm.onCreate();assert.equal(keys[0],keys[1]);assert.equal(vm.newGroup,'')
 auth.accessToken=null;assert.equal(vm.groups.length,0);assert.equal(vm.items.length,0);assert.equal(vm.busy,false);app.unmount()
@@ -117,3 +117,15 @@ const pagedTransfer=await component('src/components/EmojiPacks.vue',['groupId','
 pagedTransfer.vm.importCode='ABCDEFGHIJ12';await pagedTransfer.vm.onImport();assert.deepEqual(requestedPages,[1,2]);assert.equal(pagedTransfer.vm.groupId,'88');assert.equal(pagedTransfer.vm.editGroupSort,51);
 auth.accessToken=null;pagedTransfer.app.unmount();
 console.log('PASS emojis 9 imported last-page group reloads authoritative metadata rather than inventing a zero sort')
+
+// Keep uncertain transfer recovery bound to identity, not the short-lived token bytes.
+auth.accessToken='refresh-before';let rotationFail=true;const rotationKeys=[]
+Object.assign(__emojiAPI,{fetchV3EmojiGroups:async()=>valuePage([groupB]),importV3EmojiGroup:async(code,key)=>{rotationKeys.push({code,key});if(rotationFail){rotationFail=false;throw Error('lost import ACK')}return{groupId:groupB.oId,groupName:groupB.name,emojiCount:1,sourceGroupName:'source'}}})
+let rotation=await component('src/components/EmojiPacks.vue',['importCode','newGroup','error','onImport','groupId']);await tick();rotation.vm.importCode='ABCDEFGHIJ12';rotation.vm.newGroup='draft fish';await rotation.vm.onImport();assert.match(rotation.vm.error,/lost import/)
+auth.accessToken='refresh-after';await tick();assert.equal(rotation.vm.importCode,'ABCDEFGHIJ12','normal refresh lost uncertain import input');assert.equal(rotation.vm.newGroup,'draft fish');await rotation.vm.onImport();assert.deepEqual(rotationKeys[0],rotationKeys[1]);rotation.app.unmount()
+console.log('PASS emojis 10 same-actor refresh preserves drafts and uncertain import input/key through recovery')
+let finishImport;Object.assign(__emojiAPI,{importV3EmojiGroup:async()=>{auth.accessToken='refresh-in-flight';return new Promise(resolve=>finishImport=resolve)}})
+rotation=await component('src/components/EmojiPacks.vue',['importCode','busy','onImport','transferNotice','groupId']);await tick();rotation.vm.importCode='ABCDEFGHIJ12';const flight=rotation.vm.onImport();await tick();assert.equal(rotation.vm.busy,true);finishImport({groupId:groupB.oId,groupName:groupB.name,emojiCount:1,sourceGroupName:'source'});await flight;assert.match(rotation.vm.transferNotice,/已导入 1/);assert.equal(rotation.vm.busy,false);rotation.app.unmount()
+console.log('PASS emojis 11 token rotation inside import retains committed feedback and reloads the real group')
+rotation=await component('src/components/EmojiPacks.vue',['newGroup','groups','items','importCode']);await tick();rotation.vm.newGroup='PRIVATE';rotation.vm.importCode='ABCDEFGHIJ12';auth.account={oId:'2'};assert.equal(rotation.vm.newGroup,'');assert.equal(rotation.vm.importCode,'');assert.deepEqual(rotation.vm.groups,[]);await tick();rotation.vm.newGroup='new-session-draft';globalThis.__emojiContext++;auth.accessToken='new-login-same-owner';assert.equal(rotation.vm.newGroup,'');rotation.app.unmount()
+console.log('PASS emojis 12 same-token actor change and same-actor new session clear prior-owner drafts and transfers')

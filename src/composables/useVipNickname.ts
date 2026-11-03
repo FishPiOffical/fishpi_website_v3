@@ -38,6 +38,7 @@ const aliases = reactive(new Map<string, { id: string; at: number }>())
 export const vipNameRevision = ref(0)
 let identity = getAccessToken(), generation = 0, scheduled: ReturnType<typeof setTimeout> | undefined
 let activeRun: object | null = null
+let expiryTimer: ReturnType<typeof setTimeout> | undefined
 interface StyleJob { id: string; generation: number; cancelled: boolean; promise: Promise<VipNameConfig | undefined>; resolve: (value: VipNameConfig | undefined) => void }
 const jobs = new Map<string, StyleJob>(), queue = new Map<string, StyleJob>()
 interface NameJob { generation: number; cancelled: boolean; id?: string; promise: Promise<VipNameConfig> }
@@ -45,16 +46,41 @@ const names = new Map<string, NameJob>()
 function nameKey(value?: string) { return value && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value.toLowerCase() : '' }
 function valid(current: number) { return !import.meta.env.SSR && !!identity && current === generation && identity === getAccessToken() }
 function boundedSet<K, V>(map: Map<K,V>, key: K, value: V) { if (!map.has(key) && map.size >= MAX_CACHE) map.delete(map.keys().next().value!); map.set(key, value) }
+function scheduleExpiry() {
+  if (expiryTimer !== undefined) clearTimeout(expiryTimer)
+  expiryTimer = undefined
+  if (!valid(generation) || !cache.size && !aliases.size) return
+  let next = Infinity
+  for (const entry of cache.values()) next = Math.min(next, entry.at + CACHE_TTL)
+  for (const entry of aliases.values()) next = Math.min(next, entry.at + CACHE_TTL)
+  expiryTimer = setTimeout(() => {
+    expiryTimer = undefined
+    if (!valid(generation)) return
+    const now = Date.now(), expired = new Set<string>()
+    let changed = false
+    for (const [id, entry] of cache) if (now - entry.at >= CACHE_TTL) {
+      cache.delete(id); expired.add(id); changed = true
+    }
+    for (const [name, entry] of aliases) if (expired.has(entry.id) || now - entry.at >= CACHE_TTL) {
+      aliases.delete(name); changed = true
+    }
+    // Deleting reactive entries clears mounted styles; only visible nicknames reload through the existing batch queue.
+    if (changed) vipNameRevision.value++
+    scheduleExpiry()
+  }, Math.max(1, next - Date.now()))
+}
 function reset() {
   generation++; cache.clear(); aliases.clear()
   for (const job of jobs.values()) { job.cancelled = true; job.resolve(undefined) }
   for (const job of names.values()) job.cancelled = true
   jobs.clear(); queue.clear(); names.clear(); activeRun = null
   if (scheduled !== undefined) clearTimeout(scheduled)
-  scheduled = undefined; vipNameRevision.value++
+  scheduled = undefined
+  if (expiryTimer !== undefined) clearTimeout(expiryTimer)
+  expiryTimer = undefined; vipNameRevision.value++
 }
 const unsubscribe = onAccessTokenChange(token => { if (identity !== token) { identity = token; reset() } })
-if (import.meta.hot) import.meta.hot.dispose(() => { unsubscribe(); reset() })
+if (import.meta.hot) import.meta.hot.dispose(() => { unsubscribe(); identity = null; reset() })
 function schedule() { if (scheduled === undefined && !activeRun && queue.size) scheduled = setTimeout(() => { scheduled = undefined; void flush() }, 0) }
 async function flush() {
   if (activeRun || !identity || !queue.size) return
@@ -63,13 +89,15 @@ async function flush() {
   for (const job of batch) queue.delete(job.id)
   try {
     const results = await fetchV3MembershipStyles(batch.map(job => job.id))
+    const at = Date.now()
     for (let index = 0; index < batch.length; index++) {
       const job = batch[index]!, row = results[index]!
       if (valid(current) && !job.cancelled && jobs.get(job.id) === job) {
         const value = parseVipNameConfig(Object.keys(row.style).length > 0, row.style)
-        boundedSet(cache, job.id, { value, at: Date.now() }); job.resolve(value)
+        boundedSet(cache, job.id, { value, at }); job.resolve(value)
       }
     }
+    if (valid(current)) scheduleExpiry()
   } catch { /* Decorative read failures remain plain text and are never cached as inactive accounts. */ }
   finally {
     for (const job of batch) { job.resolve(undefined); if (jobs.get(job.id) === job) jobs.delete(job.id) }
@@ -141,7 +169,7 @@ export async function loadVipName(userId?: string | number, userName?: string): 
       job.id = resolved.id
       const value = await queued(resolved.id)
       if (value && valid(job.generation) && !job.cancelled && names.get(key) === job) {
-        boundedSet(aliases, key, { id: resolved.id, at: Date.now() }); return value
+        boundedSet(aliases, key, { id: resolved.id, at: Date.now() }); scheduleExpiry(); return value
       }
     } catch { /* Never fall back to raw membership details or persist a failed lookup. */ }
     finally { if (names.get(key) === job) names.delete(key) }
@@ -160,6 +188,7 @@ export function invalidateVipName(userId?: string | number, userName?: string) {
   for (const [name, entry] of aliases) if (name === key || entry.id === id) aliases.delete(name)
   for (const [name, job] of names) if (name === key || !!id && job.id === id) { job.cancelled = true; names.delete(name) }
   vipNameRevision.value++
+  scheduleExpiry()
 }
 
 export function vipNameClass(config: VipNameConfig | undefined) {

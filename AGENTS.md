@@ -14,6 +14,10 @@
 
 ## 接口与认证
 
+- 登录页的用户名记忆是可选存储，读写失败不能阻断登录；认证成功后路由失败须独立重试原目标，不能再次提交密码。Vue Router可能resolve失败对象，不能只catch异常。
+
+- SSR收不到URL片段；登录回跳首屏先用无片段地址，挂载后再恢复完整fullPath。评论滚动须等加载分支结束、当前页DOM实际挂载，再校验目标/身份；测试不能无条件伪造getElementById成功。
+
 - 优先使用 Rhythm JSON 接口，不在运行时抓取现网 HTML 拼装数据。
 - 当前覆盖以docs/V3_MIGRATION.md为准；MISSING_APIS仅历史来源，不恢复已删mock或旧包装。
 - 列表读取失败明确报错与重试，合法空结果单独展示，不以空列表吞错或模拟记录冒充。
@@ -22,6 +26,13 @@
 - 不反复调用密码登录接口；不要把密码、API Key、Cookie 写入源码或日志。
 - 用户能力只走既有v3认证；旧page-auth换Cookie桥接已退役，经典链接直接导航，由目标页面认证。
 - 浏览器验证默认只读；不要为测试随意发帖、转账或修改真实账号资料。
+
+- v3 内容适配分别保留作者用户名与昵称：Name 字段用于主页链接/回复寻址，Nickname 字段仅展示；SSR 二次白名单投影同步保留昵称，匿名不从旧别名恢复身份。背景头像统一用 utils/avatar.ts 的 avatarStyle 做 CSS 字符串转义，不能给签名 URL 重新编码。 文章列表/详情/作者卡、普通评论及长篇作者/段评使用共享VipNickname，匿名分支不得挂载身份样式组件。
+
+- 响应头成功不代表正文完整；JSON/文本及私有SVG/ZIP统一处理正文断流，未确认命令保留原幂等键，不自动重发收费请求。
+- 问答悬赏/已采纳取v3详情qna，缺字段显示未知，不能编造零悬赏；采纳确认经ArticleInteraction→CommentItem通知详情重新GET，回执不直接覆盖文章当前状态。
+
+- 离线通知按请求调用时的身份版本及登录状态隔离，排队请求也不能借用新身份；普通令牌轮换仍视为同一身份。
 
 ## 首页布局
 
@@ -74,6 +85,7 @@
   - src/composables/useVipNickname.ts
   - src/styles/vip-nickname.css
 - 扩展接入时核对用户 ID 与用户名来源、懒加载、请求去重和缓存行为。
+- 昵称缓存到期须删除响应式条目并重新观察可见节点；仅用 Date.now() 比较不会使已挂载的 computed 自动失效。退出/HMR须清理共享计时器及旧请求。
 - 是否已完成全站接入以当前代码及验证结果为准，不依据旧交接状态推断。
 - 外观包遵循 src/packs/README.md：
   每包使用 pack.json 与 style.css，不包含 JavaScript。
@@ -110,12 +122,14 @@
 - 纯文档修改核对内容与差异即可，不需要额外执行构建。
 - 开发服务固定使用 127.0.0.1:5173；端口冲突时先确认进程归属，
   不擅自结束用户进程。
-- 用户已要求每批改动完成并检查后提交Git，website_v3与Rhythm各自提交相关源码、文档和测试；推送、发布仍需用户明确要求。
+- 用户最新要求每次修复完成后提交本地 Git；与 Rhythm 分别提交，未经明确要求不推送远端。
 - Git 提交禁止包含 Cursor 的 Co-authored-by 标记，
   包括 Co-authored-by: Cursor <cursoragent@cursor.com>。
 - 提交后核对实际提交信息及工作区状态。
 
 ## 进一步参考
+
+- 首页自动跳转由HomePreferenceRedirect/homeRedirect承载：仅挂载后当前登录身份、无query/hash首页读取functions，支持路由内replace；失败/不支持保留首页提示，不能导航旧站、持久化私有设置或让迟到响应劫持离页/新身份。
 
 - OwnerPreferences/v3-preferences.ts管理功能/显示/隐私/位置/语言，目录来自服务端，读错不得补默认公开值。仅提交可见且改动字段，display模式与皮肤不得互相覆盖；chatImageBlur=true确为模糊处理。站点皮肤和本机AppearancePicker独立，locale保存不代表整站翻译完成。
 
@@ -138,7 +152,7 @@
 
 - PublicProfessions/v3-profession-public.ts按模块/字段存在性展示，缺省不补空数组或0，SELECTED不造等级，公开页本人也不回退私有读取；换读者/目标清旧结果，不沿用隐藏名称。MemberView基础资料/SSR门禁仍旧链，不能称整个用户页已迁移或用v3摘要伪造缺失统计。
 
-- /vips用OwnerMembership/v3-membership.ts：完整有界目录、不截断成功；支持字段看benefits的键存在而非真值，空旧配置不补false。开通确认冻结档位/券，同键恢复未知结果，后置GET失败不能重买；资格与费用由服务端重验。共享昵称/他人会员读取仍另待迁移。
+- /vips用OwnerMembership/v3-membership.ts：完整有界目录、不截断成功；支持字段看benefits的键存在而非真值，空旧配置不补false。开通确认冻结档位/券，同键恢复未知结果，后置GET失败不能重买；普通token刷新保留命令/草稿，context/actor变化才清旧状态与确认；资料/头像、偏好、职业、勋章设置同样以稳定身份保护读取、上传与未确认原key。资格与费用由服务端重验。共享昵称读取见下条。
 
 - VipNickname/useVipNickname仅v3指定ID批量styles，姓名通过v3摘要验证；缓存/队列绑定凭据，目标失效拒旧回写，不保留本地旧config兜底。isVip仅兼容渲染标志，空样式不能推出非会员。匿名/SSR普通文本；TTL只约束后续读取，非自动实时刷新。其他手写昵称/会员徽章另迁移。
 
@@ -270,8 +284,24 @@
 
 - 领域/标签目录页共用`v3-directory`/`useDirectory`，固定50项真实分页、SSR kind/第一页绑定和响应白名单；条目链接使用数字ID，不二次解码名称。不能恢复目录整库聚合SWR或按条数猜下一页。
 
+- 文章实时票据当前明确403/404须停止重连并清绑定读者/目标的正文、目录和放大图，拒绝在途回填；验证码/503不能假称资源删除。
 - ArticleView正文/评论不进通用SWR；所有来源当前401/403/404清内容与引用，确认写入后503仅GET重试。普通Token轮换重读须保留挂载评论草稿/历史，卸载与页号迟到检查不可移除；v3Article须核对详情ID/逐条comment.articleId/页与size20并拒重复，参数先验后发请求；评论后页缩减为0页仍须保留返回第一页入口。
 
 - 客户端边界复核用website_v3的`tools/v3-client-boundary-audit.mjs`，仅AST字面量/静态导入，动态表达式单列，不当运行覆盖。DomainItem在content-types，catalog/gaps假数据已删；离线ping只用v3，任意HTTP响应仅代表可达。
 
 - Rhythm注册/文档核对用`tools/api-v3-contract-audit.mjs`，从Router.requestMapping追本类辅助注册；条件/重载歧义需复核。通过仅证明固定源码形式与API.md一致，不当作IoC/HTTP或业务完成。
+- 本机联调使用5173→Rhythm 8081，`.env.development.local`只保存本地目标，8080是其他项目。Vite对login/refresh/logout须保留浏览器Host/Origin/真实Referer，不可合成来源证明；真实代理回归用`tools/v3-credential-proxy-test.mjs`。实际首批证据见docs/api-v3-live-integration-work.md，不能用隔离测试替代业务验收。
+
+- MarkdownEditor输入回调可能延迟；PostView/ChatComposer冻结写命令、判断未保存内容、收起/切换布局或追加话题/涂鸦前须flush实时缓冲，未加载应拒绝；未修改的编辑器规范化值不能覆盖精确原文。
+
+- 长篇上下文由独立ArticleColumnNavigation读取articles/{id}/column，仅摘要/前后章；目录按需分页，不可用旧longArticleColumnView推造全目录；导航错误不吞为无关联，文章/凭据边界清旧响应。
+
+- 长篇阅读登记由ArticleReadRegistration在实际正文挂载后显式POST；SSR/预览/游客/本人不发，不因普通token刷新重发，不持久化正文/凭据。服务端6小时去重；错误独立于正文、仅显式重试，文章与身份变化丢弃迟到反馈，不能将记录接口当奖励结算。
+
+- 跨仓库路由核对先由Rhythm生成当前contract audit JSON，再用tools/v3-route-parity-audit.mjs及v3-route-builder-probe.mjs的--routes读取；未知转发和pattern候选不计运行通过，builder probe只允许截停transport，禁止改为真实请求执行敏感/收费样例。
+
+- EmojiPacks读取/变更恢复以context+actor绑定，普通token刷新保留未确认命令key及草稿；退出/新登录才清旧。分享导入后按真实分页找到组元数据，不能用回执伪造排序；外部删除当前组须显示错误并允许重新选择。
+
+- NotificationsView分类/全部已读的未知命令key绑定context+actor，普通token轮换保留页码与原key；换身份/卸载清旧，迟到结果不得invalidate新页。恢复成功后只当前GET回读，不把旧回执当当前未读数。ProfessionRanking同身份刷新须保留所选职业/提示和独立请求页码（包括未完成p2），同时重做当前GET；换身份才清旧。
+
+- 评论深链用v3-comment-location/commentLink及ArticleCommentLocation，当前位置由后端确定，不从时间/哈希猜页。当前文章、身份、页数据及DOM均绑定后再滚动；长篇沿active/orphaned分组，失位显式重查，不能回退经典站或翻扫全部分页。

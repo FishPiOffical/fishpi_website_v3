@@ -52,6 +52,7 @@ export function adaptV3Article(value: unknown): ArticleSummary {
   const data = row(value), author = row(data.author), anonymous = bool(data.anonymous)
   return {
     articleAnonymous: anonymous ? 1 : 0,
+    ...(data.perfect === undefined ? {} : { articlePerfect: bool(data.perfect) ? 1 : 0 }),
     stick: data.stick === undefined ? undefined : stick(data.stick),
     oId: id(data.id), articleTitle: text(data.title), articleType: number(data.type),
     articleTags: text(data.tags), articlePreviewContent: text(data.preview),
@@ -60,6 +61,7 @@ export function adaptV3Article(value: unknown): ArticleSummary {
     // Anonymous identity is never recovered from any optional legacy aliases.
     articleAuthorId: anonymous ? '' : text(author.id),
     articleAuthorName: anonymous ? '匿名用户' : text(author.userName),
+    articleAuthorNickname: anonymous ? '匿名用户' : text(author.userNickname),
     articleAuthorThumbnailURL48: anonymous ? '' : text(author.userAvatarURL),
     articleAuthorThumbnailURL20: anonymous ? '' : text(author.userAvatarURL),
   }
@@ -72,6 +74,7 @@ export function adaptV3Comment(value: unknown): ArticleComment {
     commentContent: visible ? text(data.contentHtml) : '', commentCreateTimeStr: date(data.createdAt),
     commentAuthorId: anonymous ? '' : text(author.id),
     commentAuthorName: anonymous ? '匿名用户' : text(author.userName),
+    commentAuthorNickname: anonymous ? '匿名用户' : text(author.userNickname),
     commentAuthorThumbnailURL: anonymous ? '' : text(author.userAvatarURL),
   }
 }
@@ -168,12 +171,26 @@ export async function v3Article(articleId: string, page = 1): Promise<ArticleDet
   const format = text(detail.contentFormat)
   if (format !== 'markdown' && format !== 'thought') throw invalid()
   const rewarded = bool(detail.rewarded)
+  const commentable = detail.commentable == null ? null : bool(detail.commentable)
+  const statement = detail.statement == null ? null : number(detail.statement)
+  if (statement !== null && statement > 3) throw invalid()
+  const type = number(detail.type)
+  let question: Pick<ArticleDetail, 'articleQnAOfferPoint' | 'offered'> = {}
+  // An older server may omit the additive field; never invent a zero offer or unresolved state.
+  if (detail.qna !== undefined) {
+    if (type === 5) {
+      const qna = row(detail.qna)
+      question = { articleQnAOfferPoint: number(qna.offerPoint), offered: bool(qna.accepted) }
+    } else if (detail.qna !== null) throw invalid()
+  }
   const contentHtml=number(detail.type)===6 ? await (await import('./v3-comments')).v3ParagraphContent(articleId) : text(detail.contentHtml)
   return {
     ...adaptV3Article(detail), articleAnonymous: bool(detail.anonymous) ? 1 : 0,
     articleContent: contentHtml, articleOriginalContent: text(detail.content),
+    articleCommentable: commentable, articleStatement: statement,
     articleRewardPoint: number(detail.rewardPoint), rewarded,
     articleRewardContent: rewarded ? text(detail.rewardContentHtml) : '',
+    ...question,
     articleComments: commentList,
     pagination: { paginationCurrentPageNum: comments.pagination.p, paginationPageCount: comments.pagination.pageCount },
   }

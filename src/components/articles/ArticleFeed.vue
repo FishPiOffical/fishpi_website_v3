@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { articleTitle } from '@/utils/text'
+import { avatarStyle } from '@/utils/avatar'
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { ArticleSummary } from '@/api/fishpi'
+import VipNickname from '@/components/user/VipNickname.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -53,10 +55,11 @@ function avatarOf(a: ArticleSummary) {
         >
           <span
             class="avatar-small"
-            :style="avatarOf(item) ? { backgroundImage: `url('${avatarOf(item)}')` } : undefined"
-            :aria-label="item.articleAuthorName"
+            :style="avatarOf(item) ? avatarStyle(avatarOf(item)) : undefined"
+            :aria-label="item.articleAuthorNickname || item.articleAuthorName"
           />
         </RouterLink>
+        <span v-if="item.articlePerfect" class="icon-perfect" title="优选">🌟</span>
         <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{ titleOf(item) }}</RouterLink>
         <span class="count">{{ views(item) }}</span>
       </li>
@@ -111,8 +114,8 @@ function avatarOf(a: ArticleSummary) {
           >
             <span
               class="avatar-img"
-              :style="avatarOf(item) ? { backgroundImage: `url('${avatarOf(item)}')` } : undefined"
-              :aria-label="item.articleAuthorName"
+              :style="avatarOf(item) ? avatarStyle(avatarOf(item)) : undefined"
+              :aria-label="item.articleAuthorNickname || item.articleAuthorName"
             />
           </RouterLink>
           <div class="author-meta fn-ellipsis">
@@ -122,7 +125,7 @@ function avatarOf(a: ArticleSummary) {
                 :to="`/member/${item.articleAuthorName}`"
                 class="author-name"
               >
-                {{ item.articleAuthorName }}
+                <VipNickname :user-id="item.articleAuthorId" :user-name="item.articleAuthorName" :text="item.articleAuthorNickname || item.articleAuthorName" />
               </RouterLink>
               <span v-if="item.articleAnonymous === 1" class="author-name">匿名用户</span>
               <span v-if="item.articleAuthorIntro && item.articleAnonymous !== 1" class="author-intro">

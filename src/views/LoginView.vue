@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { isNavigationFailure, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 
 const LAST_USER = 'fp.lastUser'
-const username = ref(typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_USER) || '' : '')
+function rememberedUser() { try { return typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_USER) || '' : '' } catch { return '' } }
+const username = ref(rememberedUser())
 const passwd = ref('')
 const mfa = ref('')
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 const appearance = useAppearanceStore()
+const submitting=ref(false),returning=ref(false),returnError=ref('')
+const busy=computed(()=>submitting.value||returning.value||auth.loading)
 const securityNotice = computed(() => route.query.reason === 'security-updated' ? '账号安全设置已更新，现有登录授权已失效，请重新登录。' : route.query.reason === 'security-unconfirmed' ? '安全设置请求结果未确认，请重新登录核实；修改密码时请尝试新密码，必要时再核对原密码。' : '')
 
 function redirectTarget() {
@@ -19,35 +22,43 @@ function redirectTarget() {
 }
 
 async function afterLogin() {
-  appearance.enforceVip()
-  await router.replace(redirectTarget())
+  if (returning.value || !auth.isLoggedIn) return
+  returning.value=true;returnError.value=''
+  try {
+    appearance.enforceVip()
+    const failure=await router.replace(redirectTarget())
+    if(isNavigationFailure(failure))returnError.value='页面打开失败，请重试打开原页面。'
+  } catch { returnError.value='页面打开失败，请重试打开原页面。' }
+  finally { returning.value=false }
 }
 
-if (auth.isLoggedIn) void router.replace(redirectTarget())
+onMounted(()=>{if(auth.isLoggedIn)void afterLogin()})
 
 async function submit() {
+  if(busy.value||auth.isLoggedIn)return
+  submitting.value=true
   try {
-    // 若 IP 被风控，request() 会弹出全局极验，通过后自动重试 getKey
     await auth.login(username.value, passwd.value, mfa.value)
-    localStorage.setItem(LAST_USER, username.value)
+    passwd.value='';mfa.value=''
+    try { localStorage.setItem(LAST_USER, username.value) } catch { /* Remembering a username is optional. */ }
     await afterLogin()
   } catch {
-    /* 错误已写在 auth.error */
-  }
+    /* Authentication errors are displayed by the auth store. */
+  } finally { submitting.value=false }
 }
 
 </script>
 
 <template>
-  <form class="card" @submit.prevent="submit">
+  <form v-if="!auth.isLoggedIn" class="card" @submit.prevent="submit">
     <h1>登录</h1>
     <p v-if="securityNotice" role="status">{{ securityNotice }}</p>
     <label>用户名或邮箱<input v-model="username" required autocomplete="username" /></label>
     <label>密码<input v-model="passwd" type="password" required autocomplete="current-password" /></label>
     <label>两步验证（可选）<input v-model="mfa" /></label>
     <p v-if="auth.error" class="err">{{ auth.error }}</p>
-    <button type="submit" :disabled="auth.loading">
-      {{ auth.loading ? '登录中…' : '登录' }}
+    <button type="submit" :disabled="busy">
+      {{ busy ? '登录中…' : '登录' }}
     </button>
     <p class="links">
       <RouterLink to="/register">注册</RouterLink>
@@ -56,6 +67,12 @@ async function submit() {
       <RouterLink to="/download">客户端</RouterLink>
     </p>
   </form>
+  <section v-else class="card" aria-label="登录成功">
+    <h1>登录已成功</h1>
+    <p v-if="returning" role="status">正在打开原页面…</p>
+    <p v-if="returnError" class="err" role="alert">{{ returnError }}</p>
+    <button type="button" :disabled="returning" @click="afterLogin">重试打开原页面</button>
+  </section>
 </template>
 
 <style scoped>
