@@ -2,6 +2,8 @@ import { ApiError, request } from './http'
 import type { NoticeItem, NoticeType, UnreadCount } from './fishpi'
 
 type Row = Record<string, unknown>
+// These notices describe an action on a target; its author cannot replace a missing actor.
+const actionActorTypes = new Set([17, 23, 24, 25, 26, 27, 28, 38, 39])
 const categories = ['commented', 'reply', 'at', 'following', 'point', 'broadcast', 'sys-announce', 'other'] as const
 const keys: Record<NoticeType, keyof UnreadCount> = {
   commented: 'unreadCommentedNotificationCnt', reply: 'unreadReplyNotificationCnt', at: 'unreadAtNotificationCnt',
@@ -50,9 +52,9 @@ export function adaptNotification(value: unknown): NoticeItem {
   if (!/^\d{1,32}$/.test(id) || !categories.includes(category as NoticeType) || typeof source.hasRead !== 'boolean'
     || typeof source.contentAvailable !== 'boolean') throw invalid()
   const created = new Date(count(source.createdAt)); if (!Number.isFinite(created.getTime())) throw invalid()
-  const available = source.contentAvailable
+  const available = source.contentAvailable, type = integer(source.type)
   const result: NoticeItem = {
-    oId: id, hasRead: source.hasRead, createTime: created.toISOString(), dataType: integer(source.type),
+    oId: id, hasRead: source.hasRead, createTime: created.toISOString(), dataType: type,
     notificationTitle: text(source.title), contentAvailable: available,
     description: available ? text(source.descriptionHtml) : '相关内容不存在或不可访问',
     url: available ? notificationLink(source.url) : '',
@@ -62,8 +64,9 @@ export function adaptNotification(value: unknown): NoticeItem {
   if (article) result.articleTitle = text(article.title)
   const comment = source.comment === undefined ? null : row(source.comment)
   const actor = source.actor === undefined ? null : row(source.actor)
-  const author = actor ?? (comment && comment.anonymous !== true ? row(comment.author) : null)
-    ?? (!comment && article && article.anonymous !== true ? row(article.author) : null)
+  const author = actor ?? (actionActorTypes.has(type) ? null
+    : (comment && comment.anonymous !== true ? row(comment.author) : null)
+      ?? (!comment && article && article.anonymous !== true ? row(article.author) : null))
   if (author && typeof author.id === 'string' && author.id && typeof author.userName === 'string' && author.userName) {
     result.authorName = author.userName
     result.userAvatarURL = safeImage(author.userAvatarURL)

@@ -21,6 +21,21 @@ const anonymous=api.adaptNotification({...item,actor:undefined,comment:{anonymou
 assert.equal(anonymous.authorName,undefined)
 assert.equal(api.notificationLink('https://fishpi.cn.evil/article/7'),'');assert.equal(api.notificationLink('javascript:alert(1)'),'');assert.equal(api.notificationLink('http://localhost:8080/article/7#9'),'/article/7#9')
 console.log('PASS notices 1 exact DTO whitelist, inaccessible/anonymous projection and precise local URL mapping')
+for (const type of [17,23,24,25,26,27,28,38,39]) {
+  for (const related of [{article:{title:'target article',anonymous:false,author:actor}}, {comment:{anonymous:false,author:actor},article:{title:'target article',anonymous:false,author:actor}}]) {
+    const without=api.adaptNotification({...item,...related,type,category:'at',actor:undefined})
+    assert.equal(without.authorName,undefined,`missing actor for type ${type} was replaced with target author`)
+    assert.equal(without.userAvatarURL,undefined)
+    assert.equal(without.contentAvailable,true);assert.equal(without.description,item.descriptionHtml)
+    const currentActor={id:'3',userName:'current_actor',userAvatarURL:'https://example.com/a.png?sig=full&size=2'}
+    const present=api.adaptNotification({...item,...related,type,category:'at',actor:currentActor})
+    assert.equal(present.authorName,'current_actor');assert.equal(present.userAvatarURL,currentActor.userAvatarURL)
+  }
+}
+assert.equal(api.adaptNotification({...item,actor:undefined,comment:{anonymous:false,author:actor}}).authorName,'reader')
+assert.equal(api.adaptNotification({...item,type:5,category:'following',actor:undefined}).authorName,'reader')
+console.log('PASS notices 7 absent action actor never becomes article/comment target author; current actor and signed avatar remain exact; normal content author fallback remains')
+
 const groups={commented:2,reply:1,at:0,following:0,point:0,broadcast:0,'sys-announce':0,other:1}
 __noticeResponses.push({code:0,data:{total:4,categories:groups}});assert.equal((await api.fetchV3UnreadCount()).unreadOtherNotificationCnt,1)
 __noticeResponses.push({code:0,data:{total:5,categories:groups}});await assert.rejects(api.fetchV3UnreadCount(),e=>e.code==='invalid_response')
