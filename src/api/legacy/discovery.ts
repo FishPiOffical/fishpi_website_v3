@@ -11,7 +11,7 @@ export function legacyRepeaterEntry(value:unknown):RepeaterEntry {
     createdTime:r.repeaterContentCreatedTime,author:typeof r.repeaterContentAuthorId==='string' && r.repeaterContentAuthorId?{id:r.repeaterContentAuthorId,name:r.repeaterContentAuthorName}:null})
 }
 export async function legacyRepeaterList(type:RepeaterKind,size:number,signal?:AbortSignal) {
-  const q=new URLSearchParams({size:String(size)});if(type)q.set('type',type)
+  const q=new URLSearchParams({size:String(size)});if(type)q.set('repeaterContentType',type)
   const key=getLegacyKey();if(key)q.set('apiKey',key)
   const r=await request<{code:number;data?:unknown}>('/api/repeater/items?'+q,{cache:'no-store',signal})
   if(r.code!==0) throw new ApiError('复读机读取失败',400)
@@ -22,11 +22,11 @@ export async function legacyRepeaterList(type:RepeaterKind,size:number,signal?:A
   return list.slice(0,size)
 }
 export async function legacyRepeaterNext(type:RepeaterKind,exclude:string,signal?:AbortSignal) {
-  const q=new URLSearchParams();if(type)q.set('type',type);if(exclude)q.set('excludeId',exclude)
+  const q=new URLSearchParams();if(type)q.set('repeaterContentType',type);if(exclude)q.set('excludeId',exclude)
   const r=await request<{code:number;data?:unknown}>(privatePath('/api/repeater/next?'+q),{cache:'no-store',signal})
   if(r.code!==0) throw new ApiError('复读机读取失败',400)
   const d=legacyObject(r.data)
-  if(d.item===null)return null
+  if(d.item===null||d.item&&typeof d.item==='object'&&!Array.isArray(d.item)&&Object.keys(d.item).length===0)return null
   const item=legacyRepeaterEntry(d.item)
   if(item.id===exclude||type&&item.type!==type)throw new ApiError('旧复读机随机项响应不正确',502)
   return item

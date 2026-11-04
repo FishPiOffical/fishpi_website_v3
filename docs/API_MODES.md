@@ -12,7 +12,8 @@
 | 需求反馈列表/提交/投票/管理 | 独立服务按旧key核验，合成身份验证 | 原Bearer核验保留 |
 | 首页连签/在线榜单、最近注册、复读机读取及换一条 | 第三批已接真实快照 | 保留 |
 | 清风列表与写入口 | 第五批已接；写入为本机夹具验收，真实CSRF/权限待验 | 保留 |
-| 复读机投稿/点赞及其余榜单 | 待适配 | 保留 |
+| 复读机投稿/点赞切换 | 第二十批已接；旧切换与投稿无幂等恢复，合成身份验收 | 保留 |
+| 其余榜单 | 待适配 | 保留 |
 | 普通文章分类列表、详情和普通评论读取 | 第二批已接，未知总条数不显示 | 保留 |
 | 专栏目录读取 | 第二批适配，实际旧接口部分目录为空且与元数据不一致时明确503 | 保留 |
 | 搜索、标签/领域目录及其文章列表 | 第四批已接，搜索缺匿名元数据时无身份展示 | 保留 |
@@ -317,3 +318,15 @@ CommentComposer按模式挂载独立LegacyCommentComposer/V3CommentComposer，�
 验证：legacy-comments-test七组实际API/Pinia/编译编辑器覆盖普通/回复/段评精确字段、原文/Unicode/长度、匿名/可见范围、段落编号与无假普通ID、取消确认、未知锁定无重发、身份迟到、能力/SSR限制、匹配草稿清理及取消后的迟到批准。v3评论32组、旧长篇读取和代理回归、类型及完整构建通过。浏览器仅对本机合成账号验证普通评论确认、真实旧POST后当前GET显示评论/清草稿，另核对登录本人评论没有编辑/删除/举报本人入口；未在现网评论/扣分。夹具已停止，开发服务恢复现网v1。真实费用/手机/匿名/审核权限与生产段评写尚未联调；编辑删除、完整回复/定位及其他全站能力继续。
 
 协议来源：[CommentProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CommentProcessor.java)、[段评校验中间件](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/validate/LongArticleParagraphCommentValidationMidware.java)、[LoginCheckMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/LoginCheckMidware.java)。仅按公开JSON与源码适配，不改变生产服务认证。
+
+## 第二十批：复读机投稿与点赞切换
+
+RepeaterComposer/LikeButton/Recovery按模式挂载独立实现，原v3组件保持在V3前缀文件，明确点赞设置/删除与原键恢复不变。v1投稿POST /api/repeater，只有apiKey、repeaterContentType、repeaterContent；原文先做共享Unicode/长度校验，规范化与最终2～500单位限制由旧服务执行。投稿返回item仅投影实际oId和核验类型，绝不把回执正文插到榜单、冒充已入选前12条。
+
+旧点赞POST /api/repeater/{id}/like是真正切换，只带旧key，不传假设的目标liked，不当作v3明确设置重试。校验返回liked及真实整数计数字段，但仅发完成元数据，随后当前GET决定界面状态。投稿及点赞未知结果保留原kind/正文/类型或目标跨SPA锁定，禁止风控后自动重发、没有旧同键重放按钮；用户核对后才能解除。换key/账号清理及拒迟到；SSR/非v1/游客不能写。共享useRepeaterFeed同时选择旧store完成通知，并按实际旧key隔离个性化读取，不再只观察始终为空的Bearer。
+
+本批纠正第三批读取协议：旧服务分类参数名实际是repeaterContentType，不能发送v3的type；没有下一条时旧服务返回item:{}，按已确认协议投影null，仍拒坏记录，保留既有null响应兼容。旧列表仍是服务端前12条有限榜单，不称全量分页。
+
+验证：legacy-repeater-test六组实际API/Pinia/编译组件/共享feed与公共包装覆盖精确旧字段、原文及专用key、空next对象、无假幂等/目标状态、未知冻结无重发、身份/SSR边界、点赞/撤销后真实GET、投稿草稿清理但不插回执、成功后读失败不重写及旧key迟到读取隔离。原v3复读机19组、旧发现读取回归、类型与完整构建通过。浏览器仅对本机合成账号验证点赞后HTTP计数1而非回执999，投稿后清空输入框并显示重新读取的榜单，回执正文不渲染；未在现网投复读内容或点赞。夹具已停止并恢复现网v1开发服务。生产投稿权限/规范化/并发切换仍需真实环境联调，全站剩余榜单/账号/内容互动等继续适配。
+
+协议来源：[RepeaterProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/RepeaterProcessor.java)、[RepeaterMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/RepeaterMgmtService.java)、[RepeaterContent](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/RepeaterContent.java)。只读核对JSON协议，不恢复旧会话桥接。

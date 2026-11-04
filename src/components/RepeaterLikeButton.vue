@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import {computed,onMounted,ref} from 'vue'
+import {getApiMode} from '@/api/mode'
+import Legacy from './LegacyRepeaterLikeButton.vue'
+import Modern from './V3RepeaterLikeButton.vue'
 import type {RepeaterEntry} from '@/api/v3-repeater'
-import {useAuthStore} from '@/stores/auth'
-import {useV3RepeaterStore} from '@/stores/v3Repeater'
-const props=defineProps<{item:RepeaterEntry}>(),auth=useAuthStore(),store=useV3RepeaterStore(),blocked=computed(()=>store.busy||!!store.pending)
-function set(){if(!blocked.value&&auth.accessToken)void store.like(props.item.id,!props.item.liked)}
-const mounted=ref(false);onMounted(()=>{mounted.value=true})
+defineProps<{item:RepeaterEntry}>()
+const legacy=getApiMode()==='v1'
 </script>
-<template><button v-if="mounted&&auth.accessToken&&auth.account?.oId" type="button" :disabled="blocked" :aria-pressed="item.liked" @click="set">{{ item.liked?'取消点赞':'点赞' }} {{ item.likeCount }}</button></template>
+<template><Legacy v-if="legacy" :item="item"/><Modern v-else :item="item"/></template>
