@@ -1,6 +1,7 @@
 import {ApiError,request} from '../http'
 import {getLegacyKey} from './auth'
 import {legacyObject,legacyDate} from './home'
+import {projectLegacyPacketCard} from './chat-red-packets'
 import {legacyEditorImage} from './editor'
 import type {ChatLine,OnlineUser} from '@/stores/chat'
 import type {ChatNodeOption} from '../fishpi'
@@ -17,7 +18,7 @@ export function projectLegacyChat(value:unknown):ChatLine{
  if(r.sysMetal!==undefined){try{const source=typeof r.sysMetal==='string'?JSON.parse(text(r.sysMetal,65536)):r.sysMetal;const list=Array.isArray(source)?source:legacyObject(source).list;if(Array.isArray(list)&&list.length<=100)result.sysMetal=list.map(v=>{const m=legacyObject(v),attr=typeof m.attr==='string'?m.attr:'';for(const part of attr.split('&')){const i=part.indexOf('=');if(i>0)decodeURIComponent(part.slice(i+1))}return{name:text(m.name,255),description:typeof m.description==='string'?text(m.description,2048):'',attr}})}catch{/* malformed medals do not become identity or break the timeline */}}
  if(content.trim().startsWith('{')){
   result.html='<p>当前卡片不可读取</p>'
-  try{const card=legacyObject(JSON.parse(content));if(card.msgType==='redPacket')result.html='<p>红包消息</p>';else if(card.msgType==='music'){const projected={msgType:'music' as const,title:text(card.title,1024),source:text(card.source,4096),coverURL:legacyEditorImage(card.coverURL),from:text(card.from,128)};result.card=projected;result.html=undefined}else if(card.msgType==='weather'){const field=(v:unknown)=>{if(typeof v==='string')return text(v,4096);if(Array.isArray(v)&&v.length<=10&&v.every(x=>typeof x==='string'&&x.length<=64||typeof x==='number'&&Number.isFinite(x)))return v.map(String);throw new ApiError('天气消息字段不正确',502)};const projected={msgType:'weather' as const,date:field(card.date),weatherCode:field(card.weatherCode),max:field(card.max),min:field(card.min),t:text(card.t,128),st:text(card.st,128)};result.card=projected;result.html=undefined}}catch{/* Unknown card envelopes are not rendered or spread into the timeline. */}
+  try{const card=legacyObject(JSON.parse(content));if(card.msgType==='redPacket'){result.redPacket=projectLegacyPacketCard(card);result.html=undefined}else if(card.msgType==='music'){const projected={msgType:'music' as const,title:text(card.title,1024),source:text(card.source,4096),coverURL:legacyEditorImage(card.coverURL),from:text(card.from,128)};result.card=projected;result.html=undefined}else if(card.msgType==='weather'){const field=(v:unknown)=>{if(typeof v==='string')return text(v,4096);if(Array.isArray(v)&&v.length<=10&&v.every(x=>typeof x==='string'&&x.length<=64||typeof x==='number'&&Number.isFinite(x)))return v.map(String);throw new ApiError('天气消息字段不正确',502)};const projected={msgType:'weather' as const,date:field(card.date),weatherCode:field(card.weatherCode),max:field(card.max),min:field(card.min),t:text(card.t,128),st:text(card.st,128)};result.card=projected;result.html=undefined}}catch{/* Unknown card envelopes are not rendered or spread into the timeline. */}
  }
  return result
 }
@@ -43,7 +44,7 @@ function readingMessage(value:unknown,markdown?:string):import('../v3-chat-messa
  const line=projectLegacyChat(value),r=legacyObject(value),content=text(r.content),base={id:line.oId,createdAt:Date.parse(line.time!),author:{id:line.userOId||'',userName:line.userName,userNickname:line.userNickname||'',userAvatarURL:line.userAvatarURL||''},client:typeof r.client==='string'?text(r.client,255):''}
  if(content.trim().startsWith('{')){
   if(line.card){const card:Record<string,string|number>={};for(const[k,v]of Object.entries(line.card))if(k!=='msgType')card[k]=Array.isArray(v)?v.join(','):String(v);return{...base,type:line.card.msgType,content:'',contentHtml:'',card}}
-  if(line.html==='<p>红包消息</p>')return{...base,type:'redPacket',content:'',contentHtml:'',card:{}}
+  if(line.redPacket)return{...base,type:'redPacket',content:'',contentHtml:'',card:{}}
   return{id:line.oId,createdAt:base.createdAt,type:'unavailable',content:'',contentHtml:'',author:{id:'',userName:'',userNickname:'',userAvatarURL:''},client:'',card:{}}
  }
  return{...base,type:'text',content:markdown??'',contentHtml:line.html||'',card:{}}
