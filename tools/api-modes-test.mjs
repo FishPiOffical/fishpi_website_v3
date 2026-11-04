@@ -26,8 +26,12 @@ try {
   assert.equal((await legacyProfile.json()).version,'v1');assert.equal(calls.at(-1).headers.authorization,undefined)
   const legacyPost=await fetch(base+'/breezemoon',{method:'POST',headers:{Cookie:'fp.apiMode=v1','Content-Type':'application/json'},body:JSON.stringify({apiKey:'synthetic-legacy',breezemoonContent:'synthetic'})})
   assert.equal((await legacyPost.json()).version,'v1')
-  for(const path of ['/notifications/unread/count','/notifications/all-read','/notifications/make-read/at','/chat/has-unread','/chat/mark-all-as-read']){
+  for(const path of ['/notifications/unread/count','/notifications/all-read','/notifications/make-read/at','/chat/has-unread','/chat/mark-all-as-read','/users/emotions']){
     const response=await fetch(base+path+'?apiKey=synthetic',{headers:{Cookie:'fp.apiMode=v1; fp_v3_refresh=private',Authorization:'Bearer must-not-forward'}})
+    assert.equal((await response.json()).version,'v1');assert.equal(calls.at(-1).headers.authorization,undefined);assert.ok(!calls.at(-1).headers.cookie?.includes('fp_v3_refresh'))
+  }
+  for(const path of ['/markdown','/users/names']){
+    const response=await fetch(base+path,{method:'POST',headers:{Cookie:'fp.apiMode=v1; fp_v3_refresh=private',Authorization:'Bearer must-not-forward','Content-Type':'application/json'},body:JSON.stringify({name:'test',markdownText:'read-only fixture'})})
     assert.equal((await response.json()).version,'v1');assert.equal(calls.at(-1).headers.authorization,undefined);assert.ok(!calls.at(-1).headers.cookie?.includes('fp_v3_refresh'))
   }
   console.log('PASS actual dual proxy: deterministic targets, credential isolation, explicit unported capability, invalid mode fallback')

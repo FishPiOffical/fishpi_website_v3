@@ -1,23 +1,25 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import {getApiMode} from '@/api/mode'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { emojiToMarkdown, type EmojiItem, type EmojiGroup } from '@/api/fishpi'
 import { getAuthContextVersion } from '@/api/http'
-import { fetchV3FrequentEmotions, fetchV3EmojiGroups, fetchV3GroupEmojis } from '@/api/v3-emojis'
+import { fetchV3FrequentEmotions, fetchV3EmojiGroups, fetchV3GroupEmojis } from '@/api/editor-emojis'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
 
 const props = withDefaults(defineProps<{ showTrigger?: boolean; placement?: 'above' | 'below'; labels?: Record<string, string> }>(), { showTrigger: true, placement: 'above', labels: () => ({}) })
 const emit = defineEmits<{ insert: [markdown: string] }>()
-const { accessToken, account } = storeToRefs(useAuthStore())
-const identity = () => JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || ''])
+const { accessToken, apiKey, account } = storeToRefs(useAuthStore())
+const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+const identity = () => JSON.stringify([getAuthContextVersion(), getApiMode()==='v1'?credential.value:!!credential.value, account.value?.oId || ''])
 const open = ref(false), loading = ref(false), error = ref('')
 const items = ref<EmojiItem[]>([]), groups = ref<EmojiGroup[]>([]), groupId = ref('')
 const groupPage = ref(0), groupPages = ref(0), itemPage = ref(0), itemPages = ref(0)
 let version = 0
 async function load<T>(fetcher: () => Promise<T>, apply: (value: T) => void) {
   const reader = identity(), request = ++version
-  if (!accessToken.value) { error.value = '请先登录后使用表情'; return }
+  if (!credential.value) { error.value = '请先登录后使用表情'; return }
   loading.value = true; error.value = ''
   try { const value = await fetcher(); if (request === version && reader === identity()) apply(value) }
   catch (failure) { if (request === version && reader === identity()) { items.value = []; error.value = failure instanceof Error ? failure.message : '表情加载失败' } }
@@ -47,8 +49,8 @@ function toggle() { open.value = !open.value; if (open.value) void loadFrequent(
 watch(identity, () => { version++; open.value = false; loading.value = false; error.value = ''; items.value = []; groups.value = []; groupId.value = '' }, { flush: 'sync' })
 onBeforeUnmount(() => { version++ })
 function pick(item: EmojiItem) {
-  if (!open.value || loading.value || !accessToken.value || item.oId && !item.url) return
-  emit('insert', emojiToMarkdown(item)); open.value = false; version++; loading.value = false
+  if (!open.value || loading.value || !credential.value || item.oId && !item.url) return
+  emit('insert', !groupId.value && item.text===`:${item.name}:`?item.text:emojiToMarkdown(item)); open.value = false; version++; loading.value = false
 }
 defineExpose({ toggle })
 </script>
@@ -75,7 +77,7 @@ defineExpose({ toggle })
       <div v-else class="grid" :class="{ 'grid--aliases': items.some(item => !item.url && !props.labels[item.name]) }">
         <button v-for="(item, index) in items" :key="item.oId || `${item.name}:${index}`" :disabled="Boolean(item.oId && !item.url)" type="button" :title="item.name" @click="pick(item)">
           <img v-if="item.url" :src="item.url" :alt="item.name" />
-          <span v-else>{{ props.labels[item.name] || item.text || item.name }}</span>
+          <span v-else>{{ props.labels[item.name] || item.label || item.text || item.name }}</span>
         </button>
         <p v-if="!items.length && !error" class="hint">暂无表情</p>
       </div>

@@ -6,6 +6,7 @@ import {useLegacyMessagesStore} from '@/stores/legacyMessages'
 import {usePrivateInboxStore} from '@/stores/privateInbox'
 import {FILE_PEER,type LegacyMessageCommand} from '@/api/legacy/messages'
 import {DEFAULT_AVATAR} from '@/utils/avatar'
+import ChatComposer from '@/components/ChatComposer.vue'
 import {fpConfirm} from '@/composables/useDialog'
 const props=withDefaults(defineProps<{initialName?:string;initialId?:string}>(),{initialName:'',initialId:''})
 const emit=defineEmits<{'peer-selected':[peer:{id:string;userName:string}];'connection-change':[state:string]}>()
@@ -15,6 +16,9 @@ const listPage=ref(1),ordinaryConversations=computed(()=>conversations.value.fil
 const listPages=computed(()=>Math.max(1,Math.ceil(ordinaryConversations.value.length/20)))
 const listedConversations=computed(()=>ordinaryConversations.value.slice((listPage.value-1)*20,listPage.value*20))
 watch(listPages,pages=>{listPage.value=Math.min(listPage.value,pages)})
+const composer=ref<InstanceType<typeof ChatComposer>|null>(null),panel=ref<HTMLElement|null>(null),compact=ref(true)
+let observer:ResizeObserver|null=null
+function measure(){const next=(panel.value?.getBoundingClientRect().width||0)<=480;if(next!==compact.value){if(next)composer.value?.flush();compact.value=next}}
 const mounted=ref(false),toName=ref(''),scroller=ref<HTMLElement|null>(null),followLatest=ref(true)
 const authenticated=computed(()=>mounted.value&&auth.isLoggedIn)
 const connectionText=computed(()=>connection.value==='connected'?'已连接':connection.value==='connecting'?'连接中':'已断开')
@@ -29,12 +33,12 @@ watch(()=>[props.initialName,props.initialId],()=>{if(mounted.value&&(props.init
 watch(()=>peer.value?.id,()=>{cancelConfirmation();followLatest.value=true;const index=ordinaryConversations.value.findIndex(item=>item.peer.id===peer.value?.id);if(index>=0)listPage.value=Math.floor(index/20)+1;if(peer.value)emit('peer-selected',{id:peer.value.id,userName:peer.value.userName})},{immediate:true})
 watch(()=>auth.account?.oId,cancelConfirmation)
 watch(()=>messages.value,async()=>{if(!followLatest.value)return;await nextTick();if(scroller.value)scroller.value.scrollTop=scroller.value.scrollHeight})
-onMounted(()=>{mounted.value=true;release=chat.acquire();if(props.initialName||props.initialId)void chat.open(props.initialName,props.initialId)})
-onBeforeUnmount(()=>{mounted.value=false;cancelConfirmation();release?.();release=null})
+onMounted(async()=>{mounted.value=true;release=chat.acquire();if(props.initialName||props.initialId)void chat.open(props.initialName,props.initialId);await nextTick();if(mounted.value&&panel.value){measure();observer=new ResizeObserver(measure);observer.observe(panel.value)}})
+onBeforeUnmount(()=>{mounted.value=false;observer?.disconnect();observer=null;cancelConfirmation();release?.();release=null})
 </script>
 <template>
  <p v-if="!authenticated" class="hint">登录后可读取私信。</p>
- <div v-else class="legacy-private">
+ <div v-else ref="panel" class="legacy-private">
   <div class="status"><span>未读 {{ inbox.error?'暂不可用':inbox.unreadTotal===null?'待查询':inbox.unreadTotal }}</span><button @click="chat.loadList();chat.loadHistory();inbox.refreshUnread()">刷新</button><button :disabled="busy||!!pending" @click="command('read-all')">全部已读</button></div>
   <p v-if="inbox.error" class="error" role="alert">{{ inbox.error }} <button @click="inbox.refreshUnread">重试</button></p>
   <p v-if="notice" class="notice" role="status">{{ notice }}</p>
@@ -58,7 +62,8 @@ onBeforeUnmount(()=>{mounted.value=false;cancelConfirmation();release?.();releas
      <p v-if="!historyBusy&&!historyError&&!messages.length" class="muted">暂无消息</p>
      <ol><li v-for="message in messages" :key="message.id" :class="{mine:message.fromMe}"><div class="bubble"><small>{{ message.fromMe?'我':peer.userNickname||peer.userName }}</small><div class="message-body" v-html="message.contentHtml" /><time>{{ message.sentAt }}</time><button v-if="message.fromMe" :disabled="busy||!!pending" @click="withdraw(message.id)">撤回</button></div></li></ol>
     </div>
-    <form class="composer" @submit.prevent="command('send')"><textarea v-model="draft" aria-label="私信内容" maxlength="10240" placeholder="说点什么吧…" @keydown.ctrl.enter.prevent="command('send')" @keydown.meta.enter.prevent="command('send')" /><button :disabled="!canSend">发送</button></form>
+    <ChatComposer v-if="!compact" ref="composer" :key="peer.id" v-model="draft" compact :height="110" :sending="busy" :disabled="!canSend" submit-text="发送" placeholder="说点什么吧…" @submit="command('send')" />
+    <form v-else class="composer" @submit.prevent="command('send')"><textarea v-model="draft" aria-label="私信内容" maxlength="10240" placeholder="说点什么吧…" @keydown.ctrl.enter.prevent="command('send')" @keydown.meta.enter.prevent="command('send')" /><button :disabled="!canSend">发送</button></form>
    </section><p v-else class="muted choose">选择会话或输入用户名开始聊天。</p>
   </div>
  </div>

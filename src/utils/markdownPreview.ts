@@ -1,4 +1,4 @@
-import { getAccessToken, getAuthContextVersion } from '@/api/http'
+import { getEditorCredential as getAccessToken, getEditorContext as getAuthContextVersion } from '@/api/editor-session'
 import { markdownPreview } from '@/api/v3-markdown'
 
 /** Vditor's synchronous transform never inserts its unverified local fallback HTML. */

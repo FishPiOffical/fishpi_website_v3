@@ -1,5 +1,5 @@
-import { getAccessToken, getAuthContextVersion } from '@/api/http'
-import { userSuggestions } from '@/api/v3-user-suggestions'
+import { getEditorCredential as getAccessToken, getEditorContext as getAuthContextVersion } from '@/api/editor-session'
+import {editorUserSuggestions as userSuggestions} from '@/api/editor-suggestions'
 type Hint={value:string;html:string}
 const escape=(s:string)=>s.replace(/[&<>"']/gu,c=>`&#${c.charCodeAt(0)};`)
 /** Settle superseded promises immediately: Vditor itself does not sequence async hint responses. */

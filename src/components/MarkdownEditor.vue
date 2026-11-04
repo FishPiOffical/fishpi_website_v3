@@ -6,7 +6,7 @@ import EmojiPicker from '@/components/EmojiPicker.vue'
 import { createMarkdownPreview } from '@/utils/markdownPreview'
 import { createEditorUpload } from '@/utils/editorUpload'
 import { createMentionHints } from '@/utils/mentionHints'
-import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
+import {getEditorContext as getAuthContextVersion,onEditorCredentialChange as onAccessTokenChange} from '@/api/editor-session'
 
 const props = withDefaults(
   defineProps<{

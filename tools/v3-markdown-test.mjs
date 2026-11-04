@@ -5,8 +5,9 @@ const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.E
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__preview={token:'A',version:1,calls:[],dispatch:async()=>({code:0,data:{html:'<p>safe</p>'}})};const state=__preview
 const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAccessToken(){return globalThis.__preview.token}export function getAuthContextVersion(){return globalThis.__preview.version}export async function request(path,init){globalThis.__preview.calls.push({path,init});return globalThis.__preview.dispatch(path,init)}`)
-const apiURL=url(compile(await fs.readFile('src/api/v3-markdown.ts','utf8')).replace("from './http'",`from '${http}'`)),api=await import(apiURL)
-const {createMarkdownPreview}=await import(url(compile(await fs.readFile('src/utils/markdownPreview.ts','utf8')).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-markdown'",`from '${apiURL}'`)))
+const editorSession=url(`export {getAccessToken as getEditorCredential,getAuthContextVersion as getEditorContext} from '${http}'`),modeShim=url("export const getApiMode=()=> 'v3'")
+const apiURL=url(compile(await fs.readFile('src/api/v3-markdown.ts','utf8')).replace("from './mode'",`from '${modeShim}'`).replace("from './http'",`from '${http}'`)),api=await import(apiURL)
+const {createMarkdownPreview}=await import(url(compile(await fs.readFile('src/utils/markdownPreview.ts','utf8')).replace("from '@/api/editor-session'",`from '${editorSession}'`).replace("from '@/api/v3-markdown'",`from '${apiURL}'`)))
 function element(){return{_text:'',_html:'',children:[],listeners:{},set textContent(v){this._text=v;this._html='';this.children=[]},get textContent(){return this._text},set innerHTML(v){this._html=v;this._text='';this.children=[]},get innerHTML(){return this._html},replaceChildren(...children){this.children=children;this._html='';this._text=''},addEventListener(k,v){this.listeners[k]=v}}}
 globalThis.document={createElement:element,createTextNode:text=>({text})}
 const tick=async()=>{for(let i=0;i<20;i++)await Promise.resolve()}

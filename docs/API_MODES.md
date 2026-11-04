@@ -18,7 +18,8 @@
 | 搜索、标签/领域目录及其文章列表 | 第四批已接，搜索缺匿名元数据时无身份展示 | 保留 |
 | 长篇列表与段评、内容互动 | 待适配 | 保留 |
 | 通知列表/未读/已读及实时刷新 | 第六批已接；旧列表仅有限快照，合成身份验收 | 保留 |
-| 私信会话/历史/发送/撤回/已读/未读 | 第七批基础聊天已接，本地合成账号验收；富编辑/图片上传待共享编辑器批次 | 保留 |
+| 私信会话/历史/发送/撤回/已读/未读 | 第七批聊天及第八批富编辑已接，本地合成账号验收；真实上传权限待验 | 保留 |
+| 共享编辑器预览/上传/表情选择/@联想 | 第八批已接，上传仅本地夹具验收 | 保留 |
 | 聊天室、在线/话题/特殊卡片 | 待适配 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON，其他用户栏目待适配 | 保留 |
 | 关注/收藏、账号各类设置、财务/导出等 | 待适配 | 保留 |
@@ -135,3 +136,22 @@ get-list的receiverUserName固定表示另一位联系人，不按最后一条�
 验证：legacy-messages实际API/连接/Pinia专项涵盖参与者/顺序/白名单、result和结束哨兵、会话姓名方向、真实未读归属、共享连接、当前HTTP确认、未知结果防重发、变更失败锁定、后置读失败不再写、换号/迟到隔离、SSR零私有请求及定时器清理。原v3私信21组、通知、双模式/SSR、共享WS代理回归、类型及双构建通过。浏览器使用只在内存中运行的本地HTTP/WS合成账号夹具，实际完成登录回跳、发送/输入清除、弹窗与完整页同步切人、B聊天时A通知、离开/chat后发送、全部已读与最小窗口圆点/输入布局；没有使用真实密码或向现网用户发送消息。测试结束已停止夹具并恢复127.0.0.1:5173指向现网v1的开发服务。
 
 协议参考：[官方ChatProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ChatProcessor.java)、[官方ChatChannel](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/channel/ChatChannel.java)，与先前官方SDK交叉核对。源码只读下载至临时目录，没有运行第三方源码。
+
+
+## 第八批：共享编辑器与私信富编辑
+
+共享编辑器保持同一Vditor与原v3传输，增加editor-session按当前模式读取编辑工作所需凭据/身份边界，实际API仍由各协议适配器分别选择凭据。v1 key变化立即取消预览/上传/联想，正常v3令牌轮换保持同一身份，不把旧key当Bearer。新增editor-emojis/editor-suggestions门面只覆盖编辑器读取，表情管理写入与个人设置没有因此自动宣称完成。
+
+预览v1使用POST /markdown的markdownText与code=0/data字符串，空白正文的特殊code=0/html空串响应也按真实契约返回空预览，其他正文不回退该字段。公共参数边界仍走现有校验；同步transform继续返回空串阻止未验证的本地HTML回退，只有当前正文/身份匹配的异步预览可以写入。现网只读HTTP核对该响应为字符串，失败明确显示并可重试，不抓取网页HTML。
+
+上传v1取POST /api/rhypic/upload-ticket?apiKey，读取专用ticket和uploadURL基址（保留可信服务配置的路径前缀）后追加api/v1/files；共用原多文件命名、部分结果、URL/Markdown转义和中止处理。v3票据字段仍严格要求Bearer/file。图床请求只带专用上传票据、credentials=omit、redirect=error，旧key与站点Bearer均不进入文件请求；pic.fishpi.cn仍走现有同源/rhypic-upload代理，覆盖选择文件和剪贴板图片。换号后迟到票据不得触发文件传输，迟到文件结果不得插入；网络结果未知不自动重复上传。
+
+@联想v1用POST /users/names，按原name前缀校验返回用户名并白名单头像/可选昵称，不为旧列表没有的用户ID补值；V3UserSuggestion的严格ID契约保持。现网只读HTTP实际返回userName和头像字段、没有ID/昵称，与适配一致。共享提示仍立即结算被替换promise，防止旧候选覆盖当前列表，展示HTML转义，插入只用用户名。
+
+表情选择读取/users/emotions与/api/emoji/groups、group/emojis；常用表情以服务端别名插入，实际Unicode或图片只作展示，不加入硬编码图案。图片组保留私有成员oId与emojiId的差别，签名URL不重新编码；旧列表没有分页元数据，只按真实有限快照分50项显示，不发明服务器总量或使用云存档兜底。原表情管理写资源仍另批适配。
+
+v1私信正常宽度接回ChatComposer的精简Vditor，窄窗保持自定义textarea+发送。ResizeObserver观察的是私信面板宽度，缩放前读取当前编辑缓冲区，切换编辑器仍共用原草稿；上传在编辑器卸载时中止。没有改变原v3私信组件的发送语义。
+
+验证：legacy-editor专项运行实际双模式API/身份模块/共享上传与提示辅助器，覆盖旧预览响应、Unicode、专用票据/代理/部分文件、嵌套基址、危险URL、换号迟到票据/文件、无ID联想、转义/过期候选、真实有限表情分页与成员ID。原v3预览7组、上传9组、联想7组、编辑器/表情/涂鸦/私信专项回归、类型及客户端/SSR构建通过。浏览器使用本地HTTP/WS/图床夹具和合成账号，实际验证精简工具栏、表情插入并发送、文件选择上传、剪贴板PNG上传、@候选选择、缩小时保留完整Markdown草稿、放大后恢复Vditor。没有向现网账号发送消息、上传文件或反复密码登录；真实图床权限/大小限制/票据联调仍待账号验收。测试结束已关闭合成账号页面、停止夹具，并恢复127.0.0.1:5173现网v1开发服务。
+
+协议参考：[ArticleProcessor.markdown2HTML](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleProcessor.java)、[RhypicProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/RhypicProcessor.java)、[UserProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)、[EmojiQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/EmojiQueryService.java)。仅只读参考源码，未执行外部源码。

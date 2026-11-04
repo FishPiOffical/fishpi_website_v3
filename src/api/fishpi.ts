@@ -498,6 +498,8 @@ export interface FunctionSettings {
 }
 
 export interface EmojiItem {
+  /** Server-provided display glyph, independent from the canonical insertion alias. */
+  label?: string
   emojiId?: string
   oId?: string
   name: string
