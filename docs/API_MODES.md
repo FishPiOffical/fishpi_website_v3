@@ -27,7 +27,8 @@
 | 聊天室弹幕价格/发送/实时显示 | 第十三批已接；本地合成节点验收 | 保留 |
 | 聊天室五类红包创建、详情与领取 | 第十四批已接；本地合成账号验收，非幂等旧结算 | 保留 |
 | 思过崖旧快照、涂鸦上传与插入 | 第十五批已接；旧快照不等价于实时禁言资源 | 保留 |
-| 举报/表态等其余聊天室能力 | 待适配 | 保留 |
+| 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
+| 表态等其余聊天室能力 | 待适配 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON，其他用户栏目待适配 | 保留 |
 | 关注/收藏、账号各类设置、财务/导出等 | 待适配 | 保留 |
 
@@ -264,3 +265,15 @@ PaintPanel上传适配器此前已支持双模式，本批补齐登录与上传�
 浏览器仅使用本机HTTP/WS夹具合成账号，验证25条快照的第二页、画布绘制后上传并插入编辑器，未点击聊天发送。临时开启的思过崖模块已恢复关闭，夹具已停并恢复现网v1开发服务。现网仅只读核对空快照；真实非空名单、图床权限及用户画作上传未验。举报、表态及全站其他模块继续适配。
 
 协议来源：[ChatroomProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ChatroomProcessor.java)、[ChatRoomBot快照维护](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/bot/ChatRoomBot.java)。仅核对源码和公开JSON。
+
+## 第十六批：文章、评论、用户和聊天室举报
+
+公共ReportDialog/ReportRecovery按模式挂载独立实现，原v3组件保留在V3ReportDialog/V3ReportRecovery，继续使用服务端分类目录、编号回执及原幂等键恢复。v1没有分类GET，单独使用官方Report.java的经典协议常量，四类目标分别提供对应理由，聊天室仅49（其他）；不把旧SDK中的8当作其他，不在v3目录失败时回退本地分类。
+
+v1 POST /report仅带旧apiKey、reportDataId、reportDataType、reportType、reportMemo，不发送Bearer、客户端作者身份或v3幂等头。备注按原文传输，界面纯文本；旧服务端会trim但没有承诺清洗HTML。成功只有code=0，不造举报编号或审核结果。明确禁止共享HTTP风控后的自动重发；断流、格式不完整或未确认业务结果保留原目标/理由/备注的本机锁，跨SPA阻止重复提交，仅允许用户核对后解除，不能用重试伪装幂等恢复。全局提示只显示目标编号，不回显备注。旧key/账号/认证上下文变化清理并拒迟到结果，SSR/非v1/游客不能执行旧写。
+
+两种聊天室布局的举报入口都使用当前模式凭据，文章、评论和用户入口继续复用公共组件。SSR开发服务、SPA共用代理及nginx明确转发POST /report，并保留旧凭据与v3刷新Cookie隔离。
+
+验证：legacy-reports-test六组覆盖实际API/Pinia/编译Vue、四类分类、原文/Unicode/大小约束、精确旧字段、无假回执、未知结果跨组件锁定、无重发、全局备注保密、换key迟到、账号/模式/SSR/游客及公共包装隔离；原v3举报19组、模式/代理、聊天室共享门面和v3时间线回归、类型及完整构建通过。浏览器只用本机HTTP/WS夹具合成账号，验证聊天室举报入口、其他理由、备注、提交后关闭表单及无编号成功提示；夹具已停止并恢复127.0.0.1:5173现网v1开发服务。未向现网举报，真实权限/风控和审核结果未验。表态与其他全站模块继续适配。
+
+协议来源：[ReportProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ReportProcessor.java)、[Report模型常量](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Report.java)、[ReportMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ReportMgmtService.java)。只读核对源码，不运行第三方脚本、不恢复页面Cookie桥接。

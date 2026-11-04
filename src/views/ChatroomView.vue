@@ -342,7 +342,7 @@ function clearScreen() {
                   </button>
                   <button type="button" title="查看原文" @click="showRaw(msg.oId)">原文</button>
                 </template>
-                <ReportDialog v-if="msg.userOId !== auth.account?.oId && auth.accessToken" :data-id="msg.oId" :data-type="3" />
+                <ReportDialog v-if="msg.userOId !== auth.account?.oId && roomCredential" :data-id="msg.oId" :data-type="3" />
               </template>
             </ChatBubble>
 
@@ -453,7 +453,7 @@ function clearScreen() {
                   </button>
                   <button type="button" title="查看原文" @click="showRaw(msg.oId)">原文</button>
                 </template>
-                <ReportDialog v-if="msg.userOId !== auth.account?.oId && auth.accessToken" :data-id="msg.oId" :data-type="3" />
+                <ReportDialog v-if="msg.userOId !== auth.account?.oId && roomCredential" :data-id="msg.oId" :data-type="3" />
               </template>
             </ChatBubble>
           </div>

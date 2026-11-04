@@ -1,0 +1,10 @@
+import {ApiError,request} from '../http'
+import {getLegacyKey} from './auth'
+import {legacyObject} from './home'
+import type {ReportInput,ReportTarget} from '../v3-reports'
+// Classic has no options endpoint. These are its published Report.java constants, not a v3 fallback.
+const labels:Record<number,string>={0:'垃圾广告',1:'色情内容',2:'违法违规',3:'涉嫌侵权',4:'人身攻击',5:'冒充账号',6:'垃圾广告账号',7:'泄露个人信息',49:'其他'}
+export const LEGACY_REPORT_TARGETS:ReportTarget[]=[{targetType:0,label:'文章',reasons:[0,1,2,3,4,49]},{targetType:1,label:'评论',reasons:[0,1,2,3,4,49]},{targetType:2,label:'用户',reasons:[5,6,7,49]},{targetType:3,label:'聊天室消息',reasons:[49]}].map(t=>({...t,reasons:t.reasons.map(reason=>({reason,label:labels[reason]!}))}))
+export function legacyReportTarget(type:number,id:string){if(!Number.isInteger(type)||!LEGACY_REPORT_TARGETS.some(t=>t.targetType===type)||typeof id!=='string'||!/^[1-9][0-9]{0,31}$/.test(id))throw new ApiError('举报目标不合法',422);return{targetType:type,targetId:id}}
+export function legacyReportInput(value:ReportInput):ReportInput{const target=legacyReportTarget(value.targetType,value.targetId);if(!LEGACY_REPORT_TARGETS.find(t=>t.targetType===target.targetType)!.reasons.some(r=>r.reason===value.reason)||typeof value.memo!=='string'||value.memo.length>10240||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(value.memo))throw new ApiError('举报理由或备注不合法',422);return{...target,reason:value.reason,memo:value.memo}}
+export async function legacyPublishReport(value:ReportInput){const input=legacyReportInput(value),apiKey=getLegacyKey();if(!apiKey)throw new ApiError('请先登录后举报',401);const r=legacyObject(await request('/report',{method:'POST',__captchaRetried:true,body:JSON.stringify({apiKey,reportDataId:input.targetId,reportDataType:input.targetType,reportType:input.reason,reportMemo:input.memo}),cache:'no-store'}));if(typeof r.code!=='number')throw new ApiError('举报响应不完整，结果未确认',502);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'举报提交失败',400)}
