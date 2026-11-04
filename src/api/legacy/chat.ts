@@ -37,3 +37,34 @@ export async function legacyChatNode(preferred='',signal?:AbortSignal){const key
 }
 export function legacyChatContent(content:string){if(typeof content!=='string'||!content.trim()||content.length>4096||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(content)||Array.from(content).some(c=>c.length===1&&/[\ud800-\udfff]/.test(c)))throw new ApiError('聊天室正文不合法',422);if(/^\[(redpacket|setdiscuss|barrager|weather|music)\]/.test(content.trim()))throw new ApiError('特殊消息请使用对应的发送入口',422);return content}
 export async function legacyChatSend(content:string){legacyChatContent(content);const apiKey=getLegacyKey();if(!apiKey)throw new ApiError('请先登录聊天室',401);const r=legacyObject(await request('/chat-room/send',{method:'POST',body:JSON.stringify({apiKey,content,client:'Web/website_v3'}),cache:'no-store'}));if(typeof r.code!=='number')throw new ApiError('聊天室发送响应不完整，结果未确认',502);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'聊天室发送失败',400)}
+
+/** Legacy Markdown is read separately, never recovered from rendered timeline HTML. */
+function readingMessage(value:unknown,markdown?:string):import('../v3-chat-messages').ChatMessage{
+ const line=projectLegacyChat(value),r=legacyObject(value),content=text(r.content),base={id:line.oId,createdAt:Date.parse(line.time!),author:{id:line.userOId||'',userName:line.userName,userNickname:line.userNickname||'',userAvatarURL:line.userAvatarURL||''},client:typeof r.client==='string'?text(r.client,255):''}
+ if(content.trim().startsWith('{')){
+  if(line.card){const card:Record<string,string|number>={};for(const[k,v]of Object.entries(line.card))if(k!=='msgType')card[k]=Array.isArray(v)?v.join(','):String(v);return{...base,type:line.card.msgType,content:'',contentHtml:'',card}}
+  if(line.html==='<p>红包消息</p>')return{...base,type:'redPacket',content:'',contentHtml:'',card:{}}
+  return{id:line.oId,createdAt:base.createdAt,type:'unavailable',content:'',contentHtml:'',author:{id:'',userName:'',userNickname:'',userAvatarURL:''},client:'',card:{}}
+ }
+ return{...base,type:'text',content:markdown??'',contentHtml:line.html||'',card:{}}
+}
+async function readingRows(id:string,mode:number,size:number,type:'md'|'html',signal?:AbortSignal){legacyChatId(id);const v=await data(query('/chat-room/getMessage',{oId:id,mode:String(mode),size:String(size),type},true),signal);if(!Array.isArray(v)||v.length>(mode===0?size*2+1:size+1))throw new ApiError('聊天室上下文响应不正确',502);for(let i=0;i<v.length;i++){const a=legacyChatId(legacyObject(v[i]).oId);if(i&&BigInt(legacyObject(v[i-1]).oId as string)<=BigInt(a))throw new ApiError('聊天室上下文顺序不正确',502)}return v.reverse()}
+export async function legacyChatSource(id:string,signal?:AbortSignal){
+ const [raw,html]=await Promise.all([readingRows(id,0,0,'md',signal),readingRows(id,0,0,'html',signal)])
+ if(raw[0]?.oId!==id||html[0]?.oId!==id)throw new ApiError('当前消息不可读取',404)
+ const preview=readingMessage(html[0]),rawText=text(raw[0].content)
+ let rawKind:unknown;try{rawKind=JSON.parse(rawText)?.msgType}catch{/* Literal Markdown can start with a JSON object. */}
+ if(preview.type==='text'&&['redPacket','music','weather'].includes(String(rawKind)))throw new ApiError('消息读取期间卡片类型已变化，请重试',409)
+ const source=preview.type==='text'?{...readingMessage({...raw[0],content:''}),content:rawText}:readingMessage(raw[0]);if(source.type!==preview.type||source.author.id!==preview.author.id||source.author.userName!==preview.author.userName||source.createdAt!==preview.createdAt)throw new ApiError('消息读取期间已变化，请重试',409)
+ return{...source,contentHtml:source.type==='text'?preview.contentHtml:''}
+}
+export async function legacyChatContext(id:string,signal?:AbortSignal):Promise<import('../v3-chat-messages').ChatMessageContext>{
+ const rows=await readingRows(id,0,11,'html',signal),index=rows.findIndex(r=>r.oId===id);if(index<0)throw new ApiError('定位消息不可读取',404)
+ if(index>11||rows.length-index-1>11)throw new ApiError('聊天室上下文范围不正确',502)
+ const list=rows.slice(Math.max(0,index-10),index+11).map(v=>readingMessage(v));return{anchorId:id,list,hasMoreBefore:index>10,hasMoreAfter:rows.length-index-1>10,nextBefore:list[0]!.id,nextAfter:list.at(-1)!.id}
+}
+export async function legacyChatWindow(options:{before?:string;after?:string;size?:number},signal?:AbortSignal):Promise<import('../v3-chat-messages').ChatMessagePage>{
+ const {before,after,size=20}=options;if(!!before===!!after||!Number.isSafeInteger(size)||size<1||size>50)throw new ApiError('消息游标不合法',422);const id=legacyChatId(before||after),rows=await readingRows(id,before?1:2,size+1,'html',signal)
+ for(const r of rows)if(before?BigInt(r.oId)>BigInt(id):BigInt(r.oId)<BigInt(id))throw new ApiError('聊天室上下文游标不正确',502)
+ const exclusive=rows.filter(r=>r.oId!==id),hasMore=exclusive.length>size,list=(before?exclusive.slice(-size):exclusive.slice(0,size)).map(v=>readingMessage(v));return{list,hasMore,nextBefore:list[0]?.id||'',nextAfter:list.at(-1)?.id||''}
+}

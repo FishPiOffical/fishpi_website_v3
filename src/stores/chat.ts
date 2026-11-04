@@ -79,6 +79,7 @@ export const useChatStore = defineStore('chat', () => {
   function clearScreen(){timeline.clearVisible()}
 
   return {
+    changeHint:computed(()=>timeline.changeHint),
     messages,
     onlines,
     onlineTotal:computed(()=>online.total),

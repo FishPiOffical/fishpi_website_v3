@@ -10,6 +10,7 @@ import ChatMusicRecovery from '@/components/chat/ChatMusicRecovery.vue'
 import ChatBarrageEditor from '@/components/chat/ChatBarrageEditor.vue'
 import ChatBarrageRecovery from '@/components/chat/ChatBarrageRecovery.vue'
 import {useChatMessageSource} from '@/composables/useChatMessageSource'
+import {getApiMode} from '@/api/mode'
 import {getAuthContextVersion} from '@/api/http'
 import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
 import ChatRevokeAction from '@/components/chat/ChatRevokeAction.vue'
@@ -39,6 +40,7 @@ const auth = useAuthStore()
 const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const chatFilter = useChatFilterStore()
 const { account, isLoggedIn, apiKey, accessToken } = storeToRefs(auth)
+const roomCredential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 const composerReady = ref(false)
 const {
@@ -86,8 +88,8 @@ const me = computed(() => account.value?.userName)
 const classicMessages = computed(() => [...visibleMessages.value].reverse())
 
 const route=useRoute(),router=useRouter(),contextId=ref('')
-function syncContextHash(){const match=/^#chatroom(\d{1,32})$/.exec(route.hash);contextId.value=accessToken.value&&account.value?.oId&&match?match[1]!:''}
-watch(()=>JSON.stringify([route.hash,!!accessToken.value,account.value?.oId||'']),syncContextHash,{immediate:true})
+function syncContextHash(){const match=/^#chatroom(\d{1,32})$/.exec(route.hash);contextId.value=roomCredential.value&&account.value?.oId&&match?match[1]!:''}
+watch(()=>JSON.stringify([route.hash,!!roomCredential.value,account.value?.oId||'']),syncContextHash,{immediate:true})
 function openContext(id:string){void router.push({hash:'#chatroom'+id})}
 function closeContext(){contextId.value='';if(/^#chatroom\d{1,32}$/.test(route.hash))void router.replace({hash:''})}
 async function latestFromContext(){closeContext();await chat.refreshMessages();await nextTick();if(chatStyle.value==='modern')scrollBottom()}
@@ -334,7 +336,7 @@ function clearScreen() {
               <template #actions>
                 <button type="button" @click="openContext(msg.oId)">上下文</button>
                 <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
-                <template v-if="!msg.redPacket && accessToken">
+                <template v-if="!msg.redPacket && roomCredential">
                   <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
                     {{ quoteBusy === msg.oId ? '…' : '引用' }}
                   </button>
@@ -445,7 +447,7 @@ function clearScreen() {
               <template #actions>
                 <button type="button" @click="openContext(msg.oId)">上下文</button>
                 <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
-                <template v-if="!msg.redPacket && accessToken">
+                <template v-if="!msg.redPacket && roomCredential">
                   <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
                     {{ quoteBusy === msg.oId ? '…' : '引用' }}
                   </button>

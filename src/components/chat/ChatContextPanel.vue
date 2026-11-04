@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import {nextTick,watch} from 'vue'
+import {computed,nextTick,watch} from 'vue'
 import {storeToRefs} from 'pinia'
 import FpDialog from '@/components/FpDialog.vue'
+import {getApiMode} from '@/api/mode'
 import {getAuthContextVersion} from '@/api/http'
 import {useChatContext} from '@/composables/useChatContext'
 import {useAuthStore} from '@/stores/auth'
-const props=defineProps<{messageId:string}>(),emit=defineEmits<{close:[];latest:[]}>(),context=useChatContext(),{accessToken,account}=storeToRefs(useAuthStore())
-watch(()=>props.messageId,id=>{if(id&&accessToken.value&&account.value?.oId)void context.open(id);else context.close()},{immediate:true})
-watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),(next,previous)=>{const old=JSON.parse(previous) as [number,boolean,string];if(old[1]&&old[2]&&next!==previous)emit('close')})
+const props=defineProps<{messageId:string}>(),emit=defineEmits<{close:[];latest:[]}>(),context=useChatContext(),{accessToken,apiKey,account}=storeToRefs(useAuthStore())
+const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+watch(()=>props.messageId,id=>{if(id&&credential.value&&account.value?.oId)void context.open(id);else context.close()},{immediate:true})
+watch(()=>JSON.stringify([getAuthContextVersion(),getApiMode()==='v1'?credential.value:!!credential.value,account.value?.oId||'']),(next,previous)=>{const old=JSON.parse(previous) as [number,boolean|string|null,string];if(old[1]&&old[2]&&next!==previous)emit('close')})
 watch(()=>context.list.value,async()=>{await nextTick();if(typeof document==='undefined')return;document.getElementById('context-message-'+props.messageId)?.scrollIntoView({block:'center'})})
 </script>
 <template><FpDialog :open="!!messageId" title="聊天室消息上下文" :width="760" @close="emit('close')"><div class="chat-context">

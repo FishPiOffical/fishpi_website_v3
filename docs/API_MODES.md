@@ -21,7 +21,8 @@
 | 私信会话/历史/发送/撤回/已读/未读 | 第七批聊天及第八批富编辑已接，本地合成账号验收；真实上传权限待验 | 保留 |
 | 共享编辑器预览/上传/表情选择/@联想 | 第八批已接，上传仅本地夹具验收 | 保留 |
 | 聊天室历史/实时/普通发送/在线名单与话题读取 | 第九批已接现代节点；本地合成节点验收 | 保留 |
-| 聊天室原文/上下文/撤回/话题修改及特殊消息操作 | 待适配 | 保留 |
+| 聊天室原文、引用、消息上下文 | 第十批已接独立原文和双向上下文读取 | 保留 |
+| 聊天室撤回/话题修改及特殊消息操作 | 待适配 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON，其他用户栏目待适配 | 保留 |
 | 关注/收藏、账号各类设置、财务/导出等 | 待适配 | 保留 |
 
@@ -177,3 +178,14 @@ msg事件只按ID读取当前GET chat-room/getMessage(mode=0,size=0,type=html)�
 验证：legacy-chat实际API/现代节点连接/公共Pinia门面测试覆盖作者ID精度/时间/勋章白名单、危险卡片不回显、旧发送凭据与特殊语法、真实25项分页、当前HTTP重读、并发历史不能复活撤回、清屏后重连、未知发送无重放、离页发送busy清理、401/403与身份边界、SSR零HTTP/WS及定时器清理。原v3发送15组、消息源13组、在线12组、首页18组、私信/时间线等回归、类型及双构建通过。浏览器仅用内存合成账号和本地HTTP/现代节点夹具，实际验证完整版发送、在线2人/话题、悬浮窗共享、切页后发送、首页发送同步到浮窗。未向真实聊天室发言、修改话题、领取红包或调用密码登录；真实节点派生票据/生产连通性仍待账号联调。公开只读HTTP核对现网历史25项/字段和online-users真实契约，测试后已停夹具、恢复127.0.0.1:5173现网v1开发服务。
 
 协议来源：[ChatroomProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ChatroomProcessor.java)、[ChatroomChannel](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/channel/ChatroomChannel.java)、[ChatMsgAddValidationMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/validate/ChatMsgAddValidationMidware.java)。仅只读源码，未运行外部实现。
+
+
+## 第十批：聊天室原文、引用及上下文
+
+`chat-reading.ts`按模式选择独立读取适配器，v3原有消息API不变、不回退旧站。v1使用已认证`GET /chat-room/getMessage`，读取原文时并行取得`type=md`与`type=html`的精确单条；ID、作者和时间须一致。原Markdown保留换行，引用作者用用户名寻址并转义，预览只用服务端清洗HTML，不从历史HTML反推原文或访问`/cr/raw`页面。红包仅返回公开卡片类型，音乐/天气仅白名单摘要；未知卡片不可读，不显示私有接收人或完整传输对象。
+
+上下文继续复用`ChatContextPanel`与独立窗口，不混入最新时间线。旧mode=0取两侧11条作为各10条的边界探针；mode=1/2为包含游标的查询，适配器去掉游标并多读一条判断下一页，不根据固定页长编造更多数据。验证锚点存在、严格顺序、方向、大小；权限/404清正文，其他错误保留原窗口并按原方向重试。主门面仅暴露ID/version变化提示，msg/revoke、断连或身份变化使上下文失效，在途成员发生变化也不能提交旧窗口。v1上下文不构造v3时间线，SSR不读私有资源。
+
+原文与引用状态按当前身份/旧key隔离，关闭/取消中止两个读取，迟到结果不能重新打开弹窗；v3普通token轮换仍保留同身份请求。完整版两种布局均开放旧认证对应按钮，深链接等待当前登录恢复、返回最新清hash。公开时间线、本人撤回、特殊消息发送/领取等其他能力各自维护，不能用本次只读兼容声称全站完成。
+
+验证：`legacy-chat-reading-test.mjs`实际适配器及composable四组覆盖双原文/HTML、模式隔离、两侧边界与双向游标、重复/乱序/缺失锚点、跨读作者不一致、私有卡片过滤、身份/事件/关闭时序、授权错误恢复和SSR零私有请求。v3原文13组、上下文13组及聊天主链回归通过。浏览器本地合成账号验证经典/简约两布局原文、多行Markdown、引用预览、上下文定位与返回最新；没有向现网发送或撤回消息。完整构建/类型检查通过。测试后关闭夹具并恢复现网v1开发服务。真实旧账号权限与生产上下文尚未联调。
