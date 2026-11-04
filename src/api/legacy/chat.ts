@@ -36,7 +36,7 @@ export async function legacyChatNode(preferred='',signal?:AbortSignal){const key
  return{url:target.href,name:selected.name,options}
 }
 export function legacyChatContent(content:string){if(typeof content!=='string'||!content.trim()||content.length>4096||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(content)||Array.from(content).some(c=>c.length===1&&/[\ud800-\udfff]/.test(c)))throw new ApiError('聊天室正文不合法',422);if(/^\[(redpacket|setdiscuss|barrager|weather|music)\]/.test(content.trim()))throw new ApiError('特殊消息请使用对应的发送入口',422);return content}
-export async function legacyChatSend(content:string){legacyChatContent(content);const apiKey=getLegacyKey();if(!apiKey)throw new ApiError('请先登录聊天室',401);const r=legacyObject(await request('/chat-room/send',{method:'POST',body:JSON.stringify({apiKey,content,client:'Web/website_v3'}),cache:'no-store'}));if(typeof r.code!=='number')throw new ApiError('聊天室发送响应不完整，结果未确认',502);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'聊天室发送失败',400)}
+export async function legacyChatSend(content:string){legacyChatContent(content);const apiKey=getLegacyKey();if(!apiKey)throw new ApiError('请先登录聊天室',401);const r=legacyObject(await request('/chat-room/send',{method:'POST',__captchaRetried:true,body:JSON.stringify({apiKey,content,client:'Web/website_v3'}),cache:'no-store'}));if(typeof r.code!=='number')throw new ApiError('聊天室发送响应不完整，结果未确认',502);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'聊天室发送失败',400)}
 
 /** Legacy Markdown is read separately, never recovered from rendered timeline HTML. */
 function readingMessage(value:unknown,markdown?:string):import('../v3-chat-messages').ChatMessage{
@@ -76,12 +76,12 @@ export function legacyTopicInput(value:string){
  return text
 }
 export async function legacyChatSetTopic(value:string){const text=legacyTopicInput(value),apiKey=getLegacyKey();if(!apiKey)throw new ApiError('请先登录聊天室',401)
- const r=legacyObject(await request('/chat-room/send',{method:'POST',body:JSON.stringify({apiKey,content:`[setdiscuss]${text}[/setdiscuss]`,client:'Web/website_v3'}),cache:'no-store'}));if(typeof r.code!=='number')throw new ApiError('话题修改响应不完整，结果未确认',502);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'话题修改失败',400)
+ const r=legacyObject(await request('/chat-room/send',{method:'POST',__captchaRetried:true,body:JSON.stringify({apiKey,content:`[setdiscuss]${text}[/setdiscuss]`,client:'Web/website_v3'}),cache:'no-store'}));if(typeof r.code!=='number')throw new ApiError('话题修改响应不完整，结果未确认',502);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'话题修改失败',400)
 }
 export async function legacyChatRevoke(id:string,actorId:string){
  legacyChatId(id);legacyChatId(actorId);const apiKey=getLegacyKey();if(!apiKey)throw new ApiError('请先登录聊天室',401)
  let current:import('../v3-chat-messages').ChatMessage
  try{const rows=await readingRows(id,0,0,'html');if(rows[0]?.oId!==id)throw new ApiError('当前消息不可读取',404);current=readingMessage(rows[0])}catch(e){throw new ApiError(e instanceof Error?e.message:'当前消息读取失败',e instanceof ApiError?e.status:503,'legacy_preflight')}
  if(getLegacyKey()!==apiKey)throw new ApiError('登录状态已变化',401);if(current.author.id!==actorId||current.type==='unavailable')throw new ApiError('只能撤回自己的可读取消息',403);if(current.type==='redPacket')throw new ApiError('红包消息不能撤回',422)
- const r=legacyObject(await request(`/chat-room/revoke/${id}`,{method:'DELETE',body:JSON.stringify({apiKey}),cache:'no-store'}));if(typeof r.code!=='number')throw new ApiError('撤回响应不完整，结果未确认',502);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'撤回失败',400)
+ const r=legacyObject(await request(`/chat-room/revoke/${id}`,{method:'DELETE',__captchaRetried:true,body:JSON.stringify({apiKey}),cache:'no-store'}));if(typeof r.code!=='number')throw new ApiError('撤回响应不完整，结果未确认',502);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'撤回失败',400)
 }

@@ -79,6 +79,7 @@ export const useChatStore = defineStore('chat', () => {
   function clearScreen(){timeline.clearVisible()}
 
   return {
+    barrage:computed(()=>null as import('@/api/legacy/chat-barrage').LegacyBarrageEvent|null),
     removeConfirmed:(id:string)=>timeline.removeConfirmed(id),
     changeHint:computed(()=>timeline.changeHint),
     messages,

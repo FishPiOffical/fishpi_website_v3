@@ -145,7 +145,7 @@ export async function pingApi(timeoutMs = 8000): Promise<boolean> {
 }
 
 type RequestInitExtra = RequestInit & {
-  /** 内部：人机验证通过后已重试过，避免死循环 */
+  /** 内部：已重试或调用方禁止非幂等写入重放，避免自动重复提交 */
   __captchaRetried?: boolean
   /** Internal: an expired v3 access token has already been refreshed once. */
   __v3Retried?: boolean
