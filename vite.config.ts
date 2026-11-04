@@ -32,7 +32,19 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [vue()],
+    plugins: [vue(), {
+      name: 'feedback-deployment-switch',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (/^\/feedback-api(?:\/|$)/.test(req.url || '') && env.VITE_FEEDBACK_ENABLED !== 'true') {
+            res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+            res.end(JSON.stringify({ error: '需求反馈未启用' }))
+            return
+          }
+          next()
+        })
+      },
+    }],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -51,6 +63,13 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: true,
       proxy: {
+        '/feedback-api': {
+          target: env.FEEDBACK_TARGET || 'http://127.0.0.1:5174',
+          changeOrigin: false,
+          configure(server) {
+            server.on('proxyReq', (proxyReq, req) => { proxyReq.removeHeader('cookie'); proxyReq.setHeader('X-Forwarded-For', req.socket.remoteAddress || '127.0.0.1') })
+          },
+        },
         '/api/v3/realtime': { ...proxy, ws: true },
         '^/api/v3/auth/(?:login|refresh|logout)(?:\\?|$)': {
           ...proxy,

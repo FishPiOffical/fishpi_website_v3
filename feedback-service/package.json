@@ -1,0 +1,7 @@
+{
+  "name": "fishpi-feedback-service", "private": true, "version": "1.0.0", "type": "module",
+  "engines": { "node": ">=24.12" },
+  "scripts": { "start": "node --env-file-if-exists=.env src/main.ts", "check": "tsc --noEmit", "test": "node --test test/*.test.ts", "backup": "node src/storage.ts backup", "restore": "node src/storage.ts restore", "export": "node src/storage.ts export" },
+  "dependencies": { "express": "^5.2.1" },
+  "devDependencies": { "@types/express": "^5.0.6", "@types/node": "^24.13.3", "typescript": "~6.0.2" }
+}

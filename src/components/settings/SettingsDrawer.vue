@@ -10,11 +10,15 @@ import { useChatFilterStore, type ChatBlockMatch, type ChatBlockMode } from '@/s
 import { useAuthStore } from '@/stores/auth'
 import { usePrivateInboxStore } from '@/stores/privateInbox'
 import { useCountStore } from '@/stores/count'
+import { feedbackEnabled } from '@/feedback/api'
+import FeedbackDialog from '@/feedback/FeedbackDialog.vue'
+import { useFeedbackPanelStore } from '@/feedback/panel'
 import IncomeCard from '@/components/count/IncomeCard.vue'
 import HiddenChatConversations from '@/components/chat/HiddenChatConversations.vue'
 import WhisperConversations from '@/components/chat/WhisperConversations.vue'
 
 const drawer = useSettingsDrawerStore()
+const feedbackPanel = useFeedbackPanelStore()
 const { open, section } = storeToRefs(drawer)
 const home = useHomeLayoutStore()
 const pageSidebar = usePageSidebarStore()
@@ -29,6 +33,9 @@ const router = useRouter()
 const mounted = ref(false)
 const hiddenChatsOpen = ref(false)
 const { isLoggedIn } = storeToRefs(auth)
+watch([isLoggedIn, () => route.fullPath], ([loggedIn, path]) => {
+  if (feedbackEnabled && loggedIn && feedbackPanel.loginReturnPath === path) feedbackPanel.show(feedbackPanel.location.path)
+})
 const { unreadTotal: whisperUnread,error: whisperUnreadError, inboxOpen: whisperInboxOpen } = storeToRefs(whispers)
 const draggedSidebarId = ref('')
 const overSidebarId = ref('')
@@ -43,6 +50,7 @@ watch([showHiddenHandle], ([visible]) => {
 })
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
+  ...(feedbackEnabled ? [{ id: 'feedback' as const, label: '需求反馈', icon: '💡' }] : []),
   { id: 'home', label: '首页模块', icon: '🏠' },
   { id: 'pageSidebar', label: '内页侧栏', icon: '📑' },
   { id: 'chatSidebar', label: '聊天室侧栏', icon: '💬' },
@@ -264,7 +272,12 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
             <button type="button" class="close" aria-label="关闭设置" @click="drawer.hide()">✕</button>
           </header>
 
-          <div v-if="section === 'home'" class="content">
+          <div v-if="section === 'feedback'" class="content">
+            <p>分享建议、反馈问题，一起完善摸鱼派。</p>
+            <button class="drag-entry" @click="drawer.hide(); feedbackPanel.show('/feedback/new')"><b>提需求</b><span>描述你的想法或遇到的问题</span></button>
+            <button class="drag-entry" @click="drawer.hide(); feedbackPanel.show('/feedback')"><b>查看需求列表</b><span>查看处理进展，为感兴趣的需求投票</span></button>
+          </div>
+          <div v-else-if="section === 'home'" class="content">
             <button type="button" class="drag-entry" @click="startHomeEdit">
               <b>⠿ 拖动调整布局</b>
               <span>在首页直接拖动模块，左中右、上下任意摆放</span>
@@ -444,6 +457,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
         </div>
       </aside>
     </Transition>
+    <FeedbackDialog v-if="feedbackEnabled && feedbackPanel.open" />
   </Teleport>
 </template>
 

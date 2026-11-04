@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAppearanceStore } from '@/stores/appearance'
 
 const routes = [
+  ...['/feedback', '/feedback/new', '/feedback/:id'].map(path => ({ path, component: () => import('@/feedback/FeedbackView.vue'), meta: { robots: 'noindex' } })),
   { path: '/', name: 'home', component: () => import('@/views/HomeView.vue') },
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { robots: 'noindex' } },
   {

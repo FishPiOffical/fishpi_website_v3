@@ -147,6 +147,32 @@ function renderProdCssLinks(modules, manifest) {
 
 async function createServer() {
   const app = express()
+  app.set('trust proxy', 'loopback')
+  // Independent feedback service: do not send Rhythm cookies or use its API proxy.
+  app.use((req, res, next) => {
+    if (!/^\/feedback-api(?:\/|$)/.test(req.url || '')) return next()
+    res.setHeader('Cache-Control', 'no-store')
+    if ((process.env.VITE_FEEDBACK_ENABLED || env.VITE_FEEDBACK_ENABLED) !== 'true') {
+      res.status(503).json({ error: '需求反馈未启用' }); return
+    }
+    const target = new URL(process.env.FEEDBACK_TARGET || env.FEEDBACK_TARGET || 'http://127.0.0.1:5174')
+    const headers = { host: req.headers.host, accept: 'application/json', 'x-forwarded-for': req.ip }
+    for (const name of ['authorization', 'content-type', 'content-length', 'idempotency-key', 'origin']) {
+      if (req.headers[name]) headers[name] = req.headers[name]
+    }
+    const upstream = (target.protocol === 'https:' ? https : http).request({
+      hostname: target.hostname, port: target.port, path: req.url, method: req.method, headers,
+    }, response => {
+      res.statusCode = response.statusCode || 502
+      res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      response.on('error', () => res.destroy())
+      response.pipe(res)
+    })
+    upstream.setTimeout(20000, () => upstream.destroy())
+    upstream.on('error', () => { if (!res.headersSent) res.status(503).json({ error: '反馈服务暂不可用' }); else res.destroy() })
+    req.on('aborted', () => upstream.destroy())
+    req.pipe(upstream)
+  })
   let vite
   let template
   let render
