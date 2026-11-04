@@ -407,6 +407,7 @@ function itemProps(c: ArticleComment) {
   const own = isLoggedIn.value && isOwnComment(c)
   return {
     comment: c,
+    reactionSource: {articleId: article.value?.oId, page: commentPage.value},
     loggedIn: isLoggedIn.value,
     commentingEnabled: commentingEnabled.value,
     own,
@@ -678,7 +679,7 @@ function itemHandlers(c: ArticleComment) {
           <span><b>✨ 优质回帖</b></span>
         </div>
         <div class="comments-list">
-          <CommentItem v-for="c in nice" :key="'n' + c.oId" class="cmt-root" :comment="c" readonly />
+          <CommentItem v-for="c in nice" :key="'n' + c.oId" class="cmt-root" :comment="c" :reaction-source="{articleId:article.oId,page:commentPage}" readonly />
         </div>
       </section>
 

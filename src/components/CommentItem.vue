@@ -14,6 +14,7 @@ import MedalList from '@/components/medal/MedalList.vue'
 const props = withDefaults(
   defineProps<{
     comment: ArticleComment
+    reactionSource?: import('@/api/legacy/reactions').LegacyReactionSource
     /** 楼中楼回复：小头像、紧凑间距、相对时间 */
     reply?: boolean
     replyTo?: string
@@ -90,7 +91,7 @@ function onBodyClick(e: MouseEvent) {
         <RevisionHistory kind="comment" :target-id="comment.oId" />
 
         <footer class="cmt-ops">
-          <V3ReactionBar kind="comment" :target-id="comment.oId" :readonly="readonly" />
+          <V3ReactionBar kind="comment" :target-id="comment.oId" :readonly="readonly" :source="reactionSource" />
           <template v-if="interactive">
             <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" />
             <ArticleInteraction resource="comments" kind="thanks" :article-id="comment.oId" />

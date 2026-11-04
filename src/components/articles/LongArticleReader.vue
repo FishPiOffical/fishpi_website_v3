@@ -703,7 +703,7 @@ function chapterTitle(c: LongArticleChapter) {
               <p v-if="comment.commentContentVisible===false">此评论正文当前不可见</p>
               <div v-else class="la-paragraph-comment-body" v-html="comment.commentContent || ''" />
               <RevisionHistory kind="comment" :target-id="comment.oId" />
-              <V3ReactionBar kind="comment" :target-id="comment.oId" />
+              <V3ReactionBar kind="comment" :target-id="comment.oId" :source="{articleId:article.oId,paragraphId:activeParagraphId,page:paragraphPage,sort:paragraphSort}" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="vote" :article-id="comment.oId" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="thanks" :article-id="comment.oId" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="accept" :article-id="comment.oId" />

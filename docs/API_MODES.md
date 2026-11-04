@@ -28,7 +28,7 @@
 | 聊天室五类红包创建、详情与领取 | 第十四批已接；本地合成账号验收，非幂等旧结算 | 保留 |
 | 思过崖旧快照、涂鸦上传与插入 | 第十五批已接；旧快照不等价于实时禁言资源 | 保留 |
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
-| 表态等其余聊天室能力 | 待适配 | 保留 |
+| 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON，其他用户栏目待适配 | 保留 |
 | 关注/收藏、账号各类设置、财务/导出等 | 待适配 | 保留 |
 
@@ -277,3 +277,17 @@ v1 POST /report仅带旧apiKey、reportDataId、reportDataType、reportType、re
 验证：legacy-reports-test六组覆盖实际API/Pinia/编译Vue、四类分类、原文/Unicode/大小约束、精确旧字段、无假回执、未知结果跨组件锁定、无重发、全局备注保密、换key迟到、账号/模式/SSR/游客及公共包装隔离；原v3举报19组、模式/代理、聊天室共享门面和v3时间线回归、类型及完整构建通过。浏览器只用本机HTTP/WS夹具合成账号，验证聊天室举报入口、其他理由、备注、提交后关闭表单及无编号成功提示；夹具已停止并恢复127.0.0.1:5173现网v1开发服务。未向现网举报，真实权限/风控和审核结果未验。表态与其他全站模块继续适配。
 
 协议来源：[ReportProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ReportProcessor.java)、[Report模型常量](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Report.java)、[ReportMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ReportMgmtService.java)。只读核对源码，不运行第三方脚本、不恢复页面Cookie桥接。
+
+## 第十七批：文章、评论与聊天室表态
+
+公共V3ReactionBar按模式挂载LegacyReactionBar或原实现V3ReactionBarContent；v3目录、明确设置/删除及原键恢复保持原样。v1单独定义官方Reaction.java的28项协议常量，不把旧目录用作v3 GET失败兜底，也不重新接回原ReactionBar快照切换包装。
+
+旧协议没有独立表态GET：文章取当前/api/article，消息用getMessage精确读取；普通评论按所属文章/页定位，段评按所属文章/段落/页/排序读取，回复缺席时使用thread/replies的anchorCommentId定位精确回复。只合并同时在途的同源读取，不保留全文快照缓存；公开投影仅目标、当前选择、表情/计数/显示用户名，缺字段、缺目标及坏计数明确报错，不补零、不公开userDetails或源正文。普通评论、楼中楼和优质回帖都传当前文章页上下文，长篇段评传当前段落页与排序；段评主列表本身的旧接口迁移仍属后续批次。
+
+旧写使用POST /article/reaction、/comment/reaction、/chat-room/reaction，分别只传旧apiKey、articleId/commentId/oId、groupType和value；语义是一次切换，相同表情再次点击撤销，没有明确设置或幂等重放保证。禁用共享HTTP风控后的自动重发，保留每个kind+ID的未知原value跨SPA锁定；必须先成功重读、再明确核对解除，不能拿切换请求当安全重试。提交成功仅按当前HTTP状态重读，不拼回执summary。退出/账号/旧key变化清理并拒迟到；SSR/非v1不发旧写，游客仅显式读公开表态，聊天须登录。
+
+现代节点chatReaction事件只携ID失效提示，不接收其actorReaction/summary为本人状态、不向时间线补消息，不会因表态事件恢复清屏消息。挂载的对应消息组件重读当前状态，其余ID不扇出；焦点恢复可重读，原v3订阅链保持独立。代理和nginx转发精确旧表态写与只读评论JSON POST，并保持凭据隔离。
+
+验证：legacy-reactions-test十一组实际API/Pinia/编译组件及公共包装覆盖白名单/分类、三类目标精确格式、普通/段评/锚点读取、并发请求合并、切换/撤销、未知跨SPA锁定与重读后释放、身份迟到、实时元数据、游客/SSR/readonly、按钮DOM保留和重复处理器阻止、成功后读失败不重写；原v3表态16组、旧聊天室共享门面（补chatReaction只失效）/v3时间线、代理/模式、类型及完整构建通过。浏览器仅对本机合成HTTP/WS账号验证添加、再次点击撤销、更换表情；故意注入事件和回执计数999，仍显示当前HTTP计数1。未向现网表态；真实生产并发、权限与风控未验。测试后停夹具，恢复127.0.0.1:5173现网v1开发服务；其他全站兼容继续。
+
+协议来源：[ReactionProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ReactionProcessor.java)、[Reaction模型](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Reaction.java)、[ReactionQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ReactionQueryService.java)、[ArticleProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleProcessor.java)、[CommentProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CommentProcessor.java)。核对公开源码，不抓取HTML或恢复Cookie桥接。
