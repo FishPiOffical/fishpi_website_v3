@@ -26,7 +26,8 @@
 | 聊天室音乐/天气发送 | 第十二批已接；本地合成账号验收 | 保留 |
 | 聊天室弹幕价格/发送/实时显示 | 第十三批已接；本地合成节点验收 | 保留 |
 | 聊天室五类红包创建、详情与领取 | 第十四批已接；本地合成账号验收，非幂等旧结算 | 保留 |
-| 思过崖、举报/表态、涂鸦等其余聊天室能力 | 待适配 | 保留 |
+| 思过崖旧快照、涂鸦上传与插入 | 第十五批已接；旧快照不等价于实时禁言资源 | 保留 |
+| 举报/表态等其余聊天室能力 | 待适配 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON，其他用户栏目待适配 | 保留 |
 | 关注/收藏、账号各类设置、财务/导出等 | 待适配 | 保留 |
 
@@ -249,3 +250,17 @@ ChatRedPacketEditor/Card/Dialog/Recovery按模式挂载独立实现，原V3组�
 验证：`legacy-chat-packets-test.mjs`八组实际API/Pinia/编译Vue和模式包装覆盖五类型创建字段、接收人规范化/核验、精确只读GET不领取、公开摘要与隐私、负积分/已领取、独立POST和风险/手势、未知原操作锁、成功后读失败、取消/换号迟到、确认UI与恢复区无重放、SSR/模式边界。原v3红包23组及全部聊天室/旧主链/首页/私信/代理回归、类型及完整构建通过。浏览器仅用本机HTTP/现代节点夹具合成账号，验证创建金额确认、当前GET卡片、详情0/2不自动领、单独确认领取后当前GET显示1/2和本人15；恶意事件计数999未覆盖实际当前值。未在现网创建、领取或扣积分。夹具已停止、127.0.0.1:5173恢复现网v1开发服务。真实税务/扣款/并发领取/节点风控仍需真实账号联调，不能由本机夹具证明生产事务正确；全站剩余模块继续适配。
 
 协议来源：[ChatroomProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ChatroomProcessor.java)。旧getMessage读取与open有副作用的区别按源码核对，不抓页面、不恢复Cookie桥接。
+
+## 第十五批：思过崖快照与涂鸦入口
+
+MutesModule按模式选择LegacyMutesModule或原V3MutesModule；v3仍用有效禁言、稳定用户ID和服务端分页，不回退si:guo。v1只读公开JSON GET /chat-room/si-guo-list，不附加Bearer或旧key。投影用户名、昵称、头像、到期时间，保留签名URL；拒坏时间、重复用户名和超过1000条预算，按读取时刻过滤过期记录并排序，不造用户ID或实际权限状态。
+
+界面明确标注旧名单快照及读取时间，20条本机分页，翻页重读完整快照，非服务端分页。错误、未知人数、合法空结果分别显示；只称本次快照为空。旧服务器内部异常也可能返回成功空数组，客户端无法据此区分遗漏，不能宣称它是当前完整禁言名单。共享store按消费者计数、焦点刷新、最后卸载清理；身份变化拒迟到响应，SSR及非v1不发旧请求。头像与用户名链接仍接公共资料卡。
+
+PaintPanel上传适配器此前已支持双模式，本批补齐登录与上传证明选择。v1使用内存旧key，v3使用Bearer存在性；旧key变更取消上传并清绘制，v3正常token轮换保留绘制与上传。复用实际旧专用票据、具名PNG、无Cookie直传、签名URL及Markdown转义。只插入当前草稿，不直接发送聊天消息；失败保画布，关闭、卸载或换号拒迟到URL。
+
+验证：legacy-chat-mutes-test五组实际API/Pinia/编译Vue及模式包装覆盖白名单、过期、无假ID、分页、消费者、错误/空、焦点与身份/SSR边界；legacy-chat-paint-test十三组实际旧票据/共享上传及Canvas组件覆盖绘制、PNG、专用票据无Cookie、失败保留、关闭/身份取消和只插草稿。原v3思过崖11组、涂鸦13组及全部聊天室、首页、私信、代理回归，类型与完整构建通过。
+
+浏览器仅使用本机HTTP/WS夹具合成账号，验证25条快照的第二页、画布绘制后上传并插入编辑器，未点击聊天发送。临时开启的思过崖模块已恢复关闭，夹具已停并恢复现网v1开发服务。现网仅只读核对空快照；真实非空名单、图床权限及用户画作上传未验。举报、表态及全站其他模块继续适配。
+
+协议来源：[ChatroomProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ChatroomProcessor.java)、[ChatRoomBot快照维护](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/bot/ChatRoomBot.java)。仅核对源码和公开JSON。
