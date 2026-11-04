@@ -7,7 +7,7 @@ export function legacyObject(x:unknown):Row {if(!x || typeof x!=='object' || Arr
 export function legacyDate(value:unknown):number {
   if(typeof value==='number' && Number.isSafeInteger(value) && value>=0) return value
   if(typeof value!=='string') throw new ApiError('v1时间字段缺失',502)
-  const raw=/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)?value.replace(' ','T')+'+08:00':value
+  const raw=/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)?value.replace(' ','T')+'+08:00':value.replace(/ CST /,' GMT+0800 ')
   const n=Date.parse(raw);if(!Number.isFinite(n)) throw new ApiError('v1时间字段无效',502);return n
 }
 export async function legacyGet(path:string) {
@@ -19,7 +19,7 @@ export async function legacyHomeRead<K extends HomeRead>(key:K):Promise<HomeData
   if(key==='recent' || key==='hot') {
     const data=legacyObject(await legacyGet(key==='recent'?'/api/articles/recent?p=1&size=40':'/api/articles/recent/hot?p=1&size=12'))
     if(!Array.isArray(data.articles)) throw new ApiError('v1文章列表格式不正确',502)
-    return data.articles.map(legacyArticleSummary) as HomeData[K]
+    return data.articles.map(x=>legacyArticleSummary(x)) as HomeData[K]
   }
   if(key==='tags') {
     const data=legacyObject(await legacyGet('/api/tags?p=1&size=24'))
@@ -37,11 +37,12 @@ export async function legacyHomeRead<K extends HomeRead>(key:K):Promise<HomeData
   }) as HomeData[K]
 }
 
-export function legacyArticleSummary(x:unknown) {
-  const r=legacyObject(x),anonymous=r.articleAnonymous===1
+export function legacyArticleSummary(x:unknown, allowUnknownIdentity=false) {
+  const r=legacyObject(x),unknown=allowUnknownIdentity && r.articleAnonymous===undefined,anonymous=r.articleAnonymous===1 || unknown
   if(r.articleAnonymous!==0 && !anonymous) throw new ApiError('v1匿名标记无效',502)
   const author=r.articleAuthor && typeof r.articleAuthor==='object'?legacyObject(r.articleAuthor):{}
-  return adaptV3Article({id:r.oId,title:r.articleTitle,type:r.articleType,tags:r.articleTags,preview:r.articlePreviewContent,
-    anonymous,createdAt:legacyDate(r.articleCreateTimeStr),viewCount:r.articleViewCount,commentCount:r.articleCommentCount,
+  const result=adaptV3Article({id:r.oId,title:r.articleTitle,type:r.articleType,tags:r.articleTags,preview:r.articlePreviewContent,
+    anonymous,createdAt:legacyDate(r.articleCreateTimeStr ?? r.articleCreateTime),viewCount:r.articleViewCount,commentCount:r.articleCommentCount,
     perfect:r.articlePerfect===1,author:anonymous?{}:{id:r.articleAuthorId,userName:r.articleAuthorName,userNickname:typeof author.userNickname==='string'?author.userNickname:'',userAvatarURL:r.articleAuthorThumbnailURL48}})
+  return unknown ? {...result,articleIdentityUnavailable:true,articleAnonymous:undefined,articleAuthorId:'',articleAuthorName:'',articleAuthorNickname:'',articleAuthorThumbnailURL48:'',articleAuthorThumbnailURL20:''} : result
 }

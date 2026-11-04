@@ -10,13 +10,17 @@ function privatePath(path:string) {const key=getLegacyKey();return path+(key?'&'
 export async function legacyListing(kind:ArticleFeedKind,extra:string,p:number) {
   page(p)
   const paths:Partial<Record<ArticleFeedKind,string>>={recent:'/api/articles/recent',hot:'/api/articles/recent/hot',good:'/api/articles/recent/good',reply:'/api/articles/recent/reply',qna:'/api/articles/qna',perfect:'/api/articles/perfect'}
-  const path=paths[kind]
+  const searching=kind==='search'
+  if(searching && (!extra.trim() || extra.length>100 || /[\u0000-\u001f\u007f]/.test(extra))) throw new ApiError('搜索关键词不合法',422)
+  const scoped=kind==='tag'||kind==='domain'
+  if(scoped && (!extra || extra.length>256 || /[\u0000-\u001f\u007f]/.test(extra)))throw new ApiError('目录地址不合法',422)
+  const path=searching?'/api/search':scoped?`/api/articles/${kind}/${encodeURIComponent(extra)}`:paths[kind]
   if(!path) throw new ApiError('该列表的 v1 适配尚未完成',501)
-  if(extra) throw new ApiError('该列表不接受额外参数',422)
-  const d=legacyObject(await legacyGet(privatePath(`${path}?p=${p}&size=20`)))
+  if(extra && !scoped && !searching) throw new ApiError('该列表不接受额外参数',422)
+  const d=legacyObject(await legacyGet(privatePath(`${path}?p=${p}&size=20${searching?'&'+new URLSearchParams({key:extra.trim()}):''}`)))
   if(!Array.isArray(d.articles) || d.articles.length>20) throw new ApiError('旧文章列表响应不正确',502)
   const pagination=legacyObject(d.pagination)
-  return {list:d.articles.map(legacyArticleSummary),p,size:20,total:pagination.paginationRecordCount===undefined?null:count(pagination.paginationRecordCount),pageCount:count(pagination.paginationPageCount)}
+  return {list:d.articles.map(x=>legacyArticleSummary(x,searching)),p,size:20,total:(d.total ?? pagination.paginationRecordCount)===undefined?null:count(d.total ?? pagination.paginationRecordCount),pageCount:count(pagination.paginationPageCount)}
 }
 export function legacyComment(value:unknown):ArticleComment {
   const r=legacyObject(value)

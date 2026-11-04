@@ -235,6 +235,8 @@ export interface ArticleStickState {
 }
 
 export interface ArticleSummary {
+  /** Legacy summaries may omit anonymity metadata; do not infer identity from nested aliases. */
+  articleIdentityUnavailable?: boolean
   articleAnonymous?: number
   stick?: ArticleStickState
   oId: string

@@ -50,7 +50,7 @@ export async function legacyRanking(type:RankingType,p:number,size:number) {
 export async function legacyRandom(size:number,excludeId:string) {
   const r=await request<{articles?:unknown[];code?:number}>(privatePath(`/article/random/${size}`),{cache:'no-store'})
   if(r.code && r.code!==0 || !Array.isArray(r.articles) || r.articles.length>size)throw new ApiError('旧随机文章响应不正确',502)
-  const list=r.articles.map(legacyArticleSummary)
+  const list=r.articles.map(x=>legacyArticleSummary(x))
   if(new Set(list.map(x=>x.oId)).size!==list.length) throw new ApiError('旧随机文章列表重复',502)
   return list.filter(x=>x.oId!==excludeId)
 }

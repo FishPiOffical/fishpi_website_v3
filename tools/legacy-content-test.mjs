@@ -49,3 +49,32 @@ assert.equal((await routedColumns.legacyColumnPage('123',2)).list.length,1)
 state.route=p=>p.includes('/articles')?{articles:[],pagination:{paginationRecordCount:0,paginationPageCount:1}}:{columnId:'123',columnTitle:'接口目录不一致',columnArticleCount:68}
 await assert.rejects(routedColumns.legacyColumnDetail('123'),e=>e.status===503)
 console.log('PASS complete multi-page column directory gives genuine first/latest; inconsistent metadata versus empty directory fails rather than two-chapter fallback')
+state.key=null
+state.data={articles:[article],pagination:{paginationPageCount:2}}
+const tag=await legacyListing('tag','分享/技巧',1)
+assert.equal(tag.list.length,1);assert.match(state.calls.at(-1),/\/api\/articles\/tag\/%E5%88%86%E4%BA%AB%2F%E6%8A%80%E5%B7%A7\?p=1/)
+assert.ok(!state.calls.at(-1).includes('%25E5'))
+const directory=await import(url(replace(compile(await fs.readFile('src/api/legacy/directory.ts','utf8')),[['../http',shim],['./home',homeURL]])))
+state.data={domains:[{domainURI:'tech&life',domainTitle:'技术与生活',domainDescription:'介绍',domainIconPath:'javascript:evil',articleCnt:7,private:'drop'}]}
+const domains=await directory.legacyDirectory('domains',1)
+assert.equal(domains.total,1);assert.equal(domains.list[0].uri,'tech&life');assert.equal(domains.list[0].domainIconPath,'');assert.equal(domains.list[0].private,undefined)
+const again=directory.decodeLegacyDirectoryPage(domains,'domains',1);assert.equal(again.list[0].domainArticleCount,7)
+const tagItem={tagURI:'分享/技巧',tagTitle:'分享/技巧',tagDescription:'说明',tagIconPath:'/icon.png',tagReferenceCount:0}
+state.data={tags:[tagItem],total:51,pagination:{paginationPageCount:2}}
+const tags=await directory.legacyDirectory('tags',2)
+assert.equal(tags.list.length,1);assert.equal(tags.total,51);assert.equal(tags.pageCount,2);assert.equal(tags.list[0].tagReferenceCount,0)
+assert.deepEqual(directory.decodeLegacyDirectoryPage(tags,'tags',2),tags)
+await assert.rejects(directory.legacyDirectory('tags',1))
+state.data={tags:[],total:0,pagination:{paginationPageCount:0}}
+assert.equal((await directory.legacyDirectory('tags',1)).total,0)
+console.log('PASS real legacy tag slugs encode once; finite domain snapshot and true paginated tags preserve URI/counts, sanitize icons and SSR reproject')
+const {legacyDate}=await import(homeURL)
+assert.equal(new Date(legacyDate('Sun Sep 20 22:35:18 CST 2026')).toISOString(),'2026-09-20T14:35:18.000Z')
+state.data={articles:[{...article,articleAnonymous:undefined,articleCreateTimeStr:undefined,articleCreateTime:'Sun Sep 20 22:35:18 CST 2026',articleAuthor:{oId:'sensitive',userName:'must-not-link',userNickname:'must-not-display'}}],total:1,pagination:{paginationPageCount:1}}
+const search=await legacyListing('search','查询 & 测试',1)
+assert.equal(search.total,1);assert.equal(search.list[0].articleIdentityUnavailable,true);assert.equal(search.list[0].articleAnonymous,undefined);assert.equal(search.list[0].articleAuthorName,'')
+const searchProjection=decodeArticleListing({...search,kind:'search',extra:'查询 & 测试',order:'recent',resource:'articles'},'search','查询 & 测试','recent',1)
+assert.equal(searchProjection.list[0].articleAuthorId,'');assert.equal(searchProjection.list[0].articleIdentityUnavailable,true)
+assert.match(state.calls.at(-1),/key=/);assert.ok(!state.calls.at(-1).includes('key=查询'))
+state.mode='v3';assert.throws(()=>decodeArticleListing({...search,kind:'search',extra:'查询 & 测试',order:'recent',resource:'articles'},'search','查询 & 测试','recent',1));state.mode='v1'
+console.log('PASS legacy search masks unknown anonymity instead of nested identity inference; key encoding and China CST timestamps are correct; v3 rejects unknown identity')

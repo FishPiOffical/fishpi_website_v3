@@ -13,15 +13,16 @@ function integer(value: unknown): number { if (typeof value !== 'number' || !Num
 /** Reproject an already adapted public SSR article. Never serialize arbitrary legacy aliases. */
 export function decodePublicArticleSummary(value: unknown): ArticleSummary {
   const r = row(value)
-  if (r.articleAnonymous !== 0 && r.articleAnonymous !== 1 || typeof r.articleCreateTimeStr !== 'string') throw invalid()
+  const unknown=getApiMode()==='v1' && r.articleIdentityUnavailable===true
+  if (!unknown && r.articleAnonymous !== 0 && r.articleAnonymous !== 1 || typeof r.articleCreateTimeStr !== 'string') throw invalid()
   if (!Number.isFinite(Date.parse(r.articleCreateTimeStr)) || new Date(r.articleCreateTimeStr).toISOString() !== r.articleCreateTimeStr) throw invalid()
   if (r.articlePerfect !== undefined && r.articlePerfect !== 0 && r.articlePerfect !== 1) throw invalid()
   const result = adaptV3Article({ id: r.oId, title: r.articleTitle, preview: r.articlePreviewContent, tags: r.articleTags,
-    type: r.articleType, anonymous: r.articleAnonymous === 1, createdAt: Date.parse(r.articleCreateTimeStr), viewCount: r.articleViewCount,
+    type: r.articleType, anonymous: unknown || r.articleAnonymous === 1, createdAt: Date.parse(r.articleCreateTimeStr), viewCount: r.articleViewCount,
     commentCount: r.articleCommentCount, author: { id: r.articleAuthorId, userName: r.articleAuthorName, userNickname: r.articleAuthorNickname ?? '', userAvatarURL: r.articleAuthorThumbnailURL48 },
     ...(r.stick === undefined ? {} : { stick: r.stick }),
     ...(r.articlePerfect === undefined ? {} : { perfect: r.articlePerfect === 1 }) })
-  return result
+  return unknown ? {...result,articleIdentityUnavailable:true,articleAnonymous:undefined,articleAuthorId:'',articleAuthorName:'',articleAuthorNickname:'',articleAuthorThumbnailURL48:'',articleAuthorThumbnailURL20:''} : result
 }
 export function decodeArticleListing(value: unknown, kind: ArticleFeedKind, extra: string, order: ColumnOrder, p = 1): ArticleListing {
   const r = row(value), size = kind === 'long' ? 12 : 20
