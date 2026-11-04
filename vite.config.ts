@@ -166,7 +166,7 @@ export default defineConfig(({ mode }) => {
           ...proxy,
           bypass(req) {
             const path = (req.url || '').split('?')[0] || ''
-            const isApi = /^\/chat\/(get-list|get-message|mark-as-read|has-unread|revoke|send)(\/|$)/.test(path)
+            const isApi = /^\/chat\/(get-list|get-message|mark-as-read|mark-all-as-read|has-unread|revoke|send)(\/|$)/.test(path)
             if (isApi) return
             if (req.method === 'GET' || req.method === 'HEAD') return req.url
           },

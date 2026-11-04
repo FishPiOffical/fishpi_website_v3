@@ -18,7 +18,8 @@
 | 搜索、标签/领域目录及其文章列表 | 第四批已接，搜索缺匿名元数据时无身份展示 | 保留 |
 | 长篇列表与段评、内容互动 | 待适配 | 保留 |
 | 通知列表/未读/已读及实时刷新 | 第六批已接；旧列表仅有限快照，合成身份验收 | 保留 |
-| 聊天室、在线/话题/特殊卡片、私信 | 待适配 | 保留 |
+| 私信会话/历史/发送/撤回/已读/未读 | 第七批基础聊天已接，本地合成账号验收；富编辑/图片上传待共享编辑器批次 | 保留 |
+| 聊天室、在线/话题/特殊卡片 | 待适配 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON，其他用户栏目待适配 | 保留 |
 | 关注/收藏、账号各类设置、财务/导出等 | 待适配 | 保留 |
 
@@ -117,3 +118,20 @@ POST `/breezemoon`采用现有官方SDK的apiKey+breezemoonContent；PUT/DELETE 
 WebSocket升级代理提取到server/api-mode.ts，由SSR开发、Node生产与Vite SPA共用，nginx对应通道转Node按固定模式上游选择，避免生产绕过模式选择。v1剥离Bearer及v3刷新Cookie，v3实时URL拒绝query凭据；处理两端关闭和升级超时。Vite原重复通道代理移除，避免一次升级双重转发。回归同时发现并收紧HTTP凭据代理的精确认证路径，只有login/refresh/logout保留浏览器authority，其余API使用上游Host。
 
 验证：legacy-notifications实际模块/共享通道/状态专项覆盖快照分页、身份白名单、缺字段失败、已读语义、共享连接、换号同步清理与迟到拒绝；dual-websocket实际本机HTTP升级验证双目标与凭据隔离。原v3通知、私信21组、凭据代理、退役桥接、IPv4/IPv6升级、模式/SSR隔离回归通过；类型与双构建通过。浏览器只读核对游客访问通知正确跳转登录并保留回跳地址；登录态通知和真实现网已读/实时尚未用账号验收，未进行真实密码登录或通知写入。
+
+
+## 第七批：私信基础聊天
+
+完整页和悬浮窗统一通过PrivateMessages按模式选取实现，原V3PrivateMessages及其HTTP明确命令/幂等恢复保持。v1用独立legacy/messages、message-channel、legacyMessages及legacyPrivateInboxState；共享选中联系人、输入草稿与一条当前会话连接，两个面板同时挂载不会重复连接，离开完整页而悬浮窗仍打开时保留连接，最后一个消费者卸载才关闭并清除正文。身份变化同步清空旧正文、待核对操作和草稿，迟到历史不能恢复旧数据。完整页链接同时保留用户名和真实ID，两个列表按共同选择同步高亮。
+
+核对官方ChatProcessor源码后修正旧私信协议：HTTP使用result而非通知的code，has-unread的result为未读数且必须与实际data长度一致；逐行核对toId属于当前账号，再按fromId生成会话未读数。撤回/当前已读/全部已读分别调用chat/revoke、mark-as-read、mark-all-as-read，不存在的HTTP send不使用。撤回与已读只在明确result=0后重读，失败或不完整响应可能发生在写入之后，保留原命令并让用户先核对，解除锁定只修改本机状态，不自动重放。
+
+get-list的receiverUserName固定表示另一位联系人，不按最后一条消息的方向猜测senderUserName；根据真实参与者ID核验，白名单仅留联系人/预览/时间，不保留user_session等内部字段。会话列表为旧有限快照，客户端每20项分页；历史按真实page/pageSize读取，不补造总数，只有精确的“没有更多消息了”result=-1视为结束，其他失败明确展示。新消息或撤回后重读已展开页，按真实ID去重、排序，防止页码移动时旧正文残留；读取不自动标已读。文件传输助手使用既有FileTransfer名称和固定内建ID。
+
+旧发送只能向chat-channel写原文本，没有幂等键或请求关联ID。模块不在重连时重发；冻结目标和原文，只有看到匹配本人/目标/原文的新消息ID且当前HTTP历史再次确认该条时才解除发送锁定并清匹配草稿。这是当前消息可见性的核对，不声称旧协议有v3原子回执；超时、连接断开、服务端过滤导致原文不匹配或读失败时保留原文，用户核对后显式解除锁定。每次发送至多写一次当前连接。通道支持旧p心跳及退避重连，收到的HTML不直接写入历史，只有当前HTTP读取投影可进入正文。
+
+全局user-channel与通知共用已有单订阅，以失效后HTTP重读驱动顶部、左侧入口和弹窗内头像橙色圆点，不从事件count/preview拼私信内容。小窗口根据弹窗宽度压缩为头像列表与textarea+发送；联系人/连接状态移到紧凑标题，输入区固定在可见区域。v1目前允许输入文本/Markdown，Vditor预览、表情和图床上传仍待共享编辑器批次，不能据基础聊天完成声称富编辑全功能已适配。
+
+验证：legacy-messages实际API/连接/Pinia专项涵盖参与者/顺序/白名单、result和结束哨兵、会话姓名方向、真实未读归属、共享连接、当前HTTP确认、未知结果防重发、变更失败锁定、后置读失败不再写、换号/迟到隔离、SSR零私有请求及定时器清理。原v3私信21组、通知、双模式/SSR、共享WS代理回归、类型及双构建通过。浏览器使用只在内存中运行的本地HTTP/WS合成账号夹具，实际完成登录回跳、发送/输入清除、弹窗与完整页同步切人、B聊天时A通知、离开/chat后发送、全部已读与最小窗口圆点/输入布局；没有使用真实密码或向现网用户发送消息。测试结束已停止夹具并恢复127.0.0.1:5173指向现网v1的开发服务。
+
+协议参考：[官方ChatProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ChatProcessor.java)、[官方ChatChannel](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/channel/ChatChannel.java)，与先前官方SDK交叉核对。源码只读下载至临时目录，没有运行第三方源码。

@@ -35,7 +35,6 @@ state.dispatch=()=>({code:0,unreadNotificationCnt:-1});await assert.rejects(api.
 state.dispatch=()=>({code:0});await assert.rejects(api.legacyUnreadCount())
 for(const type of ['all','reply'])await api.markLegacyNotices(type)
 assert.ok(state.calls.at(-2).p.startsWith('/notifications/all-read?'));assert.ok(state.calls.at(-1).p.startsWith('/notifications/make-read/reply?'))
-state.dispatch=()=>({code:0,data:[{fromUser:'A'}]});assert.equal(await api.legacyPrivateUnread(),1)
 console.log('PASS explicit read semantics, required true unread total, missing category remains unknown')
 const timers=new Map();let timer=0
 globalThis.__legacyNoticeTimers={set(fn){timers.set(++timer,fn);return timer},clear(id){timers.delete(id)}}

@@ -55,10 +55,3 @@ export async function markLegacyNotices(type:NoticeType|'all') {
   if(typeof r.code!=='number')throw new ApiError('旧已读响应不完整',502)
   if(r.code!==0)throw new ApiError(r.msg || '标记已读失败',400)
 }
-export async function legacyPrivateUnread():Promise<number> {
-  const r=await request<{code:number;data?:unknown;msg?:string}>(authorized('/chat/has-unread'),{cache:'no-store'})
-  if(r.code!==0)throw new ApiError(r.msg || '私信未读数读取失败',400)
-  if(typeof r.data==='number')return count(r.data)
-  if(Array.isArray(r.data)&&r.data.length<=10000)return r.data.length
-  throw new ApiError('旧私信未读数格式不正确',502)
-}

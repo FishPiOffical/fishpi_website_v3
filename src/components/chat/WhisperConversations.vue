@@ -12,7 +12,7 @@ import ChatRevokeAction from '@/components/chat/ChatRevokeAction.vue'
 import ChatRevokeRecovery from '@/components/chat/ChatRevokeRecovery.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
 import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
-import V3PrivateMessages from '@/components/chat/V3PrivateMessages.vue'
+import PrivateMessages from '@/components/chat/PrivateMessages.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useChatFilterStore } from '@/stores/chatFilter'
@@ -28,7 +28,7 @@ const whispers = usePrivateInboxStore()
 const route = useRoute()
 const { account, apiKey } = storeToRefs(auth)
 const {inboxPeer,inboxPeerId}=storeToRefs(whispers)
-const privateFullId=ref('')
+const privateFullId=ref(''),privateFullName=ref(''),privateConnection=ref('')
 const {
   messages: roomMessages,
   connected: roomConnected,
@@ -344,7 +344,7 @@ onUnmounted(() => {
           <strong>聊天</strong>
           <RouterLink
             class="full-whisper-link"
-            :to="isChatroomSelected?'/cr':privateFullId?{path:'/chat',query:{peerId:privateFullId}}:'/chat'"
+            :to="isChatroomSelected?'/cr':privateFullId?{path:privateFullName?'/chat/'+encodeURIComponent(privateFullName):'/chat',query:{peerId:privateFullId}}:'/chat'"
             :aria-label="isChatroomSelected ? '打开完整聊天室' : '打开完整私信'"
             :title="isChatroomSelected ? '打开完整聊天室' : '打开完整私信'"
             @click="close"
@@ -355,11 +355,12 @@ onUnmounted(() => {
             </svg>
           </RouterLink>
           <div v-if="isCompactPanel && selectedPeer" class="compact-current" role="status" aria-live="polite">
-            <span class="compact-peer" :title="isChatroomSelected ? CHATROOM_LABEL : '私信'">{{ isChatroomSelected ? CHATROOM_LABEL : '私信' }}</span>
+            <span class="compact-peer" :title="isChatroomSelected ? CHATROOM_LABEL : privateFullName||'私信'">{{ isChatroomSelected ? CHATROOM_LABEL : privateFullName||'私信' }}</span>
             <span
               v-if="isChatroomSelected" class="compact-status"
               :class="{ connected: roomConnected, connecting: roomConnecting }"
             >{{ roomConnectionLabel }}</span>
+            <span v-else-if="privateConnection" class="compact-status">{{ privateConnection }}</span>
           </div>
         </div>
         <button type="button" aria-label="关闭聊天" @click="close">✕</button>
@@ -370,7 +371,7 @@ onUnmounted(() => {
           <button type="button" :aria-pressed="isChatroomSelected" @click="selectChatroom">聊天室</button>
         </nav>
         <div v-if="!isChatroomSelected" class="private-panel">
-          <V3PrivateMessages :initial-name="inboxPeer" :initial-id="inboxPeerId" @peer-selected="peer=>privateFullId=peer.id" />
+          <PrivateMessages :initial-name="inboxPeer" :initial-id="inboxPeerId" @connection-change="state=>privateConnection=state" @peer-selected="peer=>{privateFullId=peer.id;privateFullName=peer.userName}" />
         </div>
         <section v-else class="conversation-content">
           <header v-if="!isCompactPanel" class="conversation-head"><strong>{{ CHATROOM_LABEL }}</strong><small>{{ roomConnectionLabel }}</small></header>
@@ -414,7 +415,8 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .conversation-modes {flex:none;display:flex;gap:8px;padding:8px 12px;}
-.private-panel {flex:1;min-height:0;overflow:auto;padding:12px;}
+.private-panel{flex:1;min-height:0;overflow:auto;padding:10px;box-sizing:border-box}.private-panel :deep(.legacy-private){min-height:0}
+.conversation-modes{display:flex;gap:6px;padding:8px 10px 0;flex:none}.conversation-modes button{font:inherit;border:0;border-radius:6px;padding:5px 9px;color:var(--fp-muted);background:var(--fp-bg);cursor:pointer}.conversation-modes button[aria-pressed=true]{color:var(--fp-accent)}
 .whisper-panel {
   container-type: inline-size;
   container-name: whisper-panel;
@@ -859,6 +861,9 @@ onUnmounted(() => {
   }
 }
 @container whisper-panel (max-width: 520px) {
+  .private-panel :deep(.legacy-private .conversation > header){display:none}
+  .private-panel{padding:6px}
+
   .whisper-panel .conversation-layout { grid-template-columns: 56px minmax(0, 1fr); }
   .whisper-panel .conversation-list { padding: 6px 4px; }
   .whisper-panel .conversation { justify-content: center; gap: 0; padding: 7px 4px; }

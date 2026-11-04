@@ -44,7 +44,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
   return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const path=(req.url || '').split('?')[0] || ''
     const noticeResource=/^\/notifications\/(?:unread\/count|all-read|make-read\/(?:commented|reply|at|following|point|broadcast|sys-announce|other))$/.test(path)
-    const chatResource=/^\/chat\/(?:get-list|get-message|has-unread|mark-as-read|revoke|send)$/.test(path)
+    const chatResource=/^\/chat\/(?:get-list|get-message|has-unread|mark-as-read|mark-all-as-read|revoke|send)$/.test(path)
     const legacyResource=noticeResource || chatResource || /^\/user\/[A-Za-z0-9_-]+$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
     if (!/^\/api(?:\/|$)/.test(req.url || '') && !legacyResource) return next()
     const mode = requestMode(req,env)
