@@ -151,7 +151,7 @@ const settingsDrawer = useSettingsDrawerStore()
 const { immersive } = storeToRefs(useLayoutStore())
 const { isLoggedIn: authenticated, account, isVip } = storeToRefs(auth)
 const isLoggedIn = computed(() => mounted.value && authenticated.value)
-const { total: unreadTotal } = storeToRefs(notices)
+const { total: unreadTotal, error: noticeError } = storeToRefs(notices)
 const { unreadTotal: whisperUnread,error: whisperUnreadError } = storeToRefs(whispers)
 
 const isModernChat = computed(() => route.path === '/cr' && chat.chatStyle === 'modern')
@@ -324,8 +324,8 @@ onUnmounted(() => {
             to="/notifications"
             class="bar-icon count-link"
             :class="{ 'has-msg': unreadTotal > 0 }"
-            title="通知"
-            :aria-label="unreadTotal > 0 ? `通知（${unreadTotal} 条未读）` : '通知'"
+            :title="noticeError || '通知'"
+            :aria-label="noticeError || (unreadTotal > 0 ? `通知（${unreadTotal} 条未读）` : '通知')"
           >
             <NavIcon name="notice" />
             <span v-if="unreadTotal > 0" class="unread-badge" aria-hidden="true">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</span>

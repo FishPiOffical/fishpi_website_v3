@@ -7,7 +7,8 @@ const realm = `export class ApiError extends Error {constructor(message,status,c
 const shim = moduleUrl(realm)
 globalThis.window = { location: { protocol: 'http:', host: '127.0.0.1:5173', origin: 'http://127.0.0.1:5173' }, addEventListener(){},removeEventListener(){} }
 globalThis.__noticeResponses=[];globalThis.__noticeRequests=[];globalThis.__noticeToken='A';globalThis.__noticeListeners=new Set()
-function env(source,ssr=false){return source.replaceAll('import.meta.env.SSR',String(ssr)).replaceAll('import.meta.env.VITE_API_TARGET',JSON.stringify('http://localhost:8080'))}
+function env(source,ssr=false){return source.replaceAll("from './mode'",`from '${modeShim}'`).replaceAll("from '@/api/mode'",`from '${modeShim}'`).replaceAll("from './legacyNoticeState'",`from '${legacyShim}'`).replaceAll('import.meta.env.SSR',String(ssr)).replaceAll('import.meta.env.VITE_API_TARGET',JSON.stringify('http://localhost:8080'))}
+const modeShim=moduleUrl("export const getApiMode=()=> 'v3'"),legacyShim=moduleUrl("export function legacyNoticeState(){throw Error('v1 helper reached from v3')}")
 const source=env(await fs.readFile('src/api/v3-notifications.ts','utf8')).replace("from './http'",`from '${shim}'`)
 const api=await import(moduleUrl(source))
 const actor={id:'2',userName:'reader',userAvatarURL:'https://example.com/a.png'}

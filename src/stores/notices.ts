@@ -1,3 +1,5 @@
+import {getApiMode} from '@/api/mode'
+import {legacyNoticeState} from './legacyNoticeState'
 import { computed, onScopeDispose, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { UnreadCount } from '@/api/fishpi'
@@ -6,6 +8,7 @@ import { fetchV3UnreadCount } from '@/api/v3-notifications'
 import { subscribeNotificationChanges } from '@/api/v3-realtime'
 
 export const useNoticeStore = defineStore('notices', () => {
+  if(getApiMode()==='v1')return legacyNoticeState()
   const unread = ref<UnreadCount>({})
   const loading = ref(false)
   const error = ref('')

@@ -1,6 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
-import { apiProxy } from './server/api-mode.ts'
+import { apiProxy, handleApiUpgrade } from './server/api-mode.ts'
 import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
 import type { IncomingMessage } from 'node:http'
 
@@ -36,6 +36,7 @@ export default defineConfig(({ mode }) => {
     plugins: [vue(), {
       name: 'feedback-deployment-switch',
       configureServer(server) {
+        server.httpServer?.on('upgrade', (req, socket, head) => handleApiUpgrade(req, socket, head, { ...env, ...process.env }))
         server.middlewares.use(apiProxy({ ...env, ...process.env }))
         server.middlewares.use((req, res, next) => {
           if (/^\/feedback-api(?:\/|$)/.test(req.url || '') && env.VITE_FEEDBACK_ENABLED !== 'true') {
@@ -72,7 +73,6 @@ export default defineConfig(({ mode }) => {
             server.on('proxyReq', (proxyReq, req) => { proxyReq.removeHeader('cookie'); proxyReq.setHeader('X-Forwarded-For', req.socket.remoteAddress || '127.0.0.1') })
           },
         },
-        '/api/v3/realtime': { ...proxy, ws: true },
         '^/api/v3/auth/(?:login|refresh|logout)(?:\\?|$)': {
           ...proxy,
           changeOrigin: false,
@@ -86,8 +86,7 @@ export default defineConfig(({ mode }) => {
           secure: true,
           rewrite: (path) => path.replace(/^\/rhypic-upload/, ''),
         },
-        '/chat-room': { ...proxy, ws: true },
-        '/chat-room-channel': { ...proxy, ws: true },
+        '/chat-room': proxy,
         '/captcha': proxy,
         // Rhythm 风控人机验证页与校验接口（IP 黑名单时接口会 302 → /test）
         '/test': proxy,
@@ -138,7 +137,6 @@ export default defineConfig(({ mode }) => {
             }
           },
         },
-        '/chat-channel': { ...proxy, ws: true },
         '/charge': { ...proxy, bypass: spaGetBypass },
         '/pay': proxy,
         '/getApiKeyInWeb': proxy,
@@ -182,7 +180,6 @@ export default defineConfig(({ mode }) => {
         },
         '/report': proxy,
         '/markdown': proxy,
-        '/user-channel': { ...proxy, ws: true },
         '/logs': {
           ...proxy,
           bypass(req) {
@@ -232,7 +229,6 @@ export default defineConfig(({ mode }) => {
             }
           },
         },
-        '/article-channel': { ...proxy, ws: true },
         '/article': {
           ...proxy,
           bypass(req) {

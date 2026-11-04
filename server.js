@@ -1,4 +1,4 @@
-import { apiProxy, requestMode, backendTarget } from './server/api-mode.ts'
+import { apiProxy, requestMode, backendTarget, handleApiUpgrade } from './server/api-mode.ts'
 import fs from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
@@ -19,41 +19,6 @@ process.env.VITE_API_TARGET = apiTarget
 const FISHPI_UA =
   'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
 
-/**
- * Vite middlewareMode 没有 httpServer，server.proxy 的 ws: true 不生效；
- * 开发时由这里把 /*-channel 与 v3 realtime 的 WebSocket 升级请求隧道到 Rhythm（生产由 nginx 处理）。
- */
-function proxyWsUpgrade(req, socket, head) {
-  const target = new URL(req.url, backendTarget(requestMode(req, { ...env, ...process.env }), { ...env, ...process.env }))
-  const secure = target.protocol === 'https:'
-  const upstream = (secure ? https : http).request({
-    hostname: target.hostname.startsWith('[') ? target.hostname.slice(1, -1) : target.hostname,
-    port: target.port || (secure ? 443 : 80),
-    path: target.pathname + target.search,
-    method: 'GET',
-    headers: {
-      ...req.headers,
-      host: target.host,
-      origin: target.origin,
-      'user-agent': FISHPI_UA,
-    },
-  })
-  upstream.on('upgrade', (res, upstreamSocket, upstreamHead) => {
-    const lines = [`HTTP/1.1 ${res.statusCode} ${res.statusMessage}`]
-    for (let i = 0; i < res.rawHeaders.length; i += 2) lines.push(`${res.rawHeaders[i]}: ${res.rawHeaders[i + 1]}`)
-    socket.write(`${lines.join('\r\n')}\r\n\r\n`)
-    if (upstreamHead?.length) socket.write(upstreamHead)
-    if (head?.length) upstreamSocket.write(head)
-    upstreamSocket.on('error', () => socket.destroy())
-    upstreamSocket.pipe(socket).pipe(upstreamSocket)
-  })
-  upstream.on('response', (res) => {
-    socket.end(`HTTP/1.1 ${res.statusCode} ${res.statusMessage}\r\n\r\n`)
-  })
-  upstream.on('error', () => socket.destroy())
-  socket.on('error', () => upstream.destroy())
-  upstream.end()
-}
 
 function injectHtml(template, { appHtml, headPayload, payload, cssLinks }) {
   const head = [cssLinks || '', headPayload.headTags || '', headPayload.bodyTagsOpen || '']
@@ -259,12 +224,8 @@ async function createServer() {
   const server = app.listen(port, '127.0.0.1', () => {
     console.log(`FishPi SSR http://127.0.0.1:${port} (v1 → ${backendTarget('v1', { ...env, ...process.env })}, v3 → ${backendTarget('v3', { ...env, ...process.env })})`)
   })
-  if (!isProd) {
-    server.on('upgrade', (req, socket, head) => {
-      if (req.url === '/api/v3/realtime' && requestMode(req, { ...env, ...process.env }) === 'v1') { socket.end('HTTP/1.1 501 Not Implemented\r\n\r\n'); return }
-      if (req.url === '/api/v3/realtime' || /^\/[\w-]+-channel(\?|$)/.test(req.url || '')) proxyWsUpgrade(req, socket, head)
-    })
-  }
+  server.on('upgrade', (req, socket, head) => handleApiUpgrade(req, socket, head, { ...env, ...process.env }))
+
 }
 
 createServer()

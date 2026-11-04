@@ -2,8 +2,10 @@ import { md5 } from 'js-md5'
 import { ApiError, request } from '../http'
 import type { AccountInfo } from '../fishpi'
 let key: string | null = null
+const listeners=new Set<(key:string|null)=>void>()
+export function onLegacyKeyChange(listener:(key:string|null)=>void){listeners.add(listener);listener(key);return()=>{listeners.delete(listener)}}
 export function getLegacyKey() { return key }
-export function setLegacyKey(value: string | null) { key=value }
+export function setLegacyKey(value: string | null) { if(key===value)return;key=value;for(const listener of listeners)listener(key) }
 export async function legacyLogin(nameOrEmail: string, password: string, mfaCode: string) {
   const result=await request<{code:number;Key?:string;msg?:string}>('/api/getKey',{method:'POST',body:JSON.stringify({nameOrEmail,userPassword:md5(password),mfaCode})})
   if(result.code!==0 || typeof result.Key!=='string' || !result.Key) throw new ApiError(result.msg || '登录失败',401)
