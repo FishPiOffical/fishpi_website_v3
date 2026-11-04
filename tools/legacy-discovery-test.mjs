@@ -11,14 +11,15 @@ const home=url(replace(compile(await fs.readFile('src/api/legacy/home.ts','utf8'
 const relations=url(replace(compile(await fs.readFile('src/api/v3-user-relations.ts','utf8')),[['./http',shim]]))
 const repeater=url(replace(compile(await fs.readFile('src/api/v3-repeater.ts','utf8')),[['./mode',mode],['./http',shim]]))
 const auth=url('export const getLegacyKey=()=>__legacyDiscovery.key')
+const rankingAPI=await import(url(replace(compile(await fs.readFile('src/api/legacy/rankings.ts','utf8')),[['../http',shim],['./auth',auth],['./home',home],['../v3-user-relations',relations],['./public-user',url('export function legacyPublicUser(){throw Error("unused")}')]])))
 const api=await import(url(replace(compile(await fs.readFile('src/api/legacy/discovery.ts','utf8')),[['../http',shim],['./auth',auth],['./home',home],['../v3-user-relations',relations],['../v3-repeater',repeater]])))
 const extras=await import(url(replace(compile(await fs.readFile('src/api/v3-discovery-extras.ts','utf8')),[['./mode',mode],['./http',shim],['./v3-user-relations',relations],['./v3-content',content]])))
 const entries=Array.from({length:23},(_,i)=>({oId:String(100+i),userName:'user'+i,userNickname:'昵称'+i,userAvatarURL:'',userCurrentCheckinStreak:i,onlineMinute:i*60,userPassword:'must not expose'}))
 state.data={list:entries,totalData:{}}
-let result=await api.legacyRanking('checkin',2,8)
+let result=await rankingAPI.legacyRankingPage('checkin',2,8)
 assert.equal(result.total,23);assert.equal(result.pageCount,3);assert.equal(result.list[0].rank,9);assert.equal(result.list[0].score,8);assert.equal(result.list[0].user.userPassword,undefined)
-result=await api.legacyRanking('online',3,8);assert.equal(result.list.length,7);assert.equal(result.list[0].metrics.minutes,960)
-state.data.list[0].userCurrentCheckinStreak=undefined;await assert.rejects(api.legacyRanking('checkin',1,8))
+result=await rankingAPI.legacyRankingPage('online',3,8);assert.equal(result.list.length,7);assert.equal(result.list[0].metrics.minutes,960)
+state.data.list[0].userCurrentCheckinStreak=undefined;await assert.rejects(rankingAPI.legacyRankingPage('checkin',1,8))
 console.log('PASS finite legacy ranking snapshot paginates actual membership, preserves scores/ranks and never invents missing metrics')
 const item=i=>({oId:String(i),repeaterContentType:'joke',repeaterContent:'这是一段测试文本',repeaterContentLikeCount:0,repeaterContentLiked:false,repeaterContentCreatedTime:1000,repeaterContentAuthorId:'7',repeaterContentAuthorName:'author',secret:'do not project'})
 state.data={items:[item(1),item(2),item(3)]};state.key='synthetic-key'

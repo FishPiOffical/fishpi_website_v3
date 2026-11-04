@@ -13,7 +13,7 @@
 | 首页连签/在线榜单、最近注册、复读机读取及换一条 | 第三批已接真实快照 | 保留 |
 | 清风列表与写入口 | 第五批已接；写入为本机夹具验收，真实CSRF/权限待验 | 保留 |
 | 复读机投稿/点赞切换 | 第二十批已接；旧切换与投稿无幂等恢复，合成身份验收 | 保留 |
-| 其余榜单 | 待适配 | 保留 |
+| 十五类普通榜单及进化/小冰子榜 | 第二十一批已接；本次有限名单分页，职业另迁移 | 保留 |
 | 普通文章分类列表、详情和普通评论读取 | 第二批已接，未知总条数不显示 | 保留 |
 | 专栏目录读取 | 第二批适配，实际旧接口部分目录为空且与元数据不一致时明确503 | 保留 |
 | 搜索、标签/领域目录及其文章列表 | 第四批已接，搜索缺匿名元数据时无身份展示 | 保留 |
@@ -330,3 +330,15 @@ RepeaterComposer/LikeButton/Recovery按模式挂载独立实现，原v3组件保
 验证：legacy-repeater-test六组实际API/Pinia/编译组件/共享feed与公共包装覆盖精确旧字段、原文及专用key、空next对象、无假幂等/目标状态、未知冻结无重发、身份/SSR边界、点赞/撤销后真实GET、投稿草稿清理但不插回执、成功后读失败不重写及旧key迟到读取隔离。原v3复读机19组、旧发现读取回归、类型与完整构建通过。浏览器仅对本机合成账号验证点赞后HTTP计数1而非回执999，投稿后清空输入框并显示重新读取的榜单，回执正文不渲染；未在现网投复读内容或点赞。夹具已停止并恢复现网v1开发服务。生产投稿权限/规范化/并发切换仍需真实环境联调，全站剩余榜单/账号/内容互动等继续适配。
 
 协议来源：[RepeaterProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/RepeaterProcessor.java)、[RepeaterMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/RepeaterMgmtService.java)、[RepeaterContent](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/RepeaterContent.java)。只读核对JSON协议，不恢复旧会话桥接。
+
+## 第二十一批：十五类普通榜单与游戏子榜
+
+v1统一迁至legacy/rankings，删除discovery中的重复六榜实现。连签/在线/财富/支出/优选/邀请沿真实旧字段；四个积分小游戏榜使用point；人生重开取data.times和服务端achievement；进化四子榜取data.top及data.stats六个指标；捐助取total/totalCount及totalData.totalAmount/donateMakeDays；链接通过/api/top/any?types=topLinks读取公开聚合组，拒绝跨组响应并过滤危险URL。旧list仅有限名单，在原顺序上做本机分页，total表示本次实际名单长度，不能称全站人数/全量排名。
+
+小冰四子榜的uname先通过既有旧公开用户JSON核对真实稳定ID，不使用第三方oId或按名字造ID；分批最多四个并发，失败明确报错，不跳过未知用户后重排。公开投影仅姓名/昵称/头像及该榜必要指标，原存档、profile全文、联系方式和凭据不进SSR或客户端状态。签名头像URL保留。捐助汇总缺失、坏计数、重复用户或类型不一致保持错误，不补0；既有旧服务内部吞错返回空名单时客户端无法证明全站为空，界面仍只称当前快照。
+
+进化旧存档的知识值可能是合法小数，v1允许安全有限范围内的实际数值，不四舍五入成整数；v3整数契约保持不变。字符串数字只接规范十进制并校验安全范围，不从空字段推0。共享useRankingBoard按模式观察实际旧key/Bearer，旧key变化清状态并拒迟到；正常v3行为保留。公开SSR、首页8条预览和完整榜单继续共用原有组件，职业榜仍独立待适配。
+
+验证：legacy-rankings-test七组实际适配器/公共API和共享hook覆盖十五类主榜、进化/小冰四子榜、真实字段/范围分页、捐助小数和未知汇总、聚合链接与安全URL、私有存档白名单、小冰公开ID核验、空/错分离、旧key迟到与v3整数契约隔离；v3普通榜单16组、旧发现和复读机回归，类型及完整构建通过。浏览器仅对本机公开JSON夹具验证SSR进化榜、切知识子榜、第二页21～25名和小数知识显示；没有账号写入或读取真实游戏存档。夹具已停并恢复现网v1开发服务。生产非空游戏/捐助/小冰来源可用性未完整联调，职业与其余账号/关系/互动等全站兼容继续。
+
+协议来源：[TopProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/TopProcessor.java)、[ActivityQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ActivityQueryService.java)、[LinkQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/LinkQueryService.java)、[进化榜模板字段](https://github.com/FishPiOffical/rhythm/blob/master/src/main/resources/skins/classic/pc/top/evolve.ftl)。只读取源码核对JSON，不在运行时抓取模板。

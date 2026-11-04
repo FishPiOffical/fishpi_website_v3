@@ -1,9 +1,7 @@
 import { ApiError, request } from '../http'
 import { getLegacyKey } from './auth'
-import { legacyGet, legacyObject, legacyArticleSummary } from './home'
-import { decodeV3RelationUser } from '../v3-user-relations'
+import { legacyObject, legacyArticleSummary } from './home'
 import { repeaterEntry, type RepeaterEntry, type RepeaterKind } from '../v3-repeater'
-import type { RankingType } from '../v3-rankings'
 function privatePath(path:string) {const key=getLegacyKey();return path+(key?(path.includes('?')?'&':'?')+new URLSearchParams({apiKey:key}):'')}
 export function legacyRepeaterEntry(value:unknown):RepeaterEntry {
   const r=legacyObject(value)
@@ -30,22 +28,6 @@ export async function legacyRepeaterNext(type:RepeaterKind,exclude:string,signal
   const item=legacyRepeaterEntry(d.item)
   if(item.id===exclude||type&&item.type!==type)throw new ApiError('旧复读机随机项响应不正确',502)
   return item
-}
-const metricFields:Partial<Record<RankingType,string>>={checkin:'userCurrentCheckinStreak',online:'onlineMinute',balance:'userPoint',consumption:'userUsedPoint',perfect:'userPerfectArticleCount',invite:'userInviteUserCount'}
-const metricNames:Partial<Record<RankingType,string>>={checkin:'streak',online:'minutes',balance:'points',consumption:'points',perfect:'count',invite:'count'}
-export async function legacyRanking(type:RankingType,p:number,size:number) {
-  const field=metricFields[type],name=metricNames[type]
-  if(!field||!name) throw new ApiError('该榜单的 v1 适配尚未完成',501)
-  const d=legacyObject(await legacyGet(privatePath('/api/top/'+type)))
-  if(!Array.isArray(d.list)||d.list.length>10000) throw new ApiError('旧榜单响应异常',502)
-  // Legacy endpoint is a finite snapshot and ignores size/page. Paginate only that actual snapshot.
-  const list=d.list.map((item,index)=>{
-    const r=legacyObject(item),score=r[field]
-    if(typeof score!=='number'||!Number.isSafeInteger(score)||score<0) throw new ApiError('旧榜单数值不可用',502)
-    return {rank:index+1,score,metrics:{[name]:score},user:decodeV3RelationUser({id:r.oId,userName:r.userName,userNickname:r.userNickname,userAvatarURL:r.userAvatarURL})}
-  })
-  if(new Set(list.map(x=>x.user.id)).size!==list.length)throw new ApiError('旧榜单用户重复',502)
-  return {type,subType:'',p,size,total:list.length,pageCount:Math.ceil(list.length/size),list:list.slice((p-1)*size,p*size)}
 }
 export async function legacyRandom(size:number,excludeId:string) {
   const r=await request<{articles?:unknown[];code?:number}>(privatePath(`/article/random/${size}`),{cache:'no-store'})

@@ -39,9 +39,9 @@ export function decodeRanking(value: unknown, type: RankingType, sub = rankingSu
   if (row.type !== type || row.subType !== sub || page.pagination.p !== p || page.pagination.size !== size || page.list.length !== Math.max(0, Math.min(size, page.pagination.total - (p - 1) * size))) throw bad()
   const fields = rankingMetricFields(type, sub), primary = type === 'evolve' ? sub : fields[0]!
   const list = page.list.map((entry, index): RankingEntry => {
-    const rank = number(entry.rank), score = number(entry.score, type === 'donate'), source = object(entry.metrics), metrics: Record<string, number | string> = {}
+    const rank = number(entry.rank), score = number(entry.score, type === 'donate'||getApiMode()==='v1'&&type==='evolve'), source = object(entry.metrics), metrics: Record<string, number | string> = {}
     if (rank !== (p - 1) * size + index + 1) throw bad()
-    for (const field of fields) metrics[field] = field === 'ancestry' || field === 'gongfa' ? string(source[field]) : number(source[field], field === 'amount')
+    for (const field of fields) metrics[field] = field === 'ancestry' || field === 'gongfa' ? string(source[field]) : number(source[field], field === 'amount'||getApiMode()==='v1'&&type==='evolve')
     if (score !== metrics[primary]) throw bad()
     if (type === 'links') { const link = object(entry.link), id = string(link.id); if (!id || id.length > 32 || id[0] === '0' || /[^0-9]/.test(id)) throw bad(); return { rank, score, metrics, link: { id, title: string(link.title), url: url(string(link.url)) } } }
     return { rank, score, metrics, user: decodeV3RelationUser(entry.user) }
@@ -58,7 +58,7 @@ export function decodeInitialRanking(value: unknown, type: RankingType, sub: str
 export async function fetchRanking(type: RankingType, p = 1, sub?: string, size = 20): Promise<RankingPage> {
   rankingType(type); const normalized = rankingSubType(type, sub)
   if (!Number.isSafeInteger(p) || p < 1 || p > 42949672 || !Number.isInteger(size) || size < 1 || size > 50) throw new ApiError('排行榜分页不合法', 422)
-  if(getApiMode()==='v1') {const r=await (await import('./legacy/discovery')).legacyRanking(type,p,size);return decodeRanking({...r,pagination:{p,size,total:r.total,pageCount:r.pageCount}},type,normalized,p,size)}
+  if(getApiMode()==='v1') {const r=await (await import('./legacy/rankings')).legacyRankingPage(type,p,size,normalized);return decodeRanking({...r,pagination:{p,size,total:r.total,pageCount:r.pageCount}},type,normalized,p,size)}
   const query = new URLSearchParams({ p: String(p), size: String(size) }); if (normalized) query.set('subType', normalized)
   const envelope = object(await request(`/api/v3/rankings/${type}?${query}`, { cache: 'no-store' }))
   if (envelope.code !== 0) throw bad()
