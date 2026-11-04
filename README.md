@@ -12,7 +12,9 @@ npm run sitemap      # 生成 public/sitemap.xml
 
 开发服务器固定 `http://127.0.0.1:5173`，占用时请先结束旧进程，不会自动换端口。
 
-浏览器认证已迁移到 v3：访问令牌只保存在内存，通过 HttpOnly 刷新 Cookie 恢复，不再把凭据写入 localStorage。旧 apiKey 不能替代 Bearer，仍使用旧接口的功能正在分批迁移，当前覆盖与限制见 [v3迁移记录](docs/V3_MIGRATION.md)。开发脚本中的旧 apiKey 缓存仍仅适用于旧接口，不要放入 v3 访问令牌。
+新增 v1/v3 双模式分批适配：设置 → 接口版本可一键切换，当前真实覆盖和剩余批次见 [双模式说明](docs/API_MODES.md)。v1 旧 apiKey 独立保存在内存，不能与 Bearer 混用。Node.js 要求 >=24.12。
+
+v3 模式浏览器认证：访问令牌只保存在内存，通过 HttpOnly 刷新 Cookie 恢复，不再把凭据写入 localStorage。旧 apiKey 不能替代 Bearer，仍使用旧接口的功能正在分批迁移，当前覆盖与限制见 [v3迁移记录](docs/V3_MIGRATION.md)。开发脚本中的旧 apiKey 缓存仍仅适用于旧接口，不要放入 v3 访问令牌。
 
 开发代理默认指向 `https://fishpi.cn`。若本地 Rhythm 在 `8080`，在 `.env.development` 设置：
 

@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
+import { apiProxy } from './server/api-mode.ts'
 import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
 import type { IncomingMessage } from 'node:http'
 
@@ -35,6 +36,7 @@ export default defineConfig(({ mode }) => {
     plugins: [vue(), {
       name: 'feedback-deployment-switch',
       configureServer(server) {
+        server.middlewares.use(apiProxy({ ...env, ...process.env }))
         server.middlewares.use((req, res, next) => {
           if (/^\/feedback-api(?:\/|$)/.test(req.url || '') && env.VITE_FEEDBACK_ENABLED !== 'true') {
             res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })

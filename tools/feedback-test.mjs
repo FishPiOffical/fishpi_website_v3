@@ -8,7 +8,7 @@ const state={context:1,token:'first',listeners:[],calls:[],handler:null}
 globalThis.__feedback=state
 const http=url(`export const getAuthContextVersion=()=>__feedback.context;export const getAccessToken=()=>__feedback.token;export async function refreshAccessToken(){__feedback.token='rotated';for(const f of __feedback.listeners)f();return true}export function onAccessTokenChange(f){__feedback.listeners.push(f);f();return()=>{__feedback.listeners=__feedback.listeners.filter(v=>v!==f)}}`)
 const apiSource=(await fs.readFile('src/feedback/api.ts','utf8')).replaceAll("import.meta.env.VITE_FEEDBACK_ENABLED === 'true'",'true').replaceAll('import.meta.env.SSR','false')
-const apiURL=url(compile(apiSource).replace("from '@/api/http'",`from '${http}'`))
+const apiURL=url(compile(apiSource).replace("from '@/api/mode'",`from '${url('export const getApiMode=()=>"v3"')}'`).replace("from '@/api/legacy/auth'",`from '${url('export const getLegacyKey=()=>null')}'`).replace("from '@/api/http'",`from '${http}'`))
 const api=await import(apiURL)
 const oldFetch=globalThis.fetch
 globalThis.fetch=async(path,options)=>{state.calls.push({path,options});return state.handler(path,options)}

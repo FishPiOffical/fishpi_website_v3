@@ -12,12 +12,14 @@ function text(value: unknown, min: number, max: number) {
   return value as string
 }
 function choice(value: unknown, values: string[]) { if (typeof value !== 'string' || !values.includes(value)) fail(422, '选项不合法'); return value as string }
-export function rhythmVerifier(origin: string): (token: string) => Promise<Identity> {
-  const url = new URL('/api/v3/me', origin)
+export function rhythmVerifier(origin: string, mode: 'v1' | 'v3' = 'v3'): (token: string) => Promise<Identity> {
+  const url = new URL(mode === 'v1' ? '/api/user' : '/api/v3/me', origin)
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost','127.0.0.1','[::1]'].includes(url.hostname))) throw new Error('身份服务必须使用 HTTPS 或本机地址')
   return async token => {
     try {
-      const r = await fetch(url, { headers: { Authorization: token }, redirect: 'error', signal: AbortSignal.timeout(5000) })
+      const target=new URL(url)
+      if(mode==='v1') target.searchParams.set('apiKey',token)
+      const r = await fetch(target, { headers: mode==='v1'?{}:{ Authorization: token }, redirect: 'error', signal: AbortSignal.timeout(5000) })
       if (r.status === 401 || r.status === 403) fail(401, '请重新登录')
       if (!r.ok) fail(503, '身份服务暂不可用')
       if (!r.body) fail(503, '身份响应异常')
@@ -34,6 +36,8 @@ export function rhythmVerifier(origin: string): (token: string) => Promise<Ident
       } finally { reader.releaseLock() }
       const raw = Buffer.concat(chunks).toString('utf8')
       const data = JSON.parse(raw)
+      if (mode==='v1' && data.code===-1) fail(401,'请重新登录')
+      if(mode==='v1' && data.data) data.data.id=data.data.oId
       if (data.code !== 0 || typeof data.data?.id !== 'string' || typeof data.data?.userName !== 'string' || !data.data.id || !data.data.userName) fail(503, '身份响应异常')
       return { id: data.data.id, userName: data.data.userName, userNickname: typeof data.data.userNickname === 'string' ? data.data.userNickname : undefined }
     } catch (e) { if (e instanceof HttpError) throw e; fail(503, '身份服务暂不可用') }
@@ -43,7 +47,7 @@ const projection = `SELECT r.id,r.title,r.category,r.description,r.author_name A
   r.status,r.note,r.created_at AS createdAt,r.updated_at AS updatedAt,
   (SELECT count(*) FROM votes WHERE request_id=r.id AND choice='support') AS support,
   (SELECT count(*) FROM votes WHERE request_id=r.id AND choice='oppose') AS oppose FROM requests r`
-export function createApp(options: { db: DB; verify: (token: string) => Promise<Identity>; admins: Set<string>; enabled?: boolean; limits?: boolean }) {
+export function createApp(options: { db: DB; verify: (token: string) => Promise<Identity>; verifyLegacy?: (key:string) => Promise<Identity>; admins: Set<string>; enabled?: boolean; limits?: boolean }) {
   const { db, verify, admins } = options
   const app = express()
   app.disable('x-powered-by')
@@ -72,6 +76,16 @@ export function createApp(options: { db: DB; verify: (token: string) => Promise<
   router.get('/health', (_req, res) => { db.prepare('SELECT 1').get(); res.json({ ok: true }) })
   function current(id: string) { return db.prepare(`${projection} WHERE r.id=? AND r.hidden=0`).get(id) || fail(404, '需求不存在或已隐藏') }
   async function identity(req: Request) {
+    if(req.headers['x-fp-api-mode']==='v1') {
+      if(req.headers.authorization) fail(400,'v1请求不能携带Bearer')
+      const key=req.headers['x-fp-legacy-key']
+      if(typeof key!=='string' || !key || key.length>8192 || /\s/.test(key)) fail(401,'请先登录')
+      if(!options.verifyLegacy) fail(503,'v1身份核验未配置')
+      const user=await options.verifyLegacy!(key as string)
+      limit(`user:${user.id}:${req.method === 'POST' ? 'create' : 'other'}`,req.method==='POST'?10:90)
+      return user
+    }
+    if(req.headers['x-fp-legacy-key']) fail(400,'旧凭据必须明确选择v1协议')
     const token = req.headers.authorization
     if (!token || !/^Bearer [^\s]{1,8192}$/.test(token)) fail(401, '请先登录')
     const user = await verify(token!)

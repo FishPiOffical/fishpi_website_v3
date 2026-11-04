@@ -1,6 +1,6 @@
 # 公测需求反馈服务
 
-独立 Node.js/TypeScript/Express 服务，不写 Rhythm 数据库。身份只通过固定 Rhythm `/api/v3/me` 核验；没有自己的账号或刷新 Cookie。需要 Node.js >= 24.12（使用内建 `node:sqlite` 和 TypeScript 类型擦除）。运行时不需要编译器，`npm run check` 独立检查类型。
+独立 Node.js/TypeScript/Express 服务，不写 Rhythm 数据库。身份按明确协议分别通过固定 Rhythm `/api/v3/me`（v3 Bearer）或 `/api/user`（v1 apiKey）核验；没有自己的账号或刷新 Cookie。需要 Node.js >= 24.12（使用内建 `node:sqlite` 和 TypeScript 类型擦除）。运行时不需要编译器，`npm run check` 独立检查类型。
 
 ## 本地运行
 
@@ -78,3 +78,7 @@ npm test
 测试只使用本机身份HTTP夹具与内存数据库，覆盖身份核验、Cookie不转发、伪造作者、幂等冲突、双用户改/撤票、并发唯一约束、分页筛选、管理权限、隐藏及恢复、限流和关闭。前端身份/幂等专项运行根目录 `node tools/feedback-test.mjs`；网站另运行根目录 `npx vue-tsc -b` 和 `npm run build`；真实部署的网络、账号、进程管理与持久卷需上线前核验。
 
 本次本地验收：后端真实HTTP夹具专项、前端真实API/Pinia模块4组身份与恢复专项、类型检查及客户端/SSR双构建通过；浏览器验证设置两个入口、列表/详情、模拟账号提交、支持/反对/撤销、处理说明保存及关闭提示。后续改为弹窗后另验列表→详情→提交成功全过程地址不变、Escape关闭和入口焦点恢复。SQLite备份/恢复/导出命令及SPA代理启用/关闭均已实测。所有写入为本机内存库，没有真实账号或Rhythm业务写入；真实线上身份服务/权限、生产nginx与持久卷尚需部署验收。
+
+## 双模式身份
+
+网站设置可切换v1/v3，覆盖状态见根目录`docs/API_MODES.md`。`RHYTHM_V1_ORIGIN`默认现网，`RHYTHM_ORIGIN`单独指定v3后端。v1专用请求头携带旧key，服务端使用固定旧接口核验；不得传Bearer到旧apiKey参数，不记录身份请求URL或凭据。两种协议按真实稳定用户ID关联反馈与票，不建立第二份账号。

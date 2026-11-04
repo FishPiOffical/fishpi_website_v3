@@ -74,3 +74,26 @@ test('部署关闭和限流',async()=>{
   try {let status=0;for(let i=0;i<181;i++) status=(await fetch(`http://127.0.0.1:${(server.address() as {port:number}).port}/feedback-api/v1/health`)).status;assert.equal(status,429)}
   finally {await new Promise<void>(r=>server.close(()=>r()));db.close()}
 })
+
+test('v1身份与v3身份独立核验，不允许Bearer冒充apiKey',async()=>{
+  const upstream=createServer((req,res)=>{
+    const url=new URL(req.url!,'http://localhost')
+    assert.equal(url.pathname,'/api/user');assert.equal(req.headers.authorization,undefined);assert.equal(req.headers.cookie,undefined)
+    res.setHeader('Content-Type','application/json')
+    res.end(JSON.stringify(url.searchParams.get('apiKey')==='synthetic-key'?{code:0,data:{oId:'legacy-id',userName:'legacy_user'}}:{code:-1,msg:'invalid key'}))
+  }).listen(0,'127.0.0.1');await once(upstream,'listening')
+  const verifyLegacy=rhythmVerifier(`http://127.0.0.1:${(upstream.address() as {port:number}).port}`,'v1')
+  const db=openDatabase(':memory:')
+  const app=createApp({db,verify:async()=>{throw new Error('v1 must never enter v3 verifier')},verifyLegacy,admins:new Set(),limits:false})
+  const server=app.listen(0,'127.0.0.1');await once(server,'listening')
+  const endpoint=`http://127.0.0.1:${(server.address() as {port:number}).port}/feedback-api/v1/requests`
+  try {
+    const headers={'Content-Type':'application/json','Idempotency-Key':'legacy-command-1','X-FP-API-Mode':'v1','X-FP-Legacy-Key':'synthetic-key'}
+    const body=JSON.stringify({title:'旧接口身份反馈测试',category:'feature',description:'只在本机内存数据库中验证旧接口身份。'})
+    const result=await fetch(endpoint,{method:'POST',headers,body});assert.equal(result.status,200)
+    const id=(await result.json() as {id:string}).id
+    const detail=await (await fetch(endpoint+'/'+id)).json() as {authorName:string};assert.equal(detail.authorName,'legacy_user')
+    assert.equal((await fetch(endpoint,{method:'POST',headers:{...headers,Authorization:'Bearer synthetic-v3'},body})).status,400)
+    assert.equal((await fetch(endpoint,{method:'POST',headers:{...headers,'X-FP-Legacy-Key':'invalid'},body})).status,401)
+  } finally {await Promise.all([server,upstream].map(s=>new Promise<void>(r=>s.close(()=>r()))));db.close()}
+})

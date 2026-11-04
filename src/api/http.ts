@@ -1,3 +1,4 @@
+import { getApiMode } from './mode'
 import { ensureRiskCaptcha } from '@/utils/riskCaptcha'
 
 export const FISHPI_UA =
@@ -128,7 +129,7 @@ export async function pingApi(timeoutMs = 8000): Promise<boolean> {
   const ctrl = new AbortController()
   const timer = window.setTimeout(() => ctrl.abort(), timeoutMs)
   try {
-    const res = await fetch(resolveUrl('/api/v3/auth/captcha-options'), {
+    const res = await fetch(resolveUrl(getApiMode()==='v1'?'/api/articles/recent?p=1&size=1':'/api/v3/auth/captcha-options'), {
       method: 'GET',
       credentials: 'include',
       headers: { 'User-Agent': FISHPI_UA },
@@ -163,7 +164,8 @@ function apiBase() {
     (fromProcess && (fromProcess.VITE_API_TARGET || fromProcess.API_TARGET)) ||
     import.meta.env.VITE_API_TARGET ||
     'https://fishpi.cn'
-  return String(fromEnv).replace(/\/$/, '')
+  const modeTarget = getApiMode() === 'v1' ? (fromProcess && fromProcess.VITE_API_V1_TARGET) || import.meta.env.VITE_API_V1_TARGET || 'https://fishpi.cn' : (fromProcess && fromProcess.VITE_API_V3_TARGET) || import.meta.env.VITE_API_V3_TARGET || fromEnv
+  return String(modeTarget).replace(/\/$/, '')
 }
 
 function resolveUrl(path: string) {
@@ -192,6 +194,7 @@ function isRiskCaptchaPath(path: string) {
 }
 
 async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, identity: RequestIdentity): Promise<T> {
+  if(getApiMode()==='v1' && isV3Path(path)) throw new ApiError('该功能的 v1 适配尚未完成，可切换 v3 模式使用',501,'v1_pending')
   const headers = new Headers(init.headers)
   if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
   if (init.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {

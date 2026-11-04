@@ -1,3 +1,5 @@
+import { apiModeContext } from './api/server-mode'
+import { getApiMode, type ApiMode } from './api/mode'
 import { fetchDirectoryPage } from './api/v3-directory'
 import { fetchHomeBootstrap } from './api/v3-home-reads'
 import { fetchArticleListing } from './api/v3-article-list'
@@ -113,7 +115,10 @@ async function prefetch(url: string): Promise<SsrPayload> {
   return {}
 }
 
-export async function render(url: string) {
+export async function render(url: string, mode?: ApiMode) {
+  return apiModeContext.run(mode || getApiMode(), () => renderPage(url))
+}
+async function renderPage(url: string) {
   const payload = await prefetch(url)
   // Clone before render — views consume the live payload during SSR.
   const clientPayload = JSON.parse(JSON.stringify(payload)) as typeof payload

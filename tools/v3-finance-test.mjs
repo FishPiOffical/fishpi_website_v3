@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import ts from 'typescript'
 import { createPinia, setActivePinia, defineStore } from 'pinia'
 import { ref, nextTick } from 'vue'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'", "from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'")
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__finance={requests:[],responses:[],context:1,SSR:false,confirm:async()=>true,keys:0}
 const state=__finance
