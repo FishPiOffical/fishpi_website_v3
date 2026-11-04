@@ -1,0 +1,8 @@
+<script setup lang="ts">
+import {useLegacyChatActionsStore} from '@/stores/legacyChatActions'
+import {useChatStore} from '@/stores/chat'
+const props=defineProps<{kind:'topic'|'revoke'}>(),store=useLegacyChatActionsStore(),chat=useChatStore()
+async function reread(){if(props.kind==='topic')await chat.refreshOnline();else await chat.refreshMessages()}
+</script>
+<template><div class="legacy-action-state"><p v-if="store.error&&store.errorKind===kind" role="alert">{{ store.error }}</p><div v-if="store.pending?.kind===kind" role="status"><p>{{ kind==='topic'?'本次话题修改':'消息 '+(store.pending.kind==='revoke'?store.pending.id:'')+' 的撤回' }}结果未确认。</p><p v-if="store.pending.kind==='topic'" class="original">原话题：{{ store.pending.text }}</p><p>旧接口不支持幂等恢复。请先核对当前内容和积分记录，再决定后续操作。</p><button type="button" :disabled="store.busy" @click="reread">重读当前{{ kind==='topic'?'话题':'消息' }}</button><button type="button" :disabled="store.busy" @click="store.release">我已核对，解除锁定</button></div><p v-if="store.completed?.kind===kind" role="status">{{ kind==='topic'?'本次话题修改已确认，当前话题以重新读取为准。':'消息 '+(store.completed.kind==='revoke'?store.completed.id:'')+' 已撤回，实际费用请查看积分记录。' }}</p><p v-if="kind==='topic'&&chat.topicError" role="alert">{{ chat.topicError }} <button type="button" @click="reread">重读当前话题</button></p></div></template>
+<style scoped lang="scss">.legacy-action-state{overflow-wrap:anywhere}p{font-size:13px;margin:6px 0}.original{white-space:pre-wrap}[role=alert]{color:#bd503c}button{font:inherit;margin:3px;border:1px solid var(--fp-border);border-radius:5px;padding:5px 8px;background:var(--fp-card);color:var(--fp-text)}</style>

@@ -68,3 +68,20 @@ export async function legacyChatWindow(options:{before?:string;after?:string;siz
  for(const r of rows)if(before?BigInt(r.oId)>BigInt(id):BigInt(r.oId)<BigInt(id))throw new ApiError('聊天室上下文游标不正确',502)
  const exclusive=rows.filter(r=>r.oId!==id),hasMore=exclusive.length>size,list=(before?exclusive.slice(-size):exclusive.slice(0,size)).map(v=>readingMessage(v));return{list,hasMore,nextBefore:list[0]?.id||'',nextAfter:list.at(-1)?.id||''}
 }
+
+export function legacyTopicInput(value:string){
+ if(typeof value!=='string')throw new ApiError('话题不合法',422)
+ const text=value.trim(),punctuation=' ,，.。！!?？《》：“”；；‘’“”()（）【】[]『』——…-_@#$%^&*<>+=|~/'
+ if(!text||text.length>64||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(text)||Array.from(text).some(c=>{const n=c.codePointAt(0)!;return !(n>=0x200d||/[a-zA-Z0-9]/.test(c)||punctuation.includes(c))}))throw new ApiError('话题须为1至64个有效字符，不支持换行或控制字符',422)
+ return text
+}
+export async function legacyChatSetTopic(value:string){const text=legacyTopicInput(value),apiKey=getLegacyKey();if(!apiKey)throw new ApiError('请先登录聊天室',401)
+ const r=legacyObject(await request('/chat-room/send',{method:'POST',body:JSON.stringify({apiKey,content:`[setdiscuss]${text}[/setdiscuss]`,client:'Web/website_v3'}),cache:'no-store'}));if(typeof r.code!=='number')throw new ApiError('话题修改响应不完整，结果未确认',502);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'话题修改失败',400)
+}
+export async function legacyChatRevoke(id:string,actorId:string){
+ legacyChatId(id);legacyChatId(actorId);const apiKey=getLegacyKey();if(!apiKey)throw new ApiError('请先登录聊天室',401)
+ let current:import('../v3-chat-messages').ChatMessage
+ try{const rows=await readingRows(id,0,0,'html');if(rows[0]?.oId!==id)throw new ApiError('当前消息不可读取',404);current=readingMessage(rows[0])}catch(e){throw new ApiError(e instanceof Error?e.message:'当前消息读取失败',e instanceof ApiError?e.status:503,'legacy_preflight')}
+ if(getLegacyKey()!==apiKey)throw new ApiError('登录状态已变化',401);if(current.author.id!==actorId||current.type==='unavailable')throw new ApiError('只能撤回自己的可读取消息',403);if(current.type==='redPacket')throw new ApiError('红包消息不能撤回',422)
+ const r=legacyObject(await request(`/chat-room/revoke/${id}`,{method:'DELETE',body:JSON.stringify({apiKey}),cache:'no-store'}));if(typeof r.code!=='number')throw new ApiError('撤回响应不完整，结果未确认',502);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'撤回失败',400)
+}

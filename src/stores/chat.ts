@@ -79,6 +79,7 @@ export const useChatStore = defineStore('chat', () => {
   function clearScreen(){timeline.clearVisible()}
 
   return {
+    removeConfirmed:(id:string)=>timeline.removeConfirmed(id),
     changeHint:computed(()=>timeline.changeHint),
     messages,
     onlines,
