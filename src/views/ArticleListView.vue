@@ -45,11 +45,11 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
         <section v-if="isColumnPage" class="column-intro">
           <div class="column-intro-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> FISHPI · STORIES</div><h1>长篇专栏</h1><p>把故事慢慢写完，也把喜欢的章节一页页读下去。</p></div>
           <div class="column-intro-mark" aria-hidden="true"><span>卷</span><i></i><b></b></div>
-          <div class="column-intro-footer"><span v-if="value">共 {{ value.total }} 部可见作品</span><span v-else>专栏目录</span><span>每一次更新，都是故事的新一页</span></div>
+          <div class="column-intro-footer"><span v-if="value && value.total !== null">共 {{ value.total }} 部可见作品</span><span v-else>专栏目录</span><span>每一次更新，都是故事的新一页</span></div>
         </section>
         <div v-else class="module-header list-page-head">
           <div class="head-left"><h1>{{ heading }}</h1><ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" /><span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span></div>
-          <div class="head-right"><nav v-if="showRecentTabs" class="sort-tabs"><RouterLink v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to" :class="{ current: route.path === tab.to }">{{ tab.label }}</RouterLink></nav><span v-if="value" class="total-count">共 {{ value.total }} 篇</span></div>
+          <div class="head-right"><nav v-if="showRecentTabs" class="sort-tabs"><RouterLink v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to" :class="{ current: route.path === tab.to }">{{ tab.label }}</RouterLink></nav><span v-if="value && value.total !== null" class="total-count">共 {{ value.total }} 篇</span></div>
         </div>
         <div v-if="isColumnPage" class="column-shelf-head">
           <div><strong>专栏目录</strong><span>按当前可见章节统计</span></div>

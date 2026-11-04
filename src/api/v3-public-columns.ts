@@ -1,3 +1,4 @@
+import { getApiMode } from './mode'
 import { ApiError, request } from './http'
 import { decodeV3ContentPage } from './v3-content'
 export type PublicChapter = { id: string; title: string; chapterNo: number; createdAt: number; preview?: string }
@@ -34,11 +35,13 @@ export async function fetchPublicColumnCards(kind: 'latest' | 'hot', p = 1, size
   return { ...page.pagination, list }
 }
 export async function fetchPublicColumnDetail(id: string) {
+  if(getApiMode()==='v1') return (await import('./legacy/columns')).legacyColumnDetail(id)
   publicColumnId(id); const result = await data(`/api/v3/columns/${encodeURIComponent(id)}`), meta = decodePublicColumnCard(result.column), list = chapters(result.chapters)
   if (meta.id !== id || meta.articleCount !== list.length || list.some((item, index) => index > 0 && item.chapterNo < list[index - 1]!.chapterNo)) throw invalid()
   return { column: meta, first: list[0] || null, latest: list[list.length - 1] || null }
 }
 export async function fetchColumnChapters(id: string, p = 1): Promise<ColumnChapterPage> {
+  if(getApiMode()==='v1') return (await import('./legacy/columns')).legacyColumnPage(id,p)
   publicColumnId(id); paging(p, 20); const page = decodeV3ContentPage(await data(`/api/v3/columns/${encodeURIComponent(id)}/articles?p=${p}&size=20`))
   if (page.pagination.p !== p || page.pagination.size !== 20) throw invalid()
   return { ...page.pagination, list: chapters(page.list) }

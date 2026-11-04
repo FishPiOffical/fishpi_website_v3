@@ -5,7 +5,7 @@ import ts from 'typescript'
 import { parse, compileScript } from '@vue/compiler-sfc'
 import { createSSRApp, h } from 'vue'
 import { renderToString } from '@vue/server-renderer'
-const compile = source => ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
+const compile = source => ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replaceAll("from './mode'", "from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'")
 const url = source => 'data:text/javascript;base64,' + Buffer.from(source).toString('base64')
 const http = url('export class ApiError extends Error{};export function request(){throw Error("unexpected HTTP")}')
 const apiURL = url(compile(await fs.readFile('src/api/v3-content.ts', 'utf8')).replace("from './http'", `from '${http}'`))

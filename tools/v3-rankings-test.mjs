@@ -5,7 +5,7 @@ import {parse,compileScript} from '@vue/compiler-sfc'
 import {createRenderer,createSSRApp,h,ref,reactive,nextTick} from 'vue'
 import {createPinia,defineStore} from 'pinia'
 import {renderToString} from '@vue/server-renderer'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`).replaceAll(`from "${a}"`,`from '${b}'`);return s}
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'", "from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'"),url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`).replaceAll(`from "${a}"`,`from '${b}'`);return s}
 globalThis.Document=class{};globalThis.ShadowRoot=class{}
 const state=globalThis.__rankings={context:1,calls:[],dispatch:null,ssr:false,initial:null}
 const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAuthContextVersion(){return globalThis.__rankings.context}export async function request(path,init){globalThis.__rankings.calls.push({path,init});return globalThis.__rankings.dispatch(path,init)}`),{ApiError}=await import(http)

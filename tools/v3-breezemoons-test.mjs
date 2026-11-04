@@ -5,7 +5,7 @@ import { parse, compileScript } from '@vue/compiler-sfc'
 import { createRenderer, createSSRApp, h, nextTick, ref, reactive } from 'vue'
 import { createPinia, defineStore } from 'pinia'
 import { renderToString } from '@vue/server-renderer'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'", "from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'")
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.Document=class{};globalThis.ShadowRoot=class{}
 globalThis.__moons={context:1,requests:[],responses:[],dispatch:null,confirm:async()=>false};const state=__moons
