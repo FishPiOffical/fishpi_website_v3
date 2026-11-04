@@ -23,7 +23,8 @@
 | 聊天室历史/实时/普通发送/在线名单与话题读取 | 第九批已接现代节点；本地合成节点验收 | 保留 |
 | 聊天室原文、引用、消息上下文 | 第十批已接独立原文和双向上下文读取 | 保留 |
 | 本人聊天室撤回、话题修改 | 第十一批已接；无幂等恢复，合成账号验收 | 保留 |
-| 聊天室特殊消息发送、红包领取等 | 待适配 | 保留 |
+| 聊天室音乐/天气发送 | 第十二批已接；本地合成账号验收 | 保留 |
+| 聊天室弹幕、红包等剩余特殊操作 | 待适配 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON，其他用户栏目待适配 | 保留 |
 | 关注/收藏、账号各类设置、财务/导出等 | 待适配 | 保留 |
 
@@ -205,3 +206,16 @@ msg事件只按ID读取当前GET chat-room/getMessage(mode=0,size=0,type=html)�
 验证：`legacy-chat-actions-test.mjs`九组实际API/Pinia/编译Vue组件与模式包装测试覆盖旧语法/DELETE body、先验证再收费、本人及红包预检、未知冻结/无重放、预检错误、成功后读失败、换号迟到、取消/确认、原草稿完成、只读恢复UI与SSR/模式限制。原v3话题13组、撤回11组以及其他聊天室、原文/上下文、首页/私信和代理回归通过；类型及完整构建通过。浏览器仅对本机HTTP/WS夹具合成账号验证侧栏话题收费确认、成功后当前话题重读、本人撤回确认与列表即时移除；未对现网修改话题、撤回消息或扣分。测试后停夹具、恢复现网v1开发服务。真实账号收费、服务端权限及生产节点仍待联调，红包/弹幕/音乐/天气等特殊能力继续下一批。
 
 协议来源：[ChatroomProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ChatroomProcessor.java)、[LoginCheckMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/LoginCheckMidware.java)。读取官方源码核对JSON旧key认证，不恢复Cookie桥接。
+
+
+## 第十二批：音乐及天气卡片发送
+
+音乐/天气公共编辑与恢复入口按模式挂载，原v3实现保留在V3ChatMusicEditor/Recovery、V3ChatWeatherEditor/Recovery，不改变其幂等确认、当前消息读取和重试逻辑。旧实现复用相同四字段音乐与五日天气的纯校验函数，不调用v3传输；v1在`legacy/chat-media.ts`明确POST旧send，只有apiKey/content/client，正文为`[music]{...}[/music]`或`[weather]{...}[/weather]`。天气将显式填写的五个日期、代码、最低/最高温度组成逗号分隔旧字段date/weatherCode/min/max，city/description映射t/st，不查询天气、不补默认预报。序列化后连同标签总长不得超过旧接口4096单位限制。
+
+旧卡片发送共用legacyChatActions串行锁，与话题/撤回互斥；保存规范化白名单字段的独立快照，天气days深拷贝，不接受外部字段。code=0只表示本次操作已确认，旧响应没有可靠ID；成功后仅重读当前时间线，不猜ID、不以回执或本机草稿拼接卡片正文。读取失败不改变已确认状态，不再次发送。新操作清理旧完成状态；未知响应固定原kind/input跨SPA保留并冻结输入，恢复区仅显示原卡片字段、重读当前消息及明确核对后解除本机锁定，不能伪装v3同键重发。退出/换号/旧key变化清理并拒迟到响应，SSR/非v1不能发旧写。
+
+共享ChatCard继续渲染当前GET投影，数字歌曲ID只提供网易云链接，不作为相对音频地址自动请求；HTTPS音频只在显式播放时访问。天气保留完整年份并分别显示五日天气和温度。原文/引用仍仅白名单公开摘要，不回显卡片运输对象。
+
+验证：`legacy-chat-media-test.mjs`六组实际API/Pinia/编译Vue与模式包装覆盖两种旧语法和旧凭据、五日字段、危险URL/HTML/Unicode与超长序列化拒绝、无假ID/正文、成功后读失败、并发锁/嵌套草稿冻结、换key、真实编辑器空预报与提交清理、只读恢复及SSR/模式限制。v3音乐16组、天气16组及其余聊天室、首页/私信和代理回归通过；类型及完整构建通过。浏览器仅用本机HTTP/现代节点夹具合成账号，验证简约布局音乐发送/卡片/网易云链接，经典布局手填五日天气发送及日期/温度显示、完成后关闭表单。未向现网分享音乐/天气，未实际播放远程音频；生产节点、权限与风控仍待联调。夹具已停止，127.0.0.1:5173恢复现网v1开发服务。弹幕/红包及其他全站功能仍继续适配。
+
+协议来源：[ChatroomProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ChatroomProcessor.java)、[旧聊天室天气字段与渲染](https://github.com/FishPiOffical/rhythm/blob/master/src/main/resources/js/chat-room.js)。只读源码核对，不运行外部脚本。
