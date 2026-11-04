@@ -1,3 +1,4 @@
+import {getApiMode} from '@/api/mode'
 import { onMounted, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { fetchPublicUser, type PublicUser } from '@/api/v3-public-user'
 import { fetchMemberContent, fetchMemberMoon, type MemberContentKind, type MemberContentPage } from '@/api/v3-member-content'
@@ -6,10 +7,11 @@ import { consumeMemberPayload } from '@/seo/payload'
 import { getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 export function useMemberPage(name: Ref<string>, kind: Ref<string>, moonId: Ref<string>) {
+  const credential=()=>getApiMode()==='v1'?auth.apiKey:auth.accessToken
   const auth = useAuthStore(), profile = ref<PublicUser | null>(consumeMemberPayload(name.value)), profileError = ref(''), profileLoading = ref(false)
   const content = ref<MemberContentPage | null>(null), moon = ref<V3Breezemoon | null>(null), contentError = ref(''), contentLoading = ref(false), p = ref(1)
   let mounted = false, profileSequence = 0, contentSequence = 0
-  function boundary() { const context = getAuthContextVersion(), token = auth.accessToken, actor = auth.account?.oId, target = name.value; return () => mounted && context === getAuthContextVersion() && token === auth.accessToken && actor === auth.account?.oId && target === name.value }
+  function boundary() { const context = getAuthContextVersion(), token = credential(), actor = auth.account?.oId, target = name.value; return () => mounted && context === getAuthContextVersion() && token === credential() && actor === auth.account?.oId && target === name.value }
   async function readProfile() {
     if (!mounted || import.meta.env.SSR) return
     const run = ++profileSequence, current = boundary(); profile.value = null; profileError.value = ''; profileLoading.value = true
@@ -29,7 +31,7 @@ export function useMemberPage(name: Ref<string>, kind: Ref<string>, moonId: Ref<
     } catch (e) { if (valid()) contentError.value = e instanceof Error ? e.message : '用户内容读取失败' }
     finally { if (valid()) contentLoading.value = false }
   }
-  const stops = [watch(name, () => { profileSequence++; profile.value = null; profileError.value = ''; p.value = 1; void readProfile(); void readContent(1) }, { flush: 'sync' }), watch([kind, moonId], () => void readContent(1), { flush: 'sync' }), watch([() => auth.accessToken, () => auth.account?.oId], (_, old) => { const same = auth.account?.oId === old[1] && !!auth.accessToken === !!old[0]; void readProfile(); void readContent(same ? p.value : 1) }, { flush: 'sync' })]
+  const stops = [watch(name, () => { profileSequence++; profile.value = null; profileError.value = ''; p.value = 1; void readProfile(); void readContent(1) }, { flush: 'sync' }), watch([kind, moonId], () => void readContent(1), { flush: 'sync' }), watch([credential, () => auth.account?.oId], (_, old) => { const same = auth.account?.oId === old[1] && !!credential() === !!old[0]; void readProfile(); void readContent(same ? p.value : 1) }, { flush: 'sync' })]
   onMounted(() => { mounted = true; void readProfile(); void readContent() })
   onScopeDispose(() => { mounted = false; profileSequence++; contentSequence++; stops.forEach(stop => stop()); profile.value = null; content.value = null; moon.value = null })
   return { profile, profileError, profileLoading, content, moon, contentError, contentLoading, p, readProfile, readContent }

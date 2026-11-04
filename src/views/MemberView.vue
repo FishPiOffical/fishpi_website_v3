@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {getApiMode} from '@/api/mode'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -64,7 +65,7 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
         <template v-else-if="content">
           <p>共 {{ content.total }} 条</p>
           <ArticleFeed v-if="activeTab === 'home' || activeTab === 'long'" :items="content.articles" empty="本页没有可见文章" />
-          <BreezemoonList v-else-if="activeTab === 'breezemoons'" :items="content.moons"><template #actions="{ item }"><RouterLink :to="`${base}/breezemoons/${item.id}`">查看这条清风</RouterLink></template></BreezemoonList>
+          <BreezemoonList v-else-if="activeTab === 'breezemoons'" :items="content.moons"><template #actions="{ item }"><RouterLink v-if="getApiMode()==='v3'" :to="`${base}/breezemoons/${item.id}`">查看这条清风</RouterLink></template></BreezemoonList>
           <ul v-else class="member-comments"><li v-for="item in content.comments" :key="item.id"><RouterLink :to="commentLink(item.articleId,item.id)">{{ item.article.articleTitle }}</RouterLink><time :datetime="item.comment.commentCreateTimeStr">{{ item.comment.commentCreateTimeStr }}</time><div v-if="item.comment.commentContentVisible" class="comment-body" v-html="item.comment.commentContent" /><p v-else>私密评论正文不可见。</p></li></ul>
           <p v-if="!content.total && activeTab !== 'home' && activeTab !== 'long'">没有可见记录。</p>
           <div class="member-pager"><button type="button" :disabled="p <= 1" @click="readContent(p - 1)">上一页用户内容</button><span>第 {{ p }} 页 / 共 {{ content.pageCount }} 页</span><button type="button" :disabled="p >= content.pageCount" @click="readContent(p + 1)">下一页用户内容</button></div>

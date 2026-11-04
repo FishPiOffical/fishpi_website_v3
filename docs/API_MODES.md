@@ -32,7 +32,8 @@
 | 思过崖旧快照、涂鸦上传与插入 | 第十五批已接；旧快照不等价于实时禁言资源 | 保留 |
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
-| 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON，其他用户栏目待适配 | 保留 |
+| 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON | 保留 |
+| 用户文章/长文/公开回帖/清风列表 | 第二十二批已接；私密正文与清风单条读取受旧契约限制 | 保留 |
 | 关注/收藏、账号各类设置、财务/导出等 | 待适配 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
@@ -342,3 +343,17 @@ v1统一迁至legacy/rankings，删除discovery中的重复六榜实现。连签
 验证：legacy-rankings-test七组实际适配器/公共API和共享hook覆盖十五类主榜、进化/小冰四子榜、真实字段/范围分页、捐助小数和未知汇总、聚合链接与安全URL、私有存档白名单、小冰公开ID核验、空/错分离、旧key迟到与v3整数契约隔离；v3普通榜单16组、旧发现和复读机回归，类型及完整构建通过。浏览器仅对本机公开JSON夹具验证SSR进化榜、切知识子榜、第二页21～25名和小数知识显示；没有账号写入或读取真实游戏存档。夹具已停并恢复现网v1开发服务。生产非空游戏/捐助/小冰来源可用性未完整联调，职业与其余账号/关系/互动等全站兼容继续。
 
 协议来源：[TopProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/TopProcessor.java)、[ActivityQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ActivityQueryService.java)、[LinkQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/LinkQueryService.java)、[进化榜模板字段](https://github.com/FishPiOffical/rhythm/blob/master/src/main/resources/skins/classic/pc/top/evolve.ftl)。只读取源码核对JSON，不在运行时抓取模板。
+
+## 第二十二批：用户文章、回帖与个人清风列表
+
+fetchMemberContent按模式读取旧/api/user/{name}/articles、long、comments、breezemoons，使用真实页码/总数/页数，v3原栏目资源保持独立。仅当前栏目读取，三个公开资源不借用首页/全站最近列表。空结果、错误、隐私拒绝分开；旧文章/回帖接口在越界空页丢失总数时明确409并提示返回第一页，不把0伪装为该用户实际总数。接受旧合法空目录的0或1页表达，但不补计数。
+
+文章保留独立用户名/昵称，验证署名与当前主页、匿名标记和长文类型；公开回帖同时核对稳定作者ID、commenter用户名及明确非匿名。回帖所属文章只投影ID/标题，不由缺失匿名元数据推其作者身份。旧接口没有当前正文可见性证明，公开栏目只显示commentVisible=0的服务端清洗正文；私密回帖保留目标/时间占位且不显示返回体正文，包括本人浏览也不猜授权。个人清风按公开用户JSON核验身份，保留旧接口实际raw/cleaned内容、创建/更新时间，不携带IP/UA/源用户对象。
+
+useMemberPage的身份边界按模式观察实际旧key/Bearer，换key/账号/目标/栏目清旧状态并拒迟到；适配器在复合读取前后另核对旧key，不能借新身份续读旧列表。用户公开六字段及SSR入口仍用既有独立读取，不把旧完整用户资料作主页或编辑数据。
+
+当前旧清风没有精确单条JSON读取，v1隐藏列表里的单条链接，已有深链接明确501，不能从最近列表推断删除。公开勋章旧接口只是当前启用快照，尚未伪装v3历史授予分页；勋章、职业、关系/收藏栏目继续独立迁移。这些限制仍属于全站兼容未完成项。
+
+验证：legacy-member-content-test五组实际适配器/公共API/共享hook覆盖四类列表（文章与长文分支）、精确旧字段/凭据、作者及匿名验证、嵌套私有字段剔除、私密正文隐藏、清风身份/HTML、分页/隐私/空/越界、缺失单条能力零查询和旧key迟到隔离。v3用户主页14组、旧内容回归、类型及完整构建通过。浏览器仅对本机公开JSON夹具验证文章第2页3条、公开/私密回帖区分、个人清风显示与无单条入口，私密测试正文未出现；未登录或写真实账号。夹具已停并恢复现网v1开发服务。生产个人隐私组合、真实非空栏目及旧服务内部吞错情况未完整联调；私密正文的当前授权读取另需契约支持。
+
+协议来源：[UserProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)、[CommentQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CommentQueryService.java)、[BreezemoonQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/BreezemoonQueryService.java)、[DesensitizeUtil](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/util/DesensitizeUtil.java)。只读核对JSON与源码，未抓取页面内容。
