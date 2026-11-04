@@ -11,7 +11,9 @@ export function backendTarget(mode: Mode, env: Record<string,string|undefined>) 
 }
 export function apiProxy(env: Record<string,string|undefined>) {
   return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    if (!/^\/api(?:\/|$)/.test(req.url || '')) return next()
+    const path=(req.url || '').split('?')[0] || ''
+    const legacyResource=/^\/user\/[A-Za-z0-9_-]+$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
+    if (!/^\/api(?:\/|$)/.test(req.url || '') && !legacyResource) return next()
     const mode = requestMode(req,env)
     if(mode === 'v1' && /^\/api\/v3(?:\/|$)/.test(req.url || '')) {
       res.writeHead(501,{'Content-Type':'application/json','Cache-Control':'no-store'})

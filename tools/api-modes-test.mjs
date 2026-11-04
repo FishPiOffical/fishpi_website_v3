@@ -22,6 +22,10 @@ try {
   assert.equal(c.status,501);assert.equal(calls.length,before)
   assert.equal(requestMode({headers:{cookie:'fp.apiMode=bad'}},env),'v1')
   assert.equal(backendTarget('v3',env),env.VITE_API_V3_TARGET)
+  const legacyProfile=await fetch(base+'/user/known',{headers:{Cookie:'fp.apiMode=v1',Authorization:'Bearer must-not-forward'}})
+  assert.equal((await legacyProfile.json()).version,'v1');assert.equal(calls.at(-1).headers.authorization,undefined)
+  const legacyPost=await fetch(base+'/breezemoon',{method:'POST',headers:{Cookie:'fp.apiMode=v1','Content-Type':'application/json'},body:JSON.stringify({apiKey:'synthetic-legacy',breezemoonContent:'synthetic'})})
+  assert.equal((await legacyPost.json()).version,'v1')
   console.log('PASS actual dual proxy: deterministic targets, credential isolation, explicit unported capability, invalid mode fallback')
 } finally {await Promise.all([proxy,v1,v3].map(s=>new Promise(r=>s.close(r))))}
 const originalDocument=globalThis.document,originalLocation=globalThis.location
