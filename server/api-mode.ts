@@ -46,7 +46,8 @@ export function apiProxy(env: Record<string,string|undefined>) {
     const noticeResource=/^\/notifications\/(?:unread\/count|all-read|make-read\/(?:commented|reply|at|following|point|broadcast|sys-announce|other))$/.test(path)
     const chatResource=/^\/chat\/(?:get-list|get-message|has-unread|mark-as-read|mark-all-as-read|revoke|send)$/.test(path)
     const editorResource=path==='/markdown' && req.method==='POST' || path==='/users/names' && req.method==='POST' || path==='/users/emotions' && req.method==='GET'
-    const legacyResource=editorResource || noticeResource || chatResource || /^\/user\/[A-Za-z0-9_-]+$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
+    const roomResource=/^\/chat-room\//.test(path)
+    const legacyResource=roomResource || editorResource || noticeResource || chatResource || /^\/user\/[A-Za-z0-9_-]+$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
     if (!/^\/api(?:\/|$)/.test(req.url || '') && !legacyResource) return next()
     const mode = requestMode(req,env)
     if(mode === 'v1' && /^\/api\/v3(?:\/|$)/.test(req.url || '')) {

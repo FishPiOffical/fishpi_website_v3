@@ -14,6 +14,7 @@ import {getAuthContextVersion} from '@/api/http'
 import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
 import ChatRevokeAction from '@/components/chat/ChatRevokeAction.vue'
 import ChatRevokeRecovery from '@/components/chat/ChatRevokeRecovery.vue'
+import LegacyChatRecovery from '@/components/chat/LegacyChatRecovery.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
 import ChatTopicEditor from '@/components/chat/ChatTopicEditor.vue'
 import ChatTopicRecovery from '@/components/chat/ChatTopicRecovery.vue'
@@ -202,7 +203,7 @@ function clearScreen() {
 
 <template>
   <div class="cr-page" :class="`theme-${chatStyle}`">
-    <ChatPublicationRecovery @confirmed="acceptConfirmed" />
+    <LegacyChatRecovery /><ChatPublicationRecovery @confirmed="acceptConfirmed" />
     <ChatRevokeRecovery />
     <ChatTopicRecovery />
     <ChatBarrageRecovery />
@@ -227,7 +228,7 @@ function clearScreen() {
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"
               placeholder="说点什么吧！"
               :sending="sending"
-              :disabled="!!publication.pending"
+              :disabled="!!(publication.pending||chat.legacyPending)"
               :allow-empty="Boolean(quote)"
               @submit="submit"
             >
@@ -470,7 +471,7 @@ function clearScreen() {
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"
               placeholder="说点什么吧！"
               :sending="sending"
-              :disabled="!!publication.pending"
+              :disabled="!!(publication.pending||chat.legacyPending)"
               :allow-empty="Boolean(quote)"
               @submit="submit"
             >

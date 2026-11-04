@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {getApiMode} from '@/api/mode'
 import HomePreferenceRedirect from '@/components/home/HomePreferenceRedirect.vue'
 import RecentMembers from '@/components/discovery/RecentMembers.vue'
 import RankingBoard from '@/components/RankingBoard.vue'
@@ -7,6 +8,7 @@ import { consumeHomeRankingPayload, consumeHomeReadsPayload, consumeRepeaterPayl
 import { getAuthContextVersion } from '@/api/http'
 import { useHomeRead } from '@/composables/useHomeRead'
 import VipNickname from '@/components/user/VipNickname.vue'
+import LegacyChatRecovery from '@/components/chat/LegacyChatRecovery.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
 import { useV3ChatPublicationStore } from '@/stores/v3ChatPublication'
 import BreezemoonPanel from '@/components/breezemoons/BreezemoonPanel.vue'
@@ -49,6 +51,7 @@ watch(() => [columnsRecentRead.data, columnsHotRead.data], () => { failedCovers.
 const { editing } = storeToRefs(layout)
 const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive } = useHomeDrag()
 const { messages: liveChatMessages } = storeToRefs(chat)
+const roomCredential=computed(()=>getApiMode()==='v1'?auth.apiKey:accessToken.value)
 let homeMounted = false, longShelfTimer: ReturnType<typeof setInterval> | undefined
 function syncLiveChatMessages() {
   chatLines.value = liveChatMessages.value.slice(-10).reverse().map(line => ({ oId: line.oId, userOId: line.userOId, userName: line.userName,
@@ -57,8 +60,8 @@ function syncLiveChatMessages() {
 }
 watch(liveChatMessages, syncLiveChatMessages, { immediate: true })
 watch(() => JSON.stringify([getAuthContextVersion(), !!accessToken.value, auth.account?.oId || '']), () => { chatDraft.value = ''; chatLines.value = []; chatMsg.value = '' }, { flush: 'sync' })
-watch(accessToken, () => { chatLines.value = []; if (homeMounted) { if (accessToken.value) void chat.connect(); else chat.disconnect() } }, { flush: 'sync' })
-onMounted(() => { homeMounted = true; if (accessToken.value) void chat.connect(); longShelfTimer = setInterval(() => scrollShelf('long-active', 1), 6000) })
+watch(roomCredential, () => { chatLines.value = []; if (homeMounted) { if (roomCredential.value||getApiMode()==='v1') void chat.connect(); else chat.disconnect() } }, { flush: 'sync' })
+onMounted(() => { homeMounted = true; if (roomCredential.value||getApiMode()==='v1') void chat.connect(); longShelfTimer = setInterval(() => scrollShelf('long-active', 1), 6000) })
 onUnmounted(() => { homeMounted = false; editing.value = false; if (longShelfTimer) clearInterval(longShelfTimer); if (!chat.floatingChatroomOpen) chat.disconnect() })
 function isBareRow(row: HomeRowView) { return row.cells.length === 1 && row.cells[0].modules.every(m => m.id === 'long') }
 watch(activeLongShelf, async () => { await nextTick(); document.getElementById('long-active')?.scrollTo({ left: 0 }) })
@@ -98,7 +101,7 @@ function chatAvatar(item: ChatHistoryItem) {
 
 async function postChat(){
  const content=chatDraft.value.trim()
- if(!content||!accessToken.value||chatBusy.value||publication.pending)return
+ if(!content||!roomCredential.value||chatBusy.value||publication.pending||chat.legacyPending)return
  chatBusy.value=true;chatMsg.value='';const reader=JSON.stringify([getAuthContextVersion(),!!accessToken.value,auth.account?.oId||''])
  try{if(await chat.send(content)&&reader===JSON.stringify([getAuthContextVersion(),!!accessToken.value,auth.account?.oId||'']))acceptHomeChat(content)}finally{chatBusy.value=false}
 }
@@ -279,15 +282,15 @@ function scrollShelf(id: string, dir: -1 | 1) {
                   type="text"
                   maxlength="512"
                   :placeholder="isLoggedIn ? '说点什么...' : '登录后发言'"
-                  :disabled="!isLoggedIn || chatBusy || !!publication.pending"
+                  :disabled="!isLoggedIn || chatBusy || !!(publication.pending||chat.legacyPending)"
                   @keydown.enter.prevent="postChat"
                 />
-                <button v-if="isLoggedIn" type="button" class="green" :disabled="chatBusy || !!publication.pending || !chatDraft.trim()" @click="postChat">
+                <button v-if="isLoggedIn" type="button" class="green" :disabled="chatBusy || !!(publication.pending||chat.legacyPending) || !chatDraft.trim()" @click="postChat">
                   发送
                 </button>
                 <RouterLink v-else class="green-link" to="/login">登录</RouterLink>
               </div>
-              <ChatPublicationRecovery @confirmed="acceptHomeChat" />
+              <LegacyChatRecovery /><ChatPublicationRecovery @confirmed="acceptHomeChat" />
               <p v-if="chat.error" role="alert">{{ chat.error }} <button type="button" :disabled="chat.loading" @click="chat.refreshMessages">重读聊天室消息</button></p>
               <p v-if="chatMsg" class="hint">{{ chatMsg }}</p>
               <ol class="module-list chat-list">

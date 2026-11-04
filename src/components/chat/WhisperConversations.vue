@@ -10,6 +10,7 @@ import ChatComposer from '@/components/ChatComposer.vue'
 import FpLoading from '@/components/FpLoading.vue'
 import ChatRevokeAction from '@/components/chat/ChatRevokeAction.vue'
 import ChatRevokeRecovery from '@/components/chat/ChatRevokeRecovery.vue'
+import LegacyChatRecovery from '@/components/chat/LegacyChatRecovery.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
 import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
 import PrivateMessages from '@/components/chat/PrivateMessages.vue'
@@ -45,7 +46,7 @@ const selectedPeer = ref('__private__')
 const draft = ref('')
 const isChatroomSelected = computed(() => selectedPeer.value === CHATROOM_PEER)
 const visibleRoomMessages = computed(() => roomMessages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
-const canSend = computed(()=>Boolean(draft.value.trim())&&!roomSending.value&&!publication.pending)
+const canSend = computed(()=>Boolean(draft.value.trim())&&!roomSending.value&&!(publication.pending||chat.legacyPending))
 const roomConnectionLabel = computed(() => roomConnected.value ? '已连接' : roomConnecting.value ? '连接中' : '已断开')
 const scroller = ref<HTMLElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
@@ -375,7 +376,7 @@ onUnmounted(() => {
         </div>
         <section v-else class="conversation-content">
           <header v-if="!isCompactPanel" class="conversation-head"><strong>{{ CHATROOM_LABEL }}</strong><small>{{ roomConnectionLabel }}</small></header>
-          <ChatPublicationRecovery @confirmed="acceptRoomConfirmed" />
+          <LegacyChatRecovery /><ChatPublicationRecovery @confirmed="acceptRoomConfirmed" />
           <ChatRevokeRecovery />
           <p v-if="roomError" class="error">{{ roomError }}</p>
           <div ref="scroller" class="messages" @scroll.passive="onScroll">
@@ -385,8 +386,8 @@ onUnmounted(() => {
             <ChatBubble v-for="line in visibleRoomMessages" :key="line.oId" :user-name="line.userName" :avatar="line.userAvatarURL" :time="line.time" chatroom :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :self="line.userOId===account?.oId"><ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" /><ChatCard v-else-if="line.card" :card="line.card" /><template #actions><ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" /></template></ChatBubble>
           </div>
           <Transition name="composer-swap" mode="out-in">
-            <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit"><input v-model="draft" type="text" aria-label="聊天室消息" placeholder="说点什么吧…" :disabled="!!publication.pending" /><button type="submit" :disabled="!canSend">{{ roomSending?'发送中':'发送' }}</button></form>
-            <ChatComposer v-else v-model="draft" class="composer" :api-key="apiKey" :height="100" compact cache-id="chatroom-drawer" :sending="roomSending" :disabled="!!publication.pending" placeholder="说点什么吧，友善第一哦。" @submit="submit" />
+            <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit"><input v-model="draft" type="text" aria-label="聊天室消息" placeholder="说点什么吧…" :disabled="!!(publication.pending||chat.legacyPending)" /><button type="submit" :disabled="!canSend">{{ roomSending?'发送中':'发送' }}</button></form>
+            <ChatComposer v-else v-model="draft" class="composer" :api-key="apiKey" :height="100" compact cache-id="chatroom-drawer" :sending="roomSending" :disabled="!!(publication.pending||chat.legacyPending)" placeholder="说点什么吧，友善第一哦。" @submit="submit" />
           </Transition>
         </section>
       <button

@@ -20,7 +20,8 @@
 | 通知列表/未读/已读及实时刷新 | 第六批已接；旧列表仅有限快照，合成身份验收 | 保留 |
 | 私信会话/历史/发送/撤回/已读/未读 | 第七批聊天及第八批富编辑已接，本地合成账号验收；真实上传权限待验 | 保留 |
 | 共享编辑器预览/上传/表情选择/@联想 | 第八批已接，上传仅本地夹具验收 | 保留 |
-| 聊天室、在线/话题/特殊卡片 | 待适配 | 保留 |
+| 聊天室历史/实时/普通发送/在线名单与话题读取 | 第九批已接现代节点；本地合成节点验收 | 保留 |
+| 聊天室原文/上下文/撤回/话题修改及特殊消息操作 | 待适配 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON，其他用户栏目待适配 | 保留 |
 | 关注/收藏、账号各类设置、财务/导出等 | 待适配 | 保留 |
 
@@ -155,3 +156,24 @@ v1私信正常宽度接回ChatComposer的精简Vditor，窄窗保持自定义tex
 验证：legacy-editor专项运行实际双模式API/身份模块/共享上传与提示辅助器，覆盖旧预览响应、Unicode、专用票据/代理/部分文件、嵌套基址、危险URL、换号迟到票据/文件、无ID联想、转义/过期候选、真实有限表情分页与成员ID。原v3预览7组、上传9组、联想7组、编辑器/表情/涂鸦/私信专项回归、类型及客户端/SSR构建通过。浏览器使用本地HTTP/WS/图床夹具和合成账号，实际验证精简工具栏、表情插入并发送、文件选择上传、剪贴板PNG上传、@候选选择、缩小时保留完整Markdown草稿、放大后恢复Vditor。没有向现网账号发送消息、上传文件或反复密码登录；真实图床权限/大小限制/票据联调仍待账号验收。测试结束已关闭合成账号页面、停止夹具，并恢复127.0.0.1:5173现网v1开发服务。
 
 协议参考：[ArticleProcessor.markdown2HTML](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleProcessor.java)、[RhypicProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/RhypicProcessor.java)、[UserProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)、[EmojiQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/EmojiQueryService.java)。仅只读参考源码，未执行外部源码。
+
+
+## 第九批：聊天室主链路、首页预览和在线名单
+
+useChatStore按模式选择独立legacyChatState，v3时间线/发送/在线三个store仍只在v3分支构造；外观样式状态提为共用初始化，SSR继续经典默认，挂载后恢复本机偏好。主聊天室、首页简易聊天室和悬浮聊天室沿用同一个store，悬浮窗使用时离开页面不关闭连接。v1普通发送、历史读取和状态恢复不借用v3命令或幂等回执。
+
+旧GET chat-room/more按固定25项真实页码读取，清洗HTML白名单、消息ID、作者/昵称/头像、时间和公开勋章分离，不拷贝完整对象或反应回执。数字作者ID必须是安全整数，不造不存在的ID；旧CST时间显式转ISO。初始及翻页重新读取当前已展开页，去重按ID排序，空列表与读取失败分开。游客只在客户端读取既有公开历史快照/在线/话题，最多两页，不在SSR读取旧消息，也不以定时轮询伪装实时；登录后才取得节点并实时订阅。
+
+核对官方源码发现旧chat-room-channel在现代节点可用时已经停用，因此不能固定连接该旧地址。v1由GET chat-room/node/get取得服务端当前推荐节点、目录和派生临时key，校验推荐/切换目标均在目录，再直接按官方协议连接该节点；不自行回退过期频道、不将站点Bearer或旧主key拼到节点URL。只有服务端明确分配的故障转移节点才使用该路径。临时key仅在连接闭包中，Pinia节点选项不含query凭据。重连重新分配票据，心跳-hb-，错误退避；401/403不循环尝试旧授权。没有开放可由浏览器任意指定上游的服务端WS代理。
+
+msg事件只按ID读取当前GET chat-room/getMessage(mode=0,size=0,type=html)投影，不从WS正文插入；revoke事件同步保留删除集合，旧历史/详情不能复活；重连不覆盖用户清屏，新事件才继续显示。401/403清除已授权正文、旧订阅及在途投影，换身份才能重新授权。积压事件去重、超过预算仅重读当前窗口。在线/话题事件仅触发当前online-users重读，名单不从WS字段拼接。
+
+在线接口的onlineChatCnt必须真实且与本次users列表一致，源码异常回退99999不得显示成正常人数。旧目录没有用户ID，只按服务端用户名展示/链接，不造ID；按有限快照20项分页，筛选只针对当前页，失败为未知而非0。v3在线页保留为V3ChatOnlineList，公共入口按模式选择，不削弱其采样与分页契约。
+
+普通POST chat-room/send只发送旧apiKey/content/client，不附加v3幂等键；原文和4096字符限制保留，先拒绝旧特殊收费语法（包括前置空白），避免普通输入隐式执行红包/弹幕/话题等写入。code=0后只重读，不从回执造消息ID/正文；后置读失败不重发。网络/损坏响应/不明确业务失败保留原文并锁定发送，用户先读当前消息核对、明确解除锁定仅改本机状态。待核对命令跨SPA保留，离开页面不把发送busy永久卡住，换号清除。不存在15秒聊天室拉取定时器。
+
+音乐/天气仅投影既有公开卡片字段，未知JSON不作为HTML/完整对象回显；红包只保留“红包消息”占位，领取/详情/特殊发送、原文引用、上下文、本人撤回和话题修改仍在下一批。不能因主链路接通就称整个聊天室或全站已完成。首页已有布局hydration warning也未在本批解决，不能拿本次SSR零私有请求测试冒充整页水合验收。
+
+验证：legacy-chat实际API/现代节点连接/公共Pinia门面测试覆盖作者ID精度/时间/勋章白名单、危险卡片不回显、旧发送凭据与特殊语法、真实25项分页、当前HTTP重读、并发历史不能复活撤回、清屏后重连、未知发送无重放、离页发送busy清理、401/403与身份边界、SSR零HTTP/WS及定时器清理。原v3发送15组、消息源13组、在线12组、首页18组、私信/时间线等回归、类型及双构建通过。浏览器仅用内存合成账号和本地HTTP/现代节点夹具，实际验证完整版发送、在线2人/话题、悬浮窗共享、切页后发送、首页发送同步到浮窗。未向真实聊天室发言、修改话题、领取红包或调用密码登录；真实节点派生票据/生产连通性仍待账号联调。公开只读HTTP核对现网历史25项/字段和online-users真实契约，测试后已停夹具、恢复127.0.0.1:5173现网v1开发服务。
+
+协议来源：[ChatroomProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ChatroomProcessor.java)、[ChatroomChannel](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/channel/ChatroomChannel.java)、[ChatMsgAddValidationMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/validate/ChatMsgAddValidationMidware.java)。仅只读源码，未运行外部实现。
