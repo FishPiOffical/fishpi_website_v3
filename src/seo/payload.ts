@@ -2,8 +2,7 @@ import { decodeDirectoryPage, type DirectoryKind } from '@/api/v3-directory'
 import { decodeHomeBootstrap } from '@/api/v3-home-reads'
 import { decodeArticleListing, type ColumnOrder } from '@/api/v3-article-list'
 import type { ArticleFeedKind } from '@/api/fishpi'
-import { decodeRecentMembers } from '@/api/v3-discovery-extras'
-import type { RelationUser } from '@/api/v3-user-relations'
+import { decodeRecentMembers, type RecentMember } from '@/api/v3-discovery-extras'
 import { decodePublicUser, type PublicUser } from '@/api/v3-public-user'
 import type { RankingPage } from '@/api/v3-rankings'
 import type { CommunityStatistics } from '@/api/v3-statistics'
@@ -23,7 +22,7 @@ export interface SsrPayload {
   directoryPage?: unknown
   homeReads?: unknown
   articleListing?: unknown
-  recentMembers?: RelationUser[] | null
+  recentMembers?: RecentMember[] | null
   statistics?: CommunityStatistics | null
   milestonePage?: MilestonePage | null
   breezemoonPage?: BreezemoonPage | null
@@ -172,7 +171,7 @@ export function consumeStatisticsPayload(): CommunityStatistics | null { return 
 export function consumeRankingPayload(): RankingPage | null { return takeField('rankingPage') || null }
 export function consumeHomeRankingPayload() { return { checkin: takeField('homeCheckinRanking') || null, online: takeField('homeOnlineRanking') || null } }
 
-export function consumeRecentMembersPayload(): RelationUser[] | null { const value = takeField('recentMembers'); if (value == null) return null; try { return decodeRecentMembers(value) } catch { return null } }
+export function consumeRecentMembersPayload(): RecentMember[] | null { const value = takeField('recentMembers'); if (value == null) return null; try { return decodeRecentMembers(value) } catch { return null } }
 
 export function consumeArticleListingPayload(kind: ArticleFeedKind, extra: string, order: ColumnOrder) {
   const value = takeField('articleListing')

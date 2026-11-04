@@ -1,3 +1,4 @@
+import {getApiMode} from './mode'
 import { ApiError, request } from './http'
 import { decodeV3ContentPage } from './v3-content'
 import { decodeV3RelationUser, type RelationUser } from './v3-user-relations'
@@ -57,6 +58,7 @@ export function decodeInitialRanking(value: unknown, type: RankingType, sub: str
 export async function fetchRanking(type: RankingType, p = 1, sub?: string, size = 20): Promise<RankingPage> {
   rankingType(type); const normalized = rankingSubType(type, sub)
   if (!Number.isSafeInteger(p) || p < 1 || p > 42949672 || !Number.isInteger(size) || size < 1 || size > 50) throw new ApiError('排行榜分页不合法', 422)
+  if(getApiMode()==='v1') {const r=await (await import('./legacy/discovery')).legacyRanking(type,p,size);return decodeRanking({...r,pagination:{p,size,total:r.total,pageCount:r.pageCount}},type,normalized,p,size)}
   const query = new URLSearchParams({ p: String(p), size: String(size) }); if (normalized) query.set('subType', normalized)
   const envelope = object(await request(`/api/v3/rankings/${type}?${query}`, { cache: 'no-store' }))
   if (envelope.code !== 0) throw bad()
