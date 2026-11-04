@@ -29,6 +29,7 @@ import ReportDialog from '@/components/ReportDialog.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeArticlePayload } from '@/seo/payload'
 import { absoluteUrl, SITE_DEFAULT_DESC, stripHtml } from '@/seo/site'
+import {getApiMode} from '@/api/mode'
 import { useAuthStore } from '@/stores/auth'
 import ArticleSkeleton from '@/components/ArticleSkeleton.vue'
 import CommentItem from '@/components/CommentItem.vue'
@@ -64,7 +65,7 @@ const bodyEl = ref<HTMLElement | null>(null)
 const toc = ref<{ id: string; text: string; level: number }[]>([])
 const showRevisions = ref(false)
 const historyRef=ref<InstanceType<typeof RevisionHistory>|null>(null)
-const viewerIdentity=computed(()=>`${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}`)
+const viewerIdentity=computed(()=>`${getAuthContextVersion()}:${getApiMode()==='v1'?apiKey.value||'':!!accessToken.value}:${account.value?.oId||''}`)
 let stopArticle:(()=>void)|null=null,subscriptionKey='',heatRequest:AbortController|null=null,heatSequence=0,changeRevision=0,liveReadVersion=0
 let readVersion = 0, disposed = false
 

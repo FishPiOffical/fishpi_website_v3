@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import {onMounted,onBeforeUnmount,ref,watch} from 'vue'
+import {getApiMode} from '@/api/mode'
+import {computed,onMounted,onBeforeUnmount,ref,watch} from 'vue'
 import {RouterLink} from 'vue-router'
 import {storeToRefs} from 'pinia'
 import {useAuthStore} from '@/stores/auth'
 import {getAuthContextVersion} from '@/api/http'
 import {fetchArticleColumn,type ArticleColumnContext} from '@/api/v3-article-column'
 import {fetchColumnChapters,type ColumnChapterPage} from '@/api/v3-public-columns'
-const props=defineProps<{articleId:string}>(),{accessToken}=storeToRefs(useAuthStore())
+const props=defineProps<{articleId:string}>(),{accessToken,apiKey}=storeToRefs(useAuthStore()),credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
 const context=ref<ArticleColumnContext|null>(null),error=ref(''),loading=ref(false),opened=ref(false),page=ref<ColumnChapterPage|null>(null),pageNo=ref(1),pageError=ref(''),pageLoading=ref(false)
 let mounted=false,generation=0,pageRun=0,abort:AbortController|null=null
-const identity=()=>JSON.stringify([props.articleId,accessToken.value,getAuthContextVersion()])
+const identity=()=>JSON.stringify([props.articleId,credential.value,getAuthContextVersion()])
 async function readContext(){
  if(!mounted)return;const version=++generation,reader=identity();abort?.abort();abort=new AbortController();const signal=abort.signal;pageRun++;context.value=null;page.value=null;error.value='';pageError.value='';loading.value=true;pageLoading.value=false
  try{const result=await fetchArticleColumn(props.articleId,signal);if(mounted&&version===generation&&reader===identity()){context.value=result;if(opened.value&&result.column)void readPage(pageNo.value)}}
@@ -23,7 +24,7 @@ async function readPage(p=1){
  finally{if(mounted&&version===generation&&run===pageRun)pageLoading.value=false}
 }
 function toggle(){opened.value=!opened.value;if(opened.value&&!page.value)void readPage(pageNo.value)}
-watch(identity,(_,prior)=>{if(!mounted)return;const previous=JSON.parse(prior||'[]');if(previous[0]!==props.articleId||previous[2]!==getAuthContextVersion()||!accessToken.value){opened.value=false;pageNo.value=1}void readContext()},{flush:'sync'})
+watch(identity,(_,prior)=>{if(!mounted)return;const previous=JSON.parse(prior||'[]');if(previous[0]!==props.articleId||previous[2]!==getAuthContextVersion()||!credential.value){opened.value=false;pageNo.value=1}void readContext()},{flush:'sync'})
 onMounted(()=>{mounted=true;void readContext()})
 onBeforeUnmount(()=>{mounted=false;generation++;pageRun++;abort?.abort();context.value=null;page.value=null})
 </script>

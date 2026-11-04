@@ -16,6 +16,7 @@ import RevisionHistory from './RevisionHistory.vue'
 import ArticleColumnNavigation from './ArticleColumnNavigation.vue'
 import ArticleReadRegistration from './ArticleReadRegistration.vue'
 import CommentComposer from './CommentComposer.vue'
+import {getApiMode} from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import ContentRelationButton from './ContentRelationButton.vue'
 import ArticleInteraction from './ArticleInteraction.vue'
@@ -89,8 +90,10 @@ let paragraphRequest = 0, paragraphSummaryRequest=0
 
 const chapters = computed(() => props.column?.chapters || [])
 const currentChapterId = computed(() => props.article.oId)
+const legacyParagraphs=getApiMode()==='v1'
+const paragraphReadIdentity=()=>JSON.stringify([getAuthContextVersion(),auth.account?.oId,legacyParagraphs?auth.apiKey:!!auth.accessToken])
 const paragraphCountLabel = computed(() => {
-  if (paragraphTotal.value !== null) return `${paragraphTotal.value} 条`
+  if (paragraphTotal.value !== null) return `${paragraphTotal.value} ${legacyParagraphs?'个主题':'条'}`
   if (paragraphLoading.value) return '读取中'
   if (paragraphError.value || paragraphSummaryError.value) return '数量暂不可用'
   const count = paragraphCounts.value[activeParagraphId.value]
@@ -269,16 +272,16 @@ function decorateParagraphs() {
 }
 
 async function loadParagraphSummary() {
-  const articleId = props.article.oId, reader=getAuthContextVersion(), owner=auth.account?.oId, current=++paragraphSummaryRequest
+  const articleId = props.article.oId, reader=paragraphReadIdentity(), owner=auth.account?.oId, current=++paragraphSummaryRequest
   if (!articleId) return
   try {
     const summary = await fetchV3ParagraphSummary(articleId)
-    if (current!==paragraphSummaryRequest || props.article.oId !== articleId || reader!==getAuthContextVersion() || owner!==auth.account?.oId) return
+    if (current!==paragraphSummaryRequest || props.article.oId !== articleId || reader!==paragraphReadIdentity() || owner!==auth.account?.oId) return
     paragraphSummaryError.value=''
     paragraphCounts.value = Object.fromEntries(summary.map((item) => [item.paragraphId, item.commentCount]))
     updateParagraphButtons()
   } catch {
-    if(current===paragraphSummaryRequest&&props.article.oId===articleId&&reader===getAuthContextVersion()&&owner===auth.account?.oId){paragraphCounts.value={};paragraphSummaryError.value='段评统计读取失败';updateParagraphButtons()}
+    if(current===paragraphSummaryRequest&&props.article.oId===articleId&&reader===paragraphReadIdentity()&&owner===auth.account?.oId){paragraphCounts.value={};paragraphSummaryError.value='段评统计读取失败';updateParagraphButtons()}
   }
 }
 
@@ -286,14 +289,14 @@ async function loadParagraphComments(page = 1) {
   const articleId = props.article.oId
   const paragraphId = activeParagraphId.value, state=paragraphState.value
   if (!articleId || !paragraphId) return
-  const requestId = ++paragraphRequest, reader=getAuthContextVersion(), owner=auth.account?.oId
+  const requestId = ++paragraphRequest, reader=paragraphReadIdentity(), owner=auth.account?.oId
   paragraphLoading.value = true
   paragraphTotal.value = null
   paragraphError.value = ''
   paragraphPage.value = page
   try {
     const data = await fetchV3ParagraphComments(articleId, paragraphId, page, paragraphSort.value || 'oldest',state)
-    if (requestId !== paragraphRequest || activeParagraphId.value !== paragraphId || paragraphState.value!==state || props.article.oId !== articleId || reader!==getAuthContextVersion() || owner!==auth.account?.oId) return
+    if (requestId !== paragraphRequest || activeParagraphId.value !== paragraphId || paragraphState.value!==state || props.article.oId !== articleId || reader!==paragraphReadIdentity() || owner!==auth.account?.oId) return
     paragraphComments.value = data.commentThreadParents || []
     paragraphPages.value = data.pagination.paginationPageCount
     paragraphTotal.value = data.pagination.paginationRecordCount
@@ -303,7 +306,7 @@ async function loadParagraphComments(page = 1) {
       if(!paragraphComments.value.some(c=>c.oId===target))paragraphLocationError.value='评论位置已变化或本页暂不可见，请使用上方的重新定位评论。'
     }
   } catch (error) {
-    if (requestId !== paragraphRequest || reader!==getAuthContextVersion() || owner!==auth.account?.oId) return
+    if (requestId !== paragraphRequest || reader!==paragraphReadIdentity() || owner!==auth.account?.oId) return
     paragraphError.value = error instanceof Error ? error.message : '段评加载失败'
     paragraphComments.value = []
   } finally {
@@ -314,7 +317,7 @@ async function loadParagraphComments(page = 1) {
   // The loading branch hides the list: finish it before waiting for the actual comment DOM.
   await nextTick()
   if(requestId!==paragraphRequest||!commentsOpen.value||activeParagraphId.value!==paragraphId
-      ||paragraphState.value!==state||props.article.oId!==articleId||reader!==getAuthContextVersion()
+      ||paragraphState.value!==state||props.article.oId!==articleId||reader!==paragraphReadIdentity()
       ||owner!==auth.account?.oId||paragraphLocationId.value!==target)return
   const element=document.getElementById('comment'+target)
   if(element)element.scrollIntoView({block:'center'})
@@ -686,6 +689,7 @@ function chapterTitle(c: LongArticleChapter) {
           <div class="la-paragraph-context">{{ activeSnapshot || '此段落' }}</div>
           <p v-if="paragraphLocationError" role="status">{{ paragraphLocationError }}</p>
           <p v-if="paragraphSummaryError" role="status">{{ paragraphSummaryError }}<button type="button" @click="loadParagraphSummary()">重读统计</button></p>
+          <p v-if="legacyParagraphs" class="la-paragraph-state">旧接口按顶层评论分页，数量为评论主题数。</p>
           <div class="la-paragraph-sort" role="tablist" aria-label="段评排序">
             <button type="button" :class="{ active: paragraphSort === '' }" @click="paragraphSort = ''; loadParagraphComments(1)">正序</button>
             <button type="button" :class="{ active: paragraphSort === 'hot' }" @click="paragraphSort = 'hot'; loadParagraphComments(1)">热门</button>

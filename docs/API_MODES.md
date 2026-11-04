@@ -16,7 +16,8 @@
 | 普通文章分类列表、详情和普通评论读取 | 第二批已接，未知总条数不显示 | 保留 |
 | 专栏目录读取 | 第二批适配，实际旧接口部分目录为空且与元数据不一致时明确503 | 保留 |
 | 搜索、标签/领域目录及其文章列表 | 第四批已接，搜索缺匿名元数据时无身份展示 | 保留 |
-| 长篇列表与段评、内容互动 | 待适配 | 保留 |
+| 长篇列表、当前段评统计/顶层分页、章节导航 | 第十八批已接；完整回复/孤立段评定位仍待适配 | 保留 |
+| 评论写入及其余文章内容互动 | 待适配（表态见第十七批） | 保留 |
 | 通知列表/未读/已读及实时刷新 | 第六批已接；旧列表仅有限快照，合成身份验收 | 保留 |
 | 私信会话/历史/发送/撤回/已读/未读 | 第七批聊天及第八批富编辑已接，本地合成账号验收；真实上传权限待验 | 保留 |
 | 共享编辑器预览/上传/表情选择/@联想 | 第八批已接，上传仅本地夹具验收 | 保留 |
@@ -291,3 +292,15 @@ v1 POST /report仅带旧apiKey、reportDataId、reportDataType、reportType、re
 验证：legacy-reactions-test十一组实际API/Pinia/编译组件及公共包装覆盖白名单/分类、三类目标精确格式、普通/段评/锚点读取、并发请求合并、切换/撤销、未知跨SPA锁定与重读后释放、身份迟到、实时元数据、游客/SSR/readonly、按钮DOM保留和重复处理器阻止、成功后读失败不重写；原v3表态16组、旧聊天室共享门面（补chatReaction只失效）/v3时间线、代理/模式、类型及完整构建通过。浏览器仅对本机合成HTTP/WS账号验证添加、再次点击撤销、更换表情；故意注入事件和回执计数999，仍显示当前HTTP计数1。未向现网表态；真实生产并发、权限与风控未验。测试后停夹具，恢复127.0.0.1:5173现网v1开发服务；其他全站兼容继续。
 
 协议来源：[ReactionProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ReactionProcessor.java)、[Reaction模型](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Reaction.java)、[ReactionQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ReactionQueryService.java)、[ArticleProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleProcessor.java)、[CommentProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CommentProcessor.java)。核对公开源码，不抓取HTML或恢复Cookie桥接。
+
+## 第十八批：长篇列表、当前段评与章节导航读取
+
+v1长篇列表使用旧/api/articles/recent/long。共享段评读取适配器按模式选择：v3原段落目录/平铺分页不变；v1只读POST /comment/paragraph/summary和/comment/paragraph/thread/parents，使用内存旧key，游客不附凭据。严格校验64位锚点、真实当前页/页大小/总主题数/页数、文章归属、段落归属及有效状态，匿名作者仍投影为空身份；失败不伪造0条。旧接口按顶层评论分页，界面明确显示“个主题”，不把主题总数冒充包含回复的平铺评论总数。普通/最新/热门排序映射旧viewMode与sort，服务端改页返回明确重读提示。旧协议缺少按孤立段落查询的能力，orphaned显式501；完整回复展开、孤立段评定位及评论写入仍待后续批次，不能据本批称全长篇互动完成。
+
+旧文章JSON内的longArticleColumnView以白名单进入共享阅读器和SSR，仅保留专栏基本字段、实际章节目录、当前序号及相邻章节。核对数量、顺序、唯一ID、当前与相邻关系；生成本站/article/{id}链接，不沿用任意源permalink，不序列化原专栏私有对象。独立ArticleColumnNavigation同样按模式读取当前文章JSON，旧key变化清除导航并拒迟到；原v3导航契约保留。旧目录数据缺失或不一致时仍明确报错，不从最近两章补造完整目录。
+
+ArticleView读者边界在v1包含实际旧key，换key/账号重读并清旧阅读器；段评异步结果另外核对当前身份、文章、段落和请求代次，不让旧凭据响应填回。SSR保留来自服务端的data-long-paragraph-id和段内换行，不在运行时抓取现网HTML构造内容。
+
+验证：legacy-long-reading-test五组实际API覆盖统计空/零/重复、分页和三种排序、游客/匿名/签名URL与字段白名单、外来文章/段落/失效/重复目标、孤立查询显式能力错误、完整章节校验/本地导航、长篇列表及共享模式选择；旧内容回归、v3评论32组、v3章节导航7组、旧表态11组和代理回归通过，类型及完整构建通过。浏览器仅用本机合成公开JSON验证SSR长篇正文和三章元数据、挂载后的导航、段落21主题统计与第二页第21条评论；无发帖/评论/资料写操作。夹具已停止，开发服务恢复现网v1。生产非空段评/目录可见性与真实账号权限尚未联调，评论写、其他全站功能继续适配。
+
+协议来源：[ArticleProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleProcessor.java)、[CommentProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CommentProcessor.java)、[LongArticleColumnQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/LongArticleColumnQueryService.java)、[Comment模型](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Comment.java)。只读核对JSON协议与源码。

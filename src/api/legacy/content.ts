@@ -9,7 +9,7 @@ function count(value:unknown) {if(typeof value!=='number' || !Number.isSafeInteg
 function privatePath(path:string) {const key=getLegacyKey();return path+(key?'&'+new URLSearchParams({apiKey:key}):'')}
 export async function legacyListing(kind:ArticleFeedKind,extra:string,p:number) {
   page(p)
-  const paths:Partial<Record<ArticleFeedKind,string>>={recent:'/api/articles/recent',hot:'/api/articles/recent/hot',good:'/api/articles/recent/good',reply:'/api/articles/recent/reply',qna:'/api/articles/qna',perfect:'/api/articles/perfect'}
+  const paths:Partial<Record<ArticleFeedKind,string>>={recent:'/api/articles/recent',hot:'/api/articles/recent/hot',long:'/api/articles/recent/long',good:'/api/articles/recent/good',reply:'/api/articles/recent/reply',qna:'/api/articles/qna',perfect:'/api/articles/perfect'}
   const searching=kind==='search'
   if(searching && (!extra.trim() || extra.length>100 || /[\u0000-\u001f\u007f]/.test(extra))) throw new ApiError('搜索关键词不合法',422)
   const scoped=kind==='tag'||kind==='domain'
@@ -47,5 +47,16 @@ export async function legacyArticle(articleId:string,p=1):Promise<ArticleDetail>
   if(typeof r.offered==='boolean') result.offered=r.offered
   if(typeof r.rewarded==='boolean') result.rewarded=r.rewarded
   if(r.rewarded===true && typeof r.articleRewardContent==='string') result.articleRewardContent=r.articleRewardContent
+  if(d.longArticleColumnView!==undefined&&d.longArticleColumnView!==null)result.longArticleColumnView=legacyArticleColumnView(d.longArticleColumnView,articleId)
   return result
+}
+
+/** The classic article response contains a complete visible chapter view. Whitelist it before SSR. */
+export function legacyArticleColumnView(value:unknown,articleId:string):NonNullable<ArticleDetail['longArticleColumnView']>{
+ const v=legacyObject(value),c=legacyObject(v.column);if(!Array.isArray(v.chapters)||!v.chapters.length||v.chapters.length>10000)throw new ApiError('旧章节目录不完整',502)
+ const chapters=v.chapters.map(item=>{const r=legacyObject(item),articleId=id(text(r.articleId)),chapterNo=count(r.chapterNo);if(chapterNo<1)throw new ApiError('旧章节序号不合法',502);const result={articleId,articleTitle:text(r.articleTitle),chapterNo,articlePermalink:`/article/${articleId}`,...(r.articleCreateTime===undefined?{}:{articleCreateTime:new Date(legacyDate(r.articleCreateTime)).toISOString()}),...(typeof r.articlePreviewContent==='string'?{articlePreviewContent:r.articlePreviewContent}:{})};return result})
+ if(new Set(chapters.map(ch=>ch.articleId)).size!==chapters.length||chapters.some((ch,i)=>i>0&&ch.chapterNo<chapters[i-1]!.chapterNo)||count(c.columnArticleCount)!==chapters.length)throw new ApiError('旧章节目录与计数不一致',502)
+ const index=chapters.findIndex(ch=>ch.articleId===articleId);if(index<0||v.chapterNo!==chapters[index]!.chapterNo)throw new ApiError('当前章节与目录不一致',502)
+ for(const [key,expected] of [['previous',chapters[index-1]],['next',chapters[index+1]]] as const){const actual=v[key];if(expected?(!actual||legacyObject(actual).articleId!==expected.articleId):actual!==undefined&&actual!==null)throw new ApiError('相邻章节与目录不一致',502)}
+ return{column:{oId:id(text(c.oId)),columnTitle:text(c.columnTitle),columnArticleCount:chapters.length,...(typeof c.columnCoverURL==='string'?{columnCoverURL:c.columnCoverURL}:{})},chapters,chapterNo:chapters[index]!.chapterNo,...(chapters[index-1]?{previous:chapters[index-1]}:{}),...(chapters[index+1]?{next:chapters[index+1]}:{})}
 }
