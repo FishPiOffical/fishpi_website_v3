@@ -22,6 +22,7 @@ import CommentComposer from '@/components/articles/CommentComposer.vue'
 import ArticleCommentLocation from '@/components/articles/ArticleCommentLocation.vue'
 import type {CommentLocation} from '@/api/v3-comment-location'
 import { useV3CommentsStore } from '@/stores/v3Comments'
+import {useLegacyCommentsStore} from '@/stores/legacyComments'
 import MedalList from '@/components/medal/MedalList.vue'
 import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import { useV3ReactionsStore } from '@/stores/v3Reactions'
@@ -44,7 +45,7 @@ const routeMounted=ref(false)
 const loginRedirect=computed(()=>routeMounted.value?route.fullPath:route.fullPath.split('#')[0])
 onMounted(()=>{routeMounted.value=true})
 const auth = useAuthStore()
-const commentWrites=useV3CommentsStore(),commandOrigin=Symbol('article-comment-delete'),commentRefreshError=ref('')
+const commentWrites=getApiMode()==='v1'?useLegacyCommentsStore():useV3CommentsStore(),commandOrigin=Symbol('article-comment-delete'),commentRefreshError=ref('')
 const { apiKey, accessToken, isLoggedIn, account } = storeToRefs(auth)
 
 const article = ref<ArticleDetail | null>(null)
@@ -364,7 +365,7 @@ function clearReplyTarget() {
 
 watch(()=>commentWrites.revision,()=>{
   const command=commentWrites.completed
-  if(!command||command.articleId!==id.value||!accessToken.value)return
+  if(!command||command.articleId!==id.value||!(getApiMode()==='v1'?apiKey.value:accessToken.value))return
   editingId.value=''
   if(command.operation==='create'&&(command.input.parentId||'')===replyId.value&&(command.input.paragraphId||'')===paragraphIdForReply.value)cancelReply()
   void load(true)
@@ -412,6 +413,7 @@ function itemProps(c: ArticleComment) {
     loggedIn: isLoggedIn.value,
     commentingEnabled: commentingEnabled.value,
     own,
+    manage: getApiMode()==='v3',
     editing: editingId.value === c.oId,
     apiKey: apiKey.value,
     hideMedals: isLong.value,

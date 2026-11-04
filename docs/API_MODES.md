@@ -17,7 +17,8 @@
 | 专栏目录读取 | 第二批适配，实际旧接口部分目录为空且与元数据不一致时明确503 | 保留 |
 | 搜索、标签/领域目录及其文章列表 | 第四批已接，搜索缺匿名元数据时无身份展示 | 保留 |
 | 长篇列表、当前段评统计/顶层分页、章节导航 | 第十八批已接；完整回复/孤立段评定位仍待适配 | 保留 |
-| 评论写入及其余文章内容互动 | 待适配（表态见第十七批） | 保留 |
+| 普通评论/回复/段评发布 | 第十九批已接；合成身份验收，旧协议无幂等恢复 | 保留 |
+| 评论编辑/删除及其余文章互动 | 编辑/删除受旧页面会话限制，仍待适配；表态见第十七批 | 保留 |
 | 通知列表/未读/已读及实时刷新 | 第六批已接；旧列表仅有限快照，合成身份验收 | 保留 |
 | 私信会话/历史/发送/撤回/已读/未读 | 第七批聊天及第八批富编辑已接，本地合成账号验收；真实上传权限待验 | 保留 |
 | 共享编辑器预览/上传/表情选择/@联想 | 第八批已接，上传仅本地夹具验收 | 保留 |
@@ -304,3 +305,15 @@ ArticleView读者边界在v1包含实际旧key，换key/账号重读并清旧阅
 验证：legacy-long-reading-test五组实际API覆盖统计空/零/重复、分页和三种排序、游客/匿名/签名URL与字段白名单、外来文章/段落/失效/重复目标、孤立查询显式能力错误、完整章节校验/本地导航、长篇列表及共享模式选择；旧内容回归、v3评论32组、v3章节导航7组、旧表态11组和代理回归通过，类型及完整构建通过。浏览器仅用本机合成公开JSON验证SSR长篇正文和三章元数据、挂载后的导航、段落21主题统计与第二页第21条评论；无发帖/评论/资料写操作。夹具已停止，开发服务恢复现网v1。生产非空段评/目录可见性与真实账号权限尚未联调，评论写、其他全站功能继续适配。
 
 协议来源：[ArticleProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleProcessor.java)、[CommentProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CommentProcessor.java)、[LongArticleColumnQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/LongArticleColumnQueryService.java)、[Comment模型](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Comment.java)。只读核对JSON协议与源码。
+
+## 第十九批：普通评论、回复和段评发布
+
+CommentComposer按模式挂载独立LegacyCommentComposer/V3CommentComposer，原v3源码保留；父级完成通知和刷新选择对应store。v1使用旧POST /comment或/comment/paragraph，只有apiKey、articleId、原Markdown、匿名/可见范围、旧viewMode和回复ID；段评另带paragraphId，由服务端从当前段落或回复目标确定快照/位置，不接受客户端伪造段落元数据。匿名资格、手机号、发布费用和审核继续由服务器核验，不补本机授权或费用。
+
+确认后只提交一次，明确禁用共享HTTP风控后自动重发。普通评论成功没有ID，显示已确认和重新读取提示；段评只接受旧返回实际commentId，两者均不把回执正文填列表。完成后重读当前文章/段评并刷新本人资料；资料或列表读取失败不能重复发布。未知原正文/目标/匿名/可见范围跨SPA锁定，保留本机原操作，无重放按钮；仅明确核对后解除，不把local-comment序号宣称或发送为幂等键。草稿清理校验所属文章、编辑/回复/段落和原内容，确认取消/离页/目标变化拒迟到批准，旧key/账号变化清私有状态。SSR/非v1不能执行旧写。
+
+协议限制仍未解决：旧getCommentContent和removeComment直接依赖Sessions，而旧key中间件只写context用户；update虽接key，但无法安全读取原Markdown与保留原可见范围。当前v1不提供编辑/删除入口，直接调用也不发请求并明确限制；保留“本人”身份判断，不能因隐藏管理按钮而错误显示举报本人。没有恢复Cookie桥接或用已渲染HTML冒充编辑原文。此两项仍在全站兼容未完成清单，需要合法的旧key源读取/删除能力后再接入。
+
+验证：legacy-comments-test七组实际API/Pinia/编译编辑器覆盖普通/回复/段评精确字段、原文/Unicode/长度、匿名/可见范围、段落编号与无假普通ID、取消确认、未知锁定无重发、身份迟到、能力/SSR限制、匹配草稿清理及取消后的迟到批准。v3评论32组、旧长篇读取和代理回归、类型及完整构建通过。浏览器仅对本机合成账号验证普通评论确认、真实旧POST后当前GET显示评论/清草稿，另核对登录本人评论没有编辑/删除/举报本人入口；未在现网评论/扣分。夹具已停止，开发服务恢复现网v1。真实费用/手机/匿名/审核权限与生产段评写尚未联调；编辑删除、完整回复/定位及其他全站能力继续。
+
+协议来源：[CommentProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CommentProcessor.java)、[段评校验中间件](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/validate/LongArticleParagraphCommentValidationMidware.java)、[LoginCheckMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/LoginCheckMidware.java)。仅按公开JSON与源码适配，不改变生产服务认证。
