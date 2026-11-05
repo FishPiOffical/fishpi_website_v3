@@ -1,0 +1,16 @@
+
+.owner-medals { margin: 24px 0; }
+h2 { margin: 0 0 12px; font-size: 18px; }
+.hint { color: var(--fp-muted); font-size: 13px; }
+.medals { list-style: none; margin: 12px 0; padding: 0; }
+li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--fp-border); }
+.info { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; min-width: 0; overflow-wrap: anywhere; }
+.info > .hint, .info > span:not(.medal) { flex-basis: 100%; }
+.actions, nav { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.actions { flex-shrink: 0; }
+button { border: 1px solid var(--fp-border); background: transparent; color: var(--fp-text); border-radius: 8px; padding: 7px 12px; cursor: pointer; margin: 6px 6px 6px 0; }
+button:disabled { opacity: .5; cursor: default; }
+.error { color: #c34a36; }
+@media (max-width: 640px) { li { align-items: flex-start; flex-direction: column; } }
+
+.legacy-medal-image { width: 32px; height: 32px; object-fit: contain; } button[aria-disabled="true"] { opacity: .5; cursor: default; }

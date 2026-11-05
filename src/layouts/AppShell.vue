@@ -23,6 +23,7 @@ import ReportRecovery from '@/components/ReportRecovery.vue'
 import ActivityRecovery from '@/components/ActivityRecovery.vue'
 import LegacyInventoryRecovery from '@/components/LegacyInventoryRecovery.vue'
 import LegacyTransferRecovery from '@/components/LegacyTransferRecovery.vue'
+import LegacyMedalRecovery from '@/components/LegacyMedalRecovery.vue'
 import GameSaveRecovery from '@/components/GameSaveRecovery.vue'
 import MilestoneRecovery from '@/components/MilestoneRecovery.vue'
 import FishGameRecovery from '@/components/FishGameRecovery.vue'
@@ -417,6 +418,7 @@ onUnmounted(() => {
     <ActivityRecovery />
     <LegacyInventoryRecovery />
     <LegacyTransferRecovery />
+    <LegacyMedalRecovery />
     <SettingsDrawer />
     <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />

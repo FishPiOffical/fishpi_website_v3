@@ -35,7 +35,7 @@ const keyURL=url('export const profileOperationKey=()=>"medal-key-"+(++globalThi
 const apiURL=url(['fetchV3OwnerMedals','setV3MedalDisplayed','moveV3Medal'].map(n=>`export const ${n}=(...args)=>globalThis.__medalAPI.${n}(...args)`).join('\n'))
 const tick=async()=>{for(let i=0;i<30;i++)await Promise.resolve();await nextTick()}
 async function component(){
- let source=(await fs.readFile('src/components/settings/OwnerMedals.vue','utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
+ let source=(await fs.readFile('src/components/settings/V3OwnerMedals.vue','utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
  let js=compile(source).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-profile'",`from '${keyURL}'`).replace("from '@/api/v3-medals'",`from '${apiURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`)
  const imports=[...js.matchAll(/^import .+;$/gm)].map(m=>m[0]).join('\n');js=js.replace(/^import .+;$/gm,'')
  const mod=await import(url(`${imports}\nexport default{setup(){${js}\nreturn{medals,page,total,pageCount,ready,loading,busy,readError,error,message,pending,load,display,move,retry}},render(){return null}}`))

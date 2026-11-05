@@ -33,6 +33,7 @@
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
 | 用户公开勋章 | 第三十四批已接当前启用快照；无历史授予/永久有效证明 | 保留真实授予分页 |
+| 本人勋章读取/展示/相邻排序 | 第三十九批已接；重复定义ID条目保留且禁止歧义写，无幂等恢复 | 保留授予ID分页与原键写入 |
 | 积分转账 | 第三十八批已接旧apiKey POST及当前余额；仅成功确认，无费用/到账/编号回执，无幂等重放 | 保留详细回执/原键恢复 |
 | 本人背包/四卡使用 | 第三十七批已接旧JSON读取、三种消耗GET及改名卡POST；无幂等重放，积分改名另受页面会话限制 | 保留原接口/原键恢复 |
 | 本人职业状态/隐私/等级/成长提示/流水 | 第三十六批已接读取；写入被经典CSRF协议限制，未恢复Cookie桥接 | 保留原读写 |
@@ -599,3 +600,18 @@ legacyActivity保存未确认领取跨SPA锁定，没有自动恢复/重发按�
 验证：legacy-point-transfer-test三组实际API/Pinia/编译表单覆盖精确旧body/禁重发、仅成功确认投影、真实本人正负余额与输入/错身份拒绝、未知跨SPA锁定零重放、后置读失败不重转、余额不足、确认取消及目标/离页批准失效、SSR与全局提示白名单。原v3财务七组、双模式代理和完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证登录回跳含收款query、明确确认、余额100→95及忽略假明细999；模拟第二笔扣款后503，表单锁定且手动只读刷新显示89，无再次转账。生产双账号、并发余额、真实会员费率、分步扣费及通知未联调；旁路通知/私信未提供于夹具，不计入本次验收。夹具已停止并恢复现网v1开发代理，未登录真实账号或转移现网积分。
 
 协议来源：[SettingsProcessor.pointTransfer](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/SettingsProcessor.java)、[PointTransferValidationMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/validate/PointTransferValidationMidware.java)、[LoginCheckMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/LoginCheckMidware.java)。
+
+
+## 第三十九批：本人勋章读取、展示与相邻排序
+
+账号页OwnerMedals按模式挂载LegacyOwnerMedals/V3OwnerMedals，共用原样式；v3授予ID分页、图片与原键恢复保留。旧POST /api/medal/my/list使用内存apiKey，核对每条user_id为当前稳定账号ID，投影user_medal_oId为recordId、medal_id为definitionId及名称/类型/描述、display、display_order、expire_time与合法公开图标URL；data及原内部字段不进入状态。有效列表包含隐藏勋章，当前完整有界快照本机每20条分页，超过1000条明确失败；按实际display_order稳定排序，负序号不重编造，非正有效期按旧服务永久语义显示。
+
+旧服务对重复定义授予可能重复回填第一条user_medal_oId，客户端保留重复而不去重或造新授予ID。旧写入实际只接medalId定义ID，无法指定授予记录；重复定义或重复recordId条目保留展示并禁用歧义写，store同样校验当前唯一绑定。非重复项POST /api/medal/my/display发送明确display布尔、/reorder发送up/down，无用户ID或假幂等键。只接受code=0作请求确认，不从额外返回字段推当前状态或顺序；成功后仅重读本人列表，不能因读错重复移动。
+
+旧移动基于全部持有记录的相邻顺序，当前有效列表并非排序全集，因此不根据可见首尾阻止服务端移动。读接口会清理过期记录且内部异常可能返回空列表，这两项旧服务行为在客户端无法区分；空快照仅按当前返回展示，不据此宣称服务端无异常。所有原描述纯文本，图标只解析既有公开HTTP(S) URL，复用公开勋章图片解析并保留签名query，无/gen/会话桥接/CSS注入。
+
+异步写入保留按钮DOM/焦点，aria-disabled配合处理函数及store双重阻止重复；重读时保留旧快照但明确不可操作，读失败清列表。未知相对移动在Pinia跨SPA保留锁定，无自动重放，需核对当前展示与顺序后明确解除；全局提示不公开私人正文。旧key/账号/身份上下文/请求代际清理，迟到读取与写入不能复活，SSR零私有请求。
+
+验证：legacy-owner-medals-test三组实际API/Pinia/编译UI覆盖记录/定义ID、重复快照、隐藏/永久/原序号与白名单、精确旧写入/禁自动重试、歧义目标store保护、成功后当前GET而非回执、未知移动跨SPA锁定、读错不重复写、按钮节点保留且重复点击零请求、快照分页及身份/SSR隔离。原v3本人勋章、图片、旧公开勋章回归和完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证隐藏→展示、活动章上移、第三次移动后503与只读刷新后的实际顺序，仍锁定写按钮；重复授予条目保留无操作按钮。测试服务曾随执行环境终止，确认进程/句柄缺失后重启本机夹具完成最后验收。生产多账号/过期清理/重复授予具体数据未联调，账号页安全/扫码及旁路通知不在本机夹具范围。夹具已停止并恢复真实v1开发代理，未登录生产账号或修改现网勋章。
+
+协议来源：[MedalProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MedalProcessor.java)、[MedalApiAuth](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MedalApiAuth.java)、[MedalService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/MedalService.java)。
