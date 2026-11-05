@@ -25,6 +25,7 @@ import LegacyInventoryRecovery from '@/components/LegacyInventoryRecovery.vue'
 import LegacyTransferRecovery from '@/components/LegacyTransferRecovery.vue'
 import LegacyMedalRecovery from '@/components/LegacyMedalRecovery.vue'
 import LegacyMembershipRecovery from '@/components/LegacyMembershipRecovery.vue'
+import LegacyPostRecovery from '@/components/LegacyPostRecovery.vue'
 import LegacyGameSaveRecovery from '@/components/LegacyGameSaveRecovery.vue'
 import GameSaveRecovery from '@/components/GameSaveRecovery.vue'
 import MilestoneRecovery from '@/components/MilestoneRecovery.vue'
@@ -423,6 +424,7 @@ onUnmounted(() => {
     <LegacyMedalRecovery />
     <LegacyMembershipRecovery />
     <LegacyGameSaveRecovery />
+    <LegacyPostRecovery />
     <SettingsDrawer />
     <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />

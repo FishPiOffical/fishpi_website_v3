@@ -18,6 +18,7 @@
 | 专栏目录读取 | 第二批适配，实际旧接口部分目录为空且与元数据不一致时明确503 | 保留 |
 | 搜索、标签/领域目录及其文章列表 | 第四批已接，搜索缺匿名元数据时无身份展示 | 保留 |
 | 长篇列表、当前段评统计/顶层分页、章节导航 | 第十八批已接；完整回复/孤立段评定位仍待适配 | 保留 |
+| 发帖及本人云草稿 | 第四十三批已接发布/保存/读取/删除；旧草稿最近50份快照，已有文章编辑缺完整私有JSON | 保留完整编辑与原键恢复 |
 | 普通评论/回复/段评发布 | 第十九批已接；合成身份验收，旧协议无幂等恢复 | 保留 |
 | 评论编辑/删除及其余文章互动 | 编辑/删除受旧页面会话限制，仍待适配；表态见第十七批 | 保留 |
 | 通知列表/未读/已读及实时刷新 | 第六批已接；旧列表仅有限快照，合成身份验收 | 保留 |
@@ -663,3 +664,20 @@ OwnerProfileSettings按模式挂载LegacyOwnerProfileSettings/V3OwnerProfileSett
 验证：legacy-game-saves-test三组实际API/Pinia/Vue与完整SSR模板覆盖固定槽/key、原空白/多行/Unicode/HTML文本、无假元数据、空串歧义、坏字段/预算/身份迟到拒绝、未知原文跨SPA锁定零重发、成功后当前GET不采历史正文、后置读错不重写、草稿隔离/明确载入/离页取消与SSR零读/全局不显正文。原v3存档18组及完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证完整原文保存和重读、草稿未被清空、第二次保存后503锁定，手动只读核对当前新内容。真实多设备并发、生产内容/空串来源和旧存档迁移未联调；数据页导出及旁路通知不在本机夹具范围。夹具已停止并恢复现网v1开发代理，未读写真实游戏存档。
 
 协议来源：[CloudProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CloudProcessor.java)、[CloudService.sync/getFromCloud](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CloudService.java)。
+
+
+## 第四十三批：发帖与本人云草稿
+
+PostView按模式挂载LegacyPostView/V3PostView，共用表单样式及MarkdownEditor/TagInput，原v3源码编辑、真正分页与原键恢复完整保留。旧GET /api/article-drafts读取最近最多50份草稿快照，不构造全部草稿总数或服务端分页；每份按articleDraftUserId核对当前稳定ID，ID唯一、字段长度/类型/Unicode有界。GET /api/article-drafts/{id}白名单读取原Markdown、打赏区与隐藏thoughtContent，历史type4可继续保存，type3不作为新思绪发布。
+
+旧POST /api/article-drafts完整映射articleTitle/articleContent/articleDraftThoughtContent等真实字段；更新仍POST并带articleDraftId，不照搬v3 PUT。DELETE /api/article-drafts/{id}?apiKey仅删除本人目标，须显式确认。读取与草稿编辑分离，载入替换先确认，失败重试保留实际目标，不用空对象顶替。新增仅核对的云端草稿预览，未知写入锁定期间仍可读取，正文只进入readonly textarea，不替换本机输入。
+
+旧POST /article发送完整已验证字段、独立apiKey和可选articleDraftId，保留原文空白及多行，不发送author/status/bypassCensor或伪造幂等键。普通/机要/同城/问答/长文支持现有字段；专栏已有ID/新名称明确填写，不制造v3本人目录，最终归属/费用/发布资格由服务端核验。成功只认articleId，不用回执正文补详情；发布所用草稿由原服务删除，不追加第二次删除。draftRemoveMsg单独显示，已发布即禁止再次发布；导航失败、余额刷新失败均不重发。
+
+旧写入禁风控自动重试；网络、非JSON或响应未确认时冻结原命令于Pinia，跨SPA阻止重复写，核对文章/草稿后才明确解除。全局提示不展示原文，仅显示操作状态。正常读取错误不伪装空草稿，保存已确认而重读失败只重读。确认绑定身份及离页AbortSignal；上下文/旧key/账号代际拒迟到结果，退出清命令与私有内容，SSR仅未认证外壳。
+
+已有文章编辑暂未接通：/api/article/md/{id}只返回text/html原文，不含完整私有编辑字段；公开文章详情也不能证明完整打赏/匿名/专栏编辑源，不能据此拼完整PUT覆盖已有数据。v1编辑页明确说明限制、不构造v3请求；该项仍待可靠的本人JSON源码协议。本批不代表全站兼容完成。
+
+验证：legacy-posts-test三组覆盖本人及上限/重复校验、完整原文与隐藏思绪、精确旧字段/方法、发布消费草稿、无额外删除/无假幂等键、未知命令冻结和跨SPA锁定、余额/后置读取失败不重写、编译实际表单载入/保存/取消/离页、锁定期间只读云端核对且本机输入保留，以及SSR/身份隔离。原v3发帖33组、专栏选择、标签联想、双模式代理及完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证实际Vditor两段正文保存、第二次已保存但503后锁定、云端只读核对和确认发布；夹具的QnA字段大小写错误曾导致预览校验拒绝，修正夹具后重新验收通过，未放宽客户端校验。无现网发帖、删除或积分消费；真实权限/审核/收费、完整文章编辑与生产草稿规模未联调。夹具已停止，恢复真实v1开发代理。
+
+协议来源：[ArticleProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleProcessor.java)、[ArticleDraftProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleDraftProcessor.java)、[ArticleDraftMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ArticleDraftMgmtService.java)、[ArticlePostValidationMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/validate/ArticlePostValidationMidware.java)。
