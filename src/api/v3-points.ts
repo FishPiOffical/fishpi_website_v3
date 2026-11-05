@@ -1,5 +1,6 @@
 import { ApiError, request } from './http'
-export type PointEntry = { time: number; amount: number; operation: '+' | '-'; balance: number; type: number; displayType: string; descriptionHtml: string }
+import {getApiMode} from './mode'
+export type PointEntry = { time: number; amount: number; operation: '+' | '-'; balance: number; type: number; displayType: string; descriptionHtml: string; descriptionText?: string }
 export type PointPage = { list: PointEntry[]; p: number; size: number; total: number; pageCount: number }
 type Row = Record<string, unknown>
 const invalid = () => new ApiError('积分流水响应格式不正确', 502, 'invalid_response')
@@ -10,6 +11,7 @@ function text(value: unknown): string { if (typeof value !== 'string') throw inv
 async function data(path: string): Promise<Row> { const body = object(await request(path)); if (body.code !== 0) throw new ApiError(typeof body.msg === 'string' ? body.msg : '积分读取失败', 502); return object(body.data) }
 export async function fetchV3PointPage(p = 1, size = 20): Promise<PointPage> {
   if (!Number.isSafeInteger(p) || p < 1 || p > 42949672 || !Number.isSafeInteger(size) || size < 1 || size > 50) throw new ApiError('积分流水分页参数不合法', 422)
+  if(getApiMode()==='v1')return (await import('./legacy/points')).legacyPointPage(p,size)
   const source = await data(`/api/v3/me/points?p=${p}&size=${size}`), pagination = object(source.pagination)
   if (!Array.isArray(source.list) || source.list.length > size || pagination.p !== p || pagination.size !== size) throw invalid()
   const total = count(pagination.total), pageCount = count(pagination.pageCount)
@@ -21,6 +23,6 @@ export async function fetchV3PointPage(p = 1, size = 20): Promise<PointPage> {
   })
   return { list, p, size, total, pageCount }
 }
-export async function fetchV3PointBalance(): Promise<number> { return integer((await data('/api/v3/me')).userPoint) }
+export async function fetchV3PointBalance(): Promise<number> { if(getApiMode()==='v1')return (await import('./legacy/points')).legacyPointBalance(); return integer((await data('/api/v3/me')).userPoint) }
 export function pointChange(row: Pick<PointEntry, 'operation' | 'amount'>): string { const change = row.operation === '-' ? -row.amount : row.amount; return `${change >= 0 ? '+' : ''}${change}` }
 export function pointTime(value: number): string { return new Date(value).toLocaleString() }

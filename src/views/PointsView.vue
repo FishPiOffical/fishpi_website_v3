@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {getApiMode} from '@/api/mode'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -7,14 +8,15 @@ import { fetchV3PointBalance, fetchV3PointPage, pointChange, pointTime, type Poi
 import { useAuthStore } from '@/stores/auth'
 import { usePageSeo } from '@/composables/usePageSeo'
 import FpLoading from '@/components/FpLoading.vue'
-const { accessToken, account } = storeToRefs(useAuthStore())
+const { accessToken, apiKey, account } = storeToRefs(useAuthStore())
+const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
 const mounted = ref(false), items = ref<PointEntry[]>([]), balance = ref<number | null>(null)
 const page = ref(1), pageCount = ref(0), total = ref(0), loading = ref(false), balanceLoading = ref(false), error = ref(''), balanceError = ref('')
-const loggedIn = computed(() => mounted.value && !!accessToken.value && !!account.value)
-let sequence = 0, balanceSequence = 0, boundary = getAuthContextVersion(), owner = account.value?.oId
+const loggedIn = computed(() => mounted.value && !!credential.value && !!account.value)
+let sequence = 0, balanceSequence = 0, boundary = getAuthContextVersion(), owner = account.value?.oId, legacyKey = apiKey.value
 usePageSeo(() => ({ title: '积分流水', path: '/points', robots: 'noindex' }))
 function clear() { sequence++; balanceSequence++; items.value = []; balance.value = null; pageCount.value = total.value = 0; error.value = balanceError.value = ''; loading.value = balanceLoading.value = false }
-function capture(current: number, balanceRead = false) { const context = getAuthContextVersion(), id = account.value?.oId; return () => loggedIn.value && context === getAuthContextVersion() && id === account.value?.oId && current === (balanceRead ? balanceSequence : sequence) }
+function capture(current: number, balanceRead = false) { const context = getAuthContextVersion(), id = account.value?.oId, key = apiKey.value; return () => (getApiMode()!=='v1'||key===apiKey.value) && loggedIn.value && context === getAuthContextVersion() && id === account.value?.oId && current === (balanceRead ? balanceSequence : sequence) }
 async function loadRecords() {
   const valid = capture(++sequence), requested = page.value
   if (!valid()) return
@@ -31,10 +33,10 @@ async function loadBalance() {
   catch (e) { if (valid()) balanceError.value = e instanceof Error ? e.message : '当前余额读取失败' }
   finally { if (valid()) balanceLoading.value = false }
 }
-watch([accessToken, () => account.value?.oId], () => {
+watch([credential, () => account.value?.oId], () => {
   const context = getAuthContextVersion(), id = account.value?.oId
-  if (!accessToken.value || context !== boundary || id !== owner) { const changedPage = page.value !== 1; clear(); page.value = 1; if (loggedIn.value) { if (!changedPage) void loadRecords(); void loadBalance() } }
-  boundary = context; owner = id
+  if (!credential.value || context !== boundary || id !== owner || getApiMode()==='v1'&&legacyKey!==apiKey.value) { const changedPage = page.value !== 1; clear(); page.value = 1; if (loggedIn.value) { if (!changedPage) void loadRecords(); void loadBalance() } }
+  boundary = context; owner = id; legacyKey = apiKey.value
 }, { flush: 'sync' })
 watch(page, () => { if (loggedIn.value) void loadRecords() })
 onMounted(() => { mounted.value = true; if (loggedIn.value) { void loadRecords(); void loadBalance() } })
@@ -62,7 +64,7 @@ function refresh() { void loadRecords(); void loadBalance() }
             <div v-if="!items.length" class="empty-list">{{ total ? '本页暂无记录，请返回已有页码' : '暂无记录' }}</div>
             <div v-for="(row, index) in items" :key="`${page}-${index}`" class="record-item">
               <div class="record-icon" :class="row.operation === '-' ? 'out' : 'in'">{{ row.operation }}</div>
-              <div class="record-main"><div class="record-desc" v-html="row.descriptionHtml" /><div>{{ row.displayType }}</div><div class="record-time">{{ pointTime(row.time) }}</div><div>交易后余额：{{ row.balance.toLocaleString() }}</div></div>
+              <div class="record-main"><div v-if="getApiMode()==='v1'" class="record-desc">{{ row.descriptionText }}</div><div v-else class="record-desc" v-html="row.descriptionHtml" /><div>{{ row.displayType }}</div><div class="record-time">{{ pointTime(row.time) }}</div><div>交易后余额：{{ row.balance.toLocaleString() }}</div></div>
               <div class="record-amount" :class="row.operation === '-' ? 'out' : 'in'">{{ pointChange(row) }}</div>
             </div>
           </div>

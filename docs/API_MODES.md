@@ -36,6 +36,7 @@
 | 用户文章/长文/公开回帖/清风列表 | 第二十二批已接；私密正文与清风单条读取受旧契约限制 | 保留 |
 | 关注/粉丝、关注标签与收藏列表读取 | 第二十三批已接；旧订阅列表缺独立JSON，删除记录可能省略 | 保留 |
 | 用户关注/取消关注 | 第二十四批已接，旧响应无幂等回执，合成身份验收 | 保留 |
+| 本人积分流水与当前余额 | 第二十五批已接；旧说明按文本显示，合成身份验收 | 保留 |
 | 标签关注/收藏/订阅写入、账号各类设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
@@ -389,3 +390,15 @@ useMemberPage的身份边界按模式观察实际旧key/Bearer，换key/账号/�
 验证：legacy-user-follow-test五组实际API/Pinia/编译Vue覆盖canFollow/ID核验、精确旧字段、无假回执/自动重放、未知跨组件锁定与重读后解除、后置GET失败只重读、身份/SSR/本人隔离、另一组件完成废弃在途GET及模式包装。原v3关注8组、用户卡片12组、双模式代理回归和完整类型/客户端/服务端构建通过。浏览器仅使用本机合成账号验证登录回跳用户主页、关注和取消后的当前GET状态及焦点保留；没有关注真实用户。夹具已停并恢复127.0.0.1:5173现网v1开发代理。生产关注通知、并发、权限和风控仍需真实环境联调。
 
 协议来源：[FollowProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/FollowProcessor.java)、[UserProcessor.getUserInfo](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)。只读核对公开源码，不改变Rhythm服务认证。
+
+## 第二十五批：本人积分流水与当前余额
+
+/points共用原界面，fetchV3PointPage/Balance按模式选择独立legacy/points。每次旧读取先通过/api/user?apiKey核验当前本人及稳定ID，再按返回用户名读取/api/user/{name}/points；不接受页面指定他人用户名，不借公开用户资料或通知正文拼账本。旧服务实际分页大小为20～50，拒绝会被服务端静默钳制的更小size，界面仍每页20条。真实总数/页数、sum、operation、交易后balance、time、type和displayType分别严格投影，坏数字/时间/分页明确报错，不补零。
+
+当前余额独立取新的/api/user响应userPoint，不能用账户store旧快照、最新一条流水余额或旧历史回执替代；余额/列表失败独立提示与重试。旧description包含模板HTML及历史备注，原文仅放descriptionText通过Vue插值展示，不执行为HTML，不将其冒充v3服务端已清洗说明；旧模板标记可能以文字显示，这是当前旧格式展示限制。v3仍按既有descriptionHtml契约渲染，没有改变其解码或余额来源。
+
+页面按模式使用专用旧key/Bearer；旧key变化清记录/余额/页码并拒迟到写回，正常v3非空token轮换保持原页。适配器在本人核验和列表读取后各自检查key，不能借新身份续读。SSR零私有读取，挂载后实际认证才请求，没有localStorage账本缓存或Cookie桥接。
+
+验证：legacy-points-test四组实际旧认证/适配器/公共API/编译Vue覆盖精确本人路径/分页/key、真实金额及独立当前余额、私有字段剔除、历史HTML仅文本、坏数据/游客/迟到key拒绝、第二页、独立余额错误恢复、退出与SSR零读取。原v3积分5组回归及完整类型/客户端/服务端构建通过。浏览器只用本机合成账号验证登录回跳、共21条/两页和第21条记录、当前9876与历史480分别显示；没有读取或修改真实账本、转账或消费。夹具已停止并恢复127.0.0.1:5173现网v1开发代理。真实旧账本、权限、历史类型和旧服务内部吞错情况仍需生产联调；转账、背包及其他财务写入继续适配。
+
+协议来源：[UserProcessor.apiUserPoints](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)、[PointtransferQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/PointtransferQueryService.java)、[Pointtransfer字段](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Pointtransfer.java)。只读核对JSON与源码，不执行真实财务操作。
