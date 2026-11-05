@@ -6,6 +6,8 @@ import { useAuthStore } from '@/stores/auth'
 import { getAuthContextVersion } from '@/api/http'
 import { articleOwnerProof,type OwnerOperation,type OwnerReceipt } from '@/api/v3-article-owner'
 import { useV3ArticleOwnerStore } from '@/stores/v3ArticleOwner'
+import {getApiMode} from '@/api/mode'
+import LegacyArticleOwnerActions from './LegacyArticleOwnerActions.vue'
 const props=withDefaults(defineProps<{articleId:string;authorId?:string;anonymous?:boolean;permanent?:boolean}>(),{authorId:'',anonymous:false,permanent:false})
 const emit=defineEmits<{changed:[id:string];deleted:[id:string]}>()
 const {accessToken,account}=storeToRefs(useAuthStore()),operations=useV3ArticleOwnerStore()
@@ -38,7 +40,8 @@ onMounted(()=>{mounted.value=true})
 onBeforeUnmount(()=>{mounted.value=false;close()})
 </script>
 <template>
- <div v-if="authenticated&&(candidate||operations.pending||currentReceipt)" class="owner-actions">
+ <LegacyArticleOwnerActions v-if="getApiMode()==='v1'" :article-id="articleId" :author-id="authorId" :anonymous="anonymous" @changed="emit('changed',$event)" @deleted="emit('deleted',$event)" />
+ <div v-else-if="authenticated&&(candidate||operations.pending||currentReceipt)" class="owner-actions">
   <button v-if="candidate" type="button" :disabled="operations.busy||operations.confirming" :aria-expanded="opened" @click="opened?close():check()">本人文章操作</button>
   <p v-if="currentReceipt" role="status">{{ currentReceipt.kind==='delete'?'删除已确认':`本次置顶已确认，支付${currentReceipt.paidPoints}积分；当前状态以重新读取为准。` }}</p>
   <p v-if="operations.accountError&&(operations.pending?.id===articleId||currentReceipt)" role="status">{{ operations.accountError }}</p>
