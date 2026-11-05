@@ -1,0 +1,4 @@
+
+.game-saves { border-top: 1px solid var(--fp-border); margin-top: 24px; padding-top: 16px; p { overflow-wrap: anywhere; color: var(--fp-muted); } label { display: grid; gap: 8px; margin-top: 14px; } textarea { box-sizing: border-box; width: 100%; resize: vertical; min-width: 0; background: var(--fp-bg); color: var(--fp-text); border: 1px solid var(--fp-border); border-radius: 8px; padding: 10px; } [role=alert] { color: #c65044; } button { padding: 7px 10px; margin: 4px 8px 4px 0; background: var(--fp-card); color: var(--fp-text); border: 1px solid var(--fp-border); border-radius: 7px; cursor: pointer; &:disabled { opacity: .5; cursor: default; } } }
+.save-hash { font-size: 12px; } .save-actions { display: flex; flex-wrap: wrap; }
+

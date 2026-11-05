@@ -33,6 +33,7 @@
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
 | 用户公开勋章 | 第三十四批已接当前启用快照；无历史授予/永久有效证明 | 保留真实授予分页 |
+| Evolve本人云存档读写 | 第四十二批已接固定旧槽原文；无版本/冲突/幂等保护，空响应歧义明确展示 | 保留版本/hash/迁移及原键恢复 |
 | 本人资料/头像设置读取 | 第四十一批已接本人白名单；编辑处理器依赖Session，QQ/标签/MBTI缺独立本人读取，仍待后端协议支持 | 保留完整编辑/上传 |
 | 会员档位/本人状态/开通/昵称配置 | 第四十批已接旧JSON；无效券可能加价、全配置保存及未知锁定与v3分离 | 保留原规则与原键恢复 |
 | 本人勋章读取/展示/相邻排序 | 第三十九批已接；重复定义ID条目保留且禁止歧义写，无幂等恢复 | 保留授予ID分页与原键写入 |
@@ -647,3 +648,18 @@ OwnerProfileSettings按模式挂载LegacyOwnerProfileSettings/V3OwnerProfileSett
 验证：legacy-owner-profile-test两组实际API/编译UI覆盖精确旧key/GET、必要字段白名单与稳定ID、敏感QQ/手机号等不泄漏、不从公开卡片补值、坏头像/输入拒绝、空串、签名参数、纯文本/换行/无危险网址链接、图片失败、读取错误重试、身份/退出/SSR隔离及全程零写；原v3资料回归和完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证登录回跳资料、多行简介、切到头像并确认图片完成加载，未保存真实资料或上传文件。旁路通知/私信未由夹具提供，不计入本次验收；夹具已停止并恢复真实v1开发代理。
 
 协议来源：[ApiProcessor.getUser](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ApiProcessor.java)、[SettingsProcessor.updateProfiles/updateAvatar](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/SettingsProcessor.java)、[UpdateProfilesValidationMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/validate/UpdateProfilesValidationMidware.java)。
+
+
+## 第四十二批：Evolve本人旧云存档读写
+
+数据页OwnerGameSaves按模式挂载LegacyOwnerGameSaves/V3OwnerGameSaves，共用样式；v3新槽目录、版本、服务端hash/字节核验、迁移和原键恢复保留。旧POST /api/cloud/get固定{apiKey,gameId:evolve-save}读取当前本人槽，POST /api/cloud/sync固定增加data原字符串，不接客户端任意gameId、不读取榜单或其他游戏/系统存档。旧处理器明确支持apiKey，不转Cookie/Bearer或其他账号ID。
+
+原文不trim、不JSON重编码、不经HTML解析，只进入readonly textarea或明确载入后的编辑textarea；UTF16/UTF8边界复用既有校验（本页最多500000单位/2MiB），坏Unicode或超范围明确失败。旧响应没有版本、更新日期、hash和实际字节元数据，不制造GameSaveMetadata或客户端hash冒充服务器核验。字节数明确为本机计算。旧getFromCloud缺失、真实空串及内部异常均可能返回空字符串，界面明确三种可能，不把空串当404/不存在或迁移资格证明。
+
+当前云端原文与本机编辑草稿分离，任何刷新/保存后重读不自动填草稿；覆盖非空草稿须明确确认，原内容未变化才载入。保存冻结原文，确认明确无版本冲突检测、可能覆盖其他设备较新数据，建议备份；不是v3 expectedRevision语义。旧保存仅code=0作请求确认，不把历史回执额外data/revision投影为当前存档；随后只读GET语义的cloud/get，读错不重复保存。成功/未知都保留本机草稿。
+
+保存禁风控自动重发/no-store，无假幂等键。未知原文仅Pinia私有命令跨SPA锁定，不在全局恢复提示展示正文或自动重写；当前云端可只读核对，明确解除后才允许新保存。确认离页/身份变化AbortSignal取消迟到批准；旧key/账号/上下文/请求代数拒迟到读写，退出清原文、命令和草稿，SSR零私有请求。旧服务同步为删除旧记录再新增，无客户端可验证并发版本；此限制保留说明，不能伪称与v3同等安全覆盖。
+
+验证：legacy-game-saves-test三组实际API/Pinia/Vue与完整SSR模板覆盖固定槽/key、原空白/多行/Unicode/HTML文本、无假元数据、空串歧义、坏字段/预算/身份迟到拒绝、未知原文跨SPA锁定零重发、成功后当前GET不采历史正文、后置读错不重写、草稿隔离/明确载入/离页取消与SSR零读/全局不显正文。原v3存档18组及完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证完整原文保存和重读、草稿未被清空、第二次保存后503锁定，手动只读核对当前新内容。真实多设备并发、生产内容/空串来源和旧存档迁移未联调；数据页导出及旁路通知不在本机夹具范围。夹具已停止并恢复现网v1开发代理，未读写真实游戏存档。
+
+协议来源：[CloudProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CloudProcessor.java)、[CloudService.sync/getFromCloud](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CloudService.java)。
