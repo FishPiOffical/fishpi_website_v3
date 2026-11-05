@@ -35,8 +35,10 @@ try {
     const response=await fetch(base+path,{method:'POST',headers:{Cookie:'fp.apiMode=v1; fp_v3_refresh=private',Authorization:'Bearer must-not-forward','Content-Type':'application/json'},body:JSON.stringify({name:'test',markdownText:'read-only fixture'})})
     assert.equal((await response.json()).version,'v1');assert.equal(calls.at(-1).headers.authorization,undefined);assert.ok(!calls.at(-1).headers.cookie?.includes('fp_v3_refresh'))
   }
-  for(const path of ['/comment/thread/replies','/comment/paragraph/summary','/comment/paragraph/thread/parents']){
-    await fetch(base+path,{method:'POST',headers:{Cookie:'fp.apiMode=v1; sym-ce=wrong-actor; harmless=1','Content-Type':'application/json'},body:JSON.stringify({apiKey:'synthetic'})})
+  for(const path of ['/api/v1/auth/captcha-options','/api/v1/auth/registration-options','/api/v1/auth/registration/request','/api/v1/auth/registration/complete','/api/v1/auth/password-reset/request','/api/v1/auth/password-reset/complete','/comment/thread/replies','/comment/paragraph/summary','/comment/paragraph/thread/parents']){
+    const read=path.endsWith('-options')
+    await fetch(base+path,{method:read?'GET':'POST',headers:{Cookie:'fp.apiMode=v1; sym-ce=wrong-actor; harmless=1',Authorization:'Bearer must-not-forward','Content-Type':'application/json'},...(!read?{body:JSON.stringify({apiKey:'synthetic'})}:{})})
+    assert.equal(calls.at(-1).headers.authorization,undefined)
     assert.equal(calls.at(-1).headers.cookie,undefined)
   }
   console.log('PASS actual dual proxy: deterministic targets, credential isolation, explicit unported capability, invalid mode fallback')

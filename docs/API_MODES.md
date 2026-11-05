@@ -739,3 +739,13 @@ LegacyCommentReplies由普通ArticleView与长篇LongArticleReader共用，默�
 用户已提供Rhythm源码目录/Users/ling/Documents/GitHub/rhythm；只读确认README、工作区及约定，尚未改后端。注册/重置旧流程仍缺无需验证码URL和HTML的完整JSON契约，后续将在该仓库补协议，与website_v3分别提交、不部署。不能因此声明现网v1已具备未部署能力。
 
 协议来源：[CommentProcessor.getThreadReplies/getParagraphThreadParents](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CommentProcessor.java)、[CommentQueryService.buildThreadCommentBase/buildThreadReply](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CommentQueryService.java)。
+
+## 第四十七批：v1 注册与找回密码 JSON 协议
+
+Rhythm 新增六个 `/api/v1/auth/` 账号入口，与现有 v3 账号入口共用注册选项、极验配置、短信申请、注册完成与密码重置核心。未改经典路由、v3认证或数据库结构；原注册策略、邀请资格、短信证明绑定、限流及严格事务继续由既有核心处理。新增路径保留匿名访问验证码中间件，且不继承经典 Cookie/apiKey 账号作为注册或重置授权；传输日志过滤器覆盖新路径及编码错误，启动时仍要求过滤器已安装。API.md 与 UPDATE_LOG.md 已在后端同步。
+
+`v3-account-access.ts` 按当前模式明确选择六条 v1/v3 路径，共用原 AccountAccessForm。手机号、短信码和密码摘要只在 JSON 正文，不传 Bearer/apiKey，不借经典 HTML 或带验证码 URL；v1 关闭自动验证码重试，结果不明沿用原界面锁定/核实流程。旧服务器尚无新路径时返回明确“当前服务器尚未提供此版本的账号服务”，不将404当作短信结果未知。SSR不提交账号请求。双模式代理对新匿名账号路径移除上游Cookie与Authorization，避免页面身份混入。
+
+验证：前端账号适配与真实编译表单双模式各20组，新增六条路径、凭据/URL隔离、禁止自动重发及未部署服务器提示断言；代理、类型检查和完整客户端/SSR构建通过。后端使用Java25独立javac专项运行器，实际控制器/Netty原始JSON解析/响应信封及策略读取通过，SMS/存储/配额为显式夹具，未运行Maven。验证前导零、角色、四类写入白名单、伪造身份、query证明、媒体类型、坏JSON、正文预算、429/503及日志路径识别；既有v3策略测试保留。
+
+浏览器只读验证当前真实v1上游未部署时注册页显示明确提示，手动重读仍保留表单；截图 `/tmp/fp-account-access47-browser.png`。未发送真实短信、创建账号或修改密码；未验证IDEA运行中的完整IoC/全局风控链、真实数据库/短信服务和现网新接口。Rhythm需用户在IDEA重新编译/重启，既有账号凭据/注册证明所需迁移须已应用；新别名不提供旧数据库兼容替代。此批不部署。人工验收：本地重启后指向已更新的v1目标，注册页读取策略→本人主动验证并申请短信→完成后手动登录；找回密码同理；关闭注册、错误验证码、过期证明及频繁请求应明确拒绝，切回v3仍走原路径。全站资料/偏好等剩余功能继续适配，不能视为全部完成。

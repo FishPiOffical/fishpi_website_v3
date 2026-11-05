@@ -1,3 +1,4 @@
+import { getApiMode } from './mode'
 import { ApiError, request } from './http'
 import { passwordDigest } from './v3-security'
 export type RegistrationOptions = { mode: 'open' | 'invitation' | 'closed'; enabled: boolean; inviteCodeRequired: boolean; referralAccepted: boolean; username: { minLength: number; maxLength: number }; appRoles: { value: number; label: string }[] }
@@ -7,7 +8,11 @@ function row(value: unknown): Record<string, unknown> { if (!value || typeof val
 async function data(path: string, body?: Record<string, unknown>) {
   const raw = body ? JSON.stringify(body) : undefined
   if (raw && new TextEncoder().encode(raw).length > (path.endsWith('/request') ? 8192 : 4096)) throw new ApiError('请求内容过长', 422)
-  const result = row(await request(path, { method: body ? 'POST' : 'GET', cache: 'no-store', ...(raw ? { headers: { 'Content-Type': 'application/json' }, body: raw } : {}) }))
+  const legacy = getApiMode() === 'v1', target = legacy ? path.replace(/^\/api\/v3\/auth\//, '/api/v1/auth/') : path
+  let response: unknown
+  try { response = await request(target, { method: body ? 'POST' : 'GET', cache: 'no-store', ...(legacy ? { __captchaRetried: true } : {}), ...(raw ? { headers: { 'Content-Type': 'application/json' }, body: raw } : {}) }) }
+  catch (failure) { if (legacy && failure instanceof ApiError && [404,405,501].includes(failure.status)) throw new ApiError('当前服务器尚未提供此版本的账号服务', 404, 'v1_account_unavailable'); throw failure }
+  const result = row(response)
   if (result.code !== 0) throw invalid()
   return row(result.data)
 }

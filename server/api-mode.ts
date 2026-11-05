@@ -59,7 +59,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
     const target = new URL(backendTarget(mode,env)), headers = {...req.headers}
     delete headers['x-fp-api-mode']
     if (mode === 'v1') delete headers.authorization
-    if (mode === 'v1' && req.method === 'POST' && ['/comment/thread/replies','/comment/paragraph/summary','/comment/paragraph/thread/parents'].includes(path)) delete headers.cookie
+    if (mode === 'v1' && (path.startsWith('/api/v1/auth/') || req.method === 'POST' && ['/comment/thread/replies','/comment/paragraph/summary','/comment/paragraph/thread/parents'].includes(path))) delete headers.cookie
     // Do not send the browser's non-secret local mode preference upstream.
     if(headers.cookie) headers.cookie=headers.cookie.split(';').filter(x=>!x.trim().startsWith('fp.apiMode=') && !(mode==='v1' && x.trim().startsWith('fp_v3_refresh='))).join(';')
     if (!/^\/api\/v3\/auth\/(?:login|refresh|logout)(?:\?|$)/.test(req.url || '')) headers.host=target.host
