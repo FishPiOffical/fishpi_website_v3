@@ -46,11 +46,12 @@ export function apiProxy(env: Record<string,string|undefined>) {
     const noticeResource=/^\/notifications\/(?:unread\/count|all-read|make-read\/(?:commented|reply|at|following|point|broadcast|sys-announce|other))$/.test(path)
     const chatResource=/^\/chat\/(?:get-list|get-message|has-unread|mark-as-read|mark-all-as-read|revoke|send)$/.test(path)
     const mfaResource=req.method==='GET'&&/^\/mfa(?:\/(?:enabled|verify|remove))?$/.test(path)
+    const commentRemoval=req.method==='POST'&&/^\/comment\/[1-9][0-9]*\/remove$/.test(path)
     const revisionResource=req.method==='GET'&&(/^\/article\/[1-9][0-9]*\/revisions\/(?:list|current|[1-9][0-9]*)$/.test(path)||/^\/comment\/[1-9][0-9]*\/revisions$/.test(path))
     const editorResource=path==='/markdown' && req.method==='POST' || path==='/users/names' && req.method==='POST' || path==='/users/emotions' && req.method==='GET'
     const roomResource=/^\/chat-room\//.test(path)
     const reactionResource=req.method==='POST'&&['/vote/up/article','/article','/point/transfer','/follow/user','/unfollow/user','/comment','/comment/paragraph','/article/reaction','/comment/reaction','/comment/paragraph/thread/parents','/comment/paragraph/summary','/comment/thread/replies'].includes(path)
-    const legacyResource=revisionResource || mfaResource || /^\/article\/random\/[1-9][0-9]?$/.test(path)&&req.method==='GET' || path==='/activity/yesterday-liveness-reward-api'&&req.method==='GET' || reactionResource || path==='/report' && req.method==='POST' || roomResource || editorResource || noticeResource || chatResource || /^\/user\/[A-Za-z0-9_-]+(?:\/medal)?$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
+    const legacyResource=commentRemoval || revisionResource || mfaResource || /^\/article\/random\/[1-9][0-9]?$/.test(path)&&req.method==='GET' || path==='/activity/yesterday-liveness-reward-api'&&req.method==='GET' || reactionResource || path==='/report' && req.method==='POST' || roomResource || editorResource || noticeResource || chatResource || /^\/user\/[A-Za-z0-9_-]+(?:\/medal)?$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
     if (!/^\/api(?:\/|$)/.test(req.url || '') && !legacyResource) return next()
     const mode = requestMode(req,env)
     if(mode === 'v1' && /^\/api\/v3(?:\/|$)/.test(req.url || '')) {
@@ -65,7 +66,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
     if (mode === 'v1' && path.startsWith('/api/emoji/')) delete headers.cookie
     if (mode === 'v1' && /^\/api\/user\/[^/]+\/(?:articles|comments)\/anonymous$/.test(path)) delete headers.cookie
     if (mode === 'v1' && (path === '/api/watch/breezemoons' || /^\/api\/user\/[^/]+\/watching$/.test(path))) delete headers.cookie
-    if (mode === 'v1' && revisionResource) delete headers.cookie
+    if (mode === 'v1' && (revisionResource || commentRemoval)) delete headers.cookie
     // Do not send the browser's non-secret local mode preference upstream.
     if(headers.cookie) headers.cookie=headers.cookie.split(';').filter(x=>!x.trim().startsWith('fp.apiMode=') && !(mode==='v1' && x.trim().startsWith('fp_v3_refresh='))).join(';')
     if (!/^\/api\/v3\/auth\/(?:login|refresh|logout)(?:\?|$)/.test(req.url || '')) headers.host=target.host

@@ -3,7 +3,7 @@ import {onScopeDispose,ref,watch} from 'vue'
 import {ApiError,getAuthContextVersion} from '@/api/http'
 import {getApiMode} from '@/api/mode'
 import {commentInput,type CommentCommand,type CommentInput} from '@/api/v3-comments'
-import {legacyCreateComment} from '@/api/legacy/comments'
+import {legacyCreateComment,legacyRemoveComment} from '@/api/legacy/comments'
 import {fpConfirm} from '@/composables/useDialog'
 import {useAuthStore} from './auth'
 export const useLegacyCommentsStore=defineStore('legacy-comments',()=>{
@@ -26,6 +26,18 @@ export const useLegacyCommentsStore=defineStore('legacy-comments',()=>{
  }
  function release(){if(busy.value||confirming.value)return;pending.value=null;error.value=''}
  function cancelConfirmation(origin:symbol){if(confirmationOwner===origin)confirmation?.abort()}
- async function remove(_articleId:string,_id:string,_origin?:symbol){if(active())error.value='旧接口删除评论仍依赖页面会话，当前不能执行。';return false}
+ async function remove(articleId:string,id:string,origin?:symbol){
+  if(pending.value||busy.value||confirming.value||!active())return false
+  if(!/^[1-9][0-9]{0,31}$/.test(articleId)||!/^[1-9][0-9]{0,31}$/.test(id))throw new ApiError('评论目标不合法',422)
+  const valid=capture();error.value=message.value='';confirming.value=true;confirmation=new AbortController();confirmationOwner=origin
+  try{
+   const accepted=await fpConfirm({title:'删除评论',message:'删除不可恢复，并按平台当前删除费用扣除积分。旧接口不提供金额预览或幂等恢复；结果未确认时请先核对，不能重复提交。是否继续？',confirmText:'删除',tone:'danger',signal:confirmation.signal})
+   if(!accepted||!valid()||confirmation?.signal.aborted)return false
+   const command:CommentCommand={operation:'delete',articleId,id,input:{content:''},key:'local-comment-'+(++localSequence)}
+   pending.value=command;busy.value=true
+   try{const result=await legacyRemoveComment(articleId,id);if(!valid())return false;completed.value=command;receipt.value={articleId,id:result.id,operation:'delete'};pending.value=null;lastOperation.value='delete';message.value='删除已确认，请以重新读取的评论为准。';revision.value++;try{await auth.reloadAccount()}catch{if(valid())message.value='删除已确认，余额刷新失败，请另行核对。'}return true}
+   catch(failure){if(valid())error.value=(failure instanceof Error?failure.message:'删除未确认')+'。删除结果未确认，请核对原评论；旧接口不支持幂等恢复，不要重复提交。';return false}
+  }finally{if(valid()){busy.value=confirming.value=false;confirmation=undefined;confirmationOwner=undefined}}
+ }
  return{pending,completed,receipt,busy,confirming,error,message,revision,lastOperation,capture,save,remove,release,cancelConfirmation}
 })

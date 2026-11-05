@@ -407,7 +407,7 @@ function onReplyTrigger() {
   else emit('reply')
 }
 
-function ownParagraphComment(comment:ArticleComment){return !!auth.accessToken&&!!comment.commentAuthorId&&comment.commentAuthorId===auth.account?.oId}
+function ownParagraphComment(comment:ArticleComment){return !!(legacyParagraphs?auth.apiKey:auth.accessToken)&&!!comment.commentAuthorId&&comment.commentAuthorId===auth.account?.oId}
 function removeParagraphComment(comment:ArticleComment){if(ownParagraphComment(comment))void commentWrites.remove(props.article.oId,comment.oId,commentOrigin)}
 function replyToParagraphComment(comment: ArticleComment) {
   if (!commentingEnabled.value || paragraphState.value==='orphaned' || !activeParagraphId.value) return
@@ -717,11 +717,11 @@ function chapterTitle(c: LongArticleChapter) {
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="accept" :article-id="comment.oId" />
               <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
               <template v-if="ownParagraphComment(comment)">
-                <button v-if="commentingEnabled" type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="commentingEnabled && (paragraphEditingId=comment.oId)">编辑</button>
+                <button v-if="commentingEnabled&&!legacyParagraphs" type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="commentingEnabled && (paragraphEditingId=comment.oId)">编辑</button>
                 <button type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="removeParagraphComment(comment)">删除</button>
                 <CommentComposer :writable="commentingEnabled" v-if="paragraphEditingId===comment.oId" :article-id="article.oId" :edit-id="comment.oId" @cancel="paragraphEditingId=''" @saved="paragraphEditingId=''" />
               </template>
-              <LegacyCommentReplies v-if="legacyParagraphs" :article-id="article.oId" :root-id="comment.oId" :paragraph-id="activeParagraphId" :writable="loggedIn&&commentingEnabled&&paragraphState==='active'" :revision="commentWrites.revision" @reply="replyToParagraphComment" />
+              <LegacyCommentReplies v-if="legacyParagraphs" :article-id="article.oId" :root-id="comment.oId" :paragraph-id="activeParagraphId" :writable="loggedIn&&commentingEnabled&&paragraphState==='active'" :removable="true" :management-busy="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" :revision="commentWrites.revision" @reply="replyToParagraphComment" @remove="removeParagraphComment" />
               <div v-for="reply in legacyParagraphs?[]:comment.commentThreadReplies || []" :key="reply.oId" class="la-paragraph-reply-item">
                 <RouterLink v-if="reply.commentAuthorId" :to="`/member/${reply.commentAuthorName}`"><VipNickname :user-id="reply.commentAuthorId" :user-name="reply.commentAuthorName" :text="reply.commentAuthorNickname || reply.commentAuthorName" /></RouterLink>
                 <span v-else>匿名用户</span><span class="reply-colon">：</span>

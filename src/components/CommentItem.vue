@@ -22,6 +22,8 @@ const props = withDefaults(
     commentingEnabled?: boolean
     own?: boolean
     manage?: boolean
+    removeAllowed?: boolean
+    managementBusy?: boolean
     /** 只展示，不提供任何操作（如优质回帖） */
     readonly?: boolean
     editing?: boolean
@@ -36,6 +38,8 @@ const props = withDefaults(
     commentingEnabled: true,
     own: false,
     manage: true,
+    removeAllowed: false,
+    managementBusy: false,
     readonly: false,
     editing: false,
     apiKey: '',
@@ -100,7 +104,7 @@ function onBodyClick(e: MouseEvent) {
             <ArticleInteraction resource="comments" kind="accept" :article-id="comment.oId" @accepted="emit('accepted')" />
             <button v-if="commentingEnabled" type="button" class="op idle" @click="commentingEnabled && emit('reply')">回复</button>
             <button v-if="own && manage && commentingEnabled" type="button" class="op idle" @click="commentingEnabled && emit('edit')">编辑</button>
-            <button v-if="own && manage" type="button" class="op idle danger" @click="emit('remove')">删除</button>
+            <button v-if="own && (manage || removeAllowed)" type="button" class="op idle danger" :aria-disabled="managementBusy" @click="!managementBusy && emit('remove')">删除</button>
             <span v-if="!own" class="op-report idle">
               <ReportDialog :data-id="comment.oId" :data-type="1" />
             </span>

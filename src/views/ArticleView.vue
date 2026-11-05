@@ -369,12 +369,13 @@ watch(()=>commentWrites.revision,()=>{
   if(!command||command.articleId!==id.value||!(getApiMode()==='v1'?apiKey.value:accessToken.value))return
   editingId.value=''
   if(command.operation==='create'&&(command.input.parentId||'')===replyId.value&&(command.input.paragraphId||'')===paragraphIdForReply.value)cancelReply()
+  if(command.operation==='delete'&&command.id===replyId.value)cancelReply()
   void load(true)
   readerRef.value?.refreshParagraphComments()
 },{flush:'sync'})
 
 async function onRemoveComment(c: ArticleComment) {
-  if(!isOwnComment(c)||!accessToken.value)return
+  if(!isOwnComment(c)||!(getApiMode()==='v1'?apiKey.value:accessToken.value))return
   await commentWrites.remove(id.value,c.oId,commandOrigin)
 }
 function startEdit(c:ArticleComment){if(commentingEnabled.value&&isOwnComment(c)&&accessToken.value&&!commentWrites.pending&&!commentWrites.busy&&!commentWrites.confirming)editingId.value=c.oId}
@@ -415,6 +416,8 @@ function itemProps(c: ArticleComment) {
     commentingEnabled: commentingEnabled.value,
     own,
     manage: getApiMode()==='v3',
+    removeAllowed: getApiMode()==='v1',
+    managementBusy: commentWrites.busy||commentWrites.confirming||!!commentWrites.pending,
     editing: editingId.value === c.oId,
     apiKey: apiKey.value,
     hideMedals: isLong.value,
@@ -476,7 +479,7 @@ function itemHandlers(c: ArticleComment) {
             <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
           </template>
           <template v-if="t.replies.length||getApiMode()==='v1'&&!t.c.commentOriginalCommentId" #default>
-            <LegacyCommentReplies v-if="getApiMode()==='v1'&&!t.c.commentOriginalCommentId" :article-id="article.oId" :root-id="t.c.oId" :writable="isLoggedIn&&commentingEnabled" :revision="commentWrites.revision" @reply="startReply" />
+            <LegacyCommentReplies v-if="getApiMode()==='v1'&&!t.c.commentOriginalCommentId" :article-id="article.oId" :root-id="t.c.oId" :writable="isLoggedIn&&commentingEnabled" :removable="true" :management-busy="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" :revision="commentWrites.revision" @reply="startReply" @remove="onRemoveComment" />
             <CommentItem
               v-for="r in getApiMode()==='v1'&&!t.c.commentOriginalCommentId?[]:t.replies"
               :key="r.oId"

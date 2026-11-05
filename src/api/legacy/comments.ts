@@ -1,4 +1,4 @@
-import {ApiError,request} from '../http'
+import {ApiError,getAuthContextVersion,request} from '../http'
 import {getLegacyKey} from './auth'
 import {legacyObject} from './home'
 import {commentInput,type CommentInput} from '../v3-comments'
@@ -11,4 +11,13 @@ export async function legacyCreateComment(articleId:string,value:CommentInput):P
  if(!paragraph)return{}
  if(typeof r.commentId!=='string'||!/^[1-9][0-9]{0,31}$/.test(r.commentId))throw new ApiError('段评编号缺失，结果未确认',502)
  return{id:r.commentId}
+}
+
+export async function legacyRemoveComment(articleId:string,commentId:string):Promise<{id:string}>{
+ if(typeof articleId!=='string'||typeof commentId!=='string'||!/^[1-9][0-9]{0,31}$/.test(articleId)||!/^[1-9][0-9]{0,31}$/.test(commentId))throw new ApiError('评论目标不合法',422)
+ const apiKey=getLegacyKey(),context=getAuthContextVersion();if(!apiKey)throw new ApiError('请先登录后操作',401)
+ const result=legacyObject(await request(`/comment/${commentId}/remove`,{method:'POST',body:JSON.stringify({apiKey}),cache:'no-store',redirect:'error',__captchaRetried:true}))
+ if(apiKey!==getLegacyKey()||context!==getAuthContextVersion())throw new ApiError('登录状态已变化',409)
+ if(result.code!==0||result.commentId!==commentId)throw new ApiError(typeof result.msg==='string'?result.msg:'删除结果未确认',502)
+ return{id:commentId}
 }
