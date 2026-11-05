@@ -25,6 +25,7 @@ import LegacyInventoryRecovery from '@/components/LegacyInventoryRecovery.vue'
 import LegacyTransferRecovery from '@/components/LegacyTransferRecovery.vue'
 import LegacyMedalRecovery from '@/components/LegacyMedalRecovery.vue'
 import LegacyMembershipRecovery from '@/components/LegacyMembershipRecovery.vue'
+import LegacyArticleRewardRecovery from '@/components/LegacyArticleRewardRecovery.vue'
 import LegacyPostRecovery from '@/components/LegacyPostRecovery.vue'
 import LegacyGameSaveRecovery from '@/components/LegacyGameSaveRecovery.vue'
 import GameSaveRecovery from '@/components/GameSaveRecovery.vue'
@@ -423,6 +424,7 @@ onUnmounted(() => {
     <LegacyTransferRecovery />
     <LegacyMedalRecovery />
     <LegacyMembershipRecovery />
+    <LegacyArticleRewardRecovery />
     <LegacyGameSaveRecovery />
     <LegacyPostRecovery />
     <SettingsDrawer />
