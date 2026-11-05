@@ -1,4 +1,4 @@
-import {ApiError,request} from '../http'
+import {ApiError,getAuthContextVersion,request} from '../http'
 import {getLegacyKey} from './auth'
 import {legacyObject,legacyDate} from './home'
 import {legacyComment,legacyArticleColumnView} from './content'
@@ -6,7 +6,16 @@ const bad=()=>new ApiError('旧段评响应格式不正确',502)
 function article(value:string){if(typeof value!=='string'||!/^[1-9][0-9]{0,31}$/.test(value))throw new ApiError('文章ID不合法',422);return value}
 function anchor(value:string){if(typeof value!=='string'||!/^[a-f0-9]{64}$/.test(value))throw new ApiError('段落锚点不合法',422);return value}
 function count(value:unknown){if(typeof value!=='number'||!Number.isSafeInteger(value)||value<0)throw bad();return value}
-async function read(path:string,input:Record<string,unknown>,signal?:AbortSignal){const key=getLegacyKey(),r=legacyObject(await request(path,{method:'POST',body:JSON.stringify({...input,...(key?{apiKey:key}:{})}),cache:'no-store',...(signal?{signal}:{})}));if(key!==getLegacyKey())throw new ApiError('登录状态已变化',409);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'段评读取失败',400);return r}
+function reader(signal?:AbortSignal){
+ const key=getLegacyKey(),context=getAuthContextVersion()
+ const current=()=>{signal?.throwIfAborted();if(key!==getLegacyKey()||context!==getAuthContextVersion())throw new ApiError('登录状态已变化',409)}
+ current();return{key,current}
+}
+async function read(path:string,input:Record<string,unknown>,signal?:AbortSignal){
+ const {key,current}=reader(signal)
+ const value=await request(path,{method:'POST',body:JSON.stringify({...input,...(key?{apiKey:key}:{})}),cache:'no-store',redirect:'error',signal})
+ current();const r=legacyObject(value);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'段评读取失败',400);return r
+}
 export async function legacyParagraphSummary(articleId:string){const r=await read('/comment/paragraph/summary',{articleId:article(articleId)});if(!Array.isArray(r.paragraphComments)||r.paragraphComments.length>50000)throw bad();const seen=new Set<string>();return r.paragraphComments.map(v=>{const item=legacyObject(v),paragraphId=anchor(item.paragraphId as string);if(seen.has(paragraphId))throw bad();seen.add(paragraphId);return{paragraphId,commentCount:count(item.commentCount)}})}
 export async function legacyParagraphComments(articleId:string,paragraphId:string,p=1,sort='oldest',state:'active'|'orphaned'='active'){
  article(articleId);anchor(paragraphId);if(!Number.isSafeInteger(p)||p<1||p>1000000||!['oldest','latest','hot'].includes(sort)||!['active','orphaned'].includes(state))throw new ApiError('段评分页或排序不合法',422)
@@ -26,7 +35,7 @@ export async function legacyParagraphComments(articleId:string,paragraphId:strin
  return{paragraphId,paragraphSnapshot:r.paragraphSnapshot,commentThreadParents:r.commentThreadParents.map(v=>project(v)),pagination:{paginationCurrentPageNum:current,paginationPageCount:pages,paginationRecordCount:total}}
 }
 export async function legacyArticleNavigation(articleId:string,signal?:AbortSignal):Promise<import('../v3-article-column').ArticleColumnContext>{
- article(articleId);const key=getLegacyKey(),r=legacyObject(await request(`/api/article/${articleId}?`+new URLSearchParams({p:'1',...(key?{apiKey:key}:{})}),{signal,cache:'no-store'}));if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'章节导航读取失败',400)
+ article(articleId);const {key,current}=reader(signal),raw=await request(`/api/article/${articleId}?`+new URLSearchParams({p:'1',...(key?{apiKey:key}:{})}),{signal,cache:'no-store',redirect:'error'});current();const r=legacyObject(raw);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'章节导航读取失败',400)
  const d=legacyObject(r.data),target=legacyObject(d.article);if(target.oId!==articleId)throw bad()
  if(d.longArticleColumnView===undefined||d.longArticleColumnView===null)return{articleId,column:null,chapterNo:null,previous:null,next:null}
  const view=legacyArticleColumnView(d.longArticleColumnView,articleId),chapter=(value:typeof view.previous)=>value?{id:value.articleId,title:value.articleTitle,chapterNo:value.chapterNo,createdAt:legacyDate(value.articleCreateTime)}:null
