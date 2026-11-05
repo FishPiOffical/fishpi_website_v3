@@ -38,6 +38,7 @@
 | 用户关注/取消关注 | 第二十四批已接，旧响应无幂等回执，合成身份验收 | 保留 |
 | 本人积分流水与当前余额 | 第二十五批已接；旧说明按文本显示，合成身份验收 | 保留 |
 | 社区九项统计 | 第二十六批已接，现网公开JSON/SSR/刷新只读验证 | 保留 |
+| 同城用户分页 | 第二十七批已接；旧总人数未知、文章JSON仍缺失 | 保留双资源分页与排序 |
 | 标签关注/收藏/订阅写入、账号各类设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
@@ -415,3 +416,17 @@ useMemberPage的身份边界按模式观察实际旧key/Bearer，换key/账号/�
 验证：旧/新两套统计各13组实际API、编译Vue、hook及SSR测试，覆盖精确路径、九字段/安全数值、坏信封/空错区分、真实0、刷新/失败重试、身份/凭据迟到、卸载、SSR复用和路由代理检查；类型与完整客户端/服务端构建通过。现网仅公开只读核对/api/statistic；本地SSR HTML及浏览器直接打开/statistic、刷新后九项数据显示通过，没有账号写入或登录生产站点。在线值随服务端变化，不冻结到测试数值。此批仅统计，同城旧用户API缺总人数及独立文章JSON、大事记和其余全站能力继续迁移。
 
 协议来源：[Router](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/Router.java)、[StatisticProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/StatisticProcessor.java)、[Option常量](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Option.java)。只读JSON与源码，不抓取现网HTML。
+
+## 第二十七批：同城用户分页
+
+fetchCityUsers按模式选择legacy/cities，读取GET /api/city/{cityName}?p=&size=20。使用既有cityInput规范化和单次编码，核对返回city、当前页、pageSize和pageCount，严格公开投影稳定ID/用户名/昵称/签名头像/简介；不保留旧完整用户、编号、在线快照或联系方式。昵称与简介纯文本，头像继续共用安全URL与默认头像。服务端UserQueryService只查询公开位置、有效账号及指定城市，客户端不从全站用户列表猜城市。
+
+旧协议只有总页数、没有总人数，CityPage允许仅旧分支total=null，界面明确“旧接口未提供总人数”，不使用页数×20或本页长度伪造总数。v3仍执行原真实total/pageCount校验，没有放宽其解码契约。空页保留原页码和返回第一页入口；旧错误/限流与合法空列表分开。
+
+useCityFeed按模式观察旧key/Bearer，换key/账号/城市清旧资源并拒迟到写回；v3同账号正常token轮换维持原页。SSR仍准备态，不预取用户或文章，不显示假0。旧读取不携带用户凭据，公开请求失败没有经典页HTML或全站记录过滤兜底。
+
+已核对Router/CityProcessor：旧JSON仅cityUsersApi，同城文章仍是经典HTML页面，尚无独立JSON列表；v1文章请求明确501且零后续查询，不把清风、最近全站文章或同城用户各自文章拼成伪同城流。界面说明当前范围并隐藏无效排序控件，原v3署名文章四种排序保持原样。该缺口仍属于全站未完成项，不能称整个同城模块完成。
+
+验证：legacy-cities-test四组实际API/共享hook/编译Vue覆盖精确旧路径、单次编码、真实页数/未知人数、白名单与签名URL、坏ID/分页/城市、错误与空、缺文章资源零回退、第二页及重试、旧key/目标迟到、SSR零请求。原v3同城13组、类型与完整客户端/服务端构建通过。现网只读核对公开用户JSON；本地浏览器验证上海列表、未知总人数提示及第2页（当时76页），未登录或写真实账号。页数和用户顺序均由服务端当前返回，不写死测试数值。文章资源、其余公共页面和账号能力继续迁移。
+
+协议来源：[Router](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/Router.java)、[CityProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CityProcessor.java)、[UserQueryService.getUsersByCity](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/UserQueryService.java)。只读JSON及源码，不抓取现网HTML。
