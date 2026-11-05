@@ -7,7 +7,10 @@ const mode=getApiMode()
     <h3>接口版本</h3><p>v1 连接现网旧接口；v3 保留开发与联调使用。切换会刷新页面，当前草稿、连接及未确认操作会离开内存，请先完成或核实当前操作。</p>
     <div class="modes"><button :aria-pressed="mode==='v1'" :disabled="mode==='v1'" @click="switchApiMode('v1')">v1 · 现网接口</button><button :aria-pressed="mode==='v3'" :disabled="mode==='v3'" @click="switchApiMode('v3')">v3 · 开发接口</button></div>
     <p>两种模式独立认证。v1 登录凭据仅保存在内存，刷新页面后需要重新登录。</p>
-    <p v-if="mode==='v1'" role="status">全站双模式正在分批接入：当前已支持首页基础列表、登录、需求反馈、普通文章/评论读取、搜索目录、清风、通知、私信聊天、共享编辑器及聊天室基础聊天；聊天室扩展操作、部分内容写入和账号模块仍在接入，不会自动调用 v3。</p>
+    <template v-if="mode==='v1'">
+      <p role="status">已接入内容浏览、发帖与评论、聊天室及扩展消息、私信、通知、共享编辑器，以及会员、勋章、背包和积分转账等旧接口能力。</p>
+      <p>受旧接口限制，部分资料与账号设置、文章和评论编辑、收藏与订阅等功能暂不可用，入口会说明具体原因。v1 不会自动调用 v3；切换到 v3 可使用其原有完整实现。</p>
+    </template>
   </section>
 </template>
 <style scoped>
