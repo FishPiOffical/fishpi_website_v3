@@ -25,7 +25,7 @@ for(const [command,path,body]of cases){await api.writeLegacyEmoji({...command,au
 for(const command of [{op:'create',name:'a'.repeat(21),sort:0},{op:'create',name:'<b>bad</b>',sort:0},{op:'create',name:'x',sort:2**31},{op:'add-url',groupId:'11',url:'javascript:bad',sort:0,name:''},{op:'add-url',groupId:'11',url:'/private.png',sort:0,name:''},{op:'remove-item',groupId:'../11',emojiId:'3'}]){const before=state.calls.length;await assert.rejects(api.writeLegacyEmoji(command),e=>e.status===422);assert.equal(state.calls.length,before)}
 let resolve;state.dispatch=()=>new Promise(r=>resolve=r);const late=api.writeLegacyEmoji(cases[0][0]);state.key='new';resolve({code:0});await assert.rejects(late,/登录状态/)
 let groups=[{oId:'11',name:'全部',type:1,sort:0},{oId:'12',name:'我的分组',type:0,sort:1}],items=[{oId:'22',emojiId:'33',name:'图片',sort:0,url:'https://file.fishpi.cn/a.png?sig=a%2Bb',secret:'PRIVATE'}]
-const dispatch=(path,init)=>{if(init?.method==='POST')return{code:0};return{code:0,data:path.startsWith('/api/emoji/groups?')?groups:items}}
+const dispatch=(path,init)=>{if(init?.method==='POST')return{code:0};return{code:0,data:path.startsWith('/users/emotions?')?[{smile:'😄'}]:path.startsWith('/api/emoji/groups?')?groups:items}}
 state.dispatch=dispatch;assert.equal((await reader.legacyAllEmojiGroups()).length,2);assert.equal((await reader.legacyAllGroupEmojis('11'))[0].url,items[0].url);assert.ok(!JSON.stringify(await reader.legacyAllGroupEmojis('11')).includes('PRIVATE'))
 console.log('PASS legacy emoji exact six existing endpoints, ID domains, signed URL, body whitelist, name/URL/sort validation, no writes on bad input or missing auth, no automatic replay')
 
@@ -45,8 +45,11 @@ const authURL=url('export const useAuthStore=__emojiAuth'),storeURL=url(replace(
 const pinia=createPinia();setActivePinia(pinia);let store=storeModule.useLegacyEmojisStore(pinia)
 state.dispatch=()=>{throw Error('unknown')};await store.submit(cases[0][0]);assert.ok(store.pending);const before=state.calls.length;await store.submit(cases[0][0]);assert.equal(state.calls.length,before);state.dispatch=dispatch;await reader.legacyAllEmojiGroups();assert.ok(store.pending);store.release();assert.equal(store.pending,null);await store.submit(cases[0][0]);assert.equal(store.pending,null);assert.equal(store.revision,1)
 state.dispatch=()=>new Promise(r=>resolve=r);const writing=store.submit(cases[0][0]);auth(pinia).apiKey='another';state.key='another';resolve({code:0});await writing;assert.equal(store.pending,null);assert.equal(store.busy,false);assert.equal(store.revision,2)
+const frequentDescriptor=parse(await fs.readFile('src/components/LegacyFrequentEmotions.vue','utf8')).descriptor
+const frequentURL=url(replace(compile(compileScript(frequentDescriptor,{id:'legacy-frequent',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['@/api/http',http],['@/api/legacy/editor-emojis',reads],['@/stores/auth',authURL]]))
+const Frequent=(await import(frequentURL)).default
 const descriptor=parse(await fs.readFile('src/components/LegacyEmojiPacks.vue','utf8')).descriptor
-const Page=(await import(url(replace(compile(compileScript(descriptor,{id:'legacy-emojis',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['@/api/http',http],['@/api/legacy/editor-emojis',reads],['@/stores/auth',authURL],['@/stores/legacyEmojis',storeURL]])))).default
+const Page=(await import(url(replace(compile(compileScript(descriptor,{id:'legacy-emojis',inlineTemplate:true}).content),[['./LegacyFrequentEmotions.vue',frequentURL],['vue',import.meta.resolve('vue')],['@/api/http',http],['@/api/legacy/editor-emojis',reads],['@/stores/auth',authURL],['@/stores/legacyEmojis',storeURL]])))).default
 const insert=(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}const i=a?p.children.indexOf(a):-1;p.children.splice(i<0?p.children.length:i,0,n);n.parent=p},renderer=createRenderer({patchProp(n,k,o,v){n.props[k]=v},insert,remove(n){if(n.parent)n.parent.children=n.parent.children.filter(c=>c!==n)},createElement(tag){return{tag,tagName:tag.toUpperCase(),get options(){return this.children.filter(c=>c.tag==='option')},props:{},children:[],value:'',addEventListener(){},removeEventListener(){},getRootNode(){return{activeElement:null}}}},createText(text){return{text,children:[]}},createComment(){return{children:[]}},setText(n,t){n.text=t},setElementText(n,t){n.children=[{text:t,children:[]}]},parentNode:n=>n.parent,nextSibling(n){const c=n.parent?.children||[];return c[c.indexOf(n)+1]||null},insertStaticContent(t,p,a){const n={text:t,children:[]};insert(n,p,a);return[n,n]}})
 const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' '),find=(n,f)=>f(n)?n:(n.children||[]).map(c=>find(c,f)).find(Boolean),all=(n,f)=>[...(f(n)?[n]:[]),...(n.children||[]).flatMap(c=>all(c,f))],tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()}
 function mount(pinia=createPinia()){const root={children:[]},app=renderer.createApp(Page);app.use(pinia);app.mount(root);return{pinia,root,app,store:storeModule.useLegacyEmojisStore(pinia),user:auth(pinia)}}
@@ -74,3 +77,24 @@ state.dispatch=dispatch;await button('刷新核对').props.onClick();await tick(
 state.dispatch=()=>new Promise(r=>resolve=r);const reading=button('刷新核对').props.onClick();view.user.apiKey=null;view.user.account=null;state.key=null;resolve({code:0,data:groups});await reading;await tick();assert.ok(!find(view.root,n=>n.tag==='img'));view.app.unmount()
 state.ssr=true;const ssr=createSSRApp(Page);ssr.use(createPinia());const ssrCalls=state.calls.length;const html=await renderToString(ssr);assert.equal(state.calls.length,ssrCalls);assert.ok(!html.includes(items[0].url));const settings=await fs.readFile('src/views/SettingsView.vue','utf8');assert.match(settings,/<LegacyEmojiPacks v-if="getApiMode\(\) === 'v1'"/);assert.match(settings,/<EmojiPacks v-else/)
 console.log('PASS legacy emoji store unknown outcome lock/current GET no replay, identity isolation; compiled settings UI group selection, image URL, failures/retry, disabled repeats, private cleanup and SSR zero reads; v3 panel preserved')
+
+// Every private emoji list must reject old auth generations even when the apiKey is reused.
+state.key='same-key';state.ssr=false
+for(const [read,data] of [[()=>reader.legacyAllEmojiGroups(),groups],[()=>reader.legacyAllGroupEmojis('11'),items],[()=>reader.legacyFrequentEmotions(),[{smile:'😄'}]]]){
+ state.dispatch=()=>new Promise(r=>resolve=r);const old=read();state.context++;resolve({code:0,data});await assert.rejects(old,/登录状态/)
+ assert.equal(state.calls.at(-1).init.redirect,'error');assert.equal(state.calls.at(-1).init.cache,'no-store')
+}
+let activePinia=createPinia(),frequentRoot={children:[]},frequentApp=renderer.createApp(Frequent);frequentApp.use(activePinia)
+state.dispatch=()=>({code:0,data:[{smile:'😄'},{huaji:'https://file.fishpi.cn/emoji/graphics/huaji.gif?signature=a%2Bb'}]});frequentApp.mount(frequentRoot);await tick()
+const frequentText=()=>text(frequentRoot),refresh=()=>find(frequentRoot,n=>n.tag==='button').props.onClick()
+assert.match(frequentText(),/旧版保存依赖经典页面会话/);assert.match(frequentText(),/:smile:/);assert.equal(find(frequentRoot,n=>n.tag==='img').props.src,'https://file.fishpi.cn/emoji/graphics/huaji.gif?signature=a%2Bb')
+let first;state.dispatch=()=>new Promise(r=>first=r);const oldRead=refresh();await tick();const oldSignal=state.calls.at(-1).init.signal
+state.dispatch=()=>({code:0,data:[{heart:'❤️'}]});await refresh();await tick();assert.equal(oldSignal.aborted,true)
+first({code:0,data:[{smile:'😄'}]});await oldRead;await tick();assert.match(frequentText(),/:heart:/);assert.ok(!frequentText().includes(':smile:'))
+state.dispatch=()=>{throw Error('frequent-503')};await refresh();await tick();assert.match(frequentText(),/frequent-503/);assert.ok(!frequentText().includes(':heart:'));assert.ok(!frequentText().includes('暂无常用表情'))
+state.dispatch=()=>({code:0,data:[]});await refresh();await tick();assert.match(frequentText(),/暂无常用表情/)
+state.dispatch=()=>new Promise(r=>first=r);const loggedOutRead=refresh();const identitySignal=state.calls.at(-1).init.signal;auth(activePinia).apiKey=null;auth(activePinia).account=null;await tick();assert.equal(identitySignal.aborted,true);first({code:0,data:[{smile:'😄'}]});await loggedOutRead;await tick();assert.ok(!frequentText().includes(':smile:'));auth(activePinia).apiKey='same-key';auth(activePinia).account={oId:'7'};state.dispatch=()=>({code:0,data:[]});await refresh();await tick();
+state.dispatch=()=>new Promise(r=>first=r);const lateRead=refresh();const leavingSignal=state.calls.at(-1).init.signal;frequentApp.unmount();assert.equal(leavingSignal.aborted,true);first({code:0,data:[{smile:'😄'}]});await lateRead
+const beforeFrequentSSR=state.calls.length,ssrFrequent=createSSRApp(Frequent);ssrFrequent.use(createPinia());await renderToString(ssrFrequent);assert.equal(state.calls.length,beforeFrequentSSR)
+assert.ok(!state.calls.some(c=>c.path==='/settings/emotionList'))
+console.log('PASS actual frequent settings current Unicode/image aliases, GET-only limitation, failure/empty distinction, newer-read wins/abort, unmount/SSR; every private emoji list rejects same-key old auth generation')

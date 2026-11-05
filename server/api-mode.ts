@@ -65,7 +65,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
     if (mode === 'v1' && req.method === 'POST' && ['/article/reward','/vote/up/article','/vote/down/article','/vote/up/comment','/vote/down/comment','/comment/original','/comment/thread/replies','/comment/paragraph/summary','/comment/paragraph/thread/parents'].includes(path)) delete headers.cookie
     // Share handlers prefer page Sessions over apiKey. Keep the selected legacy identity authoritative.
     if (mode === 'v1' && path === '/api/columns/mine') delete headers.cookie
-    if (mode === 'v1' && path.startsWith('/api/emoji/')) delete headers.cookie
+    if (mode === 'v1' && (path.startsWith('/api/emoji/') || path === '/users/emotions')) delete headers.cookie
     if (mode === 'v1' && /^\/api\/user\/[^/]+\/(?:articles|comments)\/anonymous$/.test(path)) delete headers.cookie
     if (mode === 'v1' && (/^\/api\/watch\/(?:breezemoons|(?:tags|users)\/articles)$/.test(path) || /^\/api\/user\/[^/]+\/watching$/.test(path))) delete headers.cookie
     if (mode === 'v1' && (revisionResource || commentRemoval)) delete headers.cookie

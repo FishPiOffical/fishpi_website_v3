@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LegacyFrequentEmotions from './LegacyFrequentEmotions.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getAuthContextVersion } from '@/api/http'
 import { legacyAllEmojiGroups, legacyAllGroupEmojis } from '@/api/legacy/editor-emojis'
@@ -72,7 +73,8 @@ onBeforeUnmount(() => { mounted = false; sequence++ })
 </script>
 <template>
   <section class="legacy-emojis">
-    <p class="hint">旧版表情包 · 列表为当前快照，图片地址不会重新上传。常用表情编辑暂未接入，v3 模式保留原功能。</p>
+    <p class="hint">旧版表情包 · 列表为当前快照，图片地址不会重新上传。分组管理与常用表情分别读取，v3 模式保留原功能。</p>
+    <LegacyFrequentEmotions />
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <p v-if="commands.error" role="alert" class="error">{{ commands.error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
