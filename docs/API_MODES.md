@@ -20,7 +20,8 @@
 | 长篇列表、当前段评统计/顶层分页、章节导航 | 第十八批已接；完整回复/孤立段评定位仍待适配 | 保留 |
 | 发帖及本人云草稿 | 第四十三批已接发布/保存/读取/删除；旧草稿最近50份快照，已有文章编辑缺完整私有JSON | 保留完整编辑与原键恢复 |
 | 普通评论/回复/段评发布 | 第十九批已接；合成身份验收，旧协议无幂等恢复 | 保留 |
-| 评论编辑/删除及其余文章互动 | 编辑/删除受旧页面会话限制，仍待适配；表态见第十七批 | 保留 |
+| 文章赞同及取消赞同 | 第四十四批已接旧切换与当前状态重读；反对依赖Session，仍待支持 | 保留双向投票/明确命令恢复 |
+| 评论编辑/删除及其余文章互动 | 编辑/删除、收藏/订阅受旧页面会话限制，感谢缺动态费用JSON，仍待适配；表态见第十七批 | 保留 |
 | 通知列表/未读/已读及实时刷新 | 第六批已接；旧列表仅有限快照，合成身份验收 | 保留 |
 | 私信会话/历史/发送/撤回/已读/未读 | 第七批聊天及第八批富编辑已接，本地合成账号验收；真实上传权限待验 | 保留 |
 | 共享编辑器预览/上传/表情选择/@联想 | 第八批已接，上传仅本地夹具验收 | 保留 |
@@ -681,3 +682,22 @@ PostView按模式挂载LegacyPostView/V3PostView，共用表单样式及Markdown
 验证：legacy-posts-test三组覆盖本人及上限/重复校验、完整原文与隐藏思绪、精确旧字段/方法、发布消费草稿、无额外删除/无假幂等键、未知命令冻结和跨SPA锁定、余额/后置读取失败不重写、编译实际表单载入/保存/取消/离页、锁定期间只读云端核对且本机输入保留，以及SSR/身份隔离。原v3发帖33组、专栏选择、标签联想、双模式代理及完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证实际Vditor两段正文保存、第二次已保存但503后锁定、云端只读核对和确认发布；夹具的QnA字段大小写错误曾导致预览校验拒绝，修正夹具后重新验收通过，未放宽客户端校验。无现网发帖、删除或积分消费；真实权限/审核/收费、完整文章编辑与生产草稿规模未联调。夹具已停止，恢复真实v1开发代理。
 
 协议来源：[ArticleProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleProcessor.java)、[ArticleDraftProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleDraftProcessor.java)、[ArticleDraftMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ArticleDraftMgmtService.java)、[ArticlePostValidationMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/validate/ArticlePostValidationMidware.java)。
+
+
+## 第四十四批：文章赞同及取消赞同
+
+ArticleInteraction按模式与资源分派，v1文章vote使用LegacyArticleVote；原v3组件完整保留于V3ArticleInteraction，所有资源/类型、默认参数及contentClick/accepted事件透传。普通文章和长篇阅读器继续共用原入口，评论资源不与同ID文章混用。
+
+旧GET /api/article/{id}?apiKey单独白名单读取当前articleVote=-1/0/1与articleGoodCnt/articleBadCnt，ID必须匹配、票数为非负安全整数，缺失明确失败，不把未知计数补0。只返回当前票态和票数，不留正文、作者或收费资料。旧POST /vote/up/article精确发送apiKey/dataId，禁风控自动重发、无假幂等键；旧回执type是写前状态，绝不当作当前状态。
+
+旧接口是toggle而非明确设置：客户端每次操作先GET，目标已满足时零POST；需要改变时仅发一次up，再由完成元数据使挂载组件失效后GET。旧已反对且目标为取消赞同时不会误发up；用户显式赞同时可由反对切至赞同。读前失败没有投票，不锁为未知写；POST后任何未确认错误保留目标命令跨SPA锁定同文章，普通重读不解除、不重发，必须核对后明确解除。读前/写入不是服务端CAS，其他设备并发仍可能改变切换结果，不能宣称具有v3原键恢复保证。
+
+相同文章的两个组件完成事件废弃旧在途读取后重读，更新期间保留原按钮DOM及焦点；处理函数与aria状态共同阻止重复。退出/旧key/账号/认证上下文边界清理命令，序号拒绝迟到GET及写完成，SSR与未登录零私有读取。反对与取消反对的处理器仍直接Sessions.getUser，界面明确旧模式暂不可操作；收藏/订阅/标签关注同样不能仅凭LoginCheck有apiKey就伪称写入可用。文章感谢处理器支持apiKey，但当前JSON缺动态费用，尚未启用未知收费写入；打赏仍依赖Session，继续待支持。
+
+验证：legacy-article-votes-test四组覆盖精确协议/当前数值/白名单、缺失与坏字段、写前读取及已满足零POST、旧反对状态不误取消、未知切换跨SPA锁定/无重放、当前GET不使用历史回执、读前失败零写、身份/SSR隔离、实际编译双实例按钮节点/焦点与失效刷新、以及真实包装器模式/资源分派和v3事件/参数保留。原v3文章互动19组、评论投票12组、评论感谢/采纳11组和双模式代理回归通过；修正共享v3昵称测试夹具补充固定v3模式，避免新增mode导入无法解析，没有改动产品昵称逻辑或降低断言。类型及完整客户端/服务端构建通过。
+
+浏览器仅本机合成文章/账号验证赞同4→5、取消已生效后模拟503、重复提交被锁、手动GET返回4而锁定仍保留，截图为/tmp/fp-article-votes-browser.png。未对现网投票或读取真实账号；实际多设备并发、反对/收藏/订阅及收费互动未联调。夹具已停止，开发服务恢复真实v1上游。全站目标继续，不能将本批视为完整文章互动或全站完成。
+
+协议来源：[VoteProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/VoteProcessor.java)、[ArticleProcessor.showArticleApi/thankArticle/rewardArticle](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleProcessor.java)、[FollowProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/FollowProcessor.java)。
+
+补充限流验证：旧详情按IP每秒一次，浏览器HTTP层对所有数字ID文章详情GET统一排队，前一响应结束后至少1100ms再读，首次留出SSR间隔，最多排队32项。排队期间换号、切模式或取消拒绝旧请求；SSR、v3和写入不进入队列，不自动重试503。其他标签页和设备仍可能竞争同一IP限制。legacy-article-pacing-test真实HTTP层验证间距、失败不重放及身份隔离；HTTP正文断流与离线身份回归通过。浏览器改为实际每秒一次的夹具后再次验收赞同、取消未知结果及重读锁定，未触发夹具限流。

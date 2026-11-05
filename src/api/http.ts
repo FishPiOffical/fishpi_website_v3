@@ -21,6 +21,29 @@ let authVersion = 0
 let refreshRejected = false
 let refreshFlight: { version: number; promise: Promise<boolean> } | null = null
 let credentialQueue: Promise<unknown> = Promise.resolve()
+// Classic article details share an IP-wide one-second limiter, including reads made by voting.
+// Pace browser reads together; do not retry writes or assume other tabs/devices share this queue.
+let legacyArticleReadQueue: Promise<unknown> = Promise.resolve()
+let legacyArticleReadPending = 0, legacyArticleReadFinished = 0
+function queueLegacyArticleRead<T>(run: () => Promise<T>, version: number, signal?: AbortSignal | null): Promise<T> {
+  if (legacyArticleReadPending >= 32) return Promise.reject(new ApiError('文章读取排队过多，请稍后重试', 429))
+  legacyArticleReadPending++
+  const job = async () => {
+    const check = () => {
+      if (signal?.aborted) throw new ApiError('请求已取消', 0, 'aborted')
+      if (version !== authVersion || getApiMode() !== 'v1') throw new ApiError('登录状态已变更', 401, 'stale_session')
+    }
+    check()
+    if (!legacyArticleReadFinished) legacyArticleReadFinished = Date.now()
+    const wait = legacyArticleReadFinished + 1100 - Date.now()
+    if (wait > 0) await new Promise<void>(resolve => setTimeout(resolve, wait))
+    check()
+    try { return await run() } finally { legacyArticleReadFinished = Date.now() }
+  }
+  const result = legacyArticleReadQueue.then(job, job)
+  legacyArticleReadQueue = result.catch(() => {})
+  return result.finally(() => { legacyArticleReadPending-- })
+}
 const tokenListeners = new Set<(token: string | null) => void>()
 
 function publishToken(token: string | null) {
@@ -282,7 +305,9 @@ export async function request<T = unknown>(path: string, init: RequestInitExtra 
     return requestOnce<T>(path, init, identity)
   }
   try {
-    return await (!import.meta.env.SSR && isCredentialPath(path) ? queueCredentialRequest(run) : run())
+    if (!import.meta.env.SSR && isCredentialPath(path)) return await queueCredentialRequest(run)
+    const legacyArticleRead = !import.meta.env.SSR && getApiMode() === 'v1' && (init.method || 'GET').toUpperCase() === 'GET' && /^\/api\/article\/[1-9][0-9]*(?:\?|$)/.test(path)
+    return await (legacyArticleRead ? queueLegacyArticleRead(run, version, init.signal) : run())
   } catch (e) {
     if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && !explicitAuthorization &&
       e instanceof ApiError && e.status === 401 && !init.__v3Retried && version === authVersion) {
