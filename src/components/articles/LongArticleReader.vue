@@ -712,7 +712,7 @@ function chapterTitle(c: LongArticleChapter) {
               <div v-else class="la-paragraph-comment-body" v-html="comment.commentContent || ''" />
               <RevisionHistory kind="comment" :target-id="comment.oId" />
               <V3ReactionBar kind="comment" :target-id="comment.oId" :source="{articleId:article.oId,paragraphId:activeParagraphId,page:paragraphPage,sort:paragraphSort}" />
-              <ArticleInteraction v-if="loggedIn" resource="comments" kind="vote" :article-id="comment.oId" />
+              <ArticleInteraction v-if="loggedIn" resource="comments" kind="vote" :article-id="comment.oId" :source="{articleId:article.oId,paragraphId:activeParagraphId,page:paragraphPage,sort:paragraphSort}" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="thanks" :article-id="comment.oId" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="accept" :article-id="comment.oId" />
               <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>

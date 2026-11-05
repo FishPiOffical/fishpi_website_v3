@@ -47,18 +47,21 @@ function envelope(raw:unknown){const r=legacyObject(raw);if(r.code!==0)throw new
 export function createLegacyReactionReader(){
  const flights=new Map<string,Promise<Record<string,unknown>>>()
  async function read(path:string,body?:Record<string,unknown>){const key=getLegacyKey(),payload=body?{...body,...(key?{apiKey:key}:{})}:undefined,url=body?path:path+(path.includes('?')?'&':'?')+new URLSearchParams(key?{apiKey:key}:{}),identity=JSON.stringify([url,payload]);let task=flights.get(identity);if(!task){task=request(url,{cache:'no-store',...(payload?{method:'POST',body:JSON.stringify(payload)}:{})}).then(envelope);flights.set(identity,task)}try{return await task}finally{if(flights.get(identity)===task)flights.delete(identity)}}
- async function current(kind:ReactionTarget,id:string,source:LegacyReactionSource={}){
+ function current(kind:ReactionTarget,id:string,source?:LegacyReactionSource):Promise<ReactionState>
+ function current<T>(kind:ReactionTarget,id:string,source:LegacyReactionSource,project:(value:unknown)=>T):Promise<T>
+ async function current(kind:ReactionTarget,id:string,source:LegacyReactionSource={},project?: (value:unknown)=>unknown){
+  const decode=(value:unknown)=>project?project(value):decodeLegacyReactions(value,kind,id)
   legacyReactionTarget(kind,id)
-  if(kind==='chat'){if(!getLegacyKey())throw new ApiError('请先登录聊天室',401);const r=await read('/chat-room/getMessage?'+new URLSearchParams({oId:id,mode:'0',size:'0',type:'html'}));if(!Array.isArray(r.data)||r.data.length!==1)throw new ApiError('当前消息不可读取',404);return decodeLegacyReactions(r.data[0],kind,id)}
-  if(kind==='article'){const r=await read(`/api/article/${id}?p=1`);return decodeLegacyReactions(legacyObject(r.data).article,kind,id)}
+  if(kind==='chat'){if(!getLegacyKey())throw new ApiError('请先登录聊天室',401);const r=await read('/chat-room/getMessage?'+new URLSearchParams({oId:id,mode:'0',size:'0',type:'html'}));if(!Array.isArray(r.data)||r.data.length!==1)throw new ApiError('当前消息不可读取',404);return decode(r.data[0])}
+  if(kind==='article'){const r=await read(`/api/article/${id}?p=1`);return decode(legacyObject(r.data).article)}
   const articleId=source.articleId||'',page=source.page??1;legacyReactionTarget('article',articleId);if(!Number.isSafeInteger(page)||page<1||page>1000000)throw new ApiError('评论页码不合法',422)
   let rows:unknown,niceRows:unknown
   if(source.paragraphId){if(source.paragraphId.length>256||/[\u0000-\u001f\u007f]/u.test(source.paragraphId)||source.sort&&!['hot'].includes(source.sort))throw new ApiError('段评位置不合法',422);const r=await read('/comment/paragraph/thread/parents',{articleId,paragraphId:source.paragraphId,paginationCurrentPageNum:page,userCommentViewMode:0,sort:source.sort||''});if(r.paragraphId!==source.paragraphId)throw fail();rows=r.commentThreadParents}
   else{const r=await read(`/api/article/${articleId}?p=${page}`),article=legacyObject(legacyObject(r.data).article);if(article.oId!==articleId)throw fail();rows=article.articleComments;niceRows=article.articleNiceComments}
   let budget=0;const found:Record<string,unknown>[]=[];function scan(list:unknown,depth=0){if(!Array.isArray(list)||depth>20)throw fail();for(const v of list){if(++budget>5000)throw fail();const r=legacyObject(v);if(r.oId===id)found.push(r);if(r.commentThreadReplies!==undefined)scan(r.commentThreadReplies,depth+1)}}scan(rows);if(!found.length&&niceRows!==undefined)scan(niceRows)
-  if(found.length>1)throw fail();if(found.length===1)return decodeLegacyReactions(found[0],kind,id)
+  if(found.length>1)throw fail();if(found.length===1)return decode(found[0])
   // The reply endpoint resolves its thread root and locates this exact reply by anchor.
-  const r=await read('/comment/thread/replies',{commentId:id,anchorCommentId:id,paginationCurrentPageNum:1});if(!Array.isArray(r.commentThreadReplies)||r.commentThreadReplies.length>100)throw fail();const matches=r.commentThreadReplies.filter(v=>legacyObject(v).oId===id);if(matches.length!==1)throw new ApiError('当前评论不在可读取的列表中',404);return decodeLegacyReactions(matches[0],kind,id)
+  const r=await read('/comment/thread/replies',{commentId:id,anchorCommentId:id,paginationCurrentPageNum:1});if(!Array.isArray(r.commentThreadReplies)||r.commentThreadReplies.length>100)throw fail();const matches=r.commentThreadReplies.filter(v=>legacyObject(v).oId===id);if(matches.length!==1)throw new ApiError('当前评论不在可读取的列表中',404);return decode(matches[0])
  }
  return{current,clear:()=>flights.clear()}
 }

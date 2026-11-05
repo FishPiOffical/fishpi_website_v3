@@ -26,6 +26,7 @@
 | 文章/评论修订历史 | 第五十一批既有JSON读取，整份快照本地分页与文本详情 | 保留真实分页 |
 | 普通评论/回复/段评发布 | 第十九批已接；合成身份验收，旧协议无幂等恢复 | 保留 |
 | 文章赞同及取消赞同 | 第四十四批已接旧切换与当前状态重读；反对依赖Session，仍待支持 | 保留双向投票/明确命令恢复 |
+| 普通评论/段评/楼中楼赞同、反对与撤销 | 第五十九批已接既有apiKey切换协议，成功后当前读取，未知锁定不重放 | 保留明确命令及同键恢复 |
 | 本人普通评论/段评/楼中楼删除 | 第五十二批已有apiKey POST、明确费用未知确认及原目标未知锁定 | 保留 |
 | 评论编辑及其余文章互动 | 编辑原文、收藏/订阅受旧页面会话限制，感谢缺动态费用JSON，仍待适配；表态见第十七批 | 保留 |
 | 通知列表/未读/已读及实时刷新 | 第六批已接；旧列表仅有限快照，合成身份验收 | 保留 |
@@ -867,7 +868,7 @@ ArticleView按当前模式凭据加载热度：v1登录key可读，游客及SSR�
 
 全量运行当前54项legacy/api-modes专项，全部通过，实际进程退出码见本机/tmp/fp-audit57-results.json；这是合成API/状态/编译组件回归，不替代真实站点全部业务验收。后续本批新增legacy-comment-location另行通过，未把新增项计入上述54项。
 
-现有/comment/original返回被回复对象，/api/comment/{id}实际上把id作为文章ID且依赖Sessions，均非评论所在页查询，不得伪装v3 location契约。新增locateLegacyLoadedComment仅依据当前ArticleDetail的准确文章ID、分页和根评论ID证明普通评论位于已加载页；没有额外HTTP、后台扫描或猜你页码。不在本页、嵌套未展开或段评目标明确提示旧接口没有位置查询，需要翻页/对应段落后重试，不宣称删除/无权限或假定位成功。
+进一步核对：/comment/original实际返回指定评论及其根线程页提示，不是被回复对象；但缺所属文章/段落类型绑定，且根线程页不一定等于旧文章API的平铺评论页，不能直接充当完整v3位置契约。/api/comment/{id}实际上把id作为文章ID且依赖Sessions。本批仍只验证已加载页，后续可基于真实页提示再做绑定核验。新增locateLegacyLoadedComment仅依据当前ArticleDetail的准确文章ID、分页和根评论ID证明普通评论位于已加载页；没有额外HTTP、后台扫描或猜你页码。不在本页、嵌套未展开或段评目标明确提示旧接口没有位置查询，需要翻页/对应段落后重试，不宣称删除/无权限或假定位成功。
 
 ArticleCommentLocation按v1/v3分支：v1等待文章实际加载，变化后重验当前页，路由/query/hash/旧key/账号边界清旧状态；成功沿既有nextTick及当前DOM核对滚动。缺DOM只提示重试，不能无条件假定getElementById存在。v3原服务端GET和迟到/位置变化处理保持。SSR不查询位置、不显示成功状态；评论定位失败不影响文章读取。
 
@@ -888,3 +889,21 @@ ArticleCommentLocation按v1/v3分支：v1等待文章实际加载，变化后重
 验证：legacy-settings-capabilities编译真实SettingsView与能力组件，逐路由覆盖v1五类限制、禁用子组件setup及保留已适配模块，v3对应原slot全部继续挂载，游客/SSR零私有子组件。原v3-preferences、app-login、post-export、identity全部专项及完整类型/客户端/SSR构建通过。本机合成账号浏览器验证语言设置明确限制，切本人数据后导出说明准确、匿名内容和游戏云存档入口仍保留，截图/tmp/fp-settings58-browser.png；夹具未提供存档内容时保留真实读取错误，未保存存档或操作真实账号。
 
 人工复核：v1登录→设置→语言/功能/隐私/账号/邀请/认证/数据，不应出现空白设置、无动作扫码或v3导出收费表单；背包/两步验证/存档等原功能继续可见。切v3后确认对应真实原面板；退出后回到游客提示。生产扫码、认证、消费和导出不在本机浏览器执行，全站剩余旧协议缺口继续。
+
+## 第五十九批（仅website）：评论双向投票与撤销
+
+复核既有VoteProcessor，两种/comment投票均通过User.USER绑定apiKey，POST /vote/up/comment及/vote/down/comment是切换命令，返回type为先前选择。新增comment-votes适配，精确body仅apiKey/dataId；不发送Bearer或伪造幂等键，禁止重定向和风控自动重发，不把type当当前状态。
+
+在已有createLegacyReactionReader上增加严格投影回调，共用当前普通文章页、段评页及带anchorCommentId的楼中楼读取。投票仅保留id/vote/upCount/downCount，完整正文/作者不进入状态；缺本人选择或票数明确报错、不补0。原表态使用默认投影，原同时请求合并/有界遍历和无快照留存保持。读取及写完成按旧key/身份上下文拒迟到。
+
+legacyCommentVotes将界面期望的up/down/none转换为一次旧切换：先读当前选择，已相同则不写，撤销只切换当前选项。成功仅发编号完成事件，让挂载组件GET当前状态；读取失败不重发已成功切换。预检失败零POST；已发送后所有未知错误包括403均跨SPA锁定原评论，不自动恢复或再次切换；必须成功重读核对后显式解除。旧接口不能保证预检后其他设备不修改选择，不伪装服务端原子“明确设置”。退出/换号清命令，SSR/游客零私有读取。
+
+ArticleInteraction按资源+模式分派，普通CommentItem传现有评论上下文，LongArticleReader传真实段落/页/排序，LegacyCommentReplies增加同一投票组件。支持赞同/反对互斥和各自撤销；忙时保留按钮DOM及焦点，并由处理函数拒重复触发。文章赞同适配与v3互动分支保持，其他感谢/采纳限制未因此接通。
+
+Node/SPA与nginx示例接入两个精确旧POST路径，v1去上游Cookie及Bearer，使页面会话不能盖过apiKey。未改Rhythm、部署nginx或向真实账号投票。
+
+验证：legacy-comment-votes实际API/Pinia/编译组件和真实模式包装，覆盖普通/段评/锚定回复、票数/身份白名单、up/down/none/no-op、预检失败、未知跨SPA/403不重放、重读后解锁、迟到换号、重复点击/稳定节点、SSR/游客零读取。legacy-reactions、article-votes、comment-replies和api-modes实际代理凭据隔离回归通过；v3-comment-rewards、v3-comments完整32组和完整类型/客户端/SSR构建通过。v3-comments补齐第五十七批定位组件的v3-only夹具依赖，不削减原断言。
+
+浏览器仅本机合成账号和评论300，依次赞同/切反对，观察5→4赞同票及1→2反对票、互斥选中和当前重读，截图/tmp/fp-comment-votes59-browser.png；夹具未提供文章级票数则其独立错误仍显示，不伪造该资源。未在生产写入；真实段评/楼中楼浏览器及多设备并发未联调，相关状态与API由专项覆盖。
+
+人工复核：v1登录→普通文章评论、长文段评、展开楼中楼→分别赞同、切反对、再次点击撤销；读失败只重读，未知结果不得重复提交，核对后解除；换号不能沿用前一账号选择。切v3仍使用原明确命令与同键恢复。全站其他缺口继续。

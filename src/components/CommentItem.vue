@@ -99,7 +99,7 @@ function onBodyClick(e: MouseEvent) {
         <footer class="cmt-ops">
           <V3ReactionBar kind="comment" :target-id="comment.oId" :readonly="readonly" :source="reactionSource" />
           <template v-if="interactive">
-            <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" />
+            <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" :source="reactionSource" />
             <ArticleInteraction resource="comments" kind="thanks" :article-id="comment.oId" />
             <ArticleInteraction resource="comments" kind="accept" :article-id="comment.oId" @accepted="emit('accepted')" />
             <button v-if="commentingEnabled" type="button" class="op idle" @click="commentingEnabled && emit('reply')">回复</button>
