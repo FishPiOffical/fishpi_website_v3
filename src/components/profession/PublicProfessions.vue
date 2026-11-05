@@ -2,10 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
+import { getApiMode } from '@/api/mode'
 import { ApiError } from '@/api/http'
 import { fetchV3PublicProfessions, type PublicProfessionProfile, type PublicJob } from '@/api/v3-profession-public'
 const props = defineProps<{ userName: string }>()
-const { accessToken } = storeToRefs(useAuthStore())
+const { accessToken, apiKey } = storeToRefs(useAuthStore())
+const credential = computed(() => getApiMode() === 'v1' ? apiKey.value : accessToken.value)
 const profile = ref<PublicProfessionProfile | null>(null), loading = ref(false), unavailable = ref(false), error = ref('')
 let mounted = false, generation = 0
 const jobs = computed(() => [profile.value?.primaryProfession, ...(profile.value?.professions || [])].filter((value): value is PublicJob => !!value))
@@ -13,15 +15,15 @@ function name(id: string) { return jobs.value.find(value => value.professionId =
 function date(value: number) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '时间异常' : d.toLocaleString() }
 function reset() { generation++; profile.value = null; unavailable.value = false; error.value = ''; loading.value = false }
 async function load() {
-  const token = accessToken.value, target = props.userName, current = ++generation
-  const valid = () => mounted && token === accessToken.value && target === props.userName && current === generation
+  const token = credential.value, target = props.userName, current = ++generation
+  const valid = () => mounted && token === credential.value && target === props.userName && current === generation
   profile.value = null; unavailable.value = false; error.value = ''; loading.value = true
   try { const value = await fetchV3PublicProfessions(target); if (valid()) profile.value = value }
   catch (failure) { if (valid()) { if (failure instanceof ApiError && failure.status === 404) unavailable.value = true; else error.value = failure instanceof Error ? failure.message : '公开职业资料读取失败' } }
   finally { if (valid()) loading.value = false }
 }
 onMounted(() => { mounted = true; void load() })
-watch([accessToken, () => props.userName], () => { reset(); if (mounted) void load() }, { flush: 'sync' })
+watch([credential, () => props.userName], () => { reset(); if (mounted) void load() }, { flush: 'sync' })
 onBeforeUnmount(() => { mounted = false; reset() })
 const rewardStatus = { PENDING: '待发放', GRANTED: '已发放', REVOKED: '已撤销' }
 </script>
@@ -33,18 +35,19 @@ const rewardStatus = { PENDING: '待发放', GRANTED: '已发放', REVOKED: '已
     <p v-if="loading" role="status">正在读取职业资料…</p><p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="unavailable">当前没有可展示的职业资料。</p>
     <template v-if="profile">
+      <p v-if="getApiMode() === 'v1'" class="hint">旧版等级快照不区分已选择、有进度或已停用；等级与经验仅按接口实际提供的内容展示。</p>
       <section v-if="profile.primaryProfession" aria-label="公开主职业">
         <h3>主职业</h3><h4>{{ profile.primaryProfession.displayName }}</h4><p>{{ profile.primaryProfession.description }}</p>
         <p v-if="profile.primaryProfession.state === 'SELECTED'">已选择，尚无经验进度。</p>
         <template v-else>
           <p>{{ profile.primaryProfession.levelName }}<span v-if="profile.primaryProfession.state === 'RETIRED'"> · 已停用</span></p>
-          <p v-if="profile.primaryProfession.totalExperience !== undefined">累计经验 {{ profile.primaryProfession.totalExperience }} · 本级门槛 {{ profile.primaryProfession.requiredExperience }}</p>
+          <p v-if="profile.primaryProfession.totalExperience !== undefined">累计经验 {{ profile.primaryProfession.totalExperience }}<span v-if="profile.primaryProfession.requiredExperience !== undefined"> · 本级门槛 {{ profile.primaryProfession.requiredExperience }}</span></p>
           <p v-if="profile.primaryProfession.rarity">可见榜第 {{ profile.primaryProfession.rarity.rank }} / {{ profile.primaryProfession.rarity.totalUsers }} 名，超过 {{ profile.primaryProfession.rarity.surpassedPercent.toFixed(2) }}% 的可见用户</p>
         </template>
       </section>
       <section v-if="profile.professions !== undefined" aria-label="公开职业进度">
         <h3>职业进度</h3><p v-if="!profile.professions.length">暂无可展示的职业进度。</p>
-        <ul><li v-for="job in profile.professions" :key="job.professionId"><strong>{{ job.displayName }}</strong><p>{{ job.description }}</p><template v-if="job.state !== 'SELECTED'"><span>{{ job.levelName }}{{ job.state === 'RETIRED' ? ' · 已停用' : '' }}</span><p v-if="job.totalExperience !== undefined">累计经验 {{ job.totalExperience }} · 本级门槛 {{ job.requiredExperience }}</p><p v-if="job.rarity">可见榜第 {{ job.rarity.rank }} / {{ job.rarity.totalUsers }} 名，超过 {{ job.rarity.surpassedPercent.toFixed(2) }}% 的可见用户</p></template></li></ul>
+        <ul><li v-for="job in profile.professions" :key="job.professionId"><strong>{{ job.displayName }}</strong><p>{{ job.description }}</p><template v-if="job.state !== 'SELECTED'"><span>{{ job.levelName }}{{ job.state === 'RETIRED' ? ' · 已停用' : '' }}</span><p v-if="job.totalExperience !== undefined">累计经验 {{ job.totalExperience }}<span v-if="job.requiredExperience !== undefined"> · 本级门槛 {{ job.requiredExperience }}</span></p><p v-if="job.rarity">可见榜第 {{ job.rarity.rank }} / {{ job.rarity.totalUsers }} 名，超过 {{ job.rarity.surpassedPercent.toFixed(2) }}% 的可见用户</p></template></li></ul>
       </section>
       <section v-if="profile.majorContributions !== undefined" aria-label="公开主要贡献">
         <h3>主要贡献</h3><p v-if="!profile.majorContributions.length">暂无可展示的贡献。</p><ul><li v-for="(item, index) in profile.majorContributions" :key="index">{{ name(item.professionId) }} · {{ item.actionCode }} · {{ item.eventCount }} 次<span v-if="item.experienceSum !== undefined"> · {{ item.experienceSum }} 经验</span><span>最近 {{ date(item.lastOccurredAt) }}</span></li></ul>

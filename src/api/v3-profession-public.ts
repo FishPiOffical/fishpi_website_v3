@@ -1,7 +1,9 @@
 import { ApiError, request } from './http'
+import { getApiMode } from './mode'
+import { getLegacyKey } from './legacy/auth'
 export type PublicRarity = { rank: number; totalUsers: number; surpassedPercent: number }
 export type PublicJob = { professionId: string; professionCode: string; displayName: string; shortName: string; description: string } & (
-  { state: 'SELECTED' } | { state: 'ACTIVE' | 'RETIRED'; levelCode: string; levelName: string; totalExperience?: number; requiredExperience?: number; rarity?: PublicRarity }
+  { state: 'SELECTED' } | { state: 'ACTIVE' | 'RETIRED' | 'LEGACY_SNAPSHOT'; levelCode: string; levelName: string; totalExperience?: number; requiredExperience?: number; rarity?: PublicRarity }
 )
 export type Contribution = { professionId: string; eventCount: number; lastOccurredAt: number; experienceSum?: number }
 export type PublicProfessionProfile = {
@@ -23,20 +25,20 @@ function id(value: unknown): string { const result = text(value, 19); if (!/^[0-
 function action(value: unknown): string { const result = text(value, 64); if (!/^[a-z][a-z0-9._-]{0,63}$/.test(result)) throw invalid(); return result }
 function choice<T extends string>(value: unknown, allowed: readonly T[]): T { if (!allowed.includes(value as T)) throw invalid(); return value as T }
 function list<T>(value: unknown, project: (value: unknown) => T, max = 512): T[] { if (!Array.isArray(value) || value.length > max) throw invalid(); return value.map(project) }
-function rarity(value: unknown): PublicRarity {
+function rarity(value: unknown, legacy = false): PublicRarity {
   const row = object(value), rank = integer(row.rank), totalUsers = integer(row.totalUsers), surpassedPercent = row.surpassedPercent
-  if (rank < 1 || totalUsers < rank || typeof surpassedPercent !== 'number' || !Number.isFinite(surpassedPercent) || Math.abs(surpassedPercent - (totalUsers - rank) * 100 / totalUsers) > 0.000001) throw invalid()
+  if (rank < 1 || totalUsers < rank || typeof surpassedPercent !== 'number' || !Number.isFinite(surpassedPercent) || surpassedPercent < 0 || surpassedPercent > 100 || !legacy && Math.abs(surpassedPercent - (totalUsers - rank) * 100 / totalUsers) > 0.000001) throw invalid()
   return { rank, totalUsers, surpassedPercent }
 }
-function job(value: unknown, primary: boolean): PublicJob {
-  const row = object(value), state = choice(row.state, primary ? ['SELECTED', 'ACTIVE', 'RETIRED'] : ['ACTIVE', 'RETIRED'])
+function job(value: unknown, primary: boolean, legacy = false): PublicJob {
+  const row = object(value), state = legacy ? 'LEGACY_SNAPSHOT' : choice(row.state, primary ? ['SELECTED', 'ACTIVE', 'RETIRED'] : ['ACTIVE', 'RETIRED'])
   const base = { professionId: id(row.professionId), professionCode: text(row.professionCode, 64), displayName: text(row.displayName, 64), shortName: text(row.shortName, 32), description: text(row.description) }
   if (state === 'SELECTED') {
     if (['levelCode', 'levelName', 'totalExperience', 'requiredExperience', 'rarity'].some(field => field in row)) throw invalid()
     return { ...base, state }
   }
-  if (('totalExperience' in row) !== ('requiredExperience' in row)) throw invalid()
-  return { ...base, state, levelCode: text(row.levelCode, 64), levelName: text(row.levelName, 64), ...('totalExperience' in row ? { totalExperience: integer(row.totalExperience), requiredExperience: integer(row.requiredExperience) } : {}), ...('rarity' in row ? { rarity: rarity(row.rarity) } : {}) }
+  if (!legacy && ('totalExperience' in row) !== ('requiredExperience' in row)) throw invalid()
+  return { ...base, state, levelCode: text(row.levelCode, 64), levelName: text(row.levelName, 64), ...('totalExperience' in row ? { totalExperience: integer(row.totalExperience) } : {}), ...('requiredExperience' in row ? { requiredExperience: integer(row.requiredExperience) } : {}), ...('rarity' in row ? { rarity: rarity(row.rarity, legacy) } : {}) }
 }
 function contribution(value: unknown): Contribution {
   const row = object(value)
@@ -44,17 +46,21 @@ function contribution(value: unknown): Contribution {
 }
 export async function fetchV3PublicProfessions(userName: string): Promise<PublicProfessionProfile> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(userName)) throw new ApiError('用户名不合法', 422)
-  const response = await request<{ code: number; msg?: string; data?: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}/professions`)
+  const legacy = getApiMode() === 'v1', key = getLegacyKey()
+  const query = new URLSearchParams({ position: 'homeProfile' })
+  if (legacy && key) query.set('apiKey', key)
+  const response = await request<{ code: number; msg?: string; data?: unknown }>(legacy ? `/api/user/${encodeURIComponent(userName)}/profession?${query}` : `/api/v3/users/${encodeURIComponent(userName)}/professions`, legacy ? { cache: 'no-store' } : undefined)
+  if (legacy && key !== getLegacyKey()) throw new ApiError('登录状态已变化', 409)
   if (response.code !== 0) throw new ApiError(response.msg || '公开职业资料读取失败', 400)
   const source = object(response.data), output: PublicProfessionProfile = {}
-  if ('primaryProfession' in source) output.primaryProfession = job(source.primaryProfession, true)
-  if ('professions' in source) output.professions = list(source.professions, value => job(value, false))
+  if ('primaryProfession' in source) output.primaryProfession = job(source.primaryProfession, true, legacy)
+  if ('professions' in source) output.professions = list(source.professions, value => job(value, false, legacy))
   if ('majorContributions' in source) output.majorContributions = list(source.majorContributions, value => ({ ...contribution(value), actionCode: action(object(value).actionCode) }))
   if ('contributionStats' in source) output.contributionStats = list(source.contributionStats, contribution)
   if ('activityFeed' in source) output.activityFeed = list(source.activityFeed, value => { const row = object(value); return { professionId: id(row.professionId), actionCode: action(row.actionCode), occurredAt: integer(row.occurredAt), ...('experienceDelta' in row ? { experienceDelta: integer(row.experienceDelta, true) } : {}) } }, 30)
   if ('levelHistory' in source) output.levelHistory = list(source.levelHistory, value => { const row = object(value); return { professionId: id(row.professionId), beforeLevelCode: text(row.beforeLevelCode, 64), afterLevelCode: text(row.afterLevelCode, 64), occurredAt: integer(row.occurredAt) } }, 30)
   if ('rewards' in source) output.rewards = list(source.rewards, value => { const row = object(value); return { professionId: id(row.professionId), levelCode: text(row.levelCode, 64), rewardCode: text(row.rewardCode, 64), rewardType: choice(row.rewardType, ['POINT', 'MEDAL']), status: choice(row.status, ['PENDING', 'GRANTED', 'REVOKED']), grantedAt: integer(row.grantedAt) } })
-  if ('ranking' in source) output.ranking = list(source.ranking, value => ({ professionId: id(object(value).professionId), ...rarity(value) }))
+  if ('ranking' in source) output.ranking = list(source.ranking, value => ({ professionId: id(object(value).professionId), ...rarity(value, legacy) }))
   if (!Object.keys(output).length) throw invalid()
   for (const values of [output.professions, output.contributionStats, output.ranking]) if (values && new Set(values.map(value => value.professionId)).size !== values.length) throw invalid()
   return output

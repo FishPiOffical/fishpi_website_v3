@@ -32,6 +32,7 @@
 | 思过崖旧快照、涂鸦上传与插入 | 第十五批已接；旧快照不等价于实时禁言资源 | 保留 |
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
+| 用户公开职业资料 | 第三十三批已接旧等级快照与可见模块；本人管理/职业榜另迁移 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON | 保留 |
 | 用户文章/长文/公开回帖/清风列表 | 第二十二批已接；私密正文与清风单条读取受旧契约限制 | 保留 |
 | 关注/粉丝、关注标签与收藏列表读取 | 第二十三批已接；旧订阅列表缺独立JSON，删除记录可能省略 | 保留 |
@@ -507,3 +508,16 @@ legacyActivity保存未确认领取跨SPA锁定，没有自动恢复/重发按�
 验证：legacy-activity-test四组实际API/Pinia/hook/编译面板与全局Recovery，覆盖完整签到与未知奖励元数据、只读刷新零领取、明确确认/取消、精确旧key/GET/no-store/禁自动重发、正数/-1/坏响应、未知跨SPA锁定、退出/模式/SSR/迟到隔离、独立错误重试及离页取消确认。原v3活动14组、双模式代理回归、类型和完整客户端/服务端构建通过。浏览器仅本机合成账号验证65.5%/80%/3天、未领取提示、刷新、明确确认、领取返回50后当前GET变已领取；未登录生产站点、领取真实奖励或改余额。旁路发现模块在活动夹具中未完整提供，随机JSON路由另经现网只读验证。夹具已停止并恢复现网v1开发代理。生产服务器跨日、账本/多节点竞态及自动签到达标过程仍需真实环境联调，其他全站能力继续。
 
 协议来源：[ActivityProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ActivityProcessor.java)、[ActivityMgmtService.yesterdayLivenessRewardApi](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ActivityMgmtService.java)。按公开源码适配，不调用金手指接口、不改变生产认证。
+
+
+## 第三十三批：用户公开职业资料
+
+用户主页职业栏目按模式读取GET /api/user/{name}/profession?position=homeProfile或原v3公开资源；旧接口支持游客，登录时只带当前内存apiKey用于服务端可见性判断，不读取本人私有/me补全隐藏模块。旧key/目标变化清空页面并拒绝迟到结果，API本身也核验读取前后key；SSR仍准备态零本人读取。
+
+旧DTO没有ACTIVE/RETIRED/SELECTED字段，服务端可能为仅选择的主职业返回零级快照，因此客户端明确LEGACY_SNAPSHOT，不从零经验、等级或主职业推实际进度/启用状态。只投影实际等级与可选经验，不补缺失0；旧接口隐藏经验时仍可保留门槛，不能套v3必须成对规则。旧并列榜的百分比与rank算式不同，校验真实数值范围后按原值显示，v3原公式与SELECTED严格契约不变。额外presentation、内部版本、源说明等不进组件状态，所有描述纯文本。
+
+主职业、职业快照、贡献/统计、动态、等级变化、奖励概要和名次仍按字段存在性独立展示，空列表与权限404/失败分开；无假身份、无目录/等级本地兜底。本人职业选择/隐私/进度明细和职业榜仍待独立接入，不能宣称职业全模块完成。
+
+验证：legacy-public-professions-test三组覆盖实际API和编译Vue、精确端点/key/no-store、额外字段剔除、经验隐藏/真实零、并列百分比、错误/重复拒绝、旧key/退出/目标迟到隔离与SSR零读；原v3公开职业七组及完整类型/客户端/服务端构建通过。浏览器对现网公开JSON只读验证本地主页职业栏目与重读，未登录或改职业/隐私。登录读者隐私组合由本地测试覆盖，尚未用真实多账号联调。
+
+协议来源：[ProfessionProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ProfessionProcessor.java)、[PublicProfessionProfileQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/PublicProfessionProfileQueryService.java)。
