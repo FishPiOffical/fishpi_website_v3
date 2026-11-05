@@ -24,7 +24,7 @@ onScopeDispose(() => { mounted = false; clear() })
 </script>
 <template>
   <section class="legacy-owner-profile" :aria-label="mode === 'avatar' ? '本人头像' : '本人资料'">
-    <p class="hint">当前可查看本人资料。旧版资料与头像修改依赖经典页面的会话验证，此处暂不提供修改操作。</p>
+    <p class="hint">当前可查看本人资料。旧版资料保存会同时覆盖 QQ、标签和 MBTI，但本人读取接口缺少这些原值；头像修改仍依赖经典页面会话，此处暂不提供修改操作。</p>
     <p v-if="loading" role="status">正在读取本人资料…</p><p v-if="error" role="alert" class="error">{{ error }}</p>
     <template v-if="profile">
       <template v-if="mode === 'avatar'"><img v-if="profile.avatar && !imageError" :src="profile.avatar" alt="当前本人头像" referrerpolicy="no-referrer" @error="imageError = true" /><p v-if="imageError" role="alert">当前头像图片无法显示。</p><p v-if="!profile.avatar">尚未设置头像地址。</p><p class="avatar-url">当前头像地址：{{ profile.avatar || '未设置' }}</p></template>
