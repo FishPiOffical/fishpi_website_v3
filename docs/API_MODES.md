@@ -33,6 +33,7 @@
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
 | 用户公开勋章 | 第三十四批已接当前启用快照；无历史授予/永久有效证明 | 保留真实授予分页 |
+| 本人背包/四卡使用 | 第三十七批已接旧JSON读取、三种消耗GET及改名卡POST；无幂等重放，积分改名另受页面会话限制 | 保留原接口/原键恢复 |
 | 本人职业状态/隐私/等级/成长提示/流水 | 第三十六批已接读取；写入被经典CSRF协议限制，未恢复Cookie桥接 | 保留原读写 |
 | 职业排行 | 第三十五批已接旧经验前20名可见快照；无完整分页/人数 | 保留 |
 | 用户公开职业资料 | 第三十三批已接旧等级快照与可见模块；本人管理/职业榜另迁移 | 保留 |
@@ -567,3 +568,18 @@ legacyActivity保存未确认领取跨SPA锁定，没有自动恢复/重发按�
 挂载且已认证后读，旧key、账号、上下文、目标与请求序号隔离迟到数据，退出/卸载清私有内容，SSR零私有读。验证：legacy-owner-professions-test三组实际API/编译UI覆盖稳定ID绑定、隐私与概要完整白名单、零/负经验和快照重复、实际复合游标/坏数据/重复拒绝、独立失败重试与上一批、目标/退出隔离、SSR零读与全程零POST；原v3职业设置和职业榜回归、完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证登录回跳、只读隐私、成长提示、等级/贡献与第二批末尾流水。旁路通知/私信未提供于夹具，不计入本次验收；夹具已停止并恢复现网v1开发服务。未登录生产账号、修改职业/隐私或写入真实数据，生产本人记录与CSRF仍未做真实联调。
 
 协议来源：[ProfessionPrivacyMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ProfessionPrivacyMgmtService.java)、[ProfessionGrowthGuideQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ProfessionGrowthGuideQueryService.java)、[ProfessionProfileDetailQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ProfessionProfileDetailQueryService.java)、[ProfessionProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ProfessionProcessor.java)、[CSRFMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/CSRFMidware.java)。
+
+
+## 第三十七批：本人背包与四种道具使用
+
+账号设置OwnerInventory按模式挂载LegacyOwnerInventory/V3OwnerInventory，共用原样式，v3原消费/改名及原键恢复保留。旧GET /api/user/bag?apiKey只读取当前背包，将真实对象内有界代码与非负32位整数投影为条目；未知合法道具编号仅展示，不造本地数量、资格、功能或自动使用按钮。空对象只称当前快照无物品；CloudService会把内部读取异常转成空对象，客户端无法据此确认上游内部正常。
+
+旧/api/bag/1dayCheckin、2dayCheckin、patchCheckin为有副作用GET，只有明确确认后调用，不属于加载、预取或刷新。改名卡POST /api/bag/nameCard发送apiKey与规范化userName，用户名按实际注册规则校验；三个GET与POST都no-store并禁止风控自动重发。旧接口没有幂等键，空renderer、坏正文、业务错误/断流不能伪装确认或自动重用，未确认原操作在Pinia跨SPA锁定；全局只显示操作类型与核对入口，需用户核对当前背包/用户名后明确解除，无假“重试恢复”按钮。换key、账号、上下文或退出清理，迟到写/读不能恢复旧状态，SSR零私人请求。
+
+确认弹窗绑定身份与原输入，离页/身份变化AbortSignal取消迟到批准；当前显示有卡也不代表最终资格，仍由服务端校验补签及改名可用性。确认成功仅记录本次kind，不把历史bag回执或消息中用户名写入当前状态，也不从旧msg推免签天数/补签连续天数；随后独立GET背包及本人资料。改名后按真实用户ID/旧名失效昵称与资料缓存；缓存/后置读取失败仅提示重读，已确认消费不再执行。改名输入只在原内容仍匹配的成功情况下清空。
+
+旧积分改名处理器使用Sessions.getUser且依赖页面协议，未发现apiKey独立写资源，本批不发起旧积分改名、不恢复Cookie桥接；与已接的改名卡分开说明，不能宣称所有积分/账号功能完成。
+
+验证：legacy-inventory-test三组实际API/Pinia/编译UI覆盖四命令精确旧key、消耗GET/no-store/禁止自动重发、改名规范化、坏快照/renderer拒绝、原操作跨路由锁定、后置GET不采历史999回执、缓存/读取失败不重复消耗、当前账号名取GET、身份/迟到/SSR边界、确认取消与卸载中止、全局核对解锁；原v3背包六组及完整类型/客户端/服务端构建通过。浏览器仅本机合成账号使用免签卡和改名卡，验证真实GET剩余4天/当前名称，并模拟补签已消耗后503、离页返回仍锁定且当前卡已消失。两日卡请求协议由专项测试覆盖；真实补签业务条件、名称占用及多节点扣卡/退款未联调。账号页其他勋章/安全/扫码和旁路通知未由本机夹具提供，不计入本次验收；夹具已停止并恢复现网v1代理，未登录或消耗真实道具。
+
+协议来源：[SettingsProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/SettingsProcessor.java)、[CloudService.getBag/putBag](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CloudService.java)、[LoginCheckMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/LoginCheckMidware.java)。

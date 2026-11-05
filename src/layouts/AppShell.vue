@@ -21,6 +21,7 @@ import ChatRedPacketDialog from '@/components/chat/ChatRedPacketDialog.vue'
 import ChatRedPacketRecovery from '@/components/chat/ChatRedPacketRecovery.vue'
 import ReportRecovery from '@/components/ReportRecovery.vue'
 import ActivityRecovery from '@/components/ActivityRecovery.vue'
+import LegacyInventoryRecovery from '@/components/LegacyInventoryRecovery.vue'
 import GameSaveRecovery from '@/components/GameSaveRecovery.vue'
 import MilestoneRecovery from '@/components/MilestoneRecovery.vue'
 import FishGameRecovery from '@/components/FishGameRecovery.vue'
@@ -413,6 +414,7 @@ onUnmounted(() => {
     <MilestoneRecovery />
     <GameSaveRecovery />
     <ActivityRecovery />
+    <LegacyInventoryRecovery />
     <SettingsDrawer />
     <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />
