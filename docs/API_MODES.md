@@ -33,6 +33,7 @@
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
 | 用户公开勋章 | 第三十四批已接当前启用快照；无历史授予/永久有效证明 | 保留真实授予分页 |
+| 会员档位/本人状态/开通/昵称配置 | 第四十批已接旧JSON；无效券可能加价、全配置保存及未知锁定与v3分离 | 保留原规则与原键恢复 |
 | 本人勋章读取/展示/相邻排序 | 第三十九批已接；重复定义ID条目保留且禁止歧义写，无幂等恢复 | 保留授予ID分页与原键写入 |
 | 积分转账 | 第三十八批已接旧apiKey POST及当前余额；仅成功确认，无费用/到账/编号回执，无幂等重放 | 保留详细回执/原键恢复 |
 | 本人背包/四卡使用 | 第三十七批已接旧JSON读取、三种消耗GET及改名卡POST；无幂等重放，积分改名另受页面会话限制 | 保留原接口/原键恢复 |
@@ -615,3 +616,20 @@ legacyActivity保存未确认领取跨SPA锁定，没有自动恢复/重发按�
 验证：legacy-owner-medals-test三组实际API/Pinia/编译UI覆盖记录/定义ID、重复快照、隐藏/永久/原序号与白名单、精确旧写入/禁自动重试、歧义目标store保护、成功后当前GET而非回执、未知移动跨SPA锁定、读错不重复写、按钮节点保留且重复点击零请求、快照分页及身份/SSR隔离。原v3本人勋章、图片、旧公开勋章回归和完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证隐藏→展示、活动章上移、第三次移动后503与只读刷新后的实际顺序，仍锁定写按钮；重复授予条目保留无操作按钮。测试服务曾随执行环境终止，确认进程/句柄缺失后重启本机夹具完成最后验收。生产多账号/过期清理/重复授予具体数据未联调，账号页安全/扫码及旁路通知不在本机夹具范围。夹具已停止并恢复真实v1开发代理，未登录生产账号或修改现网勋章。
 
 协议来源：[MedalProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MedalProcessor.java)、[MedalApiAuth](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MedalApiAuth.java)、[MedalService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/MedalService.java)。
+
+
+## 第四十批：会员档位、本人状态、开通与昵称展示配置
+
+/vips的OwnerMembership按模式挂载LegacyOwnerMembership/V3OwnerMembership，共用原样式，v3完整目录、资格、优惠券拒绝规则、字段保存和原键恢复保持。旧GET /api/membership/levels投影完整有界目录的真实oId/lvCode/lvName/price/durationType/durationValue/benefits，最多512档位且ID唯一；旧权益JSON中的布尔、数字autoCheckin、checkinCard及color字符串分别保留实际类型，不把red或0套v3契约改成默认值。未支持键只标记存在并阻止完整配置编辑，不把原始未知内容留入组件。
+
+本人状态按当前稳定ID读取GET /api/membership/{id}，state=0明确无当前有效会员，无假档位/期限；state=1核对userId及真实code/期限/configJson。空配置仍为空，不从目录模板补公开/权益默认值。目录与状态分开错误/重试，正常缺字段明确失败而非空列表。SSR始终未认证占位零私有读；浏览器挂载后按旧key/账号/身份上下文及代际隔离请求，退出/换号清理。
+
+旧POST /api/membership/open精确发送apiKey/oId/couponCode/configJson空串，沿旧默认初始化流程，不把v3配置或用户自造权益混入开通。会员资格、周期结算、礼包及实际费用交服务端，成功code只确认请求，不用membership/activation历史结果推当前状态/扣费；之后重读当前状态和本人余额。旧无效券可能按原价1.2倍处罚，耗尽券可能原价，明显区别于v3拒绝无效券；旧界面和冻结档位/券的确认均明确该风险，不虚报优惠后费用或保证礼包与账本同事务。
+
+旧PUT /api/membership/config要求模板所有字段完整且类型匹配，客户端只有当前配置完整且与已核验唯一一致目录模板匹配时才能编辑。仅bold/underline/color为编辑项，保存冻结完整当前白名单配置并原样保留其他权益；缺失、未知配置或模板歧义时禁止编辑，不以模板值补齐。非VIP4六位Hex，VIP4可选既有八种动画；旧red模板仅作原值说明不注入CSS。当前昵称缓存按稳定ID/用户名失效，成功后仅当前GET更新，不将草稿或历史回执覆盖当前状态。
+
+开通和配置均禁自动风控重发/no-store，无假幂等键。未知结果Pinia跨SPA锁定会员写入，全局提示不展示券码/私人配置，需核对会员/背包/积分流水后明确解除，刷新/退出会失去本机锁定；确认绑定身份和冻结输入，离页/身份变化取消迟到批准。开通后读错或缓存/余额刷新失败不重复购买，错误按已确认后的独立读取展示。
+
+验证：legacy-membership-test三组实际API/Pinia/Vue逻辑与完整模板SSR覆盖真实旧类型、空配置不补值、未知字段隔离、ID绑定/有界目录/重复与坏JSON拒绝、精确旧POST/PUT、完整配置保留非编辑权益、未知跨SPA锁定、只认确认不采历史price/config、后置读错不重买、无效券风险确认、离页取消、身份/SSR隔离。原v3会员12组及完整类型/客户端/服务端构建通过。现网仅公开levels只读核对；浏览器仅本机合成账号开通、读取当前VIP4、颜色neon保存保留autoCheckin=0/jointVip、第三次配置已生效后503，再读ocean且写入仍锁定。没有开通/保存真实会员或消耗真实券/积分，生产优惠券结算、期限、礼包发放与并发开通未联调；旁路通知/私信不在本机夹具范围。夹具已停止并恢复真实v1开发代理。其他全站模块继续适配，不能将本批称全站完成。
+
+协议来源：[MembershipProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MembershipProcessor.java)、[MembershipQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/MembershipQueryService.java)、[MembershipMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/MembershipMgmtService.java)。
