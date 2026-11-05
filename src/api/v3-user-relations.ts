@@ -1,3 +1,4 @@
+import {getApiMode} from './mode'
 import { ApiError, request } from './http'
 export type RelationKind = 'following' | 'followers'
 export type RelationUser = { id: string; userName: string; userNickname: string; userAvatarURL: string }
@@ -18,6 +19,7 @@ export function decodeV3RelationUser(value: unknown): RelationUser {
 }
 export async function fetchV3UserRelations(userName: string, kind: RelationKind, p = 1, size = 20): Promise<RelationPage> {
   if (!relationUserName(userName) || !['following', 'followers'].includes(kind) || !Number.isSafeInteger(p) || p < 1 || p > 42949672 || !Number.isSafeInteger(size) || size < 1 || size > 50) throw new ApiError('用户列表参数不合法', 422)
+  if(getApiMode()==='v1')return(await import('./legacy/relations')).legacyUserRelations(userName,kind,p,size)
   const suffix = kind === 'following' ? 'following/users' : 'followers'
   const result = object(await request(`/api/v3/users/${encodeURIComponent(userName)}/${suffix}?p=${p}&size=${size}`, { cache: 'no-store' }))
   if (result.code !== 0) throw invalid()

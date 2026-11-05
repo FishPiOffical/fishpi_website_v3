@@ -6,7 +6,7 @@ import { renderToString } from '@vue/server-renderer'
 const source=await fs.readFile('src/seo/payload.ts','utf8'),url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 const transpile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './legacy/directory'", "from 'data:text/javascript,export function decodeLegacyDirectoryPage(){throw Error()}export function legacyDirectory(){throw Error()}'").replaceAll("from './mode'", "from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'")
 const http=url('export class ApiError extends Error{};export function request(){throw new Error("unexpected SSR decode network")}')
-const relations=url(transpile(await fs.readFile('src/api/v3-user-relations.ts','utf8')).replace("from './http'",`from '${http}'`))
+const relations=url(transpile(await fs.readFile('src/api/v3-user-relations.ts','utf8')).replaceAll("from './mode'","from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'").replace("from './http'",`from '${http}'`))
 const publicUser=url(transpile(await fs.readFile('src/api/v3-public-user.ts','utf8')).replace("from './http'",`from '${http}'`).replace("from './v3-user-relations'",`from '${relations}'`))
 const content=url(transpile(await fs.readFile('src/api/v3-content.ts','utf8')).replace("from './http'",`from '${http}'`))
 const extras=url(transpile(await fs.readFile('src/api/v3-discovery-extras.ts','utf8')).replace("from './http'",`from '${http}'`).replace("from './v3-user-relations'",`from '${relations}'`).replace("from './v3-content'",`from '${content}'`))

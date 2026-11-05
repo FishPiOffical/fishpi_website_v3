@@ -34,7 +34,8 @@
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON | 保留 |
 | 用户文章/长文/公开回帖/清风列表 | 第二十二批已接；私密正文与清风单条读取受旧契约限制 | 保留 |
-| 关注/收藏、账号各类设置、财务/导出等 | 待适配 | 保留 |
+| 关注/粉丝、关注标签与收藏列表读取 | 第二十三批已接；旧订阅列表缺独立JSON，删除记录可能省略 | 保留 |
+| 关注/收藏写入、账号各类设置、财务/导出等 | 待适配 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
 
@@ -357,3 +358,17 @@ useMemberPage的身份边界按模式观察实际旧key/Bearer，换key/账号/�
 验证：legacy-member-content-test五组实际适配器/公共API/共享hook覆盖四类列表（文章与长文分支）、精确旧字段/凭据、作者及匿名验证、嵌套私有字段剔除、私密正文隐藏、清风身份/HTML、分页/隐私/空/越界、缺失单条能力零查询和旧key迟到隔离。v3用户主页14组、旧内容回归、类型及完整构建通过。浏览器仅对本机公开JSON夹具验证文章第2页3条、公开/私密回帖区分、个人清风显示与无单条入口，私密测试正文未出现；未登录或写真实账号。夹具已停并恢复现网v1开发服务。生产个人隐私组合、真实非空栏目及旧服务内部吞错情况未完整联调；私密正文的当前授权读取另需契约支持。
 
 协议来源：[UserProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)、[CommentQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CommentQueryService.java)、[BreezemoonQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/BreezemoonQueryService.java)、[DesensitizeUtil](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/util/DesensitizeUtil.java)。只读核对JSON与源码，未抓取页面内容。
+
+## 第二十三批：关系列表、关注标签与收藏读取
+
+独立UserRelationsView和SavedContentView按模式读取旧/api/user/{name}/following/users、followers、following/tags、following/articles；原v3本人/公开资源保持不变。使用旧服务真实分页，不把当前页长度当总数；用户只投影公开身份字段，签名头像不改写。标签ID与URI独立保留，v1链接编码旧URI，描述按纯文本显示，不把数字ID冒充旧标签地址。
+
+本人/stars按模式判断实际凭据，旧key只用于旧JSON参数；换key/账号/目标/栏目清当前状态并拒绝迟到回写，普通v3令牌轮换保留现有行为。SSR只显示准备态，不读取私人列表；HTTP隐私拒绝、响应错误、合法空结果分别保留，不从旧完整用户资料拼列表。
+
+旧收藏服务可能省略已删除文章，但总数仍含原记录；保留真实总数，不编造缺失ID。返回已知失效状态或讨论类且无法确认当前可读性时只显示文章编号，不展示标题、摘要和作者；公开文章继续验证匿名元数据。旧协议不能提供与v3完全相同的不可读记录全集或授权证明，界面明确说明范围。
+
+旧/api/user/{name}/watching是关注动态，并非订阅文章记录，不能替代订阅列表；当前订阅栏目明确501且不请求该动态资源。关注/收藏关系写入、订阅读取和其余账号模块仍在全站兼容未完成范围。
+
+验证：legacy-relations-test五组覆盖实际适配器和公共入口、精确路径/旧key、真实分页、白名单/签名URL、标签URI、匿名与受限收藏、删除记录不编造、订阅零回退、隐私/空/坏响应和换key迟到。原v3关系5组/收藏7组及相关共享身份解码器共16套回归通过，类型检查和完整构建通过。浏览器仅用本机合成身份验证登录回跳/stars、受限正文隐藏、中文标签URI和粉丝第2页5条；无真实关注或收藏写入。夹具已停止，127.0.0.1:5173恢复现网v1开发代理。生产隐私组合及非空真实收藏仍需联调，不据此宣称全站已完成。
+
+协议来源：[UserProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)、[FollowQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/FollowQueryService.java)、[Tag模型](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Tag.java)。只读核对JSON协议与源码，不抓取页面或恢复Cookie桥接。

@@ -5,7 +5,7 @@ import { parse, compileScript } from '@vue/compiler-sfc'
 import { createRenderer, createSSRApp, h, nextTick, ref, reactive } from 'vue'
 import { createPinia, defineStore } from 'pinia'
 import { renderToString } from '@vue/server-renderer'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'","from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'").replaceAll("from '@/api/mode'","from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'")
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__relations={context:1,requests:[],responses:[]};const state=__relations
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__relations.context}export async function request(path,init){globalThis.__relations.requests.push({path,init});const value=globalThis.__relations.responses.shift();if(value instanceof Error)throw value;return value}`)
@@ -43,5 +43,5 @@ let releases=[];__relationsAPI.fetchV3UserRelations=async(name,kind)=>new Promis
 releases=[];view=mount();await tick();view.user.accessToken=null;view.user.account=null;await tick();assert.equal(releases.length,3);releases[0].resolve({list:[{...user,userNickname:'OLD_PRIVATE'}],p:1,size:20,total:1,pageCount:1});releases[2].resolve({list:[],p:1,size:20,total:0,pageCount:0});await tick();assert.ok(!view.text().includes('OLD_PRIVATE'));assert.match(view.text(),/暂无用户/);view.app.unmount()
 console.log('PASS relations 4 target and reader changes clear old list and discard delayed private results; anonymous re-read supported')
 let ssrReads=0;__relationsAPI.fetchV3UserRelations=async()=>{ssrReads++;throw Error('SSR')};const ssr=createSSRApp(component);ssr.use(createPinia());const html=await renderToString(ssr);assert.equal(ssrReads,0);assert.match(html,/正在准备用户列表/)
-const routes=await fs.readFile('src/router/index.ts','utf8'),legacy=await fs.readFile('src/api/fishpi.ts','utf8');assert.ok(routes.includes("import('@/views/UserRelationsView.vue')"));assert.ok(!legacy.includes('function fetchFollowers(')&&!legacy.includes('function fetchFollowingUsers('));assert.ok(!source.includes('fetchUserProfile')&&!source.includes('apiKey')&&!source.includes('v-html'))
+const routes=await fs.readFile('src/router/index.ts','utf8'),legacy=await fs.readFile('src/api/fishpi.ts','utf8');assert.ok(routes.includes("import('@/views/UserRelationsView.vue')"));assert.ok(!legacy.includes('function fetchFollowers(')&&!legacy.includes('function fetchFollowingUsers('));assert.ok(!source.includes('fetchUserProfile')&&!source.includes('v-html')&&source.includes("getApiMode()==='v1'?apiKey.value:accessToken.value"))
 console.log('PASS relations 5 SSR has no reader requests and two existing routes avoid old profile/list dependencies')

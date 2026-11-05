@@ -8,7 +8,7 @@ const replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`f
 const content=url(replace(compile(await fs.readFile('src/api/v3-content.ts','utf8')),[['./mode',mode],['./http',shim]]))
 const columns=url(replace(compile(await fs.readFile('src/api/v3-public-columns.ts','utf8')),[['./mode',mode],['./http',shim],['./v3-content',content]]))
 const home=url(replace(compile(await fs.readFile('src/api/legacy/home.ts','utf8')),[['../http',shim],['../v3-content',content],['../v3-public-columns',columns]]))
-const relations=url(replace(compile(await fs.readFile('src/api/v3-user-relations.ts','utf8')),[['./http',shim]]))
+const relations=url(replace(compile(await fs.readFile('src/api/v3-user-relations.ts','utf8')).replaceAll("from './mode'","from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'"),[['./http',shim]]))
 const repeater=url(replace(compile(await fs.readFile('src/api/v3-repeater.ts','utf8')),[['./mode',mode],['./http',shim]]))
 const auth=url('export const getLegacyKey=()=>__legacyDiscovery.key')
 const rankingAPI=await import(url(replace(compile(await fs.readFile('src/api/legacy/rankings.ts','utf8')),[['../http',shim],['./auth',auth],['./home',home],['../v3-user-relations',relations],['./public-user',url('export function legacyPublicUser(){throw Error("unused")}')]])))

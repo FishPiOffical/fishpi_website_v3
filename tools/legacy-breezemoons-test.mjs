@@ -41,7 +41,7 @@ store.draft='不会被旧响应清除';state.dispatch=()=>new Promise(r=>release
 const old=store.execute({kind:'create',id:'',content:store.draft});owner.apiKey='new-key';owner.account={oId:'8'};state.version++
 release({code:0});assert.equal(await old,false);assert.equal(store.completed,null);assert.equal(store.uncertain,null);assert.equal(store.busy,false)
 console.log('PASS actual Pinia unknown writes lock instead of retry; explicit release sends nothing, success clears matching draft, owner boundary rejects old result')
-const relation=url(replace(compile(await fs.readFile('src/api/v3-user-relations.ts','utf8')),[['./http',http]])),mode=url('export const getApiMode=()=>"v1"')
+const relation=url(replace(compile(await fs.readFile('src/api/v3-user-relations.ts','utf8')).replaceAll("from './mode'","from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'"),[['./http',http]])),mode=url('export const getApiMode=()=>"v1"')
 const publicURL=url(replace(compile(await fs.readFile('src/api/v3-public-user.ts','utf8')),[['./mode',mode],['./http',http],['./v3-user-relations',relation]]))
 const publicLegacy=await import(url(replace(compile(await fs.readFile('src/api/legacy/public-user.ts','utf8')),[['../http',http],['../v3-public-user',publicURL],['./auth',auth]])))
 state.dispatch=()=>({oId:'7',userName:'known',userNickname:'名',userAvatarURL:'',userIntro:'介绍',userURL:'https://example.invalid',userPoint:100,userRole:'admin',userPassword:'secret'})
