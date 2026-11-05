@@ -9,11 +9,16 @@ function text(value:unknown) {if(typeof value!=='string'||value.length>65536)thr
 function id(value:unknown) {const s=text(value);if(!/^[1-9][0-9]{0,18}$/.test(s))throw new ApiError('动态ID不合法',422);return s}
 export async function legacyMoonPage(p=1,size=20):Promise<LegacyMoonPage> {
   if(!Number.isSafeInteger(p)||p<1||p>1000000||!Number.isSafeInteger(size)||size<1||size>50)throw new ApiError('清风分页参数不合法',422)
-  const context=getAuthContextVersion(),key=getLegacyKey(),names=new Map<string,Promise<RelationUser>>()
+  const context=getAuthContextVersion(),key=getLegacyKey()
   const envelope=await request<{code:number;msg?:string;breezemoons?:unknown[]}>(`/api/breezemoons?p=${p}&size=${size}${key?'&'+new URLSearchParams({apiKey:key}):''}`,{cache:'no-store'})
   if(envelope.code!==0)throw new ApiError(envelope.msg || '清风读取失败',400)
   if(!Array.isArray(envelope.breezemoons)||envelope.breezemoons.length>size)throw new ApiError('旧清风列表格式不正确',502)
-  const raw=envelope.breezemoons.map(legacyObject)
+  return {list:await projectLegacyMoons(envelope.breezemoons,context,key),p,size}
+}
+export async function projectLegacyMoons(rows:unknown[],context:number,key:string|null):Promise<LegacyMoon[]> {
+  if(rows.length>50)throw new ApiError('旧清风列表过大',502)
+  const names=new Map<string,Promise<RelationUser>>()
+  const raw=rows.map(legacyObject)
   const unique=[...new Set(raw.map(r=>text(r.breezemoonAuthorName)))]
   // Bounded batches, no full legacy profiles or cross-reader cache.
   for(let start=0;start<unique.length;start+=4) {
@@ -24,7 +29,7 @@ export async function legacyMoonPage(p=1,size=20):Promise<LegacyMoonPage> {
   const list=await Promise.all(raw.map(async r=>({id:id(r.oId),content:text(r.breezemoonContentRaw),contentHtml:text(r.breezemoonContent),createdAt:legacyDate(r.breezemoonCreated),updatedAt:legacyDate(r.breezemoonUpdated),author:await names.get(text(r.breezemoonAuthorName))!})))
   if(new Set(list.map(x=>x.id)).size!==list.length)throw new ApiError('旧清风列表重复',502)
   if(context!==getAuthContextVersion()||key!==getLegacyKey())throw new ApiError('登录状态已变化',401)
-  return {list,p,size}
+  return list
 }
 export type LegacyMoonCommand={kind:'create'|'update'|'delete';id:string;content:string}
 export async function writeLegacyMoon(command:LegacyMoonCommand) {

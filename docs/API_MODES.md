@@ -47,6 +47,7 @@
 | 职业排行 | 第三十五批已接旧经验前20名可见快照；无完整分页/人数 | 保留 |
 | 用户公开职业资料 | 第三十三批已接旧等级快照与可见模块；本人管理/职业榜另迁移 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON | 保留 |
+| 关注用户/标签文章动态、关注清风 | 第五十批接入：文章仅最近快照，清风真实分页 | 保留真实分页 |
 | 本人匿名文章/匿名评论 | 第四十九批接入已有本人JSON，真实分页及元数据白名单 | 保留 |
 | 用户文章/长文/公开回帖/清风列表 | 第二十二批已接；私密正文与清风单条读取受旧契约限制 | 保留 |
 | 关注/粉丝、关注标签与收藏列表读取 | 第二十三批已接；旧订阅列表缺独立JSON，删除记录可能省略 | 保留 |
@@ -781,3 +782,13 @@ website代理在v1模式对/api/emoji/移除所有上游Cookie及原有Bearer，
 同身份v3普通令牌轮换保留页；v1 key变化、目标/栏目变化、换号/退出清旧列表并拒迟到结果。适配静态分派，在请求调用时捕获凭据/认证上下文，避免等待动态导入期间借用新身份。浏览器保留本地模式Cookie以选择正确上游，website代理解析模式后为两条旧匿名路径去除上游Cookie/Bearer；不恢复页面登录桥接，不将Bearer写入apiKey。SSR只准备外壳零私有请求。
 
 验证：legacy-anonymous-content-test执行真实适配/模式分派和编译共享Vue，覆盖双端点精确GET、作者/匿名/白名单及坏响应、CST转换、完整20+1分页、越界空页、业务403、错误重试、旧key认证上下文/外来目标/退出迟到隔离、未用Bearer兜底及SSR零读。原v3-anonymous-content五组回归保留真实分页、轮换与隐私断言，新增显式v3模式及禁止走legacy；api-modes实际代理GET验证Cookie隔离，完整类型/客户端/SSR构建通过。浏览器仅本机合成账号验证21条文章第二页和私密评论概要/所属文章链接，截图/tmp/fp-anonymous49-browser.png；未读取真实账号匿名内容，未执行写入。Rhythm未修改，全站其他未覆盖功能继续适配。
+
+## 第五十批（仅website）：关注动态
+
+共享WatchView按实际模式凭据开放已有三个栏目，保留v3真实分页和普通令牌轮换保留当前页。旧GET /api/user/{本人用户名}/watching仅返回followingUserArticles、followingTagArticles各自最近一页；v1按用户选择投影对应数组，不混合、不从全站筛选替代。明确返回total/pageCount=null，页面展示当前条数与最多size条快照范围，没有假的总数/分页按钮，p>1适配器直接501零HTTP。旧接口本身无文章动态后续分页，本批未宣称等同v3完整集合。
+
+关注清风使用已有GET /api/watch/breezemoons?p&size&apiKey，服务端API关闭全站fallback，真实paginationRecordCount/pageCount验证页长、重复和越界空页歧义，读失败独立报错/原页重试。复用从原legacyMoonPage抽出的projectLegacyMoons，最多50项、有界四并发按唯一用户名获取当前公开白名单身份，不缓存完整用户，不把raw正文传入FollowingMoon；共享BreezemoonList只接已有服务端HTML，缺字段不回退原文或全站清风。旧清风后端空页会丢总数，后续页空且total=0明确409回首页。
+
+请求开始捕获旧key/认证上下文，HTTP之后、作者资料读取前后验证，换号/退出/栏目变化清旧视图且拒迟到动态，SSR零私有读取。website代理在v1解析本地模式后，对watching与watch/breezemoons去掉上游Cookie及已有Bearer，防页面Session抢占所选身份；不增加Cookie认证桥接。匿名文章继续走共享白名单，不携真实作者身份。Rhythm仅只读核对既有处理器/服务，未修改。
+
+验证：legacy-following-feed真实适配/共享模式分派及编译WatchView覆盖精确路径/key/no-store、两类快照来源与未知总数/无假分页、匿名作者、关注清风元数据/原文白名单/真实20+1分页、业务403、错误重试、认证上下文/作者加载期间换号/旧分类迟到、未借用Bearer与SSR零读。原v3-following-feed六组完整回归、legacy-breezemoons、api-modes实际HTTP代理Cookie隔离及完整类型/客户端/SSR构建通过。浏览器仅本机合成账号验证标签/用户快照切换和关注清风第二页，截图/tmp/fp-watch50-browser.png；未读真实账号关注动态、未写入真实内容，未对生产多账号隐私联调。开发服务已恢复现网v1上游，全站其他缺口继续。
