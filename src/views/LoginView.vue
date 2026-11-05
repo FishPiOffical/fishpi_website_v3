@@ -15,7 +15,7 @@ const route = useRoute()
 const appearance = useAppearanceStore()
 const submitting=ref(false),returning=ref(false),returnError=ref('')
 const busy=computed(()=>submitting.value||returning.value||auth.loading)
-const securityNotice = computed(() => route.query.reason === 'security-updated' ? '账号安全设置已更新，现有登录授权已失效，请重新登录。' : route.query.reason === 'security-unconfirmed' ? '安全设置请求结果未确认，请重新登录核实；修改密码时请尝试新密码，必要时再核对原密码。' : '')
+const securityNotice = computed(() => route.query.reason === 'legacy-security-updated' ? '旧版两步验证操作已确认，本机登录已清除，请重新登录核对。旧接口不保证其他设备授权失效。' : route.query.reason === 'legacy-security-unconfirmed' ? '旧版两步验证提交结果未确认，本机登录已清除；请重新登录核对，不要重复提交。' : route.query.reason === 'security-updated' ? '账号安全设置已更新，现有登录授权已失效，请重新登录。' : route.query.reason === 'security-unconfirmed' ? '安全设置请求结果未确认，请重新登录核实；修改密码时请尝试新密码，必要时再核对原密码。' : '')
 
 function redirectTarget() {
   return typeof route.query.redirect === 'string' ? route.query.redirect : '/'

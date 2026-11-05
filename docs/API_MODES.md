@@ -56,7 +56,8 @@
 | 鱼游投稿/编辑申请/投票切换/评论 | 第三十批已接；四字段旧投稿，未知结果无自动重发 | 保留五字段及同键恢复 |
 | VIP 昵称公开样式 | 第三十一批已接，v1 限四处展示，游客可读 | 保留原批量与认证边界 |
 | 签到状态/昨日奖励状态及领取 | 第三十二批已接；旧领取为确认后的有副作用GET，无日期/金额预览与同键恢复 | 保留 |
-| 标签关注/收藏/订阅写入、账号各类设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
+| 两步验证状态/准备/启用/停用 | 第四十五批已接；旧GET敏感修改无幂等恢复，结果未确认也清本机登录后核实 | 保留证明/原键和授权失效语义 |
+| 标签关注/收藏/订阅写入、其余账号设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
 
@@ -701,3 +702,20 @@ ArticleInteraction按模式与资源分派，v1文章vote使用LegacyArticleVote
 协议来源：[VoteProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/VoteProcessor.java)、[ArticleProcessor.showArticleApi/thankArticle/rewardArticle](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ArticleProcessor.java)、[FollowProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/FollowProcessor.java)。
 
 补充限流验证：旧详情按IP每秒一次，浏览器HTTP层对所有数字ID文章详情GET统一排队，前一响应结束后至少1100ms再读，首次留出SSR间隔，最多排队32项。排队期间换号、切模式或取消拒绝旧请求；SSR、v3和写入不进入队列，不自动重试503。其他标签页和设备仍可能竞争同一IP限制。legacy-article-pacing-test真实HTTP层验证间距、失败不重放及身份隔离；HTTP正文断流与离线身份回归通过。浏览器改为实际每秒一次的夹具后再次验收赞同、取消未知结果及重读锁定，未触发夹具限流。
+
+
+## 第四十五批：旧版两步验证
+
+OwnerSecurity按模式挂载LegacyOwnerSecurity/V3OwnerSecurity，共用原设置样式；原v3密码/手机/邮箱证明、极验及MFA准备/原键确认流程保留。旧密码、联系方式写入仍受Session/CSRF及独立本人读取缺口限制，本批不补造这些表单数据；APP扫码仍另行适配。
+
+GET /mfa/enabled?apiKey严格识别code=0且msg=已绑定2FA为启用、code=-1且msg=未绑定2FA为未启用；其他业务错误不能默认为false。仅挂载后读取，失败独立提示/重试，不自动准备密钥。显式准备时GET /mfa?apiKey，必须核对响应user等于当前稳定ID，secret符合旧10字节生成的16位Base32，仅投影secret并本机构造otpauth URI。原qrCodeLink指向第三方图片服务、包含密钥，始终不作为图片/链接加载；密钥和URI只在当前组件内存中，不入Pinia/SSR/storage，不构造服务端未提供的准备编号或过期时间。旧缓存可被淘汰，界面明确以实际提交为准。
+
+启用按旧GET /mfa/verify?apiKey&code发送六位原验证码（保留首位0），停用按GET /mfa/remove?apiKey，仅当前登录授权、没有v3当前密码/TOTP复核契约。两者都有明确确认；确认后先重读当前启用状态，若已变化则零写入并清准备资料，不拿过期状态继续修改。读前失败也零写入，可只重读。服务端仍无CAS，跨设备竞争不能由客户端保证消除。
+
+这些是有副作用的旧GET，禁止自动风控重试、不带伪幂等键、禁止重定向，浏览器请求及代理响应均no-store。旧处理器verify会把服务异常和验证码错误折为同类失败，不能据此证明没有生效。因此任何已发送修改成功或未确认都清密钥/验证码及本机登录，使用独立legacy-security-updated/unconfirmed登录提示重新核实，不自动恢复/重复写入，不宣称其他设备授权失效。准备/确认离页或身份变化取消旧工作；提交已发出后离页仍清除同一身份的本机登录，迟到结果不能退出新账号或劫持新路由。导航失败不重新提交。
+
+SSR仅外壳零私有读取，凭据/账号/上下文/序号拒绝迟到状态与准备结果。原v3语义、源组件及7组安全测试保留；新增legacy-mfa-test两组实际API/编译Vue覆盖真实负值状态码、owner/secret白名单、无外部QR/假期限、精确旧GET/首零验证码/no-store/禁重放、明确准备、校验/取消/重复点击、提交前状态变化零写、成功/未知清本机登录、离页确认取消与已发出命令的同身份处理、换号及SSR隔离。双模式真实代理测试覆盖全部mfa路由及响应no-store，类型与完整客户端/服务端构建通过。
+
+浏览器仅本机合成账号验证账号页读取未启用状态、点击准备后手动密钥和本地URI显示，并确认没有使用夹具外部QR地址。未在浏览器执行启用或停用，写流程由本机模拟接口的编译UI测试覆盖；没有准备/修改真实账号MFA，没有把真实密钥或验证码传给第三方。旁路勋章、背包、通知/私信及APP扫码不在本机夹具范围。夹具已停止，开发服务恢复真实v1代理；全站仍未完成。
+
+协议来源：[MFAProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MFAProcessor.java)、[MultiFactorAuthenticator](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/util/MultiFactorAuthenticator.java)、[StatusCodes](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/util/StatusCodes.java)。
