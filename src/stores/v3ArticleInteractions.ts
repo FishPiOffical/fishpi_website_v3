@@ -1,27 +1,29 @@
 import { defineStore, storeToRefs } from 'pinia'
-import { onScopeDispose, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import { ApiError, getAuthContextVersion } from '@/api/http'
 import { profileOperationKey } from '@/api/v3-profile'
 import { writeArticleInteraction, type ArticleInteractionKind, type VoteChoice, type InteractionResource } from '@/api/v3-article-interactions'
+import { getApiMode } from '@/api/mode'
 import { useAuthStore } from '@/stores/auth'
 type Command = { choice: VoteChoice; key: string; busy: boolean; error: string }
 /** Only unresolved explicit commands persist across SPA views; never persist credentials or relationship snapshots. */
 export const useV3ArticleInteractionsStore = defineStore('v3-article-interactions', () => {
   const auth = useAuthStore()
-  const { accessToken, account } = storeToRefs(auth)
+  const { accessToken, apiKey, account } = storeToRefs(auth)
+  const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
   const balanceError = ref('')
   const commands = ref<Record<string,Command>>({}), lastChange = ref({ targetId:'', kind:'' as ArticleInteractionKind|'', resource:'articles' as InteractionResource, revision:0 })
-  let generation = 0, boundary = getAuthContextVersion(), owner = account.value?.oId
+  let generation = 0, boundary = getAuthContextVersion(), owner = account.value?.oId, oldCredential = credential.value
   function reset() { generation++; commands.value = {}; balanceError.value = ''; lastChange.value = { targetId:'', kind:'', resource:'articles', revision:lastChange.value.revision + 1 } }
-  const stop = watch([accessToken, () => account.value?.oId], () => {
+  const stop = watch([credential, () => account.value?.oId], () => {
     const next = getAuthContextVersion(), id = account.value?.oId
-    if (!accessToken.value || next !== boundary || id !== owner) reset()
-    boundary = next; owner = id
+    if (!credential.value || next !== boundary || id !== owner || getApiMode()==='v1' && oldCredential!==credential.value) reset()
+    boundary = next; owner = id; oldCredential = credential.value
   }, {flush:'sync'})
   onScopeDispose(() => { stop(); reset() })
   async function set(kind:ArticleInteractionKind, targetId: string, choice: VoteChoice, resource:InteractionResource='articles') {
     const current = generation, context = getAuthContextVersion(), actor = account.value?.oId
-    const valid = () => !import.meta.env.SSR && !!accessToken.value && !!actor && actor === account.value?.oId && context === getAuthContextVersion() && current === generation
+    const valid = () => !import.meta.env.SSR && !!credential.value && !!actor && actor === account.value?.oId && context === getAuthContextVersion() && current === generation
     if (!['articles','comments'].includes(resource) || resource === 'comments' && kind === 'reward' || resource === 'articles' && kind === 'accept') throw new ApiError('互动类型不合法',422)
     if (!valid() || !['vote','thanks','reward','accept'].includes(kind) || !/^[1-9][0-9]{0,18}$/.test(targetId)) return
     const identity=(resource === 'comments' ? 'comments:' : '')+kind+':'+targetId

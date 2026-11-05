@@ -425,7 +425,7 @@ function itemHandlers(c: ArticleComment) {
     reply: () => startReply(c),
     edit: () => startEdit(c),
     remove: () => onRemoveComment(c),
-    accepted: () => { if (isQnA.value && accessToken.value) void load(true) },
+    accepted: () => { if (isQnA.value && (getApiMode()==='v1'?apiKey.value:accessToken.value)) void load(true) },
   }
 }
 
@@ -475,7 +475,7 @@ function itemHandlers(c: ArticleComment) {
             <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
           </template>
           <template v-if="t.replies.length||getApiMode()==='v1'&&!t.c.commentOriginalCommentId" #default>
-            <LegacyCommentReplies v-if="getApiMode()==='v1'&&!t.c.commentOriginalCommentId" :article-id="article.oId" :root-id="t.c.oId" :writable="isLoggedIn&&commentingEnabled" :revision="commentWrites.revision" @reply="startReply" />
+            <LegacyCommentReplies v-if="getApiMode()==='v1'&&!t.c.commentOriginalCommentId" :article-id="article.oId" :root-id="t.c.oId" :writable="isLoggedIn&&commentingEnabled" :revision="commentWrites.revision" @reply="startReply" @accepted="isQnA&&isLoggedIn&&load(true)" />
             <CommentItem
               v-for="r in getApiMode()==='v1'&&!t.c.commentOriginalCommentId?[]:t.replies"
               :key="r.oId"

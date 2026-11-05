@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { readArticleInteraction, readArticleRewardHtml, type ArticleInteractionKind, type ArticleInteractionState, type VoteChoice, type InteractionResource } from '@/api/v3-article-interactions'
 import { fpConfirm } from '@/composables/useDialog'
@@ -9,9 +10,10 @@ import { useAuthStore } from '@/stores/auth'
 import { useV3ArticleInteractionsStore } from '@/stores/v3ArticleInteractions'
 const props = withDefaults(defineProps<{ kind:ArticleInteractionKind; articleId:string; initialPrice?:number; resource?:InteractionResource }>(),{initialPrice:0,resource:'articles'})
 const emit = defineEmits<{ contentClick:[event:MouseEvent]; accepted:[] }>()
-const route = useRoute(), { accessToken, account } = storeToRefs(useAuthStore()), operations = useV3ArticleInteractionsStore()
+const route = useRoute(), { accessToken, apiKey, account } = storeToRefs(useAuthStore()), operations = useV3ArticleInteractionsStore()
 const mounted=ref(false), state=ref<ArticleInteractionState|null>(null), loading=ref(false), confirming=ref(false), error=ref(''), html=ref('')
-const loggedIn=computed(()=>mounted.value && !!accessToken.value && !!account.value)
+const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+const loggedIn=computed(()=>mounted.value && !!credential.value && !!account.value)
 const pending=computed(()=>operations.commands[(props.resource === 'comments' ? 'comments:' : '')+props.kind+':'+props.articleId])
 const vote=computed(()=>state.value?.kind === 'vote' ? state.value : null)
 const thanks=computed(()=>state.value?.kind === 'thanks' ? state.value : null)
@@ -22,7 +24,7 @@ const busy=computed(()=>loading.value || confirming.value || !!pending.value?.bu
 const label=computed(()=>props.kind === 'vote' ? '投票' : props.kind === 'thanks' ? '感谢' : props.kind === 'accept' ? '采纳' : '打赏')
 let sequence=0,boundary=''
 let confirmation:AbortController|null=null
-function identity(){ return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId || ''}:${props.resource}:${props.kind}:${props.articleId}` }
+function identity(){ return `${getAuthContextVersion()}:${getApiMode()==='v1'?credential.value:!!credential.value}:${account.value?.oId || ''}:${props.resource}:${props.kind}:${props.articleId}` }
 function clear(keepState=false){ confirmation?.abort(); confirmation=null; sequence++; if(!keepState)state.value=null; html.value=''; error.value=''; loading.value=false; confirming.value=false }
 async function load(afterWrite=false){
   if (!loggedIn.value || loading.value || props.kind === 'reward' && props.initialPrice < 1) return
@@ -57,7 +59,7 @@ async function submit(choice:VoteChoice=null,recover=false){
   } catch(reason){ if(valid()) error.value=reason instanceof Error ? reason.message : '互动失败' }
   finally { if(valid()) confirming.value=false }
 }
-watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.articleId,()=>props.resource],()=>{ const next=identity(); if(next === boundary)return; boundary=next; clear(); void load() },{flush:'sync'})
+watch([credential,()=>account.value?.oId,()=>props.kind,()=>props.articleId,()=>props.resource],()=>{ const next=identity(); if(next === boundary)return; boundary=next; clear(); void load() },{flush:'sync'})
 watch(()=>operations.lastChange,change=>{if(change.resource === props.resource && change.kind === props.kind && (change.targetId === props.articleId || change.kind === 'accept' && change.resource === 'comments')){clear(true);void load(true);if(change.kind === 'accept' && change.targetId === props.articleId)emit('accepted')}},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity();void load()})
 onBeforeUnmount(()=>{mounted.value=false;clear()})
