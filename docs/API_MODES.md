@@ -33,6 +33,7 @@
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
 | 用户公开勋章 | 第三十四批已接当前启用快照；无历史授予/永久有效证明 | 保留真实授予分页 |
+| 本人资料/头像设置读取 | 第四十一批已接本人白名单；编辑处理器依赖Session，QQ/标签/MBTI缺独立本人读取，仍待后端协议支持 | 保留完整编辑/上传 |
 | 会员档位/本人状态/开通/昵称配置 | 第四十批已接旧JSON；无效券可能加价、全配置保存及未知锁定与v3分离 | 保留原规则与原键恢复 |
 | 本人勋章读取/展示/相邻排序 | 第三十九批已接；重复定义ID条目保留且禁止歧义写，无幂等恢复 | 保留授予ID分页与原键写入 |
 | 积分转账 | 第三十八批已接旧apiKey POST及当前余额；仅成功确认，无费用/到账/编号回执，无幂等重放 | 保留详细回执/原键恢复 |
@@ -633,3 +634,16 @@ legacyActivity保存未确认领取跨SPA锁定，没有自动恢复/重发按�
 验证：legacy-membership-test三组实际API/Pinia/Vue逻辑与完整模板SSR覆盖真实旧类型、空配置不补值、未知字段隔离、ID绑定/有界目录/重复与坏JSON拒绝、精确旧POST/PUT、完整配置保留非编辑权益、未知跨SPA锁定、只认确认不采历史price/config、后置读错不重买、无效券风险确认、离页取消、身份/SSR隔离。原v3会员12组及完整类型/客户端/服务端构建通过。现网仅公开levels只读核对；浏览器仅本机合成账号开通、读取当前VIP4、颜色neon保存保留autoCheckin=0/jointVip、第三次配置已生效后503，再读ocean且写入仍锁定。没有开通/保存真实会员或消耗真实券/积分，生产优惠券结算、期限、礼包发放与并发开通未联调；旁路通知/私信不在本机夹具范围。夹具已停止并恢复真实v1开发代理。其他全站模块继续适配，不能将本批称全站完成。
 
 协议来源：[MembershipProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MembershipProcessor.java)、[MembershipQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/MembershipQueryService.java)、[MembershipMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/MembershipMgmtService.java)。
+
+
+## 第四十一批：本人资料与头像设置读取
+
+OwnerProfileSettings按模式挂载LegacyOwnerProfileSettings/V3OwnerProfileSettings，原v3资料/QQ/标签/MBTI编辑及头像上传、原键恢复不改。旧/api/user?apiKey为本人认证读取，单独白名单投影username/nickname/intro/website/avatar，核对oId稳定账号与用户名格式，不从当前shell摘要或公开卡片补编辑字段。缺少必要字段明确报错，真实空串仅显示未设置；QQ、tags和MBTI不在旧本人响应中，明确缺少编辑数据，不从旧公开用户详情或其他账号恢复。
+
+资料与头像实际/api/settings/profiles和/avatar虽经过支持apiKey的LoginCheck，但处理器内部仍直接Sessions.getUser，个人标签验证也依赖Sessions；不能把路由有apiKey认证当作最终写入已兼容。因此旧模式只读并明确限制，不展示提交不了的v3输入，不上传孤立图片，不恢复Cookie桥接/伪造页面Session。旧资料编辑仍未完成，需要受信任的独立JSON本人读写协议；本批不是所有设置适配完成。
+
+用户名/昵称/简介/网址纯文本呈现，简介保留换行，网址不创建未经验证的超链接。头像复用共享displayAvatar校验，保留原签名URL，坏scheme/嵌入凭据报错，图片加载失败明确提示。读取错误/重试与真实未设置分开。挂载后读取，目标模式、旧key、账号、上下文和请求序号隔离迟到响应，退出/卸载清私人字段；SSR零本人读取，不预填客户端私有内容。
+
+验证：legacy-owner-profile-test两组实际API/编译UI覆盖精确旧key/GET、必要字段白名单与稳定ID、敏感QQ/手机号等不泄漏、不从公开卡片补值、坏头像/输入拒绝、空串、签名参数、纯文本/换行/无危险网址链接、图片失败、读取错误重试、身份/退出/SSR隔离及全程零写；原v3资料回归和完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证登录回跳资料、多行简介、切到头像并确认图片完成加载，未保存真实资料或上传文件。旁路通知/私信未由夹具提供，不计入本次验收；夹具已停止并恢复真实v1开发代理。
+
+协议来源：[ApiProcessor.getUser](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ApiProcessor.java)、[SettingsProcessor.updateProfiles/updateAvatar](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/SettingsProcessor.java)、[UpdateProfilesValidationMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/validate/UpdateProfilesValidationMidware.java)。
