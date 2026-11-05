@@ -1,5 +1,6 @@
 import { defineStore, storeToRefs } from 'pinia'
-import { onScopeDispose, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
+import { getApiMode } from '@/api/mode'
 import { ApiError, getAuthContextVersion } from '@/api/http'
 import { profileOperationKey } from '@/api/v3-profile'
 import { setContentRelation, type ContentRelationKind } from '@/api/v3-content-relations'
@@ -7,19 +8,20 @@ import { useAuthStore } from '@/stores/auth'
 type Command = { following: boolean; key: string; busy: boolean; error: string }
 /** Only unresolved explicit commands persist across SPA views; never persist credentials or relationship snapshots. */
 export const useV3ContentRelationsStore = defineStore('v3-content-relations', () => {
-  const { accessToken, account } = storeToRefs(useAuthStore())
+  const { accessToken, apiKey, account } = storeToRefs(useAuthStore())
+  const credential = computed(() => getApiMode()==='v1'?apiKey.value:accessToken.value)
   const commands = ref<Record<string,Command>>({}), lastChange = ref({ targetId:'', kind:'' as ContentRelationKind|'', revision:0 })
-  let generation = 0, boundary = getAuthContextVersion(), owner = account.value?.oId
+  let generation = 0, boundary = getAuthContextVersion(), owner = account.value?.oId, legacyKey=apiKey.value
   function reset() { generation++; commands.value = {}; lastChange.value = { targetId:'', kind:'', revision:lastChange.value.revision + 1 } }
-  const stop = watch([accessToken, () => account.value?.oId], () => {
+  const stop = watch([credential, () => account.value?.oId], () => {
     const next = getAuthContextVersion(), id = account.value?.oId
-    if (!accessToken.value || next !== boundary || id !== owner) reset()
-    boundary = next; owner = id
+    if (!credential.value || next !== boundary || id !== owner || getApiMode()==='v1' && legacyKey!==apiKey.value) reset()
+    boundary = next; owner = id; legacyKey=apiKey.value
   }, {flush:'sync'})
   onScopeDispose(() => { stop(); reset() })
   async function set(kind:ContentRelationKind, targetId: string, following: boolean) {
     const current = generation, context = getAuthContextVersion(), actor = account.value?.oId
-    const valid = () => !import.meta.env.SSR && !!accessToken.value && !!actor && actor === account.value?.oId && context === getAuthContextVersion() && current === generation
+    const valid = () => !import.meta.env.SSR && !!credential.value && !!actor && actor === account.value?.oId && context === getAuthContextVersion() && current === generation
     if (!valid() || !['tag','collection','subscription'].includes(kind) || !/^[1-9][0-9]{0,18}$/.test(targetId)) return
     const identity=kind+':'+targetId
     const previous = commands.value[identity], recovering = !!previous
