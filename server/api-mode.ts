@@ -66,7 +66,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
     // Share handlers prefer page Sessions over apiKey. Keep the selected legacy identity authoritative.
     if (mode === 'v1' && path.startsWith('/api/emoji/')) delete headers.cookie
     if (mode === 'v1' && /^\/api\/user\/[^/]+\/(?:articles|comments)\/anonymous$/.test(path)) delete headers.cookie
-    if (mode === 'v1' && (path === '/api/watch/breezemoons' || /^\/api\/user\/[^/]+\/watching$/.test(path))) delete headers.cookie
+    if (mode === 'v1' && (/^\/api\/watch\/(?:breezemoons|(?:tags|users)\/articles)$/.test(path) || /^\/api\/user\/[^/]+\/watching$/.test(path))) delete headers.cookie
     if (mode === 'v1' && (revisionResource || commentRemoval)) delete headers.cookie
     if (mode === 'v1' && (articleRemoval || path === '/api/article/stick' || /^\/api\/article\/[1-9][0-9]*$/.test(path))) delete headers.cookie
     // Do not send the browser's non-secret local mode preference upstream.

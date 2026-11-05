@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ApiError, getAuthContextVersion } from '@/api/http'
 import {getApiMode} from '@/api/mode'
-import { fetchV3FollowingFeed, type FollowingSource, type FollowingFeedResult } from '@/api/v3-following-feed'
+import { fetchV3FollowingFeed, type FollowingSource, type FollowingFeedPage } from '@/api/v3-following-feed'
 import { useAuthStore } from '@/stores/auth'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
 import BreezemoonList from '@/components/breezemoons/BreezemoonList.vue'
@@ -14,7 +14,7 @@ const TABS:{tab:FollowingSource;to:string;label:string}[]=[{tab:'tags',to:'/watc
 const route=useRoute(),{accessToken,apiKey,account}=storeToRefs(useAuthStore())
 const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
 const current=computed(()=>TABS.find(tab=>tab.tab===route.meta.watchTab)||TABS[0]!)
-const mounted=ref(false),loading=ref(false),error=ref(''),result=ref<FollowingFeedResult|null>(null),page=ref(1)
+const mounted=ref(false),loading=ref(false),error=ref(''),result=ref<FollowingFeedPage|null>(null),page=ref(1)
 const ready=computed(()=>mounted.value&&!!credential.value&&!!account.value)
 let sequence=0,boundary=''
 function identity(){return JSON.stringify([getApiMode(),getAuthContextVersion(),getApiMode()==='v1'?credential.value:!!credential.value,account.value?.oId||'',account.value?.userName||'',current.value.tab])}
@@ -28,7 +28,7 @@ async function load(){
   catch(err){if(valid())error.value=err instanceof ApiError&&err.status===403?'当前无权读取关注动态。':err instanceof Error?err.message:'关注动态读取失败'}
   finally{if(valid())loading.value=false}
 }
-function move(value:number){if(loading.value||!result.value||result.value.pageCount===null||value<1||value>Math.min(result.value.pageCount,42949672))return;page.value=value;void load()}
+function move(value:number){if(loading.value||!result.value||value<1||value>Math.min(result.value.pageCount,42949672))return;page.value=value;void load()}
 function home(){page.value=1;void load()}
 watch([credential,()=>account.value?.oId,()=>account.value?.userName,()=>current.value.tab],()=>{const next=identity();if(next===boundary)return;boundary=next;clear();page.value=1;void load()},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity();void load()})
@@ -42,15 +42,14 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
       <p v-if="!mounted" class="message">正在准备关注动态…</p>
       <p v-else-if="!ready" class="message"><RouterLink :to="{path:'/login',query:{redirect:route.fullPath}}">登录后查看关注动态</RouterLink></p>
       <template v-else>
-        <div class="controls"><button type="button" :disabled="loading" @click="load">重新读取动态</button><span v-if="result && result.total!==null">共 {{ result.total }} 条</span></div>
+        <div class="controls"><button type="button" :disabled="loading" @click="load">重新读取动态</button><span v-if="result">共 {{ result.total }} 条</span></div>
         <p v-if="loading" class="message" role="status">正在读取…</p>
         <div v-else-if="error" class="message"><p role="alert">{{ error }}</p><button v-if="page>1" type="button" @click="home">返回第一页</button></div>
         <template v-else-if="result">
-          <p v-if="result.total===null" class="message">当前显示 {{ result.list.length }} 条。旧接口仅提供最近 {{ result.size }} 条文章动态，不提供总数和后续分页。</p>
           <p v-if="!result.list.length" class="message">{{ result.total?'本页没有动态，可返回第一页重新读取。':'暂无当前可展示的关注动态' }}<button v-if="page>1" type="button" @click="home">返回第一页</button></p>
           <BreezemoonList v-else-if="result.source==='breezemoons'" :items="result.list" />
           <ArticleFeed v-else :items="result.list" />
-          <nav v-if="result.pageCount!==null&&(result.total||page>1)" class="pager" aria-label="关注动态分页"><button type="button" :disabled="page<=1||loading" @click="move(page-1)">上一页</button><span>{{ page }} / {{ result.pageCount }}</span><button type="button" :disabled="page>=Math.min(result.pageCount ?? 0,42949672)||loading" @click="move(page+1)">下一页</button></nav>
+          <nav v-if="result.total||page>1" class="pager" aria-label="关注动态分页"><button type="button" :disabled="page<=1||loading" @click="move(page-1)">上一页</button><span>{{ page }} / {{ result.pageCount }}</span><button type="button" :disabled="page>=Math.min(result.pageCount,42949672)||loading" @click="move(page+1)">下一页</button></nav>
         </template>
       </template>
     </section></main>
