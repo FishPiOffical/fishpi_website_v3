@@ -37,6 +37,7 @@
 | 关注/粉丝、关注标签与收藏列表读取 | 第二十三批已接；旧订阅列表缺独立JSON，删除记录可能省略 | 保留 |
 | 用户关注/取消关注 | 第二十四批已接，旧响应无幂等回执，合成身份验收 | 保留 |
 | 本人积分流水与当前余额 | 第二十五批已接；旧说明按文本显示，合成身份验收 | 保留 |
+| 社区九项统计 | 第二十六批已接，现网公开JSON/SSR/刷新只读验证 | 保留 |
 | 标签关注/收藏/订阅写入、账号各类设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
@@ -402,3 +403,15 @@ useMemberPage的身份边界按模式观察实际旧key/Bearer，换key/账号/�
 验证：legacy-points-test四组实际旧认证/适配器/公共API/编译Vue覆盖精确本人路径/分页/key、真实金额及独立当前余额、私有字段剔除、历史HTML仅文本、坏数据/游客/迟到key拒绝、第二页、独立余额错误恢复、退出与SSR零读取。原v3积分5组回归及完整类型/客户端/服务端构建通过。浏览器只用本机合成账号验证登录回跳、共21条/两页和第21条记录、当前9876与历史480分别显示；没有读取或修改真实账本、转账或消费。夹具已停止并恢复127.0.0.1:5173现网v1开发代理。真实旧账本、权限、历史类型和旧服务内部吞错情况仍需生产联调；转账、背包及其他财务写入继续适配。
 
 协议来源：[UserProcessor.apiUserPoints](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)、[PointtransferQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/PointtransferQueryService.java)、[Pointtransfer字段](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Pointtransfer.java)。只读核对JSON与源码，不执行真实财务操作。
+
+## 第二十六批：社区公开统计与直达路由
+
+/statistic共用原界面，v1独立legacy/statistics读取GET /api/statistic，按Option和Common的真实字段映射九项公开指标：statisticMemberCount、statisticArticleCount、statisticCmtCount、statisticDomainCount、statisticTagCount、statisticLinkCount、onlineVisitorCnt、onlineMemberCnt、statisticMaxOnlineVisitorCount。共享decodeStatistics继续校验每项非负安全整数并剔除其余字段；缺失/错误不补0，真实0保留。没有用户名、旧key或Bearer参数，不据在线快照宣称全站去重实时人数。
+
+原SSR请求模式隔离和白名单投影继续复用；游客挂载复用合法SSR首屏，实际登录或凭据变化重新读取。useStatistics按模式观察旧key或Bearer，身份/凭据边界及卸载拒迟到结果，出错清旧快照并提供重试。原v3 GET与解码行为保留。
+
+浏览器验证发现并修复遗留路由冲突：Vite仍将/statistic整页代理到经典页面，导致本地直达502；删除该过时代理，生产nginx示例同步从经典页面正则移除statistic。页面交给本地SPA/SSR，只有/api/statistic经过按模式代理，不用旧HTML页面冒充本地渲染。
+
+验证：旧/新两套统计各13组实际API、编译Vue、hook及SSR测试，覆盖精确路径、九字段/安全数值、坏信封/空错区分、真实0、刷新/失败重试、身份/凭据迟到、卸载、SSR复用和路由代理检查；类型与完整客户端/服务端构建通过。现网仅公开只读核对/api/statistic；本地SSR HTML及浏览器直接打开/statistic、刷新后九项数据显示通过，没有账号写入或登录生产站点。在线值随服务端变化，不冻结到测试数值。此批仅统计，同城旧用户API缺总人数及独立文章JSON、大事记和其余全站能力继续迁移。
+
+协议来源：[Router](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/Router.java)、[StatisticProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/StatisticProcessor.java)、[Option常量](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Option.java)。只读JSON与源码，不抓取现网HTML。

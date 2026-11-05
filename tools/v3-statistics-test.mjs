@@ -5,7 +5,7 @@ import {parse,compileScript} from '@vue/compiler-sfc'
 import {createRenderer,createSSRApp,h,ref,nextTick} from 'vue'
 import {createPinia,defineStore} from 'pinia'
 import {renderToString} from '@vue/server-renderer'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`).replaceAll(`from "${a}"`,`from '${b}'`);return s}
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'","from 'data:text/javascript,export%20const%20getApiMode=()=>%22v3%22'").replaceAll("from '@/api/mode'","from 'data:text/javascript,export%20const%20getApiMode=()=>%22v3%22'"),url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`).replaceAll(`from "${a}"`,`from '${b}'`);return s}
 const state=globalThis.__statistics={context:1,calls:[],dispatch:null,ssr:false,initial:null}
 const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAuthContextVersion(){return globalThis.__statistics.context}export async function request(path,init){globalThis.__statistics.calls.push({path,init});return globalThis.__statistics.dispatch(path,init)}`)
 const apiURL=url(replace(compile(await fs.readFile('src/api/v3-statistics.ts','utf8')),[['./http',http]])),api=await import(apiURL)
@@ -45,3 +45,6 @@ console.log('PASS statistics 11 actual zero remains valid data')
 const [router,shell,entry,routes,source]=await Promise.all(['src/router/index.ts','src/layouts/AppShell.vue','src/entry-server.ts','src/seo/ssrRoutes.ts','src/views/StatisticsView.vue'].map(p=>fs.readFile(p,'utf8')))
 assert.match(router,/path: '\/statistic'.*StatisticsView/);assert.match(shell,/href: '\/statistic', label: '数据统计', external: false }/);assert.match(entry,/path === '\/statistic'.*statistics: await fetchStatistics/);assert.ok(routes.includes("p === '/statistic'"));assert.ok(source.includes('lang="scss"'));assert.ok(!source.includes('v-html')&&!source.includes('apiKey'));assert.ok(!source.includes('class="card"'))
 console.log('PASS statistics 12 route/footer/SSR wiring and sibling metric cards with SCSS')
+
+const [viteConfig,nginx]=await Promise.all(['vite.config.ts','docs/nginx.example.conf'].map(p=>fs.readFile(p,'utf8')));assert.ok(!viteConfig.includes("'/statistic': proxy"));assert.ok(!nginx.includes('milestones|statistic|guide'))
+console.log('PASS statistics 13 direct SPA/SSR statistic route avoids obsolete classic-page proxy')
