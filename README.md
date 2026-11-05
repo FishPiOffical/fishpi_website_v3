@@ -8,6 +8,7 @@ npm run dev          # Express + Vite SSR（推荐）
 npm run dev:spa      # 纯 CSR（无服务端渲染）
 npm run build && npm run preview
 npm run sitemap      # 生成 public/sitemap.xml
+npm run test:compat  # v1/v3、代理及反馈兼容专项（本地夹具；不替代构建和浏览器验收）
 ```
 
 开发服务器固定 `http://127.0.0.1:5173`，占用时请先结束旧进程，不会自动换端口。
