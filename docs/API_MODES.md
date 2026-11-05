@@ -26,6 +26,7 @@
 | 通知列表/未读/已读及实时刷新 | 第六批已接；旧列表仅有限快照，合成身份验收 | 保留 |
 | 私信会话/历史/发送/撤回/已读/未读 | 第七批聊天及第八批富编辑已接，本地合成账号验收；真实上传权限待验 | 保留 |
 | 共享编辑器预览/上传/表情选择/@联想 | 第八批已接，上传仅本地夹具验收 | 保留 |
+| 表情包分组与图片管理 | 第四十七批仅website接入六类管理操作；分享/导入/旧云迁移及常用编辑仍待适配 | 保留完整管理 |
 | 聊天室历史/实时/普通发送/在线名单与话题读取 | 第九批已接现代节点；本地合成节点验收 | 保留 |
 | 聊天室原文、引用、消息上下文 | 第十批已接独立原文和双向上下文读取 | 保留 |
 | 本人聊天室撤回、话题修改 | 第十一批已接；无幂等恢复，合成账号验收 | 保留 |
@@ -736,15 +737,25 @@ LegacyCommentReplies由普通ArticleView与长篇LongArticleReader共用，默�
 
 浏览器仅本机合成账号/内容：普通根评论展开21条回复、翻到第二页匿名评论120、点击回复后编辑器显示匿名对象；匿名打开长篇段落30，缺省行文章ID仍正常读取，展开20条并翻到第二页匿名回复320。未发表评论、举报或表态；图片/举报共享组件未另行对现网操作。旁路通知/表态元数据不在本机夹具范围。夹具已停止，服务恢复真实v1上游，截图/tmp/fp-comment-replies-browser.png。失效段落定位、旧文章编辑、收藏/订阅等仍待后续补齐。
 
-用户已提供Rhythm源码目录/Users/ling/Documents/GitHub/rhythm；只读确认README、工作区及约定，尚未改后端。注册/重置旧流程仍缺无需验证码URL和HTML的完整JSON契约，后续将在该仓库补协议，与website_v3分别提交、不部署。不能因此声明现网v1已具备未部署能力。
+用户已提供Rhythm源码目录/Users/ling/Documents/GitHub/rhythm；只读确认README、工作区及约定，尚未改后端。注册/重置旧流程仍缺无需验证码URL和HTML的完整JSON契约，这曾作为后端扩展方向，现已按用户要求撤销；后续只改website。不能因此声明现网v1已具备未部署能力。
 
 协议来源：[CommentProcessor.getThreadReplies/getParagraphThreadParents](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CommentProcessor.java)、[CommentQueryService.buildThreadCommentBase/buildThreadReply](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CommentQueryService.java)。
 
 
 ## 范围纠正：仅适配现有接口
 
-用户明确要求撤回Rhythm改动，只修改website。Rhythm为此任务新增的九批v1兼容接口及未提交职业接口已撤回，代码树恢复到f2e5b59f；website同步撤回依赖这些新增接口的第47至55批及未提交第56批职业适配。保留此前第1至46批针对现网已有JSON/实时接口的兼容、v3实现与一键切换。
+用户明确要求撤回Rhythm改动，只修改website。Rhythm为此任务新增的九批v1兼容接口及未提交职业接口已撤回，当前分支恢复到原有928f0846；website同步撤回依赖这些新增接口的第47至55批及未提交第56批职业适配。保留此前第1至46批针对现网已有JSON/实时接口的兼容、v3实现与一键切换。
 
 后续仅改website：核对真实现网v1契约，不假定新增资源已上线，不扩展后端。现有v1未提供能力明确显示限制，不能借v3 Bearer、页面Cookie桥接或HTML抓取伪造完整支持。此前后端扩展及对应前端覆盖记录不再适用。
 
-撤回通过本地revert提交保留历史，未经推送/部署；未提交改动备份至/tmp/fishpi-v1-scope-rollback后撤销。Rhythm与f2e5b59f的树比较为空；website恢复现有接口适配后重新检查模式、经典发布/评论/资料/关系和完整构建。
+website撤回通过本地revert提交保留历史；Rhythm随后按用户要求移除本任务新增的提交，回到原有928f0846，工作区干净。均未经推送/部署。未提交改动备份至/tmp/fishpi-v1-scope-rollback后撤销；website恢复现有接口适配后重新检查模式、经典发布/评论/资料/关系和完整构建。
+
+## 第四十七批（仅website）：旧版表情包管理
+
+设置→功能按模式挂载LegacyEmojiPacks；原EmojiPacks和v3 API保持不变。复用现有GET /api/emoji/groups与group/emojis白名单，管理页读取完整有界快照后每页30张，本地分页不冒充服务端分页；编辑器原分页行为保留。组ID、私有成员oId、全局emojiId分别使用，不截断签名URL，错误清图片并独立重试，合法空列表单独展示。
+
+仅使用现有apiKey POST：group/create、group/update、group/delete、group/add-url-emoji、emoji/update、group/remove-emoji。名称按已有20字符限制及Unicode文字/数字/常用标点校验，排序为32位整数，添加只允许HTTP(S)地址；请求body白名单，更新成员传oId，移除传emojiId。全部分组不可在UI编辑/删除，移除时明确会影响所有分组；普通组移除也有确认。
+
+旧成功只有code，没有新资源或幂等回执；成功只重读列表，不拼历史数据。写入不自动验证码重试、不跟随重定向。结果未确认时原命令在Pinia内跨SPA保留，禁止重复提交；先成功刷新核对，再经用户确认解除锁定，不重放原命令。后置GET失败不重写。换号/退出/key或认证上下文变化清命令和私人列表，迟到响应拒回填，SSR零私有读取。分享导入、旧云迁移和常用表情管理仍待适配，本批不宣称全站完成。
+
+验证：legacy-emoji-management-test覆盖六端点精确参数、三个ID含义、签名URL、字段白名单/输入验证、未知写锁定/同Pinia组件重挂不重发、换号迟到写和读、编译UI分组选择/错误重试/重复提交阻止及SSR零私有读取。原legacy-editor、v3-emojis、v3-editor-emojis、api-modes测试与完整类型/客户端/服务端构建通过。浏览器使用本机合成账号验证新建分组后GET显示新分组、切换后显示组编辑操作，截图/tmp/fp-emojis47-browser.png；未对真实账号写入，其余写操作及未知恢复由本机测试验证，未做真实站点联调。没有修改Rhythm。

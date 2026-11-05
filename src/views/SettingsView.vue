@@ -4,6 +4,8 @@ import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppearancePicker from '@/components/packs/AppearancePicker.vue'
 import EmojiPacks from '@/components/EmojiPacks.vue'
+import LegacyEmojiPacks from '@/components/LegacyEmojiPacks.vue'
+import { getApiMode } from '@/api/mode'
 import OwnerProfileSettings from '@/components/settings/OwnerProfileSettings.vue'
 import OwnerPreferences from '@/components/settings/OwnerPreferences.vue'
 import OwnerGameSaves from '@/components/settings/OwnerGameSaves.vue'
@@ -136,7 +138,8 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
           <OwnerPreferences key="functions" resource="functions" title="功能设置" />
           <OwnerPreferences key="display-modes" resource="display" title="显示设置" :fields="['commentViewMode', 'avatarViewMode']" />
           <h2>表情包</h2>
-          <EmojiPacks />
+          <LegacyEmojiPacks v-if="getApiMode() === 'v1'" />
+          <EmojiPacks v-else />
         </template>
       </section>
 
