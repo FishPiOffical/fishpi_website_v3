@@ -201,7 +201,7 @@ console.log('PASS comments 31 source loading interrupted by closure drops late o
 // Production parent + production locator + current article/comment SFCs, controlled transport only.
 route.query={comment:'3'};route.hash='#comment3';
 const locationApiURL=url(compile(await fs.readFile('src/api/v3-comment-location.ts','utf8')).replace("from './http'",`from '${http}'`));
-const locationComponentURL=sfc(await fs.readFile('src/components/articles/ArticleCommentLocation.vue','utf8'),[['vue-router',routerURL],['@/api/http',http],['@/api/mode',modeStub],['@/stores/auth',authURL],['@/api/legacy/comment-location',url("export function locateLegacyLoadedComment(){throw Error('unexpected legacy location')}")],['@/api/v3-comment-location',locationApiURL]]);
+const locationComponentURL=sfc(await fs.readFile('src/components/articles/ArticleCommentLocation.vue','utf8'),[['vue-router',routerURL],['@/api/http',http],['@/api/mode',modeStub],['@/stores/auth',authURL],['@/api/legacy/comment-location',url("export function fetchLegacyCommentLocation(){throw Error('unexpected legacy location')}")],['@/api/v3-comment-location',locationApiURL]]);
 const locationParentPairs=parentPairs.filter(([name])=>name!=='@/components/articles/ArticleCommentLocation.vue');locationParentPairs.push(['@/components/articles/ArticleCommentLocation.vue',locationComponentURL]);const locationParent=(await import(sfc(parentSource,locationParentPairs))).default;
 const locationSocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};const targetedPages=[],targetedScrolls=[];let locationPage=2;
 const priorDocument=globalThis.document;globalThis.document={getElementById:id=>({scrollIntoView(){targetedScrolls.push(id)}})};

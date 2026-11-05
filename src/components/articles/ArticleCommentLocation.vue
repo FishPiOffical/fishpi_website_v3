@@ -4,7 +4,7 @@ import {useRoute} from 'vue-router'
 import {useAuthStore} from '@/stores/auth'
 import {getAuthContextVersion} from '@/api/http'
 import {getApiMode} from '@/api/mode'
-import {locateLegacyLoadedComment} from '@/api/legacy/comment-location'
+import {fetchLegacyCommentLocation} from '@/api/legacy/comment-location'
 import {commentTarget,fetchCommentLocation,type CommentLocation} from '@/api/v3-comment-location'
 import type {ArticleDetail} from '@/api/fishpi'
 const props=defineProps<{articleId:string;article:ArticleDetail|null;commentPage:number}>()
@@ -19,7 +19,7 @@ async function read(){
  if(requested.value.error){error.value=requested.value.error;return}if(!requested.value.target)return
  if(getApiMode()==='v1'&&!props.article){placement.value='等待当前文章加载后定位评论。';return}
  const controller=new AbortController();abort=controller;loading.value=true
- try{const value=getApiMode()==='v1'?locateLegacyLoadedComment(requested.value.target,props.articleId,props.article):await fetchCommentLocation(requested.value.target,props.articleId,controller.signal);if(mounted&&current===generation&&owner===binding()&&!controller.signal.aborted){location.value=value;emit('located',value)}}
+ try{const value=getApiMode()==='v1'?await fetchLegacyCommentLocation(requested.value.target,props.articleId,props.article,controller.signal):await fetchCommentLocation(requested.value.target,props.articleId,controller.signal);if(mounted&&current===generation&&owner===binding()&&!controller.signal.aborted){location.value=value;emit('located',value)}}
  catch(e){if(mounted&&current===generation&&owner===binding()&&!controller.signal.aborted)error.value=e instanceof Error?e.message:'评论定位失败'}
  finally{if(mounted&&current===generation&&owner===binding())loading.value=false}
 }

@@ -51,7 +51,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
     const revisionResource=req.method==='GET'&&(/^\/article\/[1-9][0-9]*\/revisions\/(?:list|current|[1-9][0-9]*)$/.test(path)||/^\/comment\/[1-9][0-9]*\/revisions$/.test(path))
     const editorResource=path==='/markdown' && req.method==='POST' || path==='/users/names' && req.method==='POST' || path==='/users/emotions' && req.method==='GET'
     const roomResource=/^\/chat-room\//.test(path)
-    const reactionResource=req.method==='POST'&&['/vote/up/comment','/vote/down/comment','/vote/up/article','/article','/point/transfer','/follow/user','/unfollow/user','/comment','/comment/paragraph','/article/reaction','/comment/reaction','/comment/paragraph/thread/parents','/comment/paragraph/summary','/comment/thread/replies'].includes(path)
+    const reactionResource=req.method==='POST'&&['/vote/up/comment','/vote/down/comment','/vote/up/article','/article','/point/transfer','/follow/user','/unfollow/user','/comment','/comment/paragraph','/article/reaction','/comment/reaction','/comment/paragraph/thread/parents','/comment/paragraph/summary','/comment/original','/comment/thread/replies'].includes(path)
     const legacyResource=articleRemoval || commentRemoval || revisionResource || mfaResource || /^\/article\/random\/[1-9][0-9]?$/.test(path)&&req.method==='GET' || path==='/activity/yesterday-liveness-reward-api'&&req.method==='GET' || reactionResource || path==='/report' && req.method==='POST' || roomResource || editorResource || noticeResource || chatResource || /^\/user\/[A-Za-z0-9_-]+(?:\/medal)?$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
     if (!/^\/api(?:\/|$)/.test(req.url || '') && !legacyResource) return next()
     const mode = requestMode(req,env)
@@ -62,7 +62,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
     const target = new URL(backendTarget(mode,env)), headers = {...req.headers}
     delete headers['x-fp-api-mode']
     if (mode === 'v1') delete headers.authorization
-    if (mode === 'v1' && req.method === 'POST' && ['/vote/up/comment','/vote/down/comment','/comment/thread/replies','/comment/paragraph/summary','/comment/paragraph/thread/parents'].includes(path)) delete headers.cookie
+    if (mode === 'v1' && req.method === 'POST' && ['/vote/up/comment','/vote/down/comment','/comment/original','/comment/thread/replies','/comment/paragraph/summary','/comment/paragraph/thread/parents'].includes(path)) delete headers.cookie
     // Share handlers prefer page Sessions over apiKey. Keep the selected legacy identity authoritative.
     if (mode === 'v1' && path === '/api/columns/mine') delete headers.cookie
     if (mode === 'v1' && path.startsWith('/api/emoji/')) delete headers.cookie
