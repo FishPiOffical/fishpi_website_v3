@@ -1,3 +1,5 @@
+import { getApiMode } from './mode'
+import { legacyVersionedRequest } from './legacy/versioned'
 import { ApiError, request } from './http'
 
 type Row = Record<string, unknown>
@@ -6,7 +8,11 @@ const invalid = () => new ApiError('设置接口响应格式不正确', 502, 'in
 function row(value: unknown): Row { if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid(); return value as Row }
 function text(value: unknown): string { if (typeof value !== 'string') throw invalid(); return value }
 async function data(path: string, init?: RequestInit): Promise<Row> {
-  const envelope = row(await request(path, init))
+  const legacy=getApiMode()==='v1'
+  let response:unknown
+  try{response=legacy?await legacyVersionedRequest(path.replace('/api/v3/','/api/v1/'),true,init):await request(path,init)}
+  catch(error){if(legacy&&error instanceof ApiError&&error.code==='v1_saved_unavailable')throw new ApiError('当前服务器尚未提供此版本的资料服务',404,'v1_profile_unavailable');throw error}
+  const envelope = row(response)
   if (envelope.code !== 0) throw invalid()
   return row(envelope.data)
 }

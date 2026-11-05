@@ -799,3 +799,23 @@ Rhythm新增独立ApiV1PreferencesProcessor：functions/display/privacy/location
 审查：十二个入口全部要求明确key，未添加匿名路径/viewSkips或改变黑名单/验证码解封链；无会话CSRF例外，无URL取回或外部跳转。字段/JSON/目录边界复用当前核心，身份只在服务端决定；私有响应no-store、只投影所需设置，不返回key/密码等身份字段。没有新CDN、版本号URL、sourceMappingURL、静态上传下载路径；日志过滤现有v1/me规则覆盖。完整应用IoC、真实旧key吊销/全局风控、MySQL锁与缓存刷新尚未联调。既有幂等/凭据迁移须已应用；未更新的现网不会自动具备新增路径。
 
 人工验收：用户先IDEA重新编译/重启并将v1目标指向更新Rhythm，登录→设置/功能、个性化皮肤、隐私、语言逐项读取并只修改本人愿意改变的字段→保存→重读；显示子集不能覆盖皮肤，模糊图片开关保持实际语义。模拟断流用原键核实，保存后读失败仅重读；换账号不沿用旧草稿/状态。切回v3保持原入口。API.md/UPDATE_LOG.md已更新，发布时同步站点API文档。本批仅偏好，不宣称头像/资料、账号证明或其他剩余用户能力已完成v1兼容。
+
+## 第五十一批：资料、头像、MBTI、私有QQ和个人标签
+
+ApiV1ProfileProcessor新增五个本人资源profile/avatar/personality/qq/tags的GET/PUT、MBTI目录GET和专用上传票据POST，共十二个入口；独立ApiV1Auth旧key边界与共享写预算，不挂页面Session或伪造v3Identity。基础资料/头像/MBTI保存复用现有规范化器和原子SettingsMgmt，标签复用原有完整关系/目录/内容校验核心。原经典和v3路由不变，无新SQL结构。
+
+QQ保留独立本人资源。ApiV3QqSettingsService抽取共用事务/SQL/回执流程，原v3入口仍以当前第一方OAuth证明授权；新增classic入口只接HTTP旧key核验保留的不可变AccountCredentialVersions.Proof，不接受JSON身份。读取及幂等回放前均在严格根中通过AccountCredentialStateRepository.current锁读原actor/epoch/password与当前有效账号，凭据轮换后原请求或回放拒绝，不将旧key升级为新证明。QQ不进入公开资料、OAuth第三方profile或账号壳摘要。日志过滤补充v1/uploads路径及其编码形式。
+
+OwnerProfileSettings两模式复用现有完整V3OwnerProfileSettings和v3-profile API，删除无消费者的旧只读组件/owner-profile包装；旧测试入口改为运行完整共享v1测试。本人GET、五种保存和票据按模式明确选择路径，旧key仅请求Header、Cookie omit、无自动验证码重放；API未部署独立提示。身份/key边界清理旧输入、未确认键和上传；v3正常非空token轮换仍保留草稿/原键。确认保存只GET当前资源后回填，历史回执不能覆盖现状；后置GET失败单独禁用该资源保存、明确已确认并允许重读，不重写。上传成功但设置失败继续保留URL和原键，不重新上传。
+
+头像上传复用既有专用票据服务与PNG/JPEG/GIF魔数命名；RhyPic直传只带专用ticket、具名file和正确MIME，omit Cookie/禁重定向，不带旧key或站点Bearer。未改变编辑器等其他旧上传消费者的范围。专用票据不存业务幂等表，不入本地持久化；目标端点仍由服务端配置校验。
+
+验证：前端完整profile API/实际Vue+Pinia七组及普通刷新/上传案例分别按v1/v3运行。覆盖字段白名单、MBTI目录、签名URL原样、具名multipart/专用票据、非法目标/格式/取消、原键恢复、上传后设置失败零重复上传、QQ前导零及标签规范化、身份/账号/非空key变化的上传中止与旧URL拒绝。新增历史回执不能回填、后置GET失败不重复写。账号壳头像、双模式代理回归和类型/客户端SSR完整构建通过。
+
+后端Java25独立javac：实际v1 Dispatcher/Auth/控制器、原始JSON/规范化及响应信封验证十二个入口、两账号、原actor/原proof/原key、伪造身份、坏URL/MBTI、QQ正文预算和专用票据分派；身份提供者及管理服务为显式夹具。QQ/标签完整共享SQLite事务专项和原v3第一方/第三方限制均通过；新增classic QQ真实SQL验证读取与回放前锁定凭据版本、跨账号/密码错误拒绝、epoch变化后拒旧回执、更新/回执/commit失败回滚及当前状态不被历史回放覆盖。实际公开资料/当前DTO查询及专用上传签名/目标校验专项通过。未使用Maven，未重启用户IDEA服务。
+
+浏览器仅本机合成账号：资料昵称修改后模拟503回执丢失，原键恢复后界面读取服务端最新昵称/简介，而非历史回执；MBTI ENFP-A、JS规范为JavaScript、QQ 000456前导零及独立保存状态正常；头像地址HTTPS及sig=a%2Fb保存后不被重新编码。截图 `/tmp/fp-profile51-browser.png`。未向真实账号写入、未上传真实文件；图床实际传输及图片可加载性未联调，浏览器只验地址保存；上传由File/网络夹具和真实签名专项覆盖。夹具停止，127.0.0.1:5173恢复真实v1上游。
+
+审查：十二个入口全部显式key登录，未改匿名viewSkips、黑名单或验证码解封链；不增加Cookie授权/CSRF例外。输入严格白名单、QQ与标签预算、目标/签名URL规则复用现有核心；身份及费用不来自客户端，事务与回执共同提交。QQ仅单字段私有响应，专用ticket不作站点token；没有新外部抓取、CDN/版本号URL、sourceMappingURL、公开下载目录。上传继续固定代理/已校验配置目标，拒重定向。完整IoC、真实key吊销/全局风控、MySQL并发与图床实传尚未验证，不能把夹具当作上线验收。既有凭据/幂等/图床配置迁移仍须满足。
+
+人工验收：用户先在IDEA重新编译/重启Rhythm并指向更新的v1目标，登录→设置/资料分别保存昵称、简介、网址、MBTI、QQ和标签→重读当前值；QQ仅本人可编辑，错误格式明确拒绝。设置/头像先测试合法HTTPS地址，再由用户选择文件上传；上传完成而设置失败应保留URL和键，不能重复上传。换号或退出时清输入/中止上传，切回v3维持原权限；已确认保存后的读取失败只重读。发布时同步Rhythm API.md/UPDATE_LOG.md。全站账号证明、内容操作等剩余能力继续适配，不声明全站完成。
