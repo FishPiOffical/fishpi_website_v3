@@ -1,10 +1,4 @@
 import { ApiError, request } from './http'
-import { getApiMode } from './mode'
-import { legacyVersionedRequest } from './legacy/versioned'
-async function postRequest(path:string,init:RequestInit={}){
- if(getApiMode()!=='v1')return request(path,init)
- try{return await legacyVersionedRequest(path.replace('/api/v3/','/api/v1/'),true,init)}catch(error){if(error instanceof ApiError&&error.code==='v1_saved_unavailable')throw new ApiError('当前服务器尚未提供此版本的文章与草稿服务',404,'v1_posts_unavailable');throw error}
-}
 export type PostFields={title:string;content:string;tags:string;type:number;rewardContent:string;rewardPoint:number;qnaOfferPoint:number;commentable:boolean;showInList:number;statement:number;columnId:string;columnTitle:string;chapterNo:string;columnCoverURL:string;anonymous:boolean;notifyFollowers:boolean;thoughtContent:string}
 export type PostSource=PostFields&{id:string;status:number;editorType:number;createdAt:number;updatedAt:number}
 export type DraftSummary={id:string;title:string;summary:string;tags:string;type:number;columnId:string;columnTitle:string;chapterNo:string;createdAt:number;updatedAt:number}
@@ -23,10 +17,10 @@ function checkedId(v:unknown){if(!postId(v))throw invalid();return v}
 function type(v:unknown){return integer(v,0,6)}
 export function emptyPost():PostFields{return{title:'',content:'',tags:'',type:0,rewardContent:'',rewardPoint:0,qnaOfferPoint:0,commentable:true,showInList:1,statement:0,columnId:'',columnTitle:'',chapterNo:'',columnCoverURL:'',anonymous:false,notifyFollowers:false,thoughtContent:''}}
 function fields(r:Record<string,unknown>,draft=false):PostFields{return{title:text(r.title,65536),content:text(r.content,2097152),tags:text(r.tags,65536),type:type(r.type),rewardContent:text(r.rewardContent,2097152),rewardPoint:integer(r.rewardPoint,0,2147483647),qnaOfferPoint:integer(r.qnaOfferPoint,0,2147483647),commentable:bool(r.commentable),showInList:integer(r.showInList,0,1),statement:integer(r.statement,0,3),anonymous:bool(r.anonymous),notifyFollowers:draft?bool(r.notifyFollowers):false,columnId:text(r.columnId,19),columnTitle:text(r.columnTitle,65536),chapterNo:text(r.chapterNo,32),columnCoverURL:draft?'':text(r.columnCoverURL,1024),thoughtContent:draft?text(r.thoughtContent,2097152):''}}
-export async function postSource(id:string):Promise<PostSource>{const r=data(await postRequest(`/api/v3/me/articles/${checkedId(id)}/source`,{cache:'no-store'}));if(r.id!==id)throw bad();return{...fields(r),id,status:integer(r.status,0,2),editorType:integer(r.editorType),createdAt:integer(r.createdAt),updatedAt:integer(r.updatedAt)}}
+export async function postSource(id:string):Promise<PostSource>{const r=data(await request(`/api/v3/me/articles/${checkedId(id)}/source`,{cache:'no-store'}));if(r.id!==id)throw bad();return{...fields(r),id,status:integer(r.status,0,2),editorType:integer(r.editorType),createdAt:integer(r.createdAt),updatedAt:integer(r.updatedAt)}}
 function draftSummary(raw:unknown):DraftSummary{const r=row(raw);if(!postId(r.id))throw bad();return{id:r.id,title:text(r.title,65536),summary:text(r.summary,65536),tags:text(r.tags,65536),type:type(r.type),columnId:text(r.columnId,19),columnTitle:text(r.columnTitle,65536),chapterNo:text(r.chapterNo,32),createdAt:integer(r.createdAt),updatedAt:integer(r.updatedAt)}}
-export async function draftPage(p=1){if(!Number.isSafeInteger(p)||p<1||p>42949672)throw invalid();const r=data(await postRequest(`/api/v3/me/drafts?p=${p}&size=20`,{cache:'no-store'})),page=row(r.pagination),total=integer(page.total),pageCount=integer(page.pageCount);if(page.p!==p||page.size!==20||pageCount!==Math.ceil(total/20)||!Array.isArray(r.list)||r.list.length!==Math.max(0,Math.min(20,total-(p-1)*20)))throw bad();const seen=new Set<string>();const list=r.list.map(v=>{const d=draftSummary(v);if(seen.has(d.id))throw bad();seen.add(d.id);return d});return{list,pagination:{p,size:20,total,pageCount}}}
-export async function draftSource(id:string){const r=data(await postRequest(`/api/v3/me/drafts/${checkedId(id)}`,{cache:'no-store'}));if(r.id!==id)throw bad();return{...fields(r,true),id}}
+export async function draftPage(p=1){if(!Number.isSafeInteger(p)||p<1||p>42949672)throw invalid();const r=data(await request(`/api/v3/me/drafts?p=${p}&size=20`,{cache:'no-store'})),page=row(r.pagination),total=integer(page.total),pageCount=integer(page.pageCount);if(page.p!==p||page.size!==20||pageCount!==Math.ceil(total/20)||!Array.isArray(r.list)||r.list.length!==Math.max(0,Math.min(20,total-(p-1)*20)))throw bad();const seen=new Set<string>();const list=r.list.map(v=>{const d=draftSummary(v);if(seen.has(d.id))throw bad();seen.add(d.id);return d});return{list,pagination:{p,size:20,total,pageCount}}}
+export async function draftSource(id:string){const r=data(await request(`/api/v3/me/drafts/${checkedId(id)}`,{cache:'no-store'}));if(r.id!==id)throw bad();return{...fields(r,true),id}}
 const javaTrim=(v:string)=>v.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g,'')
 function validate(input:Record<string,unknown>,op:PostCommand['op']){
   const keys=op==='draft-save'?draftKeys:op==='edit'?editKeys:[...editKeys,'anonymous','draftId','goodPost']
@@ -73,7 +67,7 @@ export async function writePost(command:PostCommand):Promise<PostReceipt>{
   if(op==='edit'||op==='draft-delete'||op==='draft-save'&&id)checkedId(id)
   if(op!=='draft-delete')validate(input,op);else if(Object.keys(input).length)throw invalid()
   const article=op==='publish'||op==='edit',path=article?`/api/v3/articles${op==='edit'?'/'+id:''}`:`/api/v3/me/drafts${id?'/'+id:''}`
-  const r=data(await postRequest(path,{method:op==='draft-delete'?'DELETE':op==='publish'||!id?'POST':'PUT',headers:{'Idempotency-Key':key},...(op==='draft-delete'?{}:{body:JSON.stringify(input)})}))
+  const r=data(await request(path,{method:op==='draft-delete'?'DELETE':op==='publish'||!id?'POST':'PUT',headers:{'Idempotency-Key':key},...(op==='draft-delete'?{}:{body:JSON.stringify(input)})}))
   if(op==='draft-delete')return{id,op}
   if(article&&typeof r.permalink!=='string')throw bad()
   if(!postId(r.id)||op==='edit'&&r.id!==id||op==='draft-save'&&id&&r.id!==id)throw bad()

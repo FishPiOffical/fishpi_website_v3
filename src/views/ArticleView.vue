@@ -22,6 +22,7 @@ import CommentComposer from '@/components/articles/CommentComposer.vue'
 import ArticleCommentLocation from '@/components/articles/ArticleCommentLocation.vue'
 import type {CommentLocation} from '@/api/v3-comment-location'
 import { useV3CommentsStore } from '@/stores/v3Comments'
+import {useLegacyCommentsStore} from '@/stores/legacyComments'
 import MedalList from '@/components/medal/MedalList.vue'
 import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import { useV3ReactionsStore } from '@/stores/v3Reactions'
@@ -45,7 +46,7 @@ const loginRedirect=computed(()=>routeMounted.value?route.fullPath:route.fullPat
 onMounted(()=>{routeMounted.value=true})
 const auth = useAuthStore()
 const LegacyCommentReplies=defineAsyncComponent(()=>import('@/components/articles/LegacyCommentReplies.vue'))
-const commentWrites=useV3CommentsStore(),commandOrigin=Symbol('article-comment-delete'),commentRefreshError=ref('')
+const commentWrites=getApiMode()==='v1'?useLegacyCommentsStore():useV3CommentsStore(),commandOrigin=Symbol('article-comment-delete'),commentRefreshError=ref('')
 const { apiKey, accessToken, isLoggedIn, account } = storeToRefs(auth)
 
 const article = ref<ArticleDetail | null>(null)
@@ -373,10 +374,10 @@ watch(()=>commentWrites.revision,()=>{
 },{flush:'sync'})
 
 async function onRemoveComment(c: ArticleComment) {
-  if(!isOwnComment(c)||!(getApiMode()==='v1'?apiKey.value:accessToken.value))return
+  if(!isOwnComment(c)||!accessToken.value)return
   await commentWrites.remove(id.value,c.oId,commandOrigin)
 }
-function startEdit(c:ArticleComment){if(commentingEnabled.value&&isOwnComment(c)&&(getApiMode()==='v1'?apiKey.value:accessToken.value)&&!commentWrites.pending&&!commentWrites.busy&&!commentWrites.confirming)editingId.value=c.oId}
+function startEdit(c:ArticleComment){if(commentingEnabled.value&&isOwnComment(c)&&accessToken.value&&!commentWrites.pending&&!commentWrites.busy&&!commentWrites.confirming)editingId.value=c.oId}
 function who(c: ArticleComment) {
   return c.commentAuthorNickname || c.commentAuthorName || '匿名'
 }
@@ -413,7 +414,7 @@ function itemProps(c: ArticleComment) {
     loggedIn: isLoggedIn.value,
     commentingEnabled: commentingEnabled.value,
     own,
-    manage: true,
+    manage: getApiMode()==='v3',
     editing: editingId.value === c.oId,
     apiKey: apiKey.value,
     hideMedals: isLong.value,
@@ -425,7 +426,7 @@ function itemHandlers(c: ArticleComment) {
     reply: () => startReply(c),
     edit: () => startEdit(c),
     remove: () => onRemoveComment(c),
-    accepted: () => { if (isQnA.value && (getApiMode()==='v1'?apiKey.value:accessToken.value)) void load(true) },
+    accepted: () => { if (isQnA.value && accessToken.value) void load(true) },
   }
 }
 
@@ -475,7 +476,7 @@ function itemHandlers(c: ArticleComment) {
             <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
           </template>
           <template v-if="t.replies.length||getApiMode()==='v1'&&!t.c.commentOriginalCommentId" #default>
-            <LegacyCommentReplies v-if="getApiMode()==='v1'&&!t.c.commentOriginalCommentId" :article-id="article.oId" :root-id="t.c.oId" :writable="isLoggedIn&&commentingEnabled" :revision="commentWrites.revision" @reply="startReply" @accepted="isQnA&&isLoggedIn&&load(true)" />
+            <LegacyCommentReplies v-if="getApiMode()==='v1'&&!t.c.commentOriginalCommentId" :article-id="article.oId" :root-id="t.c.oId" :writable="isLoggedIn&&commentingEnabled" :revision="commentWrites.revision" @reply="startReply" />
             <CommentItem
               v-for="r in getApiMode()==='v1'&&!t.c.commentOriginalCommentId?[]:t.replies"
               :key="r.oId"

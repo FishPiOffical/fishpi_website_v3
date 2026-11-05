@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { readV3CommentSource, type CommentInput } from '@/api/v3-comments'
 import { useAuthStore } from '@/stores/auth'
@@ -9,17 +8,16 @@ import { useV3CommentsStore } from '@/stores/v3Comments'
 import ChatComposer from '@/components/ChatComposer.vue'
 const props=withDefaults(defineProps<{articleId:string;editId?:string;parentId?:string;paragraphId?:string;replyLabel?:string;writable?:boolean}>(),{writable:true,editId:'',parentId:'',paragraphId:'',replyLabel:''})
 const emit=defineEmits<{cancel:[];saved:[];clearReply:[]}>()
-const {accessToken,apiKey,account}=storeToRefs(useAuthStore()),operations=useV3CommentsStore(),mounted=ref(false),draft=ref(''),anonymous=ref(false),visible=ref(false),editVisibility=ref('preserve'),sourceLoading=ref(false),sourceReady=ref(false),localError=ref('')
+const {accessToken,account}=storeToRefs(useAuthStore()),operations=useV3CommentsStore(),mounted=ref(false),draft=ref(''),anonymous=ref(false),visible=ref(false),editVisibility=ref('preserve'),sourceLoading=ref(false),sourceReady=ref(false),localError=ref('')
 const editor=ref<InstanceType<typeof ChatComposer>|null>(null),origin=Symbol('comment-composer')
-const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
-const ready=computed(()=>mounted.value&&!!credential.value&&!!account.value),locked=computed(()=>operations.busy||operations.confirming||!!operations.pending||sourceLoading.value)
+const ready=computed(()=>mounted.value&&!!accessToken.value&&!!account.value),locked=computed(()=>operations.busy||operations.confirming||!!operations.pending||sourceLoading.value)
 const applicable=computed(()=>operations.pending?.articleId===props.articleId)
 let sequence=0,boundary='',submitted:{key:string;draft:string}|null=null
-function identity(){return `${getAuthContextVersion()}:${getApiMode()==='v1'?credential.value:!!credential.value}:${account.value?.oId||''}:${props.articleId}:${props.editId}`}
+function identity(){return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${props.articleId}:${props.editId}`}
 function clear(){sequence++;operations.cancelConfirmation(origin);draft.value='';anonymous.value=false;visible.value=false;editVisibility.value='preserve';localError.value='';sourceLoading.value=false;sourceReady.value=false;submitted=null}
 async function source(){if(!ready.value||!props.writable||!props.editId)return;const current=++sequence,reader=identity();sourceLoading.value=true;sourceReady.value=false;localError.value='';draft.value='';try{const text=await readV3CommentSource(props.editId,props.articleId);if(mounted.value&&reader===identity()&&current===sequence){draft.value=text;sourceReady.value=true}}catch(err){if(mounted.value&&reader===identity()&&current===sequence)localError.value=err instanceof Error?err.message:'原文读取失败'}finally{if(mounted.value&&reader===identity()&&current===sequence)sourceLoading.value=false}}
 async function save(){if(!ready.value||!props.writable||locked.value||props.editId&&!sourceReady.value)return;const reader=identity();localError.value='';const input:CommentInput={content:draft.value};if(props.editId){if(editVisibility.value!=='preserve')input.visible=editVisibility.value==='author'}else{input.anonymous=anonymous.value;input.visible=visible.value;if(props.parentId)input.parentId=props.parentId;if(props.paragraphId)input.paragraphId=props.paragraphId}try{await operations.save(props.articleId,input,props.editId,origin)}catch(err){if(mounted.value&&reader===identity())localError.value=err instanceof Error?err.message:'评论参数不合法'}}
-watch([credential,()=>account.value?.oId,()=>props.articleId,()=>props.editId],()=>{const next=identity();if(next===boundary)return;boundary=next;clear();void source()},{flush:'sync'})
+watch([accessToken,()=>account.value?.oId,()=>props.articleId,()=>props.editId],()=>{const next=identity();if(next===boundary)return;boundary=next;clear();void source()},{flush:'sync'})
 watch(()=>props.writable,enabled=>{
   sequence++
   operations.cancelConfirmation(origin)

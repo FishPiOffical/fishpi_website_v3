@@ -14,8 +14,7 @@ globalThis.__comments={context:1,requests:[],responses:[],dispatch:null,confirma
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__comments.context}export async function request(path,init){const s=globalThis.__comments;s.requests.push({path,init});if(s.dispatch)return s.dispatch(path,init);const value=s.responses.shift();if(value instanceof Error)throw value;return value}`)
 const replace=(source,pairs)=>{for(const [from,to]of pairs)source=source.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`);return source}
 const contentSource=compile(await fs.readFile('src/api/v3-content.ts','utf8')).replace("from './http'",`from '${http}'`),contentURL=url(contentSource)
-const versionedURL=url(replace(compile(await fs.readFile('src/api/legacy/versioned.ts','utf8')),[['../http',http],['./auth',url('export const getLegacyKey=()=>null')]]))
-const apiURL=url(replace(compile(await fs.readFile('src/api/v3-comments.ts','utf8')),[['./http',http],['./legacy/versioned',versionedURL],['./v3-content',contentURL]])),api=await import(apiURL),{ApiError}=await import(http),env=data=>({code:0,data})
+const apiURL=url(replace(compile(await fs.readFile('src/api/v3-comments.ts','utf8')),[['./http',http],['./v3-content',contentURL]])),api=await import(apiURL),{ApiError}=await import(http),env=data=>({code:0,data})
 globalThis.__commentsAPI=api
 const contentWithParagraphs=await import(url(contentSource.replace("import('./v3-comments')",'Promise.resolve(globalThis.__commentsAPI)')))
 const auth=defineStore('comments-auth',()=>{const accessToken=ref('A'),account=ref({oId:'1',userName:'owner'});return{accessToken,account,apiKey:ref(null),isLoggedIn:computed(()=>!!accessToken.value&&!!account.value),async reloadAccount(){if(state.balanceFails)throw Error('balance failed')}}})

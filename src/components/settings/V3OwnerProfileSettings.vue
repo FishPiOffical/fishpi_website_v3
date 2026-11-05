@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { fetchV3Profile, saveV3Profile, fetchV3Personality, fetchV3PersonalityOptions, saveV3Personality,
   fetchV3Avatar, saveV3Avatar, displayAvatar, uploadV3Avatar, profileOperationKey, fetchV3Qq, saveV3Qq, fetchV3ProfileTags, saveV3ProfileTags } from '@/api/v3-profile'
 
 const props = defineProps<{ mode: 'profile' | 'avatar' }>()
-const auth = useAuthStore(), { accessToken, apiKey, account } = storeToRefs(auth)
-const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+const auth = useAuthStore(), { accessToken, account } = storeToRefs(auth)
 const nickname = ref(''), intro = ref(''), website = ref(''), mbti = ref(''), options = ref<string[]>([])
 const avatar = ref(''), avatarDraft = ref(''), busy = ref(false), loading = ref(false)
 const qq = ref('')
@@ -18,7 +16,7 @@ const loaded = ref({ profile: false, personality: false, avatar: false, qq: fals
 const errors = ref({ profile: '', personality: '', avatar: '', qq: '', tags: '' }), messages = ref({ profile: '', personality: '', avatar: '', qq: '', tags: '' })
 type Resource = keyof typeof loaded.value
 let mounted = false, generation = 0, uploadAbort: AbortController | null = null
-function identity() { return JSON.stringify([getAuthContextVersion(), getApiMode()==='v1'?apiKey.value:!!credential.value, account.value?.oId || '']) }
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
 let boundary = identity()
 const intentions = new Map<Resource, { fingerprint: string; key: string }>()
 const errorText = (error: unknown) => error instanceof Error ? error.message : '设置操作失败，请重试'
@@ -32,7 +30,7 @@ function reset() {
 }
 async function load() {
   const owner = identity(), current = ++generation
-  if (!credential.value) return
+  if (!accessToken.value) return
   loading.value = true
   const valid = () => mounted && current === generation && owner === identity()
   async function read<T>(group: Resource, fetcher: () => Promise<T>, apply: (value: T) => void) {
@@ -51,50 +49,49 @@ async function load() {
   ])
   if (valid()) loading.value = false
 }
-async function write<T>(group: Resource, body: unknown, action: (key: string) => Promise<T>, fetcher: () => Promise<T>, apply: (value: T) => void) {
-  if (busy.value || loading.value || !credential.value || !loaded.value[group]) return
+async function write<T>(group: Resource, body: unknown, action: (key: string) => Promise<T>, apply: (value: T) => void) {
+  if (busy.value || loading.value || !accessToken.value || !loaded.value[group]) return
   const owner = identity(), current = generation, fingerprint = JSON.stringify(body)
   const valid = () => mounted && current === generation && owner === identity()
   busy.value = true; errors.value[group] = ''; messages.value[group] = ''
   try {
     let intent = intentions.get(group)
     if (!intent || intent.fingerprint !== fingerprint) { intent = { fingerprint, key: profileOperationKey() }; intentions.set(group, intent) }
-    await action(intent.key)
+    const result = await action(intent.key)
     if (valid()) {
-      intentions.delete(group); loaded.value[group]=false
-      try{const current=await fetcher();if(valid()){apply(current);loaded.value[group]=true;messages.value[group]='已保存'}}
-      catch(error){if(valid())errors.value[group]=`保存已确认，当前资料读取失败：${errorText(error)}`}
-      if(valid())void auth.reloadAccount().catch(() => {})
+      intentions.delete(group); apply(result); messages.value[group] = '已保存'
+      // A refresh failure does not turn an already committed setting into a failed save.
+      void auth.reloadAccount().catch(() => {})
     }
   } catch (error) { if (valid()) errors.value[group] = errorText(error) }
   finally { if (valid()) busy.value = false }
 }
 function saveProfile() {
   const body = { userNickname: nickname.value.trim(), userIntro: intro.value.trim(), userURL: website.value.trim() }
-  return write('profile', body, key => saveV3Profile(body, key), fetchV3Profile, value => { nickname.value = value.userNickname; intro.value = value.userIntro; website.value = value.userURL })
+  return write('profile', body, key => saveV3Profile(body, key), value => { nickname.value = value.userNickname; intro.value = value.userIntro; website.value = value.userURL })
 }
 function savePersonality() {
   const value = mbti.value.trim().toUpperCase()
   if (value && !options.value.includes(value)) { errors.value.personality = '请选择目录中的 MBTI 类型，或留空清除'; return }
-  return write('personality', { mbti: value }, key => saveV3Personality(value, key), fetchV3Personality, value => { mbti.value = value })
+  return write('personality', { mbti: value }, key => saveV3Personality(value, key), value => { mbti.value = value })
 }
 function persistAvatar(value: string) {
-  return write('avatar', { avatarURL: value }, key => saveV3Avatar(value, key), fetchV3Avatar, saved => { avatar.value = avatarDraft.value = saved })
+  return write('avatar', { avatarURL: value }, key => saveV3Avatar(value, key), saved => { avatar.value = avatarDraft.value = saved })
 }
 function saveQq() {
   const value = qq.value.trim()
   if (value && !/^[0-9]{1,12}$/.test(value)) { errors.value.qq = 'QQ 只能填写1至12位数字，或留空清除'; return }
-  return write('qq', { qq: value }, key => saveV3Qq(value, key), fetchV3Qq, saved => { qq.value = saved })
+  return write('qq', { qq: value }, key => saveV3Qq(value, key), saved => { qq.value = saved })
 }
 function saveTags() {
   const value = tags.value.trim()
-  return write('tags', { tags: value }, key => saveV3ProfileTags(value, key), fetchV3ProfileTags, saved => { tags.value = saved })
+  return write('tags', { tags: value }, key => saveV3ProfileTags(value, key), saved => { tags.value = saved })
 }
 function saveAvatar() { return persistAvatar(avatarDraft.value.trim()) }
 async function onUpload(event: Event) {
   const input = event.target as HTMLInputElement, file = input.files?.[0]
   input.value = ''
-  if (!file || busy.value || loading.value || !loaded.value.avatar || !credential.value) return
+  if (!file || busy.value || loading.value || !loaded.value.avatar || !accessToken.value) return
   const owner = identity(), current = generation, controller = new AbortController()
   const valid = () => mounted && current === generation && owner === identity()
   uploadAbort = controller; busy.value = true; errors.value.avatar = messages.value.avatar = ''
@@ -106,7 +103,7 @@ async function onUpload(event: Event) {
   if (url && valid()) await persistAvatar(url)
 }
 onMounted(() => { mounted = true; void load() })
-watch([credential, () => account.value?.oId], () => {
+watch([accessToken, () => account.value?.oId], () => {
   const current = identity()
   if (current === boundary) return
   boundary = current; reset()

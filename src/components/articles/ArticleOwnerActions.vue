@@ -3,22 +3,20 @@ import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { articleOwnerProof,type OwnerOperation,type OwnerReceipt } from '@/api/v3-article-owner'
 import { useV3ArticleOwnerStore } from '@/stores/v3ArticleOwner'
 const props=withDefaults(defineProps<{articleId:string;authorId?:string;anonymous?:boolean;permanent?:boolean}>(),{authorId:'',anonymous:false,permanent:false})
 const emit=defineEmits<{changed:[id:string];deleted:[id:string]}>()
-const {accessToken,apiKey,account}=storeToRefs(useAuthStore()),operations=useV3ArticleOwnerStore()
+const {accessToken,account}=storeToRefs(useAuthStore()),operations=useV3ArticleOwnerStore()
 const mounted=ref(false),opened=ref(false),loading=ref(false),proof=ref<{id:string;status:number}|null>(null),error=ref('')
-const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
-const authenticated=computed(()=>mounted.value&&!!credential.value&&!!account.value?.oId)
+const authenticated=computed(()=>mounted.value&&!!accessToken.value&&!!account.value?.oId)
 const candidate=computed(()=>authenticated.value&&(props.anonymous||!!props.authorId&&props.authorId===account.value?.oId))
 const currentReceipt=computed(()=>operations.receipt?.id===props.articleId?operations.receipt:null)
 const locked=computed(()=>operations.busy||operations.confirming||!!operations.pending)
 const origin=Symbol('article-owner-confirmation')
 let sequence=0,controller:AbortController|null=null
-const identity=()=>JSON.stringify([getAuthContextVersion(),getApiMode()==='v1'?credential.value:!!credential.value,account.value?.oId||'',props.articleId])
+const identity=()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'',props.articleId])
 function close(){sequence++;controller?.abort();controller=null;operations.cancelConfirmation(origin);opened.value=false;loading.value=false;proof.value=null;error.value=''}
 async function check(){
  if(!candidate.value)return

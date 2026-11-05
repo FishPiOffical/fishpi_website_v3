@@ -1,21 +1,19 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { readContentRelation, resolveContentRelationTarget, type ContentRelationKind } from '@/api/v3-content-relations'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ContentRelationsStore } from '@/stores/v3ContentRelations'
 const props = defineProps<{ kind:ContentRelationKind;target:string }>()
-const { accessToken, apiKey, account } = storeToRefs(useAuthStore()), operations = useV3ContentRelationsStore()
+const { accessToken, account } = storeToRefs(useAuthStore()), operations = useV3ContentRelationsStore()
 const mounted = ref(false), targetId = ref(''), following = ref<boolean | null>(null), loading = ref(false), error = ref('')
-const credential = computed(() => getApiMode()==='v1'?apiKey.value:accessToken.value)
-const visible = computed(() => mounted.value && !!credential.value && !!account.value)
+const visible = computed(() => mounted.value && !!accessToken.value && !!account.value)
 const pending = computed(() => operations.commands[props.kind+':'+targetId.value])
 const action=computed(()=>props.kind==='tag'?'关注标签':props.kind==='collection'?'收藏':'订阅')
 const label=computed(()=>pending.value?pending.value.busy?'正在提交…':`重试本次${pending.value.following?'':'取消'}${action.value}`:following.value!==null?`${following.value?'取消':''}${action.value}`:loading.value?'读取状态…':'重读状态')
 let sequence = 0, boundary = ''
-function identity() { return `${getAuthContextVersion()}:${!!credential.value}:${account.value?.oId || ''}:${props.kind}:${props.target}:${getApiMode()==='v1'?apiKey.value:''}` }
+function identity() { return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId || ''}:${props.kind}:${props.target}` }
 function clear(keepTarget=false) { sequence++; if(!keepTarget)targetId.value = ''; following.value = null; loading.value = false; error.value = '' }
 async function load(afterWrite = false) {
   if (!visible.value || loading.value) return
@@ -39,7 +37,7 @@ async function submit() {
   catch (err) { if (mounted.value && reader === identity()) error.value = err instanceof Error ? err.message : '关系操作失败' }
 }
 function activate() { if (loading.value || pending.value?.busy) return; if (pending.value || following.value !== null) void submit(); else void load() }
-watch([credential, () => account.value?.oId, () => props.target, () => props.kind], () => { const next = identity(); if (next === boundary) return; boundary = next; clear(); void load() }, {flush:'sync'})
+watch([accessToken, () => account.value?.oId, () => props.target, () => props.kind], () => { const next = identity(); if (next === boundary) return; boundary = next; clear(); void load() }, {flush:'sync'})
 watch(() => operations.lastChange, change => { if (change.kind===props.kind && change.targetId && change.targetId === targetId.value) { clear(true); void load(true) } }, {flush:'sync'})
 onMounted(() => { mounted.value = true; boundary = identity(); void load() })
 onBeforeUnmount(() => { mounted.value = false; clear() })

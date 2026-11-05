@@ -3,7 +3,6 @@ import { computed,onMounted,onBeforeUnmount,ref,watch } from 'vue'
 import { RouterLink,useRoute,useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { postSource,draftPage,draftSource,postInput,emptyPost,type PostFields,type PostSource,type PostCommand,type PostReceipt,type DraftSummary } from '@/api/v3-posts'
-import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { useV3PostsStore } from '@/stores/v3Posts'
 import { fpConfirm } from '@/composables/useDialog'
@@ -29,8 +28,7 @@ const STATEMENTS = [
 ]
 
 const OP_LABELS={'publish':'发布文章','edit':'编辑文章','draft-save':'保存草稿','draft-delete':'删除草稿'}
-const auth=useAuthStore(),{accessToken,apiKey,account,isLoggedIn}=storeToRefs(auth),operations=useV3PostsStore(),router=useRouter(),route=useRoute()
-const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+const auth=useAuthStore(),{accessToken,account,isLoggedIn}=storeToRefs(auth),operations=useV3PostsStore(),router=useRouter(),route=useRoute()
 const editId=computed(()=>typeof route.params.id==='string'?route.params.id:'')
 const title=ref(''),tags=ref(''),content=ref(''),type=ref(0),offer=ref(0),rewardOpen=ref(false),rewardContent=ref(''),rewardPoint=ref<number|null>(0)
 const anonymous=ref(false),commentable=ref(true),notifyFollowers=ref(false),showInList=ref(true),statement=ref(0)
@@ -45,7 +43,7 @@ const ready=computed(()=>mounted.value&&isLoggedIn.value&&!sourceLoading.value&&
 const locked=computed(()=>operations.busy||operations.confirming||!!operations.pending||loadConfirming.value)
 const retainedReward=computed(()=>!!editId.value&&!!source.value&&source.value.rewardPoint>0)
 let generation=0,listSequence=0,sourceSequence=0,boundary='',initialForm='',localKey='',loadConfirmation:AbortController|null=null
-function identity(){return`${getAuthContextVersion()}:${getApiMode()==='v1'?credential.value:!!credential.value}:${account.value?.oId||''}:${route.fullPath}`}
+function identity(){return`${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${route.fullPath}`}
 function current(reader:string,version:number){return mounted.value&&isLoggedIn.value&&reader===identity()&&version===generation}
 function syncEditors(){
   if(type.value!==3&&editorRef.value)content.value=editorRef.value.flush()
@@ -132,7 +130,7 @@ async function dropDraft(id:string){
 }
 async function restore(){const command=operations.pending;if(!command||operations.busy)return;const owned=localKey===command.key,reader=identity(),version=generation;const result=await operations.retry();await after(result,operations.completed,reader,version,owned)}
 async function blank(){if(locked.value)return;const reader=identity();const query={...route.query};delete query.draft;await router.replace({path:route.path,query});if(mounted.value&&reader===identity())await initialize(true)}
-watch([credential,()=>account.value?.oId,()=>route.fullPath],()=>{const next=identity();if(next===boundary)return;boundary=next;void initialize()},{flush:'sync'})
+watch([accessToken,()=>account.value?.oId,()=>route.fullPath],()=>{const next=identity();if(next===boundary)return;boundary=next;void initialize()},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity();void initialize()})
 onBeforeUnmount(()=>{mounted.value=false;reset()})
 </script>

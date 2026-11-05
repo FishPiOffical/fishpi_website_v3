@@ -1,23 +1,21 @@
 import { defineStore,storeToRefs } from 'pinia'
-import { computed,onScopeDispose,ref,watch } from 'vue'
+import { onScopeDispose,ref,watch } from 'vue'
 import { ApiError,getAuthContextVersion } from '@/api/http'
 import { profileOperationKey } from '@/api/v3-profile'
 import { writeArticleOwner,type OwnerCommand,type OwnerOperation,type OwnerReceipt } from '@/api/v3-article-owner'
 import { fpConfirm } from '@/composables/useDialog'
 import { clearCache } from '@/utils/swr'
-import { getApiMode } from '@/api/mode'
 import { useAuthStore } from '@/stores/auth'
 export const useV3ArticleOwnerStore=defineStore('v3-article-owner',()=>{
- const auth=useAuthStore(),{accessToken,apiKey,account}=storeToRefs(auth)
- const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+ const auth=useAuthStore(),{accessToken,account}=storeToRefs(auth)
  const pending=ref<OwnerCommand|null>(null),receipt=ref<OwnerReceipt|null>(null),busy=ref(false),confirming=ref(false),error=ref(''),accountError=ref('')
  let completionSequence=0
- let generation=0,boundary=getAuthContextVersion(),owner=account.value?.oId,oldCredential=credential.value,confirmation:AbortController|null=null,origin:symbol|null=null
+ let generation=0,boundary=getAuthContextVersion(),owner=account.value?.oId,confirmation:AbortController|null=null,origin:symbol|null=null
  function cancelConfirmation(token:symbol){if(origin===token){confirmation?.abort();confirmation=null;origin=null;confirming.value=false}}
  function reset(){generation++;confirmation?.abort();confirmation=null;origin=null;pending.value=null;receipt.value=null;busy.value=false;confirming.value=false;error.value='';accountError.value=''}
- const stop=watch([credential,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),actor=account.value?.oId;if(!credential.value||next!==boundary||actor!==owner||getApiMode()==='v1'&&oldCredential!==credential.value)reset();boundary=next;owner=actor;oldCredential=credential.value},{flush:'sync'})
+ const stop=watch([accessToken,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),actor=account.value?.oId;if(!accessToken.value||next!==boundary||actor!==owner)reset();boundary=next;owner=actor},{flush:'sync'})
  onScopeDispose(()=>{stop();reset()})
- function capture(){const run=generation,context=getAuthContextVersion(),actor=account.value?.oId;return()=>!import.meta.env.SSR&&!!credential.value&&!!actor&&run===generation&&context===getAuthContextVersion()&&actor===account.value?.oId}
+ function capture(){const run=generation,context=getAuthContextVersion(),actor=account.value?.oId;return()=>!import.meta.env.SSR&&!!accessToken.value&&!!actor&&run===generation&&context===getAuthContextVersion()&&actor===account.value?.oId}
  async function execute(command:OwnerCommand,recovering:boolean){
   const valid=capture();if(!valid()||busy.value)return null
   pending.value=command;busy.value=true;error.value='';accountError.value=''

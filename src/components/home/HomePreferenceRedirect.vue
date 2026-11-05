@@ -2,7 +2,6 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { fetchV3Preferences } from '@/api/v3-preferences'
 import { SITE_ORIGIN } from '@/seo/site'
@@ -11,7 +10,7 @@ import { homeRedirectBases, homeRedirectDestination } from '@/utils/homeRedirect
 const auth = useAuthStore(), route = useRoute(), router = useRouter()
 const pending = ref(false), message = ref('')
 let mounted = false, generation = 0
-const identity = () => JSON.stringify([getAuthContextVersion(), getApiMode()==='v1'?auth.apiKey:!!auth.accessToken, auth.account?.oId || ''])
+const identity = () => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || ''])
 const eligible = () => mounted && auth.initialized && auth.isLoggedIn && route.path === '/' && !Object.keys(route.query).length && !route.hash
 async function check() {
   const run = ++generation, reader = identity(), entry = route.fullPath
@@ -24,7 +23,7 @@ async function check() {
     const settings = await fetchV3Preferences('functions')
     if (!current()) return
     const target = homeRedirectDestination(String(settings.indexRedirectURL), router,
-      homeRedirectBases(SITE_ORIGIN, getApiMode()==='v1' ? import.meta.env.VITE_API_V1_TARGET || 'https://fishpi.cn' : import.meta.env.VITE_API_V3_TARGET || import.meta.env.VITE_API_TARGET, window.location.origin))
+      homeRedirectBases(SITE_ORIGIN, import.meta.env.VITE_API_TARGET, window.location.origin))
     if (target.kind === 'unsupported') message.value = '首页跳转目标暂不支持，已保留首页。'
     else if (target.kind === 'target') {
       navigating = true

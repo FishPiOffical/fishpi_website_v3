@@ -1,4 +1,3 @@
-import { legacyVersionedRequest } from './legacy/versioned'
 import {getApiMode} from './mode'
 import { ApiError, request } from './http'
 import { adaptV3Article, decodeV3ContentPage } from './v3-content'
@@ -13,20 +12,18 @@ function object(value: unknown): Record<string,unknown> { if (!value || typeof v
 function text(value: unknown): string { if (typeof value !== 'string') throw invalid(); return value }
 function id(value: unknown): string { const valueId=text(value); if (!/^[1-9][0-9]{0,18}$/.test(valueId)) throw invalid(); return valueId }
 function count(value: unknown): number { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw invalid(); return value }
-function tagUri(value:unknown){const uri=text(value);if(!uri||uri.length>256||/[\u0000-\u001f\u007f]/u.test(uri))throw invalid();return uri}
 export async function fetchV3SavedContent(userName: string, kind: SavedKind, owner: boolean, p=1, size=20): Promise<SavedPage> {
   if (!relationUserName(userName) || !['tags','collections','subscriptions'].includes(kind) || typeof owner !== 'boolean' || !Number.isSafeInteger(p) || p<1 || p>42949672 || !Number.isSafeInteger(size) || size<1 || size>50) throw new ApiError('关注内容参数不合法',422)
-  const legacy=getApiMode()==='v1'
+  if(getApiMode()==='v1')return(await import('./legacy/relations')).legacySavedContent(userName,kind,owner,p,size)
   const suffix = kind === 'tags' ? 'following/tags' : kind === 'collections' ? 'following/articles' : 'watching/articles'
   const path = owner ? `/api/v3/me/${kind==='tags'?'follows/tags':kind}` : `/api/v3/users/${encodeURIComponent(userName)}/${suffix}`
-  const target=`${legacy?path.replace('/api/v3/','/api/v1/'):path}?p=${p}&size=${size}`
-  const envelope = object(legacy?await legacyVersionedRequest(target,owner):await request(target,{cache:'no-store'}))
+  const envelope = object(await request(`${path}?p=${p}&size=${size}`,{cache:'no-store'}))
   if (envelope.code !== 0) throw invalid()
   const data = decodeV3ContentPage(envelope.data), meta = data.pagination
-  if (meta.p !== p || meta.size !== size || data.list.length > Math.max(0, Math.min(size, meta.total-(p-1)*size))) throw invalid()
+  if (meta.p !== p || meta.size !== size) throw invalid()
   const seen = new Set<string>()
   function unique(value: unknown) { const key=id(value); if (seen.has(key)) throw invalid(); seen.add(key); return key }
-  if (kind === 'tags') return { ...meta, kind, list:data.list.map(row=>({id:unique(row.id),...(legacy?{uri:tagUri(row.uri)}:{}),title:text(row.title),description:text(row.description),articleCount:count(row.articleCount),followerCount:count(row.followerCount)})) }
+  if (kind === 'tags') return { ...meta, kind, list:data.list.map(row=>({id:unique(row.id),title:text(row.title),description:text(row.description),articleCount:count(row.articleCount),followerCount:count(row.followerCount)})) }
   const list: SavedArticle[] = data.list.map(row=>{
     const articleId=unique(row.id)
     if (owner) {

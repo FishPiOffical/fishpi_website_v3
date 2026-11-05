@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { profileOperationKey } from '@/api/v3-profile'
@@ -9,18 +8,17 @@ import { preferenceFields, fetchV3Preferences, saveV3Preferences, fetchV3LocaleO
   type PreferenceResource, type PreferenceValue, type PreferenceOption } from '@/api/v3-preferences'
 
 const props = defineProps<{ resource: PreferenceResource; title: string; fields?: string[] }>()
-const auth = useAuthStore(), { accessToken, apiKey, account } = storeToRefs(auth)
-const credential = computed(() => getApiMode()==='v1'?apiKey.value:accessToken.value)
+const auth = useAuthStore(), { accessToken, account } = storeToRefs(auth)
 const schema = computed(() => preferenceFields[props.resource].filter(field => !props.fields || props.fields.includes(field.key)))
 const values = ref<Record<string, PreferenceValue>>({}), original = ref<Record<string, PreferenceValue>>({})
 const options = ref<Record<string, PreferenceOption[]>>({})
 const ready = ref(false), loading = ref(false), busy = ref(false), error = ref(''), message = ref('')
 let mounted = false, generation = 0, intent: { fingerprint: string; key: string; fields: string[] } | null = null
-function identity() { return JSON.stringify([getAuthContextVersion(), getApiMode()==='v1'?apiKey.value:!!accessToken.value, account.value?.oId || '']) }
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
 let boundary = identity()
 function reset() { generation++; intent = null; values.value = {}; original.value = {}; options.value = {}; ready.value = loading.value = busy.value = false; error.value = message.value = '' }
-async function load(afterWrite = false) {
-  if (!credential.value) return
+async function load() {
+  if (!accessToken.value) return
   const owner = identity(), current = ++generation
   const valid = () => mounted && owner === identity() && current === generation
   ready.value = false; loading.value = true; error.value = message.value = ''
@@ -30,11 +28,11 @@ async function load(afterWrite = false) {
       props.resource === 'locale' ? fetchV3LocaleOptions() : props.resource === 'display' && schema.value.some(field => field.key === 'skin' || field.key === 'mobileSkin') ? fetchV3SkinOptions() : Promise.resolve({}),
     ])
     if (valid()) { values.value = { ...data }; original.value = { ...data }; options.value = choices; ready.value = true }
-  } catch (failure) { if (valid()) { values.value = {}; original.value = {}; const reason=failure instanceof Error ? failure.message : '设置读取失败';error.value=afterWrite?`保存已确认，当前设置读取失败：${reason}`:reason } }
+  } catch (failure) { if (valid()) { values.value = {}; original.value = {}; error.value = failure instanceof Error ? failure.message : '设置读取失败' } }
   finally { if (valid()) loading.value = false }
 }
 async function save() {
-  if (!ready.value || loading.value || busy.value || !credential.value) return
+  if (!ready.value || loading.value || busy.value || !accessToken.value) return
   const changes: Record<string, PreferenceValue> = {}
   for (const field of schema.value) {
     const value = typeof values.value[field.key] === 'string' ? (values.value[field.key] as string).trim() : values.value[field.key]!
@@ -46,17 +44,17 @@ async function save() {
   busy.value = true; message.value = error.value = ''
   try {
     if (!intent || intent.fingerprint !== fingerprint) intent = { fingerprint, key: profileOperationKey(), fields: Object.keys(changes) }
-    await saveV3Preferences(props.resource, changes, intent.key)
-    if (valid()) { intent = null; await load(true); if(mounted&&owner===identity()&&ready.value)message.value='已保存'; if(mounted&&owner===identity())void auth.reloadAccount().catch(() => {}) }
+    const saved = await saveV3Preferences(props.resource, changes, intent.key)
+    if (valid()) { intent = null; values.value = { ...saved }; original.value = { ...saved }; message.value = '已保存'; void auth.reloadAccount().catch(() => {}) }
   } catch (failure) { if (valid()) error.value = failure instanceof Error ? failure.message : '设置保存失败' }
-  finally { if (mounted && owner === identity()) busy.value = false }
+  finally { if (valid()) busy.value = false }
 }
 function setNumber(key: string, event: Event) { values.value[key] = (event.target as HTMLInputElement).valueAsNumber }
 function setBoolean(key: string, event: Event) { values.value[key] = (event.target as HTMLInputElement).checked }
 function setString(key: string, event: Event) { values.value[key] = (event.target as HTMLInputElement).value }
 function setChoice(key: string, event: Event) { values.value[key] = Number((event.target as HTMLSelectElement).value) }
 onMounted(() => { mounted = true; void load() })
-watch([credential, () => account.value?.oId], () => {
+watch([accessToken, () => account.value?.oId], () => {
   const current = identity()
   if (current === boundary) return
   boundary = current; reset()
@@ -89,7 +87,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
     </form>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="message" role="status">{{ message }}</p>
-    <button type="button" :disabled="loading || busy" @click="load()">重新读取{{ title }}</button>
+    <button type="button" :disabled="loading || busy" @click="load">重新读取{{ title }}</button>
   </section>
 </template>
 

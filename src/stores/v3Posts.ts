@@ -1,24 +1,22 @@
 import { defineStore,storeToRefs } from 'pinia'
-import { computed,onScopeDispose,ref,watch } from 'vue'
+import { onScopeDispose,ref,watch } from 'vue'
 import { ApiError,getAuthContextVersion } from '@/api/http'
 import { profileOperationKey } from '@/api/v3-profile'
 import { writePost,type PostCommand,type PostReceipt } from '@/api/v3-posts'
 import { fpConfirm } from '@/composables/useDialog'
-import { getApiMode } from '@/api/mode'
 import { useAuthStore } from '@/stores/auth'
 export const useV3PostsStore=defineStore('v3-posts',()=>{
-  const auth=useAuthStore(),{accessToken,apiKey,account}=storeToRefs(auth)
-  const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+  const auth=useAuthStore(),{accessToken,account}=storeToRefs(auth)
   const pending=ref<PostCommand|null>(null),completed=ref<PostCommand|null>(null),receipt=ref<PostReceipt|null>(null),busy=ref(false),confirming=ref(false),error=ref(''),message=ref(''),revision=ref(0)
-  let generation=0,boundary=getAuthContextVersion(),owner=account.value?.oId,oldCredential=credential.value,confirmation:AbortController|null=null,origin:symbol|null=null
+  let generation=0,boundary=getAuthContextVersion(),owner=account.value?.oId,confirmation:AbortController|null=null,origin:symbol|null=null
   function cancelConfirmation(token:symbol){if(origin===token){confirmation?.abort();confirmation=null;origin=null;confirming.value=false}}
   function reset(){generation++;confirmation?.abort();confirmation=null;origin=null;pending.value=null;completed.value=null;receipt.value=null;busy.value=false;confirming.value=false;error.value='';message.value='';revision.value++}
-  const stop=watch([credential,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),actor=account.value?.oId;if(!credential.value||next!==boundary||actor!==owner||getApiMode()==='v1'&&oldCredential!==credential.value)reset();boundary=next;owner=actor;oldCredential=credential.value},{flush:'sync'})
+  const stop=watch([accessToken,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),actor=account.value?.oId;if(!accessToken.value||next!==boundary||actor!==owner)reset();boundary=next;owner=actor},{flush:'sync'})
   onScopeDispose(()=>{stop();reset()})
-  function capture(){const current=generation,context=getAuthContextVersion(),actor=account.value?.oId;return()=>!import.meta.env.SSR&&!!credential.value&&!!actor&&actor===account.value?.oId&&current===generation&&context===getAuthContextVersion()}
+  function capture(){const current=generation,context=getAuthContextVersion(),actor=account.value?.oId;return()=>!import.meta.env.SSR&&!!accessToken.value&&!!actor&&actor===account.value?.oId&&current===generation&&context===getAuthContextVersion()}
   async function execute(command:PostCommand,recovering:boolean){
     const valid=capture();if(!valid()||busy.value)return null
-    pending.value=command;receipt.value=null;completed.value=null;busy.value=true;error.value='';message.value=''
+    pending.value=command;busy.value=true;error.value='';message.value=''
     try{const result=await writePost(command);if(!valid())return null;completed.value=command;receipt.value=result;pending.value=null;message.value='操作已确认';revision.value++
       if(command.op==='publish'||command.op==='edit')try{await auth.reloadAccount()}catch{if(valid())message.value='操作已确认，余额刷新失败，请到积分页核对。'}
       return valid()?result:null

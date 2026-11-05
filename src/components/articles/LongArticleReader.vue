@@ -12,6 +12,7 @@ import {
 import { fetchV3ParagraphSummary, fetchV3ParagraphComments } from '@/api/v3-comments'
 import { useAuthStore } from '@/stores/auth'
 import { useV3CommentsStore } from '@/stores/v3Comments'
+import {useLegacyCommentsStore} from '@/stores/legacyComments'
 import RevisionHistory from './RevisionHistory.vue'
 import ArticleColumnNavigation from './ArticleColumnNavigation.vue'
 import ArticleReadRegistration from './ArticleReadRegistration.vue'
@@ -54,7 +55,7 @@ type Width = (typeof WIDTHS)[number]
 
 const appearance = useAppearanceStore()
 const auth = useAuthStore()
-const commentWrites=useV3CommentsStore(),paragraphEditingId=ref(''),commentOrigin=Symbol('paragraph-delete')
+const commentWrites=getApiMode()==='v1'?useLegacyCommentsStore():useV3CommentsStore(),paragraphEditingId=ref(''),commentOrigin=Symbol('paragraph-delete')
 
 const settings = reactive<{ width: Width; desktopFontSize: number; mobileFontSize: number }>({
   width: '800',
@@ -406,7 +407,7 @@ function onReplyTrigger() {
   else emit('reply')
 }
 
-function ownParagraphComment(comment:ArticleComment){return !!(getApiMode()==='v1'?auth.apiKey:auth.accessToken)&&!!comment.commentAuthorId&&comment.commentAuthorId===auth.account?.oId}
+function ownParagraphComment(comment:ArticleComment){return !!auth.accessToken&&!!comment.commentAuthorId&&comment.commentAuthorId===auth.account?.oId}
 function removeParagraphComment(comment:ArticleComment){if(ownParagraphComment(comment))void commentWrites.remove(props.article.oId,comment.oId,commentOrigin)}
 function replyToParagraphComment(comment: ArticleComment) {
   if (!commentingEnabled.value || paragraphState.value==='orphaned' || !activeParagraphId.value) return
@@ -427,7 +428,7 @@ function locateComment(value:CommentLocation){
   void loadParagraphComments(value.page)
 }
 
-function recoverComment(){void commentWrites.retry()}
+function recoverComment(){if(legacyParagraphs)useLegacyCommentsStore().release();else void useV3CommentsStore().retry()}
 
 function refreshParagraphComments() {
   if (activeParagraphId.value) void loadParagraphComments(paragraphPage.value)
@@ -684,7 +685,7 @@ function chapterTitle(c: LongArticleChapter) {
       </header>
       <div ref="drawerScrollEl" class="la-drawer-scroll">
           <template v-if="loggedIn">
-            <p v-if="commentWrites.pending">上次评论操作结果待确认（文章 {{ commentWrites.pending.articleId }}）。<button type="button" :disabled="commentWrites.busy" @click="recoverComment()">恢复本次评论操作</button></p>
+            <p v-if="commentWrites.pending">上次评论操作结果待确认（文章 {{ commentWrites.pending.articleId }}）。<button type="button" :disabled="commentWrites.busy" @click="recoverComment()">{{ legacyParagraphs?'我已核对，解除锁定':'恢复本次评论操作' }}</button></p>
             <p v-if="commentWrites.error" role="alert">{{ commentWrites.error }}</p><p v-if="commentWrites.message" role="status">{{ commentWrites.message }}</p>
           </template>
 

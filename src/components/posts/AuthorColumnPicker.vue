@@ -1,21 +1,19 @@
 <script setup lang="ts">
-import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue'
+import { onBeforeUnmount,onMounted,ref,watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
-import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { authorColumns,type AuthorColumn } from '@/api/v3-author-columns'
 const props=withDefaults(defineProps<{modelValue:string;currentTitle?:string;disabled?:boolean}>(),{currentTitle:'',disabled:false})
 const emit=defineEmits<{select:[column:{id:string;title:string}]}>()
-const {accessToken,apiKey,account}=storeToRefs(useAuthStore())
-const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+const {accessToken,account}=storeToRefs(useAuthStore())
 const visible=ref(false)
 const list=ref<AuthorColumn[]>([]),loaded=ref(false),loading=ref(false),error=ref(''),page=ref(1),pageCount=ref(0)
 let mounted=false,sequence=0,controller:AbortController|null=null
-const identity=()=>JSON.stringify([getAuthContextVersion(),getApiMode()==='v1'?credential.value:!!credential.value,account.value?.oId||''])
+const identity=()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])
 function clear(){sequence++;controller?.abort();controller=null;list.value=[];loaded.value=false;loading.value=false;error.value='';page.value=1;pageCount.value=0}
 async function load(p=page.value){
- if(!mounted||!credential.value||!account.value?.oId)return
+ if(!mounted||!accessToken.value||!account.value?.oId)return
  controller?.abort();const abort=new AbortController();controller=abort
  const reader=identity(),run=++sequence;page.value=p;loading.value=true;loaded.value=false;error.value='';list.value=[]
  const current=()=>mounted&&run===sequence&&reader===identity()&&!abort.signal.aborted
@@ -33,7 +31,7 @@ onMounted(()=>{mounted=true;visible.value=true;void load(1)})
 onBeforeUnmount(()=>{mounted=false;clear()})
 </script>
 <template>
- <div v-if="visible&&credential" class="author-columns">
+ <div v-if="visible&&accessToken" class="author-columns">
   <label>选择本人专栏
    <select :value="modelValue" :disabled="disabled||loading||Boolean(error)" @change="choose">
     <option value="" disabled>请选择专栏</option>

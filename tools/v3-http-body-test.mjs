@@ -57,13 +57,12 @@ try{
  await assert.rejects(api.request('/api/v3/fixture/malformed'),e=>e instanceof api.ApiError&&e.status===200&&e.code!=='offline')
  assert.equal(offline.length,before)
  console.log('PASS HTTP body 4 complete business errors and malformed complete JSON retain existing classification, not network failure')
- const wireMode=url("export const getApiMode=()=> 'v3'"),wireLegacy=url('export async function legacyVersionedRequest(){throw Error("unexpected classic request")}')
- const interactionURL=url(compile(await fs.readFile('src/api/v3-article-interactions.ts','utf8')).replace("from './http'",`from '${httpURL}'`).replace("from './legacy/versioned'",`from '${wireLegacy}'`))
+ const interactionURL=url(compile(await fs.readFile('src/api/v3-article-interactions.ts','utf8')).replace("from './http'",`from '${httpURL}'`))
  const useWireAuth=defineStore('wire-auth',()=>({accessToken:ref(api.getAccessToken()),account:ref({oId:'1'}),async reloadAccount(){}}))
  globalThis.__wireAuth=useWireAuth
  const shimAuth=url('export const useAuthStore=globalThis.__wireAuth'),keys=url('export function profileOperationKey(){return "wire-original-key"}')
  let storeCode=compile(await fs.readFile('src/stores/v3ArticleInteractions.ts','utf8')).replaceAll('import.meta.env.SSR','false')
- for(const [name,target]of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/mode',wireMode],['@/api/http',httpURL],['@/stores/auth',shimAuth],['@/api/v3-profile',keys],['@/api/v3-article-interactions',interactionURL]])storeCode=storeCode.replaceAll(`from '${name}'`,`from '${target}'`)
+ for(const [name,target]of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',httpURL],['@/stores/auth',shimAuth],['@/api/v3-profile',keys],['@/api/v3-article-interactions',interactionURL]])storeCode=storeCode.replaceAll(`from '${name}'`,`from '${target}'`)
  const {useV3ArticleInteractionsStore}=await import(url(storeCode)),pinia=createPinia(),owner=useWireAuth(pinia),store=useV3ArticleInteractionsStore(pinia)
  const stop=api.onAccessTokenChange(value=>owner.accessToken=value)
  const route='/api/v3/articles/2/reward';cut=true

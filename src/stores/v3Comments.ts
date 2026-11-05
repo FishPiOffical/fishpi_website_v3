@@ -1,23 +1,21 @@
 import { defineStore, storeToRefs } from 'pinia'
-import { computed, onScopeDispose, ref, watch } from 'vue'
+import { onScopeDispose, ref, watch } from 'vue'
 import { ApiError, getAuthContextVersion } from '@/api/http'
 import { commentInput, writeV3Comment, type CommentCommand, type CommentInput } from '@/api/v3-comments'
 import { profileOperationKey } from '@/api/v3-profile'
 import { fpConfirm } from '@/composables/useDialog'
-import { getApiMode } from '@/api/mode'
 import { useAuthStore } from '@/stores/auth'
 export const useV3CommentsStore=defineStore('v3-comments',()=>{
   const auth=useAuthStore()
-  const{accessToken,apiKey,account}=storeToRefs(auth),pending=ref<CommentCommand|null>(null),completed=ref<CommentCommand|null>(null),busy=ref(false),confirming=ref(false),error=ref(''),message=ref(''),revision=ref(0),lastOperation=ref(''),receipt=ref<{articleId:string;id:string;operation:string}|null>(null)
-  const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
-  let generation=0,context=getAuthContextVersion(),owner=account.value?.oId,oldCredential=credential.value,confirmation:AbortController|undefined,confirmationOwner:symbol|undefined
+  const{accessToken,account}=storeToRefs(auth),pending=ref<CommentCommand|null>(null),completed=ref<CommentCommand|null>(null),busy=ref(false),confirming=ref(false),error=ref(''),message=ref(''),revision=ref(0),lastOperation=ref(''),receipt=ref<{articleId:string;id:string;operation:string}|null>(null)
+  let generation=0,context=getAuthContextVersion(),owner=account.value?.oId,confirmation:AbortController|undefined,confirmationOwner:symbol|undefined
   function reset(){generation++;confirmation?.abort();confirmation=undefined;confirmationOwner=undefined;pending.value=null;completed.value=null;receipt.value=null;busy.value=confirming.value=false;error.value=message.value='';lastOperation.value='';revision.value++}
-  const stop=watch([credential,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),id=account.value?.oId;if(!credential.value||next!==context||id!==owner||getApiMode()==='v1'&&oldCredential!==credential.value)reset();context=next;owner=id;oldCredential=credential.value},{flush:'sync'})
+  const stop=watch([accessToken,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),id=account.value?.oId;if(!accessToken.value||next!==context||id!==owner)reset();context=next;owner=id},{flush:'sync'})
   onScopeDispose(()=>{stop();reset()})
-  function capture(){const current=generation,version=getAuthContextVersion(),id=account.value?.oId;return()=>!import.meta.env.SSR&&!!credential.value&&!!id&&id===account.value?.oId&&current===generation&&version===getAuthContextVersion()}
+  function capture(){const current=generation,version=getAuthContextVersion(),id=account.value?.oId;return()=>!import.meta.env.SSR&&!!accessToken.value&&!!id&&id===account.value?.oId&&current===generation&&version===getAuthContextVersion()}
   async function execute(command:CommentCommand){
     const valid=capture();if(!valid()||busy.value)return false
-    const recovering=!!pending.value;pending.value=command;receipt.value=null;completed.value=null;busy.value=true;error.value=message.value=''
+    const recovering=!!pending.value;pending.value=command;busy.value=true;error.value=message.value=''
     try{const result=await writeV3Comment(command);if(!valid())return false;completed.value={...command};receipt.value={articleId:command.articleId,id:result.id,operation:command.operation};pending.value=null;message.value='操作已确认，请以重新读取的评论为准。';lastOperation.value=command.operation;revision.value++;try{await auth.reloadAccount()}catch{if(valid())message.value='操作已确认，余额刷新失败，请到积分页核对。'}return true}
     catch(err){if(valid()){error.value=err instanceof Error?err.message:'评论操作失败';if(!recovering&&err instanceof ApiError&&err.status>=400&&err.status<500)pending.value=null}return false}
     finally{if(valid())busy.value=false}
