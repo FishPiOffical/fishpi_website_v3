@@ -33,6 +33,7 @@
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
 | 用户公开勋章 | 第三十四批已接当前启用快照；无历史授予/永久有效证明 | 保留真实授予分页 |
+| 本人职业状态/隐私/等级/成长提示/流水 | 第三十六批已接读取；写入被经典CSRF协议限制，未恢复Cookie桥接 | 保留原读写 |
 | 职业排行 | 第三十五批已接旧经验前20名可见快照；无完整分页/人数 | 保留 |
 | 用户公开职业资料 | 第三十三批已接旧等级快照与可见模块；本人管理/职业榜另迁移 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON | 保留 |
@@ -551,3 +552,18 @@ legacyActivity保存未确认领取跨SPA锁定，没有自动恢复/重发按�
 验证：legacy-profession-ranking-test三组实际API及编译UI覆盖精确旧key/端点、服务端选中与目录绑定、跳号/隐藏经验/真实0、坏字段/越界/重复拒绝、失败原目标重试、选项按钮保留、职业/身份迟到隔离、SSR零读与模式分支；原v3职业榜10组、类型与完整客户端/服务端构建通过。浏览器仅本机合成账号验证登录回跳、职业切换、真实第3/20名、“未公开”与0经验及选中焦点，未登录现网；其他导航模块在本机夹具未提供，未计入验收。夹具已停止并恢复真实v1开发代理。真实多账号隐私、生产排行榜当前内容仍待环境联调。
 
 协议来源：[ProfessionProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ProfessionProcessor.java)、[ProfessionRankingQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ProfessionRankingQueryService.java)、[LoginCheckMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/LoginCheckMidware.java)。
+
+
+## 第三十六批：本人职业状态、隐私与游标明细
+
+/settings/profession按模式挂载LegacyOwnerProfessions或保留的V3OwnerProfessions，复用样式。旧GET /api/profession/me使用内存apiKey，核对真实userId与当前账号ID，白名单投影主职业ID/目录状态、选择状态、十模块隐私、完整有界目录、等级快照及已发布成长/奖励概要；不保留内部ID、版本、时间或原配置。moduleVisibilityJson必须真实且十项完整，读错不得补默认公开。目录状态ACTIVE只解释为主职业目录已发布，不伪称已积累经验；旧服务可能重复附带仅选择的零快照，保留原条目而不假造实际进度/授予。
+
+成长提示来自/me内明确publishedTriggers/publishedRewards字典，保留重复来源与奖励，不造本地成长规则；无该职业条目时仅在完整字典已核验后显示无已发布概要。未知合法触发类型纯文本显示编号，不误译为已知动作；奖励只投影真实正积分或勋章类型，配置与私人状态不混用。
+
+详情GET /api/profession/me/{id}/detail独立投影等级路线及贡献汇总，核对professionId，不从零经验推获得状态。流水GET /api/profession/me/{id}/records?limit=20按服务端nextCursor同时发送beforeOccurredAt/beforeEffectId，支持返回已读上一批；不伪造总量/页码或用时间一项翻页。记录按实际时间降序、保留负经验及来源纯文本；next仅完整20条且与末项时间一致，重复游标明确错误。失败按原批次重试，详情/流水错误独立，不清另一成功资源。
+
+主职业选择、跳过和隐私写入被旧ProfessionProcessor显式挂载CSRFMidware，该中间件同时校验经典Referer和页面Session CSRF Token，没有apiKey豁免。因此本批旧界面只读并明确限制，无伪保存/无假幂等键/无自动重发；不恢复page-auth Cookie桥接、不伪造CSRF。v3原选择、隐私写入和原键恢复完整保留。实现旧写入仍需受信任的旧JSON写协议或后端支持，不能把只读接入算整个职业设置完成。
+
+挂载且已认证后读，旧key、账号、上下文、目标与请求序号隔离迟到数据，退出/卸载清私有内容，SSR零私有读。验证：legacy-owner-professions-test三组实际API/编译UI覆盖稳定ID绑定、隐私与概要完整白名单、零/负经验和快照重复、实际复合游标/坏数据/重复拒绝、独立失败重试与上一批、目标/退出隔离、SSR零读与全程零POST；原v3职业设置和职业榜回归、完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证登录回跳、只读隐私、成长提示、等级/贡献与第二批末尾流水。旁路通知/私信未提供于夹具，不计入本次验收；夹具已停止并恢复现网v1开发服务。未登录生产账号、修改职业/隐私或写入真实数据，生产本人记录与CSRF仍未做真实联调。
+
+协议来源：[ProfessionPrivacyMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ProfessionPrivacyMgmtService.java)、[ProfessionGrowthGuideQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ProfessionGrowthGuideQueryService.java)、[ProfessionProfileDetailQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ProfessionProfileDetailQueryService.java)、[ProfessionProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ProfessionProcessor.java)、[CSRFMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/CSRFMidware.java)。

@@ -46,7 +46,7 @@ console.log('PASS profession ranking 5 collapsed last page re-read and failed ra
 auth.accessToken='D';let releaseGuide;__rankingAPI.fetchV3ProfessionGuide=async id=>id==='10'?new Promise(resolve=>releaseGuide=resolve):{...guide,professionId:id}
 globalThis.__rankingProps=reactive({professionId:'10',name:'创作'});view=await component('ProfessionGuide',['guide','error','load']);await tick();__rankingProps.professionId='11';await tick();releaseGuide(guide);await tick();assert.equal(view.vm.guide.professionId,'11');auth.accessToken=null;assert.equal(view.vm.guide,null);view.app.unmount()
 console.log('PASS profession ranking 6 guide target/credential changes reject old summaries and clear private rendering')
-const top=await fs.readFile('src/views/TopView.vue','utf8'),owner=await fs.readFile('src/components/settings/OwnerProfessions.vue','utf8'),template=await fs.readFile('src/components/profession/V3ProfessionRanking.vue','utf8')
+const top=await fs.readFile('src/views/TopView.vue','utf8'),owner=await fs.readFile('src/components/settings/V3OwnerProfessions.vue','utf8'),template=await fs.readFile('src/components/profession/V3ProfessionRanking.vue','utf8')
 assert.ok(!top.includes('fetchProfessionRanking')&&!top.includes('top:jobs:'));assert.match(top,/<section v-else-if="route.path === '\/top\/profession'"[^>]*><ProfessionRanking \/>/);assert.match(owner,/<ProfessionGuide v-if="guideId"/);assert.match(template,/user.totalExperience !== undefined/);assert.match(template,/经验未公开/);assert.match(template,/user.rank/)
 console.log('PASS profession ranking 7 actual settings/top wiring removes legacy job cache/API and renders omitted experience explicitly, without index rank fallback')
 
