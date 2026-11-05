@@ -1,0 +1,4 @@
+
+.point-transfer { margin: 16px 0; } fieldset { border: 0; padding: 0; margin: 0; } label { display: grid; gap: 6px; margin: 12px 0; } input { padding: 9px 12px; color: var(--fp-text); background: var(--fp-bg); border: 1px solid var(--fp-border); border-radius: 8px; max-width: 100%; box-sizing: border-box; }
+button { padding: 8px 12px; margin: 6px 8px 6px 0; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } .hint { font-size: 13px; color: var(--fp-muted); } .error { color: #c34a36; } .receipt { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--fp-border); overflow-wrap: anywhere; }
+

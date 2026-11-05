@@ -33,6 +33,7 @@
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
 | 用户公开勋章 | 第三十四批已接当前启用快照；无历史授予/永久有效证明 | 保留真实授予分页 |
+| 积分转账 | 第三十八批已接旧apiKey POST及当前余额；仅成功确认，无费用/到账/编号回执，无幂等重放 | 保留详细回执/原键恢复 |
 | 本人背包/四卡使用 | 第三十七批已接旧JSON读取、三种消耗GET及改名卡POST；无幂等重放，积分改名另受页面会话限制 | 保留原接口/原键恢复 |
 | 本人职业状态/隐私/等级/成长提示/流水 | 第三十六批已接读取；写入被经典CSRF协议限制，未恢复Cookie桥接 | 保留原读写 |
 | 职业排行 | 第三十五批已接旧经验前20名可见快照；无完整分页/人数 | 保留 |
@@ -583,3 +584,18 @@ legacyActivity保存未确认领取跨SPA锁定，没有自动恢复/重发按�
 验证：legacy-inventory-test三组实际API/Pinia/编译UI覆盖四命令精确旧key、消耗GET/no-store/禁止自动重发、改名规范化、坏快照/renderer拒绝、原操作跨路由锁定、后置GET不采历史999回执、缓存/读取失败不重复消耗、当前账号名取GET、身份/迟到/SSR边界、确认取消与卸载中止、全局核对解锁；原v3背包六组及完整类型/客户端/服务端构建通过。浏览器仅本机合成账号使用免签卡和改名卡，验证真实GET剩余4天/当前名称，并模拟补签已消耗后503、离页返回仍锁定且当前卡已消失。两日卡请求协议由专项测试覆盖；真实补签业务条件、名称占用及多节点扣卡/退款未联调。账号页其他勋章/安全/扫码和旁路通知未由本机夹具提供，不计入本次验收；夹具已停止并恢复现网v1代理，未登录或消耗真实道具。
 
 协议来源：[SettingsProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/SettingsProcessor.java)、[CloudService.getBag/putBag](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CloudService.java)、[LoginCheckMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/LoginCheckMidware.java)。
+
+
+## 第三十八批：旧积分转账
+
+设置与个人主页共用PointTransfer模式包装，v3原表单/详细回执及原键恢复保留；旧LegacyPointTransfer仅POST /point/transfer，精确发送apiKey/userName/amount/memo。已核对LoginCheck及PointTransferValidation均支持apiKey，服务器按用户名解析收款用户及校验状态/余额/备注，不由客户端指定收款ID或手续费。请求no-store并禁用风控自动重发，无假Idempotency-Key，不向旧端点发送Bearer。
+
+旧处理器成功只返回code=0，不含主款流水编号、到账或手续费。客户端只记本次已确认请求与冻结的请求用户名/总积分，不投影额外回执字段、不把用户输入称实际到账、不从会员代码推客户端免税资格。费率、当时会员及实际扣款由旧服务处理；主款与手续费分步执行，失败可能已有部分结果，任何未知/业务错误均保留原操作锁定，不能自动重转或用4xx释放。全局提示只显示状态/核对流水链接，不显示原收款人或备注；跨SPA保留，明确核对后才解除，刷新/退出会丢失本机锁定。
+
+确认前独立GET /api/user?apiKey读取余额，核对本人稳定ID与安全整数；失败显示未知、负余额按实际值显示，余额不足不进入确认。当前GET成功后才更新共享本人余额，历史回执绝不回填；成功后只重读当前余额，读取失败仍保持转账已确认，不重新执行。确认绑定原输入/身份，离页、换号或个人页目标变化取消迟到批准；SSR零私人请求。用户名用于寻址、原备注经旧服务清洗，不在界面注入HTML。
+
+代理新增POST /point/transfer精确入口，SSR/SPA共用按模式Node代理和生产nginx一致，防止落入固定旧Vite代理或SPA非JSON响应。邀请码查询/购买另有经典CSRF或Sessions限制，本批未恢复页面Cookie桥接，未计入已适配。
+
+验证：legacy-point-transfer-test三组实际API/Pinia/编译表单覆盖精确旧body/禁重发、仅成功确认投影、真实本人正负余额与输入/错身份拒绝、未知跨SPA锁定零重放、后置读失败不重转、余额不足、确认取消及目标/离页批准失效、SSR与全局提示白名单。原v3财务七组、双模式代理和完整类型/客户端/服务端构建通过。浏览器仅本机合成账号验证登录回跳含收款query、明确确认、余额100→95及忽略假明细999；模拟第二笔扣款后503，表单锁定且手动只读刷新显示89，无再次转账。生产双账号、并发余额、真实会员费率、分步扣费及通知未联调；旁路通知/私信未提供于夹具，不计入本次验收。夹具已停止并恢复现网v1开发代理，未登录真实账号或转移现网积分。
+
+协议来源：[SettingsProcessor.pointTransfer](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/SettingsProcessor.java)、[PointTransferValidationMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/validate/PointTransferValidationMidware.java)、[LoginCheckMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/LoginCheckMidware.java)。
