@@ -28,7 +28,7 @@ state.responses.push(env({following:true,changed:true}));await store.set('2',tru
 console.log('PASS user follow 2 real Pinia preserves unknown intent/key across token rotation and blocks opposite action until same-command recovery')
 let release;state.dispatch=()=>new Promise(r=>release=r);const pending=store.set('2',false);state.context++;owner.accessToken=null;owner.account=null;release(env({following:false,changed:true}));await pending;assert.deepEqual(store.commands,{});assert.equal(store.lastChange.targetId,'');state.dispatch=null
 console.log('PASS user follow 3 logout/new identity clear unresolved commands and delayed completions cannot revive old state')
-const source=await fs.readFile('src/components/user/UserFollowButton.vue','utf8'),descriptor=parse(source).descriptor
+const source=await fs.readFile('src/components/user/V3UserFollowButton.vue','utf8'),descriptor=parse(source).descriptor
 const storeURL=url('export const useV3UserFollowStore=globalThis.__followStore'),resolveURL=url(`export async function resolveV3NicknameUser(name){return{id:name==='other'?'2':'3',userName:name}}`)
 const component=(await import(url(replace(compile(compileScript(descriptor,{id:'follow-test',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-user-follow',apiURL],['@/api/v3-membership-styles',resolveURL],['@/stores/auth',authURL],['@/stores/v3UserFollow',storeURL]])))).default
 const insert=(node,parent,anchor)=>{if(node.parent){const i=node.parent.children.indexOf(node);if(i>=0)node.parent.children.splice(i,1)}const i=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(i<0?parent.children.length:i,0,node);node.parent=parent}

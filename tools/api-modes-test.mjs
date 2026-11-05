@@ -30,7 +30,7 @@ try {
     const response=await fetch(base+path+(path.includes('?')?'&':'?')+'apiKey=synthetic',{headers:{Cookie:'fp.apiMode=v1; fp_v3_refresh=private',Authorization:'Bearer must-not-forward'}})
     assert.equal((await response.json()).version,'v1');assert.equal(calls.at(-1).headers.authorization,undefined);assert.ok(!calls.at(-1).headers.cookie?.includes('fp_v3_refresh'))
   }
-  for(const path of ['/markdown','/users/names','/report','/comment','/comment/paragraph','/article/reaction','/comment/reaction','/comment/paragraph/thread/parents','/comment/paragraph/summary','/comment/thread/replies']){
+  for(const path of ['/markdown','/users/names','/follow/user','/unfollow/user','/report','/comment','/comment/paragraph','/article/reaction','/comment/reaction','/comment/paragraph/thread/parents','/comment/paragraph/summary','/comment/thread/replies']){
     const response=await fetch(base+path,{method:'POST',headers:{Cookie:'fp.apiMode=v1; fp_v3_refresh=private',Authorization:'Bearer must-not-forward','Content-Type':'application/json'},body:JSON.stringify({name:'test',markdownText:'read-only fixture'})})
     assert.equal((await response.json()).version,'v1');assert.equal(calls.at(-1).headers.authorization,undefined);assert.ok(!calls.at(-1).headers.cookie?.includes('fp_v3_refresh'))
   }

@@ -35,7 +35,8 @@
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON | 保留 |
 | 用户文章/长文/公开回帖/清风列表 | 第二十二批已接；私密正文与清风单条读取受旧契约限制 | 保留 |
 | 关注/粉丝、关注标签与收藏列表读取 | 第二十三批已接；旧订阅列表缺独立JSON，删除记录可能省略 | 保留 |
-| 关注/收藏写入、账号各类设置、财务/导出等 | 待适配 | 保留 |
+| 用户关注/取消关注 | 第二十四批已接，旧响应无幂等回执，合成身份验收 | 保留 |
+| 标签关注/收藏/订阅写入、账号各类设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
 
@@ -372,3 +373,19 @@ useMemberPage的身份边界按模式观察实际旧key/Bearer，换key/账号/�
 验证：legacy-relations-test五组覆盖实际适配器和公共入口、精确路径/旧key、真实分页、白名单/签名URL、标签URI、匿名与受限收藏、删除记录不编造、订阅零回退、隐私/空/坏响应和换key迟到。原v3关系5组/收藏7组及相关共享身份解码器共16套回归通过，类型检查和完整构建通过。浏览器仅用本机合成身份验证登录回跳/stars、受限正文隐藏、中文标签URI和粉丝第2页5条；无真实关注或收藏写入。夹具已停止，127.0.0.1:5173恢复现网v1开发代理。生产隐私组合及非空真实收藏仍需联调，不据此宣称全站已完成。
 
 协议来源：[UserProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)、[FollowQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/FollowQueryService.java)、[Tag模型](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Tag.java)。只读核对JSON协议与源码，不抓取页面或恢复Cookie桥接。
+
+## 第二十四批：用户关注与取消关注
+
+共享UserFollowButton按模式挂载LegacyUserFollowButton或原样保留的V3UserFollowButton，用户主页和悬浮卡共用入口。v1从/user/{name}?apiKey读取实际canFollow（yes为未关注、no为已关注、hide为当前不可操作），核对返回稳定用户ID与已知目标；不从列表缺席推断未关注，不把完整公开用户响应存入操作状态。用户名变更导致ID不一致时明确拒绝，不能跟随旧名字误操作另一用户。
+
+写入使用POST /follow/user或/unfollow/user，只有专用旧apiKey和followingId。成功响应没有当前状态或幂等回执，随后重新GET；共享完成通知废弃其他组件的在途旧读，不能被迟到状态覆盖。按钮DOM保持稳定，处理函数阻止繁忙/未确认时重复操作。SSR、游客和本人不读取/显示操作。
+
+独立legacyUserFollow保存未确认原目标/意图跨SPA锁定，不自动重发、无假幂等键，不借用v3重试同键机制。任何失败保留锁定，必须成功重读当前状态后由用户明确核对解除；重新打开组件可以核对但不能自动解锁。换key/账号清命令及拒迟到读写。成功后的GET失败只重试读取，不重复提交。
+
+本批同步补齐SSR/生产Node精确两条写路径的模式代理，nginx精确location进入Node，SPA原代理保留。原v3明确PUT/DELETE及原键恢复实现逐字保留，不改其API或生命周期。
+
+已核对的限制：旧FollowProcessor用户关注两方法显式支持getUserByKey；标签、文章收藏、文章订阅六方法仍只使用Sessions.getUser，LoginCheck的apiKey上下文不能替代页面Session。因此这些写入仍待合法接口契约支持，没有恢复退役Cookie桥接，不能宣称全部关系功能完成。
+
+验证：legacy-user-follow-test五组实际API/Pinia/编译Vue覆盖canFollow/ID核验、精确旧字段、无假回执/自动重放、未知跨组件锁定与重读后解除、后置GET失败只重读、身份/SSR/本人隔离、另一组件完成废弃在途GET及模式包装。原v3关注8组、用户卡片12组、双模式代理回归和完整类型/客户端/服务端构建通过。浏览器仅使用本机合成账号验证登录回跳用户主页、关注和取消后的当前GET状态及焦点保留；没有关注真实用户。夹具已停并恢复127.0.0.1:5173现网v1开发代理。生产关注通知、并发、权限和风控仍需真实环境联调。
+
+协议来源：[FollowProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/FollowProcessor.java)、[UserProcessor.getUserInfo](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)。只读核对公开源码，不改变Rhythm服务认证。
