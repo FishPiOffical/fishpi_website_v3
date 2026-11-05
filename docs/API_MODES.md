@@ -13,7 +13,7 @@
 | 首页连签/在线榜单、最近注册、复读机读取及换一条 | 第三批已接真实快照 | 保留 |
 | 清风列表与写入口 | 第五批已接；写入为本机夹具验收，真实CSRF/权限待验 | 保留 |
 | 复读机投稿/点赞切换 | 第二十批已接；旧切换与投稿无幂等恢复，合成身份验收 | 保留 |
-| 十五类普通榜单及进化/小冰子榜 | 第二十一批已接；本次有限名单分页，职业另迁移 | 保留 |
+| 十五类普通榜单及进化/小冰子榜 | 第二十一批已接；职业榜见第三十五批 | 保留 |
 | 普通文章分类列表、详情和普通评论读取 | 第二批已接，未知总条数不显示 | 保留 |
 | 专栏目录读取 | 第二批适配，实际旧接口部分目录为空且与元数据不一致时明确503 | 保留 |
 | 搜索、标签/领域目录及其文章列表 | 第四批已接，搜索缺匿名元数据时无身份展示 | 保留 |
@@ -33,6 +33,7 @@
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
 | 用户公开勋章 | 第三十四批已接当前启用快照；无历史授予/永久有效证明 | 保留真实授予分页 |
+| 职业排行 | 第三十五批已接旧经验前20名可见快照；无完整分页/人数 | 保留 |
 | 用户公开职业资料 | 第三十三批已接旧等级快照与可见模块；本人管理/职业榜另迁移 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON | 保留 |
 | 用户文章/长文/公开回帖/清风列表 | 第二十二批已接；私密正文与清风单条读取受旧契约限制 | 保留 |
@@ -537,3 +538,16 @@ legacyActivity保存未确认领取跨SPA锁定，没有自动恢复/重发按�
 验证：legacy-public-medals-test三组实际API/编译组件覆盖公开精确读取、重复/无ID条目、原签名URL、坏URL/日期/超预算拒绝、快照分页、图片失败、纯文本、重试、身份/目标迟到隔离与SSR零读；原v3公开勋章十组、勋章图片回归、模式代理和完整类型/客户端/服务端构建通过。浏览器现网只读验证本地Yui当前公开勋章、真实图片完成加载和刷新，未登录或修改展示/授予；非空多页由本机夹具验证。本人勋章管理、职业榜与其他全站能力仍待继续适配。
 
 协议来源：[UserProcessor.getUserMedal](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)、[CloudService.getEnabledMedal](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CloudService.java)。
+
+
+## 第三十五批：职业排行旧可见快照
+
+/top/profession共用模式包装，v3原ProfessionRanking拆为V3ProfessionRanking，仍有真实目录/榜单分页、可见人数与成长提示；旧LegacyProfessionRanking读取GET /api/profession/ranking?apiKey=...，仅当前内存旧key和可选professionId，不发送Bearer、不抓页面、不借旧Cookie认证。服务端返回professions/selectedProfession/entries，核对完整有界目录、显式选中项与请求目标一致；没有默认伪造首项，也不用v3公开目录填旧数据。
+
+旧服务先取经验前20名，再过滤读者不可见用户，所以rank可能跳号且条目数不代表可见总人数。界面保留原始名次并说明前20范围，只显示本次条目数，无假分页、总人口或按索引重排。经验缺失保留“未公开”，真实0显示0；用户名用于主页寻址、昵称仅展示，头像保留合法URL签名，缺头像复用默认图；原始presentation/iconUrl/颜色/内部身份等不投影。
+
+读取失败清榜单并可按原目标重试，目录按钮在切换请求期间保留DOM和焦点。旧key、账号、上下文、目标及请求序号隔离旧响应，退出/卸载清资料，SSR/游客零私有读。原旧榜JSON不提供成长来源/奖励规则，不能以本人私有详情推公开成长提示，不造空来源或假奖励；v3成长提示完整保留，本人职业明细/管理仍后续接入。
+
+验证：legacy-profession-ranking-test三组实际API及编译UI覆盖精确旧key/端点、服务端选中与目录绑定、跳号/隐藏经验/真实0、坏字段/越界/重复拒绝、失败原目标重试、选项按钮保留、职业/身份迟到隔离、SSR零读与模式分支；原v3职业榜10组、类型与完整客户端/服务端构建通过。浏览器仅本机合成账号验证登录回跳、职业切换、真实第3/20名、“未公开”与0经验及选中焦点，未登录现网；其他导航模块在本机夹具未提供，未计入验收。夹具已停止并恢复真实v1开发代理。真实多账号隐私、生产排行榜当前内容仍待环境联调。
+
+协议来源：[ProfessionProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ProfessionProcessor.java)、[ProfessionRankingQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ProfessionRankingQueryService.java)、[LoginCheckMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/LoginCheckMidware.java)。
