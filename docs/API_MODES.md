@@ -1074,3 +1074,12 @@ ArticleListView为v1专栏显示范围说明与当前快照数量，不显示虚
 验证：legacy-public-logs实际API/编译LogsView/真实composable覆盖精确旧URL、元数据白名单/私密拒绝/未知类别丢弃/错误信息不泄漏、空/失败与原始满批分页、apiKey-only登录、同key认证版本和新key迟到隔离、SSR游客零读。legacy-read-boundaries逐一运行以上五个实际helper，验证旧key更新取消回填并回首页、v3轮换保页、SSR零读。原v3发现十九组、专栏详情、目录、首页十八组、公开勋章、legacy勋章及api-modes真实凭据代理测试通过；类型及完整客户端/SSR构建通过。
 
 浏览器仅本机合成登录/日志夹具：首批20条→读取下一批→第2批显示发送弹幕/扣除积分两项且下一批禁用，截图/tmp/fp-logs70-browser.png。未读真实账号日志、未改真实数据，真实旧端点账号权限仍待验收。夹具已停并恢复127.0.0.1:5173现网v1上游；Rhythm保持只读f2e5b59f且干净。全站其它受经典Session/CSRF/完整私有JSON约束的能力继续。
+
+
+## 第七十一批（仅website）：本人资料读取取消与登录代次隔离
+
+复核现有本人资料读取仍只比较旧apiKey，同key退出重新登录的认证代次未被适配器校验；设置面板虽用序号拒回填，但旧HTTP读取没有被取消。fetchLegacyOwnerProfile新增getAuthContextVersion边界和AbortSignal，严格正整数目标ID，no-store/禁重定向，预先取消零请求、请求后再次核验取消及认证代次；仍只投影现有本人五字段，不扩大公开/私有字段或构造保存协议。
+
+LegacyOwnerProfileSettings每次重读建立独立AbortController，刷新、切资料/头像模式、换身份及卸载取消原请求并清本机结果；原序号/身份/模式验证继续保留。成功结束释放controller，已取消读取不能恢复头像、加载或错误状态。资料保存仍因QQ/标签/MBTI缺完整本人原值受限，头像写入仍Sessions，本批不伪称编辑已经接通。
+
+验证：legacy-owner-profile实际API/编译面板原白名单/签名头像/明文昵称/失败重试/身份清理/SSR回归通过，新增同key不同认证代次拒迟到、坏ID/预取消零请求、离页信号取消、切头像模式取消旧资料读且迟到头像不覆盖、取消后的响应拒绝。设置模式门禁回归及完整类型/客户端/SSR构建通过。本批浏览器未新增验证，面板取消交互由编译组件专项执行；未向真实账号写资料或头像。Rhythm保持f2e5b59f且干净、只读。全站其余缺口继续。

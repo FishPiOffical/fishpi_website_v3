@@ -5,18 +5,19 @@ import { getAuthContextVersion } from '@/api/http'
 import { fetchLegacyOwnerProfile, type LegacyOwnerProfile } from '@/api/legacy/owner-profile'
 const props = defineProps<{ mode: 'profile' | 'avatar' }>()
 const auth = useAuthStore(), profile = ref<LegacyOwnerProfile | null>(null), loading = ref(false), error = ref(''), imageError = ref(false)
-let mounted = false, sequence = 0
+let mounted = false, sequence = 0, controller:AbortController|null=null
 function identity() { return JSON.stringify([getAuthContextVersion(), auth.apiKey, auth.account?.oId]) }
-function clear() { sequence++; profile.value = null; loading.value = false; error.value = ''; imageError.value = false }
+function clear() { sequence++; controller?.abort(); controller=null; profile.value = null; loading.value = false; error.value = ''; imageError.value = false }
 async function read() {
   if (!mounted || import.meta.env.SSR || !auth.apiKey || !auth.account?.oId) return
   clear()
+  const abort=new AbortController();controller=abort
   const run = sequence, owner = auth.account.oId, reader = identity(), mode = props.mode
-  const valid = () => mounted && run === sequence && reader === identity() && mode === props.mode
+  const valid = () => mounted && !abort.signal.aborted && run === sequence && reader === identity() && mode === props.mode
   loading.value = true
-  try { const value = await fetchLegacyOwnerProfile(owner); if (valid()) profile.value = value }
+  try { const value = await fetchLegacyOwnerProfile(owner,abort.signal); if (valid()) profile.value = value }
   catch (failure) { if (valid()) error.value = failure instanceof Error ? failure.message : '本人资料读取失败' }
-  finally { if (valid()) loading.value = false }
+  finally { if (valid()) {loading.value = false;controller=null} }
 }
 watch([identity, () => props.mode], () => { clear(); void read() }, { flush: 'sync' })
 onMounted(() => { mounted = true; void read() })
