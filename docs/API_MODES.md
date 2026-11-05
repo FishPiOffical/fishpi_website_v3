@@ -7,6 +7,8 @@
 | 能力 | v1 | v3 |
 | --- | --- | --- |
 | 模式选择、HTTP代理、SSR请求隔离 | 已接 | 保留 |
+| 找回密码与短信重置 | 第六十五批已有旧短信/元数据/重置协议；真实短信与改密未验收 | 保留原完整流程 |
+| 注册 | 第六十五批独立说明旧协议限制，不挂载v3注册表单 | 保留原完整流程 |
 | 登录、本人基础资料、退出 | 已接旧getKey/user，合成账号验证 | 保留，认证/导航回归验证 |
 | 首页最新40、热议12、最近/热门专栏各8、标签24 | 已接现网真实JSON只读 | 保留原读取与SSR投影 |
 | 需求反馈列表/提交/投票/管理 | 独立服务按旧key核验，合成身份验证 | 原Bearer核验保留 |
@@ -978,3 +980,20 @@ Node/SPA共用代理对/users/emotions移除全部页面Cookie及v1 Authorizatio
 验证：新增legacy-content-capabilities编译真实能力提示和两个模式包装，覆盖六种原因、退出清理、游客/SSR空壳、即使故意同时存在Bearer也不挂v3私有控件、原legacy投票/打赏分派及v3 props/事件转发。原v3-content-relations九组在原样拆出的叶子组件继续完整执行，v3-article-interactions十九组和legacy文章/评论投票、打赏专项均通过；类型与完整客户端/SSR构建通过。
 
 浏览器仅本机合成账号/文章，看到收藏/订阅/感谢入口、展开收藏及感谢的不同原因，且已有赞同/反对仍正常显示，截图/tmp/fp-content64-browser.png。未对真实站点进行收藏/扣分/采纳，标签/评论及SSR/模式由专项覆盖。开发服务恢复127.0.0.1:5173现网v1上游；Rhythm保持f2e5b59f且工作区干净。全站其余缺口继续。
+
+
+## 第六十五批（仅website）：旧版短信找回与重置密码
+
+只读重新核对发现既有GET /api/reset-pwd/meta为SPA提供JSON，按code验证重置用途/到期并返回userId/code；现网不带验证码请求返回JSON「校验码不能为空」，证明端点已上线，没有尝试真实验证码。更正此前把整个重置流程视为缺少JSON的笼统判断。POST /forget-pwd接收userPhone/captcha（GeeTest4验证结果）；POST /reset-pwd接收userId/code/userPassword摘要，服务端用该ID与重置短信证明核对。无需新增Rhythm端点、页面HTML或Cookie桥接。
+
+新增legacy/password-reset与LegacyPasswordReset。短信申请冻结已验证手机号；GeeTest使用既有公开captchaId，可用部署VITE_LEGACY_GEETEST_ID覆盖（不是密钥），不调用v3 captcha-options。重置先校验6位码与新密码6..128 UTF16/控制字符/坏代理，保持空白和Unicode后MD5；目标ID只能来自同一验证码的当前meta GET，不采用当前登录/公开资料/客户端输入ID。读取后复核身份版本及取消信号，再POST。所有请求no-store/禁重定向；写操作禁自动风控重发，无伪造幂等键。
+
+提交前立即清空输入框，原值只留本次局部调用。任何已发送重置的失败（含业务错误、网络/正文错误）均按未知结果处理，清证明和密码并退出本机登录，要求先以新密码核实，不保留财务式待恢复命令或自动重试。成功只显示重新登录，不采用旧接口附带的页面会话。预检失败未POST，仍可重新填写。离页取消预检与旧验证码组件、身份变化清输入且拒迟到结果，旧重置不能退出新身份；普通页面无自动私人读取。
+
+ForgetPwdView/ResetPwdView按模式选用旧组件，v3 AccountAccessForm完全保留。RegisterView在v1说明注册选项/验证协议仍不足，不再挂载v3表单并发起注定501的请求；未把注册列为完成。查询片段中的code不自动读取/提交，不把证明或密码写入页面URL、存储、Pinia或日志。
+
+Node/SPA共用代理接管两个旧POST与meta GET，移除所有页面Cookie/Bearer，丢弃旧账号恢复响应Set-Cookie并强制no-store。nginx精确/forget-pwd、/reset-pwd均进入Node，GET仍走SPA；meta因为既有协议将code放query，示例单独access_log off，部署还需上游/监控不记录校验码查询及请求正文。现有上游GET协议无法由website改成无query，未伪称全链路无验证码URL。
+
+验证：legacy-password-reset实际API/编译表单/三个路由覆盖短信字段白名单、完整meta→reset字段与Unicode摘要、错误目标/身份变化/取消预检零POST、模式隔离、全部写失败未知且不重试、短信失败仍可填已收到验证码、重复点击、输入立即清空、成功/未知重新登录、离页取消、迟到完成不退出新账号、SSR零读取。api-modes真实本机HTTP覆盖三端点Cookie/Bearer去除、Set-Cookie丢弃、no-store及GET SPA不被接口截走；原v3-account-access二十组和类型/完整客户端/SSR构建通过。
+
+浏览器在正常现网v1上游只读检查/forget-pwd页面→点击「已收到短信验证码」→/reset-pwd三项表单，截图/tmp/fp-reset65-browser.png。没有申请真实短信、完成人机验证或输入/提交新密码；真实改密/短信送达仍需用户自行验收。开发服务继续127.0.0.1:5173。Rhythm只读，HEAD f2e5b59f且干净。全站注册/其它设置及编辑等缺口继续。

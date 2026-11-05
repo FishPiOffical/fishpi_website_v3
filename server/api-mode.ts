@@ -45,6 +45,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
     const path=(req.url || '').split('?')[0] || ''
     const noticeResource=/^\/notifications\/(?:unread\/count|all-read|make-read\/(?:commented|reply|at|following|point|broadcast|sys-announce|other))$/.test(path)
     const chatResource=/^\/chat\/(?:get-list|get-message|has-unread|mark-as-read|mark-all-as-read|revoke|send)$/.test(path)
+    const resetResource=req.method==='POST'&&['/forget-pwd','/reset-pwd'].includes(path)||req.method==='GET'&&path==='/api/reset-pwd/meta'
     const mfaResource=req.method==='GET'&&/^\/mfa(?:\/(?:enabled|verify|remove))?$/.test(path)
     const commentRemoval=req.method==='POST'&&/^\/comment\/[1-9][0-9]*\/remove$/.test(path)
     const articleRemoval=req.method==='POST'&&/^\/article\/[1-9][0-9]*\/remove$/.test(path)
@@ -52,7 +53,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
     const editorResource=path==='/markdown' && req.method==='POST' || path==='/users/names' && req.method==='POST' || path==='/users/emotions' && req.method==='GET'
     const roomResource=/^\/chat-room\//.test(path)
     const reactionResource=req.method==='POST'&&['/vote/up/comment','/vote/down/comment','/vote/down/article','/article/reward','/vote/up/article','/article','/point/transfer','/follow/user','/unfollow/user','/comment','/comment/paragraph','/article/reaction','/comment/reaction','/comment/paragraph/thread/parents','/comment/paragraph/summary','/comment/original','/comment/thread/replies'].includes(path)
-    const legacyResource=articleRemoval || commentRemoval || revisionResource || mfaResource || /^\/article\/random\/[1-9][0-9]?$/.test(path)&&req.method==='GET' || path==='/activity/yesterday-liveness-reward-api'&&req.method==='GET' || reactionResource || path==='/report' && req.method==='POST' || roomResource || editorResource || noticeResource || chatResource || /^\/user\/[A-Za-z0-9_-]+(?:\/medal)?$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
+    const legacyResource=resetResource || articleRemoval || commentRemoval || revisionResource || mfaResource || /^\/article\/random\/[1-9][0-9]?$/.test(path)&&req.method==='GET' || path==='/activity/yesterday-liveness-reward-api'&&req.method==='GET' || reactionResource || path==='/report' && req.method==='POST' || roomResource || editorResource || noticeResource || chatResource || /^\/user\/[A-Za-z0-9_-]+(?:\/medal)?$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
     if (!/^\/api(?:\/|$)/.test(req.url || '') && !legacyResource) return next()
     const mode = requestMode(req,env)
     if(mode === 'v1' && /^\/api\/v3(?:\/|$)/.test(req.url || '')) {
@@ -62,6 +63,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
     const target = new URL(backendTarget(mode,env)), headers = {...req.headers}
     delete headers['x-fp-api-mode']
     if (mode === 'v1') delete headers.authorization
+    if (mode === 'v1' && resetResource) delete headers.cookie
     if (mode === 'v1' && req.method === 'POST' && ['/article/reward','/vote/up/article','/vote/down/article','/vote/up/comment','/vote/down/comment','/comment/original','/comment/thread/replies','/comment/paragraph/summary','/comment/paragraph/thread/parents'].includes(path)) delete headers.cookie
     // Share handlers prefer page Sessions over apiKey. Keep the selected legacy identity authoritative.
     if (mode === 'v1' && path === '/api/columns/mine') delete headers.cookie
@@ -76,7 +78,8 @@ export function apiProxy(env: Record<string,string|undefined>) {
     headers['user-agent']='Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
     const upstream=(target.protocol==='https:'?https:http).request({hostname:target.hostname.replace(/^\[|\]$/g,''),port:target.port,path:req.url,method:req.method,headers}, response=>{
       const outgoing={...response.headers}
-      if(mfaResource)outgoing['cache-control']='no-store'
+      if(mfaResource || resetResource)outgoing['cache-control']='no-store'
+      if(mode==='v1'&&resetResource)delete outgoing['set-cookie']
       if(outgoing['set-cookie']) outgoing['set-cookie']=outgoing['set-cookie'].map(cookie=>cookie.replace(/;\s*Domain=[^;]+/gi,''))
       res.writeHead(response.statusCode || 502,outgoing)
       response.on('error',()=>res.destroy());response.pipe(res)
