@@ -2,20 +2,22 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { getAuthContextVersion } from '@/api/http'
+import {getApiMode} from '@/api/mode'
 import { revisionPage,revisionDetail,type RevisionKind,type RevisionMeta,type RevisionPage,type RevisionDetail } from '@/api/v3-revisions'
 import { decodeEntities } from '@/utils/text'
 import { useAuthStore } from '@/stores/auth'
 const props=withDefaults(defineProps<{kind:RevisionKind;targetId:string;trigger?:boolean}>(),{trigger:true})
 const emit=defineEmits<{openChange:[value:boolean]}>()
-const {accessToken,account}=storeToRefs(useAuthStore())
+const {accessToken,apiKey,account}=storeToRefs(useAuthStore())
+const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
 const heading=ref<HTMLElement|null>(null)
 const mounted=ref(false),opened=ref(false),page=ref(1),listing=ref<RevisionPage|null>(null),detail=ref<RevisionDetail|null>(null),selected=ref<RevisionMeta|null>(null)
 const loading=ref(false),busy=ref(false),listError=ref(''),detailError=ref('')
-const authenticated=computed(()=>mounted.value&&!!accessToken.value&&!!account.value)
+const authenticated=computed(()=>mounted.value&&!!credential.value&&!!account.value)
 const title=computed(()=>detail.value?.title===undefined?'':decodeEntities(detail.value.title))
 const content=computed(()=>detail.value?decodeEntities(detail.value.content):'')
 let listSequence=0,detailSequence=0,boundary=''
-function identity(){return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${props.kind}:${props.targetId}`}
+function identity(){return JSON.stringify([getApiMode(),getAuthContextVersion(),getApiMode()==='v1'?credential.value:!!credential.value,account.value?.oId||'',props.kind,props.targetId])}
 function clearDetail(){detailSequence++;detail.value=null;selected.value=null;detailError.value='';busy.value=false}
 function clear(){listSequence++;clearDetail();listing.value=null;loading.value=false;listError.value=''}
 function close(){opened.value=false;clear();emit('openChange',false)}
@@ -40,7 +42,7 @@ async function select(meta:RevisionMeta){
   finally{if(valid())busy.value=false}
 }
 function date(time:number|null){if(time===null)return'修改时间未知';const value=new Date(time);return Number.isFinite(value.getTime())?value.toLocaleString():String(time)}
-watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.targetId],()=>{const next=identity();if(next===boundary)return;boundary=next;close()},{flush:'sync'})
+watch([credential,()=>account.value?.oId,()=>props.kind,()=>props.targetId],()=>{const next=identity();if(next===boundary)return;boundary=next;close()},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity()})
 onBeforeUnmount(()=>{mounted.value=false;close()})
 defineExpose({toggle,opened})
@@ -51,11 +53,12 @@ defineExpose({toggle,opened})
     <div v-if="opened" class="history-content">
       <h3 ref="heading" tabindex="-1">{{ kind==='article'?'文章':'评论' }}修订历史</h3>
       <p>历史内容可能包含后来删除的文字。</p>
+      <p v-if="getApiMode()==='v1'">旧接口返回历史快照，以下为本地分页。内容经过服务端处理，仅用于文本查看。</p>
       <p v-if="loading" role="status">正在读取历史列表…</p>
       <p v-if="listError" role="alert">{{ listError }}</p>
       <button type="button" :aria-disabled="loading" :aria-busy="loading" @click="!loading&&load()">{{ listError?'重试历史列表':'刷新历史列表' }}</button>
       <template v-if="listing">
-        <p v-if="!listing.items.length">{{ listing.pagination.total===0?'暂无保存的历史记录':'本页没有历史记录，请返回前页' }}</p>
+        <p v-if="!listing.items.length">{{ listing.pagination.total===0?(getApiMode()==='v1'?'暂无当前可读取的历史，旧接口不区分无记录和不可见。':'暂无保存的历史记录'):'本页没有历史记录，请返回前页' }}</p>
         <ol>
           <li v-for="meta in listing.items" :key="meta.id"><button type="button" :aria-pressed="selected?.id===meta.id" :aria-busy="busy&&selected?.id===meta.id" :aria-disabled="loading||busy&&selected?.id===meta.id" @click="select(meta)">#{{ meta.index }} {{ meta.current?'当前版本':date(meta.time) }}</button></li>
         </ol>

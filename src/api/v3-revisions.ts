@@ -1,4 +1,6 @@
 import { ApiError, request } from './http'
+import {getApiMode} from './mode'
+import {legacyRevisionPage,legacyRevisionDetail} from './legacy/revisions'
 export type RevisionKind='article'|'comment'
 export type RevisionMeta={id:string;time:number|null;index:number;current:boolean}
 export type RevisionPage={items:RevisionMeta[];pagination:{page:number;size:number;total:number;pageCount:number}}
@@ -16,6 +18,7 @@ function metadata(v:unknown,kind:RevisionKind):RevisionMeta{
 }
 export async function revisionPage(kind:RevisionKind,target:string,page=1):Promise<RevisionPage>{
   if(!Number.isSafeInteger(page)||page<1||page>Math.floor(2147483647/50))throw new ApiError('历史页码不合法',422)
+  if(getApiMode()==='v1')return legacyRevisionPage(kind,target,page)
   const r=data(await request(`${path(kind,target)}?p=${page}&size=20`,{cache:'no-store'})),p=row(r.pagination)
   const pagination={page:integer(p.page,1),size:integer(p.size,1),total:integer(p.total),pageCount:integer(p.pageCount)}
   const expected=Math.max(0,Math.min(20,pagination.total-(page-1)*20))
@@ -24,6 +27,7 @@ export async function revisionPage(kind:RevisionKind,target:string,page=1):Promi
   return{items,pagination}
 }
 export async function revisionDetail(kind:RevisionKind,target:string,meta:RevisionMeta):Promise<RevisionDetail>{
+  if(getApiMode()==='v1')return legacyRevisionDetail(kind,target,meta)
   const expected=metadata(meta,kind),r=data(await request(`${path(kind,target)}/${expected.id}`,{cache:'no-store'})),actual=metadata(r,kind)
   if(actual.id!==expected.id||actual.index!==expected.index||actual.current!==expected.current||actual.time!==expected.time)throw new ApiError('历史列表已变化，请重新读取列表',409)
   if(typeof r.content!=='string'||r.content.length>2097152||kind==='article'&&(typeof r.title!=='string'||r.title.length>65536))throw invalid()
