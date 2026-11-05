@@ -39,6 +39,7 @@
 | 本人积分流水与当前余额 | 第二十五批已接；旧说明按文本显示，合成身份验收 | 保留 |
 | 社区九项统计 | 第二十六批已接，现网公开JSON/SSR/刷新只读验证 | 保留 |
 | 同城用户分页 | 第二十七批已接；旧总人数未知、文章JSON仍缺失 | 保留双资源分页与排序 |
+| 大事记公开时间线/详情 | 第二十八批已接；旧快照分页，投稿与本人审核状态仍缺少apiKey契约 | 保留 |
 | 标签关注/收藏/订阅写入、账号各类设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
@@ -430,3 +431,19 @@ useCityFeed按模式观察旧key/Bearer，换key/账号/城市清旧资源并拒
 验证：legacy-cities-test四组实际API/共享hook/编译Vue覆盖精确旧路径、单次编码、真实页数/未知人数、白名单与签名URL、坏ID/分页/城市、错误与空、缺文章资源零回退、第二页及重试、旧key/目标迟到、SSR零请求。原v3同城13组、类型与完整客户端/服务端构建通过。现网只读核对公开用户JSON；本地浏览器验证上海列表、未知总人数提示及第2页（当时76页），未登录或写真实账号。页数和用户顺序均由服务端当前返回，不写死测试数值。文章资源、其余公共页面和账号能力继续迁移。
 
 协议来源：[Router](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/Router.java)、[CityProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CityProcessor.java)、[UserQueryService.getUsersByCity](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/UserQueryService.java)。只读JSON及源码，不抓取现网HTML。
+
+## 第二十八批：大事记公开时间线与详情
+
+listMilestones/getMilestone按模式读取独立legacy/milestones。旧GET /api/milestones返回当前已审核通过的公开快照，不提供服务端分页或单条资源；在有界完整快照上按事件日期倒序、真实ID稳定排序，每页20条。total表示本次实际快照记录数，不把本机切页宣称为服务端全量分页。详情每次重新读取当前公开快照并按真实ID取记录，不缓存上次正文；当前快照缺席仅提示未在公开时间线中，不推断已删除或审核状态。
+
+严格映射id/title/date、可选end_date、media对象和link.url，缺省空字段只按旧缓存明确省略规则处理。日期/范围、URL协议/凭据、媒体类型、重复ID、Unicode/长度和快照上限（10000）校验，不截断后报成功；只投影公开必要字段，不带作者私有信息。旧缓存和查询服务可能吞内部异常，客户端不能用空成功证明数据库全局为空，界面只称当前公开快照。
+
+旧content不是v3清洗后的contentHtml。适配后contentHtml为空；MilestoneBody的v1公开详情在挂载后复用既有markdownPreview→旧/markdown，失败明确错误与重试，不把原content写入v-html。正文、身份/凭据、目标变化和卸载取消或拒迟到结果；原v3公开清洗正文/本人预览行为保留。SSR重投影元数据与公开列表，不执行或直接渲染旧原文HTML。
+
+旧提交处理器仍只用Sessions.getUser和表单参数，缺少本人投稿列表/单条JSON；v1不显示投稿编辑器/本人审核入口，API明确501且零旧写请求，不伪造待审回执。公开页说明该限制，原v3投稿表单及原键恢复保持。useMilestones按模式观察实际凭据，旧key变化清目标/列表/详情，不能因Bearer为空漏掉身份边界。
+
+修复Vite与nginx示例中/milestones整页转发经典站的过时规则：本地SPA/SSR负责页面，/api/milestones按当前模式代理。旧投稿能力仍缺失，没有恢复Cookie桥接或自行拓展后端认证。
+
+验证：legacy-milestones-test四组实际API/共享hook/编译页面和正文组件，覆盖旧字段、真实ID/日期、排序/两页快照、当前详情、私有字段剔除、坏日期/URL/重复/预算、合法空/详情缺席、未支持能力零查询、真实预览适配器/失败重试无原文回退、身份迟到及SSR/路由。原v3大事记18组、类型和完整客户端/服务端构建通过。现网仅公开JSON与预览只读；本地浏览器验证54条/三页、第二页和具体事件详情正文，没有投稿或改真实审核记录。真实投稿与本人状态仍需合法旧key资源，其他全站兼容继续。
+
+协议来源：[MilestoneProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MilestoneProcessor.java)、[MilestoneCache](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/cache/MilestoneCache.java)、[MilestoneQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/MilestoneQueryService.java)。只读JSON及源码，不抓取现网HTML。

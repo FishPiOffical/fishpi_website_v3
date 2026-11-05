@@ -152,7 +152,6 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/activities': proxy,
-        '/milestones': proxy,
         '/guide': proxy,
         '/column': {
           ...proxy,
