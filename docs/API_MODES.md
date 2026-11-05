@@ -40,6 +40,7 @@
 | 社区九项统计 | 第二十六批已接，现网公开JSON/SSR/刷新只读验证 | 保留 |
 | 同城用户分页 | 第二十七批已接；旧总人数未知、文章JSON仍缺失 | 保留双资源分页与排序 |
 | 大事记公开时间线/详情 | 第二十八批已接；旧快照分页，投稿与本人审核状态仍缺少apiKey契约 | 保留 |
+| 鱼游目录/详情/评论读取 | 第二十九批已接；有界旧目录与评论快照、本机分页 | 保留 |
 | 标签关注/收藏/订阅写入、账号各类设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
@@ -447,3 +448,17 @@ listMilestones/getMilestone按模式读取独立legacy/milestones。旧GET /api/
 验证：legacy-milestones-test四组实际API/共享hook/编译页面和正文组件，覆盖旧字段、真实ID/日期、排序/两页快照、当前详情、私有字段剔除、坏日期/URL/重复/预算、合法空/详情缺席、未支持能力零查询、真实预览适配器/失败重试无原文回退、身份迟到及SSR/路由。原v3大事记18组、类型和完整客户端/服务端构建通过。现网仅公开JSON与预览只读；本地浏览器验证54条/三页、第二页和具体事件详情正文，没有投稿或改真实审核记录。真实投稿与本人状态仍需合法旧key资源，其他全站兼容继续。
 
 协议来源：[MilestoneProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MilestoneProcessor.java)、[MilestoneCache](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/cache/MilestoneCache.java)、[MilestoneQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/MilestoneQueryService.java)。只读JSON及源码，不抓取现网HTML。
+
+## 第二十九批：鱼游目录、公开详情与评论读取
+
+listFishGames/getFishGame/listGameComments按模式选择独立legacy/fish-games。旧GET /api/fish-games仅返回指定页数组，无总数/排序参数或独立详情JSON；按50条逐页读取至真实短页，最多200请求，预算超出明确503，不截断后报成功。汇集本次公开目录后按总投票/点赞和时间排序、本机每页20条；跨页重复ID明确错误。详情重新读取当前目录后取实际ID，缺席仅提示未在当前公开目录中，不宣称已删除。旧服务跨页没有快照版本，不能保证并发增删时全局一致，界面只称当前快照。
+
+目录投影oId/name/description/url/iconURL/authorName/upCount/downCount/createTime，严格URL/字符/计数/安全求和和站点时区时间校验。旧响应缺更新时间与本人投票，分别保留null，绝不补成0或未投票；原v3解码仍严格要求真实数字和三态值。目录没有作者ID，不用名字伪造ID或回退当前账号；保留经格式核对的旧作者用户名用于现有主页链接，不声称公开摘要已提供头像/昵称或ID。
+
+评论GET /api/fish-games/{id}/comments返回当前公开评论快照；核对所属游戏及真实评论/作者ID、正文和时间，剔除其他字段，原文仅文本展示；作者已失效的匿名占位不挂载身份。快照最多10000条，按时间倒序本机分页，不伪称服务端游标或总量接口。错误和真实空评论分开，列表、详情与评论互不吞错。
+
+useFishGames按模式观察实际旧key/Bearer，身份/凭据/卸载使在途旧读失效；SSR仍准备态，无目录或私人请求。GamesView提示旧格式范围，v3投稿/明确投票/评论实现保留。已确认FishGameWriteSecurityMidware支持apiKey，旧写入协议与未知结果处理在后续批次接入，不因此宣称鱼游全模块完成。
+
+验证：legacy-fish-games-test四组实际API/共享hook/编译页面覆盖多批目录汇集、两种全局排序与第二页、完整预算失败、旧真实字段/未知元数据、坏URL/ID/时间/计数/重复和跨游戏评论拒绝、空错分离、详情/作者链接/评论分页/纯文本、身份迟到及SSR零读。原v3鱼游18组、类型和完整客户端/服务端构建通过。现网公开JSON只读核对；本地浏览器验证21个鱼游第二页、具体游戏详情/作者链接及空评论，未打开游戏执行动作、投票、评论或投稿真实数据。非空生产评论与并发目录变化未全验，旧写入继续适配。
+
+协议来源：[FishGameProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/FishGameProcessor.java)、[FishGameWriteSecurityMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/FishGameWriteSecurityMidware.java)。只读JSON与源码，不抓取经典详情HTML。
