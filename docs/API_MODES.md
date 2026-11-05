@@ -34,6 +34,7 @@
 | 本人普通评论/段评/楼中楼删除 | 第五十二批已有apiKey POST、明确费用未知确认及原目标未知锁定 | 保留 |
 | 普通署名文章打赏及当前付费区 | 第六十二批接既有apiKey购买，当前GET授权正文；匿名未解锁购买仍缺实际费用字段 | 保留原明确命令与同键恢复 |
 | 评论编辑及其余文章互动 | 第六十四批补明确入口限制；编辑原文、收藏/订阅受旧页面会话限制，感谢缺动态费用JSON，仍未接通；表态见第十七批 | 保留 |
+| 公开日志元数据 | 第七十批接既有/logs/more，每批20条、总数未知，仅投影时间/类别/编号 | 保留真实分页及总数 |
 | 通知列表/未读/已读及实时刷新 | 第六批已接；旧列表仅有限快照，合成身份验收 | 保留 |
 | 私信会话/历史/发送/撤回/已读/未读 | 第七批聊天及第八批富编辑已接，本地合成账号验收；真实上传权限待验 | 保留 |
 | 共享编辑器预览/上传/表情选择/@联想 | 第八批已接，上传仅本地夹具验收 | 保留 |
@@ -1058,3 +1059,18 @@ ArticleListView为v1专栏显示范围说明与当前快照数量，不显示虚
 验证：新增legacy-column-list实际API分派、共享首页投影、编译列表/真实composable与SSR，覆盖68章元数据/签名封面、最新/热门、前12/前8范围、无伪总数/分页、p2零请求、重复/超量/坏值拒绝、失败清卡片及重试、合法空快照、游客SSR复用/登录后重读、旧key迟到隔离。legacy-content、原v3-article-list十六组、v3-home-reads十八组及类型/完整双构建通过。
 
 浏览器在正常现网v1上游只读打开/column，最近更新显示12部；切换热门作品后显示真实另一批12部，封面/章数/最新章节与对应接口一致，截图/tmp/fp-columns69-browser.png。没有登录/修改作品或用户数据；章节总数与序号可能不同（例如缺失章节），保留服务端实际值，不补造。Rhythm只读，仍f2e5b59f且干净；开发服务127.0.0.1:5173保持现网v1。全量专栏目录受旧端点范围限制，不能据本批标为全站兼容全部完成。
+
+
+## 第七十批（仅website）：公开日志读取与共享读取凭据边界
+
+核对原LogsProcessor：GET /logs/more经过支持apiKey的LoginCheck，处理器查询public=true按oId倒序，接受page/pageSize/key3并返回数组，不返回总数或分页元数据。此前useDiscoveryExtras只以Bearer判断logs可读，v1登录后永久停在「尚未读取」。新增legacy/public-logs，由fetchPublicLogMetadata按模式分派既有GET /logs/more?page=N&pageSize=20&apiKey，不新增后端协议、不抓HTML。
+
+逐条核对public===true、合法唯一ID，只有simple和既有公开操作类别白名单可进入显示，投影id/key1时间/key3类别三个字段，未知类型/类别不展示其标签或正文。原始data、key2、IP和其它字段全部丢弃；上游错误可能带内部异常，适配器改为固定读取失败提示，不回显msg或底层异常。缺字段/私密/重复/超量/非法日期明确失败，旧身份/同key不同认证代次拒迟到。请求no-store/禁重定向，代理精确/logs/more去Cookie/Bearer并no-store，nginx同样转Node。
+
+旧接口没有总数：PublicLogPage允许v1 total/pageCount=null，保留sourceCount为原始批次数量。界面明确每批20条/总数未知，以原始满批才提供“读取下一批”，未知事件全部被省略也不误判已到底；不伪造总条数、pageCount或v3分页。v3继续校验真实pagination并显示原分页。游客/SSR不请求日志，换key清视图回首批，错误与空批分别显示、可原批重试。
+
+共享useHomeRead/useDirectory/usePublicColumn/usePublicMedals/useDiscoveryExtras改为按模式选用apiKey/Bearer，捕获凭据于读身份、监听凭据变化，v1登录后重读游客SSR、同账号换key废弃旧读/分页回首。v3普通非空token轮换保留原页，离页/目标/账号边界仍清状态。没有改长篇段评自身已独立实现的身份链。
+
+验证：legacy-public-logs实际API/编译LogsView/真实composable覆盖精确旧URL、元数据白名单/私密拒绝/未知类别丢弃/错误信息不泄漏、空/失败与原始满批分页、apiKey-only登录、同key认证版本和新key迟到隔离、SSR游客零读。legacy-read-boundaries逐一运行以上五个实际helper，验证旧key更新取消回填并回首页、v3轮换保页、SSR零读。原v3发现十九组、专栏详情、目录、首页十八组、公开勋章、legacy勋章及api-modes真实凭据代理测试通过；类型及完整客户端/SSR构建通过。
+
+浏览器仅本机合成登录/日志夹具：首批20条→读取下一批→第2批显示发送弹幕/扣除积分两项且下一批禁用，截图/tmp/fp-logs70-browser.png。未读真实账号日志、未改真实数据，真实旧端点账号权限仍待验收。夹具已停并恢复127.0.0.1:5173现网v1上游；Rhythm保持只读f2e5b59f且干净。全站其它受经典Session/CSRF/完整私有JSON约束的能力继续。
