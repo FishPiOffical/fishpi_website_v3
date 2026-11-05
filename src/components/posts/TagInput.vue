@@ -1,20 +1,22 @@
 <script setup lang="ts">
-import { nextTick,onBeforeUnmount,onMounted,ref,useId,watch } from 'vue'
+import { computed,nextTick,onBeforeUnmount,onMounted,ref,useId,watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
+import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { tagSuggestions,validTagPrefix } from '@/api/v3-tag-suggestions'
 import { tagContext,replaceTag,type TagContext } from '@/utils/tagInput'
 const props=withDefaults(defineProps<{modelValue:string;disabled?:boolean}>(),{disabled:false})
 const emit=defineEmits<{'update:modelValue':[value:string]}>()
-const {accessToken,account}=storeToRefs(useAuthStore()),menuId=useId()
+const {accessToken,apiKey,account}=storeToRefs(useAuthStore()),menuId=useId()
+const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
 const input=ref<HTMLInputElement|null>(null),rows=ref<string[]>([]),open=ref(false),loading=ref(false),error=ref(''),active=ref(-1)
 let mounted=false,focused=false,composing=false,sequence=0,timer:ReturnType<typeof setTimeout>|null=null,controller:AbortController|null=null,context:TagContext|null=null,ownValue=props.modelValue
-const identity=()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])
+const identity=()=>JSON.stringify([getAuthContextVersion(),getApiMode()==='v1'?credential.value:!!credential.value,account.value?.oId||''])
 function close(){sequence++;if(timer!==null)clearTimeout(timer);timer=null;controller?.abort();controller=null;rows.value=[];open.value=false;loading.value=false;error.value='';active.value=-1;context=null}
 function refresh(){
  close()
- if(!mounted||!focused||composing||props.disabled||!accessToken.value||!account.value?.oId||!input.value)return
+ if(!mounted||!focused||composing||props.disabled||!credential.value||!account.value?.oId||!input.value)return
  const current=tagContext(input.value.value,input.value.selectionStart??0,input.value.selectionEnd??0)
  if(!current)return
  if(!validTagPrefix(current.prefix)){error.value='当前标签无法联想，可继续手动输入';return}
@@ -57,6 +59,7 @@ onBeforeUnmount(()=>{mounted=false;close()})
    <input ref="input" :value="modelValue" :disabled="disabled" required placeholder="前端,摸鱼" role="combobox" aria-autocomplete="list" :aria-expanded="open" :aria-controls="menuId" :aria-activedescendant="active>=0?`${menuId}-${active}`:undefined"
     @focus="focusedInput" @blur="blurredInput" @click="refresh" @input="changed" @keydown="keydown" @keyup="event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key))refresh()}" @compositionstart="compositionStart" @compositionend="compositionEnd" />
   </label>
+  <p v-if="getApiMode()==='v1'&&open" class="hint">建议来自当前已有且被使用的标签目录；首次读取可能稍慢。</p>
   <p v-if="loading" role="status">正在查找标签…</p><p v-if="error" role="status">{{ error }}</p>
   <ul v-if="open&&rows.length" :id="menuId" role="listbox" aria-label="标签建议">
    <li v-for="(title,index) in rows" :key="title" role="presentation"><button :id="`${menuId}-${index}`" type="button" role="option" :aria-selected="index===active" tabindex="-1" @pointerdown.prevent @click="choose(title)">{{ title }}</button></li>
