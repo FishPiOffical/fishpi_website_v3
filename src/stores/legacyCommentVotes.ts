@@ -5,17 +5,17 @@ import {getApiMode} from '@/api/mode'
 import {createLegacyCommentVoteReader,toggleLegacyCommentVote} from '@/api/legacy/comment-votes'
 import type {LegacyReactionSource} from '@/api/legacy/reactions'
 import {useAuthStore} from './auth'
-type Command={choice:'up'|'down'|null;busy:boolean;error:string;sent:boolean;verified:boolean}
+type Command={choice:'up'|'down'|null;busy:boolean;error:string;sent:boolean;verified:boolean;verificationRun:number}
 export const useLegacyCommentVotesStore=defineStore('legacy-comment-votes',()=>{
  const auth=useAuthStore(),commands=ref<Record<string,Command>>({}),errors=ref<Record<string,string>>({}),lastChange=ref({id:'',revision:0}),reader=createLegacyCommentVoteReader();let generation=0
  const identity=()=>JSON.stringify([getAuthContextVersion(),auth.apiKey,auth.account?.oId]),active=()=>!import.meta.env.SSR&&getApiMode()==='v1'&&!!auth.apiKey&&!!auth.account?.oId
  function clear(){generation++;commands.value={};errors.value={};reader.clear();lastChange.value={id:'',revision:lastChange.value.revision+1}}
  const stop=watch(identity,clear,{flush:'sync'});onScopeDispose(()=>{stop();clear()})
- async function read(id:string,source:LegacyReactionSource){if(!active())throw new ApiError('请先登录查看评论投票',401);const actor=identity(),run=generation,command=commands.value[id];if(command)command.verified=false;const state=await reader.read(id,source);if(!active()||actor!==identity()||run!==generation)throw new ApiError('身份已变化',409);if(command&&!command.busy&&commands.value[id]===command)command.verified=true;return state}
+ async function read(id:string,source:LegacyReactionSource){if(!active())throw new ApiError('请先登录查看评论投票',401);const actor=identity(),run=generation,command=commands.value[id];const verification=command?++command.verificationRun:0;if(command)command.verified=false;const state=await reader.read(id,source);if(!active()||actor!==identity()||run!==generation)throw new ApiError('身份已变化',409);if(command&&!command.busy&&commands.value[id]===command&&command.verificationRun===verification)command.verified=true;return state}
  async function set(id:string,choice:'up'|'down'|null,source:LegacyReactionSource){
   if(!active()||commands.value[id]||Object.keys(commands.value).length>=100||!/^[1-9][0-9]{0,31}$/.test(id)||!['up','down',null].includes(choice))return
   const actor=identity(),run=generation,valid=()=>active()&&actor===identity()&&run===generation,origin={...source}
-  delete errors.value[id];commands.value[id]={choice,busy:true,error:'',sent:false,verified:false};const command=commands.value[id]!
+  delete errors.value[id];commands.value[id]={choice,busy:true,error:'',sent:false,verified:false,verificationRun:0};const command=commands.value[id]!
   try{const current=await reader.read(id,origin);if(!valid())return
    if(current.vote!==choice){const toggle=choice??current.vote;if(toggle){command.sent=true;await toggleLegacyCommentVote(id,toggle);if(!valid())return}}
    delete commands.value[id];reader.clear();lastChange.value={id,revision:lastChange.value.revision+1}
