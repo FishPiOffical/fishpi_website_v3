@@ -763,3 +763,21 @@ ContentRelationButton 与 v3ContentRelations 继续共享普通文章、长篇�
 审查：新增入口全部显式key鉴权；未修改anonymous.viewSkips、黑名单/验证码解封链；Cookie非授权来源，不引入CSRF会话例外；目标可见性与操作权限复用当前核心，SQL参数化，响应仅ID/关系元数据、前端文本渲染，无用户资料泄露或新外部URL抓取。共享用户/IP写预算及正文/ID边界继续有效。未新增CDN/静态下载资源、版本号URL、sourceMappingURL、上传或下载路径。完整运行中IoC、全局黑名单/首次验证码、真实旧key吊销、MySQL锁与通知交付尚未联调，不能将夹具验证当作上线验收。
 
 人工验收：用户先在IDEA重新编译/重启Rhythm并将v1目标指向更新服务；本人登录后打开普通或长篇文章，收藏/订阅→刷新当前状态→取消；标签页关注→取消。换号后状态必须独立，失效凭据不能写入；不可见文章和不存在标签明确失败；断流后保留原键恢复，不得切成反向命令。切回v3继续原Bearer接口。API.md/UPDATE_LOG.md已在Rhythm更新，发布时需同步站点API文档。本人订阅列表和其余资料/偏好编辑仍待下一批，不能声明全站完成。
+
+## 第四十九批：本人及公开关注内容列表
+
+新增六条 `/api/v1/me/collections|subscriptions|follows/tags` 与 `/api/v1/users/:userName/following/articles|watching/articles|following/tags` GET，复用当前 FollowQuery/Discovery 查询、摘要与隐私规则。本人文章关系保留 unavailable ID 占位；公开列表先 requireUserList，再选择真实收藏或仅 articles 来源的订阅，不能以关注用户/标签扩展动态代替。标签保留真实 id 与 uri。原经典和v3路径不改，无新SQL结构。
+
+ApiV1AuthMidware 新增可选身份：无凭据保持匿名，显式错误密钥/Bearer/query-key 拒绝，不降级游客。公共六路由中的三条 users 路由均接匿名验证码中间件；匿名盾对整个v1命名空间仅读独立 ApiV1AuthMidware.USER，不从Cookie Session或v3Identity恢复身份。原v1账号流程继续匿名；me仍显式要求旧key。传输日志过滤覆盖新公开路径，避免解析错误记录私有输入。
+
+`legacy/versioned.ts` 集中版本化旧key GET：固定v1路径、Header密钥、omit Cookie、禁止自动验证码重试，捕获请求当下旧key，身份变化拒绝晚响应。SavedContent API与视图共用两模式分页/摘要白名单，不再调用旧省略记录的收藏包装或返回订阅501；移除无消费者 legacySavedContent，原关注/粉丝读取另保留。本人占位只读ID，不生成假文章链接，不投影附带标题/作者；公开列表拒绝available占位，匿名文章剥离身份。v1标签强制真实uri供经典链接编码，纯数字URI也必须经目录解析，不能误当资源ID；v3继续ID链接。404目标与未部署服务提示分别保留。
+
+验证：共享列表API/实际编译Vue视图/ArticleFeed七组分别按v1和v3运行；路径、21条真分页、页码/条数/总量矛盾、重复ID、占位/匿名白名单、纯文本标签及URI、503/403/空结果、退出和目标/kind切换迟到响应、SSR零私有读取均通过。v1新增Header-only/游客公开/无key本人零请求/迟到key拒绝/未部署提示；原旧关注粉丝专项保留，删除过期包装断言改由当前实际协议覆盖。类型检查及客户端/SSR完整构建通过。
+
+后端Java25独立javac验证实际Dispatcher/可选身份/控制器，存储和完整匿名盾为显式适配：本人两账号隔离、原分页、公开匿名门禁被调用、三种隐私字段先检验、403零后续查询、明确仅文章订阅选择、坏页码/用户名、错误凭据及503保持错误。实际共享owned查询测试验证owner/type过滤、分页排序和count、当前不可读ID占位，以及count失败不能冒充空列表；既有SQLite关系状态与v3路由权限测试通过。现有内容核心专项验证真实DTO/隐私策略通过；未运行Maven，未重启用户IDEA后端。
+
+浏览器仅本机合成账号：本人21条订阅第1页有不可读ID3和匿名作者，第2页仅不可读ID22，下一页禁用；未显示夹具附带PRIVATE标题/正文。标签中文URI正确编码，HTML样式说明按纯文本；独立游客页的隐藏订阅返回明确无权查看，不回退本人。截图 `/tmp/fp-saved49-browser.png`。未连接真实账号、未收藏或修改隐私；夹具停止后127.0.0.1:5173恢复真实v1上游。
+
+审查：三个公共路由optional-key+匿名盾、三个本人路由明确登录；无viewSkips/黑名单/解封链改动，不新增会话CSRF例外。用户名和分页有界、SQL与DTO复用既有核心、公开列表先隐私后查询、读接口无写入；没有新外部请求URL、CDN/版本号资源、sourceMappingURL、上传或下载路径。完整IoC、真实全局匿名盾/黑名单挑战、MySQL并发快照与现网部署尚未验证，不能用夹具代替上线验收。既有数据库迁移仍须满足，不能宣称未更新的现网已提供这些新JSON路径。
+
+人工验收：先由用户IDEA重新编译/重启Rhythm并指向该v1目标，登录→用户菜单我的收藏或本人主页关注内容→分别打开收藏、订阅、标签→翻页/重读；本人不可读项只显示ID，订阅与上批关系写入结果吻合。再以游客/其他账号查看公开或隐藏列表，隐藏应403，错误和空结果区分；切回v3仍走原路径。发布时同步Rhythm API.md/UPDATE_LOG.md到站点API文档。全站其余资料、偏好和内容操作继续适配，此批不代表全站完成。

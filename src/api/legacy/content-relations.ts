@@ -16,7 +16,6 @@ async function data(path:string,init:RequestInit={}){
 }
 export async function resolveLegacyContentRelationTarget(kind:ContentRelationKind,value:string){
  if(kind!=='tag'){path(kind,value);return value}
- if(/^[1-9][0-9]{0,18}$/.test(value))return value
  if(!value||value.length>256||/[\u0000-\u001f\u007f]/.test(value))throw new ApiError('标签目标不合法',422)
  const result=await data('/api/v1/me/tag-target?'+new URLSearchParams({tag:value}));if(typeof result.targetId!=='string')throw bad();return id(result.targetId)
 }

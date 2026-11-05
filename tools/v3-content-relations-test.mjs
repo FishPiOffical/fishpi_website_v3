@@ -70,6 +70,7 @@ if(mode==='v1'){
  let done;state.dispatch=()=>new Promise(resolve=>done=resolve);const old=api.readContentRelation('subscription','2');state.legacyKey='b'.repeat(128);done(env({targetId:'2',following:true}));await assert.rejects(old,error=>error.status===409);state.dispatch=null;
  state.responses.push(new ApiError('目标不存在',404,'not_found'));await assert.rejects(api.readContentRelation('collection','2'),error=>error.message==='目标不存在');state.responses.push(new ApiError('非JSON',404));await assert.rejects(api.readContentRelation('collection','2'),error=>error.code==='v1_relations_unavailable');
  for(const call of state.requests){assert.ok(call.path.startsWith('/api/v1/me/'));assert.ok(!call.path.includes(legacyKey));assert.equal(call.init.credentials,'omit');assert.equal(call.init.__captchaRetried,true);assert.equal(call.init.headers.Authorization,undefined);assert.ok(!call.init.body)}
+ state.responses.push(env({targetId:'9'}));assert.equal(await api.resolveContentRelationTarget('tag','123'),'9');assert.equal(state.requests.at(-1).path,'/api/v1/me/tag-target?tag=123');
  const before=state.requests.length;state.legacyKey=null;await assert.rejects(api.readContentRelation('collection','2'),error=>error.status===401);assert.equal(state.requests.length,before);
  console.log('PASS v1 credential rotation clears commands, old-key reads reject late response, target404 differs from missing service, header-only key/omit Cookie/no retry, guest zero request')
 }
