@@ -48,7 +48,7 @@ export function apiProxy(env: Record<string,string|undefined>) {
     const editorResource=path==='/markdown' && req.method==='POST' || path==='/users/names' && req.method==='POST' || path==='/users/emotions' && req.method==='GET'
     const roomResource=/^\/chat-room\//.test(path)
     const reactionResource=req.method==='POST'&&['/follow/user','/unfollow/user','/comment','/comment/paragraph','/article/reaction','/comment/reaction','/comment/paragraph/thread/parents','/comment/paragraph/summary','/comment/thread/replies'].includes(path)
-    const legacyResource=reactionResource || path==='/report' && req.method==='POST' || roomResource || editorResource || noticeResource || chatResource || /^\/user\/[A-Za-z0-9_-]+$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
+    const legacyResource=/^\/article\/random\/[1-9][0-9]?$/.test(path)&&req.method==='GET' || path==='/activity/yesterday-liveness-reward-api'&&req.method==='GET' || reactionResource || path==='/report' && req.method==='POST' || roomResource || editorResource || noticeResource || chatResource || /^\/user\/[A-Za-z0-9_-]+$/.test(path) && ['GET','HEAD'].includes(req.method || '') || /^\/breezemoon(?:\/[0-9]+)?$/.test(path) && !['GET','HEAD'].includes(req.method || '')
     if (!/^\/api(?:\/|$)/.test(req.url || '') && !legacyResource) return next()
     const mode = requestMode(req,env)
     if(mode === 'v1' && /^\/api\/v3(?:\/|$)/.test(req.url || '')) {

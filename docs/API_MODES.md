@@ -43,6 +43,7 @@
 | 鱼游目录/详情/评论读取 | 第二十九批已接；有界旧目录与评论快照、本机分页 | 保留 |
 | 鱼游投稿/编辑申请/投票切换/评论 | 第三十批已接；四字段旧投稿，未知结果无自动重发 | 保留五字段及同键恢复 |
 | VIP 昵称公开样式 | 第三十一批已接，v1 限四处展示，游客可读 | 保留原批量与认证边界 |
+| 签到状态/昨日奖励状态及领取 | 第三十二批已接；旧领取为确认后的有副作用GET，无日期/金额预览与同键恢复 | 保留 |
 | 标签关注/收藏/订阅写入、账号各类设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
@@ -490,3 +491,19 @@ fetchV3MembershipStyles按模式选择legacy/membership-styles，v1使用既有G
 验证：legacy-membership-styles-test四组实际API、公开用户解码、helper及编译昵称组件，覆盖按ID读取/真实别名、三字段白名单、空与坏配置、Hex/动画、四并发顺序、游客加载/去重/旧key与退出清理/迟到拒绝、四处显式启用默认普通文字、SSR和HMR清理。原v3昵称8组、TTL/HMR5组、会员12组、类型和完整客户端/服务端构建通过。现网仅公开用户与单个会员配置只读；本地浏览器验证未登录个人主页应用当前neon类与加粗/下划线，截图中列表作者仍普通样式；没有登录、修改会籍或购买。聊天室/首页/悬浮卡为共享组件接线，未逐一完成真实账号交互验证；会员设置、资格与其他外观/账号能力仍继续适配。
 
 协议来源：[MembershipProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MembershipProcessor.java)、[MembershipQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/MembershipQueryService.java)、[Membership字段](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Membership.java)。只读JSON及源码，不抓取页面或从不受信任配置注入CSS。
+
+## 第三十二批：签到状态与昨日活跃奖励
+
+CheckinPanel/ActivityRecovery按模式挂载独立旧组件或逐字保留的V3前缀原组件，首页、聊天室侧栏和活动中心共用入口。旧签到仅读GET /api/checkin/status?apiKey，直接投影checkedIn/liveness/threshold/streak并校验布尔、非负有限数与整数；不用九分钟限流的旧/user/liveness拼不完整状态，不自行触发已停用的每日签到接口。自动签到门槛由服务端真实返回。
+
+昨日奖励只读GET /api/activity/is-collected-liveness只提供isCollectedYesterdayLivenessReward。旧面板独立表达“已领取/尚未领取”，明确日期、金额与实际领取资格不可预览；未领取不等于可领，不伪造RewardState的日期/金额/claimable。两读独立失败/重试，挂载且有实际旧key/账号才请求，身份/退出/目标代数拒迟到结果，SSR零本人读取。
+
+旧GET /activity/yesterday-liveness-reward-api会发放积分，绝不能当状态查询、链接预取或普通刷新。独立legacyClaimReward仅在显式确认后调用一次，冻结当次身份，关闭/离页/换号取消迟到批准；确认说明将尝试服务端当时的昨日奖励，不能保证旧协议没有的expectedDate语义。请求no-store且禁用风控自动重试，无假幂等键或日期参数。正整数sum只作本次返回金额提示，随后重读当前状态；-1同时代表已领、无活跃、金额0或发放失败，界面只称本次未发放，不据此推已领取或伪造金额0。
+
+legacyActivity保存未确认领取跨SPA锁定，没有自动恢复/重发按钮；需核对当前奖励状态及本人积分流水后明确解除，退出清理，迟到回执不能复活。确认后状态读取失败只重读，不再领取。v3仍保留原服务端日期、金额、明确POST及原键恢复行为。
+
+代理补齐有副作用旧GET精确路径，开发SSR和生产nginx按当前模式选择目标。同时修复活动页发现的遗留/article/random/{size}代理绕过：该旧JSON读取也进入按模式Node代理，防止落入本机另一上游返回非JSON；只读现网验证本地该路径实际返回8篇JSON，不使用HTML兜底。
+
+验证：legacy-activity-test四组实际API/Pinia/hook/编译面板与全局Recovery，覆盖完整签到与未知奖励元数据、只读刷新零领取、明确确认/取消、精确旧key/GET/no-store/禁自动重发、正数/-1/坏响应、未知跨SPA锁定、退出/模式/SSR/迟到隔离、独立错误重试及离页取消确认。原v3活动14组、双模式代理回归、类型和完整客户端/服务端构建通过。浏览器仅本机合成账号验证65.5%/80%/3天、未领取提示、刷新、明确确认、领取返回50后当前GET变已领取；未登录生产站点、领取真实奖励或改余额。旁路发现模块在活动夹具中未完整提供，随机JSON路由另经现网只读验证。夹具已停止并恢复现网v1开发代理。生产服务器跨日、账本/多节点竞态及自动签到达标过程仍需真实环境联调，其他全站能力继续。
+
+协议来源：[ActivityProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ActivityProcessor.java)、[ActivityMgmtService.yesterdayLivenessRewardApi](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/ActivityMgmtService.java)。按公开源码适配，不调用金手指接口、不改变生产认证。
