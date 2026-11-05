@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import VipNickname from '@/components/user/VipNickname.vue'
 import UserFollowButton from '@/components/user/UserFollowButton.vue'
+import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
@@ -35,7 +36,8 @@ const AVATAR_SELECTOR = [
 
 const auth = useAuthStore()
 const route = useRoute()
-const { accessToken, account, isLoggedIn } = storeToRefs(auth)
+const { accessToken, apiKey, account, isLoggedIn } = storeToRefs(auth)
+const credential = computed(() => getApiMode()==='v1' ? apiKey.value : accessToken.value)
 const mounted = ref(false)
 const cardEl = ref<HTMLElement | null>(null)
 const active = ref(false)
@@ -148,8 +150,8 @@ async function show(userName: string, element: HTMLElement) {
 }
 
 async function loadProfile(id = ++requestId) {
-  const name = currentUserName.value, element = anchor.value, token = accessToken.value, boundary = getAuthContextVersion(), owner = account.value?.oId
-  const valid = () => mounted.value && id === requestId && active.value && name === currentUserName.value && element === anchor.value && token === accessToken.value && boundary === getAuthContextVersion() && owner === account.value?.oId
+  const name = currentUserName.value, element = anchor.value, token = credential.value, boundary = getAuthContextVersion(), owner = account.value?.oId
+  const valid = () => mounted.value && id === requestId && active.value && name === currentUserName.value && element === anchor.value && token === credential.value && boundary === getAuthContextVersion() && owner === account.value?.oId
   profile.value = null; failed.value = false; loading.value = true
   try { const data = await fetchPublicUser(name); if (valid()) profile.value = data }
   catch { if (valid()) failed.value = true }
@@ -209,9 +211,10 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 watch(() => route.fullPath, hide, { flush: 'sync' })
-let readerBoundary = `${getAuthContextVersion()}:${account.value?.oId || ''}:${!!accessToken.value}`
-watch([accessToken, () => account.value?.oId, () => account.value?.userName], () => {
-  const next = `${getAuthContextVersion()}:${account.value?.oId || ''}:${!!accessToken.value}`
+const readerIdentity = () => JSON.stringify([getAuthContextVersion(),account.value?.oId || '',getApiMode()==='v1'?credential.value:!!credential.value])
+let readerBoundary = readerIdentity()
+watch([credential, () => account.value?.oId, () => account.value?.userName], () => {
+  const next = readerIdentity()
   if (next !== readerBoundary) { readerBoundary = next; hide() }
   else if (active.value) void loadProfile()
 }, { flush: 'sync' })

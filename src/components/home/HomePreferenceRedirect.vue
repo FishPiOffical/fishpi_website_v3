@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { fetchV3Preferences } from '@/api/v3-preferences'
 import { SITE_ORIGIN } from '@/seo/site'
@@ -10,12 +11,13 @@ import { homeRedirectBases, homeRedirectDestination } from '@/utils/homeRedirect
 const auth = useAuthStore(), route = useRoute(), router = useRouter()
 const pending = ref(false), message = ref('')
 let mounted = false, generation = 0
-const identity = () => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || ''])
+const identity = () => JSON.stringify([getAuthContextVersion(), getApiMode()==='v1'?auth.apiKey:!!auth.accessToken, auth.account?.oId || ''])
 const eligible = () => mounted && auth.initialized && auth.isLoggedIn && route.path === '/' && !Object.keys(route.query).length && !route.hash
 async function check() {
   const run = ++generation, reader = identity(), entry = route.fullPath
   pending.value = false; message.value = ''
   if (!eligible()) return
+  if (getApiMode()==='v1') { message.value='当前 v1 接口不支持读取首页自动跳转设置，已保留首页。'; return }
   const current = () => eligible() && run === generation && identity() === reader && route.fullPath === entry
   pending.value = true
   let navigating = false
@@ -41,9 +43,9 @@ onBeforeUnmount(() => { mounted = false; generation++; pending.value = false; me
 <template>
   <div v-if="pending || message" class="home-redirect" role="status" aria-label="首页跳转设置">
     <span v-if="pending">正在读取首页跳转设置…</span>
-    <template v-else>{{ message }} <button type="button" @click="check">重试跳转</button> <RouterLink to="/settings/function">修改首页设置</RouterLink></template>
+    <template v-else>{{ message }} <template v-if="getApiMode()==='v3'"><button type="button" @click="check">重试跳转</button> <RouterLink to="/settings/function">修改首页设置</RouterLink></template></template>
   </div>
 </template>
 <style scoped lang="scss">
-.home-redirect { margin: 0 0 12px; overflow-wrap: anywhere; color: var(--fp-text-muted); a { display: inline-block; white-space: nowrap; } button { margin: 0 8px; border: 1px solid var(--fp-border); border-radius: 6px; padding: 4px 8px; background: transparent; color: var(--fp-text); cursor: pointer; } }
+.home-redirect { margin: 0 0 12px; overflow-wrap: anywhere; color: var(--fp-muted); a { display: inline-block; white-space: nowrap; } button { margin: 0 8px; border: 1px solid var(--fp-border); border-radius: 6px; padding: 4px 8px; background: transparent; color: var(--fp-text); cursor: pointer; } }
 </style>
