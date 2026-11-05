@@ -62,6 +62,7 @@ const commentPage = ref(1)
 const locatedComment=ref<CommentLocation|null>(null)
 function positionComment(value:CommentLocation){locatedComment.value=value;if(value.type===0){commentPage.value=value.page;readerRef.value?.openComments()}}
 const heat = ref<number|null>(null),heatError=ref(''),articleChanged=ref(false),realtimeReadError=ref(''),realtimeReading=ref(false)
+const heatNodeLabel=computed(()=>getApiMode()==='v1'?'经典节点':'本节点')
 const editingId = ref('')
 const bodyEl = ref<HTMLElement | null>(null)
 const toc = ref<{ id: string; text: string; level: number }[]>([])
@@ -236,6 +237,7 @@ function articleUnavailable(target:string,reader:string) {
  error.value='文章不存在或当前已无权阅读';disconnectHeat();toc.value=[];zoomed.value=''
 }
 function connectHeat() {
+ if(getApiMode()==='v1')return
  if(import.meta.env.SSR||!accessToken.value||!article.value||article.value.oId!==id.value)return
  const target=id.value,reader=viewerIdentity.value,key=JSON.stringify([target,reader,accessToken.value])
  if(subscriptionKey===key)return
@@ -265,7 +267,7 @@ async function ownerDeleted(target:string){
 async function refreshHeat() {
  heatRequest?.abort();const run=++heatSequence,reader=viewerIdentity.value,target=id.value
  heat.value=null;heatError.value=''
- if(import.meta.env.SSR||!accessToken.value||!article.value||article.value.oId!==target)return
+ if(import.meta.env.SSR||!(getApiMode()==='v1'?apiKey.value:accessToken.value)||!article.value||article.value.oId!==target)return
  const abort=new AbortController();heatRequest=abort
  const valid=()=>run===heatSequence&&reader===viewerIdentity.value&&target===id.value&&!abort.signal.aborted
  try{const value=await articleHeat(target,abort.signal);if(valid())heat.value=value}
@@ -535,7 +537,7 @@ function itemHandlers(c: ArticleComment) {
       @paragraph-reply="onParagraphReply"
     >
       <template #owner-actions><ReuseOwnerActions /></template>
-      <template #live-status><ReuseLiveStatus /><span v-if="heat!==null">本节点约 {{ heat }} 个连接</span><span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span></template>
+      <template #live-status><ReuseLiveStatus /><span v-if="heat!==null">{{ heatNodeLabel }}约 {{ heat }} 个连接</span><span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span></template>
       <template #reward><ReuseReward /></template>
       <template #extra><ReuseRevisions /></template>
       <template #comments><ReuseComments /></template>
@@ -590,7 +592,7 @@ function itemHandlers(c: ArticleComment) {
           <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
           <span>•</span>
           <span>{{ commentTotal }} 评论</span>
-          <span v-if="heat!==null">（本节点约 {{ heat }} 个连接）</span>
+          <span v-if="heat!==null">（{{ heatNodeLabel }}约 {{ heat }} 个连接）</span>
           <span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span>
         </div>
 
