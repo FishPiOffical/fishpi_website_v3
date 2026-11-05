@@ -32,6 +32,7 @@
 | 思过崖旧快照、涂鸦上传与插入 | 第十五批已接；旧快照不等价于实时禁言资源 | 保留 |
 | 举报（文章/评论/用户/聊天室） | 第十六批已接；旧协议无编号与幂等恢复，本机合成身份验收 | 保留 |
 | 文章/评论/聊天室表态 | 第十七批已接；旧切换无幂等恢复，本机合成身份验收 | 保留 |
+| 用户公开勋章 | 第三十四批已接当前启用快照；无历史授予/永久有效证明 | 保留真实授予分页 |
 | 用户公开职业资料 | 第三十三批已接旧等级快照与可见模块；本人管理/职业榜另迁移 | 保留 |
 | 用户公开六字段/悬浮卡基础资料 | 第五批已接旧公开JSON | 保留 |
 | 用户文章/长文/公开回帖/清风列表 | 第二十二批已接；私密正文与清风单条读取受旧契约限制 | 保留 |
@@ -521,3 +522,18 @@ legacyActivity保存未确认领取跨SPA锁定，没有自动恢复/重发按�
 验证：legacy-public-professions-test三组覆盖实际API和编译Vue、精确端点/key/no-store、额外字段剔除、经验隐藏/真实零、并列百分比、错误/重复拒绝、旧key/退出/目标迟到隔离与SSR零读；原v3公开职业七组及完整类型/客户端/服务端构建通过。浏览器对现网公开JSON只读验证本地主页职业栏目与重读，未登录或改职业/隐私。登录读者隐私组合由本地测试覆盖，尚未用真实多账号联调。
 
 协议来源：[ProfessionProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/ProfessionProcessor.java)、[PublicProfessionProfileQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/PublicProfessionProfileQueryService.java)。
+
+
+## 第三十四批：公开勋章当前快照
+
+/member/:name/medals按模式挂载LegacyPublicMedals或保留的V3MedalsView，共用原卡片样式；v3公开授予分页与私有图片读取不变。旧读取GET /user/{name}/medal，游客可读，不发送apiKey/Bearer、不调用/gen或会话桥接。旧端点没有授予ID、授予时间、分页元数据，仅当前启用且有效的展示列表；保留顺序和重复条目，可选id仅命名definitionId，不冒充历史记录ID。当前快照大于20条时本机分页，超过1000条明确失败，不截断报成功。
+
+旧expireDate为日期字符串，服务端还用2099-12-31表达永久期限；客户端仅按原文称“显示有效期”，不推断expiresAt=0或永久有效。name/description/type纯文本，额外data/order/attr原串不留入状态；attr只提取经HTTP(S)/无凭据校验的公开图片URL，保留原签名query，不注入CSS或HTML。图片跨域匿名、无referrer，失败有明确文字；没有图片URL时只显示勋章文字。
+
+页面挂载后读取，旧key、身份上下文、账号、目标和卸载均隔离迟到响应；SSR零读取/图片。刷新失败清旧快照，真实空列表与网络失败独立。旧CloudService会把内部异常转成空list，客户端不能据此确认后端内部正常，保留这一服务端限制，不另造记录补全。
+
+补齐开发SSR、SPA共用Node代理及生产nginx的/user/{name}/medal精确读取路径，防止绕过模式选择后发到错误上游返回非JSON；代理回归验证凭据隔离。
+
+验证：legacy-public-medals-test三组实际API/编译组件覆盖公开精确读取、重复/无ID条目、原签名URL、坏URL/日期/超预算拒绝、快照分页、图片失败、纯文本、重试、身份/目标迟到隔离与SSR零读；原v3公开勋章十组、勋章图片回归、模式代理和完整类型/客户端/服务端构建通过。浏览器现网只读验证本地Yui当前公开勋章、真实图片完成加载和刷新，未登录或修改展示/授予；非空多页由本机夹具验证。本人勋章管理、职业榜与其他全站能力仍待继续适配。
+
+协议来源：[UserProcessor.getUserMedal](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/UserProcessor.java)、[CloudService.getEnabledMedal](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CloudService.java)。
