@@ -42,6 +42,7 @@
 | 大事记公开时间线/详情 | 第二十八批已接；旧快照分页，投稿与本人审核状态仍缺少apiKey契约 | 保留 |
 | 鱼游目录/详情/评论读取 | 第二十九批已接；有界旧目录与评论快照、本机分页 | 保留 |
 | 鱼游投稿/编辑申请/投票切换/评论 | 第三十批已接；四字段旧投稿，未知结果无自动重发 | 保留五字段及同键恢复 |
+| VIP 昵称公开样式 | 第三十一批已接，v1 限四处展示，游客可读 | 保留原批量与认证边界 |
 | 标签关注/收藏/订阅写入、账号各类设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
@@ -477,3 +478,15 @@ legacyFishGames保留一个原kind/target/body或value的未确认命令跨SPA�
 验证：legacy-fish-game-writes-test四组实际API/Pinia/编译页面、表单和Recovery，覆盖精确四字段/原文/旧key、无OAuth/Bearer/假键、切换回执契约、真实元数据、坏输入、换key迟到、未知跨SPA锁定零重发、模式/SSR边界、两次切换/撤销后GET、评论草稿清空与回执正文不入列表、编辑待审关闭、核对解除零写。旧读取4组、原v3鱼游18组、类型与完整客户端/服务端构建通过。浏览器只用本机合成账号和HTTP夹具验证点赞后GET为1而非回执999、当前评论及清草稿、四字段投稿后清空/待审提示、编辑关闭且公开简介仍旧值；未在现网投票、评论、投稿或编辑。夹具已停止并恢复现网v1开发代理。生产限流、OAuth之外的旧URL校验、审批、通知和并发切换仍需真实环境联调；其他全站模块继续。
 
 协议来源：[FishGameProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/FishGameProcessor.java)、[FishGameMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/FishGameMgmtService.java)、[FishGameValidationService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/FishGameValidationService.java)、[FishGameWriteSecurityMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/FishGameWriteSecurityMidware.java)。只读源码核对协议，不改Rhythm认证。
+
+## 第三十一批：VIP 昵称公开样式
+
+fetchV3MembershipStyles按模式选择legacy/membership-styles，v1使用既有GET /api/membership/{userId}逐个指定目标读取，最多四并发并保持请求顺序；不下载全站/api/memberships/configs，也不在状态中保存会员档位、期限、费用或完整配置。只从已确认state=1且userId一致的configJson投影bold/underline/color，state=0或明确空配置按普通文字处理；配置解析/已知字段类型、Hex与八种既有动画枚举严格校验。空样式不能用于判断非会员，错误不缓存为无会籍。不按前端档位补默认颜色或权限。
+
+旧用户名别名经当前/user/{name}公开JSON核验真实ID和姓名，继续复用缓存/队列去重、可视节点懒读及TTL到期删除/重新观察。共享useVipNickname按模式使用旧key或Bearer作为缓存边界；v1公开端点允许游客，用独立公开身份标记启动读取，退出/换key清缓存、队列及计时器，迟到响应不能回写。HMR取消两种凭据监听，SSR始终普通文本，不把装饰缓存放入服务端初始状态。v3仍原指定ID批量API、严格三字段和Bearer边界，没有失败时旧接口回退。
+
+遵循已确认的v1昵称使用范围：VipNickname新增显式legacyStyle选项，只有聊天室ChatBubble、首页简易聊天室、用户悬浮卡和个人主页目标昵称启用；文章/评论/榜单等默认不读不染色。v3原有消费者保持原行为。共享CSS的颜色/渐变与动画定义保持不变，本批只接线数据与生命周期，未重新设计色值。
+
+验证：legacy-membership-styles-test四组实际API、公开用户解码、helper及编译昵称组件，覆盖按ID读取/真实别名、三字段白名单、空与坏配置、Hex/动画、四并发顺序、游客加载/去重/旧key与退出清理/迟到拒绝、四处显式启用默认普通文字、SSR和HMR清理。原v3昵称8组、TTL/HMR5组、会员12组、类型和完整客户端/服务端构建通过。现网仅公开用户与单个会员配置只读；本地浏览器验证未登录个人主页应用当前neon类与加粗/下划线，截图中列表作者仍普通样式；没有登录、修改会籍或购买。聊天室/首页/悬浮卡为共享组件接线，未逐一完成真实账号交互验证；会员设置、资格与其他外观/账号能力仍继续适配。
+
+协议来源：[MembershipProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MembershipProcessor.java)、[MembershipQueryService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/MembershipQueryService.java)、[Membership字段](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/model/Membership.java)。只读JSON及源码，不抓取页面或从不受信任配置注入CSS。

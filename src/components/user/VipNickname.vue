@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import {getApiMode} from '@/api/mode'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   cachedVipName,
@@ -15,19 +16,21 @@ const props = withDefaults(
     text?: string
     /** 在昵称接近可视区域时加载会员配置。 */
     lazy?: boolean
+    legacyStyle?: boolean
   }>(),
-  { userId: '', userName: '', text: '', lazy: true },
+  { userId: '', userName: '', text: '', lazy: true, legacyStyle: false },
 )
 
 const root = ref<HTMLElement | null>(null)
-const currentConfig = computed(() => cachedVipName(props.userId, props.userName))
+const permitted=()=>getApiMode()!=='v1'||props.legacyStyle
+const currentConfig = computed(() => permitted()?cachedVipName(props.userId, props.userName):undefined)
 let observer: IntersectionObserver | undefined
 let mounted = false
-function load() { if (mounted) void loadVipName(props.userId, props.userName) }
+function load() { if (mounted && permitted()) void loadVipName(props.userId, props.userName) }
 
 function observe() {
   observer?.disconnect()
-  if (!mounted) return
+  if (!mounted || !permitted()) return
   if (!props.lazy || typeof IntersectionObserver === 'undefined') {
     void load()
     return
@@ -50,7 +53,7 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [props.userId, props.userName, vipNameRevision.value],
+  () => [props.userId, props.userName, props.legacyStyle, vipNameRevision.value],
   observe,
   { flush: 'sync' },
 )

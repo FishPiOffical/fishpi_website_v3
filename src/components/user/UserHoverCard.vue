@@ -284,7 +284,7 @@ onUnmounted(() => {
             <div class="card-meta">
               <div class="name-line">
                 <RouterLink class="nickname" :to="`/member/${encodeURIComponent(profile.userName)}`">
-                  <VipNickname :user-id="profile.id" :user-name="profile.userName">{{ profile.userNickname || profile.userName }}</VipNickname>
+                  <VipNickname legacy-style :user-id="profile.id" :user-name="profile.userName">{{ profile.userNickname || profile.userName }}</VipNickname>
                 </RouterLink>
               </div>
               <RouterLink class="username" :to="`/member/${encodeURIComponent(profile.userName)}`">@{{ profile.userName }}</RouterLink>

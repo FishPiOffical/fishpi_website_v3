@@ -1,4 +1,6 @@
 import { reactive, ref } from 'vue'
+import {getApiMode} from '@/api/mode'
+import {getLegacyKey,onLegacyKeyChange} from '@/api/legacy/auth'
 import { getAccessToken, onAccessTokenChange } from '@/api/http'
 import { fetchV3MembershipStyles, membershipUserId, resolveV3NicknameUser } from '@/api/v3-membership-styles'
 
@@ -36,7 +38,8 @@ const CACHE_TTL = 60_000, MAX_CACHE = 2000, MAX_PENDING = 1000
 const cache = reactive(new Map<string, { value: VipNameConfig; at: number }>())
 const aliases = reactive(new Map<string, { id: string; at: number }>())
 export const vipNameRevision = ref(0)
-let identity = getAccessToken(), generation = 0, scheduled: ReturnType<typeof setTimeout> | undefined
+const currentIdentity=()=>getApiMode()==='v1'?getLegacyKey()||'v1-public':getAccessToken()
+let identity = currentIdentity(), generation = 0, scheduled: ReturnType<typeof setTimeout> | undefined
 let activeRun: object | null = null
 let expiryTimer: ReturnType<typeof setTimeout> | undefined
 interface StyleJob { id: string; generation: number; cancelled: boolean; promise: Promise<VipNameConfig | undefined>; resolve: (value: VipNameConfig | undefined) => void }
@@ -44,7 +47,7 @@ const jobs = new Map<string, StyleJob>(), queue = new Map<string, StyleJob>()
 interface NameJob { generation: number; cancelled: boolean; id?: string; promise: Promise<VipNameConfig> }
 const names = new Map<string, NameJob>()
 function nameKey(value?: string) { return value && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value.toLowerCase() : '' }
-function valid(current: number) { return !import.meta.env.SSR && !!identity && current === generation && identity === getAccessToken() }
+function valid(current: number) { return !import.meta.env.SSR && !!identity && current === generation && identity === currentIdentity() }
 function boundedSet<K, V>(map: Map<K,V>, key: K, value: V) { if (!map.has(key) && map.size >= MAX_CACHE) map.delete(map.keys().next().value!); map.set(key, value) }
 function scheduleExpiry() {
   if (expiryTimer !== undefined) clearTimeout(expiryTimer)
@@ -79,8 +82,9 @@ function reset() {
   if (expiryTimer !== undefined) clearTimeout(expiryTimer)
   expiryTimer = undefined; vipNameRevision.value++
 }
-const unsubscribe = onAccessTokenChange(token => { if (identity !== token) { identity = token; reset() } })
-if (import.meta.hot) import.meta.hot.dispose(() => { unsubscribe(); identity = null; reset() })
+function updateIdentity(){const next=currentIdentity();if(identity!==next){identity=next;reset()}}
+const unsubscribe = onAccessTokenChange(()=>{if(getApiMode()==='v3')updateIdentity()}),unsubscribeLegacy=getApiMode()==='v1'?onLegacyKeyChange(updateIdentity):()=>{}
+if (import.meta.hot) import.meta.hot.dispose(() => { unsubscribe(); unsubscribeLegacy(); identity = null; reset() })
 function schedule() { if (scheduled === undefined && !activeRun && queue.size) scheduled = setTimeout(() => { scheduled = undefined; void flush() }, 0) }
 async function flush() {
   if (activeRun || !identity || !queue.size) return
@@ -143,7 +147,7 @@ export function parseVipNameConfig(isVip: boolean, configJson?: string | Record<
 }
 
 export function cachedVipName(userId?: string | number, userName?: string) {
-  if (import.meta.env.SSR || !identity || identity !== getAccessToken()) return undefined
+  if (import.meta.env.SSR || !identity || identity !== currentIdentity()) return undefined
   const explicit = membershipUserId(userId), name = nameKey(userName), alias = !explicit && name ? aliases.get(name) : undefined
   const id = explicit || (alias && Date.now() - alias.at < CACHE_TTL ? alias.id : '')
   const entry = id ? cache.get(id) : undefined

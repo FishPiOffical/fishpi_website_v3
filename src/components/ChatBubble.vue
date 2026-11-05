@@ -50,7 +50,7 @@ function onBodyClick(e: MouseEvent) {
     <div class="message-stack">
       <div v-if="chatroom" class="head">
         <RouterLink :to="`/member/${userName}`" class="name">
-          <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">
+          <VipNickname legacy-style v-if="vipNickname" :user-id="userId" :user-name="userName">
             {{ nickname || userName }}
           </VipNickname>
           <template v-else>{{ nickname || userName }}</template>
@@ -61,7 +61,7 @@ function onBodyClick(e: MouseEvent) {
       <div class="fp-bubble" @click="onBodyClick">
         <div v-if="!chatroom" class="head">
           <RouterLink :to="`/member/${userName}`" class="name">
-            <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>
+            <VipNickname legacy-style v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>
             <template v-else>{{ nickname || userName }}</template>
             <small v-if="nickname && nickname !== userName">({{ userName }})</small>
           </RouterLink>

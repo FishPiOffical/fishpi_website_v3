@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import ts from 'typescript'
 import { createRenderer, nextTick, ref } from 'vue'
 import { createPinia, defineStore, setActivePinia } from 'pinia'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'","from 'data:text/javascript,export%20const%20getApiMode=()=>%22v3%22'").replaceAll("from '@/api/mode'","from 'data:text/javascript,export%20const%20getApiMode=()=>%22v3%22'").replaceAll("from '@/api/legacy/auth'","from 'data:text/javascript,export%20const%20getLegacyKey=()=>null;export%20const%20onLegacyKeyChange=()=>()=>{}'")
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__membershipContext=0;globalThis.__membershipRequests=[];globalThis.__membershipResponses=[]
 const http=url(`export const getAuthContextVersion=()=>globalThis.__membershipContext; export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}} export async function request(path,init){globalThis.__membershipRequests.push({path,init});const result=globalThis.__membershipResponses.shift();if(result instanceof Error)throw result;if(result===undefined)throw Error('Unexpected '+path);return result}`)

@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import ts from 'typescript'
 import {parse,compileScript} from '@vue/compiler-sfc'
 import {createRenderer,h,nextTick} from 'vue'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64')
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'","from 'data:text/javascript,export%20const%20getApiMode=()=>%22v3%22'").replaceAll("from '@/api/mode'","from 'data:text/javascript,export%20const%20getApiMode=()=>%22v3%22'").replaceAll("from '@/api/legacy/auth'","from 'data:text/javascript,export%20const%20getLegacyKey=()=>null;export%20const%20onLegacyKeyChange=()=>()=>{}'"),url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64')
 let now=100000,timerId=0;const timers=new Map(),originalNow=Date.now,originalSet=globalThis.setTimeout,originalClear=globalThis.clearTimeout,originalObserver=globalThis.IntersectionObserver
 Date.now=()=>now;globalThis.setTimeout=(fn,delay=0)=>{const id=++timerId;timers.set(id,{fn,at:now+Number(delay)});return id};globalThis.clearTimeout=id=>timers.delete(id)
 const state=globalThis.__expiryStyle={token:'A',listeners:[],batches:[],dispatch:async ids=>ids.map(userId=>({userId,style:{bold:true,color:'rainbow'}})),lookups:0,hot:{dispose(fn){globalThis.__expiryStyle.dispose=fn}}}

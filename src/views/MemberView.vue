@@ -36,7 +36,7 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
       <div v-if="profileError" role="alert"><p>{{ profileError }}</p><button type="button" @click="readProfile">重试用户资料</button></div>
       <template v-else-if="profile">
         <img :key="avatarUrl(profile)" class="member-avatar" :src="avatarUrl(profile)" alt="" :data-user-card="profile.userName" @error="onAvatarError" />
-        <h1><VipNickname :user-id="profile.id" :user-name="profile.userName" :text="profile.userNickname || profile.userName" /></h1>
+        <h1><VipNickname legacy-style :user-id="profile.id" :user-name="profile.userName" :text="profile.userNickname || profile.userName" /></h1>
         <p>@{{ profile.userName }}</p><p class="intro">{{ profile.userIntro }}</p>
         <a v-if="profile.userURL" :href="profile.userURL" target="_blank" rel="noopener noreferrer">个人主页</a>
         <div v-if="auth.isLoggedIn" class="member-actions">
