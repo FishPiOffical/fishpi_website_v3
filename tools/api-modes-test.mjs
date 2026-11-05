@@ -7,7 +7,7 @@ import { apiProxy, requestMode, backendTarget } from '../server/api-mode.ts'
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64')
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const calls=[]
-const v1=http.createServer((req,res)=>{calls.push({version:'v1',url:req.url,headers:req.headers});res.setHeader('Content-Type','application/json');if(req.url.startsWith('/reset-pwd')||req.url.startsWith('/api/reset-pwd/meta'))res.setHeader('Set-Cookie','sym-ce=must-not-install; Path=/');res.end(JSON.stringify({version:'v1'}))}).listen(0,'127.0.0.1')
+const v1=http.createServer((req,res)=>{calls.push({version:'v1',url:req.url,headers:req.headers});res.setHeader('Content-Type','application/json');if(req.url.startsWith('/register2')||req.url.startsWith('/verify')||req.url.startsWith('/reset-pwd')||req.url.startsWith('/api/reset-pwd/meta'))res.setHeader('Set-Cookie','sym-ce=must-not-install; Path=/');res.end(JSON.stringify({version:'v1'}))}).listen(0,'127.0.0.1')
 const v3=http.createServer((req,res)=>{calls.push({version:'v3',url:req.url,headers:req.headers});res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version:'v3'}))}).listen(0,'127.0.0.1')
 await Promise.all([once(v1,'listening'),once(v3,'listening')])
 const env={VITE_API_MODE:'v1',VITE_API_V1_TARGET:`http://127.0.0.1:${v1.address().port}`,VITE_API_V3_TARGET:`http://127.0.0.1:${v3.address().port}`}
@@ -41,7 +41,7 @@ try {
     await fetch(base+path,{...((path.includes('/revisions') || path.endsWith('/anonymous') || path.endsWith('/watching') || path === '/api/columns/mine' || path.startsWith('/api/watch/')) ? {} : {method:'POST',body:JSON.stringify({apiKey:'synthetic'})}),headers:{Cookie:'fp.apiMode=v1; sym-ce=wrong-actor; harmless=1','Content-Type':'application/json'}})
     assert.equal(calls.at(-1).headers.cookie,undefined)
   }
-  for(const [path,method] of [['/forget-pwd','POST'],['/reset-pwd','POST'],['/api/reset-pwd/meta?code=123456','GET']]){
+  for(const [path,method] of [['/register?r=referrer','POST'],['/register2?r=referrer','POST'],['/verify?code=123456','GET'],['/forget-pwd','POST'],['/reset-pwd','POST'],['/api/reset-pwd/meta?code=123456','GET']]){
     const result=await fetch(base+path,{method,headers:{Cookie:'fp.apiMode=v1; sym-ce=wrong-account; fp_v3_refresh=private',Authorization:'Bearer must-not-forward','Content-Type':'application/json'},...(method==='POST'?{body:JSON.stringify({synthetic:true})}:{})})
     assert.equal(result.headers.get('set-cookie'),null);assert.equal(result.headers.get('cache-control'),'no-store');assert.equal(calls.at(-1).headers.cookie,undefined);assert.equal(calls.at(-1).headers.authorization,undefined);assert.equal(calls.at(-1).url,path)
   }

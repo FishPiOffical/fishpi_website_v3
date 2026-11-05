@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 模式选择、HTTP代理、SSR请求隔离 | 已接 | 保留 |
 | 找回密码与短信重置 | 第六十五批已有旧短信/元数据/重置协议；真实短信与改密未验收 | 保留原完整流程 |
-| 注册 | 第六十五批独立说明旧协议限制，不挂载v3注册表单 | 保留原完整流程 |
+| 注册 | 第六十六批接既有短信/验证码核验/激活JSON，开放及邀请码要求由提交时平台校验；真实注册未验收 | 保留原完整流程 |
 | 登录、本人基础资料、退出 | 已接旧getKey/user，合成账号验证 | 保留，认证/导航回归验证 |
 | 首页最新40、热议12、最近/热门专栏各8、标签24 | 已接现网真实JSON只读 | 保留原读取与SSR投影 |
 | 需求反馈列表/提交/投票/管理 | 独立服务按旧key核验，合成身份验证 | 原Bearer核验保留 |
@@ -997,3 +997,20 @@ Node/SPA共用代理接管两个旧POST与meta GET，移除所有页面Cookie/Be
 验证：legacy-password-reset实际API/编译表单/三个路由覆盖短信字段白名单、完整meta→reset字段与Unicode摘要、错误目标/身份变化/取消预检零POST、模式隔离、全部写失败未知且不重试、短信失败仍可填已收到验证码、重复点击、输入立即清空、成功/未知重新登录、离页取消、迟到完成不退出新账号、SSR零读取。api-modes真实本机HTTP覆盖三端点Cookie/Bearer去除、Set-Cookie丢弃、no-store及GET SPA不被接口截走；原v3-account-access二十组和类型/完整客户端/SSR构建通过。
 
 浏览器在正常现网v1上游只读检查/forget-pwd页面→点击「已收到短信验证码」→/reset-pwd三项表单，截图/tmp/fp-reset65-browser.png。没有申请真实短信、完成人机验证或输入/提交新密码；真实改密/短信送达仍需用户自行验收。开发服务继续127.0.0.1:5173。Rhythm只读，HEAD f2e5b59f且干净。全站注册/其它设置及编辑等缺口继续。
+
+
+## 第六十六批（仅website）：既有v1注册短信与账号激活
+
+只读核对原有POST /register、GET /verify、POST /register2：第一步以userName/userPhone/invitecode/userAppRole/captcha申请短信，邀请人r在query；verify返回根级userId（不是data.userId），最终激活发送userId/code/userPassword/userAppRole/mbti，同一邀请人仍用r。现网无验证码GET /verify返回JSON「短信验证码为空」，未尝试真实验证码。虽然没有注册选项JSON，仍可遵循原有提交时服务端验证流程；更正此前因此禁用整个注册的笼统限制。
+
+新增legacy/registration与LegacyRegistration，RegisterView按模式分派。页面明确注册开放/邀请码/账号资格由平台提交时校验，不造open/closed或已验证邀请权限；用户名1..64字母/数字/连字符，保留名交服务端，手机号/可选16位邀请码/邀请人及原0程序员/1设计师校验。复用既有公开GeeTest4 captchaId及部署覆盖，与找回密码相同，不查询v3目录或抓HTML。申请时冻结用户名/手机号/邀请码/邀请人，之后不能用修改输入替换原短信申请的referral。
+
+完整表单及“已收到验证码”独立继续入口都在本地阶段内切换，不读取路由query.code、不把短信码放页面地址。最终目标ID只来自当前输入验证码的根级verify响应；不采用用户名/手机号/当前登录者猜ID，错误/缺ID、取消或身份变化均零激活请求。现有verify没有回显业务类型/手机，激活时用途、到期、账号归属仍由原register2服务校验，不宣称前端能证明这些字段。角色允许用户最终明确选择，MBTI首版保持旧可选空值，不伪造资料。用户协议/隐私政策必须主动勾选，申请和激活处理函数均校验，默认未勾选；协议新页查看不丢表单。
+
+密码保留Unicode/首尾空白后MD5，开始最终操作立即清验证码和密码，仅本次调用闭包留原值；不存Pinia/浏览器缓存。未知已发送激活（含业务失败）清本机输入并要求先登录核实，不原键恢复、不自动激活/注册；短信申请失败也可能已创建待激活账号，允许继续已收码并提醒不要立即重复申请。成功只提示登录新账号，不使用页面Cookie。取消人机验证、离页/换身份清旧快照并取消旧读；迟到激活不能退出新登录账号。SSR/首次打开表单零账号API读取。
+
+Node/SPA共用代理新增既有三个协议，移除页面Cookie和Bearer，响应Set-Cookie丢弃、强制no-store；nginx精确/register、/register2、/verify进入Node，GET/register仍SPA。既有verify将校验码放查询参数，示例/verify单独access_log off；部署需上游/监控同样不记录验证码query/请求正文，未宣称可由website消除原GET协议。没有新增Rhythm /api/v1端点。
+
+验证：legacy-registration运行实际API/编译表单/模式路由，覆盖精确根级ID及两阶段r、字段白名单、Unicode摘要、错误目标/参数/模式/代次/取消零激活、全部写失败未知、协议双重门禁、短信快照不可回填、角色最终选择、未知短信与取消回调零重发、双击、密码立即清除、离页/新身份/SSR及原v3分派。原legacy-password-reset回归、api-modes实际HTTP注册Cookie/Bearer去除与Set-Cookie丢弃、v3-account-access二十组及类型/完整双构建通过。
+
+浏览器仅在正常v1上游读取/register表单→点击“已收到验证码，继续注册”→显示验证码/密码/角色与默认未同意协议的禁用完成按钮，截图/tmp/fp-register66-browser.png；未勾选真实协议、申请短信、完成人机验证或注册真实账号。真实短信/邀请/激活结果尚待用户验收。开发服务127.0.0.1:5173指现网v1；Rhythm保持只读f2e5b59f且干净。全站其它设置/编辑等缺口继续。
