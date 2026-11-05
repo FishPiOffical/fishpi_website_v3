@@ -20,7 +20,7 @@ for(const response of [null,{code:1},{code:0,data:{}},{code:0,data:{url:'javascr
 console.log('PASS donation 1 configured HTTPS page and dev loopback only; reject unsafe URLs, bad responses and use read-only v3 request')
 const auth=defineStore('donation-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__donationAuth=auth;globalThis.__donationAPI={...api}
 const apiURL=url(`export const fetchV3DonationPage=(...args)=>globalThis.__donationAPI.fetchV3DonationPage(...args)`),authURL=url('export const useAuthStore=globalThis.__donationAuth'),seoURL=url('export function usePageSeo(){}'),routerURL=url(`import{h}from'${import.meta.resolve('vue')}';export function useRoute(){return{fullPath:'/charge/point'}};export const RouterLink={props:['to'],setup:(p,{slots})=>()=>h('a',{href:typeof p.to==='string'?p.to:p.to.path},slots.default?.())}`)
-const source=await fs.readFile('src/views/ChargePointView.vue','utf8'),descriptor=parse(source).descriptor
+const source=await fs.readFile('src/views/V3ChargePointView.vue','utf8'),descriptor=parse(source).descriptor
 let code=compile(compileScript(descriptor,{id:'donation-test',inlineTemplate:true}).content)
 for(const [from,to]of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['vue-router',routerURL],['@/api/http',http],['@/api/v3-donation',apiURL],['@/stores/auth',authURL],['@/composables/usePageSeo',seoURL]])code=code.replace(new RegExp(`from ['"]${from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}['"]`,'g'),`from '${to}'`)
 const component=(await import(url(code))).default
@@ -39,3 +39,16 @@ globalThis.window={location:{origin:'https://fishpi.cn'}};__donationAPI.fetchV3D
 console.log('PASS donation 3 failure/retry and logout/new owner discard stale link and delayed old response')
 let ssrReads=0;__donationAPI.fetchV3DonationPage=async()=>{ssrReads++;throw Error('SSR')};const ssr=createSSRApp(component);ssr.use(createPinia());const html=await renderToString(ssr);assert.equal(ssrReads,0);assert.match(html,/正在准备/);assert.ok(!source.includes('/pay/wechat')&&!source.includes('QRcode_url'))
 console.log('PASS donation 4 SSR never requests private link or creates order; old payment transport removed')
+// Run the real route wrapper too: a legacy login must never be treated as missing Bearer.
+state.mode='v1';const modeURL=url('export const getApiMode=()=>__donation.mode')
+let wrapperCode=compile(compileScript(parse(await fs.readFile('src/views/ChargePointView.vue','utf8')).descriptor,{id:'donation-mode-test',inlineTemplate:true}).content)
+for(const[from,to]of [['vue',import.meta.resolve('vue')],['vue-router',routerURL],['@/api/mode',modeURL],['@/composables/usePageSeo',seoURL],['./V3ChargePointView.vue',url(code)]])wrapperCode=wrapperCode.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`)
+const Wrapper=(await import(url(wrapperCode))).default
+function mountWrapper(token,account,apiKey){const pinia=createPinia(),root={children:[]},app=renderer.createApp(Wrapper);app.use(pinia);const user=auth(pinia);user.accessToken=token;user.account=account;user.$patch({apiKey});app.mount(root);return{root,app,text:()=>text(root)}}
+let privateReads=0;__donationAPI.fetchV3DonationPage=async()=>{privateReads++;return 'https://fishpi.cn/charge/point'}
+for(const[token,owner,key]of [[null,null,null],[null,{oId:'7'},'synthetic-legacy'],['unexpected-v3-token',{oId:'7'},'synthetic-legacy']]){
+ const v=mountWrapper(token,owner,key);await tick();assert.match(v.text(),/当前 v1 接口未提供/);assert.ok(!v.text().includes('登录后读取'));assert.equal(privateReads,0);assert.ok(!find(v.root,n=>n.props?.href==='/login'));assert.ok(!find(v.root,n=>n.tag==='button'||n.tag==='input'||n.tag==='img'));for(const path of ['/vips','/settings/point','/points'])assert.ok(find(v.root,n=>n.props?.href===path));v.app.unmount()
+}
+const ssrWrapper=createSSRApp(Wrapper);ssrWrapper.use(createPinia());const wrapperHTML=await renderToString(ssrWrapper);assert.match(wrapperHTML,/当前 v1 接口未提供/);assert.equal(privateReads,0)
+state.mode='v3';const v=mountWrapper('Bearer-only',{oId:'7'},null);await tick();assert.equal(privateReads,1);assert.ok(find(v.root,n=>n.props?.href==='https://fishpi.cn/charge/point'));assert.ok(!v.text().includes('当前 v1 接口未提供'));v.app.unmount()
+console.log('PASS donation 5 actual mode wrapper v1 guest/apiKey/mixed credentials never mounts private v3 or creates login loop/order, SSR explicit limit and working point routes; full original v3 leaf retained')
