@@ -1,5 +1,5 @@
 import { ApiError } from '../http'
-import { legacyGet, legacyObject, legacyDate } from './home'
+import { legacyGet, legacyObject, legacyDate, legacyColumnCard } from './home'
 import { publicColumnId, type PublicColumn, type PublicChapter, type ColumnChapterPage } from '../v3-public-columns'
 function count(value:unknown) {if(typeof value!=='number'||!Number.isSafeInteger(value)||value<0) throw new ApiError('旧专栏计数无效',502);return value}
 function text(value:unknown) {if(typeof value!=='string') throw new ApiError('旧专栏字段无效',502);return value}
@@ -36,4 +36,15 @@ export async function legacyColumnDetail(id:string) {
   if(!first || !latest) throw new ApiError('该专栏当前没有可读取章节',404)
   const column:PublicColumn={id,title:text(d.columnTitle),coverURL:typeof d.columnCoverURL==='string'?d.columnCoverURL:'',articleCount:total,updatedAt:typeof d.columnUpdateTime==='number'?legacyDate(d.columnUpdateTime):latest.createdAt,chapters:latest?[latest]:[]}
   return {column,first,latest}
+}
+
+/** Existing latest/hot APIs ignore p and cap size at 12; this is one bounded snapshot, not a total catalog. */
+export async function legacyColumnCards(kind:'latest'|'hot',p=1,size=12) {
+  if(!['latest','hot'].includes(kind)||!Number.isSafeInteger(p)||p<1||!Number.isSafeInteger(size)||size<1||size>12)throw new ApiError('旧专栏快照参数不合法',422)
+  if(p!==1)throw new ApiError('旧接口只提供最多12部专栏的首页快照，不支持继续翻页',501)
+  const raw=await legacyGet(`/api/columns/${kind}?size=${size}`)
+  if(!Array.isArray(raw)||raw.length>size)throw new ApiError('旧专栏快照响应不正确',502)
+  const list=raw.map(legacyColumnCard)
+  if(new Set(list.map(c=>c.id)).size!==list.length)throw new ApiError('旧专栏快照包含重复作品',502)
+  return{list,p:1,size,total:null,pageCount:list.length?1:0}
 }

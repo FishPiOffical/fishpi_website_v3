@@ -32,6 +32,7 @@ export function decodeArticleListing(value: unknown, kind: ArticleFeedKind, extr
   const meta: Metadata = { kind, extra, order, p, size, total, pageCount }
   if (kind === 'long') {
     if (r.resource !== 'columns') throw invalid()
+    if (getApiMode()==='v1'&&(total!==null||p!==1||pageCount!==(r.list.length?1:0)))throw invalid()
     const list = r.list.map(decodePublicColumnCard); if (new Set(list.map(x => x.id)).size !== list.length) throw invalid()
     return { ...meta, resource: 'columns', list }
   }
@@ -41,7 +42,7 @@ export function decodeArticleListing(value: unknown, kind: ArticleFeedKind, extr
 }
 export async function fetchArticleListing(kind: ArticleFeedKind, extra = '', order: ColumnOrder = 'recent', p = 1): Promise<ArticleListing> {
   if (!kinds.includes(kind) || !['recent', 'hot'].includes(order) || typeof extra !== 'string' || !Number.isSafeInteger(p) || p < 1 || p > 42949672) throw new ApiError('文章列表参数不合法', 422)
-  if(getApiMode()==='v1') {const value=await (await import('./legacy/content')).legacyListing(kind,extra,p);return decodeArticleListing({...value,kind,extra,order,resource:'articles'},kind,extra,order,p)}
+  if(getApiMode()==='v1'&&kind!=='long') {const value=await (await import('./legacy/content')).legacyListing(kind,extra,p);return decodeArticleListing({...value,kind,extra,order,resource:'articles'},kind,extra,order,p)}
   const meta = { kind, extra, order }
   const raw = kind === 'long' ? { ...meta, resource: 'columns', ...await fetchPublicColumnCards(order === 'recent' ? 'latest' : 'hot', p, 12) }
     : { ...meta, resource: 'articles', ...await v3ArticleFeedPage(kind, p, 20, extra) }

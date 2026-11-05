@@ -29,6 +29,7 @@ async function data(path: string) { const envelope = row(await request(path, { c
 function paging(p: number, size: number) { if (!Number.isSafeInteger(p) || p < 1 || p > 42949672 || !Number.isSafeInteger(size) || size < 1 || size > 50) throw new ApiError('专栏页码不合法', 422) }
 export async function fetchPublicColumnCards(kind: 'latest' | 'hot', p = 1, size = 12) {
   paging(p, size); if (!['latest', 'hot'].includes(kind)) throw new ApiError('专栏排序不合法', 422)
+  if(getApiMode()==='v1')return (await import('./legacy/columns')).legacyColumnCards(kind,p,size)
   const page = decodeV3ContentPage(await data(`/api/v3/columns${kind === 'hot' ? '/hot' : ''}?p=${p}&size=${size}`))
   if (page.pagination.p !== p || page.pagination.size !== size) throw invalid()
   const list = page.list.map(decodePublicColumnCard); if (new Set(list.map(x => x.id)).size !== list.length) throw invalid()

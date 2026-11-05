@@ -28,13 +28,19 @@ export async function legacyHomeRead<K extends HomeRead>(key:K):Promise<HomeData
   }
   const data=await legacyGet(`/api/columns/${key==='columnsRecent'?'latest':'hot'}?size=8`)
   if(!Array.isArray(data)) throw new ApiError('v1专栏格式不正确',502)
-  return data.map(x=>{
-    const r=legacyObject(x)
-    const chapters=(Array.isArray(r.chapters)?r.chapters:[r.latestChapter,r.secondLatestChapter].filter(Boolean)).map(x=>{
-      const c=legacyObject(x);return {id:c.articleId,title:c.articleTitle,chapterNo:c.chapterNo,createdAt:legacyDate(c.articleCreateTime),...(typeof c.articlePreviewContent==='string'?{preview:c.articlePreviewContent}:{})}
-    })
-    return decodePublicColumnCard({id:r.columnId,title:r.columnTitle,coverURL:r.columnCoverURL,articleCount:r.columnArticleCount,updatedAt:legacyDate(r.columnUpdateTime),chapters})
-  }) as HomeData[K]
+  if(data.length>8) throw new ApiError('旧首页专栏快照超出请求范围',502)
+  const columns=data.map(legacyColumnCard)
+  if(new Set(columns.map(c=>c.id)).size!==columns.length)throw new ApiError('旧专栏快照包含重复作品',502)
+  return columns as HomeData[K]
+}
+
+/** Shared legacy card projection for home and the bounded public catalog. */
+export function legacyColumnCard(value:unknown) {
+  const r=legacyObject(value)
+  const chapters=(Array.isArray(r.chapters)?r.chapters:[r.latestChapter,r.secondLatestChapter].filter(Boolean)).map(value=>{
+    const c=legacyObject(value);return {id:c.articleId,title:c.articleTitle,chapterNo:c.chapterNo,createdAt:legacyDate(c.articleCreateTime),...(typeof c.articlePreviewContent==='string'?{preview:c.articlePreviewContent}:{})}
+  })
+  return decodePublicColumnCard({id:r.columnId,title:r.columnTitle,coverURL:r.columnCoverURL,articleCount:r.columnArticleCount,updatedAt:legacyDate(r.columnUpdateTime),chapters})
 }
 
 export function legacyArticleSummary(x:unknown, allowUnknownIdentity=false) {
