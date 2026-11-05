@@ -1,23 +1,26 @@
 <script setup lang="ts">
-import { onBeforeUnmount,onMounted,ref,watch } from 'vue'
+import { computed,onBeforeUnmount,onMounted,ref,watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { getAuthContextVersion } from '@/api/http'
+import {getApiMode} from '@/api/mode'
 import { authorColumns,type AuthorColumn } from '@/api/v3-author-columns'
 const props=withDefaults(defineProps<{modelValue:string;currentTitle?:string;disabled?:boolean}>(),{currentTitle:'',disabled:false})
 const emit=defineEmits<{select:[column:{id:string;title:string}]}>()
-const {accessToken,account}=storeToRefs(useAuthStore())
+const {accessToken,apiKey,account}=storeToRefs(useAuthStore())
+const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+const snapshotLimit=ref(0)
 const visible=ref(false)
 const list=ref<AuthorColumn[]>([]),loaded=ref(false),loading=ref(false),error=ref(''),page=ref(1),pageCount=ref(0)
 let mounted=false,sequence=0,controller:AbortController|null=null
-const identity=()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])
-function clear(){sequence++;controller?.abort();controller=null;list.value=[];loaded.value=false;loading.value=false;error.value='';page.value=1;pageCount.value=0}
+const identity=()=>JSON.stringify([getApiMode(),getAuthContextVersion(),getApiMode()==='v1'?credential.value:!!credential.value,account.value?.oId||''])
+function clear(){sequence++;controller?.abort();controller=null;list.value=[];loaded.value=false;loading.value=false;error.value='';page.value=1;pageCount.value=0;snapshotLimit.value=0}
 async function load(p=page.value){
- if(!mounted||!accessToken.value||!account.value?.oId)return
+ if(!mounted||!credential.value||!account.value?.oId)return
  controller?.abort();const abort=new AbortController();controller=abort
  const reader=identity(),run=++sequence;page.value=p;loading.value=true;loaded.value=false;error.value='';list.value=[]
  const current=()=>mounted&&run===sequence&&reader===identity()&&!abort.signal.aborted
- try{const result=await authorColumns(p,abort.signal);if(current()){list.value=result.list;loaded.value=true;pageCount.value=result.pagination.pageCount}}
+ try{const result=await authorColumns(p,abort.signal,account.value.oId);if(current()){list.value=result.list;loaded.value=true;pageCount.value=result.pagination?.pageCount??0;snapshotLimit.value=result.pagination?0:result.limit}}
  catch(reason){if(current())error.value=reason instanceof Error?reason.message:'本人专栏读取失败'}
  finally{if(current()){loading.value=false;if(controller===abort)controller=null}}
 }
@@ -31,7 +34,7 @@ onMounted(()=>{mounted=true;visible.value=true;void load(1)})
 onBeforeUnmount(()=>{mounted=false;clear()})
 </script>
 <template>
- <div v-if="visible&&accessToken" class="author-columns">
+ <div v-if="visible&&credential" class="author-columns">
   <label>选择本人专栏
    <select :value="modelValue" :disabled="disabled||loading||Boolean(error)" @change="choose">
     <option value="" disabled>请选择专栏</option>
@@ -39,6 +42,7 @@ onBeforeUnmount(()=>{mounted=false;clear()})
     <option v-for="column in list" :key="column.id" :value="column.id">{{ column.title||'未命名专栏' }}（{{ column.articleCount }}篇）</option>
    </select>
   </label>
+  <p v-if="snapshotLimit&&!loading&&!error">旧接口最多返回{{ snapshotLimit }}项专栏，不提供完整总数和分页；未列出的专栏仍可填写ID。</p>
   <p v-if="loading" role="status">正在读取本人专栏…</p>
   <p v-if="error" role="alert">{{ error }} <button type="button" :disabled="disabled" @click="load()">重试专栏列表</button></p>
   <p v-if="loaded&&!loading&&!error&&!list.length" role="status">{{ page>1?'本页没有专栏，可返回上一页。':'暂无本人专栏，可选择新建专栏。' }}</p>
