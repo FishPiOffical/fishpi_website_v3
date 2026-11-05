@@ -17,7 +17,8 @@
 | 普通文章分类列表、详情和普通评论读取 | 第二批已接，未知总条数不显示 | 保留 |
 | 专栏目录读取 | 第二批适配，实际旧接口部分目录为空且与元数据不一致时明确503 | 保留 |
 | 搜索、标签/领域目录及其文章列表 | 第四批已接，搜索缺匿名元数据时无身份展示 | 保留 |
-| 长篇列表、当前段评统计/顶层分页、章节导航 | 第十八批已接；完整回复/孤立段评定位仍待适配 | 保留 |
+| 长篇列表、当前段评统计/顶层分页、章节导航 | 第十八批已接；完整回复见第四十六批，孤立段评定位仍待适配 | 保留 |
+| 普通评论/段评完整楼中楼 | 第四十六批已接真实20条分页、子回复目标与身份隔离 | 保留原平铺分页 |
 | 发帖及本人云草稿 | 第四十三批已接发布/保存/读取/删除；旧草稿最近50份快照，已有文章编辑缺完整私有JSON | 保留完整编辑与原键恢复 |
 | 普通评论/回复/段评发布 | 第十九批已接；合成身份验收，旧协议无幂等恢复 | 保留 |
 | 文章赞同及取消赞同 | 第四十四批已接旧切换与当前状态重读；反对依赖Session，仍待支持 | 保留双向投票/明确命令恢复 |
@@ -719,3 +720,22 @@ SSR仅外壳零私有读取，凭据/账号/上下文/序号拒绝迟到状态�
 浏览器仅本机合成账号验证账号页读取未启用状态、点击准备后手动密钥和本地URI显示，并确认没有使用夹具外部QR地址。未在浏览器执行启用或停用，写流程由本机模拟接口的编译UI测试覆盖；没有准备/修改真实账号MFA，没有把真实密钥或验证码传给第三方。旁路勋章、背包、通知/私信及APP扫码不在本机夹具范围。夹具已停止，开发服务恢复真实v1代理；全站仍未完成。
 
 协议来源：[MFAProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/MFAProcessor.java)、[MultiFactorAuthenticator](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/util/MultiFactorAuthenticator.java)、[StatusCodes](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/util/StatusCodes.java)。
+
+
+## 第四十六批：普通评论与长篇段评完整楼中楼
+
+旧POST /comment/thread/replies按commentId和paginationCurrentPageNum读取服务端真实20条分页；返回root、replyCount、pagination和每条commentThreadRootId必须一致，按普通评论type0或指定当前段落type1/status0校验，拒绝其他root/段落/类型、重复ID、自回复循环及不完整页。目标页被服务端截到其他页时明确409，保留原方向重试和回首屏入口，不把错误当作空回复。原文HTML仅接受既有服务端过滤结果，作者/昵称/时间/祖先ID白名单投影，匿名剥离ID、用户名、头像；不信额外私有字段。
+
+旧ThreadComment DTO实际上省略commentOnArticleId，因此原段评适配强制要求该字段会拒绝合法响应。本批按已绑定文章/段落查询验证范围，字段若提供仍严格核对，缺失时不伪造行内ID；段落ID、类型、状态与返回根ID继续校验。补充真实缺省字段夹具，原跨文章/跨段落拒绝测试保留。
+
+LegacyCommentReplies由普通ArticleView与长篇LongArticleReader共用，默认折叠且不读取，展开后替换页、服务端分页/数量、独立失败重试；普通评论只为确认的顶层根挂载，不把当前页找不到父项的孤立回复当根。长篇不再只展示预览回复，新增查看完整回复。子回复点击传实际ArticleComment给现有回复编辑器，不再误用根评论；非legacy嵌套兜底的编辑/删除/回复目标同样修正。保留共享表态、举报和ImageLightbox入口，不恢复当前旧模式缺少协议的编辑/删除。评论完成revision令打开的回复读取失效后重读，不用写回执拼正文。
+
+换身份/凭据/目标立即清旧HTML及图片并废弃读取，收起/卸载AbortSignal取消，SSR只折叠外壳零私有请求；读helper拒绝旧key响应。三个旧评论读取端点的服务端认证先看Session再看apiKey，因此v1代理对summary、paragraph/thread/parents和thread/replies去掉上游Cookie，防经典页面其他登录身份抢占本机key；本地接口模式Cookie已在代理入口解析，不影响目标选择。旧匿名/验证码流程和apiKey仍由原后端处理，不引入Cookie桥接。
+
+验证：legacy-comment-replies-test两组实际API/编译Vue覆盖真实20+1分页、第二页失败及原页重试、完整root/祖先/段落/类型范围、缺省行文章ID、匿名与白名单、子回复正确目标、revision废弃在途旧页、换号清HTML和SSR零读取。原legacy-long-reading六组、v3长篇14组、v3评论32组、双模式代理与完整类型/客户端/服务端构建通过；v3长篇夹具补充显式v3模式及禁止旧store调用，未修改原行为断言。
+
+浏览器仅本机合成账号/内容：普通根评论展开21条回复、翻到第二页匿名评论120、点击回复后编辑器显示匿名对象；匿名打开长篇段落30，缺省行文章ID仍正常读取，展开20条并翻到第二页匿名回复320。未发表评论、举报或表态；图片/举报共享组件未另行对现网操作。旁路通知/表态元数据不在本机夹具范围。夹具已停止，服务恢复真实v1上游，截图/tmp/fp-comment-replies-browser.png。失效段落定位、旧文章编辑、收藏/订阅等仍待后续补齐。
+
+用户已提供Rhythm源码目录/Users/ling/Documents/GitHub/rhythm；只读确认README、工作区及约定，尚未改后端。注册/重置旧流程仍缺无需验证码URL和HTML的完整JSON契约，后续将在该仓库补协议，与website_v3分别提交、不部署。不能因此声明现网v1已具备未部署能力。
+
+协议来源：[CommentProcessor.getThreadReplies/getParagraphThreadParents](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/CommentProcessor.java)、[CommentQueryService.buildThreadCommentBase/buildThreadReply](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/CommentQueryService.java)。

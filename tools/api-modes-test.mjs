@@ -35,6 +35,10 @@ try {
     const response=await fetch(base+path,{method:'POST',headers:{Cookie:'fp.apiMode=v1; fp_v3_refresh=private',Authorization:'Bearer must-not-forward','Content-Type':'application/json'},body:JSON.stringify({name:'test',markdownText:'read-only fixture'})})
     assert.equal((await response.json()).version,'v1');assert.equal(calls.at(-1).headers.authorization,undefined);assert.ok(!calls.at(-1).headers.cookie?.includes('fp_v3_refresh'))
   }
+  for(const path of ['/comment/thread/replies','/comment/paragraph/summary','/comment/paragraph/thread/parents']){
+    await fetch(base+path,{method:'POST',headers:{Cookie:'fp.apiMode=v1; sym-ce=wrong-actor; harmless=1','Content-Type':'application/json'},body:JSON.stringify({apiKey:'synthetic'})})
+    assert.equal(calls.at(-1).headers.cookie,undefined)
+  }
   console.log('PASS actual dual proxy: deterministic targets, credential isolation, explicit unported capability, invalid mode fallback')
 } finally {await Promise.all([proxy,v1,v3].map(s=>new Promise(r=>s.close(r))))}
 const originalDocument=globalThis.document,originalLocation=globalThis.location

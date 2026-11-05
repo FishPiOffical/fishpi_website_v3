@@ -2,7 +2,7 @@
 import RandomArticles from '@/components/discovery/RandomArticles.vue'
 import { articleTitle } from '@/utils/text'
 import { avatarStyle } from '@/utils/avatar'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { defineAsyncComponent, computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
@@ -45,6 +45,7 @@ const routeMounted=ref(false)
 const loginRedirect=computed(()=>routeMounted.value?route.fullPath:route.fullPath.split('#')[0])
 onMounted(()=>{routeMounted.value=true})
 const auth = useAuthStore()
+const LegacyCommentReplies=defineAsyncComponent(()=>import('@/components/articles/LegacyCommentReplies.vue'))
 const commentWrites=getApiMode()==='v1'?useLegacyCommentsStore():useV3CommentsStore(),commandOrigin=Symbol('article-comment-delete'),commentRefreshError=ref('')
 const { apiKey, accessToken, isLoggedIn, account } = storeToRefs(auth)
 
@@ -474,9 +475,10 @@ function itemHandlers(c: ArticleComment) {
           <template #editor>
             <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
           </template>
-          <template v-if="t.replies.length" #default>
+          <template v-if="t.replies.length||getApiMode()==='v1'&&!t.c.commentOriginalCommentId" #default>
+            <LegacyCommentReplies v-if="getApiMode()==='v1'&&!t.c.commentOriginalCommentId" :article-id="article.oId" :root-id="t.c.oId" :writable="isLoggedIn&&commentingEnabled" :revision="commentWrites.revision" @reply="startReply" />
             <CommentItem
-              v-for="r in t.replies"
+              v-for="r in getApiMode()==='v1'&&!t.c.commentOriginalCommentId?[]:t.replies"
               :key="r.oId"
               v-bind="itemProps(r)"
               reply

@@ -6,7 +6,7 @@ const bad=()=>new ApiError('旧段评响应格式不正确',502)
 function article(value:string){if(typeof value!=='string'||!/^[1-9][0-9]{0,31}$/.test(value))throw new ApiError('文章ID不合法',422);return value}
 function anchor(value:string){if(typeof value!=='string'||!/^[a-f0-9]{64}$/.test(value))throw new ApiError('段落锚点不合法',422);return value}
 function count(value:unknown){if(typeof value!=='number'||!Number.isSafeInteger(value)||value<0)throw bad();return value}
-async function read(path:string,input:Record<string,unknown>){const key=getLegacyKey(),r=legacyObject(await request(path,{method:'POST',body:JSON.stringify({...input,...(key?{apiKey:key}:{})}),cache:'no-store'}));if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'段评读取失败',400);return r}
+async function read(path:string,input:Record<string,unknown>,signal?:AbortSignal){const key=getLegacyKey(),r=legacyObject(await request(path,{method:'POST',body:JSON.stringify({...input,...(key?{apiKey:key}:{})}),cache:'no-store',...(signal?{signal}:{})}));if(key!==getLegacyKey())throw new ApiError('登录状态已变化',409);if(r.code!==0)throw new ApiError(typeof r.msg==='string'?r.msg:'段评读取失败',400);return r}
 export async function legacyParagraphSummary(articleId:string){const r=await read('/comment/paragraph/summary',{articleId:article(articleId)});if(!Array.isArray(r.paragraphComments)||r.paragraphComments.length>50000)throw bad();const seen=new Set<string>();return r.paragraphComments.map(v=>{const item=legacyObject(v),paragraphId=anchor(item.paragraphId as string);if(seen.has(paragraphId))throw bad();seen.add(paragraphId);return{paragraphId,commentCount:count(item.commentCount)}})}
 export async function legacyParagraphComments(articleId:string,paragraphId:string,p=1,sort='oldest',state:'active'|'orphaned'='active'){
  article(articleId);anchor(paragraphId);if(!Number.isSafeInteger(p)||p<1||p>1000000||!['oldest','latest','hot'].includes(sort)||!['active','orphaned'].includes(state))throw new ApiError('段评分页或排序不合法',422)
@@ -17,7 +17,7 @@ export async function legacyParagraphComments(articleId:string,paragraphId:strin
  if(current!==p)throw new ApiError('段评页码已变化，请返回第一页重读',409)
  if(size<1||size>100||pages!==Math.ceil(total/size)||r.commentThreadParents.length>size||r.commentThreadParents.length>total||total===0&&r.commentThreadParents.length!==0)throw bad()
  const seen=new Set<string>();let budget=0
- function project(v:unknown,depth=0):ReturnType<typeof legacyComment>{if(depth>20||++budget>5000)throw bad();const item=legacyObject(v);if(typeof item.oId!=='string'||seen.has(item.oId)||item.commentOnArticleId!==articleId||item.commentParagraphId!==paragraphId||item.commentType!==1||item.commentParagraphStatus!==0)throw bad();seen.add(item.oId)
+ function project(v:unknown,depth=0):ReturnType<typeof legacyComment>{if(depth>20||++budget>5000)throw bad();const item=legacyObject(v);if(typeof item.oId!=='string'||seen.has(item.oId)||(item.commentOnArticleId!==undefined&&item.commentOnArticleId!==articleId)||item.commentParagraphId!==paragraphId||item.commentType!==1||item.commentParagraphStatus!==0)throw bad();seen.add(item.oId)
   // Project a single row first so nested replies share one depth/count/identity budget.
   const {commentThreadReplies,...single}=item,result=legacyComment(single)
   if(commentThreadReplies!==undefined){if(!Array.isArray(commentThreadReplies))throw bad();result.commentThreadReplies=commentThreadReplies.map(reply=>project(reply,depth+1))}
@@ -31,4 +31,25 @@ export async function legacyArticleNavigation(articleId:string,signal?:AbortSign
  if(d.longArticleColumnView===undefined||d.longArticleColumnView===null)return{articleId,column:null,chapterNo:null,previous:null,next:null}
  const view=legacyArticleColumnView(d.longArticleColumnView,articleId),chapter=(value:typeof view.previous)=>value?{id:value.articleId,title:value.articleTitle,chapterNo:value.chapterNo,createdAt:legacyDate(value.articleCreateTime)}:null
  return{articleId,column:{id:view.column.oId,title:view.column.columnTitle,articleCount:view.chapters.length},chapterNo:view.chapterNo!,previous:chapter(view.previous),next:chapter(view.next)}
+}
+
+
+export async function legacyCommentReplies(articleId:string,rootId:string,paragraphId='',p=1,signal?:AbortSignal){
+ article(articleId);article(rootId);if(paragraphId)anchor(paragraphId)
+ if(!Number.isSafeInteger(p)||p<1||p>1000000)throw new ApiError('回复页码不合法',422)
+ const r=await read('/comment/thread/replies',{commentId:rootId,paginationCurrentPageNum:p},signal),page=legacyObject(r.pagination)
+ if(r.commentThreadRootId!==rootId||!Array.isArray(r.commentThreadReplies))throw bad()
+ const current=count(page.paginationCurrentPageNum),size=count(page.paginationPageSize),total=count(page.paginationRecordCount),pages=count(page.paginationPageCount)
+ if(current!==p)throw new ApiError('回复页码已变化，请返回第一页重新读取',409)
+ if(size!==20||pages!==Math.ceil(total/size)||r.commentThreadReplyCount!==total||r.commentThreadReplies.length!==Math.max(0,Math.min(size,total-(p-1)*size)))throw bad()
+ const seen=new Set<string>()
+ const list=r.commentThreadReplies.map(value=>{
+  const item=legacyObject(value)
+  if(typeof item.oId!=='string'||item.oId===rootId||seen.has(item.oId)||item.commentThreadRootId!==rootId||(item.commentOnArticleId!==undefined&&item.commentOnArticleId!==articleId)||item.commentType!==(paragraphId?1:0)||(paragraphId&&(item.commentParagraphId!==paragraphId||item.commentParagraphStatus!==0))||typeof item.commentOriginalCommentId!=='string'||!item.commentOriginalCommentId||item.commentOriginalCommentId===item.oId)throw bad()
+  article(item.commentOriginalCommentId);seen.add(item.oId)
+  // Article ownership is scoped by the verified parent query; this legacy projection omits it per row.
+  const {commentThreadReplies,...single}=item
+  return legacyComment(single)
+ })
+ return{list,pagination:{p:current,total,pageCount:pages}}
 }

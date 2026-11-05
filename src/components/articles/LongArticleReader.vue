@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import VipNickname from '@/components/user/VipNickname.vue'
 import type {CommentLocation} from '@/api/v3-comment-location'
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { defineAsyncComponent, computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   type ArticleComment,
@@ -26,6 +26,7 @@ import ReportDialog from '@/components/ReportDialog.vue'
 import { useAppearanceStore } from '@/stores/appearance'
 import { articleTitle } from '@/utils/text'
 
+const LegacyCommentReplies=defineAsyncComponent(()=>import('./LegacyCommentReplies.vue'))
 const props = defineProps<{
   article: ArticleDetail
   column: LongArticleColumnView | null
@@ -720,15 +721,16 @@ function chapterTitle(c: LongArticleChapter) {
                 <button type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="removeParagraphComment(comment)">删除</button>
                 <CommentComposer :writable="commentingEnabled" v-if="paragraphEditingId===comment.oId" :article-id="article.oId" :edit-id="comment.oId" @cancel="paragraphEditingId=''" @saved="paragraphEditingId=''" />
               </template>
-              <div v-for="reply in comment.commentThreadReplies || []" :key="reply.oId" class="la-paragraph-reply-item">
+              <LegacyCommentReplies v-if="legacyParagraphs" :article-id="article.oId" :root-id="comment.oId" :paragraph-id="activeParagraphId" :writable="loggedIn&&commentingEnabled&&paragraphState==='active'" :revision="commentWrites.revision" @reply="replyToParagraphComment" />
+              <div v-for="reply in legacyParagraphs?[]:comment.commentThreadReplies || []" :key="reply.oId" class="la-paragraph-reply-item">
                 <RouterLink v-if="reply.commentAuthorId" :to="`/member/${reply.commentAuthorName}`"><VipNickname :user-id="reply.commentAuthorId" :user-name="reply.commentAuthorName" :text="reply.commentAuthorNickname || reply.commentAuthorName" /></RouterLink>
                 <span v-else>匿名用户</span><span class="reply-colon">：</span>
                 <span class="reply-content" v-html="reply.commentContent || ''" />
-                <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
-              <template v-if="ownParagraphComment(comment)">
-                <button v-if="commentingEnabled" type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="commentingEnabled && (paragraphEditingId=comment.oId)">编辑</button>
-                <button type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="removeParagraphComment(comment)">删除</button>
-                <CommentComposer :writable="commentingEnabled" v-if="paragraphEditingId===comment.oId" :article-id="article.oId" :edit-id="comment.oId" @cancel="paragraphEditingId=''" @saved="paragraphEditingId=''" />
+                <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(reply)">回复</button>
+              <template v-if="ownParagraphComment(reply)">
+                <button v-if="commentingEnabled" type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="commentingEnabled && (paragraphEditingId=reply.oId)">编辑</button>
+                <button type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="removeParagraphComment(reply)">删除</button>
+                <CommentComposer :writable="commentingEnabled" v-if="paragraphEditingId===reply.oId" :article-id="article.oId" :edit-id="reply.oId" @cancel="paragraphEditingId=''" @saved="paragraphEditingId=''" />
               </template>
               </div>
             </article>
