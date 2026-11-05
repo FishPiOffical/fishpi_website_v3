@@ -41,6 +41,7 @@
 | 同城用户分页 | 第二十七批已接；旧总人数未知、文章JSON仍缺失 | 保留双资源分页与排序 |
 | 大事记公开时间线/详情 | 第二十八批已接；旧快照分页，投稿与本人审核状态仍缺少apiKey契约 | 保留 |
 | 鱼游目录/详情/评论读取 | 第二十九批已接；有界旧目录与评论快照、本机分页 | 保留 |
+| 鱼游投稿/编辑申请/投票切换/评论 | 第三十批已接；四字段旧投稿，未知结果无自动重发 | 保留五字段及同键恢复 |
 | 标签关注/收藏/订阅写入、账号各类设置、财务/导出等 | 待适配，关系写入仍受旧页面会话限制 | 保留 |
 
 未适配资源在v1中明确报501，不发送v3 HTTP/订阅，不自动降级、不恢复mock、不用空列表吞错。不会把旧响应伪装为具有v3的幂等/权限/费用保证。后续批次须逐资源核对实际旧接口、字段、分页及身份，缺少的能力明确列出，不恢复退役的page-auth桥接。
@@ -462,3 +463,17 @@ useFishGames按模式观察实际旧key/Bearer，身份/凭据/卸载使在途�
 验证：legacy-fish-games-test四组实际API/共享hook/编译页面覆盖多批目录汇集、两种全局排序与第二页、完整预算失败、旧真实字段/未知元数据、坏URL/ID/时间/计数/重复和跨游戏评论拒绝、空错分离、详情/作者链接/评论分页/纯文本、身份迟到及SSR零读。原v3鱼游18组、类型和完整客户端/服务端构建通过。现网公开JSON只读核对；本地浏览器验证21个鱼游第二页、具体游戏详情/作者链接及空评论，未打开游戏执行动作、投票、评论或投稿真实数据。非空生产评论与并发目录变化未全验，旧写入继续适配。
 
 协议来源：[FishGameProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/FishGameProcessor.java)、[FishGameWriteSecurityMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/FishGameWriteSecurityMidware.java)。只读JSON与源码，不抓取经典详情HTML。
+
+## 第三十批：鱼游投稿、编辑申请、投票切换与评论
+
+FishGameEditor/Recovery按模式挂载独立旧组件或逐字保留的V3前缀原组件，GamesView/useFishGames选择对应操作store。旧FishGameWriteSecurityMidware明确核验apiKey，处理器从已核验context用户确定作者，客户端不发送作者ID、不恢复页面Cookie桥接。POST /api/fish-games、/{id}/edit只发送旧apiKey与fishGameName/fishGameDescription/fishGameUrl/fishGameIconUrl；旧验证服务只接四项，不伪造或转发v3 OAuth授权网址。原字符串保持，旧服务去HTML/trim并重验长度、HTTPS、唯一URL和作者权限。编辑入口按当前旧目录用户名提示，真正归属由服务器稳定ID重验，不能据按钮展示宣称授权证明。
+
+POST /{id}/vote发送value=like/dislike，旧语义为切换：同项再点撤销、另一项切换；没有明确none写，也没有本人投票GET。旧界面使用“切换点赞/切换点踩”，不把缺少的userVote当未投票或挂假选中状态。仅校验实际fishGameUserVote及fishGameLikeCount/fishGameDislikeCount回执格式，不写回当前票数或选择；完成后重读当前目录/详情。POST /{id}/comments保留原content，后端规范化至1～500字符，成功只认实际评论ID与匹配游戏ID，正文经当前GET显示，不插回执正文。
+
+投稿成功只认实际oId及待审状态，编辑成功无新对象只认所请求目标；全局提示申请需审核，回执不代表当前公开内容。旧投稿四字段草稿/评论按原目标及内容匹配后清空；编辑确认后关闭编辑表单，待审字段不覆盖公开详情。读失败只重读，不能重复申请或评论。
+
+legacyFishGames保留一个原kind/target/body或value的未确认命令跨SPA锁定，无假幂等键、无自动重放或恢复按钮，并禁止风控后的隐式重发。任何不确定失败先保留原操作；用户核对后明确解除锁定，投票因无本人状态JSON需另核对经典页面本人选择。换key/账号清理，SSR/非v1/游客不能写，迟到结果不能恢复旧状态。全局Recovery仅显示类型/编号/结果，不展示原评论或投稿正文。
+
+验证：legacy-fish-game-writes-test四组实际API/Pinia/编译页面、表单和Recovery，覆盖精确四字段/原文/旧key、无OAuth/Bearer/假键、切换回执契约、真实元数据、坏输入、换key迟到、未知跨SPA锁定零重发、模式/SSR边界、两次切换/撤销后GET、评论草稿清空与回执正文不入列表、编辑待审关闭、核对解除零写。旧读取4组、原v3鱼游18组、类型与完整客户端/服务端构建通过。浏览器只用本机合成账号和HTTP夹具验证点赞后GET为1而非回执999、当前评论及清草稿、四字段投稿后清空/待审提示、编辑关闭且公开简介仍旧值；未在现网投票、评论、投稿或编辑。夹具已停止并恢复现网v1开发代理。生产限流、OAuth之外的旧URL校验、审批、通知和并发切换仍需真实环境联调；其他全站模块继续。
+
+协议来源：[FishGameProcessor](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/FishGameProcessor.java)、[FishGameMgmtService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/FishGameMgmtService.java)、[FishGameValidationService](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/service/FishGameValidationService.java)、[FishGameWriteSecurityMidware](https://github.com/FishPiOffical/rhythm/blob/master/src/main/java/org/b3log/symphony/processor/middleware/FishGameWriteSecurityMidware.java)。只读源码核对协议，不改Rhythm认证。

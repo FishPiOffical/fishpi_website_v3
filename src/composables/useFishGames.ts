@@ -3,9 +3,10 @@ import {onMounted,onScopeDispose,ref,watch} from 'vue'
 import {getAuthContextVersion} from '@/api/http'
 import {listFishGames,getFishGame,listGameComments,type FishGame,type GameComment,type GamePage} from '@/api/v3-fish-games'
 import {useAuthStore} from '@/stores/auth'
+import {useLegacyFishGamesStore} from '@/stores/legacyFishGames'
 import {useV3FishGamesStore} from '@/stores/v3FishGames'
 export function useFishGames(){
- const auth=useAuthStore(),writes=useV3FishGamesStore(),sort=ref<'votes'|'likes'>('votes'),selected=ref('')
+ const auth=useAuthStore(),writes=getApiMode()==='v1'?useLegacyFishGamesStore():useV3FishGamesStore(),sort=ref<'votes'|'likes'>('votes'),selected=ref('')
  const list=resource<GamePage<FishGame>>(),detail=resource<FishGame>(),comments=resource<GamePage<GameComment>>()
  const credential=()=>getApiMode()==='v1'?auth.apiKey:auth.accessToken
  let mounted=false
