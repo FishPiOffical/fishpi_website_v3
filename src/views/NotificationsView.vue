@@ -42,7 +42,7 @@ const items = ref<NoticeItem[]>([])
 const page = ref(1)
 const pageCount = ref(0)
 let requestVersion = 0, active = true
-function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
+function identity() { return JSON.stringify([getAuthContextVersion(), getApiMode()==='v1'?accessToken.value:!!accessToken.value, account.value?.oId || '']) }
 let boundary = identity()
 const pendingReadKeys = new Map<string, string>()
 const loading = ref(false)
@@ -84,7 +84,7 @@ watch([accessToken, () => account.value?.oId], () => {
   const current = identity()
   if (current === boundary) return
   boundary = current
-  requestVersion++; pendingReadKeys.clear(); marking.value = false; items.value = []; pageCount.value = 0; page.value = 1; error.value = ''
+  requestVersion++; pendingReadKeys.clear(); marking.value = false; loading.value = false; items.value = []; pageCount.value = 0; page.value = 1; error.value = ''
 }, { flush: 'sync' })
 watch(
   () => [accessToken.value, account.value?.oId, type.value, page.value, notices.revision],

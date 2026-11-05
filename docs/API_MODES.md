@@ -1096,3 +1096,10 @@ TagInput按模式识别apiKey/Bearer，保持原IME、光标定位、分隔符�
 验证：v3-tag-suggestions十一组（原九组及真实legacy API/编译TagInput新增两组）通过，覆盖第101项跨页匹配、公共缓存、后页失败重新首批读取、取消和身份代次隔离、apiKey-only输入及当前token精确替换。legacy-posts三组、类型检查及完整客户端/SSR构建通过。本机合成账号浏览器实际输入first, C+，得到第二页C++候选，选择后为first, C++，未发布帖子；截图/tmp/fp-tags72-browser.png。真实全站目录首次延迟、并发变化和生产账号未验；不据此宣称全站兼容完成。
 
 验收后停止本机夹具并恢复127.0.0.1:5173正常上游。Rhythm仍只读f2e5b59f且工作区干净。其余受Session/CSRF或完整私有JSON限制的能力继续按真实协议核对。
+
+
+## 第七十三批（仅website）：通知页旧key更换隔离
+
+检查共享NotificationsView发现其credential已按模式选取，但identity仍仅保存凭据有无。同账号旧apiKey从非空换为另一非空时，身份监听提前返回：旧列表没有同步清空/回第一页，未确认的已读键和marking仍被保留，旧写回调可使新会话通知失效。现v1比较实际旧key（仅局部内存比较，不输出），凭据边界同步清页、总页数、读取/写入忙状态及pendingReadKeys，旧列表/写回调不能覆盖或失效新会话。v3继续仅比较token有无及稳定身份，普通刷新保留分页和原已读键。
+
+验证：修复原v3-notification-page专项缺少mode导入映射的问题，保留原四组并加入两组真实编译NotificationsView测试：apiKey-only加载、同账号换key同步清理、旧已读成功回调不invalidate新会话、旧列表迟到不覆盖当前列表。legacy-notifications实际旧协议/共享Socket四组、v3-notifications七组、类型检查及完整客户端/SSR构建通过。本批没有新增浏览器验收，页面生命周期由真实编译组件专项执行；没有标记任何真实账号通知。Rhythm保持只读f2e5b59f、工作区干净。该修复不代表其余缺少旧JSON/Session能力已经补齐。
