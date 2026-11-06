@@ -45,3 +45,11 @@
 2026-11-06 最新 UI `0d5f39b` 已发布至 `/opt/fishpi/releases/20261106-0d5f39b`，包含紧凑积分流水、收支标识、轻量刷新按钮及此前聊天界面调整。完整生产构建通过，积分页 JS/CSS 公网字节与本地产物一致，`/points` 和反馈 health 均 200，两个服务 active。切换前已在线备份反馈数据库（`backups/pre-20261106-0d5f39b-*.sqlite`），保留前版 e6c66bf 与旧 assets。未修改 Caddy、认证或防火墙；此前部署机访问 fishpi.cn 超时的 SSR 上游网络问题仍需独立处理，不能视为本次部署已修复。未执行生产账号或需求写入。
 
 2026-11-07 已发布 `d7aa1ca` 至 `/opt/fishpi/releases/20261107-d7aa1ca`，包含精简签到、个人中心共用资料卡，以及 cardBg/userPoint/onlineMinute 的客户端与 SSR 适配。完整生产构建通过，公网签到和个人页 JS/CSS、包含共用资料卡的入口 JS 均与本地产物一致；`/points`、`/member/xysheep/medals` 和反馈 health 返回 200，两个服务 active。切换前已在线备份反馈数据库（`backups/pre-20261107-d7aa1ca-*.sqlite`），前版 20261106-0d5f39b 和旧 assets 保留。发布时 fishpi.cn 公开资料仍为原六字段，真实背景及公开统计需 Rhythm 对应更新上线；本次发布目标为 yui 网站与反馈服务。
+
+## 2026-11-07 更新至 29559aa
+
+已发布至 `/opt/fishpi/releases/20261107-29559aa`，包含首页五分钟公开数据缓存、统一清风侧栏、个人中心子页精简、鱼游改版及设置页统一排版。按本文生产变量完整构建，反馈服务类型检查通过；发布前的全量 106 项本机专项通过。网站与需求反馈服务分别安装锁定依赖并重启，Caddy 配置及上游保持不变，浏览器继续直连 fishpi.cn v3。
+
+切换前反馈数据库在线备份为 `/var/lib/fishpi-feedback/backups/pre-20261107-29559aa-1793988294.sqlite`；当前数据库 `integrity_check` 为 ok，前版 `20261107-d7aa1ca` 和旧静态资源保留供回滚及旧页面使用。数据库、管理员环境配置与访客数据未替换，部署包未包含 `.host`。
+
+公网首页、`/games`、`/settings`、`/member/Yui/medals`、反馈 health 及公开列表均返回 200。入口 JS、SettingsView 与 GamesView 的 JS/CSS 共五项资源与本地字节一致；浏览器确认新版设置分组、鱼游引导区、十个经典入口和二十条首屏社区卡片，无运行警告或错误。网站、反馈及 Caddy 均 active。服务器直读 SSR 已能返回内容，连续缓存命中样本约 0.03 秒；不代表所有用户访问时延保证。未执行真实账号登录、投票、提交需求或其他生产写入。
