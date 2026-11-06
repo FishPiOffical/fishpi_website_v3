@@ -40,11 +40,12 @@ console.log('PASS membership styles 4 an old batch cannot overwrite a new reader
 token('E');let releaseInvalidated;globalThis.__styleBatch=async ids=>new Promise(resolve=>releaseInvalidated=()=>resolve(ids.map(userId=>({userId,style:{color:'#111111'}}))))
 const old=helper.loadVipName('66');await until(()=>!!releaseInvalidated);helper.invalidateVipName('66');assert.equal((await old).isVip,false);globalThis.__styleBatch=async ids=>ids.map(userId=>({userId,style:{color:'#222222'}}));const fresh=helper.loadVipName('66');releaseInvalidated();await fresh;assert.equal(helper.cachedVipName('66').color,'#222222')
 console.log('PASS membership styles 5 invalidating while a batch is in flight cancels its write and a later request installs only the fresh style')
-token('F');let failures=0;globalThis.__styleBatch=async()=>{failures++;throw Error('offline')};assert.equal((await helper.loadVipName('77')).isVip,false);assert.equal(helper.cachedVipName('77'),undefined);await helper.loadVipName('77');assert.equal(failures,2)
+token('F');let failures=0;globalThis.__styleBatch=async()=>{failures++;throw Error('offline')};assert.equal((await helper.loadVipName('77')).isVip,false);assert.equal(helper.cachedVipName('77'),undefined);await helper.loadVipName('77');assert.equal(failures,1);await helper.loadVipName('78');assert.equal(failures,1);assert.equal(helper.cachedVipName('77'),undefined)
+const realNow=Date.now;Date.now=()=>realNow()+31000
 globalThis.__styleBatch=async ids=>ids.map(userId=>({userId,style:{}}));await helper.loadVipName('77');assert.equal(helper.cachedVipName('77').isVip,false);const successfulReads=batches.length;await helper.loadVipName('77');assert.equal(batches.length,successfulReads)
-const realNow=Date.now;Date.now=()=>realNow()+61000;assert.equal(helper.cachedVipName('77'),undefined);await helper.loadVipName('77');Date.now=realNow;assert.equal(batches.length,successfulReads+1)
+Date.now=()=>realNow()+92000;assert.equal(helper.cachedVipName('77'),undefined);await helper.loadVipName('77');Date.now=realNow;assert.equal(batches.length,successfulReads+1)
 globalThis.__styleSSR=true;assert.equal(helper.cachedVipName('77'),undefined);assert.equal((await helper.loadVipName('77')).isVip,false);globalThis.__styleSSR=false
-console.log('PASS membership styles 6 transport errors are not cached, valid empty styles are plain text, later reads honor TTL and SSR never uses browser styles')
+console.log('PASS membership styles 6 transport errors enter shared cooldown without caching inactive status, valid empty styles are plain text, later reads honor TTL and SSR never uses browser styles')
 const source=await fs.readFile('src/components/user/VipNickname.vue','utf8'),descriptor=parse(source).descriptor
 let componentCode=compile(compileScript(descriptor,{id:'nickname-test',inlineTemplate:true}).content).replace(/from ['"]vue['"]/g,`from '${import.meta.resolve('vue')}'`)
 globalThis.__styleHelper=helper

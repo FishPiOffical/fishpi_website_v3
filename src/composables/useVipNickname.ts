@@ -33,12 +33,15 @@ const EMPTY_CONFIG: VipNameConfig = {
 
 // Legacy isVip means style rendering is enabled here; it is never an account membership claim.
 const CACHE_TTL = 60_000, MAX_CACHE = 2000, MAX_PENDING = 1000
+const BATCH_WINDOW = 50, MIN_BATCH_INTERVAL = 500, FAILURE_COOLDOWN = 30_000
 const cache = reactive(new Map<string, { value: VipNameConfig; at: number }>())
 const aliases = reactive(new Map<string, { id: string; at: number }>())
 export const vipNameRevision = ref(0)
 let identity = getAccessToken(), generation = 0, scheduled: ReturnType<typeof setTimeout> | undefined
 let activeRun: object | null = null
 let expiryTimer: ReturnType<typeof setTimeout> | undefined
+let retryTimer: ReturnType<typeof setTimeout> | undefined
+let lastStarted = -Infinity, blockedUntil = 0, failures = 0
 interface StyleJob { id: string; generation: number; cancelled: boolean; promise: Promise<VipNameConfig | undefined>; resolve: (value: VipNameConfig | undefined) => void }
 const jobs = new Map<string, StyleJob>(), queue = new Map<string, StyleJob>()
 interface NameJob { generation: number; cancelled: boolean; id?: string; promise: Promise<VipNameConfig> }
@@ -77,15 +80,21 @@ function reset() {
   if (scheduled !== undefined) clearTimeout(scheduled)
   scheduled = undefined
   if (expiryTimer !== undefined) clearTimeout(expiryTimer)
-  expiryTimer = undefined; vipNameRevision.value++
+  expiryTimer = undefined
+  if (retryTimer !== undefined) clearTimeout(retryTimer)
+  retryTimer = undefined; lastStarted = -Infinity; blockedUntil = 0; failures = 0
+  vipNameRevision.value++
 }
 const unsubscribe = onAccessTokenChange(token => { if (identity !== token) { identity = token; reset() } })
 if (import.meta.hot) import.meta.hot.dispose(() => { unsubscribe(); identity = null; reset() })
-function schedule() { if (scheduled === undefined && !activeRun && queue.size) scheduled = setTimeout(() => { scheduled = undefined; void flush() }, 0) }
+function schedule() {
+  if (scheduled !== undefined || activeRun || !queue.size || Date.now() < blockedUntil) return
+  scheduled = setTimeout(() => { scheduled = undefined; void flush() }, Math.max(BATCH_WINDOW, lastStarted + MIN_BATCH_INTERVAL - Date.now()))
+}
 async function flush() {
   if (activeRun || !identity || !queue.size) return
   const run = {}, current = generation, batch = [...queue.values()].slice(0, 100)
-  activeRun = run
+  activeRun = run; lastStarted = Date.now()
   for (const job of batch) queue.delete(job.id)
   try {
     const results = await fetchV3MembershipStyles(batch.map(job => job.id))
@@ -97,8 +106,23 @@ async function flush() {
         boundedSet(cache, job.id, { value, at }); job.resolve(value)
       }
     }
-    if (valid(current)) scheduleExpiry()
-  } catch { /* Decorative read failures remain plain text and are never cached as inactive accounts. */ }
+    if (valid(current)) { failures = 0; scheduleExpiry() }
+  } catch {
+    // A failed decorative read is unknown, not an inactive membership. Pause the shared
+    // endpoint as well as this batch: otherwise other visible users immediately repeat it.
+    if (valid(current)) {
+      const delay = Math.min(300_000, FAILURE_COOLDOWN * 2 ** Math.min(failures++, 4))
+      blockedUntil = Date.now() + delay
+      for (const job of queue.values()) { job.resolve(undefined); if (jobs.get(job.id) === job) jobs.delete(job.id) }
+      queue.clear()
+      if (retryTimer !== undefined) clearTimeout(retryTimer)
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined
+        // Re-observe visible names; do not blindly replay the failed user IDs.
+        if (valid(current)) vipNameRevision.value++
+      }, delay)
+    }
+  }
   finally {
     for (const job of batch) { job.resolve(undefined); if (jobs.get(job.id) === job) jobs.delete(job.id) }
     if (activeRun === run) { activeRun = null; schedule() }
@@ -109,7 +133,7 @@ function queued(id: string): Promise<VipNameConfig | undefined> {
   if (cached) return Promise.resolve(cached)
   const existing = jobs.get(id)
   if (existing) return existing.promise
-  if (!valid(generation) || jobs.size >= MAX_PENDING) return Promise.resolve(undefined)
+  if (!valid(generation) || Date.now() < blockedUntil || jobs.size >= MAX_PENDING) return Promise.resolve(undefined)
   let resolve!: StyleJob['resolve']
   const promise = new Promise<VipNameConfig | undefined>(done => { resolve = done })
   const job: StyleJob = { id, generation, cancelled: false, promise, resolve }
@@ -154,6 +178,7 @@ export async function loadVipName(userId?: string | number, userName?: string): 
   if (!valid(generation)) return { ...EMPTY_CONFIG }
   const cached = cachedVipName(userId, userName)
   if (cached) return cached
+  if (Date.now() < blockedUntil) return { ...EMPTY_CONFIG }
   const id = membershipUserId(userId)
   if (id) return (await queued(id)) || { ...EMPTY_CONFIG }
   const key = nameKey(userName)

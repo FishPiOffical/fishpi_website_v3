@@ -18,38 +18,38 @@ try{
  const helper=await import(helperURL),d=parse(await fs.readFile('src/components/user/VipNickname.vue','utf8')).descriptor
  const Component=(await import(url(compile(compileScript(d,{id:'style-expiry',inlineTemplate:true}).content).replace(/from ['"]vue['"]/g,`from '${import.meta.resolve('vue')}'`).replace("from '@/composables/useVipNickname'",`from '${helperURL}'`)))).default
  const nodes=[],renderer=createRenderer({patchProp(n,k,o,v){n.props[k]=v},insert(){},remove(){},createElement(tag){const n={tag,props:{}};nodes.push(n);return n},createText(){return{}},createComment(){return{}},setText(){},setElementText(){},parentNode(){return null},nextSibling(){return null}})
- app=renderer.createApp({setup:()=>()=>h('div',[h(Component,{userId:'1',text:'first',lazy:false}),h(Component,{userId:'2',text:'second',lazy:false})])});app.mount({});await advance(0)
+ app=renderer.createApp({setup:()=>()=>h('div',[h(Component,{userId:'1',text:'first',lazy:false}),h(Component,{userId:'2',text:'second',lazy:false})])});app.mount({});await tick();await advance(500)
  const spans=nodes.filter(n=>n.tag==='span');assert.equal(spans.length,2);assert.ok(spans.every(n=>String(n.props.class).includes('rainbow')));assert.deepEqual(state.batches,[['1','2']])
  let release;state.dispatch=ids=>new Promise(resolve=>release=()=>resolve(ids.map(userId=>({userId,style:{}}))))
  await advance(59999);assert.ok(spans.every(n=>String(n.props.class).includes('rainbow')))
  await advance(2);assert.ok(spans.every(n=>!String(n.props.class).includes('rainbow')),'Mounted nicknames kept expired style without another reactive event')
- assert.ok(spans.every(n=>n.props.style===undefined));assert.deepEqual(state.batches,[['1','2'],['1','2']]);assert.ok(release)
+ assert.ok(spans.every(n=>n.props.style===undefined));await advance(500);assert.deepEqual(state.batches,[['1','2'],['1','2']]);assert.ok(release)
  release();await tick();assert.ok(spans.every(n=>n.props.style===undefined))
  console.log('PASS style expiry 1 actual mounted nicknames clear expired style before fresh response, visible IDs coalesce into one batch and inactive result stays plain')
  state.dispatch=async ids=>ids.map(userId=>({userId,style:{color:'#123456'}}))
- const alias=helper.loadVipName(undefined,'Alias');await advance(0);await alias;const before=state.lookups
- await advance(60001);const freshAlias=helper.loadVipName(undefined,'Alias');await advance(0);await freshAlias;assert.ok(state.lookups>before)
+ const alias=helper.loadVipName(undefined,'Alias');await tick();await advance(500);await alias;const before=state.lookups
+ await advance(60001);const freshAlias=helper.loadVipName(undefined,'Alias');await tick();await advance(500);await freshAlias;assert.ok(state.lookups>before)
  console.log('PASS style expiry 2 expired name alias cannot recover old style or avoid a current username lookup')
  app.unmount();app=null
  const observers=[]
  globalThis.IntersectionObserver=class{constructor(callback){this.callback=callback;this.disconnected=false;observers.push(this)}observe(){}disconnect(){this.disconnected=true}}
- const seeded=helper.loadVipName('3');await advance(0);await seeded
+ const seeded=helper.loadVipName('3');await tick();await advance(500);await seeded
  app=renderer.createApp({setup:()=>()=>h(Component,{userId:'3',text:'offscreen',lazy:true})});app.mount({});await tick();const lazyNode=nodes.filter(n=>n.tag==='span').at(-1)
  assert.equal(lazyNode.props.style['--vip-color'],'#123456')
  const countThree=()=>state.batches.filter(batch=>batch.includes('3')).length,beforeThree=countThree()
  await advance(60001);assert.equal(lazyNode.props.style,undefined);assert.equal(countThree(),beforeThree)
  state.dispatch=async ids=>ids.map(userId=>({userId,style:{color:'#ABCDEF'}}))
- observers.at(-1).callback([{isIntersecting:true}]);await advance(0);assert.equal(lazyNode.props.style['--vip-color'],'#ABCDEF');assert.equal(countThree(),beforeThree+1)
+ observers.at(-1).callback([{isIntersecting:true}]);await tick();await advance(500);assert.equal(lazyNode.props.style['--vip-color'],'#ABCDEF');assert.equal(countThree(),beforeThree+1)
  console.log('PASS style expiry 3 offscreen nickname clears expired CSS without fetching; entering visibility performs exactly one fresh batched read')
 
  token(null);await tick();assert.equal(timers.size,0);const reads=state.batches.length;await advance(120000);assert.equal(state.batches.length,reads);assert.equal(lazyNode.props.style,undefined)
  console.log('PASS style expiry 4 logout cancels the shared expiry/batch timers and cannot trigger background reads or retain old CSS')
  app.unmount();app=null;token('HMR')
  state.dispatch=async ids=>ids.map(userId=>({userId,style:{color:'#455667'}}))
- app=renderer.createApp({setup:()=>()=>h(Component,{userId:'3',text:'hmr',lazy:false})});app.mount({});await advance(0)
+ app=renderer.createApp({setup:()=>()=>h(Component,{userId:'3',text:'hmr',lazy:false})});app.mount({});await tick();await advance(500)
  const hmrNode=nodes.filter(n=>n.tag==='span').at(-1);assert.equal(hmrNode.props.style['--vip-color'],'#455667')
  let oldReply;state.dispatch=ids=>new Promise(resolve=>oldReply=()=>resolve(ids.map(userId=>({userId,style:{color:'#FF0000'}}))))
- helper.invalidateVipName('3');await advance(0);assert.ok(oldReply);state.dispose();await tick();assert.equal(timers.size,0,'Disposed module scheduled new style work')
+ helper.invalidateVipName('3');await tick();await advance(500);assert.ok(oldReply);state.dispose();await tick();assert.equal(timers.size,0,'Disposed module scheduled new style work')
  oldReply();await tick();assert.equal(helper.cachedVipName('3'),undefined);assert.equal(hmrNode.props.style,undefined);assert.equal(timers.size,0)
  console.log('PASS style expiry 5 HMR disposal cancels cache timers and queued style work; late old batch cannot restore CSS or start a new timer')
 
