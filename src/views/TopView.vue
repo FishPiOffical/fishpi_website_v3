@@ -134,20 +134,297 @@ const topCatalog = [
   },
 ]
 
+const navIcons: Record<string, string> = {
+  checkin: '♣',
+  online: '♦',
+  balance: '♠',
+  consumption: '♥',
+  donate: '💰',
+  perfect: '👍',
+  invite: '🤝',
+  links: '🔗',
+  xiaoice: '🧊',
+  evolve: '🧬',
+  adr: '🕯️',
+  mofish: '🐟',
+  smallmofish: '🐠',
+  lifeRestart: '🔄',
+  emoji: '😘',
+}
 </script>
 <template>
   <div class="top-page fp-page fp-page--wide fp-ui">
-    <nav class="top-nav fp-tabs" aria-label="排行榜分类"><RouterLink to="/top">全部榜单</RouterLink><RouterLink v-for="(title, key) in rankingTitles" :key="key" :to="`/top/${key}`">{{ title }}</RouterLink><RouterLink to="/top/profession">职业排行</RouterLink></nav>
-    <section v-if="kind" class="top-board fp-card"><h1 class="fp-page-title">{{ rankingTitles[kind] }}</h1><RankingBoard :key="kind" :type="kind" :initial="initial" /></section>
+    <nav class="top-nav fp-tabs" aria-label="排行榜分类">
+      <RouterLink to="/top" class="top-nav-item"><span class="nav-icon">🏅</span><span>全部榜单</span></RouterLink>
+      <RouterLink v-for="(title, key) in rankingTitles" :key="key" :to="`/top/${key}`" class="top-nav-item">
+        <span class="nav-icon">{{ navIcons[key] || '•' }}</span><span>{{ title }}</span>
+      </RouterLink>
+      <RouterLink to="/top/profession" class="top-nav-item"><span class="nav-icon">✦</span><span>职业排行</span></RouterLink>
+    </nav>
+    <section v-if="kind" class="top-board fp-card">
+      <header class="board-header">
+        <span class="board-header-icon">{{ navIcons[kind] || '🏆' }}</span>
+        <div class="board-header-copy">
+          <h1 class="fp-page-title">{{ rankingTitles[kind] }}</h1>
+          <p class="board-header-sub">摸鱼派社区实时公开荣誉与数据排行</p>
+        </div>
+      </header>
+      <RankingBoard :key="kind" :type="kind" :initial="initial" />
+    </section>
     <section v-else-if="route.path === '/top/profession'" class="top-board fp-card"><ProfessionRanking /></section>
-    <template v-else><h1 class="fp-page-title">全部榜单</h1><div class="top-catalog"><RouterLink v-for="item in topCatalog" :key="item.to" :to="item.to" class="catalog-item fp-card"><span>{{ item.icon }} {{ item.title }}</span><p>{{ item.desc }}</p></RouterLink><RouterLink to="/top/links" class="catalog-item fp-card">链接点击排行</RouterLink></div></template>
+    <template v-else>
+      <section class="catalog-hero fp-card">
+        <div class="catalog-hero-head">
+          <div>
+            <h1 class="fp-page-title">全部榜单</h1>
+            <p class="catalog-hero-sub">汇总摸鱼派活跃、财富、创作、资助与小游戏荣誉排行榜</p>
+          </div>
+          <span class="catalog-count-pill">共 {{ topCatalog.length + 1 }} 个榜单</span>
+        </div>
+        <div class="top-catalog">
+          <RouterLink v-for="item in topCatalog" :key="item.to" :to="item.to" class="catalog-item">
+            <div class="card-icon-col" :style="{ backgroundColor: item.color + '18', color: item.color }">
+              <span class="catalog-icon">{{ item.icon }}</span>
+            </div>
+            <div class="card-content">
+              <div class="card-title-row">
+                <span class="catalog-title">{{ item.icon }} {{ item.title }}</span>
+                <span class="catalog-tag" :style="{ backgroundColor: item.color + '18', color: item.color }">{{ item.badge }}</span>
+              </div>
+              <p class="catalog-desc">{{ item.desc }}</p>
+            </div>
+          </RouterLink>
+          <RouterLink to="/top/links" class="catalog-item">
+            <div class="card-icon-col" style="background-color: rgba(22, 160, 133, 0.1); color: #16a085">
+              <span class="catalog-icon">🔗</span>
+            </div>
+            <div class="card-content">
+              <div class="card-title-row">
+                <span class="catalog-title">链接点击排行</span>
+                <span class="catalog-tag" style="background-color: rgba(22, 160, 133, 0.1); color: #16a085">外链</span>
+              </div>
+              <p class="catalog-desc">社区热门外链分享与点击统计排行</p>
+            </div>
+          </RouterLink>
+        </div>
+      </section>
+    </template>
   </div>
 </template>
 <style scoped lang="scss">
-.top-page {    }
-.top-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; box-shadow: var(--fp-card-shadow); a { color: var(--fp-text); text-decoration: none; } .router-link-exact-active { color: var(--fp-accent, #68a84f); } }
-.top-board { background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); box-shadow: var(--fp-card-shadow); padding: 20px; h1 { margin-top: 0; color: var(--fp-title); } }
-.top-catalog { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.catalog-item { display: block; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); box-shadow: var(--fp-card-shadow); padding: 20px; color: var(--fp-title); text-decoration: none; transition: border-color .16s, transform .16s; &:hover { border-color: var(--fp-primary); transform: translateY(-1px); } p { color: var(--fp-muted); font-size: 13px; } }
-@media (max-width: 650px) { .top-catalog { grid-template-columns: minmax(0, 1fr); } .top-board { padding: 14px; } }
+.top-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 8px 10px;
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-panel-radius);
+  box-shadow: var(--fp-card-shadow);
+
+  .top-nav-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fp-text);
+    text-decoration: none;
+    transition: all 0.16s ease;
+
+    .nav-icon {
+      font-size: 13px;
+      line-height: 1;
+      opacity: 0.85;
+    }
+
+    &:hover {
+      background: var(--fp-hover);
+      color: var(--fp-title);
+    }
+
+    &.router-link-exact-active {
+      background: color-mix(in srgb, var(--fp-accent) 14%, var(--fp-card));
+      color: var(--fp-accent, #68a84f);
+      font-weight: 600;
+    }
+  }
+}
+
+.top-board,
+.catalog-hero {
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-panel-radius);
+  box-shadow: var(--fp-card-shadow);
+  padding: 22px 24px;
+}
+
+.board-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--fp-divider);
+
+  .board-header-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--fp-accent) 12%, var(--fp-surface-subtle));
+    color: var(--fp-accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .board-header-copy {
+    min-width: 0;
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--fp-title);
+    }
+
+    .board-header-sub {
+      margin: 3px 0 0;
+      font-size: 12px;
+      color: var(--fp-muted);
+    }
+  }
+}
+
+.catalog-hero-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--fp-divider);
+
+  h1 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--fp-title);
+  }
+
+  .catalog-hero-sub {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--fp-muted);
+  }
+
+  .catalog-count-pill {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fp-muted);
+    background: var(--fp-surface-subtle);
+    border: 1px solid var(--fp-divider);
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+}
+
+.top-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 14px;
+}
+
+.catalog-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: var(--fp-surface-subtle);
+  border: 1px solid var(--fp-divider);
+  border-radius: 12px;
+  padding: 16px;
+  color: var(--fp-title);
+  text-decoration: none;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--fp-card);
+    border-color: color-mix(in srgb, var(--fp-accent) 45%, var(--fp-border));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  }
+
+  .card-icon-col {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    .catalog-icon {
+      font-size: 21px;
+      line-height: 1;
+    }
+  }
+
+  .card-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+
+  .catalog-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fp-title);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .catalog-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+
+  .catalog-desc {
+    margin: 0;
+    color: var(--fp-muted);
+    font-size: 12.5px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 650px) {
+  .top-catalog {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .top-board,
+  .catalog-hero {
+    padding: 14px;
+  }
+}
 </style>

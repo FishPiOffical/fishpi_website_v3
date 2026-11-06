@@ -31,5 +31,106 @@ onMounted(()=>{mounted.value=true});onBeforeUnmount(()=>{mounted.value=false;dra
   </div>
 </template>
 <style scoped lang="scss">
-.moon-composer { padding: 12px 0; min-width: 0; } form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; } label { flex: 1 1 100%; } textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 6px; resize: vertical; padding: 8px; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-card); color: var(--fp-text); } button { padding: 7px 11px; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-card); color: var(--fp-text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; } p { overflow-wrap: anywhere; } .pending-content { white-space: pre-wrap; } [role='alert'] { color: #c34a36; } a { color: var(--fp-link); }
+.moon-composer {
+  padding: 14px 16px;
+  margin: 12px 0;
+  background: var(--fp-surface-subtle);
+  border: 1px solid var(--fp-divider);
+  border-radius: 12px;
+  min-width: 0;
+}
+
+form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+label {
+  flex: 1 1 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fp-title);
+}
+
+textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 8px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  background: var(--fp-card);
+  color: var(--fp-text);
+  font-size: 13.5px;
+  line-height: 1.55;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--fp-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fp-accent) 14%, transparent);
+  }
+}
+
+span {
+  font-size: 12px;
+  color: var(--fp-muted);
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  padding: 6px 14px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  background: var(--fp-card);
+  color: var(--fp-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+
+  &[type='submit'] {
+    background: var(--fp-accent);
+    border-color: var(--fp-accent);
+    color: #fff;
+  }
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.04);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+p {
+  overflow-wrap: anywhere;
+  margin: 6px 0 0;
+  font-size: 12.5px;
+}
+
+.pending-content {
+  white-space: pre-wrap;
+  padding: 8px 10px;
+  background: var(--fp-card);
+  border: 1px dashed var(--fp-border);
+  border-radius: 8px;
+}
+
+[role='alert'] {
+  color: #c34a36;
+}
+
+a {
+  color: var(--fp-link);
+  font-weight: 500;
+  text-decoration: none;
+}
 </style>

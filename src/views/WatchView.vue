@@ -55,5 +55,83 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
   </div>
 </template>
 <style scoped lang="scss">
-.watch-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--fp-border); } h1 { margin: 0; font-size: 18px; } nav,.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; } .controls button { display: none; } nav a { color: var(--fp-muted); } nav a.current { color: var(--fp-link); } .controls { padding: 10px 18px 0; font-size: 12px; color: var(--fp-muted); } .pager { padding: 14px 18px; } .message { padding: 18px; line-height: 1.7; overflow-wrap: anywhere; } .message a { color: var(--fp-link); } button { padding: 7px 11px; border: 1px solid var(--fp-border); border-radius: 8px; background: transparent; color: var(--fp-text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; } [role='alert'] { color: var(--fp-danger); }
+.watch-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--fp-divider);
+}
+h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+nav,
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.controls button {
+  display: none;
+}
+nav a {
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fp-muted);
+  text-decoration: none;
+  transition: all 0.16s ease;
+
+  &:hover {
+    background: var(--fp-hover);
+    color: var(--fp-title);
+  }
+}
+nav a.current {
+  background: color-mix(in srgb, var(--fp-accent) 14%, var(--fp-card));
+  color: var(--fp-accent);
+  font-weight: 600;
+}
+.controls {
+  padding: 10px 18px 0;
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+.pager {
+  display: flex;
+  justify-content: center;
+  padding: 14px 18px;
+  border-top: 1px solid var(--fp-divider);
+}
+.message {
+  padding: 20px 18px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  color: var(--fp-muted);
+  text-align: center;
+}
+.message a {
+  color: var(--fp-link);
+}
+button {
+  padding: 6px 12px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  background: var(--fp-card);
+  color: var(--fp-text);
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+[role='alert'] {
+  color: var(--fp-danger);
+}
 </style>

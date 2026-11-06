@@ -117,45 +117,115 @@ onBeforeUnmount(() => { mounted.value = false; reset() })
 
 <template>
   <div class="membership">
-    <h1 class="fp-page-title">摸鱼派会员</h1>
-    <p v-if="!active"><RouterLink :to="{ path: '/login', query: { redirect: '/vips' } }">登录</RouterLink>后查看会员档位与本人状态。</p>
+    <header class="vip-hero">
+      <div class="vip-hero-icon">👑</div>
+      <div class="vip-hero-copy">
+        <h1 class="fp-page-title">摸鱼派会员</h1>
+        <p class="vip-hero-sub">解锁专属炫彩昵称特效、免签卡礼包与尊享社区身份标识</p>
+      </div>
+    </header>
+    <p v-if="!active" class="vip-guest-card"><RouterLink :to="{ path: '/login', query: { redirect: '/vips' } }">登录</RouterLink>后查看会员档位与本人状态。</p>
     <template v-else>
-      <section class="state">
-        <h2>本人会员状态</h2><p v-if="stateLoading" role="status">正在读取会员状态…</p><p v-if="stateError" class="error" role="alert">{{ stateError }}</p>
-        <template v-if="state"><p>{{ state.active ? `当前有效会员：${state.levelCode}` : '当前没有有效会员' }}</p><p v-if="state.active">到期：{{ date(state.expiresAt) }}</p></template>
-        <button class="fp-control" type="button" :disabled="disabled" @click="loadState">重新读取会员状态</button>
+      <section class="state" :class="{ 'is-active': state?.active }">
+        <div class="state-header">
+          <div>
+            <h2>本人会员状态</h2>
+            <p v-if="stateLoading" role="status">正在读取会员状态…</p>
+            <p v-if="stateError" class="error" role="alert">{{ stateError }}</p>
+            <template v-if="state">
+              <p class="state-badge-line">
+                <span class="status-pill" :class="{ 'status-pill--active': state.active }">
+                  {{ state.active ? `当前有效会员：${state.levelCode}` : '当前没有有效会员' }}
+                </span>
+                <span v-if="state.active" class="expires-pill">到期：{{ date(state.expiresAt) }}</span>
+              </p>
+            </template>
+          </div>
+          <button class="fp-control refresh-vip-btn" :class="{ 'is-hidden': state && !stateError }" type="button" :disabled="disabled" @click="loadState">重新读取会员状态</button>
+        </div>
       </section>
-      <p v-if="error" role="alert" class="error">{{ error }}</p><p v-if="message" role="status">{{ message }}</p>
-      <p v-if="pending && !busy">操作结果尚未确认，重试将恢复同一次操作，不重新选择档位或优惠券。</p>
-      <button class="fp-control" v-if="pending" type="button" :disabled="busy" @click="retry">重试未确认的会员操作</button>
+      <p v-if="error" role="alert" class="error">{{ error }}</p>
+      <p v-if="message" role="status" class="vip-message">{{ message }}</p>
+      <div v-if="pending" class="vip-pending-box">
+        <p v-if="!busy">操作结果尚未确认，重试将恢复同一次操作，不重新选择档位或优惠券。</p>
+        <button class="fp-control" type="button" :disabled="busy" @click="retry">重试未确认的会员操作</button>
+      </div>
       <section v-if="state?.active" class="display">
-        <h2>昵称展示</h2><p v-if="support.error" class="error" role="alert">{{ support.error }}</p>
+        <h2>昵称展示</h2>
+        <p v-if="support.error" class="error" role="alert">{{ support.error }}</p>
         <p v-if="levelsReady && !support.error && !support.fields.length">当前档位没有可设置的昵称展示字段。</p>
         <form v-if="support.fields.length" @submit.prevent="save">
           <fieldset :disabled="disabled">
-            <label v-if="support.fields.includes('bold')">昵称加粗<select class="fp-control" v-model="draft.bold" aria-label="昵称加粗"><option value="" disabled>尚未设置</option><option :value="true">加粗</option><option :value="false">不加粗</option></select></label>
-            <label v-if="support.fields.includes('underline')">昵称下划线<select class="fp-control" v-model="draft.underline" aria-label="昵称下划线"><option value="" disabled>尚未设置</option><option :value="true">显示下划线</option><option :value="false">不显示下划线</option></select></label>
-            <template v-if="support.fields.includes('color')"><label>昵称颜色<input class="fp-control" v-model="draft.color" aria-label="昵称颜色" maxlength="32" placeholder="#RRGGBB" /></label><div v-if="advanced" class="effects"><button class="fp-control" v-for="effect in membershipEffects" :key="effect" type="button" :aria-pressed="draft.color === effect" @click="draft.color = effect">{{ effect }}</button></div></template>
-            <p>预览：<span :class="vipNameClass(preview)" :style="vipNameStyle(preview)">{{ account?.userNickname || account?.userName || '我的昵称' }}</span></p>
-            <button data-tone="primary" class="fp-control" type="submit">保存会员展示</button>
+            <div class="display-form-grid">
+              <label v-if="support.fields.includes('bold')">昵称加粗<select class="fp-control" v-model="draft.bold" aria-label="昵称加粗"><option value="" disabled>尚未设置</option><option :value="true">加粗</option><option :value="false">不加粗</option></select></label>
+              <label v-if="support.fields.includes('underline')">昵称下划线<select class="fp-control" v-model="draft.underline" aria-label="昵称下划线"><option value="" disabled>尚未设置</option><option :value="true">显示下划线</option><option :value="false">不显示下划线</option></select></label>
+              <label v-if="support.fields.includes('color')">昵称颜色<input class="fp-control" v-model="draft.color" aria-label="昵称颜色" maxlength="32" placeholder="#RRGGBB" /></label>
+            </div>
+            <div v-if="support.fields.includes('color') && advanced" class="effects">
+              <span class="effects-label">VIP4 炫彩特效：</span>
+              <button class="fp-control effect-btn" v-for="effect in membershipEffects" :key="effect" type="button" :aria-pressed="draft.color === effect" @click="draft.color = effect">{{ effect }}</button>
+            </div>
+            <div class="preview-box">
+              <p class="preview-line">预览：<span class="preview-nickname" :class="vipNameClass(preview)" :style="vipNameStyle(preview)">{{ account?.userNickname || account?.userName || '我的昵称' }}</span></p>
+              <button data-tone="primary" class="fp-control save-display-btn" type="submit">保存会员展示</button>
+            </div>
           </fieldset>
         </form>
-        <h3>本人已知权益（只读）</h3><ul><li v-for="(value, key) in state.config" :key="key">{{ benefitNames[key] }}：{{ benefit(value) }}</li></ul>
+        <div class="readonly-benefits">
+          <h3>本人已知权益（只读）</h3>
+          <ul class="benefit-pills">
+            <li v-for="(value, key) in state.config" :key="key">
+              <span class="benefit-key">{{ benefitNames[key] }}</span>
+              <span class="benefit-val">{{ benefit(value) }}</span>
+            </li>
+          </ul>
+        </div>
       </section>
       <section class="plans">
-        <h2>会员档位</h2><p v-if="levelsLoading" role="status">正在读取会员档位…</p><p v-if="levelsError" role="alert" class="error">{{ levelsError }}</p>
-        <button class="fp-control" type="button" :disabled="disabled" @click="loadLevels">重新读取会员档位</button>
-        <label v-if="levelsReady" class="coupon">优惠券（可选）<input class="fp-control" v-model="coupon" aria-label="会员优惠券" maxlength="128" autocomplete="off" :disabled="disabled || !state || state.active" placeholder="不使用时留空" /></label>
-        <p class="hint">仅未开通或已到期且符合资格的账号可开通，有效或永久会员不能重复购买。期限从服务器次日零点起加所列自然日，配置与礼包由服务端初始化；优惠券无效时拒绝开通。</p>
+        <div class="plans-head">
+          <div>
+            <h2>会员档位</h2>
+            <p class="hint">仅未开通或已到期且符合资格的账号可开通，有效或永久会员不能重复购买。期限从服务器次日零点起加所列自然日，配置与礼包由服务端初始化；优惠券无效时拒绝开通。</p>
+          </div>
+          <label v-if="levelsReady" class="coupon">
+            <span>优惠券（可选）</span>
+            <input class="fp-control" v-model="coupon" aria-label="会员优惠券" maxlength="128" autocomplete="off" :disabled="disabled || !state || state.active" placeholder="不使用时留空" />
+          </label>
+        </div>
+        <p v-if="levelsLoading" role="status">正在读取会员档位…</p>
+        <p v-if="levelsError" role="alert" class="error">{{ levelsError }}</p>
+        <button class="fp-control refresh-vip-btn" :class="{ 'is-hidden': levelsReady && !levelsError }" type="button" :disabled="disabled" @click="loadLevels">重新读取会员档位</button>
         <p v-if="levelsReady && !levels.length">暂无可用会员档位。</p>
-        <div class="plan-grid"><article v-for="level in levels" :key="level.id" class="plan"><h3>{{ level.name }}</h3><p>{{ level.code }} · {{ level.durationType }} · {{ level.durationValue }}天</p><p class="price">{{ level.price.toLocaleString() }} 积分</p><ul><li v-for="(value, key) in level.benefits" :key="key">{{ benefitNames[key] }}{{ ['bold','underline','color'].includes(key) ? '默认值' : '' }}：{{ benefit(value) }}</li></ul><button class="fp-control" type="button" :disabled="disabled || !state || state.active" @click="buy(level)">{{ state?.active ? '已有有效会员' : `开通${level.name}（${level.durationType}）` }}</button></article></div>
+        <div class="plan-grid">
+          <article v-for="level in levels" :key="level.id" class="plan" :class="{ 'plan--featured': level.code.includes('VIP4') || level.code.includes('YEAR') }">
+            <div class="plan-top">
+              <div class="plan-title-row">
+                <h3>{{ level.name }}</h3>
+                <span class="plan-code-badge">{{ level.code }}</span>
+              </div>
+              <p class="plan-duration">{{ level.durationType }} · {{ level.durationValue }}天</p>
+              <p class="price"><span class="price-num">{{ level.price.toLocaleString() }}</span> <span class="price-unit">积分</span></p>
+            </div>
+            <ul class="plan-benefits">
+              <li v-for="(value, key) in level.benefits" :key="key">
+                <span class="check-icon">✓</span>
+                <span>{{ benefitNames[key] }}{{ ['bold','underline','color'].includes(key) ? '默认值' : '' }}：{{ benefit(value) }}</span>
+              </li>
+            </ul>
+            <button class="fp-control plan-cta" data-tone="primary" type="button" :disabled="disabled || !state || state.active" @click="buy(level)">
+              {{ state?.active ? '已有有效会员' : `开通${level.name}（${level.durationType}）` }}
+            </button>
+          </article>
+        </div>
       </section>
       <section class="questions">
         <h2>开通说明</h2>
-        <details><summary>有效会员可以续购或升级吗？</summary><p>当前有效或永久会员不能重复开通。已到期账号可按届时档位与资格重新申请。</p></details>
-        <details><summary>优惠券无效或余额不足会怎样？</summary><p>开通会被拒绝，不扣积分。使用优惠券后的实际费用以服务端结算结果为准。</p></details>
-        <details><summary>网络中断后如何确认结果？</summary><p>留在本页使用“重试未确认的会员操作”恢复同一次请求。若已离开本页，请重新读取会员状态、积分流水和背包核实，不要把读取失败当作未开通。</p></details>
-        <details><summary>年卡礼包有哪些？</summary><p>VIP1_YEAR、VIP2_YEAR、VIP3_YEAR分别赠送20、50、120张免签卡，VIP4_YEAR增加366天免签额度；其他档位不含这组礼包。礼包与扣费一起提交，背包数量达到上限时保持上限。</p></details>
+        <div class="faq-list">
+          <details><summary>有效会员可以续购或升级吗？</summary><p>当前有效或永久会员不能重复开通。已到期账号可按届时档位与资格重新申请。</p></details>
+          <details><summary>优惠券无效或余额不足会怎样？</summary><p>开通会被拒绝，不扣积分。使用优惠券后的实际费用以服务端结算结果为准。</p></details>
+          <details><summary>网络中断后如何确认结果？</summary><p>留在本页使用“重试未确认的会员操作”恢复同一次请求。若已离开本页，请重新读取会员状态、积分流水和背包核实，不要把读取失败当作未开通。</p></details>
+          <details><summary>年卡礼包有哪些？</summary><p>VIP1_YEAR、VIP2_YEAR、VIP3_YEAR分别赠送20、50、120张免签卡，VIP4_YEAR增加366天免签额度；其他档位不含这组礼包。礼包与扣费一起提交，背包数量达到上限时保持上限。</p></details>
+        </div>
       </section>
     </template>
   </div>

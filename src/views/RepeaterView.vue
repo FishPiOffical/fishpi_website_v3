@@ -19,56 +19,108 @@ const kind=ref<RepeaterKind>(''),feed=useRepeaterFeed(kind,consumeRepeaterPayloa
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
   border-radius: var(--fp-panel-radius);
-
 }
 h1 {
-  margin: 0 0 8px;
-  font-size: 18px;
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
 }
 .hint {
   color: var(--fp-muted);
   font-size: 13px;
+  margin: 0 0 12px;
 }
 .err {
   color: var(--fp-danger);
 }
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin: 12px 0;
+  margin: 12px 0 16px;
+  padding: 6px 8px;
+  background: var(--fp-surface-subtle);
+  border: 1px solid var(--fp-divider);
+  border-radius: 10px;
 }
 .tabs button,
 .ghost {
-  border: 1px solid var(--fp-border);
+  border: 1px solid transparent;
   background: transparent;
-  color: var(--fp-text);
-  border-radius: 999px;
-  padding: 4px 12px;
+  color: var(--fp-muted);
+  border-radius: 8px;
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.16s ease;
+
+  &:hover {
+    color: var(--fp-title);
+    background: var(--fp-hover);
+  }
 }
 .tabs button.on {
-  background: var(--fp-primary);
-  color: #fff;
-  border-color: transparent;
+  background: color-mix(in srgb, var(--fp-accent) 14%, var(--fp-card));
+  color: var(--fp-accent);
+  border-color: color-mix(in srgb, var(--fp-accent) 38%, var(--fp-border));
+  font-weight: 600;
 }
 ol {
   list-style: none;
-  margin: 0;
+  margin: 0 0 18px;
   padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
 }
 li {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--fp-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--fp-surface-subtle);
+  border: 1px solid var(--fp-divider);
+  border-radius: 12px;
+  transition: border-color 0.16s ease, transform 0.16s ease;
+
+  &:hover {
+    border-color: var(--fp-border);
+    transform: translateY(-1px);
+  }
+
+  > p {
+    margin: 8px 0 12px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--fp-title);
+    overflow-wrap: anywhere;
+  }
 }
 header {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--fp-muted);
-  margin-bottom: 6px;
+
+  > span:last-child {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--fp-card);
+    border: 1px solid var(--fp-divider);
+  }
 }
 header a {
-  color: inherit;
+  color: var(--fp-title);
+  font-weight: 600;
   text-decoration: none;
+
+  &:hover {
+    color: var(--fp-accent);
+  }
 }
 </style>
