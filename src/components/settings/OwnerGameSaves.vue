@@ -63,11 +63,11 @@ onBeforeUnmount(() => { mounted = false; generation++; stopConfirmation(); clear
 <template>
   <div class="game-saves">
     <h2>游戏云存档</h2><p>Evolve完整存档，每人一个槽。只管理存档，不修改游戏分数；存档内容可复制到对应游戏导入。</p>
-    <button type="button" :disabled="loading || confirming" @click="read()">重新读取云存档</button>
+    <button class="fp-control" type="button" :disabled="loading || confirming" @click="read()">重新读取云存档</button>
     <p v-if="loading" role="status">正在读取存档…</p><p v-if="error" role="alert">{{ error }}</p>
     <p v-if="state === 'missing'">当前没有新存档。可首次保存，或显式迁移本人旧存档。</p>
-    <template v-if="current"><p>当前版本 {{ current.revision }} · {{ current.byteLength }} 字节 · {{ new Date(current.updatedAt).toLocaleString('zh-CN') }}</p><p class="save-hash">SHA-256：{{ current.sha256 }}</p><button type="button" :disabled="blocked" @click="loadDraft()">载入当前存档到编辑框</button></template>
-    <template v-if="options"><label>Evolve存档原文<textarea v-model="draft" rows="8" :maxlength="options[0]?.maxLength" :disabled="blocked" autocomplete="off" spellcheck="false" /></label><p>最多500000个UTF-16单位、UTF-8最多2MiB。空字符串也可保存；读取和提交不会自动清除编辑框。</p><p>操作结果不确定时请保留页面或使用全局恢复；刷新或退出会丢失仅在内存中的恢复信息。</p><div class="save-actions"><button type="button" :disabled="blocked || !['ready','missing'].includes(state)" @click="save()">保存当前编辑框</button><button v-if="state === 'missing'" type="button" :disabled="blocked" @click="migrate()">迁移本人旧存档</button></div></template>
+    <template v-if="current"><p>当前版本 {{ current.revision }} · {{ current.byteLength }} 字节 · {{ new Date(current.updatedAt).toLocaleString('zh-CN') }}</p><p class="save-hash">SHA-256：{{ current.sha256 }}</p><button class="fp-control" type="button" :disabled="blocked" @click="loadDraft()">载入当前存档到编辑框</button></template>
+    <template v-if="options"><label>Evolve存档原文<textarea class="fp-control" v-model="draft" rows="8" :maxlength="options[0]?.maxLength" :disabled="blocked" autocomplete="off" spellcheck="false" /></label><p>最多500000个UTF-16单位、UTF-8最多2MiB。空字符串也可保存；读取和提交不会自动清除编辑框。</p><p>操作结果不确定时请保留页面或使用全局恢复；刷新或退出会丢失仅在内存中的恢复信息。</p><div class="save-actions"><button class="fp-control" type="button" :disabled="blocked || !['ready','missing'].includes(state)" @click="save()">保存当前编辑框</button><button class="fp-control" v-if="state === 'missing'" type="button" :disabled="blocked" @click="migrate()">迁移本人旧存档</button></div></template>
   </div>
 </template>
 <style scoped lang="scss" src="./game-saves.scss"></style>

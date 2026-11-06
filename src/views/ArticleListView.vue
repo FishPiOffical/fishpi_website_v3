@@ -39,7 +39,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 </script>
 
 <template>
-  <div class="wrapper list-page-wrap">
+  <div class="wrapper list-page-wrap fp-page fp-page--wide fp-ui fp-list-page">
     <div class="content">
       <div ref="panel" class="list-content">
         <section v-if="isColumnPage" class="column-intro">
@@ -48,16 +48,16 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
           <div class="column-intro-footer"><span v-if="value">共 {{ value.total }} 部可见作品</span><span v-else>专栏目录</span><span>每一次更新，都是故事的新一页</span></div>
         </section>
         <div v-else class="module-header list-page-head">
-          <div class="head-left"><h1>{{ heading }}</h1><ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" /><span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span></div>
+          <div class="head-left"><h1 class="fp-page-title">{{ heading }}</h1><ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" /><span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span></div>
           <div class="head-right"><nav v-if="showRecentTabs" class="sort-tabs"><RouterLink v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to" :class="{ current: route.path === tab.to }">{{ tab.label }}</RouterLink></nav><span v-if="value" class="total-count">共 {{ value.total }} 篇</span></div>
         </div>
         <div v-if="isColumnPage" class="column-shelf-head">
           <div><strong>专栏目录</strong><span>按当前可见章节统计</span></div>
-          <div class="column-switch" role="tablist" aria-label="专栏排序"><button type="button" role="tab" :aria-selected="columnShelf === 'recent'" :class="{ selected: columnShelf === 'recent' }" @click="columnShelf = 'recent'">最近更新</button><button type="button" role="tab" :aria-selected="columnShelf === 'hot'" :class="{ selected: columnShelf === 'hot' }" @click="columnShelf = 'hot'">热门作品</button></div>
+          <div class="column-switch" role="tablist" aria-label="专栏排序"><button class="fp-control" type="button" role="tab" :aria-selected="columnShelf === 'recent'" :class="{ selected: columnShelf === 'recent' }" @click="columnShelf = 'recent'">最近更新</button><button class="fp-control" type="button" role="tab" :aria-selected="columnShelf === 'hot'" :class="{ selected: columnShelf === 'hot' }" @click="columnShelf = 'hot'">热门作品</button></div>
         </div>
-        <button type="button" class="btn refresh-list" :disabled="loading" @click="read()">刷新列表</button>
+        <button type="button" class="btn refresh-list fp-control" :disabled="loading" @click="read()">刷新列表</button>
         <FpLoading v-if="loading" :rows="8" />
-        <div v-else-if="error" class="err" role="alert"><p>{{ error }}</p><button type="button" class="btn" @click="read()">重试当前页</button><button v-if="p > 1" type="button" class="btn" @click="read(1)">返回第一页</button></div>
+        <div v-else-if="error" class="err fp-state" role="alert"><p>{{ error }}</p><button type="button" class="btn fp-control" @click="read()">重试当前页</button><button class="fp-control btn" v-if="p > 1" type="button"  @click="read(1)">返回第一页</button></div>
         <template v-else-if="value">
           <div v-if="value.resource === 'columns'" class="column-grid">
             <article v-for="column in columns" :key="column.id" class="column-card">
@@ -76,7 +76,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
             <p v-if="!columns.length" class="column-empty">本页暂无可见专栏。</p>
           </div>
           <ArticleFeed v-else :items="items" empty="该分类下暂无内容" />
-          <nav class="pagination-bar" aria-label="列表分页"><button type="button" class="btn page-btn" :disabled="p <= 1" @click="read(p - 1)">‹ 上一页</button><span v-if="value.pageCount" class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span><span v-else>暂无分页</span><button type="button" class="btn page-btn" :disabled="p >= value.pageCount" @click="read(p + 1)">下一页 ›</button><button v-if="p > value.pageCount && p > 1" type="button" class="btn" @click="read(1)">返回第一页</button></nav>
+          <nav class="pagination-bar fp-pagination" aria-label="列表分页"><button type="button" class="btn page-btn fp-control" :disabled="p <= 1" @click="read(p - 1)">‹ 上一页</button><span v-if="value.pageCount" class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span><span v-else>暂无分页</span><button type="button" class="btn page-btn fp-control" :disabled="p >= value.pageCount" @click="read(p + 1)">下一页 ›</button><button class="fp-control btn" v-if="p > value.pageCount && p > 1" type="button"  @click="read(1)">返回第一页</button></nav>
         </template>
         <p v-else role="status">列表尚未读取。</p>
       </div>
@@ -163,7 +163,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 .err {
   padding: 30px 18px;
   text-align: center;
-  color: #e07a5f;
+  color: var(--fp-danger);
   font-size: 14px;
 }
 
@@ -239,7 +239,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 .column-switch button { border: 0; padding: 6px 11px; border-radius: 7px; background: transparent; color: var(--fp-muted); font: inherit; font-size: 12px; cursor: pointer; }
 .column-switch button.selected { color: var(--fp-title); background: var(--fp-card); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 .column-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; padding: 0 16px 20px; }
-.column-card { min-width: 0; display: grid; grid-template-columns: 112px minmax(0,1fr); gap: 16px; padding: 14px; border: 1px solid var(--fp-border); border-radius: 12px; background: var(--fp-card); transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+.column-card { min-width: 0; display: grid; grid-template-columns: 112px minmax(0,1fr); gap: 16px; padding: 14px; border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); background: var(--fp-card); transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
 .column-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--fp-accent) 40%, var(--fp-border)); box-shadow: 0 8px 24px rgba(60,45,30,.08); }
 .column-cover-link { position: relative; display: block; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 7px; background: linear-gradient(145deg,#ead6b6,#b38c61); box-shadow: 0 5px 14px rgba(50,35,20,.17); }
 .column-cover-link::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(255,255,255,.22); border-radius: inherit; }

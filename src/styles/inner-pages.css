@@ -1,0 +1,196 @@
+/* Opt-in inner-page primitives. Home, reader typography, editor internals and floating
+   windows deliberately keep their own layout. Theme colors come from the active pack. */
+:root {
+  --fp-page-standard: 1040px;
+  --fp-page-wide: 1200px;
+  --fp-page-reading: 760px;
+  --fp-page-auth: 440px;
+  --fp-page-gap: 20px;
+  --fp-panel-padding: 20px;
+  --fp-panel-radius: 10px;
+  --fp-control-height: 36px;
+  --fp-control-radius: 6px;
+  --fp-page-title-size: 24px;
+}
+
+.fp-page {
+  --fp-page-width: var(--fp-page-standard);
+  width: 100%;
+  max-width: var(--fp-page-width);
+  min-width: 0;
+  margin: 0 auto;
+  padding: 0;
+  color: var(--fp-text);
+}
+.fp-page--wide { --fp-page-width: var(--fp-page-wide); }
+.fp-page--reading { --fp-page-width: var(--fp-page-reading); }
+.fp-page--auth {
+  --fp-page-width: var(--fp-page-auth);
+  margin: 24px auto;
+}
+.fp-page:not(.fp-special-page) .fp-page-title {
+  margin: 0 0 12px;
+  font-size: var(--fp-page-title-size);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--fp-title);
+  overflow-wrap: anywhere;
+}
+/* Book and marketing headlines remain controlled by their page stylesheet. */
+.fp-ui .fp-page-description { margin: 0; color: var(--fp-muted); font-size: 13px; line-height: 1.7; }
+.fp-ui .fp-page-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin: 0 0 20px; }
+.fp-surface, .fp-ui .fp-card {
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-panel-radius);
+  padding: var(--fp-panel-padding);
+  box-shadow: var(--fp-card-shadow);
+}
+/* Native controls are explicitly marked in the owning template. Never style Vditor
+   or the drawing canvas through a catch-all button/input selector. */
+.fp-ui :is(button.fp-control, input.fp-control, select.fp-control, textarea.fp-control) {
+  min-height: var(--fp-control-height);
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: var(--fp-control-radius);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 7px 12px;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+.fp-ui :is(input.fp-control, select.fp-control, textarea.fp-control) {
+  color: var(--fp-text);
+  background: var(--fp-bg);
+  border: 1px solid var(--fp-border);
+  min-width: 0;
+}
+.fp-ui :is(input.fp-control, select.fp-control, textarea.fp-control):hover:not(:disabled) { border-color: var(--fp-border-strong); }
+.fp-ui :is(input.fp-control, select.fp-control, textarea.fp-control):focus {
+  outline: none;
+  border-color: var(--fp-primary);
+  box-shadow: var(--fp-focus-ring);
+}
+.fp-ui textarea.fp-control { resize: vertical; }
+.fp-ui button.fp-control { cursor: pointer; font-weight: 500; }
+.fp-ui button.fp-control:disabled { opacity: .5; cursor: default; box-shadow: none; }
+.fp-ui button.fp-control:focus-visible, .fp-ui a:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
+.fp-ui button.fp-control[aria-busy='true'] { cursor: progress; }
+.fp-ui button.fp-control[data-tone='primary'] {
+  color: #fff;
+  background: var(--fp-primary);
+  border: 1px solid var(--fp-primary);
+}
+.fp-ui button.fp-control[data-tone='primary']:hover:not(:disabled) { background: var(--fp-primary-hover); border-color: var(--fp-primary-hover); }
+.fp-ui .fp-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  margin: 20px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--fp-border);
+  color: var(--fp-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.fp-ui .fp-pagination button.fp-control { margin: 0; }
+.fp-ui .fp-pagination :where(.page-btn, .pager-btn) { min-width: 76px; }
+.fp-ui :is(nav, div).fp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 20px;
+  padding: 4px;
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-panel-radius);
+  background: var(--fp-card);
+}
+.fp-ui :is(nav, div).fp-tabs a, .fp-ui :is(nav, div).fp-tabs button.fp-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  margin: 0;
+  border: 0;
+  border-radius: var(--fp-control-radius);
+  color: var(--fp-muted);
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.5;
+  text-decoration: none;
+}
+.fp-ui :is(nav, div).fp-tabs :is(a, button.fp-control):hover { background: var(--fp-hover); text-decoration: none; }
+.fp-ui :is(nav, div).fp-tabs a:is(.router-link-exact-active, .current),
+.fp-ui :is(nav, div).fp-tabs button.fp-control:is([aria-selected='true'], [aria-pressed='true']) {
+  color: var(--fp-primary);
+  background: var(--fp-primary-soft);
+  font-weight: 600;
+}
+.fp-ui .fp-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 168px;
+  padding: 28px 20px;
+  margin: 0;
+  text-align: center;
+  color: var(--fp-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.fp-ui .fp-state p { margin: 0; }
+.fp-ui .fp-state[role='alert'] { color: var(--fp-danger); }
+.fp-ui .fp-state-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+/* Primary list panes share the same surface as their sidebar modules. */
+.fp-list-page > .content, .fp-list-page > .city-main {
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-panel-radius);
+  box-shadow: var(--fp-card-shadow);
+  overflow: clip;
+  align-self: start;
+}
+.fp-list-page .list-page-head { padding: 18px 20px; }
+.fp-list-page .list-page-head :is(h1, h2) { margin: 0; font-size: 20px; line-height: 1.4; color: var(--fp-title); }
+.fp-list-page .fp-pagination { margin: 0 20px; padding: 16px 0; }
+.fp-settings .card { padding: var(--fp-panel-padding); border-radius: var(--fp-panel-radius); }
+.fp-settings .fp-page-title { margin-bottom: 16px; }
+.fp-settings :is(h2, .owner-membership h2) { font-size: 17px; line-height: 1.5; }
+.fp-settings :where(.hint, .error, [role='status']) { font-size: 13px; line-height: 1.7; }
+.fp-settings :where(fieldset) { min-width: 0; }
+/* Text links keep their resting color; action buttons/tabs retain their interaction treatment. */
+.fp-ui :is(.city-meta, .member-content, .user-relations, .prose) a:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 900px) {
+  .fp-page--wide { width: 100%; }
+  .fp-list-page { flex-direction: column; }
+}
+@media (max-width: 640px) {
+  :root { --fp-page-gap: 14px; --fp-panel-padding: 16px; --fp-page-title-size: 21px; }
+  .fp-page--auth { margin: 12px auto; }
+  .fp-ui .fp-page-heading { margin-bottom: 16px; }
+  .fp-list-page .list-page-head { padding: 16px; }
+  .fp-ui .fp-pagination { gap: 8px; }
+  .fp-ui :is(nav, div).fp-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+  .fp-ui :is(nav, div).fp-tabs :is(a, button) { flex: none; white-space: nowrap; }
+  .fp-ui .fp-state { min-height: 144px; padding: 24px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fp-ui .fp-control { transition: none; }
+}
+
+/* Core page grids share spacing without affecting grids of book covers or chat messages. */
+.fp-page.fp-ui:is(.activity-page, .milestones-page, .member-page) { gap: var(--fp-page-gap); }
+.fp-ui .fp-card > :first-child { margin-top: 0; }
+.fp-ui .fp-card > :last-child { margin-bottom: 0; }
+.fp-ui :is(nav, div).fp-tabs button.fp-control.on { color: var(--fp-primary); background: var(--fp-primary-soft); }
+.fp-ui .fp-state-actions .fp-control { margin: 0; }
+
+.fp-ui a.fp-link-action { display: inline-flex; align-items: center; justify-content: center; min-height: var(--fp-control-height); padding: 7px 12px; font-size: 13px; border-radius: var(--fp-control-radius); text-decoration: none; }
+.fp-ui a.fp-link-action:hover { text-decoration: none; filter: brightness(.97); }

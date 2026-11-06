@@ -82,23 +82,22 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
 </script>
 
 <template>
-  <div class="page">
+  <div class="page fp-page fp-ui fp-settings">
     <div class="set-main">
-      <p v-if="!isLoggedIn" class="card hint">
-        <RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>
-        后可修改设置。游客仍可调整本机主题外观。
+      <p v-if="!isLoggedIn" class="card hint fp-card login-notice">
+        <span><RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>后可修改设置。游客仍可调整本机主题外观。</span>
       </p>
 
-      <section v-if="tab === 'profile'" class="card">
+      <section v-if="tab === 'profile'" class="card fp-card">
         <header class="mod-head">
           <RouterLink v-if="isLoggedIn && account?.userName" :to="`/member/${account.userName}`">{{ account.userName }}</RouterLink>
-          <h1>资料</h1>
+          <h1 class="fp-page-title">资料</h1>
         </header>
         <OwnerProfileSettings v-if="isLoggedIn" key="profile" mode="profile" />
       </section>
 
-      <section v-if="tab === 'system'" class="card">
-        <h1>个性化</h1>
+      <section v-if="tab === 'system'" class="card fp-card">
+        <h1 class="fp-page-title">个性化</h1>
         <p class="hint">
           主题免费。对话框和头像框的进阶样式需
           <RouterLink to="/vips">开通 VIP</RouterLink>
@@ -111,13 +110,13 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
         </template>
       </section>
 
-      <section v-if="tab === 'avatar'" class="card">
-        <h1>头像</h1>
+      <section v-if="tab === 'avatar'" class="card fp-card">
+        <h1 class="fp-page-title">头像</h1>
         <OwnerProfileSettings v-if="isLoggedIn" key="avatar" mode="avatar" />
       </section>
 
-      <section v-if="tab === 'account'" class="card">
-        <h1>账号</h1>
+      <section v-if="tab === 'account'" class="card fp-card">
+        <h1 class="fp-page-title">账号</h1>
         <template v-if="isLoggedIn">
           <OwnerInventory />
 
@@ -130,8 +129,8 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
         </template>
       </section>
 
-      <section v-if="tab === 'function'" class="card">
-        <h1>功能</h1>
+      <section v-if="tab === 'function'" class="card fp-card">
+        <h1 class="fp-page-title">功能</h1>
         <template v-if="isLoggedIn">
           <OwnerPreferences key="functions" resource="functions" title="功能设置" />
           <OwnerPreferences key="display-modes" resource="display" title="显示设置" :fields="['commentViewMode', 'avatarViewMode']" />
@@ -140,24 +139,24 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
         </template>
       </section>
 
-      <section v-if="tab === 'privacy'" class="card">
-        <h1>隐私</h1>
+      <section v-if="tab === 'privacy'" class="card fp-card">
+        <h1 class="fp-page-title">隐私</h1>
         <template v-if="isLoggedIn">
           <OwnerPreferences key="privacy" resource="privacy" title="隐私设置" />
           <OwnerPreferences key="location" resource="location" title="地理位置公开设置" />
         </template>
       </section>
 
-      <section v-if="tab === 'profession'" class="card">
-        <h1>职业成长</h1>
+      <section v-if="tab === 'profession'" class="card fp-card">
+        <h1 class="fp-page-title">职业成长</h1>
         <template v-if="isLoggedIn">
           <OwnerProfessions />
         </template>
       </section>
 
-      <section v-if="tab === 'point'" class="card">
+      <section v-if="tab === 'point'" class="card fp-card">
         <header class="mod-head">
-          <h1>积分转账</h1>
+          <h1 class="fp-page-title">积分转账</h1>
           <RouterLink to="/points">流水</RouterLink>
         </header>
         <template v-if="isLoggedIn">
@@ -165,29 +164,29 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
         </template>
       </section>
 
-      <section v-if="tab === 'invite'" class="card">
-        <h1>邀请</h1><OwnerInvitations v-if="isLoggedIn" />
+      <section v-if="tab === 'invite'" class="card fp-card">
+        <h1 class="fp-page-title">邀请</h1><OwnerInvitations v-if="isLoggedIn" />
       </section>
 
-      <section v-if="tab === 'identity'" class="card">
-        <h1>官方身份认证</h1>
+      <section v-if="tab === 'identity'" class="card fp-card">
+        <h1 class="fp-page-title">官方身份认证</h1>
         <OwnerIdentityApplication v-if="isLoggedIn" />
       </section>
 
-      <section v-if="tab === 'data'" class="card">
-        <h1>本人数据</h1>
+      <section v-if="tab === 'data'" class="card fp-card">
+        <h1 class="fp-page-title">本人数据</h1>
         <nav v-if="isLoggedIn && account" aria-label="本人匿名创作入口"><RouterLink :to="`/member/${encodeURIComponent(account.userName)}/articles/anonymous`">本人匿名文章</RouterLink> · <RouterLink :to="`/member/${encodeURIComponent(account.userName)}/comments/anonymous`">本人匿名评论</RouterLink></nav>
         <OwnerPostExport v-if="isLoggedIn" />
         <OwnerGameSaves v-if="isLoggedIn" />
       </section>
 
-      <section v-if="tab === 'i18n'" class="card">
-        <h1>语言与时区</h1>
+      <section v-if="tab === 'i18n'" class="card fp-card">
+        <h1 class="fp-page-title">语言与时区</h1>
         <OwnerPreferences v-if="isLoggedIn" key="locale" resource="locale" title="语言与时区" />
       </section>
 
-      <section v-if="tab === 'help'" class="card">
-        <h1>使用指南</h1>
+      <section v-if="tab === 'help'" class="card fp-card">
+        <h1 class="fp-page-title">使用指南</h1>
         <ul class="help-list">
           <li v-for="item in helpLinks" :key="item.to">
             <RouterLink :to="item.to">{{ item.title }}</RouterLink>
@@ -200,7 +199,7 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
     <aside class="set-side">
       <button
         type="button"
-        class="set-toggle"
+        class="set-toggle fp-control"
         :aria-expanded="settingsMenuOpen"
         @click="settingsMenuOpen = !settingsMenuOpen"
       >
@@ -228,8 +227,8 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
   grid-template-columns: minmax(0, 1fr) 200px;
   gap: 16px;
   align-items: start;
-  max-width: 960px;
-  margin: 0 auto;
+
+
 }
 .set-side {
   position: sticky;
@@ -480,7 +479,7 @@ input[readonly] {
   font-size: 13px;
 }
 .err {
-  color: #e07a5f;
+  color: var(--fp-danger);
   font-size: 13px;
 }
 

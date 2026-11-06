@@ -136,18 +136,18 @@ const topCatalog = [
 
 </script>
 <template>
-  <div class="top-page">
-    <nav class="top-nav" aria-label="排行榜分类"><RouterLink to="/top">全部榜单</RouterLink><RouterLink v-for="(title, key) in rankingTitles" :key="key" :to="`/top/${key}`">{{ title }}</RouterLink><RouterLink to="/top/profession">职业排行</RouterLink></nav>
-    <section v-if="kind" class="top-board"><h1>{{ rankingTitles[kind] }}</h1><RankingBoard :key="kind" :type="kind" :initial="initial" /></section>
-    <section v-else-if="route.path === '/top/profession'" class="top-board"><ProfessionRanking /></section>
-    <template v-else><h1>全部榜单</h1><div class="top-catalog"><RouterLink v-for="item in topCatalog" :key="item.to" :to="item.to" class="catalog-item"><span>{{ item.icon }} {{ item.title }}</span><p>{{ item.desc }}</p></RouterLink><RouterLink to="/top/links" class="catalog-item">链接点击排行</RouterLink></div></template>
+  <div class="top-page fp-page fp-page--wide fp-ui">
+    <nav class="top-nav fp-tabs" aria-label="排行榜分类"><RouterLink to="/top">全部榜单</RouterLink><RouterLink v-for="(title, key) in rankingTitles" :key="key" :to="`/top/${key}`">{{ title }}</RouterLink><RouterLink to="/top/profession">职业排行</RouterLink></nav>
+    <section v-if="kind" class="top-board fp-card"><h1 class="fp-page-title">{{ rankingTitles[kind] }}</h1><RankingBoard :key="kind" :type="kind" :initial="initial" /></section>
+    <section v-else-if="route.path === '/top/profession'" class="top-board fp-card"><ProfessionRanking /></section>
+    <template v-else><h1 class="fp-page-title">全部榜单</h1><div class="top-catalog"><RouterLink v-for="item in topCatalog" :key="item.to" :to="item.to" class="catalog-item fp-card"><span>{{ item.icon }} {{ item.title }}</span><p>{{ item.desc }}</p></RouterLink><RouterLink to="/top/links" class="catalog-item fp-card">链接点击排行</RouterLink></div></template>
   </div>
 </template>
 <style scoped lang="scss">
-.top-page { max-width: 1150px; margin: 0 auto; padding: 24px 16px; }
+.top-page {    }
 .top-nav { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; a { color: var(--fp-text); text-decoration: none; } .router-link-exact-active { color: var(--fp-accent, #68a84f); } }
-.top-board { background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 12px; padding: 20px; h1 { margin-top: 0; color: var(--fp-title); } }
+.top-board { background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); padding: 20px; h1 { margin-top: 0; color: var(--fp-title); } }
 .top-catalog { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.catalog-item { display: block; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 12px; padding: 20px; color: var(--fp-title); text-decoration: none; p { color: var(--fp-muted); font-size: 13px; } }
+.catalog-item { display: block; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); padding: 20px; color: var(--fp-title); text-decoration: none; p { color: var(--fp-muted); font-size: 13px; } }
 @media (max-width: 650px) { .top-catalog { grid-template-columns: minmax(0, 1fr); } .top-board { padding: 14px; } }
 </style>

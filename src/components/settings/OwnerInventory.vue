@@ -17,17 +17,17 @@ onMounted(() => { void store.load() })
 </script>
 <template>
   <section class="owner-inventory" aria-label="本人背包和用户名">
-    <h2>你的背包</h2><button type="button" :disabled="loading || busy" @click="store.load">重新读取背包</button>
+    <h2>你的背包</h2><button class="fp-control" type="button" :disabled="loading || busy" @click="store.load">重新读取背包</button>
     <p v-if="loading">正在读取背包…</p><p v-else-if="readError" role="alert" class="error">{{ readError }}</p>
     <template v-else-if="items">
       <p v-if="!hasItems">背包暂无物品或生效中的免签天数。</p>
-      <ul v-else><li v-for="item in items.filter(row => row.count !== 0)" :key="item.code"><span>{{ labels[item.code] || item.code }}：{{ item.count }}</span><button v-if="available(item.code) && item.count > 0 && item.code !== 'nameCard'" type="button" :disabled="blocked" @click="useCard(item.code)">使用{{ labels[item.code] }}</button></li></ul>
-      <form v-if="items.some(item => item.code === 'nameCard' && item.count > 0)" @submit.prevent="useCard('nameCard')"><fieldset :disabled="blocked"><label>改名卡新用户名<input v-model="cardName" aria-label="改名卡新用户名" maxlength="64" autocomplete="off" /></label><button type="submit">使用一张改名卡</button></fieldset></form>
+      <ul v-else><li v-for="item in items.filter(row => row.count !== 0)" :key="item.code"><span>{{ labels[item.code] || item.code }}：{{ item.count }}</span><button class="fp-control" v-if="available(item.code) && item.count > 0 && item.code !== 'nameCard'" type="button" :disabled="blocked" @click="useCard(item.code)">使用{{ labels[item.code] }}</button></li></ul>
+      <form v-if="items.some(item => item.code === 'nameCard' && item.count > 0)" @submit.prevent="useCard('nameCard')"><fieldset :disabled="blocked"><label>改名卡新用户名<input class="fp-control" v-model="cardName" aria-label="改名卡新用户名" maxlength="64" autocomplete="off" /></label><button data-tone="primary" class="fp-control" type="submit">使用一张改名卡</button></fieldset></form>
     </template>
     <p class="hint">免签卡增加后续系统签到使用的剩余天数；补签须满足当天签到等条件，最终以服务端校验为准。周年勋章领取券仅展示。</p>
     <h2>使用积分改名</h2><p>当前用户名：{{ account?.userName || '—' }}</p><p class="hint">每次按当前改名费用扣费（目前1000积分）；不能使用当前名称、保留名称或已用名称。</p>
-    <form @submit.prevent="store.use({ kind: 'points', userName: paidName })"><fieldset :disabled="blocked"><label>积分改名新用户名<input v-model="paidName" aria-label="积分改名新用户名" maxlength="64" autocomplete="off" /></label><button type="submit">核对并用积分改名</button></fieldset></form>
-    <p v-if="error" role="alert" class="error">{{ error }}</p><p v-if="pending" class="hint">操作结果尚未确认，原请求保留在当前页面会话中。刷新或退出会清除本地恢复信息，请先核对当前背包、用户名及流水。</p><button v-if="pending" type="button" :disabled="busy" @click="store.retry">重试未确认操作</button>
+    <form @submit.prevent="store.use({ kind: 'points', userName: paidName })"><fieldset :disabled="blocked"><label>积分改名新用户名<input class="fp-control" v-model="paidName" aria-label="积分改名新用户名" maxlength="64" autocomplete="off" /></label><button data-tone="primary" class="fp-control" type="submit">核对并用积分改名</button></fieldset></form>
+    <p v-if="error" role="alert" class="error">{{ error }}</p><p v-if="pending" class="hint">操作结果尚未确认，原请求保留在当前页面会话中。刷新或退出会清除本地恢复信息，请先核对当前背包、用户名及流水。</p><button class="fp-control" v-if="pending" type="button" :disabled="busy" @click="store.retry">重试未确认操作</button>
     <section v-if="receipt" class="receipt" aria-label="本次已确认背包或改名回执"><h3>本次已确认操作</h3>
       <p v-if="receipt.kind === 'points'">积分改名：{{ receipt.userName }}，实际扣费 {{ receipt.paidPoints }} 积分。</p>
       <p v-else-if="receipt.kind === 'nameCard'">已使用一张改名卡，本次用户名：{{ receipt.userName }}。</p>

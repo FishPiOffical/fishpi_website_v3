@@ -115,31 +115,31 @@ onBeforeUnmount(() => { mounted = false; reset() })
 <template>
   <div class="owner-profile">
     <p v-if="loading" role="status">正在读取设置…</p>
-    <button type="button" :disabled="loading || busy" @click="load">重新读取</button>
+    <button class="fp-control" type="button" :disabled="loading || busy" @click="load">重新读取</button>
     <template v-if="mode === 'profile'">
       <form @submit.prevent="saveProfile">
         <fieldset :disabled="loading || busy || !loaded.profile">
-          <label>昵称<input v-model="nickname" maxlength="20" /></label>
-          <label>网址<input v-model="website" maxlength="100" placeholder="https://" /></label>
-          <label>简介<textarea v-model="intro" rows="3" maxlength="255" /></label>
-          <button type="submit">保存资料</button>
+          <label>昵称<input class="fp-control" v-model="nickname" maxlength="20" /></label>
+          <label>网址<input class="fp-control" v-model="website" maxlength="100" placeholder="https://" /></label>
+          <label>简介<textarea class="fp-control" v-model="intro" rows="3" maxlength="255" /></label>
+          <button data-tone="primary" class="fp-control" type="submit">保存资料</button>
         </fieldset>
         <p v-if="errors.profile" role="alert" class="error">{{ errors.profile }}</p>
         <p v-if="messages.profile" role="status">{{ messages.profile }}</p>
       </form>
       <form @submit.prevent="savePersonality">
         <fieldset :disabled="loading || busy || !loaded.personality">
-          <label>MBTI<input v-model="mbti" list="owner-mbti-options" maxlength="6" placeholder="如 ENFP-A，留空清除" /></label>
+          <label>MBTI<input class="fp-control" v-model="mbti" list="owner-mbti-options" maxlength="6" placeholder="如 ENFP-A，留空清除" /></label>
           <datalist id="owner-mbti-options"><option v-for="choice in options" :key="choice" :value="choice" /></datalist>
-          <button type="submit">保存 MBTI</button>
+          <button data-tone="primary" class="fp-control" type="submit">保存 MBTI</button>
         </fieldset>
         <p v-if="errors.personality" role="alert" class="error">{{ errors.personality }}</p>
         <p v-if="messages.personality" role="status">{{ messages.personality }}</p>
       </form>
       <form @submit.prevent="saveTags">
         <fieldset :disabled="loading || busy || !loaded.tags">
-          <label>个人标签<input v-model="tags" maxlength="128" placeholder="逗号分隔，留空清除" /></label>
-          <button type="submit">保存个人标签</button>
+          <label>个人标签<input class="fp-control" v-model="tags" maxlength="128" placeholder="逗号分隔，留空清除" /></label>
+          <button data-tone="primary" class="fp-control" type="submit">保存个人标签</button>
         </fieldset>
         <p>支持中英文逗号、顿号及分号，最多4项，每项最多12字符，白名单标签除外。</p>
         <p v-if="errors.tags" role="alert" class="error">{{ errors.tags }}</p>
@@ -147,8 +147,8 @@ onBeforeUnmount(() => { mounted = false; reset() })
       </form>
       <form @submit.prevent="saveQq">
         <fieldset :disabled="loading || busy || !loaded.qq">
-          <label>QQ<input v-model="qq" inputmode="numeric" maxlength="12" placeholder="留空清除" /></label>
-          <button type="submit">保存 QQ</button>
+          <label>QQ<input class="fp-control" v-model="qq" inputmode="numeric" maxlength="12" placeholder="留空清除" /></label>
+          <button data-tone="primary" class="fp-control" type="submit">保存 QQ</button>
         </fieldset>
         <p>QQ 仅供本人查看和编辑。</p>
         <p v-if="errors.qq" role="alert" class="error">{{ errors.qq }}</p>
@@ -159,8 +159,8 @@ onBeforeUnmount(() => { mounted = false; reset() })
       <img class="owner-avatar" :src="displayAvatar(avatar) || '/favicon.svg'" alt="当前头像" />
       <form @submit.prevent="saveAvatar">
         <fieldset :disabled="loading || busy || !loaded.avatar">
-          <label>头像图片地址<input v-model="avatarDraft" maxlength="255" placeholder="https://" /></label>
-          <button type="submit">保存头像地址</button>
+          <label>头像图片地址<input class="fp-control" v-model="avatarDraft" maxlength="255" placeholder="https://" /></label>
+          <button data-tone="primary" class="fp-control" type="submit">保存头像地址</button>
           <label>上传头像<input type="file" accept="image/jpeg,image/png,image/gif" @change="onUpload" /></label>
         </fieldset>
       </form>
@@ -179,6 +179,6 @@ label { display: grid; gap: 6px; }
 input, textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-bg); color: var(--fp-text); padding: 9px 12px; }
 button { width: fit-content; border: 1px solid var(--fp-border); border-radius: 8px; background: transparent; color: var(--fp-text); padding: 7px 14px; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
-.error { color: #c34a36; }
+.error { color: var(--fp-danger); }
 .owner-avatar { display: block; width: 80px; height: 80px; object-fit: cover; border-radius: 50%; margin: 16px 0; }
 </style>

@@ -43,19 +43,19 @@ function refresh() { void loadRecords(); void loadBalance() }
 </script>
 
 <template>
-  <div class="points-view">
-    <section v-if="!loggedIn" class="card empty-state">
-      <h1>积分流水</h1><p class="hint">请先 <RouterLink to="/login?redirect=/points">登录</RouterLink> 后查看积分余额与变动。</p>
+  <div class="points-view fp-page fp-ui">
+    <section v-if="!loggedIn" class="card empty-state fp-card">
+      <h1 class="fp-page-title">积分流水</h1><p class="hint">请先 <RouterLink to="/login?redirect=/points">登录</RouterLink> 后查看积分余额与变动。</p>
     </section>
     <template v-else>
       <section class="balance-card">
-        <div class="balance-info"><span class="balance-label">当前可用积分</span><div class="balance-value"><span class="currency-icon">💠</span><strong>{{ balance !== null ? balance.toLocaleString() : balanceLoading ? '读取中…' : '—' }}</strong></div><p v-if="balanceError" role="alert" class="err">{{ balanceError }} <button type="button" @click="loadBalance">重试余额读取</button></p></div>
+        <div class="balance-info"><span class="balance-label">当前可用积分</span><div class="balance-value"><span class="currency-icon">💠</span><strong>{{ balance !== null ? balance.toLocaleString() : balanceLoading ? '读取中…' : '—' }}</strong></div><p v-if="balanceError" role="alert" class="err fp-state">{{ balanceError }} <button class="fp-control" type="button" @click="loadBalance">重试余额读取</button></p></div>
         <div class="balance-actions"><RouterLink to="/charge/point" class="action-btn primary">💰 充值积分</RouterLink><RouterLink to="/settings/point" class="action-btn">💸 积分转账</RouterLink><RouterLink to="/activity" class="action-btn">📅 活动签到</RouterLink></div>
       </section>
-      <section class="card records-section">
-        <header class="section-header"><h2>积分流水</h2><button type="button" class="refresh-points-btn" :disabled="loading || balanceLoading" @click="refresh">刷新余额与流水</button></header>
+      <section class="card records-section fp-card">
+        <header class="section-header"><h2>积分流水</h2><button type="button" class="refresh-points-btn fp-control" :disabled="loading || balanceLoading" @click="refresh">刷新余额与流水</button></header>
         <FpLoading v-if="loading" class="loading-wrap" />
-        <div v-else-if="error" role="alert" class="err">{{ error }} <button type="button" @click="loadRecords">重试流水读取</button></div>
+        <div v-else-if="error" role="alert" class="err fp-state">{{ error }} <button class="fp-control" type="button" @click="loadRecords">重试流水读取</button></div>
         <template v-else>
           <p>共 {{ total }} 条记录</p>
           <div class="records-list">
@@ -66,7 +66,7 @@ function refresh() { void loadRecords(); void loadBalance() }
               <div class="record-amount" :class="row.operation === '-' ? 'out' : 'in'">{{ pointChange(row) }}</div>
             </div>
           </div>
-          <footer v-if="total || page > 1" class="pager"><button type="button" class="pager-btn" :disabled="page <= 1" @click="page--">上一页</button><span class="page-num">{{ page }} / {{ pageCount }}</span><button type="button" class="pager-btn" :disabled="page >= Math.min(pageCount, 42949672)" @click="page++">下一页</button></footer>
+          <footer v-if="total || page > 1" class="pager"><button type="button" class="pager-btn fp-control" :disabled="page <= 1" @click="page--">上一页</button><span class="page-num">{{ page }} / {{ pageCount }}</span><button type="button" class="pager-btn fp-control" :disabled="page >= Math.min(pageCount, 42949672)" @click="page++">下一页</button></footer>
         </template>
       </section>
     </template>
@@ -78,13 +78,13 @@ function refresh() { void loadRecords(); void loadBalance() }
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 900px;
-  margin: 0 auto;
+
+
 }
 .card {
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 12px;
+  border-radius: var(--fp-panel-radius);
 }
 .empty-state {
   text-align: center;
@@ -111,7 +111,7 @@ function refresh() { void loadRecords(); void loadBalance() }
 .balance-card {
   background: linear-gradient(135deg, var(--fp-card) 0%, color-mix(in srgb, var(--fp-primary) 10%, var(--fp-card)) 100%);
   border: 1px solid color-mix(in srgb, var(--fp-primary) 20%, var(--fp-border));
-  border-radius: 12px;
+  border-radius: var(--fp-panel-radius);
   padding: 32px;
   display: flex;
   align-items: center;
@@ -209,7 +209,7 @@ function refresh() { void loadRecords(); void loadBalance() }
   color: var(--fp-muted);
 }
 .err {
-  color: #e07a5f;
+  color: var(--fp-danger);
 }
 .records-list {
   display: flex;

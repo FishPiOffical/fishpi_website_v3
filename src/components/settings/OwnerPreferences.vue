@@ -73,21 +73,21 @@ onBeforeUnmount(() => { mounted = false; reset() })
           <template v-if="field.kind === 'boolean'"><input type="checkbox" :aria-label="field.label" :checked="values[field.key] === true" @change="setBoolean(field.key, $event)" />{{ field.label }}</template>
           <template v-else>
             {{ field.label }}
-            <select v-if="options[field.key]" :aria-label="field.label" :value="values[field.key]" @change="setString(field.key, $event)">
+            <select class="fp-control" v-if="options[field.key]" :aria-label="field.label" :value="values[field.key]" @change="setString(field.key, $event)">
               <option v-if="!options[field.key]?.some(option => option.value === values[field.key])" :value="String(values[field.key] ?? '')" disabled>{{ values[field.key] || '暂无选项' }}</option>
               <option v-for="option in options[field.key]" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
-            <select v-else-if="field.kind === 'choice'" :aria-label="field.label" :value="values[field.key]" @change="setChoice(field.key, $event)"><option v-for="choice in field.choices" :key="choice.value" :value="choice.value">{{ choice.label }}</option></select>
-            <input v-else-if="field.kind === 'number'" type="number" :aria-label="field.label" :value="values[field.key]" :min="field.min" :max="field.max" step="1" @input="setNumber(field.key, $event)" />
-            <input v-else :aria-label="field.label" :value="values[field.key]" :maxlength="field.max" @input="setString(field.key, $event)" />
+            <select class="fp-control" v-else-if="field.kind === 'choice'" :aria-label="field.label" :value="values[field.key]" @change="setChoice(field.key, $event)"><option v-for="choice in field.choices" :key="choice.value" :value="choice.value">{{ choice.label }}</option></select>
+            <input class="fp-control" v-else-if="field.kind === 'number'" type="number" :aria-label="field.label" :value="values[field.key]" :min="field.min" :max="field.max" step="1" @input="setNumber(field.key, $event)" />
+            <input class="fp-control" v-else :aria-label="field.label" :value="values[field.key]" :maxlength="field.max" @input="setString(field.key, $event)" />
           </template>
         </label>
-        <button type="submit">{{ busy ? '保存中…' : `保存${title}` }}</button>
+        <button data-tone="primary" class="fp-control" type="submit">{{ busy ? '保存中…' : `保存${title}` }}</button>
       </fieldset>
     </form>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="message" role="status">{{ message }}</p>
-    <button type="button" :disabled="loading || busy" @click="load">重新读取{{ title }}</button>
+    <button class="fp-control" type="button" :disabled="loading || busy" @click="load">重新读取{{ title }}</button>
   </section>
 </template>
 
@@ -100,5 +100,5 @@ label.check { display: flex; align-items: center; gap: 8px; }
 input:not([type='checkbox']), select { box-sizing: border-box; width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--fp-border); background: var(--fp-bg); color: var(--fp-text); }
 button { width: fit-content; border: 1px solid var(--fp-border); border-radius: 8px; background: transparent; color: var(--fp-text); padding: 7px 14px; cursor: pointer; margin-top: 8px; }
 button:disabled { opacity: .5; cursor: default; }
-.error { color: #c34a36; }
+.error { color: var(--fp-danger); }
 </style>

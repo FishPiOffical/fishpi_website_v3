@@ -16,23 +16,23 @@ async function page(next: number) { await read(next); document.getElementById('d
 </script>
 
 <template>
-  <div class="wrapper list-page-wrap">
+  <div class="wrapper list-page-wrap fp-page fp-page--wide fp-ui fp-list-page">
     <div class="content directory-content" id="directory-list">
       <div class="module-header list-page-head">
-        <div class="head-left"><h2>{{ label }}目录</h2><span v-if="value" class="sub-tag">共 {{ value.total }} 个{{ label }}</span></div>
-        <button type="button" class="btn refresh-dir-btn" :disabled="loading" @click="read()">刷新目录</button>
+        <div class="head-left"><h1 class="fp-page-title">{{ label }}目录</h1><span v-if="value" class="sub-tag">共 {{ value.total }} 个{{ label }}</span></div>
+        <button type="button" class="btn refresh-dir-btn fp-control" :disabled="loading" @click="read()">刷新目录</button>
       </div>
       <FpLoading v-if="loading" :rows="6" />
-      <div v-else-if="error" class="err" role="alert">{{ error }} <button type="button" class="btn" @click="read()">重试当前页</button></div>
-      <p v-else-if="!value" class="err">{{ label }}尚未读取</p>
+      <div v-else-if="error" class="err fp-state" role="alert">{{ error }} <button type="button" class="btn fp-control" @click="read()">重试当前页</button></div>
+      <p v-else-if="!value" class="err fp-state">{{ label }}尚未读取</p>
       <template v-else>
-        <p v-if="!value.list.length" class="err">本页暂无{{ label }}</p>
+        <p v-if="!value.list.length" class="err fp-state">本页暂无{{ label }}</p>
         <ul v-if="tags.length" class="tag-grid"><li v-for="tag in tags" :key="tag.tagURI"><RouterLink :to="'/tag/' + tag.tagURI" class="tag-card"><img v-if="tag.tagIconPath" :src="tag.tagIconPath" alt="" /><strong>{{ tag.tagTitle }}</strong><em>{{ tag.tagReferenceCount }}</em></RouterLink></li></ul>
-        <div class="pagination-bar">
-          <button type="button" class="btn page-btn" :disabled="p <= 1" @click="page(p - 1)">‹ 上一页</button>
+        <div class="pagination-bar fp-pagination">
+          <button type="button" class="btn page-btn fp-control" :disabled="p <= 1" @click="page(p - 1)">‹ 上一页</button>
           <span class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span>
-          <button type="button" class="btn page-btn" :disabled="p >= value.pageCount" @click="page(p + 1)">下一页 ›</button>
-          <button v-if="p > 1 && p > value.pageCount" type="button" class="btn" @click="page(1)">返回第一页</button>
+          <button type="button" class="btn page-btn fp-control" :disabled="p >= value.pageCount" @click="page(p + 1)">下一页 ›</button>
+          <button class="fp-control btn" v-if="p > 1 && p > value.pageCount" type="button"  @click="page(1)">返回第一页</button>
         </div>
       </template>
     </div>
@@ -157,6 +157,6 @@ async function page(next: number) { await read(next); document.getElementById('d
   min-width: 24px;
   text-align: center;
 }
-.directory-content { scroll-margin-top: 80px; background:transparent; border:0; box-shadow:none; }
+.directory-content { scroll-margin-top: 80px;  }
 .pagination-bar { flex-wrap:wrap; }
 </style>

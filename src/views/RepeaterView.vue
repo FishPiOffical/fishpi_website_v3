@@ -10,7 +10,7 @@ import RepeaterComposer from '@/components/RepeaterComposer.vue'
 usePageSeo(()=>({title:'复读机',path:'/repeater',description:'摸鱼派复读机精选'}))
 const kind=ref<RepeaterKind>(''),feed=useRepeaterFeed(kind,consumeRepeaterPayload()),{items,loading,error,ready}=feed
 </script>
-<template><section class="card"><h1>复读机</h1><p class="hint">按点赞数与时间展示前12条，支持筛选类型。</p><div class="tabs"><button v-for="option in [{value:'',label:'全部'},...REPEATER_KINDS]" :key="option.value" type="button" :class="{on:kind===option.value}" @click="kind=option.value as RepeaterKind">{{ option.label }}</button></div><button type="button" class="refresh-repeater-btn" :disabled="loading" @click="feed.refresh">刷新列表</button><p v-if="loading" role="status">正在读取复读内容…</p><p v-if="error" class="err" role="alert">{{ error }} <button type="button" @click="feed.retry">重试读取</button></p><ol><li v-for="item in items" :key="item.id"><header><RouterLink v-if="item.author" :to="`/member/${encodeURIComponent(item.author.name)}`">{{ item.author.name }}</RouterLink><span v-else>作者未展示</span><span>{{ REPEATER_KINDS.find(k=>k.value===item.type)?.label }}</span></header><p>{{ item.content }}</p><RepeaterLikeButton :item="item"/></li></ol><p v-if="ready&&!loading&&!error&&!items.length" class="hint">当前没有内容。</p><p v-if="!ready&&!loading&&!error" role="status">复读机尚未读取。</p><RepeaterComposer/></section></template>
+<template><section class="card fp-page fp-ui fp-surface"><h1 class="fp-page-title">复读机</h1><p class="hint">按点赞数与时间展示前12条，支持筛选类型。</p><div class="tabs fp-tabs"><button class="fp-control" v-for="option in [{value:'',label:'全部'},...REPEATER_KINDS]" :key="option.value" type="button" :class="{on:kind===option.value}" @click="kind=option.value as RepeaterKind">{{ option.label }}</button></div><button type="button" class="fp-control refresh-repeater-btn" :disabled="loading" @click="feed.refresh">刷新列表</button><p v-if="loading" role="status">正在读取复读内容…</p><p v-if="error" class="err fp-state" role="alert">{{ error }} <button class="fp-control" type="button" @click="feed.retry">重试读取</button></p><ol><li v-for="item in items" :key="item.id"><header><RouterLink v-if="item.author" :to="`/member/${encodeURIComponent(item.author.name)}`">{{ item.author.name }}</RouterLink><span v-else>作者未展示</span><span>{{ REPEATER_KINDS.find(k=>k.value===item.type)?.label }}</span></header><p>{{ item.content }}</p><RepeaterLikeButton :item="item"/></li></ol><p v-if="ready&&!loading&&!error&&!items.length" class="hint">当前没有内容。</p><p v-if="!ready&&!loading&&!error" role="status">复读机尚未读取。</p><RepeaterComposer/></section></template>
 <style scoped lang="scss">
 .refresh-repeater-btn {
   display: none;
@@ -18,8 +18,8 @@ const kind=ref<RepeaterKind>(''),feed=useRepeaterFeed(kind,consumeRepeaterPayloa
 .card {
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 12px;
-  padding: 18px 20px;
+  border-radius: var(--fp-panel-radius);
+
 }
 h1 {
   margin: 0 0 8px;
@@ -30,7 +30,7 @@ h1 {
   font-size: 13px;
 }
 .err {
-  color: #e07a5f;
+  color: var(--fp-danger);
 }
 .tabs {
   display: flex;

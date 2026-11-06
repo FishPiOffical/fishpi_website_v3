@@ -568,7 +568,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   right: -8px;
   min-width: 16px;
   padding: 2px 4px;
-  border-radius: 10px;
+  border-radius: var(--fp-panel-radius);
   background: var(--fp-accent);
   color: #fff;
   font-size: 9px;
@@ -605,7 +605,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   height: min(560px, calc(100vh - 96px));
   transform: translateY(-50%);
   border: 1px solid var(--fp-border);
-  border-radius: 14px;
+  border-radius: var(--fp-panel-radius);
   background: color-mix(in srgb, var(--fp-card) 88%, transparent);
   backdrop-filter: blur(16px);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
@@ -690,7 +690,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   margin-bottom: 12px;
   padding: 10px 12px;
   border: 1px dashed var(--fp-link);
-  border-radius: 10px;
+  border-radius: var(--fp-panel-radius);
   background: color-mix(in srgb, var(--fp-link) 8%, transparent);
   color: var(--fp-link);
   text-align: left;
@@ -882,7 +882,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   padding: 12px 14px;
   margin-bottom: 12px;
   border: 1px solid var(--fp-border);
-  border-radius: 10px;
+  border-radius: var(--fp-panel-radius);
   background: var(--fp-card);
 }
 .switch {

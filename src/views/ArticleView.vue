@@ -1222,7 +1222,7 @@ h1 {
   color: var(--fp-muted);
 }
 .load-error .err {
-  color: #e07a5f;
+  color: var(--fp-danger);
   font-size: 15px;
 }
 .load-error .retry {

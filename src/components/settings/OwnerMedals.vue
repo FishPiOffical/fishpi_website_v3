@@ -80,22 +80,22 @@ onBeforeUnmount(() => { mounted = false; reset() })
           <span class="hint">{{ medal.displayed ? '展示中' : '已隐藏' }} · 到期：{{ expires(medal.expiresAt) }}</span>
         </div>
         <div class="actions">
-          <button type="button" :aria-label="`上移${medal.name}`" :disabled="loading || busy || !!pending" @click="move(medal, 'up')">上移</button>
-          <button type="button" :aria-label="`下移${medal.name}`" :disabled="loading || busy || !!pending" @click="move(medal, 'down')">下移</button>
-          <button type="button" :aria-label="`${medal.displayed ? '隐藏' : '展示'}${medal.name}`" :disabled="loading || busy || !!pending" @click="display(medal)">{{ medal.displayed ? '隐藏' : '展示' }}</button>
+          <button class="fp-control" type="button" :aria-label="`上移${medal.name}`" :disabled="loading || busy || !!pending" @click="move(medal, 'up')">上移</button>
+          <button class="fp-control" type="button" :aria-label="`下移${medal.name}`" :disabled="loading || busy || !!pending" @click="move(medal, 'down')">下移</button>
+          <button class="fp-control" type="button" :aria-label="`${medal.displayed ? '隐藏' : '展示'}${medal.name}`" :disabled="loading || busy || !!pending" @click="display(medal)">{{ medal.displayed ? '隐藏' : '展示' }}</button>
         </div>
       </li>
     </ul>
     <nav v-if="ready && pageCount > 1" aria-label="本人勋章分页">
-      <button type="button" :disabled="page <= 1 || busy || loading" @click="load(page - 1)">上一页勋章</button>
+      <button class="fp-control" type="button" :disabled="page <= 1 || busy || loading" @click="load(page - 1)">上一页勋章</button>
       <span>第 {{ page }} / {{ pageCount }} 页，共 {{ total }} 枚</span>
-      <button type="button" :disabled="page >= pageCount || busy || loading" @click="load(page + 1)">下一页勋章</button>
+      <button class="fp-control" type="button" :disabled="page >= pageCount || busy || loading" @click="load(page + 1)">下一页勋章</button>
     </nav>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <p v-if="message" role="status">{{ message }}</p>
     <p v-if="pending && !busy" class="hint">“{{ pending.name }}”的操作结果尚未确认，重试会恢复同一次操作。</p>
-    <button v-if="pending" type="button" :disabled="busy || loading" @click="retry">重试未确认的勋章操作</button>
-    <button type="button" :disabled="busy || loading" @click="load()">重新读取勋章</button>
+    <button class="fp-control" v-if="pending" type="button" :disabled="busy || loading" @click="retry">重试未确认的勋章操作</button>
+    <button class="fp-control" type="button" :disabled="busy || loading" @click="load()">重新读取勋章</button>
   </section>
 </template>
 

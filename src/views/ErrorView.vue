@@ -52,7 +52,7 @@ usePageSeo(() => ({ title: info.value.title, path: route.fullPath, robots: 'noin
   margin: 48px auto;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 12px;
+  border-radius: var(--fp-panel-radius);
   padding: 28px 24px;
   text-align: center;
 }

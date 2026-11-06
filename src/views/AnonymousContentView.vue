@@ -33,29 +33,29 @@ usePageSeo(() => ({ title: title.value, path: route.path, robots: 'noindex' }))
 function date(value: number) { return new Date(value).toLocaleString() }
 </script>
 <template>
-  <section class="anonymous-content">
-    <h1>{{ title }}</h1>
+  <section class="anonymous-content fp-page fp-ui fp-surface">
+    <h1 class="fp-page-title">{{ title }}</h1>
     <p v-if="!mounted">正在准备本人内容…</p>
     <p v-else-if="!accessToken"><RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录后查看本人匿名内容</RouterLink></p>
     <template v-else-if="!self"><p>匿名创作列表仅供本人查看。</p><RouterLink v-if="account" :to="`${base}/${kind}/anonymous`">查看我自己的列表</RouterLink></template>
     <template v-else>
-      <nav aria-label="本人匿名创作"><RouterLink :to="`${base}/articles/anonymous`">匿名文章</RouterLink><RouterLink :to="`${base}/comments/anonymous`">匿名评论</RouterLink><RouterLink :to="base">返回本人主页</RouterLink></nav>
+      <nav class="fp-tabs" aria-label="本人匿名创作"><RouterLink :to="`${base}/articles/anonymous`">匿名文章</RouterLink><RouterLink :to="`${base}/comments/anonymous`">匿名评论</RouterLink><RouterLink :to="base">返回本人主页</RouterLink></nav>
       <p>这里只显示概要。正文需进入文章，按当前阅读权限查看。</p>
-      <button type="button" class="refresh-anon-btn" :disabled="loading" @click="load">重新读取列表</button>
-      <p v-if="loading" role="status">正在读取…</p>
-      <template v-else-if="error"><p role="alert" class="error">{{ error }}</p><button v-if="page > 1" type="button" @click="home">返回第一页</button></template>
+      <button type="button" class="refresh-anon-btn fp-control" :disabled="loading" @click="load">重新读取列表</button>
+      <p class="fp-state" v-if="loading" role="status">正在读取…</p>
+      <div v-else-if="error" class="fp-state"><p role="alert" class="error">{{ error }}</p><div class="fp-state-actions"><button class="fp-control" type="button" :disabled="loading" @click="load">重试当前页</button><button class="fp-control" v-if="page > 1" type="button" @click="home">返回第一页</button></div></div>
       <template v-else>
-        <p>共 {{ total }} 条</p><p v-if="!list.length">{{ total ? '本页没有记录，可返回第一页重新读取。' : '暂无当前可列出的匿名内容' }}</p>
-        <button v-if="!list.length && page > 1" type="button" @click="home">返回第一页</button>
+        <p>共 {{ total }} 条</p><p class="fp-state" v-if="!list.length">{{ total ? '本页没有记录，可返回第一页重新读取。' : '暂无当前可列出的匿名内容' }}</p>
+        <button class="fp-control" v-if="!list.length && page > 1" type="button" @click="home">返回第一页</button>
         <ul><li v-for="item in list" :key="item.id">
           <template v-if="'title' in item"><RouterLink :to="`/article/${item.id}`">{{ item.title || '无标题文章' }}</RouterLink><p>文章 ID：{{ item.id }}</p><p>创建：{{ date(item.createdAt) }} · 更新：{{ date(item.updatedAt) }}</p></template>
           <template v-else><RouterLink :to="`/article/${item.articleId}`">{{ item.articleTitle || '无标题文章' }}</RouterLink><p>评论 ID：{{ item.id }} · {{ item.visibility === 1 ? '私密评论' : '普通评论' }}</p><p>评论创建：{{ date(item.createdAt) }}</p></template>
         </li></ul>
-        <nav v-if="total || page > 1" aria-label="匿名内容分页"><button type="button" :disabled="page <= 1 || loading" @click="move(page - 1)">上一页</button><span>{{ page }} / {{ pageCount }}</span><button type="button" :disabled="page >= Math.min(pageCount, 42949672) || loading" @click="move(page + 1)">下一页</button></nav>
+        <nav v-if="total || page > 1" aria-label="匿名内容分页"><button class="fp-control" type="button" :disabled="page <= 1 || loading" @click="move(page - 1)">上一页</button><span>{{ page }} / {{ pageCount }}</span><button class="fp-control" type="button" :disabled="page >= Math.min(pageCount, 42949672) || loading" @click="move(page + 1)">下一页</button></nav>
       </template>
     </template>
   </section>
 </template>
 <style scoped lang="scss">
-.anonymous-content { max-width: 900px; margin: 24px auto; padding: 0 20px; .refresh-anon-btn { display: none; } } h1 { font-size: 22px; } nav { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 16px 0; } a { color: var(--fp-link); } p { line-height: 1.7; overflow-wrap: anywhere; } ul { list-style: none; padding: 0; } li { border-top: 1px solid var(--fp-border); padding: 16px 0; overflow-wrap: anywhere; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } .error { color: #c34a36; }
+.anonymous-content {    .refresh-anon-btn { display: none; } } h1 { font-size: 22px; } nav { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 16px 0; } a { color: var(--fp-link); } p { line-height: 1.7; overflow-wrap: anywhere; } ul { list-style: none; padding: 0; } li { border-top: 1px solid var(--fp-border); padding: 16px 0; overflow-wrap: anywhere; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } .error { color: var(--fp-danger); }
 </style>

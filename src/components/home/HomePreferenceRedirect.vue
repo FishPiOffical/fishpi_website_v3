@@ -45,5 +45,5 @@ onBeforeUnmount(() => { mounted = false; generation++; pending.value = false; me
   </div>
 </template>
 <style scoped lang="scss">
-.home-redirect { margin: 0 0 10px; font-size: 12px; &.is-loading { display: none !important; } overflow-wrap: anywhere; color: var(--fp-text-muted); a { display: inline-block; white-space: nowrap; } button { margin: 0 8px; border: 1px solid var(--fp-border); border-radius: 6px; padding: 3px 8px; background: transparent; color: var(--fp-text); cursor: pointer; } }
+.home-redirect { margin: 0 0 10px; font-size: 12px; &.is-loading { display: none !important; } overflow-wrap: anywhere; color: var(--fp-muted); a { display: inline-block; white-space: nowrap; } button { margin: 0 8px; border: 1px solid var(--fp-border); border-radius: 6px; padding: 3px 8px; background: transparent; color: var(--fp-text); cursor: pointer; } }
 </style>

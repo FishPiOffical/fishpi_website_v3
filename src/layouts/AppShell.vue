@@ -868,7 +868,7 @@ onUnmounted(() => {
 .logout {
   color: #c45c4a;
 }
-main {
+.shell > main {
   max-width: var(--fp-wrap);
   margin: 0 auto;
   padding: 14px 15px 20px;

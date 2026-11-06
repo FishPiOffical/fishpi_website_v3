@@ -19,8 +19,8 @@ usePageSeo(() => ({
 </script>
 
 <template>
-  <section class="card">
-    <h1>{{ title }}</h1>
+  <section class="card fp-page fp-page--reading fp-ui fp-surface">
+    <h1 class="fp-page-title">{{ title }}</h1>
     <p v-if="kind === 'agreement'">
       使用摸鱼派即表示你同意遵守社区规范：友善交流、不传播违法违规内容、尊重他人知识产权与隐私，并接受站点运营方对违规行为的处理措施。
     </p>
@@ -36,12 +36,12 @@ usePageSeo(() => ({
 
 <style scoped>
 .card {
-  max-width: 720px;
-  margin: 0 auto;
+
+
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 12px;
-  padding: 22px 24px;
+  border-radius: var(--fp-panel-radius);
+
   line-height: 1.7;
 }
 h1 {

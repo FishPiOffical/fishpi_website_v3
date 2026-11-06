@@ -14,8 +14,8 @@ const OPTIONS = [
 </script>
 
 <template>
-  <section class="card pre-post">
-    <h1>请选择发布类型</h1>
+  <section class="card pre-post fp-page fp-ui fp-surface">
+    <h1 class="fp-page-title">请选择发布类型</h1>
     <div class="grid">
       <RouterLink v-for="o in OPTIONS" :key="o.to" :to="o.to" class="opt">
         <span class="icon">{{ o.icon }}</span>
@@ -35,7 +35,7 @@ const OPTIONS = [
   box-sizing: border-box;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 12px;
+  border-radius: var(--fp-panel-radius);
 }
 .pre-post h1 {
   font-size: 18px;

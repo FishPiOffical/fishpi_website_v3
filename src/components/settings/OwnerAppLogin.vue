@@ -80,11 +80,11 @@ onBeforeUnmount(() => { mounted = false; if (timer) clearInterval(timer); discar
     <p v-if="error" role="alert">{{ error }}</p>
     <p v-if="busy" role="status">正在处理…</p>
     <div class="app-login-actions">
-      <button v-if="!current || expired || terminal" type="button" :disabled="busy" @click="create()">生成新二维码</button>
+      <button class="fp-control" v-if="!current || expired || terminal" type="button" :disabled="busy" @click="create()">生成新二维码</button>
       <template v-if="current && !expired && !terminal">
-        <button type="button" :disabled="busy" @click="read()">查询扫码状态</button>
-        <button v-if="status?.state === 'app_confirmed'" type="button" :disabled="busy || unknown" @click="decide('approve')">批准APP登录</button>
-        <button type="button" :disabled="busy || unknown" @click="decide('deny')">拒绝APP登录</button>
+        <button class="fp-control" type="button" :disabled="busy" @click="read()">查询扫码状态</button>
+        <button class="fp-control" v-if="status?.state === 'app_confirmed'" type="button" :disabled="busy || unknown" @click="decide('approve')">批准APP登录</button>
+        <button class="fp-control" type="button" :disabled="busy || unknown" @click="decide('deny')">拒绝APP登录</button>
       </template>
     </div>
   </div>

@@ -41,20 +41,51 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
 <template>
  <div v-if="!authenticated" class="hint">登录后可读取私信。</div>
  <div v-else class="private-messages">
-  <div class="toolbar"><span>未读：{{ unread===null?'待查询':unread }}</span><button type="button" :disabled="listBusy||historyBusy" @click="refresh">刷新当前状态</button><button type="button" :disabled="writes.busy||!!writes.pending" @click="markRead(true)">全部标记已读</button></div>
-  <p v-if="unreadError" role="alert">{{ unreadError }} <button @click="loadUnread">重读未读数</button></p>
+  <div class="toolbar"><span>未读：{{ unread===null?'待查询':unread }}</span><button class="fp-control" type="button" :disabled="listBusy||historyBusy" @click="refresh">刷新当前状态</button><button class="fp-control" type="button" :disabled="writes.busy||!!writes.pending" @click="markRead(true)">全部标记已读</button></div>
+  <p v-if="unreadError" role="alert">{{ unreadError }} <button class="fp-control" @click="loadUnread">重读未读数</button></p>
   <p v-if="notice" role="status">{{ notice }}</p>
-  <div v-if="writes.pending" role="status"><p>私信操作结果未确认（{{ writes.pending.kind }}，目标 {{ writes.pending.target||'全部会话' }}），请恢复原操作。</p><button :disabled="writes.busy" @click="retry">恢复本次私信操作</button><p>整页刷新或退出会清除本地恢复信息，请先核对原操作。</p></div>
+  <div v-if="writes.pending" role="status"><p>私信操作结果未确认（{{ writes.pending.kind }}，目标 {{ writes.pending.target||'全部会话' }}），请恢复原操作。</p><button class="fp-control" :disabled="writes.busy" @click="retry">恢复本次私信操作</button><p>整页刷新或退出会清除本地恢复信息，请先核对原操作。</p></div>
   <p v-if="writes.error" role="alert">{{ writes.error }}</p>
-  <form @submit.prevent="resolve()"><label>发起私信 <input v-model="toName" maxlength="64" placeholder="输入用户名" /></label><button :disabled="resolveBusy||!toName.trim()">查找并打开</button><button type="button" @click="select({id:'1000000000086',userName:'',userNickname:'文件传输助手',userAvatarURL:'',available:true,builtin:true})">文件传输助手</button></form>
+  <form @submit.prevent="resolve()"><label>发起私信 <input class="fp-control" v-model="toName" maxlength="64" placeholder="输入用户名" /></label><button class="fp-control" :disabled="resolveBusy||!toName.trim()">查找并打开</button><button class="fp-control" type="button" @click="select({id:'1000000000086',userName:'',userNickname:'文件传输助手',userAvatarURL:'',available:true,builtin:true})">文件传输助手</button></form>
   <p v-if="resolveError" role="alert">{{ resolveError }}</p>
   <div class="columns">
-   <aside><h2>会话</h2><p v-if="listBusy" role="status">读取会话…</p><p v-if="listError" role="alert">{{ listError }} <button @click="loadList()">重读会话</button></p><p v-if="!listBusy&&!listError&&!list.length">暂无会话</p><ol><li v-for="item in list" :key="item.peerId"><button class="peer" :aria-current="target===item.peerId?'true':undefined" @click="select(item.peer)"><b>{{ item.peer.userNickname||item.peer.userName||'不可用账号' }}</b><span> · {{ item.unreadCount }} 未读</span><p>{{ item.lastMessage.available?item.lastMessage.preview:'正文不可用' }}</p></button></li></ol><nav><button :disabled="listBusy||page<=1" @click="loadList(page-1)">上一页会话</button><span>{{ page }} / {{ Math.max(1,pages) }}</span><button :disabled="listBusy||page>=pages" @click="loadList(page+1)">下一页会话</button></nav></aside>
-   <section v-if="target"><h2>{{ other?.userNickname||other?.userName||'会话 '+target }}</h2><p v-if="other&&!other.available">该账号资料不可用，仍可阅读本人历史。</p><button :disabled="writes.busy||!!writes.pending" @click="markRead()">本会话标记已读</button><p v-if="changed" role="status">私信状态有更新 <button :disabled="historyBusy" @click="loadHistory()">读取当前历史</button></p><p v-if="historyError" role="alert">{{ historyError }} <button :disabled="historyBusy" @click="loadHistory()">重读当前历史</button></p><p v-if="historyBusy" role="status">读取历史…</p><button v-if="hasMore" :disabled="historyBusy" @click="loadHistory(true)">读取更早消息</button><p v-if="!messages.length&&!historyBusy&&!historyError">暂无消息</p><ol class="messages"><li v-for="m in messages" :key="m.id"><span>{{ m.fromMe?'我':'对方' }} · {{ m.sentAt||'时间未知' }}</span><div v-if="m.available&&m.contentHtml" class="message-body" v-html="m.contentHtml" /><pre v-else-if="m.available">{{ m.content }}</pre><p v-else>正文不可用</p><button v-if="m.fromMe" :disabled="writes.busy||!!writes.pending" @click="withdraw(m)">撤回</button></li></ol><ChatComposer :key="identity()+':'+target" v-model="draft" :height="130" compact :sending="writes.busy" :disabled="!canSend" placeholder="Markdown私信，最多10240个字符" submit-text="发送私信" @submit="send" /><p>{{ draft.length }} / 10240</p></section>
+   <aside><h2>会话</h2><p v-if="listBusy" role="status">读取会话…</p><p v-if="listError" role="alert">{{ listError }} <button class="fp-control" @click="loadList()">重读会话</button></p><p v-if="!listBusy&&!listError&&!list.length">暂无会话</p><ol><li v-for="item in list" :key="item.peerId"><button class="peer fp-control" :aria-current="target===item.peerId?'true':undefined" @click="select(item.peer)"><b>{{ item.peer.userNickname||item.peer.userName||'不可用账号' }}</b><span> · {{ item.unreadCount }} 未读</span><p>{{ item.lastMessage.available?item.lastMessage.preview:'正文不可用' }}</p></button></li></ol><nav><button class="fp-control" :disabled="listBusy||page<=1" @click="loadList(page-1)">上一页会话</button><span>{{ page }} / {{ Math.max(1,pages) }}</span><button class="fp-control" :disabled="listBusy||page>=pages" @click="loadList(page+1)">下一页会话</button></nav></aside>
+   <section v-if="target"><h2>{{ other?.userNickname||other?.userName||'会话 '+target }}</h2><p v-if="other&&!other.available">该账号资料不可用，仍可阅读本人历史。</p><button class="fp-control" :disabled="writes.busy||!!writes.pending" @click="markRead()">本会话标记已读</button><p v-if="changed" role="status">私信状态有更新 <button class="fp-control" :disabled="historyBusy" @click="loadHistory()">读取当前历史</button></p><p v-if="historyError" role="alert">{{ historyError }} <button class="fp-control" :disabled="historyBusy" @click="loadHistory()">重读当前历史</button></p><p v-if="historyBusy" role="status">读取历史…</p><button class="fp-control" v-if="hasMore" :disabled="historyBusy" @click="loadHistory(true)">读取更早消息</button><p v-if="!messages.length&&!historyBusy&&!historyError">暂无消息</p><ol class="messages"><li v-for="m in messages" :key="m.id"><span>{{ m.fromMe?'我':'对方' }} · {{ m.sentAt||'时间未知' }}</span><div v-if="m.available&&m.contentHtml" class="message-body" v-html="m.contentHtml" /><pre v-else-if="m.available">{{ m.content }}</pre><p v-else>正文不可用</p><button class="fp-control" v-if="m.fromMe" :disabled="writes.busy||!!writes.pending" @click="withdraw(m)">撤回</button></li></ol><ChatComposer :key="identity()+':'+target" v-model="draft" :height="130" compact :sending="writes.busy" :disabled="!canSend" placeholder="Markdown私信，最多10240个字符" submit-text="发送私信" @submit="send" /><p>{{ draft.length }} / 10240</p></section>
    <p v-else>选择会话或查找用户开始私信。读取不会自动标记已读。</p>
   </div>
  </div>
 </template>
 <style scoped lang="scss">
 .private-messages{display:flex;flex-direction:column;gap:12px;min-width:0}.columns{display:grid;grid-template-columns:minmax(180px,30%) minmax(0,1fr);gap:20px}aside,section{min-width:0}h2{font-size:17px}ol{list-style:none;padding:0}p{overflow-wrap:anywhere}button,input,textarea{font:inherit;color:inherit;border:1px solid var(--fp-border);background:var(--fp-card);border-radius:6px;padding:6px 9px}button{cursor:pointer;margin:3px}button:disabled{opacity:.5;cursor:default}button[aria-current=true]{border-color:var(--fp-accent)}textarea{display:block;width:100%;box-sizing:border-box}.peer{width:100%;text-align:left}.peer p{margin:5px 0}.messages li{padding:12px 0;border-bottom:1px solid var(--fp-border)}.message-body{overflow-wrap:anywhere;:deep(img){max-width:100%}}pre{white-space:pre-wrap;overflow-wrap:anywhere}[role=alert]{color:#b9503c}.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px}@media(max-width:640px){.columns{grid-template-columns:minmax(0,1fr)}}
+</style>
+
+<style scoped lang="scss">
+.private-messages { gap: var(--fp-page-gap); }
+.columns { gap: var(--fp-page-gap); align-items: start; }
+.columns > aside, .columns > section, .columns > p {
+  margin: 0;
+  padding: var(--fp-panel-padding);
+  background: var(--fp-card);
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-panel-radius);
+  box-shadow: var(--fp-card-shadow);
+  min-width: 0;
+}
+.columns > aside > h2, .columns > section > h2 { margin: 0 0 16px; color: var(--fp-title); }
+.columns > p { display: grid; place-items: center; min-height: 240px; color: var(--fp-muted); font-size: 13px; line-height: 1.8; text-align: center; }
+.toolbar { padding: 12px 16px; border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); background: var(--fp-card); color: var(--fp-muted); font-size: 13px; }
+.private-messages > form { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+.private-messages > form label { display: grid; gap: 6px; flex: 1; min-width: 180px; font-size: 13px; color: var(--fp-muted); }
+.peer { margin: 0 0 6px; padding: 12px; border: 1px solid transparent; background: transparent; border-radius: var(--fp-control-radius); }
+.peer[aria-current='true'] { border-color: var(--fp-primary); background: var(--fp-primary-soft); }
+.peer:hover { background: var(--fp-hover); }
+.peer b { color: var(--fp-title); font-size: 14px; }
+.peer span { font-size: 12px; color: var(--fp-accent); }
+.peer p { margin: 6px 0 0; font-size: 12px; color: var(--fp-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.messages { max-height: 52dvh; overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; }
+.messages > li > span { font-size: 12px; color: var(--fp-muted); }
+.message-body, pre { font-size: 14px; line-height: 1.75; }
+.messages button { font-size: 12px; }
+[role='alert'] { color: var(--fp-danger); }
+@media (max-width: 640px) { .columns > aside ol { max-height: 220px; overflow-y: auto; } .messages { max-height: 48dvh; } }
 </style>

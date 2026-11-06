@@ -45,3 +45,7 @@ console.log('PASS relations 4 target and reader changes clear old list and disca
 let ssrReads=0;__relationsAPI.fetchV3UserRelations=async()=>{ssrReads++;throw Error('SSR')};const ssr=createSSRApp(component);ssr.use(createPinia());const html=await renderToString(ssr);assert.equal(ssrReads,0);assert.match(html,/正在准备用户列表/)
 const routes=await fs.readFile('src/router/index.ts','utf8'),legacy=await fs.readFile('src/api/fishpi.ts','utf8');assert.ok(routes.includes("import('@/views/UserRelationsView.vue')"));assert.ok(!legacy.includes('function fetchFollowers(')&&!legacy.includes('function fetchFollowingUsers('));assert.ok(!source.includes('fetchUserProfile')&&!source.includes('apiKey')&&!source.includes('v-html'))
 console.log('PASS relations 5 SSR has no reader requests and two existing routes avoid old profile/list dependencies')
+
+let retryCalls=0;__relationsRoute.params.userName='owner';__relationsRoute.meta.memberTab='followingUsers';__relationsAPI.fetchV3UserRelations=async(name,kind,p)=>{retryCalls++;if(retryCalls===1)throw new ApiError('retryable-ui-failure',503);return{list:[user],p,size:20,total:1,pageCount:1}}
+view=mount();await tick();assert.match(view.text(),/retryable-ui-failure/);click(view,'重试当前页');await tick();assert.equal(retryCalls,2);assert.match(view.text(),/昵称文本/);view.app.unmount()
+console.log('PASS relations 6 first-page error exposes a visible retry action; actual compiled page recovers the current list without navigation')

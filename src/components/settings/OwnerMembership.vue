@@ -117,38 +117,38 @@ onBeforeUnmount(() => { mounted.value = false; reset() })
 
 <template>
   <div class="membership">
-    <h1>摸鱼派会员</h1>
+    <h1 class="fp-page-title">摸鱼派会员</h1>
     <p v-if="!active"><RouterLink :to="{ path: '/login', query: { redirect: '/vips' } }">登录</RouterLink>后查看会员档位与本人状态。</p>
     <template v-else>
       <section class="state">
         <h2>本人会员状态</h2><p v-if="stateLoading" role="status">正在读取会员状态…</p><p v-if="stateError" class="error" role="alert">{{ stateError }}</p>
         <template v-if="state"><p>{{ state.active ? `当前有效会员：${state.levelCode}` : '当前没有有效会员' }}</p><p v-if="state.active">到期：{{ date(state.expiresAt) }}</p></template>
-        <button type="button" :disabled="disabled" @click="loadState">重新读取会员状态</button>
+        <button class="fp-control" type="button" :disabled="disabled" @click="loadState">重新读取会员状态</button>
       </section>
       <p v-if="error" role="alert" class="error">{{ error }}</p><p v-if="message" role="status">{{ message }}</p>
       <p v-if="pending && !busy">操作结果尚未确认，重试将恢复同一次操作，不重新选择档位或优惠券。</p>
-      <button v-if="pending" type="button" :disabled="busy" @click="retry">重试未确认的会员操作</button>
+      <button class="fp-control" v-if="pending" type="button" :disabled="busy" @click="retry">重试未确认的会员操作</button>
       <section v-if="state?.active" class="display">
         <h2>昵称展示</h2><p v-if="support.error" class="error" role="alert">{{ support.error }}</p>
         <p v-if="levelsReady && !support.error && !support.fields.length">当前档位没有可设置的昵称展示字段。</p>
         <form v-if="support.fields.length" @submit.prevent="save">
           <fieldset :disabled="disabled">
-            <label v-if="support.fields.includes('bold')">昵称加粗<select v-model="draft.bold" aria-label="昵称加粗"><option value="" disabled>尚未设置</option><option :value="true">加粗</option><option :value="false">不加粗</option></select></label>
-            <label v-if="support.fields.includes('underline')">昵称下划线<select v-model="draft.underline" aria-label="昵称下划线"><option value="" disabled>尚未设置</option><option :value="true">显示下划线</option><option :value="false">不显示下划线</option></select></label>
-            <template v-if="support.fields.includes('color')"><label>昵称颜色<input v-model="draft.color" aria-label="昵称颜色" maxlength="32" placeholder="#RRGGBB" /></label><div v-if="advanced" class="effects"><button v-for="effect in membershipEffects" :key="effect" type="button" :aria-pressed="draft.color === effect" @click="draft.color = effect">{{ effect }}</button></div></template>
+            <label v-if="support.fields.includes('bold')">昵称加粗<select class="fp-control" v-model="draft.bold" aria-label="昵称加粗"><option value="" disabled>尚未设置</option><option :value="true">加粗</option><option :value="false">不加粗</option></select></label>
+            <label v-if="support.fields.includes('underline')">昵称下划线<select class="fp-control" v-model="draft.underline" aria-label="昵称下划线"><option value="" disabled>尚未设置</option><option :value="true">显示下划线</option><option :value="false">不显示下划线</option></select></label>
+            <template v-if="support.fields.includes('color')"><label>昵称颜色<input class="fp-control" v-model="draft.color" aria-label="昵称颜色" maxlength="32" placeholder="#RRGGBB" /></label><div v-if="advanced" class="effects"><button class="fp-control" v-for="effect in membershipEffects" :key="effect" type="button" :aria-pressed="draft.color === effect" @click="draft.color = effect">{{ effect }}</button></div></template>
             <p>预览：<span :class="vipNameClass(preview)" :style="vipNameStyle(preview)">{{ account?.userNickname || account?.userName || '我的昵称' }}</span></p>
-            <button type="submit">保存会员展示</button>
+            <button data-tone="primary" class="fp-control" type="submit">保存会员展示</button>
           </fieldset>
         </form>
         <h3>本人已知权益（只读）</h3><ul><li v-for="(value, key) in state.config" :key="key">{{ benefitNames[key] }}：{{ benefit(value) }}</li></ul>
       </section>
       <section class="plans">
         <h2>会员档位</h2><p v-if="levelsLoading" role="status">正在读取会员档位…</p><p v-if="levelsError" role="alert" class="error">{{ levelsError }}</p>
-        <button type="button" :disabled="disabled" @click="loadLevels">重新读取会员档位</button>
-        <label v-if="levelsReady" class="coupon">优惠券（可选）<input v-model="coupon" aria-label="会员优惠券" maxlength="128" autocomplete="off" :disabled="disabled || !state || state.active" placeholder="不使用时留空" /></label>
+        <button class="fp-control" type="button" :disabled="disabled" @click="loadLevels">重新读取会员档位</button>
+        <label v-if="levelsReady" class="coupon">优惠券（可选）<input class="fp-control" v-model="coupon" aria-label="会员优惠券" maxlength="128" autocomplete="off" :disabled="disabled || !state || state.active" placeholder="不使用时留空" /></label>
         <p class="hint">仅未开通或已到期且符合资格的账号可开通，有效或永久会员不能重复购买。期限从服务器次日零点起加所列自然日，配置与礼包由服务端初始化；优惠券无效时拒绝开通。</p>
         <p v-if="levelsReady && !levels.length">暂无可用会员档位。</p>
-        <div class="plan-grid"><article v-for="level in levels" :key="level.id" class="plan"><h3>{{ level.name }}</h3><p>{{ level.code }} · {{ level.durationType }} · {{ level.durationValue }}天</p><p class="price">{{ level.price.toLocaleString() }} 积分</p><ul><li v-for="(value, key) in level.benefits" :key="key">{{ benefitNames[key] }}{{ ['bold','underline','color'].includes(key) ? '默认值' : '' }}：{{ benefit(value) }}</li></ul><button type="button" :disabled="disabled || !state || state.active" @click="buy(level)">{{ state?.active ? '已有有效会员' : `开通${level.name}（${level.durationType}）` }}</button></article></div>
+        <div class="plan-grid"><article v-for="level in levels" :key="level.id" class="plan"><h3>{{ level.name }}</h3><p>{{ level.code }} · {{ level.durationType }} · {{ level.durationValue }}天</p><p class="price">{{ level.price.toLocaleString() }} 积分</p><ul><li v-for="(value, key) in level.benefits" :key="key">{{ benefitNames[key] }}{{ ['bold','underline','color'].includes(key) ? '默认值' : '' }}：{{ benefit(value) }}</li></ul><button class="fp-control" type="button" :disabled="disabled || !state || state.active" @click="buy(level)">{{ state?.active ? '已有有效会员' : `开通${level.name}（${level.durationType}）` }}</button></article></div>
       </section>
       <section class="questions">
         <h2>开通说明</h2>

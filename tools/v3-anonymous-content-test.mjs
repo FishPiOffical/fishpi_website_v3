@@ -45,3 +45,7 @@ console.log('PASS anonymous 4 foreign target performs no owner lookup; logout/ta
 let ssrReads=0;__anonymousAPI.fetchV3AnonymousContent=async()=>{ssrReads++;throw Error('SSR')};const ssr=createSSRApp(component);ssr.use(createPinia());const html=await renderToString(ssr);assert.equal(ssrReads,0);assert.match(html,/正在准备本人内容/)
 const routes=await fs.readFile('src/router/index.ts','utf8'),member=await fs.readFile('src/views/MemberView.vue','utf8');assert.ok(routes.includes("import('@/views/AnonymousContentView.vue')"));assert.ok(!member.includes("articlesAnonymous: 'GET /api/user/")&&!member.includes("commentsAnonymous: 'GET /api/user/"));assert.ok(!source.includes('fetchUserProfile')&&!source.includes('apiKey')&&!source.includes('v-html'))
 console.log('PASS anonymous 5 SSR/private isolation and existing route integration do not depend on public legacy profile or raw HTML')
+
+let retryCalls=0;__anonymousRoute.params.userName='owner';__anonymousRoute.meta.memberTab='articlesAnonymous';__anonymousAPI.fetchV3AnonymousContent=async(kind,p)=>{retryCalls++;if(retryCalls===1)throw new Error('retryable-ui-failure');return{list:[article],p,size:20,total:1,pageCount:1}}
+view=mount();await tick();assert.match(view.text(),/retryable-ui-failure/);click(view,'重试当前页');await tick();assert.equal(retryCalls,2);assert.match(view.text(),/标题字面文本/);view.app.unmount()
+console.log('PASS anonymous 6 visible first-page retry uses the existing authorized read and restores metadata without publishing or changing identity')

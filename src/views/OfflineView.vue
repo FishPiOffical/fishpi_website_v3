@@ -83,7 +83,7 @@ onUnmounted(() => {
   margin: 40px auto 56px;
   padding: 36px 28px;
   border: 1px solid var(--fp-border);
-  border-radius: 14px;
+  border-radius: var(--fp-panel-radius);
   background: var(--fp-card);
   text-align: center;
 }
@@ -127,7 +127,7 @@ h1 {
   border: 1px solid color-mix(in srgb, var(--fp-accent) 30%, transparent);
 }
 .err {
-  color: #e07a5f;
+  color: var(--fp-danger);
   border: 1px solid color-mix(in srgb, #e07a5f 30%, transparent);
 }
 .actions {

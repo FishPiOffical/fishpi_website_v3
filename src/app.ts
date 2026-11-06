@@ -7,6 +7,7 @@ import { createAppRouter } from './router'
 import type { Router } from 'vue-router'
 import './styles/base.css'
 import './packs'
+import './styles/inner-pages.css'
 
 export interface FishpiAppContext {
   app: App

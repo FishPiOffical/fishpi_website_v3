@@ -136,29 +136,29 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
 </script>
 
 <template>
-  <form class="card" @submit.prevent="submit">
-    <h1>{{ heading }}</h1>
+  <form class="card fp-page fp-ui fp-surface" @submit.prevent="submit">
+    <h1 class="fp-page-title">{{ heading }}</h1>
     <p v-if="!isLoggedIn" class="hint">请先登录。</p>
     <template v-else>
       <template v-if="operations.pending">
         <p role="status">上次{{ OP_LABELS[operations.pending.op] }}结果待确认，目标 {{ operations.pending.id||'新内容' }}；恢复仍提交原先的内容。</p>
-        <button type="button" :aria-disabled="operations.busy" @click="restore()">恢复本次操作</button>
+        <button class="fp-control" type="button" :aria-disabled="operations.busy" @click="restore()">恢复本次操作</button>
       </template>
       <p v-if="operations.message" role="status">{{ operations.message }}</p><p v-if="operations.error" role="alert">{{ operations.error }}</p>
       <p v-if="operations.receipt&&(operations.receipt.op==='publish'||operations.receipt.op==='edit')">文章 {{ operations.receipt.id }} 已确认。<RouterLink :to="'/article/'+operations.receipt.id">查看文章</RouterLink></p>
-      <button v-if="operations.receipt?.op==='draft-save'&&!editId" type="button" :aria-disabled="locked" @click="loadDraft(operations.receipt.id)">载入已保存草稿 {{ operations.receipt.id }}</button>
+      <button class="fp-control" v-if="operations.receipt?.op==='draft-save'&&!editId" type="button" :aria-disabled="locked" @click="loadDraft(operations.receipt.id)">载入已保存草稿 {{ operations.receipt.id }}</button>
       <section v-if="!editId" class="drafts">
         <h2>草稿</h2><p v-if="draftsLoading" role="status">正在读取草稿…</p><p v-if="draftsError" role="alert">{{ draftsError }}</p>
-        <button type="button" :aria-disabled="draftsLoading" @click="!draftsLoading&&loadDrafts()">{{ draftsError?'重试草稿列表':'刷新草稿列表' }}</button>
-        <div v-for="d in drafts" :key="d.id"><button type="button" class="ghost" :aria-disabled="locked||sourceLoading" @click="loadDraft(d.id)">{{ d.title||'无标题' }}</button><button type="button" class="ghost" :aria-disabled="locked||sourceLoading" @click="dropDraft(d.id)">删除草稿 {{ d.id }}</button></div>
+        <button class="fp-control" type="button" :aria-disabled="draftsLoading" @click="!draftsLoading&&loadDrafts()">{{ draftsError?'重试草稿列表':'刷新草稿列表' }}</button>
+        <div v-for="d in drafts" :key="d.id"><button type="button" class="ghost fp-control" :aria-disabled="locked||sourceLoading" @click="loadDraft(d.id)">{{ d.title||'无标题' }}</button><button type="button" class="ghost fp-control" :aria-disabled="locked||sourceLoading" @click="dropDraft(d.id)">删除草稿 {{ d.id }}</button></div>
         <p v-if="!draftsLoading&&!draftsError&&!drafts.length">{{ draftPagination.total===0?'暂无草稿':'本页无草稿' }}</p>
-        <nav v-if="draftPagination.pageCount>1||draftPageNo>1"><button type="button" :aria-disabled="draftsLoading||draftPageNo<=1" @click="!draftsLoading&&draftPageNo>1&&loadDrafts(draftPageNo-1)">上一页草稿</button><span>第 {{ draftPageNo }} 页<span v-if="!draftsError&&!draftsLoading"> · 共 {{ draftPagination.total }}份</span></span><button type="button" :aria-disabled="draftsLoading||draftPageNo>=draftPagination.pageCount" @click="!draftsLoading&&draftPageNo<draftPagination.pageCount&&loadDrafts(draftPageNo+1)">下一页草稿</button></nav>
+        <nav v-if="draftPagination.pageCount>1||draftPageNo>1"><button class="fp-control" type="button" :aria-disabled="draftsLoading||draftPageNo<=1" @click="!draftsLoading&&draftPageNo>1&&loadDrafts(draftPageNo-1)">上一页草稿</button><span>第 {{ draftPageNo }} 页<span v-if="!draftsError&&!draftsLoading"> · 共 {{ draftPagination.total }}份</span></span><button class="fp-control" type="button" :aria-disabled="draftsLoading||draftPageNo>=draftPagination.pageCount" @click="!draftsLoading&&draftPageNo<draftPagination.pageCount&&loadDrafts(draftPageNo+1)">下一页草稿</button></nav>
       </section>
       <p v-if="sourceLoading" role="status">正在读取原文…</p><p v-if="sourceError" role="alert">{{ sourceError }}</p>
-      <button v-if="sourceError" type="button" @click="retrySource()">重试原文</button><button v-if="!editId&&sourceError&&initialDraftResolved" type="button" @click="sourceError=''">保留当前输入</button><button v-if="!editId&&sourceError" type="button" @click="blank()">新建空白文章</button>
+      <button class="fp-control" v-if="sourceError" type="button" @click="retrySource()">重试原文</button><button class="fp-control" v-if="!editId&&sourceError&&initialDraftResolved" type="button" @click="sourceError=''">保留当前输入</button><button class="fp-control" v-if="!editId&&sourceError" type="button" @click="blank()">新建空白文章</button>
       <template v-if="ready">
-      <p v-if="published" role="status">本次文章已发布。<button type="button" @click="published=false">将当前输入作为新文章</button></p>
-      <p v-if="needsReload" role="status">编辑已确认，继续编辑前请重新读取原文。<button type="button" @click="reloadEdit()">重新读取原文后继续编辑</button></p>
+      <p v-if="published" role="status">本次文章已发布。<button class="fp-control" type="button" @click="published=false">将当前输入作为新文章</button></p>
+      <p v-if="needsReload" role="status">编辑已确认，继续编辑前请重新读取原文。<button class="fp-control" type="button" @click="reloadEdit()">重新读取原文后继续编辑</button></p>
       <p v-if="source&&source.status!==0" role="status">当前文章不可编辑，可查看源码。</p>
       <p class="type-tip">
         <b>{{ TYPE_LABELS[type] || '帖子' }}</b>
@@ -166,8 +166,8 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
         <span v-if="isLong">适合创作小说、长篇故事等</span>
       </p>
 
-      <input v-model="title" class="title-input" required placeholder="标题" />
-      <textarea v-if="type===3" v-model="content" aria-label="思绪回放记录" rows="12" /><p v-if="type===3" class="hint">思绪回放记录修改需保留原格式，不能作为普通 Markdown 发布。</p>
+      <input v-model="title" class="title-input fp-control" required placeholder="标题" />
+      <textarea class="fp-control" v-if="type===3" v-model="content" aria-label="思绪回放记录" rows="12" /><p v-if="type===3" class="hint">思绪回放记录修改需保留原格式，不能作为普通 Markdown 发布。</p>
       <MarkdownEditor v-else
         ref="editorRef"
         v-model="content"
@@ -183,7 +183,7 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
         <p class="type-tip">专栏设置（可选）：可将长文归入已有专栏，或新建专栏进行章节连载。</p>
         <label class="inline-field">
           所属专栏
-          <select v-model="columnMode">
+          <select class="fp-control" v-model="columnMode">
             <option value="">不归属专栏（独立长文）</option>
             <option value="existing">已有专栏</option>
             <option value="__NEW__">+ 新建专栏</option>
@@ -192,11 +192,11 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
         <AuthorColumnPicker v-if="columnMode === 'existing'" :model-value="columnId" :current-title="columnTitle" :disabled="locked" @select="column => { columnId=column.id; columnTitle=column.title }" />
         <label v-if="columnMode === '__NEW__'" class="inline-field">
           新专栏名称
-          <input v-model="columnTitle" maxlength="64" placeholder="请输入专栏名称（例如：《三体》）" />
+          <input class="fp-control" v-model="columnTitle" maxlength="64" placeholder="请输入专栏名称（例如：《三体》）" />
         </label>
         <label v-if="columnMode" class="inline-field">
           章节号
-          <input v-model="chapterNo" inputmode="numeric" placeholder="可选，留空自动排在该专栏末尾" />
+          <input class="fp-control" v-model="chapterNo" inputmode="numeric" placeholder="可选，留空自动排在该专栏末尾" />
         </label>
         <p class="type-tip">同一专栏按章节号排序，阅读页将自动显示章节目录与上下章跳转。</p>
       </section>
@@ -205,10 +205,10 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
       <TagInput v-model="tags" />
       <label v-if="type === 5" class="inline-field">
         悬赏积分
-        <input v-model.number="offer" type="number" min="20" max="2147483647" placeholder="采纳答案时奖励给回答者" />
+        <input class="fp-control" v-model.number="offer" type="number" min="20" max="2147483647" placeholder="采纳答案时奖励给回答者" />
       </label>
       <section v-else class="reward">
-        <button type="button" class="ghost reward-toggle" @click="toggleReward">
+        <button type="button" class="ghost reward-toggle fp-control" @click="toggleReward">
           {{ rewardOpen ? retainedReward ? '收起打赏设置' : '取消打赏' : '打赏' }}
         </button>
         <template v-if="rewardOpen">
@@ -216,7 +216,7 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
           <MarkdownEditor ref="rewardEditorRef" v-model="rewardContent" :height="200" placeholder="打赏后可见的内容" />
           <label class="inline-field">
             打赏积分
-            <input v-model.number="rewardPoint" type="number" min="1" max="2147483647" placeholder="打赏积分" />
+            <input class="fp-control" v-model.number="rewardPoint" type="number" min="1" max="2147483647" placeholder="打赏积分" />
           </label>
         </template>
       </section>
@@ -224,7 +224,7 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
       <section class="settings">
         <label class="inline-field">
           创作声明
-          <select v-model.number="statement">
+          <select class="fp-control" v-model.number="statement">
             <option v-for="s in STATEMENTS" :key="s.value" :value="s.value">{{ s.label }}</option>
           </select>
         </label>
@@ -237,12 +237,12 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
       </section>
       </template>
 
-      <p v-if="error" class="err">{{ error }}</p>
+      <p v-if="error" class="err fp-state">{{ error }}</p>
       <div class="tools">
-        <button v-if="!editId" type="button" class="ghost" :aria-disabled="locked||!ready" @click="saveDraft">
+        <button v-if="!editId" type="button" class="ghost fp-control" :aria-disabled="locked||!ready" @click="saveDraft">
           {{ operations.busy ? '保存中…' : '存草稿' }}
         </button>
-        <button type="submit" :aria-disabled="locked||!ready||published||needsReload||!!source&&source.status!==0">
+        <button data-tone="primary" class="fp-control" type="submit" :aria-disabled="locked||!ready||published||needsReload||!!source&&source.status!==0">
           {{ operations.busy ? '提交中…' : editId ? '保存' : '发布' }}
         </button>
       </div>

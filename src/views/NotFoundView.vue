@@ -38,7 +38,7 @@ usePageSeo(() => ({ title: '页面不存在', path: route.fullPath, robots: 'noi
   margin: 40px auto 56px;
   padding: 36px 28px;
   border: 1px solid var(--fp-border);
-  border-radius: 14px;
+  border-radius: var(--fp-panel-radius);
   background: var(--fp-card);
   text-align: center;
 }

@@ -38,7 +38,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
       <p v-else>暂无等级奖励概要。</p>
       <p class="hint">这里只说明成长来源与奖励类型，不保证每次操作都会增加经验或发放奖励。</p>
     </template>
-    <button type="button" class="refresh-guide-btn" :class="{ 'is-hidden': guide && !error }" :disabled="loading || !accessToken" @click="load">重新读取成长提示</button>
+    <button type="button" class="refresh-guide-btn fp-control" :class="{ 'is-hidden': guide && !error }" :disabled="loading || !accessToken" @click="load">重新读取成长提示</button>
   </section>
 </template>
 

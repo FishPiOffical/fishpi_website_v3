@@ -55,3 +55,7 @@ __savedRoute.name=undefined;__savedRoute.params.userName='owner';__savedRoute.me
 const feed=(await import(feedURL)).default
 for(const compact of [true,false]){const ssrFeed=createSSRApp(feed,{items:[{...value.article,articleAuthorName:'PRIVATE_AUTHOR',articleAuthorIntro:'PRIVATE_INTRO',articleAuthorThumbnailURL48:'https://example.org/private.png'}],compact});const html=await renderToString(ssrFeed);assert.ok(!html.includes('PRIVATE_AUTHOR')&&!html.includes('PRIVATE_INTRO')&&!html.includes('private.png'));if(!compact)assert.match(html,/匿名用户/)}
 console.log('PASS saved 7 target/kind switch rejects delayed owner rows; actual shared compact/full feed never links or displays anonymous author metadata')
+
+let retryCalls=0;__savedRoute.name=undefined;__savedRoute.params.userName='owner';__savedRoute.meta.memberTab='followingArticles';__savedAPI.fetchV3SavedContent=async(name,kind,owner,p)=>{retryCalls++;if(retryCalls===1)throw new ApiError('retryable-ui-failure',503);return{kind:'collections',list:[articleItem],p,size:20,total:1,pageCount:1}}
+view=mount();await tick();assert.match(view.text(),/retryable-ui-failure/);click(view,'重试当前页');await tick();assert.equal(retryCalls,2);assert.ok(!view.text().includes('retryable-ui-failure'));assert.match(view.text(),/共 1/);view.app.unmount()
+console.log('PASS saved 8 current-page retry remains visible after first-page read failure and replaces the error only after successful current GET')

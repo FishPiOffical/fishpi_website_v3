@@ -374,7 +374,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   color: var(--fp-link);
 }
 .err {
-  color: #e07a5f;
+  color: var(--fp-danger);
   font-size: 13px;
 }
 .home {
@@ -391,7 +391,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   gap: 10px;
   padding: 10px 14px;
   border: 1px solid var(--fp-link);
-  border-radius: 10px;
+  border-radius: var(--fp-panel-radius);
   background: color-mix(in srgb, var(--fp-card) 92%, transparent);
   backdrop-filter: blur(10px);
   box-shadow: var(--fp-card-shadow);

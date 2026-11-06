@@ -50,14 +50,14 @@ async function submit() {
 </script>
 
 <template>
-  <form v-if="!auth.isLoggedIn" class="card" @submit.prevent="submit">
-    <h1>登录</h1>
+  <form v-if="!auth.isLoggedIn" class="card fp-page fp-page--auth fp-ui fp-surface" @submit.prevent="submit">
+    <h1 class="fp-page-title">登录</h1>
     <p v-if="securityNotice" role="status">{{ securityNotice }}</p>
-    <label>用户名或邮箱<input v-model="username" required autocomplete="username" /></label>
-    <label>密码<input v-model="passwd" type="password" required autocomplete="current-password" /></label>
-    <label>两步验证（可选）<input v-model="mfa" /></label>
-    <p v-if="auth.error" class="err">{{ auth.error }}</p>
-    <button type="submit" :disabled="busy">
+    <label>用户名或邮箱<input class="fp-control" v-model="username" required autocomplete="username" /></label>
+    <label>密码<input class="fp-control" v-model="passwd" type="password" required autocomplete="current-password" /></label>
+    <label>两步验证（可选）<input class="fp-control" v-model="mfa" /></label>
+    <p v-if="auth.error" class="err fp-state">{{ auth.error }}</p>
+    <button data-tone="primary" class="fp-control" type="submit" :disabled="busy">
       {{ busy ? '登录中…' : '登录' }}
     </button>
     <p class="links">
@@ -67,23 +67,23 @@ async function submit() {
       <RouterLink to="/download">客户端</RouterLink>
     </p>
   </form>
-  <section v-else class="card" aria-label="登录成功">
-    <h1>登录已成功</h1>
+  <section v-else class="card fp-card" aria-label="登录成功">
+    <h1 class="fp-page-title">登录已成功</h1>
     <p v-if="returning" role="status">正在打开原页面…</p>
-    <p v-if="returnError" class="err" role="alert">{{ returnError }}</p>
-    <button type="button" :disabled="returning" @click="afterLogin">重试打开原页面</button>
+    <p v-if="returnError" class="err fp-state" role="alert">{{ returnError }}</p>
+    <button class="fp-control" type="button" :disabled="returning" @click="afterLogin">重试打开原页面</button>
   </section>
 </template>
 
 <style scoped>
 .card {
-  max-width: 380px;
-  margin: 40px auto;
+
+
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
   box-shadow: var(--fp-card-shadow);
   border-radius: var(--fp-radius-lg, 10px);
-  padding: 24px;
+
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -144,7 +144,7 @@ button[type='submit']:disabled {
   font: inherit;
 }
 .err {
-  color: #e07a5f;
+  color: var(--fp-danger);
   font-size: 13px;
 }
 .hint {

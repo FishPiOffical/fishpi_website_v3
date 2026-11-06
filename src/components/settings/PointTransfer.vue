@@ -23,15 +23,15 @@ onBeforeUnmount(() => { recipient.value = ''; memo.value = '' })
     <p class="hint">总额包含手续费。普通手续费为总额的1%向下取整、最低1分；当前有效VIP4_YEAR/VIP4_MONTH和手续费收款账号本人免手续费。实际到账与费用以回执为准。</p>
     <form @submit.prevent="send">
       <fieldset :disabled="transferBusy || transferConfirming || !!transferPending">
-        <label>收款用户名<input v-model="recipient" aria-label="转账收款用户名" maxlength="64" autocomplete="off" /></label>
-        <label>总扣款积分<input v-model.number="amount" aria-label="转账总积分" type="number" min="2" max="2147483647" step="1" /></label>
-        <label>备注<input v-model="memo" aria-label="转账备注" maxlength="128" placeholder="可空，保存时清除HTML" /></label>
-        <button type="submit">{{ transferBusy ? '正在转账…' : '核对并转账' }}</button>
+        <label>收款用户名<input class="fp-control" v-model="recipient" aria-label="转账收款用户名" maxlength="64" autocomplete="off" /></label>
+        <label>总扣款积分<input class="fp-control" v-model.number="amount" aria-label="转账总积分" type="number" min="2" max="2147483647" step="1" /></label>
+        <label>备注<input class="fp-control" v-model="memo" aria-label="转账备注" maxlength="128" placeholder="可空，保存时清除HTML" /></label>
+        <button class="fp-control" data-tone="primary" type="submit">{{ transferBusy ? '正在转账…' : '核对并转账' }}</button>
       </fieldset>
     </form>
     <p v-if="transferError" role="alert" class="error">{{ transferError }}</p>
     <p v-if="transferPending && !transferBusy" class="hint">转账结果尚未确认，原请求保留在当前登录会话中；重试恢复同一笔转账。刷新页面或退出会清除本地恢复信息，请先核对流水。</p>
-    <button v-if="transferPending" type="button" :disabled="transferBusy" @click="finance.retryTransfer">重试未确认转账</button>
+    <button class="fp-control" v-if="transferPending" type="button" :disabled="transferBusy" @click="finance.retryTransfer">重试未确认转账</button>
     <section v-if="transferReceipt" class="receipt" aria-label="最近已确认转账">
       <h3>最近已确认转账</h3><p role="status">转账结果已确认</p>
       <p>收款用户名：{{ transferReceipt.recipient.userName }}</p><p>总扣款：{{ transferReceipt.amount }} 积分 · 主款到账：{{ transferReceipt.receivedPoints }} 积分 · 手续费：{{ transferReceipt.feePoints }} 积分</p>

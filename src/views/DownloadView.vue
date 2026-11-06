@@ -181,11 +181,11 @@ const retiredClients = clients.filter(client => client.retired)
 </script>
 
 <template>
-  <section class="download-page">
+  <section class="download-page fp-page fp-page--wide fp-ui fp-special-page">
     <header class="hero">
       <div class="hero-copy">
         <span class="eyebrow"><span class="eyebrow-dot"></span>摸鱼派 · 多端客户端</span>
-        <h1>把摸鱼派<br /><span>装进你的设备</span></h1>
+        <h1 class="fp-page-title">把摸鱼派<br /><span>装进你的设备</span></h1>
         <p>电脑、手机、浏览器与开发工具，总有一种适合你的摸鱼方式。</p>
         <div class="hero-meta">
           <span>官方与社区客户端</span>

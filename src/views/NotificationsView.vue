@@ -169,18 +169,18 @@ function readAll() { return mark('all') }
 </script>
 
 <template>
-  <section class="notifications-page" aria-labelledby="notifications-title">
-    <header class="page-heading">
+  <section class="notifications-page fp-page fp-ui" aria-labelledby="notifications-title">
+    <header class="page-heading fp-page-heading">
       <div>
-        <h1 id="notifications-title">通知</h1>
-        <p class="page-summary" role="status">
+        <h1 class="fp-page-title" id="notifications-title">通知</h1>
+        <p class="page-summary fp-page-description" role="status">
           <template v-if="notices.loading">正在更新未读数</template>
           <template v-else-if="notices.error">未读数暂不可用</template>
           <template v-else-if="notices.total > 0">你有 <strong>{{ notices.total }}</strong> 条未读通知</template>
           <template v-else>暂时没有未读通知</template>
         </p>
       </div>
-      <button type="button" class="action-button" :disabled="marking || notices.total <= 0" @click="readAll">
+      <button type="button" class="action-button fp-control" :disabled="marking || notices.total <= 0" @click="readAll">
         <NoticeIcon name="check" />全部标为已读
       </button>
     </header>
@@ -193,7 +193,7 @@ function readAll() { return mark('all') }
             v-for="tab in tabs"
             :key="tab.id"
             type="button"
-            class="category"
+            class="category fp-control"
             :class="{ selected: type === tab.id }"
             :aria-pressed="type === tab.id"
             aria-controls="notification-list"
@@ -207,21 +207,21 @@ function readAll() { return mark('all') }
       </aside>
 
       <div id="notification-list" class="list-panel" :aria-busy="loading">
-        <header class="list-heading">
+        <header class="list-heading fp-page-heading">
           <div class="list-heading-copy">
             <div class="list-title"><h2>{{ currentTab.label }}</h2><span v-if="currentUnread > 0" class="unread-label">{{ currentUnread }} 条未读</span></div>
             <p>{{ currentTab.hint }}</p>
           </div>
           <div class="list-actions">
-            <button type="button" class="read-button" :disabled="marking || !canReadType || loading" @click="readType">本类已读</button>
-            <button type="button" class="refresh-button" aria-label="刷新通知" title="刷新通知" :disabled="loading || marking" @click="load"><NoticeIcon name="refresh" /></button>
+            <button type="button" class="read-button fp-control" :disabled="marking || !canReadType || loading" @click="readType">本类已读</button>
+            <button type="button" class="refresh-button fp-control" aria-label="刷新通知" title="刷新通知" :disabled="loading || marking" @click="load"><NoticeIcon name="refresh" /></button>
           </div>
         </header>
         <FpLoading v-if="loading" :rows="5" />
         <div v-else-if="error" class="empty-state error-state" role="alert">
           <span class="empty-icon"><NoticeIcon name="inbox" /></span>
           <h3>通知加载遇到问题</h3><p>{{ error }}</p>
-          <button type="button" class="action-button" @click="load">重新加载</button>
+          <button type="button" class="action-button fp-control" @click="load">重新加载</button>
         </div>
         <div v-else-if="!items.length" class="empty-state">
           <span class="empty-icon"><NoticeIcon :name="type" /></span>
@@ -251,8 +251,8 @@ function readAll() { return mark('all') }
         <footer v-if="!loading && !error && (items.length || page > 1)" class="pager" aria-label="通知分页">
           <span class="page-number">第 {{ page }} 页</span>
           <div class="page-buttons">
-            <button type="button" :disabled="page <= 1 || marking" @click="page -= 1">上一页</button>
-            <button type="button" :disabled="page >= pageCount || marking" @click="page += 1">下一页</button>
+            <button class="fp-control" type="button" :disabled="page <= 1 || marking" @click="page -= 1">上一页</button>
+            <button class="fp-control" type="button" :disabled="page >= pageCount || marking" @click="page += 1">下一页</button>
           </div>
         </footer>
       </div>
@@ -261,8 +261,8 @@ function readAll() { return mark('all') }
 </template>
 
 <style scoped>
-.notifications-page { max-width: 1080px; margin: 0 auto; }
-.page-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 4px 0 24px; }
+.notifications-page {   }
+.page-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 0 var(--fp-page-gap); }
 h1 { margin: 0; color: var(--fp-title); font-size: 24px; font-weight: 600; letter-spacing: .02em; }
 .page-summary { margin: 7px 0 0; color: var(--fp-muted); font-size: 13px; }
 .page-summary strong { color: var(--fp-accent); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -273,7 +273,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--fp-primary); ou
 .action-button svg { width: 16px; height: 16px; }
 .action-button:not(:disabled):hover { background: var(--fp-hover); }
 .notification-layout { display: grid; grid-template-columns: 188px minmax(0, 1fr); gap: 22px; align-items: start; }
-.category-panel { position: sticky; top: calc(var(--fp-nav-h) + 20px); padding: 16px 10px 10px; border: 1px solid var(--fp-border); border-radius: 12px; background: var(--fp-card); }
+.category-panel { position: sticky; top: calc(var(--fp-nav-h) + 20px); padding: 16px 10px 10px; border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); background: var(--fp-card); }
 .category-panel > .page-summary { display: none !important; }
 .category-heading { margin: 0 12px 12px; font-size: 11px; color: var(--fp-muted); letter-spacing: .1em; }
 .categories { display: flex; flex-direction: column; gap: 4px; }
@@ -283,7 +283,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--fp-primary); ou
 .category.selected { color: var(--fp-accent); background: color-mix(in srgb, var(--fp-accent) 9%, var(--fp-card)); font-weight: 500; }
 .category.selected svg { color: inherit; }
 .count { display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px; margin-left: auto; border-radius: 6px; color: #fff; background: var(--fp-accent); font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.list-panel { min-width: 0; min-height: 470px; border: 1px solid var(--fp-border); border-radius: 12px; background: var(--fp-card); overflow: hidden; }
+.list-panel { min-width: 0; min-height: 470px; border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); background: var(--fp-card); overflow: hidden; }
 .list-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 24px; border-bottom: 1px solid var(--fp-border); }
 .list-heading-copy { min-width: 0; }
 .list-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
@@ -342,7 +342,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   h1 { font-size: 21px; }
   .action-button { padding: 8px 10px; }
   .notification-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .category-panel { position: static; padding: 7px; border-radius: 10px; }
+  .category-panel { position: static; padding: 7px; border-radius: var(--fp-panel-radius); }
   .category-heading { display: none; }
   .categories { flex-direction: row; overflow-x: auto; scrollbar-width: thin; }
   .category { flex: none; width: auto; min-height: 36px; padding: 8px 11px; gap: 6px; white-space: nowrap; }

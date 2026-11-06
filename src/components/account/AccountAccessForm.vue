@@ -77,8 +77,8 @@ onMounted(() => { if (props.registration) { const value = route.query.referral ?
 onScopeDispose(() => { alive = false; sequence++; optionsSequence++; erase(); phone.value = userName.value = invitecode.value = referral.value = '' })
 </script>
 <template>
-  <section class="account-access">
-    <h1>{{ title }}</h1>
+  <section class="account-access fp-page fp-page--auth fp-ui fp-surface">
+    <h1 class="fp-page-title">{{ title }}</h1>
     <p v-if="stage === 'done' || stage === 'uncertain'" role="status">{{ notice }}</p>
     <template v-else>
       <p v-if="optionsLoading" role="status">正在读取注册选项…</p>
@@ -86,40 +86,40 @@ onScopeDispose(() => { alive = false; sequence++; optionsSequence++; erase(); ph
       <form v-if="stage === 'form'" @submit.prevent="prepare">
         <fieldset :disabled="blocked">
           <template v-if="registration">
-            <label>用户名<input v-model="userName" autocomplete="username" :minlength="options?.username.minLength || 1" :maxlength="options?.username.maxLength || 64" required /></label>
+            <label>用户名<input class="fp-control" v-model="userName" autocomplete="username" :minlength="options?.username.minLength || 1" :maxlength="options?.username.maxLength || 64" required /></label>
             <p v-if="options">{{ options.username.minLength }}至{{ options.username.maxLength }}位英文字母、数字或连字符。</p>
-            <label>邀请人用户名（可选）<input v-model="referral" maxlength="64" /></label>
-            <label v-if="!options || options.mode === 'invitation'">邀请码{{ !options ? '（要求待读取）' : options.inviteCodeRequired ? '（必填）' : '（可选）' }}<input v-model="invitecode" maxlength="16" :required="options?.inviteCodeRequired" /></label>
+            <label>邀请人用户名（可选）<input class="fp-control" v-model="referral" maxlength="64" /></label>
+            <label v-if="!options || options.mode === 'invitation'">邀请码{{ !options ? '（要求待读取）' : options.inviteCodeRequired ? '（必填）' : '（可选）' }}<input class="fp-control" v-model="invitecode" maxlength="16" :required="options?.inviteCodeRequired" /></label>
           </template>
-          <label>手机号码<input v-model="phone" type="tel" inputmode="numeric" maxlength="11" autocomplete="tel" required /></label>
-          <button type="submit" :disabled="registration && options?.mode === 'closed'">{{ blocked ? '请稍候…' : '验证并申请短信' }}</button>
+          <label>手机号码<input class="fp-control" v-model="phone" type="tel" inputmode="numeric" maxlength="11" autocomplete="tel" required /></label>
+          <button data-tone="primary" class="fp-control" type="submit" :disabled="registration && options?.mode === 'closed'">{{ blocked ? '请稍候…' : '验证并申请短信' }}</button>
         </fieldset>
       </form>
-      <div v-if="checking"><p>请完成人机验证以申请短信。</p><div ref="captchaEl" class="captcha" /><p v-if="captcha.error.value" role="alert">{{ captcha.error.value }}</p><button type="button" :disabled="busy" @click="cancelCaptcha">取消验证</button></div>
+      <div v-if="checking"><p>请完成人机验证以申请短信。</p><div ref="captchaEl" class="captcha" /><p v-if="captcha.error.value" role="alert">{{ captcha.error.value }}</p><button class="fp-control" type="button" :disabled="busy" @click="cancelCaptcha">取消验证</button></div>
       <template v-if="stage === 'verify'">
         <p role="status">{{ notice || '请输入已收到验证码的手机号。' }}</p>
         <p v-if="registration">账号：{{ snapshot?.userName }}；手机号：{{ snapshot?.userPhone }}</p>
         <p v-else-if="resetPhone">接收短信的手机号：{{ resetPhone }}</p>
         <form @submit.prevent="complete"><fieldset :disabled="busy">
-          <label v-if="!registration && !resetPhone">接收验证码的手机号<input v-model="phone" type="tel" inputmode="numeric" maxlength="11" autocomplete="tel" required /></label>
-          <label>短信验证码<input v-model="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required /></label>
-          <label>新密码<input v-model="password" type="password" minlength="6" maxlength="128" autocomplete="new-password" required /></label>
-          <label>确认新密码<input v-model="repeatPassword" type="password" minlength="6" maxlength="128" autocomplete="new-password" required /></label>
+          <label v-if="!registration && !resetPhone">接收验证码的手机号<input class="fp-control" v-model="phone" type="tel" inputmode="numeric" maxlength="11" autocomplete="tel" required /></label>
+          <label>短信验证码<input class="fp-control" v-model="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required /></label>
+          <label>新密码<input class="fp-control" v-model="password" type="password" minlength="6" maxlength="128" autocomplete="new-password" required /></label>
+          <label>确认新密码<input class="fp-control" v-model="repeatPassword" type="password" minlength="6" maxlength="128" autocomplete="new-password" required /></label>
           <p>密码6至128个字符，保留首尾空白，不含控制字符。</p>
-          <label v-if="registration">角色<select v-model.number="role"><option v-for="item in options?.appRoles || []" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
-          <button type="submit">{{ busy ? '提交中…' : registration ? '完成注册' : '确认重置密码' }}</button>
+          <label v-if="registration">角色<select class="fp-control" v-model.number="role"><option v-for="item in options?.appRoles || []" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
+          <button data-tone="primary" class="fp-control" type="submit">{{ busy ? '提交中…' : registration ? '完成注册' : '确认重置密码' }}</button>
         </fieldset></form>
       </template>
       <p v-if="notice && stage === 'form'" role="status">{{ notice }}</p>
     </template>
     <p v-if="error" role="alert">{{ error }}</p>
-    <button v-if="registration && stage === 'form' && !checking" type="button" :disabled="blocked" @click="loadOptions">重新读取注册选项</button>
-    <button v-if="stage === 'verify' || stage === 'uncertain'" type="button" :disabled="busy" @click="restart">重新填写并申请短信</button>
+    <button class="fp-control" v-if="registration && stage === 'form' && !checking" type="button" :disabled="blocked" @click="loadOptions">重新读取注册选项</button>
+    <button class="fp-control" v-if="stage === 'verify' || stage === 'uncertain'" type="button" :disabled="busy" @click="restart">重新填写并申请短信</button>
     <nav><RouterLink to="/login">前往登录</RouterLink><RouterLink v-if="!registration" to="/register">注册</RouterLink><RouterLink v-else to="/forget-pwd">找回密码</RouterLink><RouterLink to="/agreement">用户协议</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink></nav>
   </section>
 </template>
 <style scoped lang="scss">
-.account-access { max-width: 440px; margin: 32px auto; padding: 24px; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 10px; color: var(--fp-text); overflow-wrap: anywhere; h1 { font-size: 23px; } p { font-size: 14px; color: var(--fp-muted); line-height: 1.6; } [role=alert] { color: #bd503c; } }
+.account-access {    background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); color: var(--fp-text); overflow-wrap: anywhere; h1 { font-size: 23px; } p { font-size: 14px; color: var(--fp-muted); line-height: 1.6; } [role=alert] { color: var(--fp-danger); } }
 fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 16px; min-width: 0; } label { display: grid; gap: 8px; } input, select, button { font: inherit; padding: 9px 12px; border: 1px solid var(--fp-border); border-radius: 6px; color: var(--fp-text); background: var(--fp-bg); min-width: 0; max-width: 100%; } button { cursor: pointer; margin: 8px 8px 8px 0; &:disabled { opacity: .5; cursor: default; } } nav { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; } a { color: var(--fp-link); } .captcha { min-height: 44px; }
-@media(max-width: 600px) { .account-access { margin: 16px 12px; padding: 18px; } }
+@media(max-width: 600px) { .account-access {   } }
 </style>
