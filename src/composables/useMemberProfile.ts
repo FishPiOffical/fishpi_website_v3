@@ -25,25 +25,27 @@ export function useMemberProfile(name: Ref<string>): MemberProfile {
     const run = ++sequence, target = name.value, context = getAuthContextVersion()
     const token = auth.accessToken, actor = auth.account?.oId
     const valid = () => mounted && run === sequence && target === name.value && context === getAuthContextVersion() && token === auth.accessToken && actor === auth.account?.oId
-    profile.value = null
     profileError.value = ''
-    profileLoading.value = true
+    profileLoading.value = profile.value === null
     try {
       const result = await fetchPublicUser(target)
       if (valid()) profile.value = result
     } catch (error) {
-      if (valid()) profileError.value = error instanceof Error ? error.message : '用户资料读取失败'
+      if (valid()) { profile.value = null; profileError.value = error instanceof Error ? error.message : '用户资料读取失败' }
     } finally {
       if (valid()) profileLoading.value = false
     }
   }
+  let boundary = `${getAuthContextVersion()}:${!!auth.accessToken}:${auth.account?.oId || ''}:${name.value}`
   const stop = watch([name, () => auth.accessToken, () => auth.account?.oId], () => {
     sequence++
-    profile.value = null
+    const next = `${getAuthContextVersion()}:${!!auth.accessToken}:${auth.account?.oId || ''}:${name.value}`
+    if (next !== boundary) profile.value = null
+    boundary = next
     profileError.value = ''
     void readProfile()
   }, { flush: 'sync' })
-  onMounted(() => { mounted = true; void readProfile() })
+  onMounted(() => { mounted = true; if (!profile.value || auth.accessToken) void readProfile() })
   onScopeDispose(() => { mounted = false; sequence++; stop(); profile.value = null })
   return { profile, profileError, profileLoading, readProfile }
 }

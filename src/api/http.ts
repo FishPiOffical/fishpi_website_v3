@@ -281,6 +281,11 @@ export function requestSvg(path: string, init: RequestInit = {}): Promise<Blob> 
 export function requestZip(path: string, init: RequestInit = {}): Promise<Blob> { return request<Blob>(path, { ...init, __zip: true }) }
 
 export async function request<T = unknown>(path: string, init: RequestInitExtra = {}): Promise<T> {
+  // Bound SSR reads, including body consumption; a slow upstream must not hang HTML forever.
+  if (import.meta.env.SSR && (init.method || 'GET').toUpperCase() === 'GET') {
+    const timeout = AbortSignal.timeout(8000)
+    init = { ...init, signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout }
+  }
   const identity = requestIdentity()
   const version = identity.version
   const sentToken = getAccessToken()

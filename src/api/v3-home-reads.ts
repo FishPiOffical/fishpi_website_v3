@@ -34,7 +34,7 @@ export async function fetchHomeRead<K extends HomeRead>(key: K): Promise<HomeDat
   return decodeHomeRead(key, list)
 }
 /** Public SSR only. A failed resource is null; a legitimate empty result is []. */
-export async function fetchHomeBootstrap(): Promise<HomeBootstrap> {
-  const results = await Promise.allSettled(homeReadKeys.map(key => fetchHomeRead(key)))
+export async function fetchHomeBootstrap(read: typeof fetchHomeRead = fetchHomeRead): Promise<HomeBootstrap> {
+  const results = await Promise.allSettled(homeReadKeys.map(key => read(key)))
   return decodeHomeBootstrap(Object.fromEntries(homeReadKeys.map((key, index) => [key, results[index]!.status === 'fulfilled' ? results[index]!.value : null])))
 }

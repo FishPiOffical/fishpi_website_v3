@@ -35,6 +35,8 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 - `public/robots.txt` 屏蔽登录态路由；`npm run sitemap` 拉近期帖生成站点地图
 - 生产：`npm run build` 产出 `dist/client` + `dist/server`，`npm run preview` 走 Node SSR
 - 公开内容路由（首页、帖子、用户主页、列表等）服务端 prefetch JSON 后 `renderToString`；聊天/设置等仅 CSR shell
+- 首页公开预取按资源缓存 15 秒，同期并发合并；只缓存成功结果（包括合法空列表），每次渲染独立克隆。上游 GET 最长 8 秒，失败仍渲染外壳并由对应模块重试，不缓存错误或整页 HTML。缓存为每个 Node 进程内存，重启即清空。
+- 首页文章、标签及专栏在浏览器内存保留 30 秒，SPA 返回时复用，手动刷新绕过缓存；登录、退出与换号隔离，普通令牌轮换保留已显示内容并重验，失败清除旧数据。清风及个人资料有有效游客 SSR 数据时不在挂载后重复请求；登录相关数据仍需当前身份读取，不缓存私信、余额或收费正文。
 - 首页本机布局在水合完成后恢复，首帧使用 SSR 默认布局；存储不可用时仍能显示和调整模块。首页路由节点意外脱离 DOM 时，容器最多恢复一次，避免页面只剩导航和页脚；不会整页刷新或自动重试写操作。
 - nginx：HTML 反代到 Node；`/api`、`/chat-room`、`/games/*`、`/activity/*`、`/cr/raw/*` 等仍指 Rhythm，完整规则见 [docs/nginx.example.conf](docs/nginx.example.conf)
 

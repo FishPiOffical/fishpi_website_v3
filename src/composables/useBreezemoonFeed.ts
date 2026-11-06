@@ -22,7 +22,7 @@ export function useBreezemoonFeed(size:number,bootstrap:BreezemoonPage|null=null
   function home(){page.value=1;void load()}
   watch([accessToken,()=>account.value?.oId],()=>{const next=identity();if(next===boundary)return;boundary=next;clear();page.value=1;void load()},{flush:'sync'})
   watch(()=>operations.revision,()=>{if(!mounted.value||!operations.lastOperation)return;clear();if(operations.lastOperation==='create')page.value=1;void load(true)},{flush:'sync'})
-  onMounted(()=>{mounted.value=true;boundary=identity();loading.value=false;void load()})
+  onMounted(()=>{mounted.value=true;boundary=identity();loading.value=false;if(!result.value||accessToken.value)void load()})
   onBeforeUnmount(()=>{mounted.value=false;clear()})
   return{mounted,result,loading,error,page,load,move,home}
 }

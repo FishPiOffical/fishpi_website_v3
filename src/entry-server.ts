@@ -1,5 +1,6 @@
 import { fetchDirectoryPage } from './api/v3-directory'
-import { fetchHomeBootstrap } from './api/v3-home-reads'
+import { fetchHomeBootstrap, fetchHomeRead } from './api/v3-home-reads'
+import { createPublicHomeCache } from './seo/publicHomeCache'
 import { fetchArticleListing } from './api/v3-article-list'
 import { fetchRecentMembers } from './api/v3-discovery-extras'
 import { fetchPublicUser } from './api/v3-public-user'
@@ -17,6 +18,16 @@ import { SSR_PAYLOAD_KEY, type SsrPayload } from './seo/payload'
 import { fetchV3Breezemoons } from './api/v3-breezemoons'
 import { listMilestones } from './api/v3-milestones'
 import { shouldPrefetchSsr } from './seo/ssrRoutes'
+
+const readPublicHome = createPublicHomeCache()
+function homeRead<T>(key: string, load: () => Promise<T>) {
+  const origin = process.env.VITE_API_TARGET || process.env.API_TARGET || 'https://fishpi.cn'
+  return readPublicHome(`${origin}:${key}`, load).catch(error => {
+    // Resource and status only: never log upstream bodies, credentials or request headers.
+    console.warn('[SSR homepage] preload failed', key, typeof error?.status === 'number' ? error.status : 'network')
+    throw error
+  })
+}
 
 async function prefetch(url: string): Promise<SsrPayload> {
   const path = url.split('?')[0] || '/'
@@ -39,12 +50,12 @@ async function prefetch(url: string): Promise<SsrPayload> {
 
     if (path === '/') {
       const settled = await Promise.allSettled([
-        fetchHomeBootstrap(),
-        fetchRanking('checkin', 1, undefined, 8),
-        fetchRanking('online', 1, undefined, 8),
-        fetchRecentMembers(),
-        fetchV3Breezemoons(1, 8),
-        fetchRepeaterItems('joke'),
+        fetchHomeBootstrap(key => homeRead(key, () => fetchHomeRead(key))),
+        homeRead('ranking:checkin:8', () => fetchRanking('checkin', 1, undefined, 8)),
+        homeRead('ranking:online:8', () => fetchRanking('online', 1, undefined, 8)),
+        homeRead('recent-members', () => fetchRecentMembers()),
+        homeRead('breezemoons:8', () => fetchV3Breezemoons(1, 8)),
+        homeRead('repeater:joke', () => fetchRepeaterItems('joke')),
       ])
       const val = <T>(i: number, fallback: T): T =>
         settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
