@@ -28,7 +28,7 @@ import FishGameRecovery from '@/components/FishGameRecovery.vue'
 import RepeaterRecovery from '@/components/RepeaterRecovery.vue'
 import ChatBarrageOverlay from '@/components/chat/ChatBarrageOverlay.vue'
 import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
-import MemberTabs from '@/components/member/MemberTabs.vue'
+import MemberLayout from '@/components/member/MemberLayout.vue'
 import UserHoverCard from '@/components/user/UserHoverCard.vue'
 import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import { useLayoutStore } from '@/stores/layout'
@@ -436,8 +436,10 @@ onUnmounted(() => {
         <p v-else role="status">正在恢复登录状态…</p>
       </div>
       <template v-else>
-        <MemberTabs v-if="route.path.startsWith('/member/') && typeof route.params.userName === 'string'" />
-        <RouterView ref="routeView" />
+        <MemberLayout v-if="route.path.startsWith('/member/') && typeof route.params.userName === 'string'">
+          <RouterView ref="routeView" />
+        </MemberLayout>
+        <RouterView v-else ref="routeView" />
       </template>
     </main>
     <footer v-if="!isModernChat && !immersive" class="foot">

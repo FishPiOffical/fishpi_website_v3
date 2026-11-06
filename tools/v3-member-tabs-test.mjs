@@ -17,6 +17,6 @@ for(const path of ['','/long','/comments','/medals','/followers','/following/use
 route.path='/member/A/articles/anonymous';let html=await renderToString(createSSRApp(client));assert.ok(html.includes('匿贴'));assert.match(html,/aria-current="page"[^>]*>匿贴/);assert.ok(html.includes('/member/A/points'))
 auth.account.userName='B';html=await renderToString(createSSRApp(client));assert.ok(!html.includes('匿贴'));assert.ok(!html.includes('我的积分'))
 route.params.userName='A B/中文';html=await renderToString(createSSRApp(c));assert.ok(html.includes('/member/A%20B%2F%E4%B8%AD%E6%96%87'))
-const shell=await fs.readFile('src/layouts/AppShell.vue','utf8');assert.equal((shell.match(/<MemberTabs /g)||[]).length,1)
+const shell=await fs.readFile('src/layouts/AppShell.vue','utf8');assert.equal((shell.match(/<MemberLayout /g)||[]).length,1);const layout=await fs.readFile('src/components/member/MemberLayout.vue','utf8');assert.equal((layout.match(/<MemberTabs /g)||[]).length,1);assert.ok(layout.includes('<MemberProfileCard '));assert.ok(!source.includes('的主页</RouterLink>'))
 const points=await fs.readFile('src/views/MemberPointsView.vue','utf8');assert.ok(points.includes('<PointsView v-if="own"'));assert.ok(points.includes('mounted.value && auth.isLoggedIn'));assert.ok((await fs.readFile('src/router/index.ts','utf8')).includes("import('@/views/MemberPointsView.vue')"))
 console.log('PASS all member subroutes share persistent tabs, exact/deep active item, encoded target; SSR hides private tabs, owner-only points gate')

@@ -3,70 +3,23 @@ import { formatDisplayTime } from '@/utils/time'
 
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import { useMemberPage } from '@/composables/useMemberPage'
 import { usePageSeo } from '@/composables/usePageSeo'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
 import { commentLink } from '@/api/v3-comment-location'
 import BreezemoonList from '@/components/breezemoons/BreezemoonList.vue'
 import PublicProfessions from '@/components/profession/PublicProfessions.vue'
-import VipNickname from '@/components/user/VipNickname.vue'
-import UserFollowButton from '@/components/user/UserFollowButton.vue'
-import ReportDialog from '@/components/ReportDialog.vue'
-import PointTransfer from '@/components/settings/PointTransfer.vue'
-import { avatarStyle, avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
-function onAvatarError(event: Event) {
-  const image = event.currentTarget as HTMLImageElement | null
-  if (image && image.getAttribute('src') !== DEFAULT_AVATAR) image.src = DEFAULT_AVATAR
-}
-const route = useRoute(), auth = useAuthStore(), userName = computed(() => String(route.params.userName || ''))
+const route = useRoute(), userName = computed(() => String(route.params.userName || ''))
 const activeTab = computed(() => String(route.meta.memberTab || 'home')), moonId = computed(() => String(route.params.breezemoonId || ''))
-const { profile, profileError, profileLoading, content, moon, contentError, contentLoading, p, readProfile, readContent } = useMemberPage(userName, activeTab, moonId)
-const base = computed(() => `/member/${encodeURIComponent(userName.value)}`), viewSelf = computed(() => !!profile.value && auth.account?.oId === profile.value.id)
-const showTransfer = ref(false), panel = ref<HTMLElement | null>(null)
-watch([userName, () => auth.account?.oId, () => auth.accessToken], () => { showTransfer.value = false })
+const { profile, content, moon, contentError, contentLoading, p, readContent } = useMemberPage(userName, activeTab, moonId)
+const base = computed(() => `/member/${encodeURIComponent(userName.value)}`)
+const panel = ref<HTMLElement | null>(null)
 let lastPage = 1
 watch(content, data => { if (!data) return; const moved = lastPage !== data.p; lastPage = data.p; if (moved) void nextTick(() => { if (content.value === data) panel.value?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }) }) })
 
 usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的主页`, description: profile.value?.userIntro || `${userName.value} 在摸鱼派的个人主页`, path: route.path, image: profile.value?.userAvatarURL, type: 'profile' }))
 </script>
 <template>
-  <div class="member-page fp-page fp-page--wide fp-ui">
-    <aside class="member-profile">
-      <p v-if="profileLoading" role="status" class="member-status">正在读取用户资料…</p>
-      <div v-if="profileError" role="alert" class="member-alert">
-        <p>{{ profileError }}</p>
-        <button class="fp-control" type="button" @click="readProfile">重试用户资料</button>
-      </div>
-      <template v-else-if="profile">
-        <div class="soft-bg" aria-hidden="true">
-          <div class="soft-bg-img" :style="avatarStyle(avatarUrl(profile))" />
-          <div class="soft-bg-overlay" />
-        </div>
-        <div class="profile-body">
-          <div class="avatar-stage">
-            <img :key="avatarUrl(profile)" class="member-avatar" :src="avatarUrl(profile)" alt="" :data-user-card="profile.userName" @error="onAvatarError" />
-          </div>
-          <div class="identity-head">
-            <h1 class="fp-page-title"><VipNickname :user-id="profile.id" :user-name="profile.userName" :text="profile.userNickname || profile.userName" /></h1>
-            <p class="handle-pill">@{{ profile.userName }}</p>
-          </div>
-          <p v-if="profile.userIntro" class="intro">{{ profile.userIntro }}</p>
-          <a v-if="profile.userURL" :href="profile.userURL" target="_blank" rel="noopener noreferrer" class="user-site-link">🔗 个人主页</a>
-          <div v-if="auth.isLoggedIn" class="member-actions">
-            <RouterLink v-if="viewSelf" to="/settings" class="action-link action-link--primary">编辑资料</RouterLink>
-            <template v-else>
-              <UserFollowButton :user-name="profile.userName" :user-id="profile.id" />
-              <RouterLink :to="`/chat?toUser=${encodeURIComponent(profile.userName)}`" class="action-link">发私信</RouterLink>
-              <button class="fp-control" type="button" @click="showTransfer = !showTransfer">转账</button>
-              <ReportDialog :data-id="profile.id" :data-type="2" />
-            </template>
-          </div>
-        </div>
-      </template>
-      <p v-else-if="!profileLoading && !profileError" role="status" class="member-status">用户资料尚未读取。</p>
-    </aside>
-    <PointTransfer v-if="showTransfer && profile && auth.isLoggedIn && !viewSelf" :initial-recipient="profile.userName" />
     <main ref="panel" class="member-content">
 
       <PublicProfessions v-if="activeTab === 'profession'" :user-name="userName" />
@@ -116,173 +69,8 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
         <p v-else role="status" class="member-status">用户内容尚未读取。</p>
       </template>
     </main>
-  </div>
 </template>
 <style scoped lang="scss">
-.member-page {
-  display: grid;
-  grid-template-columns: 296px minmax(0, 1fr);
-  gap: var(--fp-page-gap, 18px);
-  align-items: start;
-}
-
-.member-profile {
-  position: sticky;
-  top: calc(var(--fp-nav-h) + 14px);
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: var(--fp-panel-radius);
-  box-shadow: var(--fp-card-shadow);
-  overflow: hidden;
-  overflow-wrap: anywhere;
-
-  .soft-bg {
-    position: relative;
-    height: 112px;
-    overflow: hidden;
-    background: linear-gradient(135deg, color-mix(in srgb, var(--fp-accent) 22%, var(--fp-surface-subtle)), var(--fp-surface-subtle));
-
-    .soft-bg-img {
-      position: absolute;
-      inset: -24px;
-      background-size: cover;
-      background-position: center;
-      filter: blur(22px) saturate(1.25);
-      opacity: 0.42;
-      transform: scale(1.12);
-    }
-
-    .soft-bg-overlay {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to bottom, rgba(15, 23, 42, 0.04), var(--fp-card));
-    }
-  }
-
-  .profile-body {
-    position: relative;
-    padding: 0 20px 22px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .avatar-stage {
-    margin-top: -48px;
-    margin-bottom: 10px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .identity-head {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-
-  h1 {
-    font-size: 19px;
-    font-weight: 700;
-    margin: 0;
-    color: var(--fp-title);
-  }
-
-  .handle-pill {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fp-muted);
-    background: var(--fp-surface-subtle);
-    border: 1px solid var(--fp-divider);
-    padding: 2px 9px;
-    border-radius: 999px;
-  }
-
-  .intro {
-    margin: 12px 0 0;
-    padding: 10px 12px;
-    width: 100%;
-    font-size: 13px;
-    line-height: 1.55;
-    color: var(--fp-text);
-    background: var(--fp-surface-subtle);
-    border: 1px solid var(--fp-divider);
-    border-radius: 10px;
-    white-space: pre-wrap;
-    text-align: left;
-  }
-
-  .user-site-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 10px;
-    font-size: 12.5px;
-    color: var(--fp-link);
-    background: var(--fp-surface-subtle);
-    border: 1px solid var(--fp-divider);
-    padding: 4px 12px;
-    border-radius: 999px;
-    text-decoration: none;
-
-    &:hover {
-      border-color: var(--fp-accent);
-      color: var(--fp-accent);
-    }
-  }
-}
-
-.member-avatar {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid var(--fp-card);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
-  background: var(--fp-card);
-}
-
-.member-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 14px;
-  width: 100%;
-  border-top: 1px solid var(--fp-divider);
-
-  .action-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 32px;
-    padding: 5px 12px;
-    border-radius: 8px;
-    border: 1px solid var(--fp-border);
-    background: var(--fp-card);
-    color: var(--fp-text);
-    font-size: 13px;
-    font-weight: 500;
-    text-decoration: none;
-    transition: all 0.16s ease;
-
-    &:hover {
-      border-color: var(--fp-accent);
-      color: var(--fp-title);
-    }
-
-    &--primary {
-      background: color-mix(in srgb, var(--fp-accent) 14%, var(--fp-card));
-      border-color: color-mix(in srgb, var(--fp-accent) 42%, var(--fp-border));
-      color: var(--fp-accent);
-      font-weight: 600;
-    }
-  }
-}
-
 .member-content {
   min-width: 0;
   scroll-margin-top: 88px;
@@ -446,14 +234,6 @@ button {
 }
 
 @media (max-width: 900px) {
-  .member-page {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .member-profile {
-    position: static;
-  }
-  .member-content {
-    padding: 16px;
-  }
+  .member-content { padding:16px; }
 }
 </style>

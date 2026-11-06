@@ -57,7 +57,7 @@ const routes = [{ path: '/', component: Home }, { path: '/top', component: { ren
 const router = () => createRouter({ history: createMemoryHistory(), routes })
 let currentRouter
 function root() {
-  return { components: { RouterView, MemberTabs: { render: () => null } }, setup() {
+  return { components: { RouterView, MemberLayout: { render: () => null } }, setup() {
     const pageHost = ref(null), routeView = ref(null)
     return { pageHost, routeView, pageRevision: useRouteDomBoundary(pageHost, routeView, () => currentRouter.currentRoute.value.fullPath), route: currentRouter.currentRoute,
       ssrAuthShell: false, isModernChat: false, immersive: false }

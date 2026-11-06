@@ -21,16 +21,13 @@ watch(()=>route.path,reveal)
 </script>
 <template>
   <section class="member-navigation" aria-label="个人主页导航">
-    <div class="member-navigation-title"><RouterLink :to="base">{{ target }} 的主页</RouterLink></div>
     <nav ref="nav" aria-label="用户主页栏目">
       <RouterLink v-for="tab in tabs" :key="tab[0]" :to="base+(tab[0]?'/'+tab[0]:'')" :class="{selected:active(tab[0]!)}" :aria-current="active(tab[0]!)?'page':undefined">{{ tab[1] }}</RouterLink>
     </nav>
   </section>
 </template>
 <style scoped>
-.member-navigation{max-width:1200px;margin:0 auto 18px;min-width:0;background:var(--fp-card);border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius,10px);box-shadow:var(--fp-card-shadow);padding:14px 16px}
-.member-navigation-title{margin-bottom:10px;font-size:13px;color:var(--fp-muted)}
-.member-navigation-title a{color:inherit}
+.member-navigation{margin:0 0 14px;min-width:0;background:var(--fp-card);border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius,10px);box-shadow:var(--fp-card-shadow);padding:14px 16px}
 nav{display:flex;flex-wrap:wrap;gap:4px}
 nav a{flex:none;padding:7px 11px;border-radius:6px;color:var(--fp-muted);font-size:13px;line-height:1.5;text-decoration:none;white-space:nowrap}
 nav a:hover{background:var(--fp-hover);text-decoration:underline;text-underline-offset:3px}
