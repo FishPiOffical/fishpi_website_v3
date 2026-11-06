@@ -14,7 +14,7 @@
 
 ## 接口与认证
 
-- v1/v3兼容只修改website，不新增或修改Rhythm接口；以现网已有v1协议为准。缺少对应能力时明确限制，保留v3实现，禁止依赖自建`/api/v1/`扩展端点。
+- main仅支持v3；v1/v3兼容实现备份在v1_v3分支。不恢复版本切换、旧apiKey认证或旧协议适配，不修改Rhythm。需求反馈独立服务仅通过v3身份核验；其/feedback-api/v1是反馈服务自身版本号。
 
 - 通知中的操作人actor与目标文章/评论author含义不同；操作类通知缺少actor时保留无身份状态，不得回退为目标作者。普通内容通知的作者及匿名规则独立保留。
 
@@ -26,7 +26,7 @@
 - 当前覆盖以docs/V3_MIGRATION.md为准；MISSING_APIS仅历史来源，不恢复已删mock或旧包装。
 - 列表读取失败明确报错与重试，合法空结果单独展示，不以空列表吞错或模拟记录冒充。
 - 用户悬浮卡片加载失败应展示错误状态，不回退到模拟用户资料。
-- v3浏览器只用内存Bearer与HttpOnly刷新Cookie，不写localStorage；旧脚本缓存/FP_API_KEY仅用于旧接口，禁止把Bearer传入旧apiKey参数。当前分批状态见docs/V3_MIGRATION.md。
+- v3浏览器只用内存Bearer与HttpOnly刷新Cookie，不写localStorage；旧apiKey脚本已移至备份分支，禁止把Bearer传入旧apiKey参数。当前分批状态见docs/V3_MIGRATION.md。
 - 不反复调用密码登录接口；不要把密码、API Key、Cookie 写入源码或日志。
 - 用户能力只走既有v3认证；旧page-auth换Cookie桥接已退役，经典链接直接导航，由目标页面认证。
 - 浏览器验证默认只读；不要为测试随意发帖、转账或修改真实账号资料。

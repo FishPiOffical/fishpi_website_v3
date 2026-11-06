@@ -6,12 +6,11 @@ import EmojiPicker from '@/components/EmojiPicker.vue'
 import { createMarkdownPreview } from '@/utils/markdownPreview'
 import { createEditorUpload } from '@/utils/editorUpload'
 import { createMentionHints } from '@/utils/mentionHints'
-import {getEditorContext as getAuthContextVersion,onEditorCredentialChange as onAccessTokenChange} from '@/api/editor-session'
+import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
 
 const props = withDefaults(
   defineProps<{
     modelValue: string
-    apiKey?: string | null
     height?: number
     placeholder?: string
     outline?: boolean
@@ -22,7 +21,7 @@ const props = withDefaults(
     /** 启用本地草稿缓存（Vditor localStorage），值为缓存键 */
     cacheId?: string
   }>(),
-  { apiKey: null, height: 500, placeholder: '', outline: false, mode: 'post', toolbarPreset: 'default', cacheId: '' },
+  { height: 500, placeholder: '', outline: false, mode: 'post', toolbarPreset: 'default', cacheId: '' },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
 

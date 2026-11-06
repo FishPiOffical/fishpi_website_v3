@@ -1,26 +1,22 @@
 import {computed,onScopeDispose,ref,watch} from 'vue'
 import {storeToRefs} from 'pinia'
 import {ApiError,getAuthContextVersion} from '@/api/http'
-import type {ChatMessage} from '@/api/v3-chat-messages'
-import {readChatContext,readChatWindow} from '@/api/chat-reading'
-import {getApiMode} from '@/api/mode'
-import {useChatStore} from '@/stores/chat'
+import {chatMessageContext,chatMessagePage,type ChatMessage} from '@/api/v3-chat-messages'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ChatTimelineStore} from '@/stores/v3ChatTimeline'
 export function useChatContext(){
- const {accessToken,apiKey,account}=storeToRefs(useAuthStore()),timeline=getApiMode()==='v1'?useChatStore():useV3ChatTimelineStore()
- const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+ const {accessToken,account}=storeToRefs(useAuthStore()),timeline=useV3ChatTimelineStore()
  const anchor=ref(''),list=ref<ChatMessage[]>([]),busy=ref(false),error=ref(''),changed=ref(false),hasBefore=ref(false),hasAfter=ref(false),before=ref(''),after=ref('')
  let run=0,abort:AbortController|null=null,disposed=false,attempt:{kind:'anchor'|'before'|'after';cursor:string}|null=null
- const identity=computed(()=>JSON.stringify([getAuthContextVersion(),getApiMode()==='v1'?credential.value:!!credential.value,account.value?.oId||''])),active=()=>!import.meta.env.SSR&&!disposed&&!!credential.value&&!!account.value?.oId
+ const identity=computed(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])),active=()=>!import.meta.env.SSR&&!disposed&&!!accessToken.value&&!!account.value?.oId
  function empty(){list.value=[];hasBefore.value=false;hasAfter.value=false;before.value='';after.value=''}
  function cancel(){run++;abort?.abort();abort=null;busy.value=false}
  function close(){cancel();anchor.value='';attempt=null;empty();error.value='';changed.value=false}
  const observed=new Set<string>()
  async function read(kind:'anchor'|'before'|'after'='anchor',cursor=anchor.value){if(!active()||!anchor.value)return;cancel();const seq=run,reader=identity.value,id=anchor.value,controller=new AbortController();abort=controller;observed.clear();busy.value=true;error.value='';changed.value=false;attempt={kind,cursor};const valid=()=>active()&&seq===run&&reader===identity.value&&id===anchor.value&&!controller.signal.aborted
  try{let rows:ChatMessage[],left:boolean,right:boolean,first:string,last:string
- if(kind==='anchor'){const d=await readChatContext(id,controller.signal);rows=d.list;left=d.hasMoreBefore;right=d.hasMoreAfter;first=d.nextBefore;last=d.nextAfter}
- else{const d=await readChatWindow({[kind]:cursor,size:20},controller.signal);rows=d.list;left=kind==='before'?d.hasMore:true;right=kind==='after'?d.hasMore:true;first=d.nextBefore;last=d.nextAfter}
+ if(kind==='anchor'){const d=await chatMessageContext(id,controller.signal);rows=d.list;left=d.hasMoreBefore;right=d.hasMoreAfter;first=d.nextBefore;last=d.nextAfter}
+ else{const d=await chatMessagePage({[kind]:cursor,size:20},controller.signal);rows=d.list;left=kind==='before'?d.hasMore:true;right=kind==='after'?d.hasMore:true;first=d.nextBefore;last=d.nextAfter}
  if(!valid())return;if(observed.has('')||rows.some(m=>observed.has(m.id)))throw new Error('上下文读取期间内容已变化，请重读定位消息')
  if(!rows.length){if(kind==='before')hasBefore.value=false;else hasAfter.value=false;return}
  list.value=rows;hasBefore.value=left;hasAfter.value=right;before.value=first;after.value=last

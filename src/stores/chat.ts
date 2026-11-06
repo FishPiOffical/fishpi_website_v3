@@ -1,5 +1,3 @@
-import {getApiMode} from '@/api/mode'
-import {legacyChatState} from './legacyChatState'
 import { defineStore } from 'pinia'
 import { computed,ref,watch } from 'vue'
 import {
@@ -42,15 +40,10 @@ function asV3Line(message:ChatMessage):ChatLine{
  return{oId:message.id,userOId:message.author.id,userName:message.author.userName,userNickname:message.author.userNickname,userAvatarURL:message.author.userAvatarURL,html:message.type==='text'?message.contentHtml:message.type==='unavailable'?'<p>当前消息不可读取</p>':undefined,time:Number.isFinite(new Date(message.createdAt).getTime())?new Date(message.createdAt).toISOString():'',redPacket,card:publicCard}
 }
 
-function chatStyleState(){
+export const useChatStore = defineStore('chat', () => {
+  const publication=useV3ChatPublicationStore(),timeline=useV3ChatTimelineStore(),online=useV3ChatOnlineStore()
   const chatStyle = ref<ChatStyle>('classic')
   function restoreStyle(){if(import.meta.env.SSR||typeof localStorage==='undefined')return;const saved=localStorage.getItem('fp_chat_style');if(saved==='classic'||saved==='modern')chatStyle.value=saved}
-  return{chatStyle,restoreStyle,setChatStyle(style:ChatStyle){chatStyle.value=style;if(typeof localStorage!=='undefined')localStorage.setItem('fp_chat_style',style)},toggleChatStyle(){const next=chatStyle.value==='classic'?'modern':'classic';chatStyle.value=next;if(typeof localStorage!=='undefined')localStorage.setItem('fp_chat_style',next)}}
-}
-export const useChatStore = defineStore('chat', () => {
-  const style=chatStyleState()
-  if(getApiMode()==='v1')return{...legacyChatState(),...style}
-  const publication=useV3ChatPublicationStore(),timeline=useV3ChatTimelineStore(),online=useV3ChatOnlineStore()
   const messages = computed(()=>timeline.messages.map(asV3Line))
   const onlines=computed<OnlineUser[]>(()=>online.users.map(u=>({userOId:u.id,userName:u.userName,userAvatarURL:u.userAvatarURL})))
   const discuss = computed(()=>timeline.topic)
@@ -79,9 +72,6 @@ export const useChatStore = defineStore('chat', () => {
   function clearScreen(){timeline.clearVisible()}
 
   return {
-    barrage:computed(()=>null as import('@/api/legacy/chat-barrage').LegacyBarrageEvent|null),
-    removeConfirmed:(id:string)=>timeline.removeConfirmed(id),
-    changeHint:computed(()=>timeline.changeHint),
     messages,
     onlines,
     onlineTotal:computed(()=>online.total),
@@ -105,9 +95,20 @@ export const useChatStore = defineStore('chat', () => {
     clearScreen,
     switchNode,
     refreshNodes,
-    ...style,
-    onlineError:computed(()=>online.error),refreshOnline:()=>online.refresh(),
-    legacyPending:ref<{content:string}|null>(null),legacySendError:ref(''),legacyRelease(){},
-
+    chatStyle,
+    restoreStyle,
+    setChatStyle(style: ChatStyle) {
+      chatStyle.value = style
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('fp_chat_style', style)
+      }
+    },
+    toggleChatStyle() {
+      const next = chatStyle.value === 'classic' ? 'modern' : 'classic'
+      chatStyle.value = next
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('fp_chat_style', next)
+      }
+    },
   }
 })

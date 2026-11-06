@@ -6,7 +6,6 @@ import MarkdownEditor from '@/components/MarkdownEditor.vue'
 const props = withDefaults(
   defineProps<{
     modelValue: string
-    apiKey?: string | null
     cacheId?: string
     placeholder?: string
     height?: number
@@ -19,7 +18,6 @@ const props = withDefaults(
     compact?: boolean
   }>(),
   {
-    apiKey: null,
     cacheId: '',
     placeholder: '',
     height: 150,
@@ -74,7 +72,6 @@ defineExpose({
     <MarkdownEditor
       ref="editor"
       :model-value="modelValue"
-      :api-key="apiKey"
       :height="height"
       mode="reply"
       :toolbar-preset="compact ? 'message' : 'default'"

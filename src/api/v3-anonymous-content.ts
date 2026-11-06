@@ -1,6 +1,4 @@
 import { ApiError, request } from './http'
-import { getApiMode } from './mode'
-import { legacyAnonymousContent } from './legacy/anonymous-content'
 export type AnonymousKind = 'articles' | 'comments'
 export type AnonymousArticle = { id: string; title: string; type: number; createdAt: number; updatedAt: number }
 export type AnonymousComment = { id: string; articleId: string; articleTitle: string; createdAt: number; visibility: 0 | 1 }
@@ -13,9 +11,8 @@ function count(value: unknown): number { if (typeof value !== 'number' || !Numbe
 function time(value: unknown): number { const n = count(value); if (!Number.isFinite(new Date(n).getTime())) throw invalid(); return n }
 function id(value: unknown): string { if (typeof value !== 'string' || !/^[0-9]{1,32}$/.test(value)) throw invalid(); return value }
 function title(value: unknown): string { if (typeof value !== 'string' || value.length > 255) throw invalid(); return value }
-export async function fetchV3AnonymousContent(kind: AnonymousKind, p = 1, size = 20, owner?: {id: string; userName: string}): Promise<AnonymousPage> {
+export async function fetchV3AnonymousContent(kind: AnonymousKind, p = 1, size = 20): Promise<AnonymousPage> {
   if (!['articles', 'comments'].includes(kind) || !Number.isSafeInteger(p) || p < 1 || p > 42949672 || !Number.isSafeInteger(size) || size < 1 || size > 50) throw new ApiError('匿名内容分页参数不合法', 422)
-  if (getApiMode() === 'v1') return legacyAnonymousContent(kind, p, size, owner)
   const envelope = row(await request(`/api/v3/me/anonymous-${kind}?p=${p}&size=${size}`, { cache: 'no-store' }))
   if (envelope.code !== 0) throw invalid()
   const data = row(envelope.data), meta = row(data.pagination), total = count(meta.total), pageCount = count(meta.pageCount)

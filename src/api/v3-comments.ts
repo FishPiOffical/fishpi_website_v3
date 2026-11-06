@@ -1,4 +1,3 @@
-import {getApiMode} from './mode'
 import { ApiError, request } from './http'
 import { adaptV3Comment, decodeV3ContentPage } from './v3-content'
 import type { ArticleComment } from './fishpi'
@@ -38,7 +37,6 @@ export async function readV3CommentSource(commentId:string,articleId:string){con
 function paging(p:number,size:number){if(!Number.isInteger(p)||p<1||p>42949672||!Number.isInteger(size)||size<1||size>50)throw new ApiError('段评分页不合法',422);return `p=${p}&size=${size}`}
 export async function v3ParagraphContent(articleId:string){const value=row(await data(`/api/v3/articles/${id(articleId)}/paragraphs?${paging(1,50)}&includeContent=true`,{cache:'no-store'}));const decoded=decodeV3ContentPage(value);if(decoded.pagination.p!==1||decoded.pagination.size!==50)throw new ApiError('段落页码响应不一致',502);if(typeof value.contentHtml!=='string')throw new ApiError('段落正文响应不正确',502);return value.contentHtml}
 export async function fetchV3ParagraphSummary(articleId:string){
-  if(getApiMode()==='v1')return (await import('./legacy/long-reading')).legacyParagraphSummary(articleId)
   const result:Array<{paragraphId:string;commentCount:number}>=[],seen=new Set<string>();let expectedTotal:number|undefined
   for(let p=1;;p++){
     if(p>1000)throw new ApiError('段落目录过大，请稍后重试',503)
@@ -50,7 +48,6 @@ export async function fetchV3ParagraphSummary(articleId:string){
   }
 }
 export async function fetchV3ParagraphComments(articleId:string,paragraphId:string,p=1,sort='oldest',state:'active'|'orphaned'='active'){
-  if(getApiMode()==='v1')return (await import('./legacy/long-reading')).legacyParagraphComments(articleId,paragraphId,p,sort,state)
   if(!['active','orphaned'].includes(state))throw new ApiError('段评状态不合法',422)
   if(!['oldest','latest','hot'].includes(sort))throw new ApiError('段评排序不合法',422)
   const value=decodeV3ContentPage(await data(`/api/v3/articles/${id(articleId)}/paragraph-comments?paragraphId=${paragraph(paragraphId)}&state=${state}&sort=${sort}&${paging(p,20)}`,{cache:'no-store'}))

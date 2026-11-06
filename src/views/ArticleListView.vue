@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { getApiMode } from '@/api/mode'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import type { ArticleFeedKind } from '@/api/fishpi'
@@ -24,7 +23,6 @@ const { value, p, loading, error, read } = useArticleListing(kind, extra, column
 const items = computed(() => value.value?.resource === 'articles' ? value.value.list : [])
 const columns = computed(() => value.value?.resource === 'columns' ? value.value.list : [])
 const isColumnPage = computed(() => kind.value === 'long')
-const legacyColumnSnapshot = computed(()=>isColumnPage.value&&getApiMode()==='v1')
 const heading = computed(() => kind.value === 'tag' ? `#${extra.value}` : title.value)
 const RECENT_TABS = [{ to: '/recent', label: '默认' }, { to: '/recent/hot', label: '热议' }, { to: '/recent/good', label: '👍 好评' }, { to: '/recent/reply', label: '最近回帖' }]
 const showRecentTabs = computed(() => RECENT_TABS.some(tab => tab.to === route.path))
@@ -47,17 +45,16 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
         <section v-if="isColumnPage" class="column-intro">
           <div class="column-intro-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> FISHPI · STORIES</div><h1>长篇专栏</h1><p>把故事慢慢写完，也把喜欢的章节一页页读下去。</p></div>
           <div class="column-intro-mark" aria-hidden="true"><span>卷</span><i></i><b></b></div>
-          <div class="column-intro-footer"><span v-if="value && value.total !== null">共 {{ value.total }} 部可见作品</span><span v-else>{{ legacyColumnSnapshot?'专栏快照':'专栏目录' }}</span><span>每一次更新，都是故事的新一页</span></div>
+          <div class="column-intro-footer"><span v-if="value">共 {{ value.total }} 部可见作品</span><span v-else>专栏目录</span><span>每一次更新，都是故事的新一页</span></div>
         </section>
         <div v-else class="module-header list-page-head">
           <div class="head-left"><h1>{{ heading }}</h1><ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" /><span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span></div>
-          <div class="head-right"><nav v-if="showRecentTabs" class="sort-tabs"><RouterLink v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to" :class="{ current: route.path === tab.to }">{{ tab.label }}</RouterLink></nav><span v-if="value && value.total !== null" class="total-count">共 {{ value.total }} 篇</span></div>
+          <div class="head-right"><nav v-if="showRecentTabs" class="sort-tabs"><RouterLink v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to" :class="{ current: route.path === tab.to }">{{ tab.label }}</RouterLink></nav><span v-if="value" class="total-count">共 {{ value.total }} 篇</span></div>
         </div>
         <div v-if="isColumnPage" class="column-shelf-head">
           <div><strong>专栏目录</strong><span>按当前可见章节统计</span></div>
           <div class="column-switch" role="tablist" aria-label="专栏排序"><button type="button" role="tab" :aria-selected="columnShelf === 'recent'" :class="{ selected: columnShelf === 'recent' }" @click="columnShelf = 'recent'">最近更新</button><button type="button" role="tab" :aria-selected="columnShelf === 'hot'" :class="{ selected: columnShelf === 'hot' }" @click="columnShelf = 'hot'">热门作品</button></div>
         </div>
-        <p v-if="legacyColumnSnapshot" class="column-snapshot-note" role="status">旧接口仅提供最近更新或热门的前 12 部作品快照，不代表完整专栏目录。</p>
         <button type="button" class="btn refresh-list" :disabled="loading" @click="read()">刷新列表</button>
         <FpLoading v-if="loading" :rows="8" />
         <div v-else-if="error" class="err" role="alert"><p>{{ error }}</p><button type="button" class="btn" @click="read()">重试当前页</button><button v-if="p > 1" type="button" class="btn" @click="read(1)">返回第一页</button></div>
@@ -79,8 +76,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
             <p v-if="!columns.length" class="column-empty">本页暂无可见专栏。</p>
           </div>
           <ArticleFeed v-else :items="items" empty="该分类下暂无内容" />
-          <nav v-if="!legacyColumnSnapshot" class="pagination-bar" aria-label="列表分页"><button type="button" class="btn page-btn" :disabled="p <= 1" @click="read(p - 1)">‹ 上一页</button><span v-if="value.pageCount" class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span><span v-else>暂无分页</span><button type="button" class="btn page-btn" :disabled="p >= value.pageCount" @click="read(p + 1)">下一页 ›</button><button v-if="p > value.pageCount && p > 1" type="button" class="btn" @click="read(1)">返回第一页</button></nav>
-          <p v-else class="column-snapshot-note">当前快照 {{ columns.length }} 部作品</p>
+          <nav class="pagination-bar" aria-label="列表分页"><button type="button" class="btn page-btn" :disabled="p <= 1" @click="read(p - 1)">‹ 上一页</button><span v-if="value.pageCount" class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span><span v-else>暂无分页</span><button type="button" class="btn page-btn" :disabled="p >= value.pageCount" @click="read(p + 1)">下一页 ›</button><button v-if="p > value.pageCount && p > 1" type="button" class="btn" @click="read(1)">返回第一页</button></nav>
         </template>
         <p v-else role="status">列表尚未读取。</p>
       </div>
@@ -90,7 +86,6 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 </template>
 
 <style scoped lang="scss">
-.column-snapshot-note { display: none; margin: 12px 16px; color: var(--fp-muted); font-size: 13px; line-height: 1.6; }
 .list-content { min-width: 0; scroll-margin-top: 80px; }
 .refresh-list { display: none; margin: 8px 16px 16px; }
 .list-page-wrap {

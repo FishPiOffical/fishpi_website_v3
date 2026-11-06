@@ -50,7 +50,7 @@ const apiURL=moduleURL(names.map(name=>`export const ${name}=(...args)=>globalTh
 const tick=async()=>{for(let i=0;i<20;i++)await Promise.resolve();await nextTick()}
 async function component(mode,exposed){
   globalThis.__profileProps={mode}
-  let source=(await fs.readFile('src/components/settings/V3OwnerProfileSettings.vue','utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
+  let source=(await fs.readFile('src/components/settings/OwnerProfileSettings.vue','utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
   let js=transpile(source).replace("from '@/api/v3-profile'",`from '${apiURL}'`).replace("from '@/api/http'",`from '${shim}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`).replace('const props = defineProps();','const props = globalThis.__profileProps;')
   const imports=[...js.matchAll(/^import .+;$/gm)].map(m=>m[0]).join('\n');js=js.replace(/^import .+;$/gm,'')
   const loaded=await import(moduleURL(`${imports}\nexport default{setup(){${js}\nreturn{${exposed.join(',')}}},render(){return null}}`))

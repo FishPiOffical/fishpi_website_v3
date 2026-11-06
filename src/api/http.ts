@@ -1,4 +1,3 @@
-import { getApiMode } from './mode'
 import { ensureRiskCaptcha } from '@/utils/riskCaptcha'
 
 export const FISHPI_UA =
@@ -21,29 +20,6 @@ let authVersion = 0
 let refreshRejected = false
 let refreshFlight: { version: number; promise: Promise<boolean> } | null = null
 let credentialQueue: Promise<unknown> = Promise.resolve()
-// Classic article details share an IP-wide one-second limiter, including reads made by voting.
-// Pace browser reads together; do not retry writes or assume other tabs/devices share this queue.
-let legacyArticleReadQueue: Promise<unknown> = Promise.resolve()
-let legacyArticleReadPending = 0, legacyArticleReadFinished = 0
-function queueLegacyArticleRead<T>(run: () => Promise<T>, version: number, signal?: AbortSignal | null): Promise<T> {
-  if (legacyArticleReadPending >= 32) return Promise.reject(new ApiError('文章读取排队过多，请稍后重试', 429))
-  legacyArticleReadPending++
-  const job = async () => {
-    const check = () => {
-      if (signal?.aborted) throw new ApiError('请求已取消', 0, 'aborted')
-      if (version !== authVersion || getApiMode() !== 'v1') throw new ApiError('登录状态已变更', 401, 'stale_session')
-    }
-    check()
-    if (!legacyArticleReadFinished) legacyArticleReadFinished = Date.now()
-    const wait = legacyArticleReadFinished + 1100 - Date.now()
-    if (wait > 0) await new Promise<void>(resolve => setTimeout(resolve, wait))
-    check()
-    try { return await run() } finally { legacyArticleReadFinished = Date.now() }
-  }
-  const result = legacyArticleReadQueue.then(job, job)
-  legacyArticleReadQueue = result.catch(() => {})
-  return result.finally(() => { legacyArticleReadPending-- })
-}
 const tokenListeners = new Set<(token: string | null) => void>()
 
 function publishToken(token: string | null) {
@@ -152,7 +128,7 @@ export async function pingApi(timeoutMs = 8000): Promise<boolean> {
   const ctrl = new AbortController()
   const timer = window.setTimeout(() => ctrl.abort(), timeoutMs)
   try {
-    const res = await fetch(resolveUrl(getApiMode()==='v1'?'/api/articles/recent?p=1&size=1':'/api/v3/auth/captcha-options'), {
+    const res = await fetch(resolveUrl('/api/v3/auth/captcha-options'), {
       method: 'GET',
       credentials: 'include',
       headers: { 'User-Agent': FISHPI_UA },
@@ -168,7 +144,7 @@ export async function pingApi(timeoutMs = 8000): Promise<boolean> {
 }
 
 type RequestInitExtra = RequestInit & {
-  /** 内部：已重试或调用方禁止非幂等写入重放，避免自动重复提交 */
+  /** 内部：人机验证通过后已重试过，避免死循环 */
   __captchaRetried?: boolean
   /** Internal: an expired v3 access token has already been refreshed once. */
   __v3Retried?: boolean
@@ -187,8 +163,7 @@ function apiBase() {
     (fromProcess && (fromProcess.VITE_API_TARGET || fromProcess.API_TARGET)) ||
     import.meta.env.VITE_API_TARGET ||
     'https://fishpi.cn'
-  const modeTarget = getApiMode() === 'v1' ? (fromProcess && fromProcess.VITE_API_V1_TARGET) || import.meta.env.VITE_API_V1_TARGET || 'https://fishpi.cn' : (fromProcess && fromProcess.VITE_API_V3_TARGET) || import.meta.env.VITE_API_V3_TARGET || fromEnv
-  return String(modeTarget).replace(/\/$/, '')
+  return String(fromEnv).replace(/\/$/, '')
 }
 
 function resolveUrl(path: string) {
@@ -217,7 +192,6 @@ function isRiskCaptchaPath(path: string) {
 }
 
 async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, identity: RequestIdentity): Promise<T> {
-  if(getApiMode()==='v1' && isV3Path(path)) throw new ApiError('该功能的 v1 适配尚未完成，可切换 v3 模式使用',501,'v1_pending')
   const headers = new Headers(init.headers)
   if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
   if (init.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
@@ -305,9 +279,7 @@ export async function request<T = unknown>(path: string, init: RequestInitExtra 
     return requestOnce<T>(path, init, identity)
   }
   try {
-    if (!import.meta.env.SSR && isCredentialPath(path)) return await queueCredentialRequest(run)
-    const legacyArticleRead = !import.meta.env.SSR && getApiMode() === 'v1' && (init.method || 'GET').toUpperCase() === 'GET' && /^\/api\/article\/[1-9][0-9]*(?:\?|$)/.test(path)
-    return await (legacyArticleRead ? queueLegacyArticleRead(run, version, init.signal) : run())
+    return await (!import.meta.env.SSR && isCredentialPath(path) ? queueCredentialRequest(run) : run())
   } catch (e) {
     if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && !explicitAuthorization &&
       e instanceof ApiError && e.status === 401 && !init.__v3Retried && version === authVersion) {

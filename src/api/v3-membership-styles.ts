@@ -1,5 +1,4 @@
 import { ApiError, request } from './http'
-import {getApiMode} from './mode'
 export type MembershipStyle = { bold?: boolean; underline?: boolean; color?: string }
 const effects = ['rainbow','neon','fire','ocean','forest','sunset','metal','galaxy']
 const invalid = () => new ApiError('昵称样式响应格式不正确', 502, 'invalid_response')
@@ -16,7 +15,6 @@ function style(value: unknown): MembershipStyle {
 }
 export async function fetchV3MembershipStyles(userIds: string[]): Promise<{ userId: string; style: MembershipStyle }[]> {
   if (!userIds.length || userIds.length > 100 || userIds.some(id => membershipUserId(id) !== id) || new Set(userIds).size !== userIds.length) throw new ApiError('用户ID列表不合法', 422)
-  if(getApiMode()==='v1')return (await import('./legacy/membership-styles')).legacyMembershipStyles(userIds)
   const result = await request<{ code: number; msg?: string; data?: unknown }>(`/api/v3/membership/styles?${new URLSearchParams({ userIds: userIds.join(',') })}`)
   if (result.code !== 0) throw new ApiError(result.msg || '昵称样式读取失败', 400)
   const data = object(result.data)
@@ -25,7 +23,6 @@ export async function fetchV3MembershipStyles(userIds: string[]): Promise<{ user
 }
 export async function resolveV3NicknameUser(userName: string): Promise<{ id: string; userName: string }> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(userName)) throw new ApiError('用户名不合法', 422)
-  if(getApiMode()==='v1'){const user=await (await import('./legacy/public-user')).legacyPublicUser(userName);const id=membershipUserId(user.id);if(!id)throw invalid();return{id,userName:user.userName}}
   const result = await request<{ code: number; msg?: string; data?: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}`)
   if (result.code !== 0) throw new ApiError(result.msg || '用户读取失败', 400)
   const row = object(result.data), id = membershipUserId(row.id)

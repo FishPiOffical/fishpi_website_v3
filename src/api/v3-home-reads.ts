@@ -1,4 +1,3 @@
-import { getApiMode } from './mode'
 import { ApiError } from './http'
 import { v3ArticleFeedPage, v3Tags, adaptV3Tag } from './v3-content'
 import { decodePublicArticleSummary } from './v3-article-list'
@@ -15,11 +14,6 @@ export function decodeHomeRead<K extends HomeRead>(key: K, value: unknown): Home
   const list = key === 'recent' || key === 'hot' ? value.map(decodePublicArticleSummary)
     : key === 'tags' ? value.map(item => {
       if (!item || typeof item !== 'object' || Array.isArray(item)) throw invalid()
-      if(getApiMode()==='v1') {
-        const r=item as Record<string,unknown>
-        if(['tagURI','tagTitle','tagDescription','tagIconPath'].some(k=>typeof r[k]!=='string') || typeof r.tagReferenceCount!=='number' || !Number.isSafeInteger(r.tagReferenceCount) || r.tagReferenceCount<0) throw invalid()
-        return {tagURI:r.tagURI,tagTitle:r.tagTitle,tagDescription:r.tagDescription,tagIconPath:r.tagIconPath,tagReferenceCount:r.tagReferenceCount} as TagItem
-      }
       return adaptV3Tag({ id: item.tagURI, title: item.tagTitle, description: item.tagDescription, iconURL: item.tagIconPath, articleCount: item.tagReferenceCount })
     }) : value.map(decodePublicColumnCard)
   const ids = list.map(item => 'oId' in item ? item.oId : 'id' in item ? item.id : item.tagURI)
@@ -34,7 +28,6 @@ export function decodeHomeBootstrap(value: unknown): HomeBootstrap {
 }
 export async function fetchHomeRead<K extends HomeRead>(key: K): Promise<HomeData[K]> {
   if (!homeReadKeys.includes(key)) throw new ApiError('首页资源不合法', 422)
-  if(getApiMode()==='v1') {const {legacyHomeRead}=await import('./legacy/home');return decodeHomeRead(key,await legacyHomeRead(key))}
   const list = key === 'recent' || key === 'hot' ? (await v3ArticleFeedPage(key, 1, limits[key])).list
     : key === 'tags' ? (await v3Tags(1, limits[key])).tags
     : (await fetchPublicColumnCards(key === 'columnsRecent' ? 'latest' : 'hot', 1, limits[key])).list

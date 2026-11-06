@@ -37,8 +37,7 @@ async function fetchArticles(path) {
     if (!res.ok) return []
     const json = await res.json()
     const data = json?.data
-    if (Array.isArray(data)) return data
-    if (Array.isArray(data?.articles)) return data.articles
+    if (json.code === 0 && Array.isArray(data?.list)) return data.list
     return []
   } catch (e) {
     console.warn('sitemap fetch failed', path, e.message)
@@ -54,11 +53,11 @@ function urlEntry(loc, changefreq = 'daily', priority = '0.7') {
   </url>`
 }
 
-const recent = await fetchArticles('/api/articles/recent?p=1&size=50')
-const hot = await fetchArticles('/api/articles/recent/hot?p=1&size=50')
+const recent = await fetchArticles('/api/v3/articles?p=1&size=50&sort=latest&type=recent')
+const hot = await fetchArticles('/api/v3/articles?p=1&size=50&sort=hot&type=all')
 const ids = new Set()
 for (const a of [...recent, ...hot]) {
-  if (a?.oId && !String(a.oId).startsWith('mock-')) ids.add(String(a.oId))
+  if (typeof a?.id === 'string' && /^[1-9][0-9]{0,18}$/.test(a.id)) ids.add(a.id)
 }
 
 const urls = [

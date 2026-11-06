@@ -55,7 +55,7 @@ await check('first /me sees login token synchronously; no persistent credentials
   await store.login('alice', 'hash')
   assert.equal(store.account.userName, 'alice')
   assert.equal(http.getAccessToken(), store.accessToken)
-  assert.equal(store.apiKey, null)
+  assert.equal(store.apiKey, undefined)
 })
 await check('concurrent 401s share one refresh and synchronize store token', async () => {
   const { store, http } = await fixture()

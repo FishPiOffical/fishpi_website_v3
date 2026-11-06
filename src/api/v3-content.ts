@@ -1,4 +1,3 @@
-import { getApiMode } from './mode'
 import { ApiError, request } from './http'
 import type { ArticleComment, ArticleDetail, ArticleFeedKind, ArticleSummary, DomainItem, TagItem } from './fishpi'
 
@@ -153,7 +152,6 @@ export async function v3Tags(page = 1, size = 50): Promise<{ tags: TagItem[]; to
   return { tags: data.list.map(adaptV3Tag), total: data.pagination.total }
 }
 export async function v3Article(articleId: string, page = 1): Promise<ArticleDetail> {
-  if(getApiMode()==='v1') return (await import('./legacy/content')).legacyArticle(articleId,page)
   const path = pathId(articleId), paging = params(page, 20)
   if (page > 42949672) throw new ApiError('页码不合法', 422)
   const [raw, rawComments] = await Promise.all([

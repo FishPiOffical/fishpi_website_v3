@@ -1,4 +1,3 @@
-import {getApiMode} from './mode'
 import { ApiError, request } from './http'
 import type { NoticeItem, NoticeType, UnreadCount } from './fishpi'
 
@@ -79,7 +78,6 @@ export async function fetchNotificationPage(type: NoticeType, page = 1, size = 1
   if (!categories.includes(type) || !Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(size) || size < 1 || size > 50) {
     throw new ApiError('通知分页参数不合法', 422)
   }
-  if(getApiMode()==='v1')return (await import('./legacy/notifications')).legacyNotificationPage(type,page,size)
   const source = row(await data(`/api/v3/me/notifications?type=${encodeURIComponent(type)}&p=${page}&size=${size}`))
   if (!Array.isArray(source.list)) throw invalid()
   const pagination = row(source.pagination), p = count(pagination.p), actualSize = count(pagination.size)
@@ -87,7 +85,6 @@ export async function fetchNotificationPage(type: NoticeType, page = 1, size = 1
   return { items: source.list.map(adaptNotification), p, size: actualSize, total: count(pagination.total), pageCount: count(pagination.pageCount) }
 }
 export async function fetchV3UnreadCount(): Promise<UnreadCount> {
-  if(getApiMode()==='v1')return (await import('./legacy/notifications')).legacyUnreadCount()
   const source = row(await data('/api/v3/me/notifications/unread-count')), groups = row(source.categories)
   const result: UnreadCount = { unreadNotificationCnt: count(source.total) }
   let sum = 0
@@ -101,7 +98,6 @@ export function notificationReadKey(): string {
 }
 export async function markV3NotificationsRead(type: NoticeType | 'all', key: string): Promise<void> {
   if (type !== 'all' && !categories.includes(type) || !/^[A-Za-z0-9._:-]{1,128}$/.test(key)) throw new ApiError('通知请求参数不合法', 422)
-  if(getApiMode()==='v1')return (await import('./legacy/notifications')).markLegacyNotices(type)
   const source = row(await data('/api/v3/me/notifications/read', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key }, body: JSON.stringify({ type }),
   }))

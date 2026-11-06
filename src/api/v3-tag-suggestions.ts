@@ -1,11 +1,9 @@
-import { getApiMode } from './mode'
 import { ApiError,request } from './http'
 export const tagPrefix=(value:string)=>value.trim()
 export function validTagPrefix(value:string){return value.length<=64&&/^[\u4e00-\u9fa5A-Za-z0-9_&#+.\-]*$/u.test(value)}
 export async function tagSuggestions(value:string,signal?:AbortSignal):Promise<string[]>{
  const prefix=tagPrefix(value)
  if(!validTagPrefix(prefix))throw new ApiError('标签联想前缀不合法',422)
- if(getApiMode()==='v1')return (await import('./legacy/tag-suggestions')).legacyTagSuggestions(prefix,signal)
  const raw=await request<unknown>(`/api/v3/suggestions/tags?prefix=${encodeURIComponent(prefix)}`,{signal,cache:'no-store'})
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new ApiError('标签联想响应不正确',502)
  const r=raw as Record<string,unknown>,data=r.data as Record<string,unknown>|null

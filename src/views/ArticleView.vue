@@ -2,7 +2,7 @@
 import RandomArticles from '@/components/discovery/RandomArticles.vue'
 import { articleTitle } from '@/utils/text'
 import { avatarStyle } from '@/utils/avatar'
-import { defineAsyncComponent, computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
@@ -22,7 +22,6 @@ import CommentComposer from '@/components/articles/CommentComposer.vue'
 import ArticleCommentLocation from '@/components/articles/ArticleCommentLocation.vue'
 import type {CommentLocation} from '@/api/v3-comment-location'
 import { useV3CommentsStore } from '@/stores/v3Comments'
-import {useLegacyCommentsStore} from '@/stores/legacyComments'
 import MedalList from '@/components/medal/MedalList.vue'
 import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import { useV3ReactionsStore } from '@/stores/v3Reactions'
@@ -30,7 +29,6 @@ import ReportDialog from '@/components/ReportDialog.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { consumeArticlePayload } from '@/seo/payload'
 import { absoluteUrl, SITE_DEFAULT_DESC, stripHtml } from '@/seo/site'
-import {getApiMode} from '@/api/mode'
 import { useAuthStore } from '@/stores/auth'
 import ArticleSkeleton from '@/components/ArticleSkeleton.vue'
 import CommentItem from '@/components/CommentItem.vue'
@@ -45,9 +43,8 @@ const routeMounted=ref(false)
 const loginRedirect=computed(()=>routeMounted.value?route.fullPath:route.fullPath.split('#')[0])
 onMounted(()=>{routeMounted.value=true})
 const auth = useAuthStore()
-const LegacyCommentReplies=defineAsyncComponent(()=>import('@/components/articles/LegacyCommentReplies.vue'))
-const commentWrites=getApiMode()==='v1'?useLegacyCommentsStore():useV3CommentsStore(),commandOrigin=Symbol('article-comment-delete'),commentRefreshError=ref('')
-const { apiKey, accessToken, isLoggedIn, account } = storeToRefs(auth)
+const commentWrites=useV3CommentsStore(),commandOrigin=Symbol('article-comment-delete'),commentRefreshError=ref('')
+const { accessToken, isLoggedIn, account } = storeToRefs(auth)
 
 const article = ref<ArticleDetail | null>(null)
 const loading = ref(true), articleReading = ref(false)
@@ -62,13 +59,12 @@ const commentPage = ref(1)
 const locatedComment=ref<CommentLocation|null>(null)
 function positionComment(value:CommentLocation){locatedComment.value=value;if(value.type===0){commentPage.value=value.page;readerRef.value?.openComments()}}
 const heat = ref<number|null>(null),heatError=ref(''),articleChanged=ref(false),realtimeReadError=ref(''),realtimeReading=ref(false)
-const heatNodeLabel=computed(()=>getApiMode()==='v1'?'经典节点':'本节点')
 const editingId = ref('')
 const bodyEl = ref<HTMLElement | null>(null)
 const toc = ref<{ id: string; text: string; level: number }[]>([])
 const showRevisions = ref(false)
 const historyRef=ref<InstanceType<typeof RevisionHistory>|null>(null)
-const viewerIdentity=computed(()=>`${getAuthContextVersion()}:${getApiMode()==='v1'?apiKey.value||'':!!accessToken.value}:${account.value?.oId||''}`)
+const viewerIdentity=computed(()=>`${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}`)
 let stopArticle:(()=>void)|null=null,subscriptionKey='',heatRequest:AbortController|null=null,heatSequence=0,changeRevision=0,liveReadVersion=0
 let readVersion = 0, disposed = false
 
@@ -237,7 +233,6 @@ function articleUnavailable(target:string,reader:string) {
  error.value='文章不存在或当前已无权阅读';disconnectHeat();toc.value=[];zoomed.value=''
 }
 function connectHeat() {
- if(getApiMode()==='v1')return
  if(import.meta.env.SSR||!accessToken.value||!article.value||article.value.oId!==id.value)return
  const target=id.value,reader=viewerIdentity.value,key=JSON.stringify([target,reader,accessToken.value])
  if(subscriptionKey===key)return
@@ -267,7 +262,7 @@ async function ownerDeleted(target:string){
 async function refreshHeat() {
  heatRequest?.abort();const run=++heatSequence,reader=viewerIdentity.value,target=id.value
  heat.value=null;heatError.value=''
- if(import.meta.env.SSR||!(getApiMode()==='v1'?apiKey.value:accessToken.value)||!article.value||article.value.oId!==target)return
+ if(import.meta.env.SSR||!accessToken.value||!article.value||article.value.oId!==target)return
  const abort=new AbortController();heatRequest=abort
  const valid=()=>run===heatSequence&&reader===viewerIdentity.value&&target===id.value&&!abort.signal.aborted
  try{const value=await articleHeat(target,abort.signal);if(valid())heat.value=value}
@@ -293,7 +288,7 @@ async function load(force=false,reason:'comments'|'owner'|'realtime'='comments')
   error.value = ''
   if(force){if(reason==='owner')ownerRefreshError.value='';else if(reason==='realtime')realtimeReadError.value='';else commentRefreshError.value=''}
   try {
-    const data = await fetchArticle(reqId, null, requestedPage)
+    const data = await fetchArticle(reqId, requestedPage)
     if (!current()) return
     article.value = data; heat.value = null; loading.value = false
     void buildToc(); void refreshHeat(); connectHeat()
@@ -368,16 +363,15 @@ function clearReplyTarget() {
 
 watch(()=>commentWrites.revision,()=>{
   const command=commentWrites.completed
-  if(!command||command.articleId!==id.value||!(getApiMode()==='v1'?apiKey.value:accessToken.value))return
+  if(!command||command.articleId!==id.value||!accessToken.value)return
   editingId.value=''
   if(command.operation==='create'&&(command.input.parentId||'')===replyId.value&&(command.input.paragraphId||'')===paragraphIdForReply.value)cancelReply()
-  if(command.operation==='delete'&&command.id===replyId.value)cancelReply()
   void load(true)
   readerRef.value?.refreshParagraphComments()
 },{flush:'sync'})
 
 async function onRemoveComment(c: ArticleComment) {
-  if(!isOwnComment(c)||!(getApiMode()==='v1'?apiKey.value:accessToken.value))return
+  if(!isOwnComment(c)||!accessToken.value)return
   await commentWrites.remove(id.value,c.oId,commandOrigin)
 }
 function startEdit(c:ArticleComment){if(commentingEnabled.value&&isOwnComment(c)&&accessToken.value&&!commentWrites.pending&&!commentWrites.busy&&!commentWrites.confirming)editingId.value=c.oId}
@@ -413,15 +407,10 @@ function itemProps(c: ArticleComment) {
   const own = isLoggedIn.value && isOwnComment(c)
   return {
     comment: c,
-    reactionSource: {articleId: article.value?.oId, page: commentPage.value},
     loggedIn: isLoggedIn.value,
     commentingEnabled: commentingEnabled.value,
     own,
-    manage: getApiMode()==='v3',
-    removeAllowed: getApiMode()==='v1',
-    managementBusy: commentWrites.busy||commentWrites.confirming||!!commentWrites.pending,
     editing: editingId.value === c.oId,
-    apiKey: apiKey.value,
     hideMedals: isLong.value,
   }
 }
@@ -480,10 +469,9 @@ function itemHandlers(c: ArticleComment) {
           <template #editor>
             <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
           </template>
-          <template v-if="t.replies.length||getApiMode()==='v1'&&!t.c.commentOriginalCommentId" #default>
-            <LegacyCommentReplies v-if="getApiMode()==='v1'&&!t.c.commentOriginalCommentId" :article-id="article.oId" :root-id="t.c.oId" :writable="isLoggedIn&&commentingEnabled" :removable="true" :management-busy="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" :revision="commentWrites.revision" @reply="startReply" @remove="onRemoveComment" />
+          <template v-if="t.replies.length" #default>
             <CommentItem
-              v-for="r in getApiMode()==='v1'&&!t.c.commentOriginalCommentId?[]:t.replies"
+              v-for="r in t.replies"
               :key="r.oId"
               v-bind="itemProps(r)"
               reply
@@ -528,7 +516,6 @@ function itemHandlers(c: ArticleComment) {
       :comment-total="commentTotal"
       :logged-in="isLoggedIn"
       :can-edit="canEdit"
-      :api-key="apiKey"
       :statement="statementLabel"
       :action-msg="actionMsg"
       @revisions="toggleRevisions"
@@ -537,7 +524,7 @@ function itemHandlers(c: ArticleComment) {
       @paragraph-reply="onParagraphReply"
     >
       <template #owner-actions><ReuseOwnerActions /></template>
-      <template #live-status><ReuseLiveStatus /><span v-if="heat!==null">{{ heatNodeLabel }}约 {{ heat }} 个连接</span><span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span></template>
+      <template #live-status><ReuseLiveStatus /><span v-if="heat!==null">本节点约 {{ heat }} 个连接</span><span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span></template>
       <template #reward><ReuseReward /></template>
       <template #extra><ReuseRevisions /></template>
       <template #comments><ReuseComments /></template>
@@ -592,7 +579,7 @@ function itemHandlers(c: ArticleComment) {
           <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
           <span>•</span>
           <span>{{ commentTotal }} 评论</span>
-          <span v-if="heat!==null">（{{ heatNodeLabel }}约 {{ heat }} 个连接）</span>
+          <span v-if="heat!==null">（本节点约 {{ heat }} 个连接）</span>
           <span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span>
         </div>
 
@@ -695,7 +682,7 @@ function itemHandlers(c: ArticleComment) {
           <span><b>✨ 优质回帖</b></span>
         </div>
         <div class="comments-list">
-          <CommentItem v-for="c in nice" :key="'n' + c.oId" class="cmt-root" :comment="c" :reaction-source="{articleId:article.oId,page:commentPage}" readonly />
+          <CommentItem v-for="c in nice" :key="'n' + c.oId" class="cmt-root" :comment="c" readonly />
         </div>
       </section>
 

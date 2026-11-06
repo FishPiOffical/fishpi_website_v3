@@ -3,23 +3,20 @@ import {computed,nextTick,onMounted,onBeforeUnmount,ref,watch} from 'vue'
 import {useRoute} from 'vue-router'
 import {useAuthStore} from '@/stores/auth'
 import {getAuthContextVersion} from '@/api/http'
-import {getApiMode} from '@/api/mode'
-import {fetchLegacyCommentLocation} from '@/api/legacy/comment-location'
 import {commentTarget,fetchCommentLocation,type CommentLocation} from '@/api/v3-comment-location'
 import type {ArticleDetail} from '@/api/fishpi'
 const props=defineProps<{articleId:string;article:ArticleDetail|null;commentPage:number}>()
 const emit=defineEmits<{located:[location:CommentLocation];reset:[]}>(),route=useRoute(),auth=useAuthStore()
 const location=ref<CommentLocation|null>(null),error=ref(''),loading=ref(false),placement=ref('')
 let mounted=false,generation=0,abort:AbortController|null=null,scrolled=''
-const binding=()=>JSON.stringify([props.articleId,route.query.comment,route.hash,getApiMode(),getAuthContextVersion(),getApiMode()==='v1'?auth.apiKey:auth.accessToken,auth.account?.oId||''])
+const binding=()=>JSON.stringify([props.articleId,route.query.comment,route.hash,getAuthContextVersion(),auth.accessToken,auth.account?.oId||''])
 const requested=computed(()=>{try{return{target:commentTarget(route.query.comment,route.hash),error:''}}catch(e){return{target:'',error:e instanceof Error?e.message:'评论定位参数不合法'}}})
 async function read(){
  if(!mounted)return
  const current=++generation,owner=binding();abort?.abort();abort=null;location.value=null;error.value='';placement.value='';scrolled='';loading.value=false;emit('reset')
  if(requested.value.error){error.value=requested.value.error;return}if(!requested.value.target)return
- if(getApiMode()==='v1'&&!props.article){placement.value='等待当前文章加载后定位评论。';return}
  const controller=new AbortController();abort=controller;loading.value=true
- try{const value=getApiMode()==='v1'?await fetchLegacyCommentLocation(requested.value.target,props.articleId,props.article,controller.signal):await fetchCommentLocation(requested.value.target,props.articleId,controller.signal);if(mounted&&current===generation&&owner===binding()&&!controller.signal.aborted){location.value=value;emit('located',value)}}
+ try{const value=await fetchCommentLocation(requested.value.target,props.articleId,controller.signal);if(mounted&&current===generation&&owner===binding()&&!controller.signal.aborted){location.value=value;emit('located',value)}}
  catch(e){if(mounted&&current===generation&&owner===binding()&&!controller.signal.aborted)error.value=e instanceof Error?e.message:'评论定位失败'}
  finally{if(mounted&&current===generation&&owner===binding())loading.value=false}
 }
@@ -35,7 +32,6 @@ async function scroll(){
  else placement.value='评论当前无法在页面中定位，请重新定位。'
 }
 watch(binding,()=>{void read()},{flush:'post'})
-watch(()=>getApiMode()==='v1'?props.article:null,()=>{void read()},{flush:'post'})
 watch([location,()=>props.article,()=>props.commentPage],()=>{void scroll()},{flush:'post'})
 onMounted(()=>{mounted=true;void read()})
 onBeforeUnmount(()=>{mounted=false;generation++;abort?.abort();location.value=null})

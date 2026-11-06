@@ -1,5 +1,3 @@
-import {getApiMode} from './mode'
-import {legacyUploadTicket} from './legacy/editor'
 import { ApiError, request } from './http'
 type Row = Record<string, unknown>
 export type UploadResult = { name: string; url: string | null; image: boolean }
@@ -20,15 +18,10 @@ function filename(file: File, index: number) {
 export async function uploadV3Files(files: File[], signal: AbortSignal): Promise<UploadResult[]> {
   if (!files.length) return []
   const names = files.map(filename); signal.throwIfAborted()
-  let credential:string,uploadURL:string
-  if(getApiMode()==='v1')({credential,uploadURL}=await legacyUploadTicket(signal))
-  else{
-    const envelope = row(await request('/api/v3/uploads/tickets', { method: 'POST', body: '{}', signal, cache: 'no-store' }))
-    if (envelope.code !== 0) throw invalid()
-    const ticket = row(envelope.data), token = ticket.ticket, address = ticket.uploadURL
-    if (typeof token !== 'string' || !token || token.length > 16384 || /\s/u.test(token) || typeof address !== 'string' || ticket.tokenType !== 'Bearer' || ticket.fieldName !== 'file') throw invalid()
-    credential=token;uploadURL=address
-  }
+  const envelope = row(await request('/api/v3/uploads/tickets', { method: 'POST', body: '{}', signal, cache: 'no-store' }))
+  if (envelope.code !== 0) throw invalid()
+  const ticket = row(envelope.data), credential = ticket.ticket, uploadURL = ticket.uploadURL
+  if (typeof credential !== 'string' || !credential || credential.length > 16384 || /\s/u.test(credential) || typeof uploadURL !== 'string' || ticket.tokenType !== 'Bearer' || ticket.fieldName !== 'file') throw invalid()
   let target: URL
   try { target = new URL(uploadURL) } catch { throw invalid() }
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(target.hostname)

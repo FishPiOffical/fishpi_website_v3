@@ -1,6 +1,4 @@
 import { ApiError, request } from './http'
-import {getApiMode} from './mode'
-import {legacyFollowingFeed} from './legacy/following-feed'
 import { adaptV3Article, decodeV3ContentPage } from './v3-content'
 import { relationUserName } from './v3-user-relations'
 import { decodeBreezemoonSummary, type BreezemoonSummary } from './v3-breezemoon-data'
@@ -13,7 +11,6 @@ function object(value:unknown):Record<string,unknown>{if(!value||typeof value!==
 function id(value:unknown):string{if(typeof value!=='string'||!/^[1-9][0-9]{0,18}$/.test(value))throw invalid();return value}
 export async function fetchV3FollowingFeed(userName:string,source:FollowingSource,p=1,size=20):Promise<FollowingFeedPage>{
   if(!relationUserName(userName)||!['tags','users','breezemoons'].includes(source)||!Number.isSafeInteger(p)||p<1||p>42949672||!Number.isSafeInteger(size)||size<1||size>50)throw new ApiError('关注动态参数不合法',422)
-  if(getApiMode()==='v1')return legacyFollowingFeed(userName,source,p,size)
   const path=source==='breezemoons'?`/api/v3/me/watching/breezemoons?p=${p}&size=${size}`:`/api/v3/users/${encodeURIComponent(userName)}/watching?p=${p}&size=${size}&source=${source}`
   const envelope=object(await request(path,{cache:'no-store'}));if(envelope.code!==0)throw invalid()
   const page=decodeV3ContentPage(envelope.data),meta=page.pagination

@@ -1,15 +1,11 @@
+import { v3Only } from './server/v3-only.ts'
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
-import { apiProxy, handleApiUpgrade } from './server/api-mode.ts'
 import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
-import type { IncomingMessage } from 'node:http'
 
 const FISHPI_UA =
   'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
 
-function spaGetBypass(req: IncomingMessage) {
-  if (req.method === 'GET' || req.method === 'HEAD') return req.url
-}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -20,14 +16,12 @@ export default defineConfig(({ mode }) => {
     changeOrigin: true,
     secure: true,
     headers: { 'User-Agent': FISHPI_UA, Referer: `${target}/` },
-    // Forward page-session cookie + Rhythm CSRF header for profession POSTs.
     cookieDomainRewrite: '',
     configure(proxyServer) {
       proxyServer.on('proxyReq', (proxyReq, req) => {
-        const csrf = req.headers.csrftoken || req.headers.csrfToken
-        if (csrf && !proxyReq.getHeader('csrfToken')) {
-          proxyReq.setHeader('csrfToken', Array.isArray(csrf) ? csrf[0] : csrf)
-        }
+        proxyReq.removeHeader('x-fp-api-mode')
+        proxyReq.removeHeader('x-fp-legacy-key')
+        if (req.headers.cookie) proxyReq.setHeader('cookie', req.headers.cookie.split(';').filter(value => !value.trim().startsWith('fp.apiMode=')).join(';'))
       })
     },
   }
@@ -36,8 +30,7 @@ export default defineConfig(({ mode }) => {
     plugins: [vue(), {
       name: 'feedback-deployment-switch',
       configureServer(server) {
-        server.httpServer?.on('upgrade', (req, socket, head) => handleApiUpgrade(req, socket, head, { ...env, ...process.env }))
-        server.middlewares.use(apiProxy({ ...env, ...process.env }))
+        server.middlewares.use(v3Only)
         server.middlewares.use((req, res, next) => {
           if (/^\/feedback-api(?:\/|$)/.test(req.url || '') && env.VITE_FEEDBACK_ENABLED !== 'true') {
             res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
@@ -73,171 +66,27 @@ export default defineConfig(({ mode }) => {
             server.on('proxyReq', (proxyReq, req) => { proxyReq.removeHeader('cookie'); proxyReq.setHeader('X-Forwarded-For', req.socket.remoteAddress || '127.0.0.1') })
           },
         },
+        '/api/v3/realtime': { ...proxy, ws: true },
         '^/api/v3/auth/(?:login|refresh|logout)(?:\\?|$)': {
           ...proxy,
           changeOrigin: false,
           // Keep the browser Host/Origin/Referer tuple for credential-origin checks.
           headers: { 'User-Agent': FISHPI_UA },
         },
-        '/api': proxy,
+        '/api/v3': proxy,
         '/rhypic-upload': {
           target: 'https://pic.fishpi.cn',
           changeOrigin: true,
           secure: true,
           rewrite: (path) => path.replace(/^\/rhypic-upload/, ''),
         },
-        '/chat-room': proxy,
         '/captcha': proxy,
-        // Rhythm 风控人机验证页与校验接口（IP 黑名单时接口会 302 → /test）
         '/test': proxy,
         '/validateCaptcha': proxy,
-        '/comment': proxy,
-        '/verify': proxy,
-        '/register2': proxy,
-        '/vote': proxy,
-        '/breezemoon': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            // SPA 列表页 /breezemoons；API 为 POST /breezemoon
-            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/breezemoons' || path === '/breezemoons/')) {
-              return req.url
-            }
-          },
-        },
-        '/follow': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            // SPA /following；API 为 /follow/...
-            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/following' || path === '/following/')) {
-              return req.url
-            }
-          },
-        },
-        '/unfollow': proxy,
-        '/user': proxy,
-        '/users': proxy,
-        '/activity': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            // SPA 活动页；签到/活跃 API 仍走 /activity/*
-            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/activity' || path === '/activity/')) {
-              return req.url
-            }
-          },
-        },
-        '/notifications': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0]
-            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/notifications' || path === '/notifications/')) {
-              return req.url
-            }
-          },
-        },
-        '/charge': { ...proxy, bypass: spaGetBypass },
-        '/pay': proxy,
-        '/getApiKeyInWeb': proxy,
-        '/vips': { ...proxy, bypass: spaGetBypass },
-        '/games': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            // SPA 入口 /games；子路径（adarkroom 等）走 Rhythm
-            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/games' || path === '/games/')) {
-              return req.url
-            }
-          },
-        },
-        '/activities': proxy,
-        '/guide': proxy,
-        '/column': {
-          ...proxy,
-          bypass(req) {
-            // SPA /column、/column/:id；无公开 JSON 时勿吃掉页面
-            if (req.method === 'GET' || req.method === 'HEAD') return req.url
-          },
-        },
-        '/chat': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            const isApi = /^\/chat\/(get-list|get-message|mark-as-read|mark-all-as-read|has-unread|revoke|send)(\/|$)/.test(path)
-            if (isApi) return
-            if (req.method === 'GET' || req.method === 'HEAD') return req.url
-          },
-        },
-        '/point': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            if (path === '/points' || path.startsWith('/points/')) return req.url
-          },
-        },
-        '/report': proxy,
-        '/markdown': proxy,
-        '/logs': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            if ((req.method === 'GET' || req.method === 'HEAD') && (path === '/logs' || path === '/logs/')) {
-              return req.url
-            }
-          },
-        },
-        '/tags': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            if (path === '/tags/query') return
-            if (req.method === 'GET' || req.method === 'HEAD') return req.url
-          },
-        },
-        '/cr': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            if (path.startsWith('/cr/raw/')) return
-            if (req.method === 'GET' || req.method === 'HEAD') return req.url
-          },
-        },
-        '/register': { ...proxy, bypass: spaGetBypass },
-        '/forget-pwd': { ...proxy, bypass: spaGetBypass },
-        '/reset-pwd': { ...proxy, bypass: spaGetBypass },
-        '/invitecode': proxy,
-        '/export': proxy,
-        '/mfa': proxy,
-        '/bag': proxy,
         '/gen': proxy,
-        '/settings': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            // SPA 设置子页；API：POST /settings/password|function|geo/status|privacy|i18n
-            if (req.method === 'GET' || req.method === 'HEAD') {
-              const spa =
-                path === '/settings' ||
-                path === '/settings/' ||
-                /^\/settings\/(point|account|function|system|profession|privacy|avatar|invite|identity|data|i18n|help)(\/|$)/.test(
-                  path,
-                )
-              if (spa) return req.url
-            }
-          },
-        },
-        '/article': {
-          ...proxy,
-          bypass(req) {
-            const path = (req.url || '').split('?')[0] || ''
-            if (path.startsWith('/article-channel')) return
-            if (path.startsWith('/article/random')) return
-            // 修订历史 JSON：/article/:id/revisions/list|/:revisionId
-            if (/^\/article\/[^/]+\/revisions(\/|$)/.test(path)) return
-            return spaGetBypass(req)
-          },
-        },
+        '/games/': proxy,
+        '/activities/': proxy,
+
       },
     },
   }

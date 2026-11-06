@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ApiError, getAuthContextVersion } from '@/api/http'
-import {getApiMode} from '@/api/mode'
 import { fetchV3FollowingFeed, type FollowingSource, type FollowingFeedPage } from '@/api/v3-following-feed'
 import { useAuthStore } from '@/stores/auth'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
@@ -11,13 +10,12 @@ import BreezemoonList from '@/components/breezemoons/BreezemoonList.vue'
 import SideBar from '@/components/SideBar.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 const TABS:{tab:FollowingSource;to:string;label:string}[]=[{tab:'tags',to:'/watch',label:'关注标签'},{tab:'users',to:'/watch/users',label:'关注用户'},{tab:'breezemoons',to:'/watch/breezemoons',label:'清风明月'}]
-const route=useRoute(),{accessToken,apiKey,account}=storeToRefs(useAuthStore())
-const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+const route=useRoute(),{accessToken,account}=storeToRefs(useAuthStore())
 const current=computed(()=>TABS.find(tab=>tab.tab===route.meta.watchTab)||TABS[0]!)
 const mounted=ref(false),loading=ref(false),error=ref(''),result=ref<FollowingFeedPage|null>(null),page=ref(1)
-const ready=computed(()=>mounted.value&&!!credential.value&&!!account.value)
+const ready=computed(()=>mounted.value&&!!accessToken.value&&!!account.value)
 let sequence=0,boundary=''
-function identity(){return JSON.stringify([getApiMode(),getAuthContextVersion(),getApiMode()==='v1'?credential.value:!!credential.value,account.value?.oId||'',account.value?.userName||'',current.value.tab])}
+function identity(){return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${account.value?.userName||''}:${current.value.tab}`}
 function clear(){sequence++;result.value=null;loading.value=false;error.value=''}
 async function load(){
   if(!ready.value||loading.value)return
@@ -30,7 +28,7 @@ async function load(){
 }
 function move(value:number){if(loading.value||!result.value||value<1||value>Math.min(result.value.pageCount,42949672))return;page.value=value;void load()}
 function home(){page.value=1;void load()}
-watch([credential,()=>account.value?.oId,()=>account.value?.userName,()=>current.value.tab],()=>{const next=identity();if(next===boundary)return;boundary=next;clear();page.value=1;void load()},{flush:'sync'})
+watch([accessToken,()=>account.value?.oId,()=>account.value?.userName,()=>current.value.tab],()=>{const next=identity();if(next===boundary)return;boundary=next;clear();page.value=1;void load()},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity();void load()})
 onBeforeUnmount(()=>{mounted.value=false;clear()})
 usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots:'noindex'}))

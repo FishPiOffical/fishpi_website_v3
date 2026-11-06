@@ -4,7 +4,7 @@ import ts from 'typescript'
 const source = await readFile(new URL('../src/api/v3-content.ts', import.meta.url), 'utf8')
 const shim = `export class ApiError extends Error { constructor(message,status,code){super(message);this.status=status;this.code=code} } export async function request(path){globalThis.__v3Paths.push(path);const next=globalThis.__v3Responses.shift();if(next instanceof Error)throw next;if(next===undefined)throw Error('Unexpected request '+path);return next}`
 const shimUrl = `data:text/javascript;base64,${Buffer.from(shim).toString('base64')}`
-const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replaceAll("from './mode'", "from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'").replace("from './http'", `from '${shimUrl}'`)
+const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace("from './http'", `from '${shimUrl}'`)
 const api = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`)
 const author = { id: '3', userName: 'reader', userNickname: '昵称', userAvatarURL: 'https://example.test/a.png' }
 const article = { id: '101', title: '<title>', preview: '真实摘要', tags: 'a,b', type: 0, anonymous: false, author, createdAt: 1, viewCount: 8, commentCount: 2 }

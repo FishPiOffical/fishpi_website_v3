@@ -1,4 +1,4 @@
-import { getEditorCredential as getAccessToken, getEditorContext as getAuthContextVersion } from '@/api/editor-session'
+import { getAccessToken, getAuthContextVersion } from '@/api/http'
 import { uploadV3Files, uploadedMarkdown } from '@/api/v3-uploads'
 
 export function createEditorUpload(insert: (markdown: string) => void) {

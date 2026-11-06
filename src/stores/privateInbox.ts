@@ -1,5 +1,3 @@
-import {getApiMode} from '@/api/mode'
-import {legacyPrivateInboxState} from './legacyPrivateInboxState'
 import {onScopeDispose,ref,watch} from 'vue'
 import {defineStore,storeToRefs} from 'pinia'
 import {getAuthContextVersion} from '@/api/http'
@@ -9,7 +7,6 @@ import {useAuthStore} from '@/stores/auth'
 import {useV3MessagesStore} from '@/stores/v3Messages'
 /** Shared messages subscription/count for header, drawer and full page; never stores message bodies. */
 export const usePrivateInboxStore=defineStore('private-inbox',()=>{
- if(getApiMode()==='v1')return legacyPrivateInboxState()
  const {accessToken,account}=storeToRefs(useAuthStore()),writes=useV3MessagesStore()
  const unreadTotal=ref<number|null>(null),loading=ref(false),error=ref(''),revision=ref(0),inboxOpen=ref(false),inboxPeer=ref(''),inboxPeerId=ref('')
  let generation=0,sequence=0,boundary=getAuthContextVersion(),owner=account.value?.oId,stopSubscription:(()=>void)|null=null,dirty=false
@@ -25,5 +22,5 @@ export const usePrivateInboxStore=defineStore('private-inbox',()=>{
  const stopWrites=watch(()=>writes.revision,()=>{if(writes.completed)invalidate()},{flush:'post'})
  const focus=()=>invalidate();if(!import.meta.env.SSR)window.addEventListener('focus',focus)
  onScopeDispose(()=>{stopAuth();stopWrites();clear();if(!import.meta.env.SSR)window.removeEventListener('focus',focus)})
- return{unreadTotal,byPeer:ref<Record<string,number>>({}),loading,error,revision,inboxOpen,inboxPeer,inboxPeerId,refreshUnread,invalidate,showInbox,clear}
+ return{unreadTotal,loading,error,revision,inboxOpen,inboxPeer,inboxPeerId,refreshUnread,invalidate,showInbox,clear}
 })

@@ -9,9 +9,8 @@ const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.E
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__publicRequests=[];globalThis.__publicResponses=[]
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}} export async function request(path,init){globalThis.__publicRequests.push({path,init});const result=globalThis.__publicResponses.shift();if(result instanceof Error)throw result;if(result===undefined)throw Error('Unexpected '+path);return result}`)
-const mode=url('export const getApiMode=()=>"v3"'),legacyAuth=url('export const getLegacyKey=()=>null')
 const {ApiError}=await import(http)
-const api=await import(url(compile(await fs.readFile('src/api/v3-profession-public.ts','utf8')).replace("from './http'",`from '${http}'`).replace("from './mode'",`from '${mode}'`).replace("from './legacy/auth'",`from '${legacyAuth}'`)))
+const api=await import(url(compile(await fs.readFile('src/api/v3-profession-public.ts','utf8')).replace("from './http'",`from '${http}'`)))
 const definition={professionId:'10',professionCode:'writer',displayName:'创作者',shortName:'创作',description:'<b>仅作文本</b>'}
 const progress={...definition,state:'ACTIVE',levelCode:'L1',levelName:'初学者'}
 const contribution={professionId:'10',actionCode:'article.publish',eventCount:2,lastOccurredAt:1792800000000}
@@ -35,7 +34,7 @@ console.log('PASS public professions 3 invalid rarity math, partial experience, 
 setActivePinia(createPinia());const auth=defineStore('public-profession-auth',()=>({accessToken:ref(null)}))();globalThis.__publicAuth=()=>auth;globalThis.__publicAPI={...api}
 const authURL=url('export const useAuthStore=globalThis.__publicAuth'),apiURL=url('export const fetchV3PublicProfessions=(...args)=>globalThis.__publicAPI.fetchV3PublicProfessions(...args)')
 const source=await fs.readFile('src/components/profession/PublicProfessions.vue','utf8'),descriptor=parse(source).descriptor
-let componentCode=compile(compileScript(descriptor,{id:'public-profession-test',inlineTemplate:true}).content).replace(/from ['"]vue['"]/g,`from '${import.meta.resolve('vue')}'`).replace(/from ['"]pinia['"]/g,`from '${import.meta.resolve('pinia')}'`).replace("from '@/api/mode'",`from '${mode}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-profession-public'",`from '${apiURL}'`)
+let componentCode=compile(compileScript(descriptor,{id:'public-profession-test',inlineTemplate:true}).content).replace(/from ['"]vue['"]/g,`from '${import.meta.resolve('vue')}'`).replace(/from ['"]pinia['"]/g,`from '${import.meta.resolve('pinia')}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-profession-public'",`from '${apiURL}'`)
 const component=(await import(url(componentCode))).default
 const tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()}
 const insert=(node,parent,anchor)=>{if(node.parent){const i=node.parent.children.indexOf(node);if(i>=0)node.parent.children.splice(i,1)}const i=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(i<0?parent.children.length:i,0,node);node.parent=parent}

@@ -8,14 +8,17 @@ npm run dev          # Express + Vite SSR（推荐）
 npm run dev:spa      # 纯 CSR（无服务端渲染）
 npm run build && npm run preview
 npm run sitemap      # 生成 public/sitemap.xml
-npm run test:compat  # v1/v3、代理及反馈兼容专项（本地夹具；不替代构建和浏览器验收）
 ```
 
 开发服务器固定 `http://127.0.0.1:5173`，占用时请先结束旧进程，不会自动换端口。
 
-新增 v1/v3 双模式分批适配：设置 → 接口版本可一键切换，当前真实覆盖和剩余批次见 [双模式说明](docs/API_MODES.md)。v1 旧 apiKey 独立保存在内存，不能与 Bearer 混用。已确认的交付范围允许 v1 对缺少现有协议的功能明确显示限制，v3 保留原有完整实现；不通过修改 Rhythm 补接口。Node.js 要求 >=24.12。
+main 分支仅支持 Rhythm v3 接口，双版本代码已备份至本地 `v1_v3` 分支（`ce9e4dd`，包含最近两次 UI 调整）。版本切换、旧 apiKey 登录及 v1 适配器已移除；旧 `fp.apiMode` Cookie 不会改变请求目标，旧 `/api/` 端点返回 410。开发上游通过 `VITE_API_TARGET` 配置，须指向支持 v3 的 Rhythm，不自动回退现网旧接口。
 
-v3 模式浏览器认证：访问令牌只保存在内存，通过 HttpOnly 刷新 Cookie 恢复，不再把凭据写入 localStorage。旧 apiKey 不能替代 Bearer，仍使用旧接口的功能正在分批迁移，当前覆盖与限制见 [v3迁移记录](docs/V3_MIGRATION.md)。开发脚本中的旧 apiKey 缓存仍仅适用于旧接口，不要放入 v3 访问令牌。
+浏览器访问令牌只保存在内存，通过 HttpOnly 刷新 Cookie 恢复。需求反馈服务仅核验 v3 Bearer；`/feedback-api/v1` 是该独立服务自身的版本号，与已移除的网站 v1 无关。Node.js 要求 >=24.12。移除范围与验收见 [main 分支说明](docs/V3_ONLY.md)。
+
+```sh
+npm run test:v3  # 全部 v3、反馈与仅 v3 边界专项；本地夹具，不替代构建和浏览器验收
+```
 
 开发代理默认指向 `https://fishpi.cn`。若本地 Rhythm 在 `8080`，在 `.env.development` 设置：
 

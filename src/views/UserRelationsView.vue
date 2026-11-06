@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {getApiMode} from '@/api/mode'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -9,15 +8,14 @@ import { useAuthStore } from '@/stores/auth'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
 import VipNickname from '@/components/user/VipNickname.vue'
-const route = useRoute(), { accessToken, apiKey, account } = storeToRefs(useAuthStore())
-const credential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+const route = useRoute(), { accessToken, account } = storeToRefs(useAuthStore())
 const mounted = ref(false), loading = ref(false), error = ref(''), list = ref<RelationUser[]>([]), page = ref(1), pageCount = ref(0), total = ref<number | null>(null)
 const target = computed(() => String(route.params.userName || ''))
 const kind = computed<RelationKind>(() => route.meta.memberTab === 'followers' ? 'followers' : 'following')
 const title = computed(() => `${target.value} · ${kind.value === 'followers' ? '粉丝' : '关注用户'}`)
 const base = computed(() => `/member/${encodeURIComponent(target.value)}`)
 let sequence = 0, boundary = ''
-function identity() { return `${getAuthContextVersion()}:${getApiMode()==='v1'?apiKey.value||'':!!accessToken.value}:${account.value?.oId || ''}:${target.value}:${kind.value}` }
+function identity() { return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId || ''}:${target.value}:${kind.value}` }
 function clear() { sequence++; list.value = []; total.value = null; pageCount.value = 0; loading.value = false; error.value = '' }
 async function load() {
   if (!mounted.value || loading.value) return
@@ -30,7 +28,7 @@ async function load() {
 function move(value: number) { if (loading.value || value < 1 || value > Math.min(pageCount.value, 42949672)) return; page.value = value; void load() }
 function home() { page.value = 1; void load() }
 function fallback(event: Event) { const image = event.target as HTMLImageElement; if (image.getAttribute('src') !== DEFAULT_AVATAR) image.src = DEFAULT_AVATAR }
-watch([credential, () => account.value?.oId, target, kind], () => { const next = identity(); if (next === boundary) return; boundary = next; clear(); page.value = 1; void load() }, { flush: 'sync' })
+watch([accessToken, () => account.value?.oId, target, kind], () => { const next = identity(); if (next === boundary) return; boundary = next; clear(); page.value = 1; void load() }, { flush: 'sync' })
 onMounted(() => { mounted.value = true; boundary = identity(); void load() })
 onBeforeUnmount(() => { mounted.value = false; clear() })
 usePageSeo(() => ({ title: title.value, path: route.path, robots: 'noindex' }))

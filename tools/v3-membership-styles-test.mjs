@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import ts from 'typescript'
 import { parse, compileScript } from '@vue/compiler-sfc'
 import { createRenderer, h, nextTick, ref } from 'vue'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'","from 'data:text/javascript,export%20const%20getApiMode=()=>%22v3%22'").replaceAll("from '@/api/mode'","from 'data:text/javascript,export%20const%20getApiMode=()=>%22v3%22'").replaceAll("from '@/api/legacy/auth'","from 'data:text/javascript,export%20const%20getLegacyKey=()=>null;export%20const%20onLegacyKeyChange=()=>()=>{}'")
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__styleRequests=[];globalThis.__styleResponses=[];globalThis.__styleToken=null;globalThis.__styleListeners=[];globalThis.__styleSSR=false
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}} export async function request(path){globalThis.__styleRequests.push(path);const result=globalThis.__styleResponses.shift();if(result instanceof Error)throw result;if(result===undefined)throw Error('Unexpected '+path);return result} export function getAccessToken(){return globalThis.__styleToken} export function onAccessTokenChange(fn){globalThis.__styleListeners.push(fn);fn(globalThis.__styleToken);return()=>{}}`)

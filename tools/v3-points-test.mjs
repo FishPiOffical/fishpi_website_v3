@@ -5,7 +5,7 @@ import { parse, compileScript } from '@vue/compiler-sfc'
 import { createRenderer, createSSRApp, h, nextTick, ref } from 'vue'
 import { createPinia, defineStore } from 'pinia'
 import { renderToString } from '@vue/server-renderer'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'","from 'data:text/javascript,export%20const%20getApiMode=()=>%22v3%22'").replaceAll("from '@/api/mode'","from 'data:text/javascript,export%20const%20getApiMode=()=>%22v3%22'")
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__points={context:1,requests:[],responses:[]};const state=__points
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__points.context}export async function request(path){globalThis.__points.requests.push(path);const r=globalThis.__points.responses.shift();if(r instanceof Error)throw r;if(!r)throw Error('Missing fixture '+path);return r}`)
@@ -18,7 +18,7 @@ for(const [p,size] of [[0,20],[42949673,20],[1,51],[1.5,20]])await assert.reject
 for(const change of [{pagination:{p:2,size:20,total:21,pageCount:2}},{pagination:{p:1,size:20,total:21,pageCount:1}},{list:[{...entry,operation:'income'}]},{list:[{...entry,time:9e15}]},{list:[{...entry,balance:'9900'}]},{list:[{...entry,amount:Number.MAX_SAFE_INTEGER+1}]}]){state.responses.push(env({...page(),...change}));await assert.rejects(api.fetchV3PointPage(),e=>e.status===502)}
 state.responses.push(env({id:'1',userPoint:0,userPhone:'private'}));assert.equal(await api.fetchV3PointBalance(),0);assert.equal(state.requests.at(-1),'/api/v3/me');state.responses.push(env({userPoint:'100'}));await assert.rejects(api.fetchV3PointBalance())
 console.log('PASS points 1 exact pagination, typed private-field projection, true amounts/signs/zero/balance and invalid-response rejection')
-const auth=defineStore('points-auth',()=>({apiKey:ref(null),accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__pointsAuth=auth
+const auth=defineStore('points-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__pointsAuth=auth
 globalThis.__pointsAPI={...api};const apiURL=url(['fetchV3PointBalance','fetchV3PointPage','pointChange','pointTime'].map(k=>`export const ${k}=(...args)=>globalThis.__pointsAPI.${k}(...args)`).join('\n'))
 const authURL=url('export const useAuthStore=globalThis.__pointsAuth'),seoURL=url('export function usePageSeo(){}'),routerURL=url(`import{h}from'${import.meta.resolve('vue')}';export const RouterLink={props:['to'],setup:(p,{slots})=>()=>h('a',{href:p.to},slots.default?.())}`),loadingURL=url('export default {render:()=>null}')
 const source=await fs.readFile('src/views/PointsView.vue','utf8'),descriptor=parse(source).descriptor
@@ -42,5 +42,5 @@ let release;__pointsAPI.fetchV3PointPage=async()=>new Promise(r=>release=r);__po
 let releaseOld;__pointsAPI.fetchV3PointPage=async()=>new Promise(r=>releaseOld=r);view=mount();await tick();__pointsAPI.fetchV3PointPage=async()=>({list:[{...entry,descriptionHtml:'NEW_OWNER'}],p:1,size:20,total:1,pageCount:1});state.context++;view.user.account={oId:'2'};view.user.accessToken='C';await tick();releaseOld({list:[{...entry,descriptionHtml:'OLD_OWNER'}],p:1,size:20,total:1,pageCount:1});await tick();assert.match(view.text(),/NEW_OWNER/);assert.ok(!view.text().includes('OLD_OWNER'));view.app.unmount()
 console.log('PASS points 4 logout clears private rows synchronously and delayed old-reader result cannot overwrite a new account')
 let ssrReads=0;__pointsAPI.fetchV3PointPage=async()=>{ssrReads++;throw Error('SSR request')};__pointsAPI.fetchV3PointBalance=async()=>{ssrReads++;throw Error('SSR request')};const app=createSSRApp(component);app.use(createPinia());const html=await renderToString(app);assert.equal(ssrReads,0);assert.ok(!html.includes('OLD_OWNER')&&!html.includes('交易后余额'));assert.match(html,/登录/)
-const oldAPI=await fs.readFile('src/api/fishpi.ts','utf8');assert.ok(source.includes("getApiMode()==='v1'?apiKey.value:accessToken.value")&&!source.includes('createSwrLoader')&&!source.includes('/api/getNotifications')&&!oldAPI.includes('parsePointNotice'))
+const oldAPI=await fs.readFile('src/api/fishpi.ts','utf8');assert.ok(!source.includes('apiKey')&&!source.includes('createSwrLoader')&&!source.includes('/api/getNotifications')&&!oldAPI.includes('parsePointNotice'))
 console.log('PASS points 5 SSR makes no private reads and old notification parsing/cache fallback is removed')

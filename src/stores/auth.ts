@@ -1,5 +1,3 @@
-import { getApiMode } from '@/api/mode'
-import { legacyLogin, legacyAccount, setLegacyKey } from '@/api/legacy/auth'
 import { defineStore } from 'pinia'
 import { computed, onScopeDispose, ref } from 'vue'
 import { ApiError, getAccessToken, onAccessTokenChange, refreshAccessToken, wasRefreshRejected, request, setAccessToken } from '@/api/http'
@@ -8,8 +6,6 @@ import { login as loginApi, type AccountInfo, type V3AccountInfo } from '@/api/f
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null)
-  // Kept only for modules awaiting migration; never put a Bearer token in this field.
-  const apiKey = ref<string | null>(null)
   const account = ref<AccountInfo | null>(null)
   const isVip = ref(false)
   const loading = ref(false)
@@ -19,7 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
   let restoreFlight: Promise<void> | null = null
   let loginFlight: Promise<void> | null = null
 
-  const isLoggedIn = computed(() => Boolean((getApiMode()==='v1'?apiKey.value:accessToken.value) && account.value))
+  const isLoggedIn = computed(() => Boolean(accessToken.value && account.value))
   const unsubscribe = onAccessTokenChange((token) => {
     if (accessToken.value !== token) clearCache()
     accessToken.value = token
@@ -39,11 +35,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function loadAccount(expected: number) {
-    if(getApiMode()==='v1') {
-      if(!apiKey.value) throw new ApiError('请先登录',401)
-      const data=await legacyAccount(apiKey.value)
-      assertCurrent(expected);account.value=data;return
-    }
     const res = await request<{ code: number; msg?: string; data?: V3AccountInfo }>('/api/v3/me')
     assertCurrent(expected)
     if (res.code !== 0 || !res.data) throw new ApiError(res.msg || '登录状态已失效', 401)
@@ -54,7 +45,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   function restore(): Promise<void> {
     if (import.meta.env.SSR) return Promise.resolve()
-    if(getApiMode()==='v1') { initialized.value=true;return Promise.resolve() }
     if (loginFlight) return loginFlight
     if (restoreFlight) return restoreFlight
     if (initialized.value && (isLoggedIn.value || !accessToken.value)) return Promise.resolve()
@@ -83,7 +73,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function refreshMembership() {
-    if(getApiMode()==='v1') return
     const expected = version
     const id = account.value?.oId
     if (!id) {
@@ -102,17 +91,11 @@ export const useAuthStore = defineStore('auth', () => {
   function login(username: string, passwd: string, mfaCode = ''): Promise<void> {
     const expected = ++version
     setAccessToken(null)
-    setLegacyKey(null);apiKey.value=null
     initialized.value = false
     loading.value = true
     error.value = ''
     const operation = (async () => {
       try {
-        if(getApiMode()==='v1') {
-          const legacy=await legacyLogin(username,passwd,mfaCode)
-          assertCurrent(expected);apiKey.value=legacy;setLegacyKey(legacy)
-          await loadAccount(expected);initialized.value=true;return
-        }
         const token = await loginApi(username, passwd, mfaCode)
         assertCurrent(expected)
         // Publish synchronously before /me, rather than relying on Vue's deferred watch queue.
@@ -122,7 +105,6 @@ export const useAuthStore = defineStore('auth', () => {
       } catch (e) {
         if (expected === version) {
           setAccessToken(null)
-          setLegacyKey(null);apiKey.value=null
           error.value = e instanceof Error ? e.message : '登录失败'
         }
         throw e
@@ -139,21 +121,18 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     ++version
     setAccessToken(null)
-    apiKey.value = null
-    setLegacyKey(null)
     initialized.value = true
     loading.value = false
     error.value = ''
     // The transport serializes this cookie mutation after any pending rotation/login.
-    if(getApiMode()==='v1') return
     await request('/api/v3/auth/logout', { method: 'POST' }).catch(() => {})
   }
 
   async function reloadAccount() {
-    if (getApiMode()==='v1'?!apiKey.value:!accessToken.value) return
+    if (!accessToken.value) return
     await loadAccount(version)
   }
 
-  return { accessToken, apiKey, account, isVip, loading, error, initialized, isLoggedIn,
+  return { accessToken, account, isVip, loading, error, initialized, isLoggedIn,
     restore, login, logout, refreshMembership, reloadAccount }
 })

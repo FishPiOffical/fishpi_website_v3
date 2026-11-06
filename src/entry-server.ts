@@ -1,5 +1,3 @@
-import { apiModeContext } from './api/server-mode'
-import { getApiMode, type ApiMode } from './api/mode'
 import { fetchDirectoryPage } from './api/v3-directory'
 import { fetchHomeBootstrap } from './api/v3-home-reads'
 import { fetchArticleListing } from './api/v3-article-list'
@@ -46,7 +44,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
         fetchRanking('online', 1, undefined, 8),
         fetchRecentMembers(),
         fetchV3Breezemoons(1, 8),
-        fetchRepeaterItems(null, 'joke'),
+        fetchRepeaterItems('joke'),
       ])
       const val = <T>(i: number, fallback: T): T =>
         settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
@@ -76,7 +74,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
     if (ranking && Object.hasOwn(rankingTitles, ranking)) return { rankingPage: await fetchRanking(ranking as RankingType) }
 
     if (path === '/repeater') {
-      return { repeater: await fetchRepeaterItems(null) }
+      return { repeater: await fetchRepeaterItems() }
     }
 
     const listMap: Record<string, ArticleFeedKind> = {
@@ -115,10 +113,7 @@ async function prefetch(url: string): Promise<SsrPayload> {
   return {}
 }
 
-export async function render(url: string, mode?: ApiMode) {
-  return apiModeContext.run(mode || getApiMode(), () => renderPage(url))
-}
-async function renderPage(url: string) {
+export async function render(url: string) {
   const payload = await prefetch(url)
   // Clone before render — views consume the live payload during SSR.
   const clientPayload = JSON.parse(JSON.stringify(payload)) as typeof payload

@@ -235,8 +235,6 @@ export interface ArticleStickState {
 }
 
 export interface ArticleSummary {
-  /** Legacy summaries may omit anonymity metadata; do not infer identity from nested aliases. */
-  articleIdentityUnavailable?: boolean
   articleAnonymous?: number
   stick?: ArticleStickState
   oId: string
@@ -498,8 +496,6 @@ export interface FunctionSettings {
 }
 
 export interface EmojiItem {
-  /** Server-provided display glyph, independent from the canonical insertion alias. */
-  label?: string
   emojiId?: string
   oId?: string
   name: string
@@ -548,9 +544,9 @@ export interface TagItem {
 
 
 export type RepeaterItem = RepeaterEntry
-export function fetchRepeaterItems(_apiKey?: string | null, type = '') { return repeaterList(type as import('./v3-repeater').RepeaterKind) }
+export function fetchRepeaterItems(type = '') { return repeaterList(type as import('./v3-repeater').RepeaterKind) }
 
-export async function fetchArticle(id: string, _apiKey?: string | null, page = 1): Promise<ArticleDetail> {
+export async function fetchArticle(id: string, page = 1): Promise<ArticleDetail> {
   return v3Article(id, page)
 }
 
@@ -636,17 +632,6 @@ export interface ChatNodeOption {
   online?: number
   weight?: number
 }
-
-export interface ChatNodeBundle {
-  /** 推荐连接的完整 WS URL（已含加密 apiKey） */
-  data: string
-  /** 当前推荐节点显示名 */
-  msg: string
-  /** 节点切换用的加密 key（拼到 node 后） */
-  apiKey: string
-  avaliable: ChatNodeOption[]
-}
-
 
 export interface MyMedal {
   medalId: string

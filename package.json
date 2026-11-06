@@ -11,9 +11,7 @@
     "build:server": "vite build --ssr src/entry-server.ts --outDir dist/server",
     "preview": "NODE_ENV=production node server.js",
     "sitemap": "node scripts/generate-sitemap.mjs",
-    "test:compat": "node tools/test-api-compat.mjs",
-    "auth:check": "node scripts/dev-auth.mjs",
-    "auth:login": "node scripts/dev-auth.mjs --login"
+    "test:v3": "node tools/test-v3.mjs"
   },
   "dependencies": {
     "@unhead/ssr": "^3.4.2",

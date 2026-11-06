@@ -13,7 +13,6 @@ import { useCountStore } from '@/stores/count'
 import { feedbackEnabled } from '@/feedback/api'
 import FeedbackDialog from '@/feedback/FeedbackDialog.vue'
 import { useFeedbackPanelStore } from '@/feedback/panel'
-import ApiModeSettings from './ApiModeSettings.vue'
 import IncomeCard from '@/components/count/IncomeCard.vue'
 import HiddenChatConversations from '@/components/chat/HiddenChatConversations.vue'
 import WhisperConversations from '@/components/chat/WhisperConversations.vue'
@@ -51,7 +50,6 @@ watch([showHiddenHandle], ([visible]) => {
 })
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
-  { id: 'apiMode', label: '接口版本', icon: '⇄' },
   ...(feedbackEnabled ? [{ id: 'feedback' as const, label: '需求反馈', icon: '💡' }] : []),
   { id: 'home', label: '首页模块', icon: '🏠' },
   { id: 'pageSidebar', label: '内页侧栏', icon: '📑' },
@@ -274,8 +272,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
             <button type="button" class="close" aria-label="关闭设置" @click="drawer.hide()">✕</button>
           </header>
 
-          <div v-if="section === 'apiMode'" class="content"><ApiModeSettings /></div>
-          <div v-else-if="section === 'feedback'" class="content">
+          <div v-if="section === 'feedback'" class="content">
             <p>分享建议、反馈问题，一起完善摸鱼派。</p>
             <button class="drag-entry" @click="drawer.hide(); feedbackPanel.show('/feedback/new')"><b>提需求</b><span>描述你的想法或遇到的问题</span></button>
             <button class="drag-entry" @click="drawer.hide(); feedbackPanel.show('/feedback')"><b>查看需求列表</b><span>查看处理进展，为感兴趣的需求投票</span></button>

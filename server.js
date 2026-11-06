@@ -1,4 +1,4 @@
-import { apiProxy, requestMode, backendTarget, handleApiUpgrade } from './server/api-mode.ts'
+import { v3Only } from './server/v3-only.ts'
 import fs from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
@@ -19,6 +19,41 @@ process.env.VITE_API_TARGET = apiTarget
 const FISHPI_UA =
   'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
 
+/**
+ * Vite middlewareMode 没有 httpServer，server.proxy 的 ws: true 不生效；
+ * 开发时由这里把 v3 realtime 的 WebSocket 升级请求隧道到 Rhythm（生产由 nginx 处理）。
+ */
+function proxyWsUpgrade(req, socket, head) {
+  const target = new URL(req.url, apiTarget)
+  const secure = target.protocol === 'https:'
+  const upstream = (secure ? https : http).request({
+    hostname: target.hostname.startsWith('[') ? target.hostname.slice(1, -1) : target.hostname,
+    port: target.port || (secure ? 443 : 80),
+    path: target.pathname + target.search,
+    method: 'GET',
+    headers: {
+      ...req.headers,
+      host: target.host,
+      origin: apiTarget,
+      'user-agent': FISHPI_UA,
+    },
+  })
+  upstream.on('upgrade', (res, upstreamSocket, upstreamHead) => {
+    const lines = [`HTTP/1.1 ${res.statusCode} ${res.statusMessage}`]
+    for (let i = 0; i < res.rawHeaders.length; i += 2) lines.push(`${res.rawHeaders[i]}: ${res.rawHeaders[i + 1]}`)
+    socket.write(`${lines.join('\r\n')}\r\n\r\n`)
+    if (upstreamHead?.length) socket.write(upstreamHead)
+    if (head?.length) upstreamSocket.write(head)
+    upstreamSocket.on('error', () => socket.destroy())
+    upstreamSocket.pipe(socket).pipe(upstreamSocket)
+  })
+  upstream.on('response', (res) => {
+    socket.end(`HTTP/1.1 ${res.statusCode} ${res.statusMessage}\r\n\r\n`)
+  })
+  upstream.on('error', () => socket.destroy())
+  socket.on('error', () => upstream.destroy())
+  upstream.end()
+}
 
 function injectHtml(template, { appHtml, headPayload, payload, cssLinks }) {
   const head = [cssLinks || '', headPayload.headTags || '', headPayload.bodyTagsOpen || '']
@@ -114,7 +149,7 @@ function renderProdCssLinks(modules, manifest) {
 async function createServer() {
   const app = express()
   app.set('trust proxy', 'loopback')
-  app.use(apiProxy({ ...env, ...process.env }))
+  app.use(v3Only)
   // Independent feedback service: do not send Rhythm cookies or use its API proxy.
   app.use((req, res, next) => {
     if (!/^\/feedback-api(?:\/|$)/.test(req.url || '')) return next()
@@ -124,7 +159,7 @@ async function createServer() {
     }
     const target = new URL(process.env.FEEDBACK_TARGET || env.FEEDBACK_TARGET || 'http://127.0.0.1:5174')
     const headers = { host: req.headers.host, accept: 'application/json', 'x-forwarded-for': req.ip }
-    for (const name of ['authorization', 'content-type', 'content-length', 'idempotency-key', 'origin', 'x-fp-api-mode', 'x-fp-legacy-key']) {
+    for (const name of ['authorization', 'content-type', 'content-length', 'idempotency-key', 'origin']) {
       if (req.headers[name]) headers[name] = req.headers[name]
     }
     const upstream = (target.protocol === 'https:' ? https : http).request({
@@ -192,7 +227,7 @@ async function createServer() {
         tpl = await vite.transformIndexHtml(pageUrl, template)
         renderFn = (await vite.ssrLoadModule('/src/entry-server.ts')).render
       }
-      const result = await renderFn(pageUrl, requestMode(req, { ...env, ...process.env }))
+      const result = await renderFn(pageUrl)
       let cssLinks = ''
       if (!isProd && vite) {
         cssLinks = collectDevCssLinks(vite, result.modules)
@@ -204,7 +239,7 @@ async function createServer() {
 
     try {
       const { html, status } = await renderPage(url)
-      res.status(status).set({ 'Content-Type': 'text/html', Vary: 'Cookie' }).end(html)
+      res.status(status).set({ 'Content-Type': 'text/html' }).end(html)
     } catch (e) {
       if (!isProd && vite) vite.ssrFixStacktrace(e)
       console.error(e)
@@ -222,10 +257,13 @@ async function createServer() {
   })
 
   const server = app.listen(port, '127.0.0.1', () => {
-    console.log(`FishPi SSR http://127.0.0.1:${port} (v1 → ${backendTarget('v1', { ...env, ...process.env })}, v3 → ${backendTarget('v3', { ...env, ...process.env })})`)
+    console.log(`FishPi SSR http://127.0.0.1:${port} (api → ${apiTarget})`)
   })
-  server.on('upgrade', (req, socket, head) => handleApiUpgrade(req, socket, head, { ...env, ...process.env }))
-
+  if (!isProd) {
+    server.on('upgrade', (req, socket, head) => {
+      if (/^\/api\/v3\/realtime(?:\?|$)/.test(req.url || '')) proxyWsUpgrade(req, socket, head)
+    })
+  }
 }
 
 createServer()

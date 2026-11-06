@@ -22,7 +22,7 @@ const port = reservation.address().port
 await new Promise(resolve => reservation.close(resolve))
 const site = `http://127.0.0.1:${port}`
 const child = spawn(process.execPath, ['server.js'], {
-  env: { ...process.env, NODE_ENV: 'development', PORT: String(port), VITE_API_TARGET: target, VITE_API_MODE: 'v3', VITE_API_V3_TARGET: target },
+  env: { ...process.env, NODE_ENV: 'development', PORT: String(port), VITE_API_TARGET: target },
   stdio: ['ignore', 'pipe', 'pipe'],
 })
 let output = ''

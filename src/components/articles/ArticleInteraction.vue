@@ -1,12 +1,114 @@
 <script setup lang="ts">
-import { getApiMode } from '@/api/mode'
-import type { ArticleInteractionKind,InteractionResource } from '@/api/v3-article-interactions'
-import LegacyArticleVote from './LegacyArticleVote.vue'
-import LegacyCommentVote from './LegacyCommentVote.vue'
-import LegacyArticleReward from './LegacyArticleReward.vue'
-import LegacyContentCapability from './LegacyContentCapability.vue'
-import V3ArticleInteraction from './V3ArticleInteraction.vue'
-withDefaults(defineProps<{kind:ArticleInteractionKind;articleId:string;initialPrice?:number;resource?:InteractionResource;source?:import('@/api/legacy/reactions').LegacyReactionSource}>(),{initialPrice:0,resource:'articles'})
-const emit=defineEmits<{contentClick:[event:MouseEvent];accepted:[]}>()
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { getAuthContextVersion } from '@/api/http'
+import { readArticleInteraction, readArticleRewardHtml, type ArticleInteractionKind, type ArticleInteractionState, type VoteChoice, type InteractionResource } from '@/api/v3-article-interactions'
+import { fpConfirm } from '@/composables/useDialog'
+import { useAuthStore } from '@/stores/auth'
+import { useV3ArticleInteractionsStore } from '@/stores/v3ArticleInteractions'
+const props = withDefaults(defineProps<{ kind:ArticleInteractionKind; articleId:string; initialPrice?:number; resource?:InteractionResource }>(),{initialPrice:0,resource:'articles'})
+const emit = defineEmits<{ contentClick:[event:MouseEvent]; accepted:[] }>()
+const route = useRoute(), { accessToken, account } = storeToRefs(useAuthStore()), operations = useV3ArticleInteractionsStore()
+const mounted=ref(false), state=ref<ArticleInteractionState|null>(null), loading=ref(false), confirming=ref(false), error=ref(''), html=ref('')
+const loggedIn=computed(()=>mounted.value && !!accessToken.value && !!account.value)
+const pending=computed(()=>operations.commands[(props.resource === 'comments' ? 'comments:' : '')+props.kind+':'+props.articleId])
+const vote=computed(()=>state.value?.kind === 'vote' ? state.value : null)
+const thanks=computed(()=>state.value?.kind === 'thanks' ? state.value : null)
+const acceptance=computed(()=>state.value?.kind === 'accept' ? state.value : null)
+const reward=computed(()=>state.value?.kind === 'reward' ? state.value : null)
+const price=computed(()=>reward.value?.rewardPoint ?? props.initialPrice)
+const busy=computed(()=>loading.value || confirming.value || !!pending.value?.busy)
+const label=computed(()=>props.kind === 'vote' ? '投票' : props.kind === 'thanks' ? '感谢' : props.kind === 'accept' ? '采纳' : '打赏')
+let sequence=0,boundary=''
+let confirmation:AbortController|null=null
+function identity(){ return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId || ''}:${props.resource}:${props.kind}:${props.articleId}` }
+function clear(keepState=false){ confirmation?.abort(); confirmation=null; sequence++; if(!keepState)state.value=null; html.value=''; error.value=''; loading.value=false; confirming.value=false }
+async function load(afterWrite=false){
+  if (!loggedIn.value || loading.value || props.kind === 'reward' && props.initialPrice < 1) return
+  const current=++sequence,reader=identity(),kind=props.kind,id=props.articleId
+  const valid=()=>mounted.value && loggedIn.value && current === sequence && reader === identity()
+  loading.value=true; error.value=''; if(!afterWrite)state.value=null; html.value=''
+  try {
+    const result=await readArticleInteraction(kind,id,props.resource)
+    if (!valid()) return
+    const content=result.kind === 'reward' && result.rewarded ? await readArticleRewardHtml(id) : ''
+    if (valid()) { state.value=result; html.value=content }
+  } catch(reason){ if(valid()) { state.value=null; html.value=''; error.value=(afterWrite?'操作已确认，读取当前状态失败：':'')+(reason instanceof Error ? reason.message : '互动读取失败') } }
+  finally { if(valid()) loading.value=false }
+}
+async function submit(choice:VoteChoice=null,recover=false){
+  if (!loggedIn.value || busy.value || pending.value && !recover || !state.value && !pending.value) return
+  const reader=identity(),id=props.articleId,kind=props.kind,current=state.value,recovery=pending.value
+  const valid=()=>mounted.value && loggedIn.value && reader === identity()
+  error.value=''
+  try {
+    if (!recovery && kind !== 'vote') {
+      if (current?.kind === 'thanks' && (current.thanked || current.canThank === false) || current?.kind === 'accept' && (current.accepted || !current.canAccept) || current?.kind === 'reward' && (current.rewarded || current.rewardPoint < 1)) return
+      const cost=current?.kind === 'thanks' ? current.thankPoint : current?.kind === 'reward' ? current.rewardPoint : current?.kind === 'accept' ? current.offerPoint : null
+      if (cost === null) return
+      confirming.value=true
+      const controller=new AbortController(); confirmation=controller
+      const confirmed=await fpConfirm({signal:controller.signal,title:`${label.value}确认`,message:`当前${label.value}费用为 ${cost} 积分，实际按提交时平台规则结算。是否继续？`,confirmText:`确认${label.value}`})
+      if(confirmation === controller) confirmation=null
+      if (!valid() || !confirmed || state.value !== current) return
+    }
+    if (valid()) await operations.set(kind,id,recovery ? recovery.choice : choice,props.resource)
+  } catch(reason){ if(valid()) error.value=reason instanceof Error ? reason.message : '互动失败' }
+  finally { if(valid()) confirming.value=false }
+}
+watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.articleId,()=>props.resource],()=>{ const next=identity(); if(next === boundary)return; boundary=next; clear(); void load() },{flush:'sync'})
+watch(()=>operations.lastChange,change=>{if(change.resource === props.resource && change.kind === props.kind && (change.targetId === props.articleId || change.kind === 'accept' && change.resource === 'comments')){clear(true);void load(true);if(change.kind === 'accept' && change.targetId === props.articleId)emit('accepted')}},{flush:'sync'})
+onMounted(()=>{mounted.value=true;boundary=identity();void load()})
+onBeforeUnmount(()=>{mounted.value=false;clear()})
 </script>
-<template><LegacyArticleVote v-if="getApiMode()==='v1'&&kind==='vote'&&resource==='articles'" :article-id="articleId" /><LegacyCommentVote v-else-if="getApiMode()==='v1'&&kind==='vote'&&resource==='comments'" :comment-id="articleId" :source="source" /><LegacyArticleReward v-else-if="getApiMode()==='v1'&&kind==='reward'&&resource==='articles'" :article-id="articleId" :initial-price="initialPrice" @content-click="emit('contentClick',$event)" /><LegacyContentCapability v-else-if="getApiMode()==='v1' && (kind==='thanks'||kind==='accept' && resource==='comments')" :capability="kind==='accept'?'comment-accept':resource==='comments'?'comment-thanks':'article-thanks'" /><V3ArticleInteraction v-else-if="getApiMode()==='v3'" :kind="kind" :article-id="articleId" :initial-price="initialPrice" :resource="resource" @content-click="emit('contentClick',$event)" @accepted="emit('accepted')" /></template>
+<template>
+  <section v-if="kind === 'reward' ? initialPrice > 0 : loggedIn" class="article-interaction" :class="{ 'reward-panel': kind === 'reward', 'is-comment': resource === 'comments' }" :aria-label="`${resource === 'comments' ? '评论' : '文章'}${label}`">
+    <template v-if="kind === 'reward'"><h3>🎁 打赏区</h3><p>当前 {{ price }} 积分，正文以当前阅读权限为准。</p></template>
+    <template v-if="loggedIn">
+      <p v-if="loading" class="loading-status" role="status">正在读取{{ label }}状态…</p>
+      <template v-if="pending">
+        <button type="button" :disabled="busy" @click="submit(null,true)">{{ pending.busy ? '正在提交…' : `重试本次${label}` }}</button>
+        <p v-if="!pending.busy">上次操作结果待确认，请恢复同一次操作；刷新页面或退出会清除本地恢复信息。</p>
+      </template>
+      <template v-if="state">
+        <template v-if="vote">
+          <button type="button" class="act-btn vote-up" :aria-disabled="busy || !!pending" :aria-busy="busy" :aria-pressed="vote.vote === 'up'" @click="submit(vote.vote === 'up' ? null : 'up')">{{ vote.vote === 'up' ? '取消赞同' : '赞同' }} · {{ vote.upCount }}</button>
+          <button type="button" class="act-btn vote-down" :aria-disabled="busy || !!pending" :aria-busy="busy" :aria-pressed="vote.vote === 'down'" @click="submit(vote.vote === 'down' ? null : 'down')">{{ vote.vote === 'down' ? '取消反对' : '反对' }} · {{ vote.downCount }}</button>
+        </template>
+        <button v-else-if="thanks" type="button" class="act-btn act-thanks" :aria-disabled="busy || !!pending || thanks.thanked || thanks.canThank === false" :aria-busy="busy" @click="submit()">{{ thanks.thanked ? '已感谢' : `感谢（${thanks.thankPoint}积分）` }} · {{ thanks.thankCount }}</button>
+        <template v-else-if="acceptance">
+          <p v-if="acceptance.accepted" class="accepted-badge">✓ 已采纳</p>
+          <button v-else-if="acceptance.canAccept" type="button" class="act-btn act-accept" :aria-disabled="busy || !!pending" :aria-busy="busy" @click="submit()">采纳（{{ acceptance.offerPoint }}积分）</button>
+        </template>
+        <template v-else-if="reward">
+          <p v-if="reward.rewarded">已解锁打赏区</p>
+          <button v-else type="button" class="act-btn act-reward" :aria-disabled="busy || !!pending || price < 1" :aria-busy="busy" @click="submit()">{{ price > 0 ? `打赏 ${price} 积分` : '当前未启用打赏' }}</button>
+        </template>
+      </template>
+      <button v-else-if="!loading && !pending" type="button" class="reread-btn" :class="{ 'is-hidden': !error }" :disabled="busy" @click="load()">重读{{ label }}状态</button>
+      <template v-if="reward?.rewarded && !loading && !error"><div v-if="html" class="reward-content" v-html="html" @click="emit('contentClick',$event)" /><p v-else>打赏区暂无内容</p></template>
+      <p v-if="error || pending?.error" role="alert">{{ error || pending?.error }}</p>
+      <p v-if="kind !== 'vote' && operations.balanceError" role="status">{{ operations.balanceError }}</p>
+    </template>
+    <RouterLink v-else :to="{path:'/login',query:{redirect:mounted?route.fullPath:route.fullPath.split('#')[0]}}">登录后打赏</RouterLink>
+  </section>
+</template>
+<style scoped lang="scss">
+.article-interaction { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: 100%; overflow-wrap: anywhere;
+  .loading-status, .reread-btn.is-hidden { display: none !important; }
+  p { margin: 4px 0; font-size: 12px; }
+  button { display: inline-flex; align-items: center; gap: 4px; height: 28px; border: 1px solid var(--fp-border); border-radius: 999px; padding: 0 11px; font-size: 12.5px; color: var(--fp-text); background: var(--fp-card); cursor: pointer; transition: border-color .15s, background-color .15s, color .15s; &:hover:not(:disabled):not([aria-disabled='true']) { background: var(--fp-hover); } }
+  .vote-up::before { content: '▲'; font-size: 10px; opacity: .75; }
+  .vote-down::before { content: '▼'; font-size: 10px; opacity: .75; }
+  .act-thanks::before { content: '♥'; font-size: 11px; opacity: .8; color: #e05d44; }
+  .act-accept::before { content: '✓'; font-size: 11px; opacity: .85; }
+  .accepted-badge { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: #2d8a56; background: rgba(45, 138, 86, 0.12); }
+  &.is-comment { gap: 4px; button { height: 24px; padding: 0 7px; border: 0; font-size: 12px; background: transparent; color: var(--fp-muted); &:hover:not(:disabled):not([aria-disabled='true']) { background: var(--fp-hover); color: var(--fp-title); } } }
+  button:disabled, button[aria-disabled='true'] { opacity: .5; cursor: default; }
+  button[aria-pressed='true'] { color: var(--fp-primary); border-color: var(--fp-primary); background: var(--fp-primary-soft, rgba(105, 170, 105, 0.14)); font-weight: 500; }
+  [role='alert'] { color: #c34a36; }
+}
+.reward-panel { display: block; padding: 12px 14px; margin: 10px 0; border: 1px dashed var(--fp-border); border-radius: 10px; background: var(--fp-bg); h3 { margin: 0 0 6px; font-size: 14px; } }
+.reward-content { min-width: 0; :deep(img), :deep(video) { max-width: 100%; height: auto; } :deep(pre) { overflow-x: auto; } }
+</style>

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { getApiMode } from '@/api/mode'
 import { getAuthContextVersion } from '@/api/http'
 import { uploadV3Files, uploadedMarkdown } from '@/api/v3-uploads'
 import { useAuthStore } from '@/stores/auth'
@@ -13,9 +12,7 @@ const color = ref('#222222')
 const size = ref(3)
 const busy = ref(false)
 const err = ref('')
-const credential = computed(() => getApiMode()==='v1'?auth.apiKey:auth.accessToken)
-const identity = computed(() => JSON.stringify([getAuthContextVersion(),getApiMode()==='v1'?credential.value:!!credential.value,auth.account?.oId||'']))
-const loggedIn = computed(() => !!credential.value && !!auth.account?.oId)
+const loggedIn = computed(() => !!auth.accessToken && !!auth.account?.oId)
 let upload: AbortController | null = null, disposed = false
 function cancelUpload() { upload?.abort(); upload = null; busy.value = false }
 
@@ -94,11 +91,11 @@ async function submit() {
   const c = canvasRef.value
   if (!c || busy.value || !loggedIn.value || !strokes.value.length || disposed) return
   onUp()
-  const abort = new AbortController(), context = identity.value, owner = auth.account!.oId
+  const abort = new AbortController(), context = getAuthContextVersion(), owner = auth.account!.oId
   upload = abort
   busy.value = true
   err.value = ''
-  const currentUpload = () => !disposed && upload === abort && !abort.signal.aborted && loggedIn.value && owner === auth.account?.oId && context === identity.value
+  const currentUpload = () => !disposed && upload === abort && !abort.signal.aborted && loggedIn.value && owner === auth.account?.oId && context === getAuthContextVersion()
   try {
     const blob = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, 'image/png'))
     if (!currentUpload()) return
@@ -121,7 +118,7 @@ async function submit() {
   }
 }
 
-watch(identity, () => {
+watch(() => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || '']), () => {
   cancelUpload(); onUp(); strokes.value = []; err.value = ''; redraw()
 }, { flush: 'sync' })
 

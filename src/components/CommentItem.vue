@@ -14,20 +14,15 @@ import MedalList from '@/components/medal/MedalList.vue'
 const props = withDefaults(
   defineProps<{
     comment: ArticleComment
-    reactionSource?: import('@/api/legacy/reactions').LegacyReactionSource
     /** 楼中楼回复：小头像、紧凑间距、相对时间 */
     reply?: boolean
     replyTo?: string
     loggedIn?: boolean
     commentingEnabled?: boolean
     own?: boolean
-    manage?: boolean
-    removeAllowed?: boolean
-    managementBusy?: boolean
     /** 只展示，不提供任何操作（如优质回帖） */
     readonly?: boolean
     editing?: boolean
-    apiKey?: string | null
     /** 长篇文章评论不展示勋章（与现网一致） */
     hideMedals?: boolean
   }>(),
@@ -37,12 +32,8 @@ const props = withDefaults(
     loggedIn: false,
     commentingEnabled: true,
     own: false,
-    manage: true,
-    removeAllowed: false,
-    managementBusy: false,
     readonly: false,
     editing: false,
-    apiKey: '',
     hideMedals: false,
   },
 )
@@ -98,23 +89,22 @@ function onBodyClick(e: MouseEvent) {
         <div v-else class="cmt-body" @click="onBodyClick" v-html="comment.commentContent || ''" />
 
         <footer class="cmt-ops">
-          <V3ReactionBar kind="comment" :target-id="comment.oId" :readonly="readonly" :source="reactionSource" />
+          <V3ReactionBar kind="comment" :target-id="comment.oId" :readonly="readonly" />
           <template v-if="interactive">
-            <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" :source="reactionSource" />
+            <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" />
             <ArticleInteraction resource="comments" kind="thanks" :article-id="comment.oId" />
             <ArticleInteraction resource="comments" kind="accept" :article-id="comment.oId" @accepted="emit('accepted')" />
             <button v-if="commentingEnabled" type="button" class="op op-reply idle" @click="commentingEnabled && emit('reply')">回复</button>
-            <button v-if="own && manage && commentingEnabled" type="button" class="op op-edit idle" @click="commentingEnabled && emit('edit')">编辑</button>
-            <button v-if="own && (manage || removeAllowed)" type="button" class="op op-del idle danger" :aria-disabled="managementBusy" @click="!managementBusy && emit('remove')">删除</button>
+            <button v-if="own && commentingEnabled" type="button" class="op op-edit idle" @click="commentingEnabled && emit('edit')">编辑</button>
+            <button v-if="own" type="button" class="op op-del idle danger" @click="emit('remove')">删除</button>
+
           </template>
           <template v-else>
             <span v-if="goodCnt" class="op static">👍{{ goodCnt }}</span>
             <span v-if="thankCnt" class="op static">❤️{{ thankCnt }}</span>
           </template>
           <RevisionHistory kind="comment" :target-id="comment.oId" class="cmt-history" />
-          <span v-if="interactive && !own" class="op-report idle">
-            <ReportDialog :data-id="comment.oId" :data-type="1" />
-          </span>
+          <span v-if="interactive && !own" class="op-report idle"><ReportDialog :data-id="comment.oId" :data-type="1" /></span>
         </footer>
       </div>
     </div>

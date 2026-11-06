@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import ts from 'typescript'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'", "from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'"),url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__zipCaptcha=0
 const risk=url('export async function ensureRiskCaptcha(){globalThis.__zipCaptcha++}')
 let code=compile(await fs.readFile('src/api/http.ts','utf8')).replace("from '@/utils/riskCaptcha'",`from '${risk}'`).replaceAll('import.meta.env.SSR','false').replaceAll('import.meta.env.VITE_API_TARGET',"''")

@@ -1,5 +1,4 @@
 import { ApiError, request } from './http'
-import {getApiMode} from './mode'
 
 export const statisticFields = [
   ['memberCount', '用户数'], ['articleCount', '文章数'], ['commentCount', '评论数'],
@@ -22,7 +21,6 @@ export function decodeStatistics(value: unknown): CommunityStatistics {
 }
 
 export async function fetchStatistics(): Promise<CommunityStatistics> {
-  if(getApiMode()==='v1')return (await import('./legacy/statistics')).legacyStatistics()
   const envelope = await request<{ code: number; data: unknown }>('/api/v3/statistics', { cache: 'no-store' })
   if (!envelope || envelope.code !== 0) throw new ApiError('统计响应格式不正确', 502)
   return decodeStatistics(envelope.data)

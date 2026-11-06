@@ -1,5 +1,3 @@
-import { getApiMode } from './mode'
-import { decodeLegacyDirectoryPage, legacyDirectory } from './legacy/directory'
 import { ApiError, request } from './http'
 import { adaptV3Domain, adaptV3Tag, decodeV3ContentPage } from './v3-content'
 import type { DomainItem, TagItem } from './fishpi'
@@ -17,7 +15,6 @@ function project(kind: DirectoryKind, value: unknown) {
 }
 export function decodeDirectoryPage(value: unknown, kind: DirectoryKind, p = 1): DirectoryPage {
   if (kind !== 'domains' && kind !== 'tags') throw invalid()
-  if(getApiMode()==='v1')return decodeLegacyDirectoryPage(value,kind,p)
   const raw = value as DirectoryPage
   if (!raw || raw.kind !== kind || raw.p !== p || raw.size !== 50 || !Array.isArray(raw.list)) throw invalid()
   const data = decodeV3ContentPage({ list: raw.list.map(item => {
@@ -31,7 +28,6 @@ export function decodeDirectoryPage(value: unknown, kind: DirectoryKind, p = 1):
 }
 export async function fetchDirectoryPage(kind: DirectoryKind, p = 1): Promise<DirectoryPage> {
   if (!['domains', 'tags'].includes(kind) || !Number.isSafeInteger(p) || p < 1 || p > 42949672) throw new ApiError('目录分页参数不合法', 422)
-  if(getApiMode()==='v1')return legacyDirectory(kind,p)
   const raw = await request<{ code: number; msg?: string; data?: unknown }>(`/api/v3/${kind}?p=${p}&size=50`, { cache: 'no-store' })
   if (raw.code !== 0) throw new ApiError(raw.msg || '目录读取失败', 400)
   const data = decodeV3ContentPage(raw.data)

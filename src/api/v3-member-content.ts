@@ -1,4 +1,3 @@
-import {getApiMode} from './mode'
 import { ApiError, request } from './http'
 import { publicUserName } from './v3-public-user'
 import { adaptV3Article, adaptV3Comment, decodeV3ContentPage } from './v3-content'
@@ -12,7 +11,6 @@ const invalid = () => new ApiError('用户内容响应格式不正确', 502)
 export async function fetchMemberContent(userName: string, kind: MemberContentKind, p = 1): Promise<MemberContentPage> {
   publicUserName(userName)
   if (!['home', 'long', 'comments', 'breezemoons'].includes(kind) || !Number.isSafeInteger(p) || p < 1 || p > 42949672) throw new ApiError('用户内容参数不合法', 422)
-  if(getApiMode()==='v1')return(await import('./legacy/member-content')).legacyMemberContent(userName,kind,p)
   const suffix = kind === 'home' || kind === 'long' ? 'articles' : kind
   const envelope = await request<{ code: number; data: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}/${suffix}?p=${p}&size=20${suffix === 'articles' ? `&sort=latest&type=${kind === 'long' ? 'long' : 'recent'}` : ''}`, { cache: 'no-store' })
   if (!envelope || envelope.code !== 0) throw invalid()
@@ -33,7 +31,6 @@ export async function fetchMemberContent(userName: string, kind: MemberContentKi
 }
 export async function fetchMemberMoon(userName: string, id: string) {
   publicUserName(userName)
-  if(getApiMode()==='v1')throw new ApiError('旧接口不支持按编号读取单条用户清风，请返回用户清风列表查看',501)
   const moon = await fetchV3Breezemoon(id)
   if (moon.author.userName.toLowerCase() !== userName.toLowerCase()) throw new ApiError('这条清风明月不属于当前用户', 404)
   return moon

@@ -10,12 +10,10 @@ import ChatMusicRecovery from '@/components/chat/ChatMusicRecovery.vue'
 import ChatBarrageEditor from '@/components/chat/ChatBarrageEditor.vue'
 import ChatBarrageRecovery from '@/components/chat/ChatBarrageRecovery.vue'
 import {useChatMessageSource} from '@/composables/useChatMessageSource'
-import {getApiMode} from '@/api/mode'
 import {getAuthContextVersion} from '@/api/http'
 import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
 import ChatRevokeAction from '@/components/chat/ChatRevokeAction.vue'
 import ChatRevokeRecovery from '@/components/chat/ChatRevokeRecovery.vue'
-import LegacyChatRecovery from '@/components/chat/LegacyChatRecovery.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
 import ChatTopicEditor from '@/components/chat/ChatTopicEditor.vue'
 import ChatTopicRecovery from '@/components/chat/ChatTopicRecovery.vue'
@@ -39,8 +37,7 @@ import FpDialog from '@/components/FpDialog.vue'
 const auth = useAuthStore()
 const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const chatFilter = useChatFilterStore()
-const { account, isLoggedIn, apiKey, accessToken } = storeToRefs(auth)
-const roomCredential=computed(()=>getApiMode()==='v1'?apiKey.value:accessToken.value)
+const { account, isLoggedIn, accessToken } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 const composerReady = ref(false)
 const {
@@ -88,8 +85,8 @@ const me = computed(() => account.value?.userName)
 const classicMessages = computed(() => [...visibleMessages.value].reverse())
 
 const route=useRoute(),router=useRouter(),contextId=ref('')
-function syncContextHash(){const match=/^#chatroom(\d{1,32})$/.exec(route.hash);contextId.value=roomCredential.value&&account.value?.oId&&match?match[1]!:''}
-watch(()=>JSON.stringify([route.hash,!!roomCredential.value,account.value?.oId||'']),syncContextHash,{immediate:true})
+function syncContextHash(){const match=/^#chatroom(\d{1,32})$/.exec(route.hash);contextId.value=accessToken.value&&account.value?.oId&&match?match[1]!:''}
+watch(()=>JSON.stringify([route.hash,!!accessToken.value,account.value?.oId||'']),syncContextHash,{immediate:true})
 function openContext(id:string){void router.push({hash:'#chatroom'+id})}
 function closeContext(){contextId.value='';if(/^#chatroom\d{1,32}$/.test(route.hash))void router.replace({hash:''})}
 async function latestFromContext(){closeContext();await chat.refreshMessages();await nextTick();if(chatStyle.value==='modern')scrollBottom()}
@@ -205,7 +202,7 @@ function clearScreen() {
 
 <template>
   <div class="cr-page" :class="`theme-${chatStyle}`">
-    <LegacyChatRecovery /><ChatPublicationRecovery @confirmed="acceptConfirmed" />
+    <ChatPublicationRecovery @confirmed="acceptConfirmed" />
     <ChatRevokeRecovery />
     <ChatTopicRecovery />
     <ChatBarrageRecovery />
@@ -226,11 +223,10 @@ function clearScreen() {
               v-if="composerReady && isLoggedIn"
               ref="composerRef"
               v-model="draft"
-              :api-key="apiKey"
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"
               placeholder="说点什么吧！"
               :sending="sending"
-              :disabled="!!(publication.pending||chat.legacyPending)"
+              :disabled="!!publication.pending"
               :allow-empty="Boolean(quote)"
               @submit="submit"
             >
@@ -336,13 +332,13 @@ function clearScreen() {
               <template #actions>
                 <button type="button" @click="openContext(msg.oId)">上下文</button>
                 <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
-                <template v-if="!msg.redPacket && roomCredential">
+                <template v-if="!msg.redPacket && accessToken">
                   <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
                     {{ quoteBusy === msg.oId ? '…' : '引用' }}
                   </button>
                   <button type="button" title="查看原文" @click="showRaw(msg.oId)">原文</button>
                 </template>
-                <ReportDialog v-if="msg.userOId !== auth.account?.oId && roomCredential" :data-id="msg.oId" :data-type="3" />
+                <ReportDialog v-if="msg.userOId !== auth.account?.oId && auth.accessToken" :data-id="msg.oId" :data-type="3" />
               </template>
             </ChatBubble>
 
@@ -447,13 +443,13 @@ function clearScreen() {
               <template #actions>
                 <button type="button" @click="openContext(msg.oId)">上下文</button>
                 <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
-                <template v-if="!msg.redPacket && roomCredential">
+                <template v-if="!msg.redPacket && accessToken">
                   <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
                     {{ quoteBusy === msg.oId ? '…' : '引用' }}
                   </button>
                   <button type="button" title="查看原文" @click="showRaw(msg.oId)">原文</button>
                 </template>
-                <ReportDialog v-if="msg.userOId !== auth.account?.oId && roomCredential" :data-id="msg.oId" :data-type="3" />
+                <ReportDialog v-if="msg.userOId !== auth.account?.oId && auth.accessToken" :data-id="msg.oId" :data-type="3" />
               </template>
             </ChatBubble>
           </div>
@@ -469,11 +465,10 @@ function clearScreen() {
             <ChatComposer
               ref="composerRef"
               v-model="draft"
-              :api-key="apiKey"
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"
               placeholder="说点什么吧！"
               :sending="sending"
-              :disabled="!!(publication.pending||chat.legacyPending)"
+              :disabled="!!publication.pending"
               :allow-empty="Boolean(quote)"
               @submit="submit"
             >

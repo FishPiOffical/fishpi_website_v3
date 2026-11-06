@@ -27,7 +27,7 @@ async function page(next: number) { await read(next); document.getElementById('d
       <p v-else-if="!value" class="err">{{ label }}尚未读取</p>
       <template v-else>
         <p v-if="!value.list.length" class="err">本页暂无{{ label }}</p>
-        <ul v-if="tags.length" class="tag-grid"><li v-for="tag in tags" :key="tag.tagURI"><RouterLink :to="'/tag/' + encodeURIComponent(tag.tagURI)" class="tag-card"><img v-if="tag.tagIconPath" :src="tag.tagIconPath" alt="" /><strong>{{ tag.tagTitle }}</strong><em>{{ tag.tagReferenceCount }}</em></RouterLink></li></ul>
+        <ul v-if="tags.length" class="tag-grid"><li v-for="tag in tags" :key="tag.tagURI"><RouterLink :to="'/tag/' + tag.tagURI" class="tag-card"><img v-if="tag.tagIconPath" :src="tag.tagIconPath" alt="" /><strong>{{ tag.tagTitle }}</strong><em>{{ tag.tagReferenceCount }}</em></RouterLink></li></ul>
         <div class="pagination-bar">
           <button type="button" class="btn page-btn" :disabled="p <= 1" @click="page(p - 1)">‹ 上一页</button>
           <span class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span>

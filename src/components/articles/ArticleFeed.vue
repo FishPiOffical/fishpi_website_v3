@@ -127,7 +127,6 @@ function avatarOf(a: ArticleSummary) {
               >
                 <VipNickname :user-id="item.articleAuthorId" :user-name="item.articleAuthorName" :text="item.articleAuthorNickname || item.articleAuthorName" />
               </RouterLink>
-              <span v-if="item.articleIdentityUnavailable" class="author-name">作者信息未提供</span>
               <span v-if="item.articleAnonymous === 1" class="author-name">匿名用户</span>
               <span v-if="item.articleAuthorIntro && item.articleAnonymous !== 1" class="author-intro">
                 - {{ item.articleAuthorIntro }}

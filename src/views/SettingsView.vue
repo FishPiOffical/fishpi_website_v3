@@ -4,11 +4,8 @@ import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import AppearancePicker from '@/components/packs/AppearancePicker.vue'
 import EmojiPacks from '@/components/EmojiPacks.vue'
-import LegacyEmojiPacks from '@/components/LegacyEmojiPacks.vue'
-import { getApiMode } from '@/api/mode'
 import OwnerProfileSettings from '@/components/settings/OwnerProfileSettings.vue'
 import OwnerPreferences from '@/components/settings/OwnerPreferences.vue'
-import SettingsApiCapability from '@/components/settings/SettingsApiCapability.vue'
 import OwnerGameSaves from '@/components/settings/OwnerGameSaves.vue'
 import OwnerAppLogin from '@/components/settings/OwnerAppLogin.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -110,7 +107,7 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
         <AppearancePicker />
         <template v-if="isLoggedIn">
           <p class="hint">以下皮肤选项用于经典页面的桌面与移动显示。</p>
-          <SettingsApiCapability v-if="isLoggedIn" capability="preferences" title="站点皮肤"><OwnerPreferences key="site-skins" resource="display" title="站点皮肤" :fields="['skin', 'mobileSkin']" /></SettingsApiCapability>
+          <OwnerPreferences key="site-skins" resource="display" title="站点皮肤" :fields="['skin', 'mobileSkin']" />
         </template>
       </section>
 
@@ -128,7 +125,7 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
 
           <OwnerSecurity />
 
-          <SettingsApiCapability v-if="isLoggedIn" capability="app-login" title="APP 扫码登录"><OwnerAppLogin /></SettingsApiCapability>
+          <OwnerAppLogin />
 
         </template>
       </section>
@@ -136,19 +133,18 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
       <section v-if="tab === 'function'" class="card">
         <h1>功能</h1>
         <template v-if="isLoggedIn">
-          <SettingsApiCapability v-if="isLoggedIn" capability="preferences" title="功能设置"><OwnerPreferences key="functions" resource="functions" title="功能设置" /></SettingsApiCapability>
-          <SettingsApiCapability v-if="isLoggedIn" capability="preferences" title="显示设置"><OwnerPreferences key="display-modes" resource="display" title="显示设置" :fields="['commentViewMode', 'avatarViewMode']" /></SettingsApiCapability>
+          <OwnerPreferences key="functions" resource="functions" title="功能设置" />
+          <OwnerPreferences key="display-modes" resource="display" title="显示设置" :fields="['commentViewMode', 'avatarViewMode']" />
           <h2>表情包</h2>
-          <LegacyEmojiPacks v-if="getApiMode() === 'v1'" />
-          <EmojiPacks v-else />
+          <EmojiPacks />
         </template>
       </section>
 
       <section v-if="tab === 'privacy'" class="card">
         <h1>隐私</h1>
         <template v-if="isLoggedIn">
-          <SettingsApiCapability v-if="isLoggedIn" capability="preferences" title="隐私设置"><OwnerPreferences key="privacy" resource="privacy" title="隐私设置" /></SettingsApiCapability>
-          <SettingsApiCapability v-if="isLoggedIn" capability="preferences" title="地理位置公开设置"><OwnerPreferences key="location" resource="location" title="地理位置公开设置" /></SettingsApiCapability>
+          <OwnerPreferences key="privacy" resource="privacy" title="隐私设置" />
+          <OwnerPreferences key="location" resource="location" title="地理位置公开设置" />
         </template>
       </section>
 
@@ -170,24 +166,24 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
       </section>
 
       <section v-if="tab === 'invite'" class="card">
-        <h1>邀请</h1><SettingsApiCapability v-if="isLoggedIn" capability="invitations" title="邀请码"><OwnerInvitations v-if="isLoggedIn" /></SettingsApiCapability>
+        <h1>邀请</h1><OwnerInvitations v-if="isLoggedIn" />
       </section>
 
       <section v-if="tab === 'identity'" class="card">
         <h1>官方身份认证</h1>
-        <SettingsApiCapability v-if="isLoggedIn" capability="identity" title="身份认证"><OwnerIdentityApplication v-if="isLoggedIn" /></SettingsApiCapability>
+        <OwnerIdentityApplication v-if="isLoggedIn" />
       </section>
 
       <section v-if="tab === 'data'" class="card">
         <h1>本人数据</h1>
         <nav v-if="isLoggedIn && account" aria-label="本人匿名创作入口"><RouterLink :to="`/member/${encodeURIComponent(account.userName)}/articles/anonymous`">本人匿名文章</RouterLink> · <RouterLink :to="`/member/${encodeURIComponent(account.userName)}/comments/anonymous`">本人匿名评论</RouterLink></nav>
-        <SettingsApiCapability v-if="isLoggedIn" capability="export" title="本人内容导出"><OwnerPostExport v-if="isLoggedIn" /></SettingsApiCapability>
+        <OwnerPostExport v-if="isLoggedIn" />
         <OwnerGameSaves v-if="isLoggedIn" />
       </section>
 
       <section v-if="tab === 'i18n'" class="card">
         <h1>语言与时区</h1>
-        <SettingsApiCapability v-if="isLoggedIn" capability="preferences" title="语言与时区"><OwnerPreferences v-if="isLoggedIn" key="locale" resource="locale" title="语言与时区" /></SettingsApiCapability>
+        <OwnerPreferences v-if="isLoggedIn" key="locale" resource="locale" title="语言与时区" />
       </section>
 
       <section v-if="tab === 'help'" class="card">

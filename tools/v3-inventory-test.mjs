@@ -41,7 +41,7 @@ let release;state.responses.push(()=>new Promise(r=>release=r));const running=st
 let releaseRead;__inventoryAPI.fetchV3Bag=async()=>new Promise(r=>releaseRead=r);const read=store.load();await until(()=>!!releaseRead);auth.accessToken=null;releaseRead([{code:'PRIVATE',count:1}]);await read;assert.equal(store.items,null)
 auth.accessToken='D';state.SSR=true;count=state.requests.length;await store.use({kind:'points',userName:'Other'});assert.equal(state.requests.length,count);state.SSR=false
 console.log('PASS inventory 5 identity boundaries reject delayed write/read results, clear pending private state and SSR never submits')
-const descriptor=parse(await fs.readFile('src/components/settings/V3OwnerInventory.vue','utf8')).descriptor;let component=compile(compileScript(descriptor,{id:'inventory-component',inlineTemplate:true}).content)
+const descriptor=parse(await fs.readFile('src/components/settings/OwnerInventory.vue','utf8')).descriptor;let component=compile(compileScript(descriptor,{id:'inventory-component',inlineTemplate:true}).content)
 globalThis.__inventoryStore=()=>store
 const storePort=url('export const useV3InventoryStore=globalThis.__inventoryStore'),componentAPIPort=url(`export const usableCards=['checkin1day','checkin2days','patchCheckinCard','nameCard']`)
 for(const[from,to]of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/stores/auth',authPort],['@/stores/v3Inventory',storePort],['@/api/v3-inventory',componentAPIPort]])component=component.replace(new RegExp(`from ['"]${from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}['"]`,'g'),`from '${to}'`)

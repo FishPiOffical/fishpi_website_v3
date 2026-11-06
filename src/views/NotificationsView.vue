@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import {getApiMode} from '@/api/mode'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -29,8 +28,7 @@ const tabs: { id: NoticeType; label: string; hint: string; unreadKey: keyof Unre
 
 const auth = useAuthStore()
 const notices = useNoticeStore()
-const { account } = storeToRefs(auth)
-const accessToken=computed(()=>getApiMode()==='v1'?auth.apiKey:auth.accessToken)
+const { accessToken, account } = storeToRefs(auth)
 const { unread } = storeToRefs(notices)
 
 function firstUnread(u: UnreadCount): NoticeType {
@@ -42,7 +40,7 @@ const items = ref<NoticeItem[]>([])
 const page = ref(1)
 const pageCount = ref(0)
 let requestVersion = 0, active = true
-function identity() { return JSON.stringify([getAuthContextVersion(), getApiMode()==='v1'?accessToken.value:!!accessToken.value, account.value?.oId || '']) }
+function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
 let boundary = identity()
 const pendingReadKeys = new Map<string, string>()
 const loading = ref(false)
@@ -84,7 +82,7 @@ watch([accessToken, () => account.value?.oId], () => {
   const current = identity()
   if (current === boundary) return
   boundary = current
-  requestVersion++; pendingReadKeys.clear(); marking.value = false; loading.value = false; items.value = []; pageCount.value = 0; page.value = 1; error.value = ''
+  requestVersion++; pendingReadKeys.clear(); marking.value = false; items.value = []; pageCount.value = 0; page.value = 1; error.value = ''
 }, { flush: 'sync' })
 watch(
   () => [accessToken.value, account.value?.oId, type.value, page.value, notices.revision],
@@ -190,7 +188,6 @@ function readAll() { return mark('all') }
     <div class="notification-layout">
       <aside class="category-panel">
         <p class="category-heading">消息分类</p>
-        <p v-if="getApiMode()==='v1'" class="page-summary">旧接口提供最近通知快照，分页仅覆盖本次返回内容。</p>
         <nav class="categories" aria-label="通知分类">
           <button
             v-for="tab in tabs"

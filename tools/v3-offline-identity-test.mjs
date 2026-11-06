@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import http from 'node:http'
 import ts from 'typescript'
 import { ref, reactive, watch, effectScope } from 'vue'
-const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replaceAll("from './mode'", "from 'data:text/javascript,export%20function%20getApiMode()%7Breturn%20%22v3%22%7D'"),url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64')
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64')
 const bodyWaiters=new Map(),requestWaiters=new Map();let refreshCount=0,rejectRefresh=false,heldLoginResponse
 const server=http.createServer((req,res)=>{
  if(req.url==='/api/v3/auth/refresh'){if(rejectRefresh){res.writeHead(401,{'Content-Type':'application/json'});res.end('{"code":"unauthorized","msg":"expired"}');return}res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({code:0,data:{accessToken:'synthetic-rotated-'+(++refreshCount)}}));return}

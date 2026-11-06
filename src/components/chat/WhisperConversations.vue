@@ -10,10 +10,9 @@ import ChatComposer from '@/components/ChatComposer.vue'
 import FpLoading from '@/components/FpLoading.vue'
 import ChatRevokeAction from '@/components/chat/ChatRevokeAction.vue'
 import ChatRevokeRecovery from '@/components/chat/ChatRevokeRecovery.vue'
-import LegacyChatRecovery from '@/components/chat/LegacyChatRecovery.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
 import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
-import PrivateMessages from '@/components/chat/PrivateMessages.vue'
+import V3PrivateMessages from '@/components/chat/V3PrivateMessages.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useChatFilterStore } from '@/stores/chatFilter'
@@ -27,9 +26,9 @@ const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const chatFilter = useChatFilterStore()
 const whispers = usePrivateInboxStore()
 const route = useRoute()
-const { account, apiKey } = storeToRefs(auth)
+const { account } = storeToRefs(auth)
 const {inboxPeer,inboxPeerId}=storeToRefs(whispers)
-const privateFullId=ref(''),privateFullName=ref(''),privateConnection=ref('')
+const privateFullId=ref('')
 const {
   messages: roomMessages,
   connected: roomConnected,
@@ -46,7 +45,7 @@ const selectedPeer = ref('__private__')
 const draft = ref('')
 const isChatroomSelected = computed(() => selectedPeer.value === CHATROOM_PEER)
 const visibleRoomMessages = computed(() => roomMessages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
-const canSend = computed(()=>Boolean(draft.value.trim())&&!roomSending.value&&!(publication.pending||chat.legacyPending))
+const canSend = computed(()=>Boolean(draft.value.trim())&&!roomSending.value&&!publication.pending)
 const roomConnectionLabel = computed(() => roomConnected.value ? '已连接' : roomConnecting.value ? '连接中' : '已断开')
 const scroller = ref<HTMLElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
@@ -345,7 +344,7 @@ onUnmounted(() => {
           <strong>聊天</strong>
           <RouterLink
             class="full-whisper-link"
-            :to="isChatroomSelected?'/cr':privateFullId?{path:privateFullName?'/chat/'+encodeURIComponent(privateFullName):'/chat',query:{peerId:privateFullId}}:'/chat'"
+            :to="isChatroomSelected?'/cr':privateFullId?{path:'/chat',query:{peerId:privateFullId}}:'/chat'"
             :aria-label="isChatroomSelected ? '打开完整聊天室' : '打开完整私信'"
             :title="isChatroomSelected ? '打开完整聊天室' : '打开完整私信'"
             @click="close"
@@ -356,12 +355,11 @@ onUnmounted(() => {
             </svg>
           </RouterLink>
           <div v-if="isCompactPanel && selectedPeer" class="compact-current" role="status" aria-live="polite">
-            <span class="compact-peer" :title="isChatroomSelected ? CHATROOM_LABEL : privateFullName||'私信'">{{ isChatroomSelected ? CHATROOM_LABEL : privateFullName||'私信' }}</span>
+            <span class="compact-peer" :title="isChatroomSelected ? CHATROOM_LABEL : '私信'">{{ isChatroomSelected ? CHATROOM_LABEL : '私信' }}</span>
             <span
               v-if="isChatroomSelected" class="compact-status"
               :class="{ connected: roomConnected, connecting: roomConnecting }"
             >{{ roomConnectionLabel }}</span>
-            <span v-else-if="privateConnection" class="compact-status">{{ privateConnection }}</span>
           </div>
         </div>
         <button type="button" aria-label="关闭聊天" @click="close">✕</button>
@@ -372,11 +370,11 @@ onUnmounted(() => {
           <button type="button" :aria-pressed="isChatroomSelected" @click="selectChatroom">聊天室</button>
         </nav>
         <div v-if="!isChatroomSelected" class="private-panel">
-          <PrivateMessages :initial-name="inboxPeer" :initial-id="inboxPeerId" @connection-change="state=>privateConnection=state" @peer-selected="peer=>{privateFullId=peer.id;privateFullName=peer.userName}" />
+          <V3PrivateMessages :initial-name="inboxPeer" :initial-id="inboxPeerId" @peer-selected="peer=>privateFullId=peer.id" />
         </div>
         <section v-else class="conversation-content">
           <header v-if="!isCompactPanel" class="conversation-head"><strong>{{ CHATROOM_LABEL }}</strong><small>{{ roomConnectionLabel }}</small></header>
-          <LegacyChatRecovery /><ChatPublicationRecovery @confirmed="acceptRoomConfirmed" />
+          <ChatPublicationRecovery @confirmed="acceptRoomConfirmed" />
           <ChatRevokeRecovery />
           <p v-if="roomError" class="error">{{ roomError }}</p>
           <div ref="scroller" class="messages" @scroll.passive="onScroll">
@@ -386,8 +384,8 @@ onUnmounted(() => {
             <ChatBubble v-for="line in visibleRoomMessages" :key="line.oId" :user-name="line.userName" :avatar="line.userAvatarURL" :time="line.time" chatroom :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :self="line.userOId===account?.oId"><ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" /><ChatCard v-else-if="line.card" :card="line.card" /><template #actions><ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" /></template></ChatBubble>
           </div>
           <Transition name="composer-swap" mode="out-in">
-            <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit"><input v-model="draft" type="text" aria-label="聊天室消息" placeholder="说点什么吧…" :disabled="!!(publication.pending||chat.legacyPending)" /><button type="submit" :disabled="!canSend">{{ roomSending?'发送中':'发送' }}</button></form>
-            <ChatComposer v-else v-model="draft" class="composer" :api-key="apiKey" :height="100" compact cache-id="chatroom-drawer" :sending="roomSending" :disabled="!!(publication.pending||chat.legacyPending)" placeholder="说点什么吧，友善第一哦。" @submit="submit" />
+            <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit"><input v-model="draft" type="text" aria-label="聊天室消息" placeholder="说点什么吧…" :disabled="!!publication.pending" /><button type="submit" :disabled="!canSend">{{ roomSending?'发送中':'发送' }}</button></form>
+            <ChatComposer v-else v-model="draft" class="composer" :height="100" compact cache-id="chatroom-drawer" :sending="roomSending" :disabled="!!publication.pending" placeholder="说点什么吧，友善第一哦。" @submit="submit" />
           </Transition>
         </section>
       <button
@@ -416,8 +414,7 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .conversation-modes {flex:none;display:flex;gap:8px;padding:8px 12px;}
-.private-panel{flex:1;min-height:0;overflow:auto;padding:10px;box-sizing:border-box}.private-panel :deep(.legacy-private){min-height:0}
-.conversation-modes{display:flex;gap:6px;padding:8px 10px 0;flex:none}.conversation-modes button{font:inherit;border:0;border-radius:6px;padding:5px 9px;color:var(--fp-muted);background:var(--fp-bg);cursor:pointer}.conversation-modes button[aria-pressed=true]{color:var(--fp-accent)}
+.private-panel {flex:1;min-height:0;overflow:auto;padding:12px;}
 .whisper-panel {
   container-type: inline-size;
   container-name: whisper-panel;
@@ -862,9 +859,6 @@ onUnmounted(() => {
   }
 }
 @container whisper-panel (max-width: 520px) {
-  .private-panel :deep(.legacy-private .conversation > header){display:none}
-  .private-panel{padding:6px}
-
   .whisper-panel .conversation-layout { grid-template-columns: 56px minmax(0, 1fr); }
   .whisper-panel .conversation-list { padding: 6px 4px; }
   .whisper-panel .conversation { justify-content: center; gap: 0; padding: 7px 4px; }
