@@ -39,6 +39,10 @@ watch([accessToken, () => account.value?.oId], () => {
 watch(page, () => { if (loggedIn.value) void loadRecords() })
 onMounted(() => { mounted.value = true; if (loggedIn.value) { void loadRecords(); void loadBalance() } })
 onBeforeUnmount(() => { mounted.value = false; clear() })
+function direction(row: PointEntry) {
+  const change = row.operation === '-' ? -row.amount : row.amount
+  return change > 0 ? 'income' : change < 0 ? 'expense' : 'neutral'
+}
 function refresh() { void loadRecords(); void loadBalance() }
 </script>
 
@@ -53,17 +57,16 @@ function refresh() { void loadRecords(); void loadBalance() }
         <div class="balance-actions"><RouterLink to="/charge/point" class="action-btn primary">💰 充值积分</RouterLink><RouterLink to="/settings/point" class="action-btn">💸 积分转账</RouterLink><RouterLink to="/activity" class="action-btn">📅 活动签到</RouterLink></div>
       </section>
       <section class="card records-section fp-card">
-        <header class="section-header"><h2>积分流水</h2><button type="button" class="refresh-points-btn fp-control" :disabled="loading || balanceLoading" @click="refresh">刷新余额与流水</button></header>
+        <header class="section-header"><div class="section-title"><h2>积分流水</h2><span v-if="!loading && !error" class="record-count">共 {{ total.toLocaleString() }} 条</span></div><button type="button" class="refresh-points-btn fp-control" :disabled="loading || balanceLoading" @click="refresh">刷新余额与流水</button></header>
         <FpLoading v-if="loading" class="loading-wrap" />
         <div v-else-if="error" role="alert" class="err fp-state">{{ error }} <button class="fp-control" type="button" @click="loadRecords">重试流水读取</button></div>
         <template v-else>
-          <p>共 {{ total }} 条记录</p>
           <div class="records-list">
             <div v-if="!items.length" class="empty-list">{{ total ? '本页暂无记录，请返回已有页码' : '暂无记录' }}</div>
-            <div v-for="(row, index) in items" :key="`${page}-${index}`" class="record-item">
-              <div class="record-icon" :class="row.operation === '-' ? 'out' : 'in'">{{ row.operation }}</div>
-              <div class="record-main"><div class="record-desc" v-html="row.descriptionHtml" /><div>{{ row.displayType }}</div><div class="record-time">{{ pointTime(row.time) }}</div><div>交易后余额：{{ row.balance.toLocaleString() }}</div></div>
-              <div class="record-amount" :class="row.operation === '-' ? 'out' : 'in'">{{ pointChange(row) }}</div>
+            <div v-for="(row, index) in items" :key="`${page}-${index}`" class="record-item" :class="direction(row)">
+              <span class="record-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path v-if="direction(row) === 'income'" d="M7 7l10 10M7 17h10V7" /><path v-else-if="direction(row) === 'expense'" d="M7 17L17 7H7m10 0v10" /><path v-else d="M6 12h12" /></svg></span>
+              <div class="record-main"><div class="record-desc" v-html="row.descriptionHtml" /><div class="record-meta"><span v-if="row.displayType" class="record-type">{{ row.displayType }}</span><time>{{ pointTime(row.time) }}</time></div></div>
+              <div class="record-value"><div class="record-change"><span class="direction-label">{{ direction(row) === 'income' ? '收入' : direction(row) === 'expense' ? '支出' : '无变动' }}</span><strong>{{ pointChange(row) }}</strong></div><span class="record-balance">交易后余额：{{ row.balance.toLocaleString() }}</span></div>
             </div>
           </div>
           <footer v-if="total || page > 1" class="pager"><button type="button" class="pager-btn fp-control" :disabled="page <= 1" @click="page--">上一页</button><span class="page-num">{{ page }} / {{ pageCount }}</span><button type="button" class="pager-btn fp-control" :disabled="page >= Math.min(pageCount, 42949672)" @click="page++">下一页</button></footer>
@@ -74,281 +77,43 @@ function refresh() { void loadRecords(); void loadBalance() }
 </template>
 
 <style scoped lang="scss">
-.points-view {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-
-
+.points-view { display:flex; flex-direction:column; gap:16px; }
+.card { background:var(--fp-card); border:1px solid var(--fp-border); border-radius:var(--fp-panel-radius); }
+.empty-state { text-align:center; padding:40px 20px; h1 { margin:0 0 14px; } }
+.hint { color:var(--fp-muted); font-size:14px; }
+.balance-card { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:20px; padding:24px; border:1px solid color-mix(in srgb,var(--fp-primary) 20%,var(--fp-border)); border-radius:var(--fp-panel-radius); background:linear-gradient(120deg,var(--fp-card),color-mix(in srgb,var(--fp-primary) 7%,var(--fp-card))); }
+.balance-label { display:block; margin-bottom:9px; font-size:13px; color:var(--fp-muted); }
+.balance-value { display:flex; align-items:center; gap:9px; color:var(--fp-title); strong { font-size:32px; font-weight:650; line-height:1.1; font-variant-numeric:tabular-nums; } }
+.currency-icon { font-size:23px; }
+.balance-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.action-btn { display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:8px 12px; border:1px solid var(--fp-border); border-radius:8px; background:var(--fp-card); color:var(--fp-text); font-size:13px; text-decoration:none; &:hover { background:var(--fp-hover); text-decoration:underline; } &.primary { background:var(--fp-primary); border-color:var(--fp-primary); color:#fff; } }
+.records-section { padding:0; overflow:hidden; }
+.section-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; padding:15px 20px; border-bottom:1px solid var(--fp-border); }
+.section-title { display:flex; align-items:baseline; flex-wrap:wrap; gap:10px; h2 { margin:0; color:var(--fp-title); font-size:16px; font-weight:600; } }
+.record-count { color:var(--fp-muted); font-size:12px; }
+.refresh-points-btn { font-size:12px; }
+.loading-wrap,.empty-list,.err { padding:32px 20px; text-align:center; color:var(--fp-muted); }
+.err { color:var(--fp-danger); }
+.record-item { --flow-color:var(--fp-muted); display:flex; align-items:center; gap:12px; padding:12px 20px; border-bottom:1px solid var(--fp-border); transition:background-color .15s; &:last-child { border-bottom:0; } &:hover { background:var(--fp-hover); } &.income { --flow-color:var(--fp-income); } &.expense { --flow-color:var(--fp-danger); } }
+.record-icon { display:grid; place-items:center; flex:none; width:30px; height:30px; border-radius:9px; color:var(--flow-color); background:color-mix(in srgb,var(--flow-color) 10%,transparent); svg { width:17px; height:17px; } }
+.record-main { flex:1; min-width:0; }
+.record-desc { font-size:14px; line-height:1.55; overflow-wrap:anywhere; color:var(--fp-text); :deep(p) { margin:0; } :deep(a) { color:var(--fp-link); text-decoration:none; &:hover { text-decoration:underline; } } }
+.record-meta { display:flex; align-items:center; flex-wrap:wrap; column-gap:9px; row-gap:2px; margin-top:4px; color:var(--fp-muted); font-size:11px; line-height:1.5; }
+.record-type { max-width:100%; overflow-wrap:anywhere; &::after { content:'·'; margin-left:9px; opacity:.6; } }
+.record-value { flex:none; min-width:140px; text-align:right; }
+.record-change { display:flex; align-items:center; justify-content:flex-end; gap:8px; color:var(--flow-color); strong { font-size:18px; font-weight:650; font-variant-numeric:tabular-nums; line-height:1.4; } }
+.direction-label { font-size:10px; line-height:1.5; padding:1px 5px; border-radius:4px; background:color-mix(in srgb,var(--flow-color) 10%,transparent); }
+.record-balance { display:block; margin-top:4px; color:var(--fp-muted); font-size:11px; line-height:1.5; font-variant-numeric:tabular-nums; }
+.pager { display:flex; align-items:center; justify-content:center; gap:16px; padding:14px 20px; border-top:1px solid var(--fp-border); }
+.pager-btn { padding:6px 12px; font-size:13px; }
+.page-num { color:var(--fp-muted); font-size:12px; font-variant-numeric:tabular-nums; }
+@media(max-width:640px) {
+ .balance-card { padding:18px 16px; gap:16px; } .balance-actions { width:100%; } .action-btn { flex:1; padding:8px 6px; font-size:12px; } .balance-value strong { font-size:28px; }
+ .section-header { padding:12px 14px; } .record-item { position:relative; display:grid; grid-template-columns:24px minmax(0,1fr); column-gap:9px; row-gap:6px; padding:11px 14px; }
+ .record-icon { width:24px; height:24px; border-radius:7px; align-self:start; margin-top:1px; svg { width:15px; height:15px; } }
+ .record-desc { font-size:13px; } .record-meta { font-size:10px; margin-top:3px; }
+ .record-value { grid-column:2; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:3px 10px; min-width:0; text-align:left; }
+ .record-change { justify-content:flex-start; gap:6px; strong { font-size:16px; } } .record-balance { margin:0; font-size:10px; }
 }
-.card {
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: var(--fp-panel-radius);
-}
-.empty-state {
-  text-align: center;
-  padding: 48px 24px;
-}
-.empty-state h1 {
-  margin: 0 0 16px;
-  font-size: 20px;
-  color: var(--fp-title);
-}
-.hint {
-  color: var(--fp-muted);
-  font-size: 14px;
-}
-.hint a {
-  color: var(--fp-link);
-  text-decoration: none;
-}
-.hint a:hover {
-  text-decoration: underline;
-}
-
-/* 资产概览卡片 */
-.balance-card {
-  background: linear-gradient(135deg, var(--fp-card) 0%, color-mix(in srgb, var(--fp-primary) 10%, var(--fp-card)) 100%);
-  border: 1px solid color-mix(in srgb, var(--fp-primary) 20%, var(--fp-border));
-  border-radius: var(--fp-panel-radius);
-  padding: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 24px;
-}
-.balance-label {
-  display: block;
-  font-size: 14px;
-  color: var(--fp-muted);
-  margin-bottom: 8px;
-}
-.balance-value {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--fp-title);
-}
-.currency-icon {
-  font-size: 28px;
-}
-.balance-value strong {
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1;
-}
-.balance-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-  background: var(--fp-bg);
-  color: var(--fp-text);
-  border: 1px solid var(--fp-border);
-  transition: all 0.2s;
-}
-.action-btn:hover {
-  border-color: var(--fp-primary);
-  color: var(--fp-primary);
-}
-.action-btn.primary {
-  background: var(--fp-primary);
-  color: #fff;
-  border-color: var(--fp-primary);
-}
-.action-btn.primary:hover {
-  filter: brightness(1.1);
-  color: #fff;
-}
-
-/* 流水列表区 */
-.records-section {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--fp-border);
-  .refresh-points-btn {
-    display: none;
-  }
-}
-.section-header h2 {
-  margin: 0;
-  font-size: 18px;
-  color: var(--fp-title);
-}
-.api-hint {
-  font-size: 12px;
-  color: var(--fp-muted);
-  opacity: 0.6;
-}
-.api-hint code {
-  background: var(--fp-bg);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-.loading-wrap, .empty-list, .err {
-  padding: 48px 24px;
-  text-align: center;
-  color: var(--fp-muted);
-}
-.err {
-  color: var(--fp-danger);
-}
-.records-list {
-  display: flex;
-  flex-direction: column;
-}
-.record-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--fp-border);
-  transition: background 0.2s;
-}
-.record-item:hover {
-  background: var(--fp-bg);
-}
-.record-item:last-child {
-  border-bottom: none;
-}
-.record-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  font-weight: 700;
-  flex-shrink: 0;
-  background: var(--fp-bg);
-  color: var(--fp-muted);
-}
-.record-icon.in {
-  background: color-mix(in srgb, var(--fp-income) 15%, transparent);
-  color: var(--fp-income);
-}
-.record-icon.out {
-  background: color-mix(in srgb, var(--fp-accent) 15%, transparent);
-  color: var(--fp-accent);
-}
-.record-main {
-  flex: 1;
-  min-width: 0;
-}
-.record-desc {
-  font-size: 15px;
-  color: var(--fp-text);
-  margin-bottom: 4px;
-  word-break: break-word;
-}
-:deep(.record-desc a) {
-  color: var(--fp-link);
-  text-decoration: none;
-}
-:deep(.record-desc a:hover) {
-  text-decoration: underline;
-}
-.record-time {
-  font-size: 13px;
-  color: var(--fp-muted);
-}
-.record-amount {
-  font-size: 18px;
-  font-weight: 600;
-  font-family: monospace;
-}
-.record-amount.in {
-  color: var(--fp-income);
-}
-.record-amount.out {
-  color: var(--fp-text);
-}
-
-/* 分页 */
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 20px 24px;
-  border-top: 1px solid var(--fp-border);
-}
-.pager-btn {
-  border: 1px solid var(--fp-border);
-  background: var(--fp-bg);
-  color: var(--fp-text);
-  border-radius: 8px;
-  padding: 6px 16px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-weight: 500;
-}
-.pager-btn:not(:disabled):hover {
-  border-color: var(--fp-primary);
-  color: var(--fp-primary);
-}
-.pager-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.page-num {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--fp-title);
-  min-width: 24px;
-  text-align: center;
-}
-
-@media (max-width: 640px) {
-  .balance-card {
-    padding: 24px;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .balance-actions {
-    width: 100%;
-  }
-  .action-btn {
-    flex: 1;
-    justify-content: center;
-    padding: 10px 8px;
-  }
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  .record-item {
-    padding: 12px 16px;
-    gap: 12px;
-  }
-  .record-icon {
-    width: 32px;
-    height: 32px;
-    font-size: 16px;
-  }
-  .record-amount {
-    font-size: 16px;
-  }
-}
+@media(prefers-reduced-motion:reduce) { .record-item { transition:none; } }
 </style>
