@@ -55,7 +55,7 @@ function refresh() { void loadRecords(); void loadBalance() }
         <div class="balance-actions"><RouterLink to="/charge/point" class="action-btn primary">💰 充值积分</RouterLink><RouterLink to="/settings/point" class="action-btn">💸 积分转账</RouterLink><RouterLink to="/activity" class="action-btn">📅 活动签到</RouterLink></div>
       </section>
       <section class="card records-section">
-        <header class="section-header"><h2>积分流水</h2><button type="button" :disabled="loading || balanceLoading" @click="refresh">刷新余额与流水</button></header>
+        <header class="section-header"><h2>积分流水</h2><button type="button" class="refresh-points-btn" :disabled="loading || balanceLoading" @click="refresh">刷新余额与流水</button></header>
         <FpLoading v-if="loading" class="loading-wrap" />
         <div v-else-if="error" role="alert" class="err">{{ error }} <button type="button" @click="loadRecords">重试流水读取</button></div>
         <template v-else>
@@ -186,6 +186,9 @@ function refresh() { void loadRecords(); void loadBalance() }
   justify-content: space-between;
   padding: 20px 24px;
   border-bottom: 1px solid var(--fp-border);
+  .refresh-points-btn {
+    display: none;
+  }
 }
 .section-header h2 {
   margin: 0;

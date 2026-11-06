@@ -25,6 +25,9 @@ function fallback(event:Event){const image=event.target as HTMLImageElement;if(i
 
 .list-page-head {
   padding: 12px 18px;
+  > button {
+    display: none;
+  }
 }
 
 .head-left {

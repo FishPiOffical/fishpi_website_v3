@@ -43,12 +43,20 @@ onMounted(() => { mounted.value = true; boundary = identity(); void load() })
 onBeforeUnmount(() => { mounted.value = false; clear() })
 </script>
 <template>
-  <span v-if="visible" class="content-relation-action">
-    <button type="button" :aria-disabled="loading || pending?.busy || undefined" :aria-busy="loading || pending?.busy || undefined" @click="activate">{{ label }}</button>
+  <span v-if="visible" class="content-relation-action" :data-kind="kind">
+    <button type="button" :data-kind="kind" :aria-pressed="following === true || undefined" :aria-disabled="loading || pending?.busy || undefined" :aria-busy="loading || pending?.busy || undefined" @click="activate">{{ label }}</button>
     <span v-if="error || pending?.error" role="status">{{ error || pending?.error }}</span>
     <span v-if="pending && !pending.busy">上次操作结果待确认，请重试同一次操作。</span>
   </span>
 </template>
 <style scoped lang="scss">
-.content-relation-action { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: 100%; } button { border: 1px solid var(--fp-border); border-radius: 6px; padding: 7px 12px; color: var(--fp-text); background: var(--fp-card); cursor: pointer; } button[aria-disabled='true'] { opacity: .5; cursor: default; } span[role='status'] { color: #c34a36; overflow-wrap: anywhere; }
+.content-relation-action { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: 100%; }
+button { display: inline-flex; align-items: center; gap: 4px; height: 28px; border: 1px solid var(--fp-border); border-radius: 999px; padding: 0 11px; font-size: 12.5px; color: var(--fp-text); background: var(--fp-card); cursor: pointer; transition: border-color .15s, background-color .15s, color .15s; &:hover:not([aria-disabled='true']) { background: var(--fp-hover); } }
+button[data-kind='collection']::before { content: '☆'; font-size: 12px; opacity: .85; }
+button[data-kind='collection'][aria-pressed='true']::before { content: '★'; color: #e6a23c; }
+button[data-kind='subscription']::before { content: '🔔'; font-size: 11px; opacity: .85; }
+button[data-kind='tag']::before { content: '#'; font-size: 12px; opacity: .8; }
+button[aria-pressed='true'] { color: var(--fp-primary); border-color: var(--fp-primary); background: var(--fp-primary-soft, rgba(105, 170, 105, 0.12)); }
+button[aria-disabled='true'] { opacity: .5; cursor: default; }
+span[role='status'] { color: #c34a36; font-size: 12px; overflow-wrap: anywhere; }
 </style>

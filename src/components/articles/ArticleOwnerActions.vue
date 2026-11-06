@@ -65,8 +65,9 @@ onBeforeUnmount(()=>{mounted.value=false;close()})
  </div>
 </template>
 <style scoped lang="scss">
-.owner-actions {display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:100%;overflow-wrap:anywhere;}
-button {border:1px solid var(--fp-border);border-radius:6px;background:var(--fp-bg);color:var(--fp-text);padding:5px 8px;cursor:pointer;}
+.owner-actions {display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;max-width:100%;overflow-wrap:anywhere;}
+.owner-actions > button {display:inline-flex;align-items:center;gap:4px;height:28px;border:1px solid var(--fp-border);border-radius:999px;background:var(--fp-card);color:var(--fp-muted);padding:0 10px;font-size:12px;cursor:pointer;&::before{content:'⚙️';font-size:11px;opacity:.8}&:hover:not(:disabled){background:var(--fp-hover);color:var(--fp-title)}}
+button {border:1px solid var(--fp-border);border-radius:999px;background:var(--fp-card);color:var(--fp-text);padding:4px 10px;font-size:12px;cursor:pointer;}
 button:disabled {opacity:.5;cursor:default;}
-p {margin:0;font-size:13px;color:var(--fp-muted);}[role='alert'] {color:#c34a36;}
+p {margin:0;font-size:12.5px;color:var(--fp-muted);}[role='alert'] {color:#c34a36;}
 </style>

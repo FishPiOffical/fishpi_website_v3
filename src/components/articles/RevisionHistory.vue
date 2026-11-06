@@ -48,15 +48,15 @@ onBeforeUnmount(()=>{mounted.value=false;close()})
 defineExpose({toggle,opened})
 </script>
 <template>
-  <section v-if="authenticated" class="revision-history" :aria-label="`${kind==='article'?'文章':'评论'}修订历史`">
-    <button v-if="trigger" type="button" :aria-expanded="opened" @click="toggle()">{{ opened?'收起历史':'修订历史' }}</button>
+  <section v-if="authenticated" class="revision-history" :class="`kind-${kind}`" :aria-label="`${kind==='article'?'文章':'评论'}修订历史`">
+    <button v-if="trigger" type="button" class="history-trigger" :aria-expanded="opened" @click="toggle()">{{ opened?'收起历史':'修订历史' }}</button>
     <div v-if="opened" class="history-content">
       <h3 ref="heading" tabindex="-1">{{ kind==='article'?'文章':'评论' }}修订历史</h3>
-      <p>历史内容可能包含后来删除的文字。</p>
-      <p v-if="getApiMode()==='v1'">旧接口返回历史快照，以下为本地分页。内容经过服务端处理，仅用于文本查看。</p>
+      <p class="history-note">历史内容可能包含后来删除的文字。</p>
+      <p v-if="getApiMode()==='v1'" class="v1-note">旧接口返回历史快照，以下为本地分页。内容经过服务端处理，仅用于文本查看。</p>
       <p v-if="loading" role="status">正在读取历史列表…</p>
       <p v-if="listError" role="alert">{{ listError }}</p>
-      <button type="button" :aria-disabled="loading" :aria-busy="loading" @click="!loading&&load()">{{ listError?'重试历史列表':'刷新历史列表' }}</button>
+      <button type="button" class="refresh-list-btn" :class="{'is-hidden':!listError}" :aria-disabled="loading" :aria-busy="loading" @click="!loading&&load()">{{ listError?'重试历史列表':'刷新历史列表' }}</button>
       <template v-if="listing">
         <p v-if="!listing.items.length">{{ listing.pagination.total===0?(getApiMode()==='v1'?'暂无当前可读取的历史，旧接口不区分无记录和不可见。':'暂无保存的历史记录'):'本页没有历史记录，请返回前页' }}</p>
         <ol>
@@ -80,7 +80,15 @@ defineExpose({toggle,opened})
   </section>
 </template>
 <style scoped lang="scss">
-.revision-history { max-width: 100%; min-width: 0; overflow-wrap: anywhere; button { border: 1px solid var(--fp-border); background: transparent; color: var(--fp-text); border-radius: 6px; padding: 5px 9px; cursor: pointer; } button[aria-pressed='true'] { color: var(--fp-link); border-color: var(--fp-primary); } button[aria-disabled='true'] { opacity: .5; cursor: default; } [role='alert'] { color: #c34a36; } }
-.history-content { padding: 12px 0; border-top: 1px solid var(--fp-border); margin-top: 8px; h3,h4 { margin: 6px 0; } p { margin: 6px 0; } ol { padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; } nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } }
-.history-text { margin-top: 10px; pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--fp-font-mono,monospace); margin: 8px 0; } }
+.revision-history { max-width: 100%; min-width: 0; overflow-wrap: anywhere;
+  button { border: 1px solid var(--fp-border); background: transparent; color: var(--fp-text); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  .history-trigger { display: inline-flex; align-items: center; gap: 3px; height: 26px; padding: 0 9px; font-size: 12px; color: var(--fp-muted); border-color: var(--fp-border); &::before { content: '🕘'; font-size: 11px; opacity: .75; } &:hover { background: var(--fp-hover); color: var(--fp-title); } }
+  &.kind-comment { display: inline-flex; flex-wrap: wrap; align-items: center; .history-trigger { height: 24px; padding: 0 7px; border: 0; background: transparent; } .history-content { flex-basis: 100%; width: 100%; } }
+  .refresh-list-btn.is-hidden, .v1-note { display: none !important; }
+  button[aria-pressed='true'] { color: var(--fp-link); border-color: var(--fp-primary); }
+  button[aria-disabled='true'] { opacity: .5; cursor: default; }
+  [role='alert'] { color: #c34a36; }
+}
+.history-content { padding: 10px 12px; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-bg); margin-top: 8px; font-size: 12.5px; h3,h4 { margin: 4px 0; font-size: 13px; } p { margin: 4px 0; color: var(--fp-muted); } ol { padding: 0; margin: 6px 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; } nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } }
+.history-text { margin-top: 8px; pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--fp-font-mono,monospace); margin: 6px 0; padding: 8px; border-radius: 6px; background: var(--fp-card); border: 1px solid var(--fp-border); } }
 </style>

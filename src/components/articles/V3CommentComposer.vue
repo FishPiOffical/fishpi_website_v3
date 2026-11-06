@@ -52,10 +52,10 @@ defineExpose({reveal:()=>props.writable&&editor.value?.reveal()})
       <button v-if="editId" type="button" :disabled="operations.busy" @click="emit('cancel')">取消编辑</button>
       <p v-if="localError||operations.error" role="alert">{{ localError||operations.error }}</p><p v-if="operations.message" role="status">{{ operations.message }}</p>
       <p v-if="operations.receipt" role="status">已确认评论编号 {{ operations.receipt.id }}（文章 {{ operations.receipt.articleId }}）。<span v-if="operations.receipt.operation==='create'">新回复可能位于其他页，请通过分页查看。</span></p>
-      <p>发布、匿名资格、编辑费用和五分钟规则由平台在提交时校验；整页刷新或退出会清除本地恢复信息，请先核对原操作。</p>
+      <p class="composer-policy-note">发布、匿名资格、编辑费用和五分钟规则由平台在提交时校验；整页刷新或退出会清除本地恢复信息，请先核对原操作。</p>
     </template>
   </div>
 </template>
 <style scoped lang="scss">
-.comment-composer { min-width: 0; max-width: 100%; p { overflow-wrap: anywhere; } .pending-content { white-space: pre-wrap; } .options { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 8px 0; } button,select { color: var(--fp-text); background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 6px; padding: 6px 9px; margin: 4px; } button:disabled { opacity: .5; } [role='alert'] { color: #c34a36; } }
+.comment-composer { min-width: 0; max-width: 100%; p { overflow-wrap: anywhere; } .composer-policy-note { display: none; } .pending-content { white-space: pre-wrap; } .options { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 8px 0; font-size: 12.5px; color: var(--fp-muted); } button,select { color: var(--fp-text); background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 6px; padding: 6px 9px; margin: 4px; } button:disabled { opacity: .5; } [role='alert'] { color: #c34a36; } }
 </style>

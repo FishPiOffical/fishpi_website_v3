@@ -43,7 +43,7 @@ function date(value: number) { return new Date(value).toLocaleString() }
     <template v-else>
       <nav aria-label="本人匿名创作"><RouterLink :to="`${base}/articles/anonymous`">匿名文章</RouterLink><RouterLink :to="`${base}/comments/anonymous`">匿名评论</RouterLink><RouterLink :to="base">返回本人主页</RouterLink></nav>
       <p>这里只显示概要。正文需进入文章，按当前阅读权限查看。</p>
-      <button type="button" :disabled="loading" @click="load">重新读取列表</button>
+      <button type="button" class="refresh-anon-btn" :disabled="loading" @click="load">重新读取列表</button>
       <p v-if="loading" role="status">正在读取…</p>
       <template v-else-if="error"><p role="alert" class="error">{{ error }}</p><button v-if="page > 1" type="button" @click="home">返回第一页</button></template>
       <template v-else>
@@ -59,5 +59,5 @@ function date(value: number) { return new Date(value).toLocaleString() }
   </section>
 </template>
 <style scoped lang="scss">
-.anonymous-content { max-width: 900px; margin: 24px auto; padding: 0 20px; } h1 { font-size: 22px; } nav { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 16px 0; } a { color: var(--fp-link); } p { line-height: 1.7; overflow-wrap: anywhere; } ul { list-style: none; padding: 0; } li { border-top: 1px solid var(--fp-border); padding: 16px 0; overflow-wrap: anywhere; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } .error { color: #c34a36; }
+.anonymous-content { max-width: 900px; margin: 24px auto; padding: 0 20px; .refresh-anon-btn { display: none; } } h1 { font-size: 22px; } nav { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 16px 0; } a { color: var(--fp-link); } p { line-height: 1.7; overflow-wrap: anywhere; } ul { list-style: none; padding: 0; } li { border-top: 1px solid var(--fp-border); padding: 16px 0; overflow-wrap: anywhere; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } .error { color: #c34a36; }
 </style>

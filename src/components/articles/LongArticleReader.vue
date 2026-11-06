@@ -693,7 +693,7 @@ function chapterTitle(c: LongArticleChapter) {
           <div class="la-paragraph-context">{{ activeSnapshot || '此段落' }}</div>
           <p v-if="paragraphLocationError" role="status">{{ paragraphLocationError }}</p>
           <p v-if="paragraphSummaryError" role="status">{{ paragraphSummaryError }}<button type="button" @click="loadParagraphSummary()">重读统计</button></p>
-          <p v-if="legacyParagraphs" class="la-paragraph-state">旧接口按顶层评论分页，数量为评论主题数。</p>
+          <p v-if="legacyParagraphs" class="la-paragraph-state la-v1-note">旧接口按顶层评论分页，数量为评论主题数。</p>
           <div class="la-paragraph-sort" role="tablist" aria-label="段评排序">
             <button type="button" :class="{ active: paragraphSort === '' }" @click="paragraphSort = ''; loadParagraphComments(1)">正序</button>
             <button type="button" :class="{ active: paragraphSort === 'hot' }" @click="paragraphSort = 'hot'; loadParagraphComments(1)">热门</button>
@@ -710,12 +710,14 @@ function chapterTitle(c: LongArticleChapter) {
               <p v-if="comment.commentOriginalCommentId">回复评论 {{ comment.commentOriginalCommentId }}</p>
               <p v-if="comment.commentContentVisible===false">此评论正文当前不可见</p>
               <div v-else class="la-paragraph-comment-body" v-html="comment.commentContent || ''" />
-              <RevisionHistory kind="comment" :target-id="comment.oId" />
-              <V3ReactionBar kind="comment" :target-id="comment.oId" :source="{articleId:article.oId,paragraphId:activeParagraphId,page:paragraphPage,sort:paragraphSort}" />
-              <ArticleInteraction v-if="loggedIn" resource="comments" kind="vote" :article-id="comment.oId" :source="{articleId:article.oId,paragraphId:activeParagraphId,page:paragraphPage,sort:paragraphSort}" />
-              <ArticleInteraction v-if="loggedIn" resource="comments" kind="thanks" :article-id="comment.oId" />
-              <ArticleInteraction v-if="loggedIn" resource="comments" kind="accept" :article-id="comment.oId" />
-              <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
+              <div class="la-paragraph-ops">
+                <V3ReactionBar kind="comment" :target-id="comment.oId" :source="{articleId:article.oId,paragraphId:activeParagraphId,page:paragraphPage,sort:paragraphSort}" />
+                <ArticleInteraction v-if="loggedIn" resource="comments" kind="vote" :article-id="comment.oId" :source="{articleId:article.oId,paragraphId:activeParagraphId,page:paragraphPage,sort:paragraphSort}" />
+                <ArticleInteraction v-if="loggedIn" resource="comments" kind="thanks" :article-id="comment.oId" />
+                <ArticleInteraction v-if="loggedIn" resource="comments" kind="accept" :article-id="comment.oId" />
+                <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
+                <RevisionHistory kind="comment" :target-id="comment.oId" />
+              </div>
               <template v-if="ownParagraphComment(comment)">
                 <button v-if="commentingEnabled&&!legacyParagraphs" type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="commentingEnabled && (paragraphEditingId=comment.oId)">编辑</button>
                 <button type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="removeParagraphComment(comment)">删除</button>
@@ -1444,16 +1446,18 @@ html[data-theme='classic-light'] .la-ico-sun {
 .la-paragraph-sort button { padding: 4px 0; border: 0; color: var(--la-muted); background: transparent; font-size: 12px; cursor: pointer; }
 .la-paragraph-sort button.active { color: var(--la-active); font-weight: 600; }
 .la-paragraph-state { padding: 24px 8px; color: var(--la-muted); font-size: 13px; text-align: center; }
+.la-paragraph-state.la-v1-note { display: none; }
 .la-paragraph-state.error { color: #c96b58; }
-.la-paragraph-comment { position: relative; padding: 14px 0 12px; border-bottom: 1px solid var(--la-line); }
-.la-paragraph-comment-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 7px; font-size: 12px; }
+.la-paragraph-comment { position: relative; padding: 12px 0 10px; border-bottom: 1px solid var(--la-line); }
+.la-paragraph-comment-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 6px; font-size: 12px; }
 .la-paragraph-comment-head a,.la-paragraph-reply-item a { color: var(--la-title); text-decoration: none; font-weight: 600; }
 .la-paragraph-comment-head a:hover,.la-paragraph-reply-item a:hover { text-decoration: underline; }
 .la-paragraph-comment-head time { color: var(--la-muted); font-size: 10px; }
 .la-paragraph-comment-body { color: var(--la-text); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .la-paragraph-comment-body :deep(p) { margin: 0 0 6px; }.la-paragraph-comment-body :deep(img) { max-width: 100%; }
-.la-paragraph-reply { padding: 3px 0; border: 0; color: var(--la-muted); background: transparent; font-size: 10px; cursor: pointer; }
-.la-paragraph-reply:hover { color: var(--la-active); }
+.la-paragraph-ops { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+.la-paragraph-reply { padding: 3px 7px; border: 0; border-radius: 999px; color: var(--la-muted); background: transparent; font-size: 11px; cursor: pointer; }
+.la-paragraph-reply:hover { background: var(--la-hover); color: var(--la-active); }
 .la-paragraph-reply-item { margin-top: 8px; padding: 8px; border-radius: 6px; color: var(--la-text); background: var(--la-soft); font-size: 11px; line-height: 1.6; }
 .la-paragraph-reply-item .reply-colon { color: var(--la-muted); }.la-paragraph-reply-item .reply-content :deep(p) { display: inline; margin: 0; }
 .la-paragraph-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0; color: var(--la-muted); font-size: 11px; }

@@ -33,7 +33,7 @@ onScopeDispose(() => { mounted.value = false; clear() })
     <template v-else>
       <p v-if="loading" role="status">正在读取职业排行…</p>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
-      <button type="button" :disabled="loading" @click="read()">重新读取职业榜单</button>
+      <button type="button" class="refresh-prof-btn" :class="{ 'is-hidden': value && !error }" :disabled="loading" @click="read()">重新读取职业榜单</button>
       <div class="choices" aria-label="选择排行职业" :aria-busy="loading"><button v-for="job in catalog" :key="job.professionId" type="button" :aria-pressed="job.professionId === (target || value?.selected.professionId)" @click="choose(job)">{{ job.displayName }}</button></div>
       <template v-if="value">
         <h3>{{ value.selected.displayName }}</h3><p>{{ value.selected.description }}</p>

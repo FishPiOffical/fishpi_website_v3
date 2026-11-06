@@ -63,30 +63,30 @@ onMounted(()=>{mounted.value=true;boundary=identity();void load()})
 onBeforeUnmount(()=>{mounted.value=false;clear()})
 </script>
 <template>
-  <section v-if="kind === 'reward' ? initialPrice > 0 : loggedIn" class="article-interaction" :class="{ 'reward-panel': kind === 'reward' }" :aria-label="`${resource === 'comments' ? '评论' : '文章'}${label}`">
+  <section v-if="kind === 'reward' ? initialPrice > 0 : loggedIn" class="article-interaction" :class="{ 'reward-panel': kind === 'reward', 'is-comment': resource === 'comments' }" :aria-label="`${resource === 'comments' ? '评论' : '文章'}${label}`">
     <template v-if="kind === 'reward'"><h3>🎁 打赏区</h3><p>当前 {{ price }} 积分，正文以当前阅读权限为准。</p></template>
     <template v-if="loggedIn">
-      <p v-if="loading" role="status">正在读取{{ label }}状态…</p>
+      <p v-if="loading" class="loading-status" role="status">正在读取{{ label }}状态…</p>
       <template v-if="pending">
         <button type="button" :disabled="busy" @click="submit(null,true)">{{ pending.busy ? '正在提交…' : `重试本次${label}` }}</button>
         <p v-if="!pending.busy">上次操作结果待确认，请恢复同一次操作；刷新页面或退出会清除本地恢复信息。</p>
       </template>
       <template v-if="state">
         <template v-if="vote">
-          <button type="button" :aria-disabled="busy || !!pending" :aria-busy="busy" :aria-pressed="vote.vote === 'up'" @click="submit(vote.vote === 'up' ? null : 'up')">{{ vote.vote === 'up' ? '取消赞同' : '赞同' }} · {{ vote.upCount }}</button>
-          <button type="button" :aria-disabled="busy || !!pending" :aria-busy="busy" :aria-pressed="vote.vote === 'down'" @click="submit(vote.vote === 'down' ? null : 'down')">{{ vote.vote === 'down' ? '取消反对' : '反对' }} · {{ vote.downCount }}</button>
+          <button type="button" class="act-btn vote-up" :aria-disabled="busy || !!pending" :aria-busy="busy" :aria-pressed="vote.vote === 'up'" @click="submit(vote.vote === 'up' ? null : 'up')">{{ vote.vote === 'up' ? '取消赞同' : '赞同' }} · {{ vote.upCount }}</button>
+          <button type="button" class="act-btn vote-down" :aria-disabled="busy || !!pending" :aria-busy="busy" :aria-pressed="vote.vote === 'down'" @click="submit(vote.vote === 'down' ? null : 'down')">{{ vote.vote === 'down' ? '取消反对' : '反对' }} · {{ vote.downCount }}</button>
         </template>
-        <button v-else-if="thanks" type="button" :aria-disabled="busy || !!pending || thanks.thanked || thanks.canThank === false" :aria-busy="busy" @click="submit()">{{ thanks.thanked ? '已感谢' : `感谢（${thanks.thankPoint}积分）` }} · {{ thanks.thankCount }}</button>
+        <button v-else-if="thanks" type="button" class="act-btn act-thanks" :aria-disabled="busy || !!pending || thanks.thanked || thanks.canThank === false" :aria-busy="busy" @click="submit()">{{ thanks.thanked ? '已感谢' : `感谢（${thanks.thankPoint}积分）` }} · {{ thanks.thankCount }}</button>
         <template v-else-if="acceptance">
-          <p v-if="acceptance.accepted">已采纳</p>
-          <button v-else-if="acceptance.canAccept" type="button" :aria-disabled="busy || !!pending" :aria-busy="busy" @click="submit()">采纳（{{ acceptance.offerPoint }}积分）</button>
+          <p v-if="acceptance.accepted" class="accepted-badge">✓ 已采纳</p>
+          <button v-else-if="acceptance.canAccept" type="button" class="act-btn act-accept" :aria-disabled="busy || !!pending" :aria-busy="busy" @click="submit()">采纳（{{ acceptance.offerPoint }}积分）</button>
         </template>
         <template v-else-if="reward">
           <p v-if="reward.rewarded">已解锁打赏区</p>
-          <button v-else type="button" :aria-disabled="busy || !!pending || price < 1" :aria-busy="busy" @click="submit()">{{ price > 0 ? `打赏 ${price} 积分` : '当前未启用打赏' }}</button>
+          <button v-else type="button" class="act-btn act-reward" :aria-disabled="busy || !!pending || price < 1" :aria-busy="busy" @click="submit()">{{ price > 0 ? `打赏 ${price} 积分` : '当前未启用打赏' }}</button>
         </template>
       </template>
-      <button v-else-if="!loading && !pending" type="button" :disabled="busy" @click="load()">重读{{ label }}状态</button>
+      <button v-else-if="!loading && !pending" type="button" class="reread-btn" :class="{ 'is-hidden': !error }" :disabled="busy" @click="load()">重读{{ label }}状态</button>
       <template v-if="reward?.rewarded && !loading && !error"><div v-if="html" class="reward-content" v-html="html" @click="emit('contentClick',$event)" /><p v-else>打赏区暂无内容</p></template>
       <p v-if="error || pending?.error" role="alert">{{ error || pending?.error }}</p>
       <p v-if="kind !== 'vote' && operations.balanceError" role="status">{{ operations.balanceError }}</p>
@@ -95,10 +95,20 @@ onBeforeUnmount(()=>{mounted.value=false;clear()})
   </section>
 </template>
 <style scoped lang="scss">
-.article-interaction { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: 100%; overflow-wrap: anywhere;
-  p { margin: 4px 0; } button { border: 1px solid var(--fp-border); border-radius: 6px; padding: 7px 12px; color: var(--fp-text); background: var(--fp-card); cursor: pointer; }
-  button:disabled, button[aria-disabled='true'] { opacity: .5; cursor: default; } button[aria-pressed='true'] { color: var(--fp-link); border-color: var(--fp-primary); } [role='alert'] { color: #c34a36; }
+.article-interaction { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: 100%; overflow-wrap: anywhere;
+  .loading-status, .reread-btn.is-hidden { display: none !important; }
+  p { margin: 4px 0; font-size: 12px; }
+  button { display: inline-flex; align-items: center; gap: 4px; height: 28px; border: 1px solid var(--fp-border); border-radius: 999px; padding: 0 11px; font-size: 12.5px; color: var(--fp-text); background: var(--fp-card); cursor: pointer; transition: border-color .15s, background-color .15s, color .15s; &:hover:not(:disabled):not([aria-disabled='true']) { background: var(--fp-hover); } }
+  .vote-up::before { content: '▲'; font-size: 10px; opacity: .75; }
+  .vote-down::before { content: '▼'; font-size: 10px; opacity: .75; }
+  .act-thanks::before { content: '♥'; font-size: 11px; opacity: .8; color: #e05d44; }
+  .act-accept::before { content: '✓'; font-size: 11px; opacity: .85; }
+  .accepted-badge { padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: #2d8a56; background: rgba(45, 138, 86, 0.12); }
+  &.is-comment { gap: 4px; button { height: 24px; padding: 0 7px; border: 0; font-size: 12px; background: transparent; color: var(--fp-muted); &:hover:not(:disabled):not([aria-disabled='true']) { background: var(--fp-hover); color: var(--fp-title); } } }
+  button:disabled, button[aria-disabled='true'] { opacity: .5; cursor: default; }
+  button[aria-pressed='true'] { color: var(--fp-primary); border-color: var(--fp-primary); background: var(--fp-primary-soft, rgba(105, 170, 105, 0.14)); font-weight: 500; }
+  [role='alert'] { color: #c34a36; }
 }
-.reward-panel { display: block; border-top: 1px solid var(--fp-border); padding: 16px 0; margin: 12px 0; h3 { margin: 0 0 8px; } }
+.reward-panel { display: block; padding: 12px 14px; margin: 10px 0; border: 1px dashed var(--fp-border); border-radius: 10px; background: var(--fp-bg); h3 { margin: 0 0 6px; font-size: 14px; } }
 .reward-content { min-width: 0; :deep(img), :deep(video) { max-width: 100%; height: auto; } :deep(pre) { overflow-x: auto; } }
 </style>

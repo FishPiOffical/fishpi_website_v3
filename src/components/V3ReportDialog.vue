@@ -15,7 +15,7 @@ watch(()=>store.completed,command=>{if(!command||JSON.stringify(command.input)!=
 watch(()=>JSON.stringify([getAuthContextVersion(),!!auth.accessToken,auth.account?.oId||'',props.dataType,props.dataId]),clear,{flush:'sync'})
 </script>
 <template>
- <button v-if="auth.accessToken&&auth.account?.oId" type="button" class="fp-btn fp-btn--ghost fp-btn--sm" @click="show">举报</button>
+ <button v-if="auth.accessToken&&auth.account?.oId" type="button" class="report-trigger fp-btn fp-btn--ghost fp-btn--sm" @click="show">举报</button>
  <p v-if="error&&!open" role="alert">{{ error }}</p>
  <FpDialog :open="open" :title="target?`举报${target.label}`:'举报内容'" @close="close">
   <p v-if="store.optionsLoading" role="status">正在读取举报分类…</p>
@@ -31,6 +31,28 @@ watch(()=>JSON.stringify([getAuthContextVersion(),!!auth.accessToken,auth.accoun
  </FpDialog>
 </template>
 <style scoped lang="scss">
+.report-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--fp-muted);
+  border: 1px solid var(--fp-border);
+  background: transparent;
+  cursor: pointer;
+  &::before {
+    content: '🚩';
+    font-size: 11px;
+    opacity: 0.75;
+  }
+  &:hover {
+    background: var(--fp-hover);
+    color: var(--fp-title);
+  }
+}
 .report-form {
   display: flex;
   flex-direction: column;

@@ -628,23 +628,29 @@ function itemHandlers(c: ArticleComment) {
 
         <!-- 文章底部互动操作栏 -->
         <div class="article-tail-bar">
-          <ContentRelationButton kind="collection" :target="article.oId" />
-          <ContentRelationButton kind="subscription" :target="article.oId" />
-          <div v-if="isLoggedIn" class="actions">
-            <ArticleInteraction kind="vote" :article-id="article.oId" />
-            <ArticleInteraction kind="thanks" :article-id="article.oId" />
-            <ReuseOwnerActions />
-            <RouterLink v-if="canEdit" class="btn small edit-btn" :to="`/post/${article.oId}`">编辑</RouterLink>
-            <button type="button" class="btn small" @click="toggleRevisions">
-              {{ showRevisions ? '收起历史' : '修订历史' }}
-            </button>
-            <ReportDialog :data-id="article.oId" :data-type="0" />
-          </div>
-          <div class="share-row">
-            <span class="share-label">分享</span>
-            <button type="button" class="btn-text" @click="copyShare">{{ shareCopied ? '✅ 已复制' : '🔗 复制链接' }}</button>
-            <a class="btn-text" :href="weiboShareUrl" target="_blank" rel="noopener noreferrer">微博</a>
-            <a class="btn-text" :href="twitterShareUrl" target="_blank" rel="noopener noreferrer">Twitter</a>
+          <div class="tail-main-row">
+            <div class="actions">
+              <template v-if="isLoggedIn">
+                <ArticleInteraction kind="vote" :article-id="article.oId" />
+                <ArticleInteraction kind="thanks" :article-id="article.oId" />
+              </template>
+              <ContentRelationButton kind="collection" :target="article.oId" />
+              <ContentRelationButton kind="subscription" :target="article.oId" />
+              <template v-if="isLoggedIn">
+                <ReuseOwnerActions />
+                <RouterLink v-if="canEdit" class="btn small edit-btn" :to="`/post/${article.oId}`">编辑</RouterLink>
+                <button type="button" class="btn small history-btn" @click="toggleRevisions">
+                  {{ showRevisions ? '收起历史' : '修订历史' }}
+                </button>
+                <ReportDialog :data-id="article.oId" :data-type="0" />
+              </template>
+            </div>
+            <div class="share-row">
+              <span class="share-label">分享</span>
+              <button type="button" class="btn-text" @click="copyShare">{{ shareCopied ? '✅ 已复制' : '🔗 复制链接' }}</button>
+              <a class="btn-text" :href="weiboShareUrl" target="_blank" rel="noopener noreferrer">微博</a>
+              <a class="btn-text" :href="twitterShareUrl" target="_blank" rel="noopener noreferrer">Twitter</a>
+            </div>
           </div>
           <p v-if="actionMsg" class="action-alert">{{ actionMsg }}</p>
         </div>
@@ -990,18 +996,56 @@ h1 {
 }
 
 .article-tail-bar {
-  margin-top: 24px;
-  padding-top: 16px;
+  margin-top: 20px;
+  padding-top: 14px;
   border-top: 1px solid var(--fp-border);
+}
+.tail-main-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
 }
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
+}
+.actions .btn.small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--fp-border);
+  background: var(--fp-card);
+  color: var(--fp-muted);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.actions .btn.small:hover {
+  background: var(--fp-hover);
+  color: var(--fp-title);
 }
 .actions a.edit-btn {
   text-decoration: none;
+  &::before {
+    content: '✏️';
+    font-size: 11px;
+  }
+}
+.actions .history-btn::before {
+  content: '🕘';
+  font-size: 11px;
+  opacity: 0.8;
+}
+.actions :deep(.report-trigger) {
+  height: 28px;
+  padding: 0 10px;
 }
 .action-alert {
   font-size: 13px;
@@ -1010,7 +1054,7 @@ h1 {
 }
 
 .reaction-wrap {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .author-summary-card {

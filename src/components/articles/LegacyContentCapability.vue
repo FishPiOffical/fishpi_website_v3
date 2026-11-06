@@ -21,5 +21,5 @@ onMounted(() => { mounted.value = true })
   </details>
 </template>
 <style scoped>
-.legacy-capability{position:relative;display:inline-block;max-width:100%;vertical-align:middle;font-size:12px}summary{display:flex;gap:6px;align-items:center;list-style:none;cursor:pointer;padding:6px 8px;border:1px solid var(--fp-border);border-radius:6px;color:var(--fp-muted);background:var(--fp-card)}summary::-webkit-details-marker{display:none}summary span{font-size:11px}summary:focus-visible{outline:2px solid var(--fp-primary);outline-offset:2px}p{box-sizing:border-box;width:260px;max-width:100%;padding:8px 0;margin:0;line-height:1.7;overflow-wrap:anywhere;color:var(--fp-muted)}
+.legacy-capability{display:none !important;position:relative;max-width:100%;vertical-align:middle;font-size:12px}summary{display:flex;gap:6px;align-items:center;list-style:none;cursor:pointer;padding:6px 8px;border:1px solid var(--fp-border);border-radius:6px;color:var(--fp-muted);background:var(--fp-card)}summary::-webkit-details-marker{display:none}summary span{font-size:11px}summary:focus-visible{outline:2px solid var(--fp-primary);outline-offset:2px}p{box-sizing:border-box;width:260px;max-width:100%;padding:8px 0;margin:0;line-height:1.7;overflow-wrap:anywhere;color:var(--fp-muted)}
 </style>

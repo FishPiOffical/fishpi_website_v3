@@ -43,8 +43,8 @@ usePageSeo(()=>({title:title.value,path:route.path,robots:'noindex'}))
     <p v-else-if="privatePage && !owner"><RouterLink :to="{path:'/login',query:{redirect:route.fullPath}}">登录后查看我的收藏</RouterLink></p>
     <template v-else>
       <nav aria-label="用户关注内容"><RouterLink :to="`${base}/following/tags`">关注标签</RouterLink><RouterLink :to="`${base}/following/articles`">收藏文章</RouterLink><RouterLink :to="`${base}/watching/articles`">订阅文章</RouterLink><RouterLink :to="base">用户主页</RouterLink></nav>
-      <p v-if="owner && kind!=='tags'">{{ getApiMode()==='v1'?'旧接口可能省略已删除的收藏，订阅记录尚无独立JSON接口。':'本人记录保留当前不可读的条目，正文仍按当前阅读权限判断。' }}</p>
-      <button type="button" :disabled="loading" @click="load">重新读取列表</button>
+      <p v-if="owner && kind!=='tags'" class="v1-saved-note">{{ getApiMode()==='v1'?'旧接口可能省略已删除的收藏，订阅记录尚无独立JSON接口。':'本人记录保留当前不可读的条目，正文仍按当前阅读权限判断。' }}</p>
+      <button type="button" class="refresh-saved-btn" :disabled="loading" @click="load">重新读取列表</button>
       <p v-if="loading" role="status">正在读取…</p>
       <template v-else-if="error"><p role="alert">{{ error }}</p><button v-if="page>1" type="button" @click="home">返回第一页</button></template>
       <template v-else-if="result">
@@ -59,5 +59,5 @@ usePageSeo(()=>({title:title.value,path:route.path,robots:'noindex'}))
   </section>
 </template>
 <style scoped lang="scss">
-.saved-content { max-width: 900px; margin: 24px auto; padding: 0 20px; } h1 { font-size: 22px; overflow-wrap: anywhere; } nav { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 16px 0; } a { color: var(--fp-link); } p { line-height: 1.7; overflow-wrap: anywhere; } .tags { list-style: none; padding: 0; } .tags li, .unavailable { border-top: 1px solid var(--fp-border); padding: 16px 0; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } [role='alert'] { color: #c34a36; }
+.saved-content { max-width: 900px; margin: 24px auto; padding: 0 20px; .refresh-saved-btn, .v1-saved-note { display: none; } } h1 { font-size: 22px; overflow-wrap: anywhere; } nav { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 16px 0; } a { color: var(--fp-link); } p { line-height: 1.7; overflow-wrap: anywhere; } .tags { list-style: none; padding: 0; } .tags li, .unavailable { border-top: 1px solid var(--fp-border); padding: 16px 0; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } [role='alert'] { color: #c34a36; }
 </style>

@@ -1,5 +1,5 @@
 
-h2 { margin-top: 0; } .profession-ranking { padding: 20px 28px; } .hint { font-size: 13px; color: var(--fp-muted); } .error { color: #c34a36; }
+h2 { margin-top: 0; } .profession-ranking { padding: 20px 28px; } .hint { font-size: 13px; color: var(--fp-muted); } .error { color: #c34a36; } .refresh-prof-btn.is-hidden { display: none !important; }
 button { padding: 7px 12px; margin: 5px 8px 5px 0; color: var(--fp-text); border: 1px solid var(--fp-border); border-radius: 8px; background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } button[aria-pressed='true'] { color: var(--fp-primary); border-color: var(--fp-primary); }
 nav, .choices { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } .rankings { list-style: none; margin: 0; padding: 0; }
 .rankings li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--fp-border); overflow-wrap: anywhere; }

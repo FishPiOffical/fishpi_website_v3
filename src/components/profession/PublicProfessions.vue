@@ -68,12 +68,12 @@ const rewardStatus = { PENDING: '待发放', GRANTED: '已发放', REVOKED: '已
         <h3>可见榜名次</h3><p v-if="!profile.ranking.length">当前无可展示的名次。</p><ul><li v-for="item in profile.ranking" :key="item.professionId">{{ name(item.professionId) }} · 第 {{ item.rank }} / {{ item.totalUsers }} 名<span>超过 {{ item.surpassedPercent.toFixed(2) }}% 的可见用户</span></li></ul>
       </section>
     </template>
-    <button type="button" :disabled="loading" @click="load">重新读取公开职业资料</button>
+    <button type="button" class="refresh-pub-prof-btn" :class="{ 'is-hidden': profile && !error }" :disabled="loading" @click="load">重新读取公开职业资料</button>
   </section>
 </template>
 
 <style scoped lang="scss">
-.public-professions { padding: 16px 18px; } section > section { padding: 12px 0; border-top: 1px solid var(--fp-border); } h2 { margin: 0 0 12px; font-size: 20px; } h3 { margin: 0 0 10px; font-size: 17px; } h4 { margin: 8px 0; } li { margin: 12px 0; overflow-wrap: anywhere; } li > span:last-child { display: block; } ul { padding-left: 22px; }
+.public-professions { padding: 16px 18px; .refresh-pub-prof-btn.is-hidden { display: none !important; } } section > section { padding: 12px 0; border-top: 1px solid var(--fp-border); } h2 { margin: 0 0 12px; font-size: 20px; } h3 { margin: 0 0 10px; font-size: 17px; } h4 { margin: 8px 0; } li { margin: 12px 0; overflow-wrap: anywhere; } li > span:last-child { display: block; } ul { padding-left: 22px; }
 button { border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; padding: 7px 12px; cursor: pointer; } button:disabled { opacity: .5; cursor: default; }.hint { color: var(--fp-muted); font-size: 13px; } .error { color: #c34a36; }
 @media(max-width: 640px) { .public-professions { padding: 14px; } }
 </style>

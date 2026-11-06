@@ -277,6 +277,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--fp-primary); ou
 .action-button:not(:disabled):hover { background: var(--fp-hover); }
 .notification-layout { display: grid; grid-template-columns: 188px minmax(0, 1fr); gap: 22px; align-items: start; }
 .category-panel { position: sticky; top: calc(var(--fp-nav-h) + 20px); padding: 16px 10px 10px; border: 1px solid var(--fp-border); border-radius: 12px; background: var(--fp-card); }
+.category-panel > .page-summary { display: none !important; }
 .category-heading { margin: 0 12px 12px; font-size: 11px; color: var(--fp-muted); letter-spacing: .1em; }
 .categories { display: flex; flex-direction: column; gap: 4px; }
 .category { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 43px; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; text-align: left; font-size: 13px; transition: background-color 160ms ease; }
@@ -294,7 +295,7 @@ h2 { margin: 0; color: var(--fp-title); font-size: 17px; font-weight: 500; }
 .list-heading p { margin: 6px 0 0; color: var(--fp-muted); font-size: 12px; line-height: 1.5; }
 .list-actions { display: flex; gap: 8px; align-items: center; flex: none; }
 .read-button, .refresh-button { padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--fp-muted); font-size: 12px; white-space: nowrap; }
-.refresh-button { display: grid; place-items: center; width: 30px; height: 30px; }
+.refresh-button { display: none !important; place-items: center; width: 30px; height: 30px; }
 .refresh-button svg { width: 16px; height: 16px; }
 .read-button:not(:disabled):hover, .refresh-button:not(:disabled):hover { background: var(--fp-hover); }
 .hint, time { color: var(--fp-muted); font-size: 11px; }

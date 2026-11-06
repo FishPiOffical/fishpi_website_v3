@@ -39,11 +39,11 @@ onBeforeUnmount(() => { mounted.value = false; clear() })
       <p v-if="busy" role="status">正在读取捐助入口…</p>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
       <template v-if="url"><a class="donation-link" :href="url" target="_blank" rel="noopener noreferrer">打开站内捐助页面</a><p class="address">{{ url }}</p></template>
-      <button type="button" :disabled="busy" @click="load">重新读取捐助入口</button>
+      <button type="button" class="refresh-donation-btn" :class="{ 'is-hidden': url && !error }" :disabled="busy" @click="load">重新读取捐助入口</button>
     </template>
     <nav aria-label="相关积分功能"><RouterLink to="/vips">开通 VIP</RouterLink><RouterLink to="/settings/point">积分转账</RouterLink><RouterLink to="/points">积分流水</RouterLink></nav>
   </section>
 </template>
 <style scoped lang="scss">
-.donation-page { max-width: 560px; margin: 24px auto; padding: 22px 24px; display: grid; gap: 16px; } h1 { margin: 0; font-size: 20px; color: var(--fp-title); } p { margin: 0; line-height: 1.6; color: var(--fp-text); } .hint { color: var(--fp-muted); } .address { overflow-wrap: anywhere; font-size: 13px; } .error { color: #c34a36; } button { justify-self: start; padding: 8px 12px; background: transparent; color: var(--fp-text); border: 1px solid var(--fp-border); border-radius: 8px; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } a { color: var(--fp-link); } nav { display: flex; flex-wrap: wrap; gap: 14px; }
+.donation-page { max-width: 560px; margin: 24px auto; padding: 22px 24px; display: grid; gap: 16px; .refresh-donation-btn.is-hidden { display: none; } } h1 { margin: 0; font-size: 20px; color: var(--fp-title); } p { margin: 0; line-height: 1.6; color: var(--fp-text); } .hint { color: var(--fp-muted); } .address { overflow-wrap: anywhere; font-size: 13px; } .error { color: #c34a36; } button { justify-self: start; padding: 8px 12px; background: transparent; color: var(--fp-text); border: 1px solid var(--fp-border); border-radius: 8px; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } a { color: var(--fp-link); } nav { display: flex; flex-wrap: wrap; gap: 14px; }
 </style>

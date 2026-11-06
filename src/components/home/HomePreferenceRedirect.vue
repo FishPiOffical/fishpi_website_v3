@@ -41,11 +41,11 @@ onMounted(() => { mounted = true; void check() })
 onBeforeUnmount(() => { mounted = false; generation++; pending.value = false; message.value = '' })
 </script>
 <template>
-  <div v-if="pending || message" class="home-redirect" role="status" aria-label="首页跳转设置">
+  <div v-if="pending || message" class="home-redirect" :class="{ 'is-v1': getApiMode() === 'v1', 'is-loading': pending }" role="status" aria-label="首页跳转设置">
     <span v-if="pending">正在读取首页跳转设置…</span>
     <template v-else>{{ message }} <template v-if="getApiMode()==='v3'"><button type="button" @click="check">重试跳转</button> <RouterLink to="/settings/function">修改首页设置</RouterLink></template></template>
   </div>
 </template>
 <style scoped lang="scss">
-.home-redirect { margin: 0 0 12px; overflow-wrap: anywhere; color: var(--fp-muted); a { display: inline-block; white-space: nowrap; } button { margin: 0 8px; border: 1px solid var(--fp-border); border-radius: 6px; padding: 4px 8px; background: transparent; color: var(--fp-text); cursor: pointer; } }
+.home-redirect { margin: 0 0 10px; font-size: 12px; overflow-wrap: anywhere; color: var(--fp-muted); &.is-v1, &.is-loading { display: none !important; } a { display: inline-block; white-space: nowrap; } button { margin: 0 8px; border: 1px solid var(--fp-border); border-radius: 6px; padding: 3px 8px; background: transparent; color: var(--fp-text); cursor: pointer; } }
 </style>

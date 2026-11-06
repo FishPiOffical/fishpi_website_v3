@@ -58,7 +58,7 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
       <p v-else-if="activeTab === 'points'">积分流水仅本人可在<RouterLink to="/points">我的积分</RouterLink>查看。</p>
       <template v-else>
         <h2>{{ activeTab === 'long' ? '长文章' : activeTab === 'comments' ? '公开回帖' : activeTab === 'breezemoons' ? '清风明月' : '公开帖子' }}</h2>
-        <button type="button" :disabled="contentLoading" @click="readContent()">刷新用户内容</button>
+        <button type="button" class="refresh-member-btn" :disabled="contentLoading" @click="readContent()">刷新用户内容</button>
         <p v-if="contentLoading" role="status">正在读取用户内容…</p>
         <div v-else-if="contentError" role="alert"><p>{{ contentError }}</p><button type="button" @click="readContent()">重试用户内容</button><button v-if="p > 1" type="button" @click="readContent(1)">返回第一页</button></div>
         <template v-else-if="moon"><BreezemoonList :items="[moon]" /><RouterLink :to="`${base}/breezemoons`">查看全部清风明月</RouterLink></template>
@@ -79,7 +79,7 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
 .member-page { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; padding: 20px; max-width: 1200px; margin: auto; align-items: start; }
 .member-profile { padding: 20px; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 10px; overflow-wrap: anywhere; h1 { font-size: 22px; } .intro { white-space: pre-wrap; } }
 .member-avatar { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; }
-.member-content { min-width: 0; scroll-margin-top: 88px; } nav, .member-actions, .member-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; } nav .router-link-exact-active { font-weight: 700; text-decoration: underline; } nav { padding-bottom: 16px; border-bottom: 1px solid var(--fp-border); } a { color: var(--fp-link); text-decoration: none; } p, time { color: var(--fp-muted); } time { display: block; font-size: 12px; margin-top: 8px; } button { padding: 7px 10px; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-card); color: var(--fp-text); cursor: pointer; &:disabled { opacity: .5; cursor: default; } } [role=alert] { color: #bd503c; }
+.member-content { min-width: 0; scroll-margin-top: 88px; .refresh-member-btn { display: none; } } nav, .member-actions, .member-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; } nav .router-link-exact-active { font-weight: 700; text-decoration: underline; } nav { padding-bottom: 16px; border-bottom: 1px solid var(--fp-border); } a { color: var(--fp-link); text-decoration: none; } p, time { color: var(--fp-muted); } time { display: block; font-size: 12px; margin-top: 8px; } button { padding: 7px 10px; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-card); color: var(--fp-text); cursor: pointer; &:disabled { opacity: .5; cursor: default; } } [role=alert] { color: #bd503c; }
 .member-comments { list-style: none; margin: 16px 0; padding: 0; li { padding: 16px 0; border-bottom: 1px solid var(--fp-border); } } .comment-body { overflow-wrap: anywhere; overflow: auto; :deep(img) { max-width: 100%; height: auto; } :deep(pre) { overflow: auto; } }
 @media(max-width: 900px) { .member-page { grid-template-columns: minmax(0, 1fr); padding: 12px; } }
 </style>

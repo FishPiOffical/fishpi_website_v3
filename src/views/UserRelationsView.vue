@@ -41,7 +41,7 @@ usePageSeo(() => ({ title: title.value, path: route.path, robots: 'noindex' }))
     <nav aria-label="用户关系列表"><RouterLink :to="`${base}/following/users`">关注用户</RouterLink><RouterLink :to="`${base}/followers`">粉丝</RouterLink><RouterLink :to="base">用户主页</RouterLink></nav>
     <p v-if="!mounted">正在准备用户列表…</p>
     <template v-else>
-      <button type="button" :disabled="loading" @click="load">重新读取列表</button>
+      <button type="button" class="refresh-rel-btn" :disabled="loading" @click="load">重新读取列表</button>
       <p v-if="loading" role="status">正在读取…</p>
       <template v-else-if="error"><p role="alert">{{ error }}</p><button v-if="page > 1" type="button" @click="home">返回第一页</button></template>
       <template v-else-if="total !== null">
@@ -55,5 +55,5 @@ usePageSeo(() => ({ title: title.value, path: route.path, robots: 'noindex' }))
   </section>
 </template>
 <style scoped lang="scss">
-.user-relations { max-width: 900px; margin: 24px auto; padding: 0 20px; } h1 { font-size: 22px; overflow-wrap: anywhere; } nav { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 16px 0; } a { color: var(--fp-link); } ul { list-style: none; padding: 0; } li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; border-top: 1px solid var(--fp-border); overflow-wrap: anywhere; } li a { display: flex; align-items: center; gap: 12px; min-width: 0; } img { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; flex-shrink: 0; } li span { overflow-wrap: anywhere; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; background: transparent; color: var(--fp-text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; } [role='alert'] { color: #c34a36; }
+.user-relations { max-width: 900px; margin: 24px auto; padding: 0 20px; .refresh-rel-btn { display: none; } } h1 { font-size: 22px; overflow-wrap: anywhere; } nav { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 16px 0; } a { color: var(--fp-link); } ul { list-style: none; padding: 0; } li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; border-top: 1px solid var(--fp-border); overflow-wrap: anywhere; } li a { display: flex; align-items: center; gap: 12px; min-width: 0; } img { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; flex-shrink: 0; } li span { overflow-wrap: anywhere; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; background: transparent; color: var(--fp-text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; } [role='alert'] { color: #c34a36; }
 </style>

@@ -54,5 +54,5 @@ watch([accessToken,()=>account.value?.oId],()=>{const next=`${getAuthContextVers
     button { padding: 3px 10px; font-size: 12px; }
   }
 }
-.controls,nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; } button { padding: 6px 9px; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-card); color: var(--fp-text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; } p { overflow-wrap: anywhere; } [role='alert'] { color: #c34a36; }
+.controls,nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; } .controls > button { display: none; } button { padding: 6px 9px; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-card); color: var(--fp-text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; } p { overflow-wrap: anywhere; } [role='alert'] { color: #c34a36; }
 </style>

@@ -90,9 +90,9 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 </template>
 
 <style scoped lang="scss">
-.column-snapshot-note {margin:12px 16px;color:var(--fp-muted);font-size:13px;line-height:1.6}
+.column-snapshot-note { display: none; margin: 12px 16px; color: var(--fp-muted); font-size: 13px; line-height: 1.6; }
 .list-content { min-width: 0; scroll-margin-top: 80px; }
-.refresh-list { margin: 8px 16px 16px; }
+.refresh-list { display: none; margin: 8px 16px 16px; }
 .list-page-wrap {
   padding-top: 4px;
 }

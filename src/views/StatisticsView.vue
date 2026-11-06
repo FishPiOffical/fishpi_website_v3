@@ -30,7 +30,7 @@ const { value, loading, error, read } = useStatistics(consumeStatisticsPayload()
 
 <style scoped lang="scss">
 .statistics-page { max-width: 1000px; margin: 0 auto; padding: 24px 16px; }
-header { margin-bottom: 24px; h1 { color: var(--fp-title); font-size: 24px; } p { color: var(--fp-muted); } }
+header { margin-bottom: 24px; h1 { color: var(--fp-title); font-size: 24px; } p { color: var(--fp-muted); } > button { display: none; } }
 .statistics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; }
 .statistic-item { min-width: 0; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 12px; padding: 20px; dt { color: var(--fp-muted); } dd { margin: 10px 0 0; font-size: 26px; color: var(--fp-title); overflow-wrap: anywhere; } }
 .statistics-error { color: var(--fp-text); }

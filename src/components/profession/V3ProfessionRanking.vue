@@ -69,7 +69,7 @@ onBeforeUnmount(() => { mounted.value = false; reset() })
         <div class="choices"><button v-for="job in catalog.list" :key="job.professionId" type="button" :aria-pressed="job.professionId === selected?.professionId" @click="choose(job)">{{ job.displayName }}</button></div>
         <nav v-if="catalog.pagination.pageCount > 1" aria-label="排行职业目录分页"><button :disabled="catalogLoading || catalog.pagination.p <= 1" @click="loadCatalog(catalog.pagination.p - 1)">上一页排行职业</button><span>第 {{ catalog.pagination.p }} / {{ catalog.pagination.pageCount }} 页</span><button :disabled="catalogLoading || catalog.pagination.p >= catalog.pagination.pageCount" @click="loadCatalog(catalog.pagination.p + 1)">下一页排行职业</button></nav>
       </template>
-      <button type="button" :disabled="catalogLoading" @click="loadCatalog()">重新读取排行职业目录</button>
+      <button type="button" class="refresh-prof-btn" :class="{ 'is-hidden': catalog && !catalogError }" :disabled="catalogLoading" @click="loadCatalog()">重新读取排行职业目录</button>
       <template v-if="selected">
         <h3>{{ selected.displayName }}</h3><p>{{ selected.description }}</p>
         <p v-if="rankingLoading" role="status">正在读取职业排行…</p><p v-if="rankingError" role="alert" class="error">{{ rankingError }}</p>
@@ -88,7 +88,7 @@ onBeforeUnmount(() => { mounted.value = false; reset() })
           </ol>
           <nav v-if="ranking.pagination.pageCount > 1" aria-label="职业榜单分页"><button :disabled="rankingLoading || ranking.pagination.p <= 1" @click="loadRanking(ranking.pagination.p - 1)">上一页职业榜单</button><span>第 {{ ranking.pagination.p }} / {{ ranking.pagination.pageCount }} 页</span><button :disabled="rankingLoading || ranking.pagination.p >= ranking.pagination.pageCount" @click="loadRanking(ranking.pagination.p + 1)">下一页职业榜单</button></nav>
         </template>
-        <button type="button" :disabled="rankingLoading" @click="loadRanking()">重新读取职业榜单</button>
+        <button type="button" class="refresh-prof-btn" :class="{ 'is-hidden': ranking && !rankingError }" :disabled="rankingLoading" @click="loadRanking()">重新读取职业榜单</button>
         <button type="button" :aria-expanded="showGuide" @click="showGuide = !showGuide">{{ showGuide ? '收起成长提示' : '查看成长提示' }}</button>
         <ProfessionGuide v-if="showGuide" :profession-id="selected.professionId" :name="selected.displayName" />
       </template>

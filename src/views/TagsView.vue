@@ -20,7 +20,7 @@ async function page(next: number) { await read(next); document.getElementById('d
     <div class="content directory-content" id="directory-list">
       <div class="module-header list-page-head">
         <div class="head-left"><h2>{{ label }}目录</h2><span v-if="value" class="sub-tag">共 {{ value.total }} 个{{ label }}</span></div>
-        <button type="button" class="btn" :disabled="loading" @click="read()">刷新目录</button>
+        <button type="button" class="btn refresh-dir-btn" :disabled="loading" @click="read()">刷新目录</button>
       </div>
       <FpLoading v-if="loading" :rows="6" />
       <div v-else-if="error" class="err" role="alert">{{ error }} <button type="button" class="btn" @click="read()">重试当前页</button></div>
@@ -46,6 +46,9 @@ async function page(next: number) { await read(next); document.getElementById('d
 
 .list-page-head {
   padding: 12px 18px;
+}
+.refresh-dir-btn {
+  display: none;
 }
 
 .head-left {

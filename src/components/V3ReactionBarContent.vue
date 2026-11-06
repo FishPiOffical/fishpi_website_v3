@@ -43,16 +43,16 @@ onMounted(()=>{mounted.value=true;boundary=identity();if(authenticated.value)voi
 onBeforeUnmount(()=>{mounted.value=false;clear()})
 </script>
 <template>
-  <section v-if="kind!=='chat'||authenticated" class="v3-reactions" :aria-label="`${kind==='article'?'文章':kind==='comment'?'评论':'消息'}表态`">
-    <button v-if="readable&&!authenticated&&!loading&&!error" type="button" @click="load()">{{ state?'刷新表态':'查看表态' }}</button>
-    <p v-if="loading" role="status">正在读取表态…</p>
+  <section v-if="kind!=='chat'||authenticated" class="v3-reactions" :class="`kind-${kind}`" :aria-label="`${kind==='article'?'文章':kind==='comment'?'评论':'消息'}表态`">
+    <button v-if="readable&&!authenticated&&!loading&&!error" type="button" class="guest-rx-btn" :class="{'is-refresh':!!state}" @click="load()">{{ state?'刷新表态':'查看表态' }}</button>
+    <p v-if="loading" class="rx-loading" role="status">正在读取表态…</p>
     <div v-if="state" class="rx">
       <template v-for="item in state.summary" :key="item.value">
         <button v-if="writable" type="button" class="chip" :title="item.users.join(', ')" :aria-pressed="item.selected" :aria-disabled="blocked" :aria-busy="loading||!!pending?.busy" @click="choose(item.value)">{{ item.emoji }} {{ item.count }}</button>
         <span v-else class="chip" :title="item.users.join(', ')">{{ item.emoji }} {{ item.count }}</span>
       </template>
       <button v-if="writable" type="button" class="ghost" :aria-expanded="open" @click="open=!open">{{ open?'收起表情':'添加表情' }}</button>
-      <p v-if="!state.summary.length&&!writable">暂无表态</p>
+      <p v-if="!state.summary.length&&!writable" class="rx-empty">暂无表态</p>
     </div>
     <div v-if="writable&&operations.options.length" v-show="open" class="palette" aria-label="选择表情">
       <button v-for="option in operations.options" :key="option.value" type="button" :title="option.value" :aria-pressed="state?.currentUserReaction===option.value" :aria-disabled="blocked||!state" :aria-busy="loading||!!pending?.busy" @click="choose(option.value)">{{ option.emoji }}</button>
@@ -63,9 +63,11 @@ onBeforeUnmount(()=>{mounted.value=false;clear()})
   </section>
 </template>
 <style scoped lang="scss">
-.v3-reactions { max-width: 100%; min-width: 0; overflow-wrap: anywhere; p { margin: 4px 0; } [role='alert'] { color: #c34a36; } }
-.rx, .palette { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-button, .chip { border: 1px solid var(--fp-border); background: transparent; color: var(--fp-text); border-radius: 12px; padding: 3px 8px; font-size: 12px; }
-button { cursor: pointer; &[aria-disabled='true'] { opacity: .5; cursor: default; } &[aria-pressed='true'] { border-color: var(--fp-primary); color: var(--fp-link); } }
-.palette { margin: 6px 0; padding: 4px 0; }
+.v3-reactions { max-width: 100%; min-width: 0; overflow-wrap: anywhere; p { margin: 4px 0; font-size: 12px; } .rx-loading, .rx-empty, .guest-rx-btn.is-refresh { display: none !important; } [role='alert'] { color: #c34a36; } }
+.rx, .palette { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+button, .chip { display: inline-flex; align-items: center; gap: 3px; border: 1px solid var(--fp-border); background: transparent; color: var(--fp-text); border-radius: 999px; height: 24px; padding: 0 8px; font-size: 12px; transition: background-color .14s, border-color .14s, color .14s; }
+.ghost { border: 0; color: var(--fp-muted); padding: 0 7px; &::before { content: '😊'; font-size: 12px; opacity: .85; } &:hover { background: var(--fp-hover); color: var(--fp-title); } }
+.kind-article .ghost { border: 1px dashed var(--fp-border); padding: 0 9px; }
+button { cursor: pointer; &:hover:not([aria-disabled='true']) { background: var(--fp-hover); } &[aria-disabled='true'] { opacity: .5; cursor: default; } &[aria-pressed='true'] { border-color: var(--fp-primary); color: var(--fp-primary); background: var(--fp-primary-soft, rgba(105, 170, 105, 0.12)); } }
+.palette { margin: 4px 0; padding: 4px 6px; border: 1px solid var(--fp-border); border-radius: 10px; background: var(--fp-card); }
 </style>

@@ -570,6 +570,14 @@ function clearScreen() {
   margin: 0 auto;
 }
 
+.timeline-controls {
+  margin: 0;
+}
+
+.timeline-controls > button {
+  display: none !important;
+}
+
 :deep(video),
 :deep(iframe) {
   max-width: 320px !important;

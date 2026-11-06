@@ -56,8 +56,11 @@ const emit = defineEmits<{
 
 const zoomed = ref('')
 const author = computed(() => props.comment.commentAuthorNickname || props.comment.commentAuthorName || '匿名')
-const fullTime = computed(() => props.comment.commentCreateTimeStr || props.comment.timeAgo || '')
-const shownTime = computed(() => (props.reply ? props.comment.timeAgo || fullTime.value : fullTime.value))
+function cleanTimeStr(raw: string): string {
+  return raw.replace(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?Z?$/, '$1 $2')
+}
+const fullTime = computed(() => cleanTimeStr(props.comment.commentCreateTimeStr || props.comment.timeAgo || ''))
+const shownTime = computed(() => cleanTimeStr(props.reply ? props.comment.timeAgo || fullTime.value : fullTime.value))
 const goodCnt = computed(() => Number(props.comment.commentGoodCnt || 0))
 const thankCnt = computed(() => Number(props.comment.commentThankCnt || 0))
 const interactive = computed(() => props.loggedIn && !props.readonly)
@@ -94,25 +97,24 @@ function onBodyClick(e: MouseEvent) {
         <p v-else-if="comment.commentContentVisible===false" class="cmt-body">此评论正文当前不可见</p>
         <div v-else class="cmt-body" @click="onBodyClick" v-html="comment.commentContent || ''" />
 
-        <RevisionHistory kind="comment" :target-id="comment.oId" />
-
         <footer class="cmt-ops">
           <V3ReactionBar kind="comment" :target-id="comment.oId" :readonly="readonly" :source="reactionSource" />
           <template v-if="interactive">
             <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" :source="reactionSource" />
             <ArticleInteraction resource="comments" kind="thanks" :article-id="comment.oId" />
             <ArticleInteraction resource="comments" kind="accept" :article-id="comment.oId" @accepted="emit('accepted')" />
-            <button v-if="commentingEnabled" type="button" class="op idle" @click="commentingEnabled && emit('reply')">回复</button>
-            <button v-if="own && manage && commentingEnabled" type="button" class="op idle" @click="commentingEnabled && emit('edit')">编辑</button>
-            <button v-if="own && (manage || removeAllowed)" type="button" class="op idle danger" :aria-disabled="managementBusy" @click="!managementBusy && emit('remove')">删除</button>
-            <span v-if="!own" class="op-report idle">
-              <ReportDialog :data-id="comment.oId" :data-type="1" />
-            </span>
+            <button v-if="commentingEnabled" type="button" class="op op-reply idle" @click="commentingEnabled && emit('reply')">回复</button>
+            <button v-if="own && manage && commentingEnabled" type="button" class="op op-edit idle" @click="commentingEnabled && emit('edit')">编辑</button>
+            <button v-if="own && (manage || removeAllowed)" type="button" class="op op-del idle danger" :aria-disabled="managementBusy" @click="!managementBusy && emit('remove')">删除</button>
           </template>
           <template v-else>
             <span v-if="goodCnt" class="op static">👍{{ goodCnt }}</span>
             <span v-if="thankCnt" class="op static">❤️{{ thankCnt }}</span>
           </template>
+          <RevisionHistory kind="comment" :target-id="comment.oId" class="cmt-history" />
+          <span v-if="interactive && !own" class="op-report idle">
+            <ReportDialog :data-id="comment.oId" :data-type="1" />
+          </span>
         </footer>
       </div>
     </div>
@@ -265,11 +267,12 @@ function onBodyClick(e: MouseEvent) {
   border-color: transparent;
 }
 .op,
+.op-report :deep(.report-trigger),
 .op-report :deep(.ghost) {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  height: 22px;
+  height: 24px;
   padding: 0 7px;
   border: 0;
   border-radius: 999px;
@@ -279,7 +282,13 @@ function onBodyClick(e: MouseEvent) {
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
+.op-reply::before {
+  content: '💬';
+  font-size: 11px;
+  opacity: 0.75;
+}
 .op:hover:not(:disabled),
+.op-report :deep(.report-trigger:hover),
 .op-report :deep(.ghost:hover),
 .cmt-ops :deep(.rx .ghost:hover) {
   background: var(--fp-hover);
@@ -317,14 +326,17 @@ function onBodyClick(e: MouseEvent) {
 @media (hover: hover) and (pointer: fine) {
   .op.idle,
   .op-report.idle,
+  .cmt-history :deep(.history-trigger[aria-expanded='false']),
   .cmt-ops :deep(.rx.empty:not(.open)) {
     opacity: 0;
   }
   .cmt-self:hover .op.idle,
   .cmt-self:hover .op-report.idle,
+  .cmt-self:hover .cmt-history :deep(.history-trigger),
   .cmt-self:hover .cmt-ops :deep(.rx.empty),
   .cmt-self:focus-within .op.idle,
   .cmt-self:focus-within .op-report.idle,
+  .cmt-self:focus-within .cmt-history :deep(.history-trigger),
   .cmt-self:focus-within .cmt-ops :deep(.rx.empty) {
     opacity: 1;
   }

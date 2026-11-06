@@ -14,8 +14,33 @@ async function submit(){if(!canSubmit.value)return;error.value='';try{const inpu
 watch(()=>store.completed,command=>{if(!command||JSON.stringify(command.input)!==submitted.value)return;memo.value='';reason.value=null;submitted.value='';close()})
 watch(()=>JSON.stringify([getAuthContextVersion(),auth.apiKey,auth.account?.oId||'',props.dataType,props.dataId]),clear,{flush:'sync'})
 </script>
-<template><button v-if="auth.apiKey&&auth.account?.oId" type="button" class="fp-btn fp-btn--ghost fp-btn--sm" @click="show">举报</button><p v-if="error&&!open" role="alert">{{ error }}</p><FpDialog :open="open" :title="target?`举报${target.label}`:'举报内容'" @close="close"><p>旧接口举报分类。提交成功不代表审核已处理。</p><form :id="formId" class="report-form" @submit.prevent="submit"><div class="kinds"><label v-for="kind in target?.reasons||[]" :key="kind.reason" class="kind-option" :class="{on:reason===kind.reason}"><input v-model.number="reason" type="radio" :name="formId" :value="kind.reason" :disabled="frozen"/><span>{{ kind.label }}</span></label></div><label>备注（可空）<textarea v-model="memo" class="fp-input" rows="3" maxlength="10240" :disabled="frozen" placeholder="补充需要核实的信息（纯文本）"/></label></form><p v-if="error" role="alert">{{ error }}</p><p v-if="store.error" role="alert">{{ store.error }}</p><p v-if="store.pending" role="status">已有举报结果未确认，请先核对原操作。</p><template #footer><button type="button" class="fp-btn fp-btn--ghost" @click="close">关闭</button><button type="submit" :form="formId" class="fp-btn fp-btn--primary" :disabled="!canSubmit">{{ store.busy?'提交中…':'提交举报' }}</button></template></FpDialog></template>
+<template><button v-if="auth.apiKey&&auth.account?.oId" type="button" class="report-trigger fp-btn fp-btn--ghost fp-btn--sm" @click="show">举报</button><p v-if="error&&!open" role="alert">{{ error }}</p><FpDialog :open="open" :title="target?`举报${target.label}`:'举报内容'" @close="close"><p class="v1-report-note">旧接口举报分类。提交成功不代表审核已处理。</p><form :id="formId" class="report-form" @submit.prevent="submit"><div class="kinds"><label v-for="kind in target?.reasons||[]" :key="kind.reason" class="kind-option" :class="{on:reason===kind.reason}"><input v-model.number="reason" type="radio" :name="formId" :value="kind.reason" :disabled="frozen"/><span>{{ kind.label }}</span></label></div><label>备注（可空）<textarea v-model="memo" class="fp-input" rows="3" maxlength="10240" :disabled="frozen" placeholder="补充需要核实的信息（纯文本）"/></label></form><p v-if="error" role="alert">{{ error }}</p><p v-if="store.error" role="alert">{{ store.error }}</p><p v-if="store.pending" role="status">已有举报结果未确认，请先核对原操作。</p><template #footer><button type="button" class="fp-btn fp-btn--ghost" @click="close">关闭</button><button type="submit" :form="formId" class="fp-btn fp-btn--primary" :disabled="!canSubmit">{{ store.busy?'提交中…':'提交举报' }}</button></template></FpDialog></template>
 <style scoped lang="scss">
+.report-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--fp-muted);
+  border: 1px solid var(--fp-border);
+  background: transparent;
+  cursor: pointer;
+  &::before {
+    content: '🚩';
+    font-size: 11px;
+    opacity: 0.75;
+  }
+  &:hover {
+    background: var(--fp-hover);
+    color: var(--fp-title);
+  }
+}
+.v1-report-note {
+  display: none;
+}
 .report-form {
   display: flex;
   flex-direction: column;

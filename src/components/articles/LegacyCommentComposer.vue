@@ -53,10 +53,10 @@ defineExpose({reveal:()=>props.writable&&editor.value?.reveal()})
       <p v-if="localError||operations.error" role="alert">{{ localError||operations.error }}</p><p v-if="operations.message" role="status">{{ operations.message }}</p>
       <p v-if="operations.receipt?.id" role="status">已确认评论编号 {{ operations.receipt.id }}（文章 {{ operations.receipt.articleId }}）。<span v-if="operations.receipt.operation==='create'">新回复可能位于其他页，请通过分页查看。</span></p>
       <p v-if="operations.receipt&&!operations.receipt.id" role="status">旧接口未返回评论编号，请重新读取当前文章核对。</p>
-      <p>发布费用、匿名资格和可见范围由平台在提交时校验；旧接口不支持幂等恢复；整页刷新或退出会清除本机未确认信息，请先核对原操作。</p>
+      <p class="composer-policy-note">发布费用、匿名资格和可见范围由平台在提交时校验；旧接口不支持幂等恢复；整页刷新或退出会清除本机未确认信息，请先核对原操作。</p>
     </template>
   </div>
 </template>
 <style scoped lang="scss">
-.comment-composer { min-width: 0; max-width: 100%; p { overflow-wrap: anywhere; } .pending-content { white-space: pre-wrap; } .options { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 8px 0; } button,select { color: var(--fp-text); background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 6px; padding: 6px 9px; margin: 4px; } button:disabled { opacity: .5; } [role='alert'] { color: #c34a36; } }
+.comment-composer { min-width: 0; max-width: 100%; p { overflow-wrap: anywhere; } .composer-policy-note { display: none; } .pending-content { white-space: pre-wrap; } .options { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 8px 0; font-size: 12.5px; color: var(--fp-muted); } button,select { color: var(--fp-text); background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 6px; padding: 6px 9px; margin: 4px; } button:disabled { opacity: .5; } [role='alert'] { color: #c34a36; } }
 </style>

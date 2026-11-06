@@ -38,12 +38,12 @@ onBeforeUnmount(() => { mounted = false; reset() })
       <p v-else>暂无等级奖励概要。</p>
       <p class="hint">这里只说明成长来源与奖励类型，不保证每次操作都会增加经验或发放奖励。</p>
     </template>
-    <button type="button" :disabled="loading || !accessToken" @click="load">重新读取成长提示</button>
+    <button type="button" class="refresh-guide-btn" :class="{ 'is-hidden': guide && !error }" :disabled="loading || !accessToken" @click="load">重新读取成长提示</button>
   </section>
 </template>
 
 <style scoped lang="scss">
-.profession-guide { scroll-margin-top: 88px; margin: 20px 0; border-top: 1px solid var(--fp-border); padding-top: 12px; }
+.profession-guide { scroll-margin-top: 88px; margin: 20px 0; border-top: 1px solid var(--fp-border); padding-top: 12px; .refresh-guide-btn.is-hidden { display: none !important; } }
 h3 { font-size: 17px; } h4 { font-size: 15px; margin: 14px 0 8px; } li { margin: 8px 0; }
 button { border: 1px solid var(--fp-border); color: var(--fp-text); background: transparent; border-radius: 8px; padding: 7px 12px; cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
 .hint { color: var(--fp-muted); font-size: 13px; } .error { color: #c34a36; }
