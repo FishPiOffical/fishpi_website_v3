@@ -66,6 +66,15 @@ const showMusic=ref(false)
 const showBarrage = ref(false)
 const showPaint = ref(false)
 
+const chatTools = [
+  { id: 'packet', label: '红包', title: '发放红包', path: 'M5 3h14v18H5z M5 8l7 4 7-4 M9 15h6' },
+  { id: 'paint', label: '涂鸦', title: '涂鸦画板', path: 'm14 5 5 5 M4 20l4-1L21 6l-4-4L4 15v5Z M13 20h8' },
+  { id: 'barrage', label: '弹幕', title: '发送弹幕', path: 'M4 4h16v13H9l-5 4V4Z M8 9h8 M8 13h5' },
+  { id: 'music', label: '音乐', title: '分享音乐', path: 'M9 18V5l11-2v13 M9 8l11-2 M9 18c0 2-6 3-6 0s6-3 6 0Z M20 16c0 2-6 3-6 0s6-3 6 0Z' },
+  { id: 'weather', label: '天气', title: '分享天气', path: 'M12 2v2 M5 5l1 1 M2 12h2 M18 5l-1 1 M9 16a5 5 0 1 1 8-5 M8 20h11a3 3 0 0 0 0-6 4 4 0 0 0-7-2 4 4 0 0 0-4 8Z' },
+] as const
+function toolOpen(id: typeof chatTools[number]['id']) { return ({ packet: showPacket.value, paint: showPaint.value, barrage: showBarrage.value, music: showMusic.value, weather: showWeather.value })[id] }
+
 function togglePanel(panel: 'packet' | 'barrage' | 'paint' | 'music' | 'weather') {
   showPacket.value = panel === 'packet' && !showPacket.value
   showBarrage.value = panel === 'barrage' && !showBarrage.value
@@ -241,16 +250,16 @@ function clearScreen() {
               </div>
               </template>
               <template #tools>
-                <button type="button" class="classic-tool-btn" title="发放红包" @click="togglePanel('packet')">🧧 红包</button>
-                <button type="button" class="classic-tool-btn" title="涂鸦画板" @click="togglePanel('paint')">🎨 涂鸦</button>
-                <button type="button" class="classic-tool-btn" title="发送弹幕" @click="togglePanel('barrage')">💬 弹幕</button>
-                <button type="button" class="classic-tool-btn" title="分享音乐" @click="togglePanel('music')">♫ 音乐</button>
-                <button type="button" class="classic-tool-btn" title="分享天气" @click="togglePanel('weather')">☀ 天气</button>
+                <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-pressed="toolOpen(tool.id)" @click="togglePanel(tool.id)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="tool.path" /></svg><span>{{ tool.label }}</span>
+                </button>
+              </template>
+              <template #context>
                 <div class="classic-topic-pill" :title="discuss">
-                  <span class="topic-label">话题：</span>
-                  <span class="topic-text"># {{ discuss }} #</span>
-                  <button type="button" class="topic-action-btn" title="引用话题" @click="useTopic">#</button>
-                  <button type="button" class="topic-action-btn" title="编辑话题" @click="editingTopic = !editingTopic">✏️</button>
+                  <span class="topic-label">话题</span>
+                  <span class="topic-text">{{ discuss || '聊点什么？' }}</span>
+                  <button type="button" class="topic-action-btn" title="引用话题" aria-label="引用话题" @click="useTopic">#</button>
+                  <button type="button" class="topic-action-btn" title="编辑话题" aria-label="编辑话题" :aria-expanded="editingTopic" @click="editingTopic = !editingTopic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 4 5 5 M4 20l5-1L21 7l-4-4L5 15l-1 5Z" /></svg></button>
                 </div>
               </template>
               <template #actions>
@@ -258,14 +267,14 @@ function clearScreen() {
                   🌐 {{ nodeName ? `大区: ${nodeName}` : '选择大区' }}
                 </button>
                 <button type="button" class="classic-btn style-toggle" title="切换到简约气泡版本（输入框吸底）" @click="toggleChatStyle">
-                  切换样式：简约
+                  简约模式
                 </button>
                 <button type="button" class="classic-btn" @click="clearScreen">清屏</button>
               </template>
             </ChatComposer>
             <div v-else-if="composerReady" class="comment-login-hint">
               <RouterLink to="/login" class="login-link">登录</RouterLink>后参与讨论与收发消息
-              <button type="button" class="classic-btn style-toggle" @click="toggleChatStyle">切换样式：简约</button>
+              <button type="button" class="classic-btn style-toggle" @click="toggleChatStyle">简约模式</button>
             </div>
 
             <!-- 话题编辑展开表单 -->
@@ -393,7 +402,7 @@ function clearScreen() {
               title="切换到经典版本（输入框在顶部，新消息在最上）"
               @click="toggleChatStyle"
             >
-              切换样式：经典
+              经典模式
             </button>
             <button v-if="isLoggedIn" type="button" class="cr-top-btn" @click="clearScreen">
               清屏置底
@@ -483,18 +492,16 @@ function clearScreen() {
               </div>
               </template>
               <template #tools>
-                <button type="button" class="tool-btn" title="插入涂鸦图片" @click="togglePanel('paint')">🎨 涂鸦</button>
-                <button type="button" class="tool-btn" title="发放积分红包" @click="togglePanel('packet')">🧧 红包</button>
-                <button type="button" class="tool-btn" title="发射全屏弹幕" @click="togglePanel('barrage')">💬 弹幕</button>
-                <button type="button" class="tool-btn" title="分享音乐" @click="togglePanel('music')">♫ 音乐</button>
-                <button type="button" class="tool-btn" title="分享天气" @click="togglePanel('weather')">☀ 天气</button>
+                <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-pressed="toolOpen(tool.id)" @click="togglePanel(tool.id)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="tool.path" /></svg><span>{{ tool.label }}</span>
+                </button>
               </template>
-              <template #actions>
+              <template #context>
                 <div class="classic-topic-pill" :title="discuss">
-                  <span class="topic-label">话题:</span>
-                  <span class="topic-text"># {{ discuss }} #</span>
-                  <button type="button" class="topic-action-btn" title="插入" @click="useTopic">#</button>
-                  <button type="button" class="topic-action-btn" title="修改" @click="editingTopic = !editingTopic">✏️</button>
+                  <span class="topic-label">话题</span>
+                  <span class="topic-text">{{ discuss || '聊点什么？' }}</span>
+                  <button type="button" class="topic-action-btn" title="引用话题" aria-label="引用话题" @click="useTopic">#</button>
+                  <button type="button" class="topic-action-btn" title="编辑话题" aria-label="编辑话题" :aria-expanded="editingTopic" @click="editingTopic = !editingTopic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 4 5 5 M4 20l5-1L21 7l-4-4L5 15l-1 5Z" /></svg></button>
                 </div>
               </template>
             </ChatComposer>
@@ -558,7 +565,7 @@ function clearScreen() {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .cr-page {
   width: 95%;
   max-width: 1400px;
@@ -620,30 +627,12 @@ function clearScreen() {
 }
 
 .classic-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  color: var(--fp-title);
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.classic-btn:hover {
-  background: var(--fp-hover);
-  border-color: var(--fp-accent);
-  color: var(--fp-accent);
-}
-
-.classic-btn.style-toggle {
-  background: var(--fp-hover);
-  border-color: var(--fp-accent);
-  color: var(--fp-accent);
-  font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-height: 34px; padding: 6px 10px; border: 1px solid transparent; border-radius: 8px;
+  background: transparent; color: var(--fp-muted); font-size: 12px; cursor: pointer;
+  transition: background-color .16s, color .16s;
+  &:hover { background: var(--fp-hover); color: var(--fp-title); }
+  &.style-toggle { background: var(--fp-surface-subtle,var(--fp-bg)); color: var(--fp-text); }
 }
 
 /* 输入框容器与文本域：100% 占满宽度 */
@@ -666,59 +655,28 @@ function clearScreen() {
 
 /* 工具栏与操作行（经典版） */
 
-.classic-tool-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  color: var(--fp-title);
-  border-radius: 4px;
-  padding: 5px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+.composer-tool-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 9px;
+  background: transparent; border: 1px solid transparent; color: var(--fp-muted); border-radius: 8px;
+  font-size: 12px; cursor: pointer; transition: background-color .16s, color .16s;
+  svg { width: 17px; height: 17px; flex: none; }
+  &:hover { background: var(--fp-hover); color: var(--fp-title); }
+  &.is-active { background: var(--fp-accent-soft,var(--fp-hover)); color: var(--fp-accent); }
 }
-
-.classic-tool-btn:hover {
-  background: var(--fp-hover);
-  border-color: var(--fp-accent);
-  color: var(--fp-accent);
-}
-
 .classic-topic-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--fp-hover);
-  border: 1px solid var(--fp-border);
-  border-radius: 4px;
-  padding: 3px 8px;
-  font-size: 12px;
-  max-width: 300px;
+  display: flex; align-items: center; gap: 9px; min-width: 0; width: 100%; box-sizing: border-box;
+  padding: 5px 8px 5px 10px; border-left: 2px solid var(--fp-accent); border-radius: 0 7px 7px 0;
+  background: var(--fp-surface-subtle,var(--fp-bg)); font-size: 12px;
+  .topic-label { color: var(--fp-muted); flex: none; font-size: 11px; }
+  .topic-text { flex: 1; min-width: 0; color: var(--fp-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
-
-.classic-topic-pill .topic-label {
-  color: var(--fp-muted);
-}
-
-.classic-topic-pill .topic-text {
-  color: var(--fp-accent);
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-style: normal;
-}
-
 .topic-action-btn {
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 0 2px;
-  color: var(--fp-link);
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px;
+  background: transparent; border: 0; border-radius: 6px; cursor: pointer; font-size: 16px; color: var(--fp-muted);
+  svg { width: 14px; height: 14px; }
+  &:hover, &[aria-expanded='true'] { background: var(--fp-hover); color: var(--fp-accent); }
 }
+@media(max-width:600px){.composer-tool-btn { padding: 6px 10px; gap: 0; span { display: none; } }.classic-topic-pill { gap: 6px; }}
 
 /* 在线人数条 */
 .classic-online-bar {
@@ -1022,25 +980,6 @@ function clearScreen() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.tool-btn {
-  display: inline-flex;
-  align-items: center;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  color: var(--fp-title);
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.tool-btn:hover {
-  background: var(--fp-hover);
-  border-color: var(--fp-accent);
-  color: var(--fp-accent);
 }
 
 .guest-bottom-bar {

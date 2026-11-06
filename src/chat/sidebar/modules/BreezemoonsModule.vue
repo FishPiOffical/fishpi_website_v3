@@ -3,5 +3,5 @@ import BreezemoonFeed from '@/components/sidebar/BreezemoonFeed.vue'
 </script>
 
 <template>
-  <BreezemoonFeed />
+  <BreezemoonFeed avatar-only />
 </template>

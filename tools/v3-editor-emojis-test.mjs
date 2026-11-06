@@ -71,3 +71,11 @@ appendHandlers.useTopic();appendHandlers.insertPaint('![画](https://example.inv
 state.editors.at(-1).value='刚输入的正文 🐟';appendHandlers.useTopic();assert.equal(appendDraft.value,'刚输入的正文 🐟 # 本次话题 # ');await tick()
 state.editors.at(-1).value='涂鸦前的末尾输入';appendHandlers.insertPaint('![画](https://example.invalid/a.png)');assert.equal(appendDraft.value,'涂鸦前的末尾输入\n![画](https://example.invalid/a.png)');assert.equal(showPaint.value,false);appendApp.unmount()
 console.log('PASS editor emoji 12 topic and paint append to latest editor buffer without discarding unsent input; loading preserves draft/panel')
+
+// The composer has a second picker outside Vditor: its labels must come from the same loaded editor.
+state.dispatch=dispatch
+const regularRoot={children:[]},regularApp=renderer.createApp({setup:()=>()=>h(Composer,{modelValue:'',compact:false})});regularApp.use(createPinia());regularApp.mount(regularRoot);await tick()
+const regularTrigger=find(regularRoot,n=>n.tag==='button'&&n.props['aria-label']==='表情');assert.ok(regularTrigger);regularTrigger.props.onClick();await tick()
+assert.match(text(regularRoot),/😄/);assert.ok(!text(regularRoot).includes(':smile:'));assert.ok(!text(regularRoot).includes(':heart:'))
+find(regularRoot,n=>n.tag==='button'&&n.props.title==='smile').props.onClick();await tick();assert.equal(state.insertions.at(-1),':smile:');regularApp.unmount()
+console.log('PASS editor emoji 13 actual noncompact composer passes loaded Unicode labels to its external picker; selection still inserts the server alias')

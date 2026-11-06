@@ -196,7 +196,7 @@
 
 - 评论感谢/采纳由当前GET给费用/基本资格，POST回执不替代当前状态；anonymous费用0，canThank/canAccept不保证提交时余额或权限。任何comments/accept完成须重读全部挂载采纳候选；其他资源/种类仍精确目标隔离。
 
-- 表态统一V3ReactionBar/v3Reactions/v3-reactions，目录无硬编码兜底，article/comment/chat+ID隔离原choice/key；回执不回填、事件仅失效后GET，不合并他人actorReaction。认证恢复前零请求，游客显式读且事件不扇出，chat需认证；迟到目录/状态也按身份废弃。旧ReactionBar未接线，不要重新接回旧toggle/快照。
+- 表态统一V3ReactionBar/v3Reactions/v3-reactions，目录无硬编码兜底，article/comment/chat+ID隔离原choice/key；回执不回填、事件仅失效后GET，不合并他人actorReaction。认证恢复前零请求，游客显式读且事件不扇出，chat需认证；迟到目录/状态也按身份废弃。旧ReactionBar未接线，不要重新接回旧toggle/快照。消息添加入口仅emoji（保留aria-label），palette挂载后Teleport到body并用v-show保留节点，选择/外部/Escape/滚动关闭，不能破坏原键恢复。
 
 - 历史统一RevisionHistory/v3-revisions，惰性当前GET、列表/详情各自序号与重试；current仅取列表，评论time=null未知，清洗content只能作文本不能当原Markdown/HTML预览或编辑。ArticleView以getAuthContextVersion+有无token+owner管理读取，正常token轮换不能关闭历史；换身份仍清正文。
 
@@ -206,7 +206,7 @@
 
 - 共享编辑器上传用v3-uploads/editorUpload：唯一file名称对应多文件部分结果，图床仅专用票据/omit Cookie/禁重定向；外部正文/身份/卸载取消旧插入。Vditor insertValue走HTML模板，原Markdown统一insertMD，目的地转义括号；不能把合法HTTP成功误当实际图片可加载。其他旧上传消费者仍待迁移。
 
-- Editor工具栏自定义v3-emoji复用EmojiPicker，Lute本地Unicode只显示且过滤HTML/URL，选择仍插服务端别名。Picker authContext/owner隔离而非token字符串，普通轮换保留；below/隐藏trigger用于工具栏。@联想已接suggestions/users，规则和限制见后端user-suggestions工作记录。
+- Editor工具栏自定义v3-emoji复用EmojiPicker，Lute本地Unicode只显示且过滤HTML/URL；MarkdownEditor经emoji-labels事件同步给ChatComposer下方选择器，选择仍插服务端别名。Picker authContext/owner隔离而非token字符串，普通轮换保留；below/隐藏trigger用于工具栏。@联想已接suggestions/users，规则和限制见后端user-suggestions工作记录。
 
 - @联想用v3-user-suggestions/mentionHints，取消时立即结算旧promise，防Vditor迟到genHTML覆盖新候选；在根input.capture清提示，勿放延迟options.input。原生hint会自行追加冒号项，不要给toolbar元素加emoji别名。客户端API10条/64位，当前CDN UI自身显示8条/触发31位。
 

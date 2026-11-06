@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { emojiToMarkdown, type EmojiItem, type EmojiGroup } from '@/api/fishpi'
 import { getAuthContextVersion } from '@/api/http'
@@ -12,6 +12,7 @@ const emit = defineEmits<{ insert: [markdown: string] }>()
 const { accessToken, account } = storeToRefs(useAuthStore())
 const identity = () => JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || ''])
 const open = ref(false), loading = ref(false), error = ref('')
+const root = ref<HTMLElement | null>(null)
 const items = ref<EmojiItem[]>([]), groups = ref<EmojiGroup[]>([]), groupId = ref('')
 const groupPage = ref(0), groupPages = ref(0), itemPage = ref(0), itemPages = ref(0)
 let version = 0
@@ -44,8 +45,12 @@ function moreItems() {
   return load(() => fetchV3GroupEmojis(id, p), page => { items.value = [...items.value, ...page.list]; itemPage.value = page.p; itemPages.value = page.pageCount })
 }
 function toggle() { open.value = !open.value; if (open.value) void loadFrequent(); else { version++; loading.value = false } }
+function close() { if (open.value) { open.value = false; version++; loading.value = false } }
+function outside(event: Event) { if (open.value && event.target instanceof Node && !root.value?.contains(event.target)) close() }
+function escape(event: KeyboardEvent) { if (event.key === 'Escape') close() }
+onMounted(() => { if (typeof document !== 'undefined') { document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape) } })
 watch(identity, () => { version++; open.value = false; loading.value = false; error.value = ''; items.value = []; groups.value = []; groupId.value = '' }, { flush: 'sync' })
-onBeforeUnmount(() => { version++ })
+onBeforeUnmount(() => { version++; if (typeof document !== 'undefined') { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) } })
 function pick(item: EmojiItem) {
   if (!open.value || loading.value || !accessToken.value || item.oId && !item.url) return
   emit('insert', emojiToMarkdown(item)); open.value = false; version++; loading.value = false
@@ -54,8 +59,8 @@ defineExpose({ toggle })
 </script>
 
 <template>
-  <div class="emoji">
-    <button v-if="props.showTrigger" type="button" class="ghost" @click="toggle">表情</button>
+  <div ref="root" class="emoji">
+    <button v-if="props.showTrigger" type="button" class="ghost" :aria-expanded="open" aria-label="表情" @click="toggle"><svg class="trigger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 14c1 4 7 4 8 0M8 9h.01M16 9h.01" stroke-linecap="round" /></svg><span>表情</span></button>
     <div v-if="open" class="panel" :class="{ 'panel--below': props.placement === 'below' }">
       <div v-if="groups.length" class="tabs">
         <button type="button" :class="{ on: !groupId }" @click="loadFrequent">常用</button>
@@ -88,6 +93,7 @@ defineExpose({ toggle })
 .emoji {
   position: relative;
 }
+.trigger-icon { width: 17px; height: 17px; vertical-align: middle; }
 .ghost {
   border: 1px solid var(--fp-border);
   background: transparent;

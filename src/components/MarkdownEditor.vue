@@ -23,7 +23,7 @@ const props = withDefaults(
   }>(),
   { height: 500, placeholder: '', outline: false, mode: 'post', toolbarPreset: 'default', cacheId: '' },
 )
-const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: []; 'emoji-labels': [labels: Record<string, string>] }>()
 
 const VDITOR_CDN = 'https://file.fishpi.cn/vditor/latest/dist'
 
@@ -210,6 +210,7 @@ onMounted(async () => {
         if (/^[A-Za-z0-9_+-]{1,64}$/.test(alias) && typeof value === 'string' && value.length <= 64 && /[^\u0000-\u007f]/u.test(value) && !/[A-Za-z_<>/:.\\\u0000-\u001f\u007f]/u.test(value)) labels[alias] = value
       }
       nativeEmojis.value = labels
+      emit('emoji-labels', labels)
       ready.value = true
       const cached = editor?.getValue().replace(/\n$/, '') || ''
       if (props.modelValue !== lastEmitted) editor?.setValue(props.modelValue, true)
