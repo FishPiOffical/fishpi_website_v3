@@ -114,19 +114,20 @@ defineExpose({ toggle })
   bottom: 36px;
   left: 0;
   z-index: 8;
-  width: min(360px, 70vw);
+  width: min(280px, calc(100vw - 32px));
+  box-sizing: border-box;
   max-height: 240px;
   overflow: auto;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
   border-radius: 10px;
-  padding: 8px;
+  padding: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 .tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px;
   margin-bottom: 8px;
 }
 .tabs button {
@@ -145,19 +146,21 @@ defineExpose({ toggle })
 .grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 4px;
+  gap: 2px;
 }
 .grid button {
   border: 0;
   background: var(--fp-hover);
-  border-radius: 6px;
-  padding: 4px;
+  border-radius: 5px;
+  padding: 2px;
   cursor: pointer;
-  min-height: 32px;
+  min-height: 28px;
+  font-size: 18px;
 }
+.grid--aliases button { font-size: 12px; }
 .grid img {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   object-fit: contain;
 }
 .hint {

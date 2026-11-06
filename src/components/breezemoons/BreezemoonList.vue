@@ -150,10 +150,10 @@ time {
 }
 .avatar-only {
   gap: 0;
-  li { display: grid; grid-template-columns: 30px minmax(0,1fr); align-items: start; column-gap: 10px; padding: 11px 0; }
+  li { display: grid; grid-template-columns: 20px minmax(0,1fr); align-items: start; column-gap: 8px; padding: 11px 0; }
   header { grid-column: 1; grid-row: 1; }
   header a { display: block; }
-  header img { display: block; width: 30px; height: 30px; border-radius: 9px; }
-  .moon-body { grid-column: 2; grid-row: 1; margin: 0; padding: 2px 0 0; font-size: 12.5px; line-height: 1.6; }
+  header img { display: block; width: 20px; height: 20px; border-radius: 6px; }
+  .moon-body { grid-column: 2; grid-row: 1; margin: 0; padding: 0; font-size: 12.5px; line-height: 1.6; }
 }
 </style>
