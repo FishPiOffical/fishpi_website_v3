@@ -158,7 +158,7 @@
 
 - /vips用OwnerMembership/v3-membership.ts：完整有界目录、不截断成功；支持字段看benefits的键存在而非真值，空旧配置不补false。开通确认冻结档位/券，同键恢复未知结果，后置GET失败不能重买；普通token刷新保留命令/草稿，context/actor变化才清旧状态与确认；资料/头像、偏好、职业、勋章设置同样以稳定身份保护读取、上传与未确认原key。资格与费用由服务端重验。共享昵称读取见下条。
 
-- VipNickname/useVipNickname仅v3指定ID批量styles，姓名通过v3摘要验证；缓存/队列绑定凭据，目标失效拒旧回写，不保留本地旧config兜底。isVip仅兼容渲染标志，空样式不能推出非会员。匿名/SSR普通文本；TTL只约束后续读取，非自动实时刷新。其他手写昵称/会员徽章另迁移。
+- VipNickname/useVipNickname使用v3全量styles快照（用户ID+三展示字段configJson），后续version未变化不传list，不恢复userIds逐人请求；姓名仅必要时经v3摘要解析。内存快照/条件版本绑定凭据，失效拒旧回写；按服务端maxAgeMs清过期CSS，仅可见昵称触发共享校验，失败全局退避。null配置是未知，空样式不能推出非会员；匿名/SSR普通文本，不持久化名单。
 
 - v3转账/邀请码由v3-finance.ts与v3Finance store承载，PointTransfer共享设置/主页；未知扣款命令/key跨SPA路由保留，正常非空token轮换保留，HTTP稳定身份版本或账号变化/退出清理。不能用token字符串变更清未确认扣款；恢复4xx也不证明此前未提交。仅内存、不跨整页刷新；后置余额读取失败不重买/重转。
 
