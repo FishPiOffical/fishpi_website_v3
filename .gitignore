@@ -155,3 +155,6 @@ vite.config.ts.timestamp-*
 
 # JetBrains IDE
 .idea/
+
+# Local deployment credentials
+.host

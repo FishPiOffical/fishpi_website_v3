@@ -1,0 +1,28 @@
+[Unit]
+Description=FishPi independent feedback API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fishpi-feedback
+Group=fishpi-feedback
+WorkingDirectory=/opt/fishpi/current/feedback-service
+Environment=NODE_ENV=production
+Environment=PORT=5174
+Environment=FEEDBACK_ENABLED=true
+Environment=FEEDBACK_DB=/var/lib/fishpi-feedback/feedback.sqlite
+Environment=RHYTHM_ORIGIN=https://fishpi.cn
+EnvironmentFile=-/etc/fishpi-feedback.env
+ExecStart=/opt/fishpi/runtime/bin/node src/main.ts
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/fishpi-feedback
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

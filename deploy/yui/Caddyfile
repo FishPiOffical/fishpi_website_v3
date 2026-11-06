@@ -1,0 +1,27 @@
+# Append this block to the existing Caddyfile; retain all other sites.
+yui.fishpi.cn {
+    encode gzip zstd
+    header X-Content-Type-Options nosniff
+    request_body {
+        max_size 22MB
+    }
+
+    @rhythm path /api/v3 /api/v3/* /captcha /captcha/* /test /validateCaptcha /gen /gen/* /games/* /activities/*
+    handle @rhythm {
+        reverse_proxy https://fishpi.cn {
+            # Public upstream routing needs its canonical Host; actual browser
+            # Origin/Referer and X-Forwarded-Host are retained, never forged.
+            header_up Host fishpi.cn
+        }
+    }
+    handle /rhypic-upload/api/v1/files {
+        rewrite * /api/v1/files
+        reverse_proxy https://pic.fishpi.cn {
+            header_up Host pic.fishpi.cn
+            header_up -Cookie
+        }
+    }
+    handle {
+        reverse_proxy 127.0.0.1:5173
+    }
+}
