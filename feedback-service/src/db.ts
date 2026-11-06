@@ -18,7 +18,10 @@ export function openDatabase(path: string) {
     CREATE TABLE IF NOT EXISTS moderation_log(id INTEGER PRIMARY KEY, request_id TEXT NOT NULL,
       actor TEXT NOT NULL, input TEXT NOT NULL, created_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS requests_created ON requests(created_at DESC,id);
-    INSERT OR IGNORE INTO migrations VALUES(1);`)
+    CREATE TABLE IF NOT EXISTS visitor_sessions(
+      id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL, expires_at INTEGER NOT NULL);
+    INSERT OR IGNORE INTO migrations VALUES(1);
+    INSERT OR IGNORE INTO migrations VALUES(2);`)
   return db
 }
 export type DB = ReturnType<typeof openDatabase>

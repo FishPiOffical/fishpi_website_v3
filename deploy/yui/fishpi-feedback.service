@@ -12,7 +12,7 @@ Environment=NODE_ENV=production
 Environment=PORT=5174
 Environment=FEEDBACK_ENABLED=true
 Environment=FEEDBACK_DB=/var/lib/fishpi-feedback/feedback.sqlite
-Environment=RHYTHM_ORIGIN=https://fishpi.cn
+Environment=FEEDBACK_COOKIE_SECURE=true
 EnvironmentFile=-/etc/fishpi-feedback.env
 ExecStart=/opt/fishpi/runtime/bin/node src/main.ts
 Restart=on-failure

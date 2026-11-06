@@ -159,14 +159,18 @@ async function createServer() {
     }
     const target = new URL(process.env.FEEDBACK_TARGET || env.FEEDBACK_TARGET || 'http://127.0.0.1:5174')
     const headers = { host: req.headers.host, accept: 'application/json', 'x-forwarded-for': req.ip }
-    for (const name of ['authorization', 'content-type', 'content-length', 'idempotency-key', 'origin']) {
+    for (const name of ['content-type', 'content-length', 'idempotency-key', 'origin']) {
       if (req.headers[name]) headers[name] = req.headers[name]
     }
+    const visitor = (req.headers.cookie || '').split(';').map(value => value.trim()).filter(value => value.startsWith('fp_feedback_visitor='))
+    if (visitor.length === 1 && /^fp_feedback_visitor=[A-Za-z0-9_-]{43}$/.test(visitor[0])) headers.cookie = visitor[0]
     const upstream = (target.protocol === 'https:' ? https : http).request({
       hostname: target.hostname, port: target.port, path: req.url, method: req.method, headers,
     }, response => {
       res.statusCode = response.statusCode || 502
       res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      const cookies = response.headers['set-cookie']?.filter(value => value.startsWith('fp_feedback_visitor='))
+      if (cookies?.length) res.setHeader('Set-Cookie', cookies)
       response.on('error', () => res.destroy())
       response.pipe(res)
     })

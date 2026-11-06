@@ -2,14 +2,12 @@
 import { useHead } from '@unhead/vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
-import { categories, statuses, feedbackEnabled, feedbackApi, type Feedback, type FeedbackList, type Personal, type Vote } from './api'
+import { categories, statuses, feedbackEnabled, feedbackApi, ensureFeedbackVisitor, getFeedbackContextVersion, onFeedbackIdentityChange, type Feedback, type FeedbackList, type Personal, type Vote } from './api'
 import { useFeedbackStore } from './store'
 import { useFeedbackPanelStore } from './panel'
 const props=defineProps<{embedded?:boolean}>()
 if(!props.embedded) useHead({ title: '需求反馈 - 摸鱼派', meta: [{ name: 'robots', content: 'noindex' }] })
-const browserRoute=useRoute(), router=useRouter(), auth=useAuthStore(), store=useFeedbackStore(), panel=useFeedbackPanelStore()
+const browserRoute=useRoute(), router=useRouter(), store=useFeedbackStore(), panel=useFeedbackPanelStore()
 const route=computed(()=>props.embedded?panel.location:browserRoute)
 async function navigate(path:string) {if(props.embedded) {panel.navigate(path);return} return router.push(path)}
 const mounted=ref(false), loading=ref(false), error=ref(''), actionError=ref(''), personalError=ref(''), voting=ref(false)
@@ -19,21 +17,16 @@ const moderation=reactive({status:'pending',note:'',hidden:false})
 const mode=computed(()=>route.value.path==='/feedback/new'?'new':route.value.params.id?'detail':'list')
 let sequence=0, personalSequence=0, controller:AbortController|null=null, moderationOwner=''
 const message=(e:unknown)=>e instanceof Error?e.message:'请求失败，请重试'
-function login() {
-  const target=props.embedded?browserRoute.fullPath:route.value.fullPath
-  if(props.embedded) {panel.loginReturnPath=target;panel.hide()}
-  void router.push({path:'/login',query:{redirect:target}})
-}
 async function loadPersonal() {
-  const seq=++personalSequence, id=String(route.value.params.id || ''), context=getAuthContextVersion()
+  const seq=++personalSequence, id=String(route.value.params.id || '')
   personal.value=null; personalError.value=''
-  if(mode.value!=='detail' || !auth.isLoggedIn || !id) return
+  if(mode.value!=='detail' || !id) return
   try {
     const value=await feedbackApi<Personal>(`/requests/${encodeURIComponent(id)}/me`,{private:true})
-    if(seq!==personalSequence || context!==getAuthContextVersion()) return
+    if(seq!==personalSequence) return
     personal.value=value
-    if(value.moderation && moderationOwner!==`${context}:${id}`) { Object.assign(moderation,value.moderation); moderationOwner=`${context}:${id}` }
-  } catch(e) { if(seq===personalSequence && context===getAuthContextVersion()) personalError.value=message(e) }
+    if(value.moderation && moderationOwner!==`${getFeedbackContextVersion()}:${id}`) { Object.assign(moderation,value.moderation); moderationOwner=`${getFeedbackContextVersion()}:${id}` }
+  } catch(e) { if(seq===personalSequence) personalError.value=message(e) }
 }
 async function load() {
   if(!mounted.value || !feedbackEnabled) return
@@ -58,38 +51,37 @@ async function navigateResult(id:string) {
   store.acknowledge(); await load()
 }
 async function submit() {
-  if(!auth.isLoggedIn) return login()
-  const context=getAuthContextVersion()
+  let context=getFeedbackContextVersion()
   actionError.value=''
   try {
+    await ensureFeedbackVisitor(); context=getFeedbackContextVersion()
     const result=store.result || await store.run({path:'/requests',method:'POST',body:store.draft})
     if(result) await navigateResult(result.id)
-  } catch(e) { if(context===getAuthContextVersion()) actionError.value=message(e) }
+  } catch(e) { if(context===getFeedbackContextVersion()) actionError.value=message(e) }
 }
 async function resume() {
-  const context=getAuthContextVersion()
+  const context=getFeedbackContextVersion()
   actionError.value=''
-  try { const result=store.result || await store.run(); if(result) await navigateResult(result.id) } catch(e) { if(context===getAuthContextVersion()) actionError.value=message(e) }
+  try { const result=store.result || await store.run(); if(result) await navigateResult(result.id) } catch(e) { if(context===getFeedbackContextVersion()) actionError.value=message(e) }
 }
 async function vote(value:Vote) {
-  if(!auth.isLoggedIn) return login()
   if(voting.value || !personal.value || !item.value) return
-  const id=item.value.id, context=getAuthContextVersion()
+  const id=item.value.id, context=getFeedbackContextVersion()
   voting.value=true; actionError.value=''
   try {
     await feedbackApi(`/requests/${encodeURIComponent(id)}/vote`,{method:'PUT',private:true,body:{choice:personal.value.vote===value?'none':value}})
-    if(context===getAuthContextVersion() && String(route.value.params.id)===id) {
+    if(context===getFeedbackContextVersion() && String(route.value.params.id)===id) {
       const fresh=await feedbackApi<Feedback>(`/requests/${encodeURIComponent(id)}`)
-      if(context===getAuthContextVersion() && String(route.value.params.id)===id) { item.value=fresh; await loadPersonal() }
+      if(context===getFeedbackContextVersion() && String(route.value.params.id)===id) { item.value=fresh; await loadPersonal() }
     }
-  } catch(e) { if(context===getAuthContextVersion()) actionError.value=message(e) }
+  } catch(e) { if(context===getFeedbackContextVersion()) actionError.value=message(e) }
   finally { voting.value=false }
 }
 async function moderate() {
   if(!personal.value?.canModerate || !route.value.params.id) return
-  const context=getAuthContextVersion()
+  const context=getFeedbackContextVersion()
   actionError.value=''
-  try { const result=await store.run({path:`/requests/${encodeURIComponent(String(route.value.params.id))}/moderation`,method:'PATCH',body:moderation}); if(result) {store.acknowledge(); await load()} } catch(e) {if(context===getAuthContextVersion()) actionError.value=message(e)}
+  try { const result=await store.run({path:`/requests/${encodeURIComponent(String(route.value.params.id))}/moderation`,method:'PATCH',body:moderation}); if(result) {store.acknowledge(); await load()} } catch(e) {if(context===getFeedbackContextVersion()) actionError.value=message(e)}
 }
 function search() { page.value=1; void load() }
 function selectCategory(cat:string) { filter.category=cat; search() }
@@ -102,12 +94,11 @@ function formatTime(raw:string) {
 }
 const categoryIcons:Record<string,string>={feature:'💡',bug:'🐛',experience:'✨'}
 watch(()=>route.value.fullPath,()=>{actionError.value=''; void load()})
-let identity=getAuthContextVersion()
-const off=onAccessTokenChange(()=>{
-  if(identity!==getAuthContextVersion()) {identity=getAuthContextVersion(); personalSequence++; personal.value=null; personalError.value=''; actionError.value=''; moderationOwner=''; Object.assign(moderation,{status:'pending',note:'',hidden:false})}
+let identity=getFeedbackContextVersion()
+const off=onFeedbackIdentityChange(()=>{
+  if(identity!==getFeedbackContextVersion()) {identity=getFeedbackContextVersion(); personalSequence++; personal.value=null; personalError.value=''; actionError.value=''; moderationOwner=''; Object.assign(moderation,{status:'pending',note:'',hidden:false})}
   if(mounted.value) void loadPersonal()
 })
-watch(()=>auth.isLoggedIn,()=>{if(mounted.value) void loadPersonal()})
 onMounted(()=>{mounted.value=true; void load()})
 onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
 </script>
@@ -146,6 +137,11 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
             <p class="muted">请描述使用场景、遇到的问题或期望的效果。请勿填写密码、令牌等私密信息。</p>
           </div>
 
+          <label class="field-group">
+            <span class="field-label">展示昵称（选填）</span>
+            <input class="fp-control" v-model="store.draft.displayName" maxlength="40" :disabled="!!store.pending" placeholder="留空使用自动生成的访客昵称">
+          </label>
+          <p class="muted">本浏览器使用独立访客身份，无需站点登录。昵称仅作展示，未经站点身份认证；清除浏览器数据会生成新身份。</p>
           <div class="field-group">
             <span class="field-label">反馈分类</span>
             <div class="cat-picker" role="group" aria-label="选择反馈分类">
@@ -188,7 +184,7 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
 
           <div class="form-footer">
             <a class="cancel-link fp-link-action" href="/feedback" @click.prevent="navigate('/feedback')">取消</a>
-            <button class="primary fp-control" :disabled="store.busy || !!store.pending || !!store.result">{{ auth.isLoggedIn ? '提交需求' : '登录后提交' }}</button>
+            <button class="primary fp-control" :disabled="store.busy || !!store.pending || !!store.result">提交需求</button>
           </div>
         </form>
 
@@ -287,7 +283,7 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
                 class="fp-control vote-btn vote-support"
                 :aria-pressed="personal?.vote==='support'"
                 :class="{selected:personal?.vote==='support'}"
-                :disabled="voting || (auth.isLoggedIn && !personal)"
+                :disabled="voting || !personal"
                 @click="vote('support')"
               >
                 <span aria-hidden="true">▲</span>
@@ -297,13 +293,13 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
                 class="fp-control vote-btn vote-oppose"
                 :aria-pressed="personal?.vote==='oppose'"
                 :class="{selected:personal?.vote==='oppose'}"
-                :disabled="voting || (auth.isLoggedIn && !personal)"
+                :disabled="voting || !personal"
                 @click="vote('oppose')"
               >
                 <span aria-hidden="true">▼</span>
                 <span>反对 {{ item.oppose }}</span>
               </button>
-              <span class="vote-hint muted">{{ auth.isLoggedIn ? '再次点击可撤销投票' : '登录后可参与投票' }}</span>
+              <span class="vote-hint muted">再次点击可撤销投票</span>
             </div>
 
             <section v-if="item.note" class="official-note">

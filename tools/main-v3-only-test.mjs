@@ -57,8 +57,8 @@ try {
   const settings = await fs.readFile('src/components/settings/SettingsDrawer.vue', 'utf8')
   assert.ok(settings.includes('需求反馈') && !settings.includes('接口版本'))
   const feedback = await fs.readFile('feedback-service/src/app.ts', 'utf8')
-  assert.ok(feedback.includes("new URL('/api/v3/me'") && !/verifyLegacy|x-fp-legacy-key|api\/user\?/.test(feedback))
-  console.log('PASS main v3-only: actual server and shared SPA gate reject old API without upstream calls; old cookie/env/header cannot select v1, Bearer/refresh preserved, retired source and switch removed, feedback stays v3')
+  assert.ok(feedback.includes("visitor_sessions") && !feedback.includes("rhythmVerifier") && !/verifyLegacy|x-fp-legacy-key|api\/user\?/.test(feedback))
+  console.log('PASS main v3-only: actual server and shared SPA gate reject old API without upstream calls; old cookie/env/header cannot select v1, Bearer/refresh preserved, retired source and switch removed, feedback uses separate visitor identity')
 } finally {
   if (child.exitCode === null) { const stopped = new Promise(resolve => child.once('exit', resolve)); child.kill('SIGTERM'); await stopped }
   await Promise.all([new Promise(resolve => upstream.close(resolve)), new Promise(resolve => gate.close(resolve))])

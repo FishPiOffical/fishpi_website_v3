@@ -1,17 +1,18 @@
 import { defineStore } from 'pinia'
 import { onScopeDispose, reactive, ref } from 'vue'
-import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
-import { FeedbackError, feedbackApi } from './api'
+import { FeedbackError, feedbackApi, ensureFeedbackVisitor, getFeedbackContextVersion, onFeedbackIdentityChange } from './api'
 type Command = { path:string; method:string; body:unknown; key:string }
 export const useFeedbackStore = defineStore('feedback',()=>{
-  const draft=reactive({ title:'', category:'feature', description:'' })
+  const draft=reactive({ title:'', category:'feature', description:'', displayName:'' })
   const pending=ref<Command|null>(null), busy=ref(false), result=ref<{id:string}|null>(null)
-  let context=getAuthContextVersion(), generation=0
-  const off=onAccessTokenChange(()=>{
-    if(context!==getAuthContextVersion()) { context=getAuthContextVersion(); generation++; pending.value=null; result.value=null; busy.value=false; Object.assign(draft,{title:'',category:'feature',description:''}) }
+  let context=getFeedbackContextVersion(), generation=0
+  const off=onFeedbackIdentityChange(()=>{
+    if(context!==getFeedbackContextVersion()) { context=getFeedbackContextVersion(); generation++; pending.value=null; result.value=null; busy.value=false }
   })
   onScopeDispose(off)
   async function run(command?: Omit<Command,'key'>) {
+    if(busy.value) return null
+    await ensureFeedbackVisitor()
     if(busy.value) return null
     if(!pending.value) { if(!command) return null; pending.value={...command,body:JSON.parse(JSON.stringify(command.body)),key:crypto.randomUUID()} }
     const frozen=pending.value, version=generation

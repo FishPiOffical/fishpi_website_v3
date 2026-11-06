@@ -1,81 +1,56 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { openDatabase } from '../src/db.ts'
-import { createApp, rhythmVerifier } from '../src/app.ts'
+import { createApp } from '../src/app.ts'
 
-test('真实HTTP身份夹具：核验、幂等、分页、投票、权限和隐藏',async()=>{
-  let identityCalls=0
-  const upstream=createServer((req,res)=>{
-    identityCalls++
-    assert.equal(req.url,'/api/v3/me'); assert.equal(req.headers.cookie,undefined)
-    res.setHeader('Content-Type','application/json')
-    const token=req.headers.authorization
-    if(token==='Bearer down') {res.writeHead(503);res.end('{}');return}
-    if(!['Bearer alice','Bearer bob','Bearer admin'].includes(token || '')) {res.writeHead(401);res.end('{}');return}
-    const name=token!.slice(7)
-    res.end(JSON.stringify({code:0,data:{id:name,userName:name,userNickname:name+'昵称'}}))
-  }).listen(0,'127.0.0.1')
-  await once(upstream,'listening')
-  const port=(upstream.address() as {port:number}).port
-  const db=openDatabase(':memory:')
-  const app=createApp({db,verify:rhythmVerifier(`http://127.0.0.1:${port}`),admins:new Set(['admin']),limits:false})
-  const server=app.listen(0,'127.0.0.1'); await once(server,'listening')
-  const base=`http://127.0.0.1:${(server.address() as {port:number}).port}/feedback-api/v1`
-  async function call(path:string, method='GET',body?:unknown, user?:string,key?:string) {
-    const r=await fetch(base+path,{method,headers:{'Content-Type':'application/json',...(user?{Authorization:'Bearer '+user}:{}),...(key?{'Idempotency-Key':key}:{})},body:body===undefined?undefined:JSON.stringify(body)})
-    return {status:r.status,data:await r.json() as any}
-  }
-  try {
-    assert.equal((await call('/requests')).data.total,0)
-    const body={title:'希望增加夜间阅读',description:'夜间阅读时希望可以单独调整字号。',category:'feature',author_id:'spoof'}
-    assert.equal((await call('/requests','POST',body)).status,401)
-    const beforeLegacy=identityCalls
-    const retired=await fetch(base+'/requests',{method:'POST',headers:{'Content-Type':'application/json','X-FP-API-Mode':'v1','X-FP-Legacy-Key':'synthetic-retired','Idempotency-Key':'retired-key-only'},body:JSON.stringify(body)})
-    assert.equal(retired.status,401);await retired.json();assert.equal(identityCalls,beforeLegacy,'retired key must not invoke identity verification')
-    assert.equal((await call('/requests','POST',body,'bad','bad-key-1')).status,401)
-    assert.equal((await call('/requests','POST',body,'down','down-key-1')).status,503)
-    const created=await call('/requests','POST',body,'alice','create-key-1');assert.equal(created.status,200)
-    const id=created.data.id
-    assert.equal((await call('/requests','POST',body,'alice','create-key-1')).data.id,id)
-    assert.equal((await call('/requests','POST',{...body,title:'不同标题内容'},'alice','create-key-1')).status,409)
-    assert.equal((await call('/requests/'+id)).data.authorName,'alice')
-    await Promise.all(Array.from({length:10},()=>call('/requests/'+id+'/vote','PUT',{choice:'support'},'bob')))
-    assert.equal((await call('/requests/'+id)).data.support,1)
-    await call('/requests/'+id+'/vote','PUT',{choice:'support'},'alice')
-    assert.equal((await call('/requests/'+id)).data.support,2)
-    await call('/requests/'+id+'/vote','PUT',{choice:'oppose'},'bob')
-    let detail=(await call('/requests/'+id)).data; assert.equal(detail.support,1);assert.equal(detail.oppose,1)
-    assert.equal((await call('/requests/'+id+'/me','GET',undefined,'bob')).data.vote,'oppose')
-    await call('/requests/'+id+'/vote','PUT',{choice:'none'},'bob')
-    assert.equal((await call('/requests/'+id)).data.oppose,0)
-    await call('/requests','POST',{...body,title:'第二条需求标题'},'alice','create-key-2')
-    const list=await call('/requests?size=1&page=2');assert.equal(list.data.total,2);assert.equal(list.data.pageCount,2);assert.equal(list.data.items.length,1)
-    assert.equal((await call('/requests?category=bug')).data.total,0)
-    assert.equal((await call('/requests?q=夜间')).data.total,2)
-    assert.equal((await call('/requests?page=0')).status,422)
-    const mod={status:'planned',note:'已经排入计划',hidden:true}
-    assert.equal((await call('/requests/'+id+'/moderation','PATCH',mod,'bob','moderate-1')).status,403)
-    assert.equal((await call('/requests/'+id+'/moderation','PATCH',mod,'admin','moderate-1')).status,200)
-    assert.equal((await call('/requests/'+id)).status,404)
-    assert.equal((await call('/requests/'+id+'/vote','PUT',{choice:'support'},'bob')).status,404)
-    assert.equal((await call('/requests')).data.total,1)
-    assert.equal((await call('/requests/'+id+'/me','GET',undefined,'bob')).status,404)
-    assert.equal((await call('/requests/'+id+'/me','GET',undefined,'admin')).data.moderation.hidden,true)
-    await call('/requests/'+id+'/moderation','PATCH',{...mod,hidden:false},'admin','moderate-2')
-    assert.equal((await call('/requests/'+id)).data.note,mod.note)
-    assert.equal(db.prepare('SELECT count(*) n FROM moderation_log').get()!.n,2)
-    const cross=await fetch(base+'/requests',{method:'POST',headers:{Origin:'https://evil.invalid','Content-Type':'application/json'},body:JSON.stringify(body)});assert.equal(cross.status,403)
-  } finally {await new Promise<void>(r=>server.close(()=>r()));await new Promise<void>(r=>upstream.close(()=>r()));db.close()}
+test('独立访客真实HTTP：Cookie、身份隔离、昵称、投票去重、幂等、管理与隐藏',async()=>{
+ const db=openDatabase(':memory:'),admins=new Set<string>(),server=createApp({db,admins,limits:false}).listen(0,'127.0.0.1');await once(server,'listening')
+ const base=`http://127.0.0.1:${(server.address() as {port:number}).port}`,api=base+'/feedback-api/v1'
+ async function call(path:string,method='GET',body?:unknown,cookie='',key='') {
+  const r=await fetch(api+path,{method,headers:{Origin:base,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{}),...(key?{'Idempotency-Key':key}:{})},body:body===undefined?undefined:JSON.stringify(body)})
+  return{status:r.status,data:await r.json() as any,cookie:r.headers.get('set-cookie')}
+ }
+ try{
+  assert.equal((await call('/health')).data.ok,true)
+  const a=await call('/session','POST',{}),b=await call('/session','POST',{}),ca=a.cookie!.split(';')[0]!,cb=b.cookie!.split(';')[0]!
+  assert.match(a.data.id,/^guest:/);assert.notEqual(a.data.id,b.data.id);assert.match(a.cookie!,/HttpOnly/);assert.match(a.cookie!,/Secure/);assert.match(a.cookie!,/SameSite=Strict/);assert.match(a.cookie!,/Path=\/feedback-api\/v1/)
+  assert.equal((await call('/session','POST',{},ca)).data.id,a.data.id)
+  const raw=ca.split('=')[1]!;assert.equal(db.prepare('SELECT token_hash FROM visitor_sessions WHERE id=?').get(a.data.id)!.token_hash===raw,false)
+  const body={title:'希望增加夜间阅读',description:'夜间阅读时希望可以单独调整字号。',category:'feature',displayName:'自选昵称',author_id:b.data.id}
+  assert.equal((await call('/requests','POST',body,'','key-none')).status,401)
+  const spoof=await fetch(api+'/requests',{method:'POST',headers:{Origin:base,'Content-Type':'application/json',Authorization:'Bearer spoof','Idempotency-Key':'spoof-key'},body:JSON.stringify(body)});assert.equal(spoof.status,401)
+  const made=await call('/requests','POST',body,ca,'create-key-1');assert.equal(made.status,200);const id=made.data.id
+  assert.equal((await call('/requests','POST',body,ca,'create-key-1')).data.id,id)
+  assert.equal((await call('/requests','POST',{...body,title:'修改后的不同标题'},ca,'create-key-1')).status,409)
+  const detail=(await call('/requests/'+id)).data;assert.equal(detail.authorNickname,'自选昵称');assert.equal(db.prepare('SELECT author_id FROM requests WHERE id=?').get(id)!.author_id,a.data.id)
+  await Promise.all(Array.from({length:10},()=>call('/requests/'+id+'/vote','PUT',{choice:'support'},cb)))
+  assert.equal((await call('/requests/'+id)).data.support,1)
+  await call('/requests/'+id+'/vote','PUT',{choice:'support'},ca);assert.equal((await call('/requests/'+id)).data.support,2)
+  await call('/requests/'+id+'/vote','PUT',{choice:'oppose'},cb);assert.equal((await call('/requests/'+id)).data.oppose,1)
+  assert.equal((await call('/requests/'+id+'/me','GET',undefined,cb)).data.vote,'oppose')
+  await call('/requests/'+id+'/vote','PUT',{choice:'none'},cb);assert.equal((await call('/requests/'+id)).data.oppose,0)
+  const mod={status:'planned',note:'排入计划',hidden:true};assert.equal((await call('/requests/'+id+'/moderation','PATCH',mod,ca,'moderate-1')).status,403)
+  admins.add(a.data.id);assert.equal((await call('/requests/'+id+'/me','GET',undefined,ca)).data.canModerate,true)
+  assert.equal((await call('/requests/'+id+'/moderation','PATCH',mod,ca,'moderate-1')).status,200)
+  assert.equal((await call('/requests/'+id)).status,404);assert.equal((await call('/requests/'+id+'/me','GET',undefined,cb)).status,404)
+  assert.equal((await call('/requests/'+id+'/me','GET',undefined,ca)).data.moderation.hidden,true)
+  await call('/requests/'+id+'/moderation','PATCH',{...mod,hidden:false},ca,'moderate-2')
+  await call('/requests','POST',{...body,title:'第二条不同需求标题'},ca,'create-key-2')
+  assert.equal((await call('/requests?size=1&page=2')).data.items.length,1);assert.equal((await call('/requests?q=不存在')).data.total,0);assert.equal((await call('/requests?page=0')).status,422)
+  const cross=await fetch(api+'/session',{method:'POST',headers:{Origin:'https://evil.example'}});assert.equal(cross.status,403)
+  assert.equal((await fetch(api+'/session',{method:'POST'})).status,403)
+  assert.equal((await call('/session','POST',{},'fp_feedback_visitor=forged')).status,200)
+  assert.equal((await call('/requests/'+id+'/me','GET',undefined,'fp_feedback_visitor=forged')).status,401)
+  db.prepare('UPDATE visitor_sessions SET expires_at=0 WHERE id=?').run(b.data.id)
+  assert.equal((await call('/requests/'+id+'/me','GET',undefined,cb)).status,401)
+  const replacement=await call('/session','POST',{},cb);assert.notEqual(replacement.data.id,b.data.id)
+ }finally{await new Promise<void>(r=>server.close(()=>r()));db.close()}
 })
-test('部署关闭和限流',async()=>{
-  const db=openDatabase(':memory:')
-  const verify=async()=>({id:'1',userName:'user'})
-  const closed=createApp({db,verify,admins:new Set(),enabled:false}).listen(0,'127.0.0.1');await once(closed,'listening')
-  const r=await fetch(`http://127.0.0.1:${(closed.address() as {port:number}).port}/feedback-api/v1/health`);assert.equal(r.status,503)
-  await new Promise<void>(r=>closed.close(()=>r()))
-  const server=createApp({db,verify,admins:new Set()}).listen(0,'127.0.0.1');await once(server,'listening')
-  try {let status=0;for(let i=0;i<181;i++) status=(await fetch(`http://127.0.0.1:${(server.address() as {port:number}).port}/feedback-api/v1/health`)).status;assert.equal(status,429)}
-  finally {await new Promise<void>(r=>server.close(()=>r()));db.close()}
+test('访客创建限流、功能关闭与旧数据兼容',async()=>{
+ const db=openDatabase(':memory:')
+ db.prepare('INSERT INTO requests VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run('legacy','旧需求测试标题','feature','旧说明内容','site-uid','legacy','旧昵称','pending','',0,'now','now')
+ const server=createApp({db,admins:new Set(['site-uid']),cookieSecure:false}).listen(0,'127.0.0.1');await once(server,'listening');const base=`http://127.0.0.1:${(server.address() as {port:number}).port}`
+ try{const old=await(await fetch(base+'/feedback-api/v1/requests')).json() as any;assert.equal(old.items[0].authorNickname,'旧昵称');let status=0;for(let i=0;i<21;i++)status=(await fetch(base+'/feedback-api/v1/session',{method:'POST',headers:{Origin:base}})).status;assert.equal(status,429)}finally{await new Promise<void>(r=>server.close(()=>r()))}
+ const closed=createApp({db,admins:new Set(),enabled:false}).listen(0,'127.0.0.1');await once(closed,'listening');assert.equal((await fetch(`http://127.0.0.1:${(closed.address() as {port:number}).port}/feedback-api/v1/health`)).status,503);await new Promise<void>(r=>closed.close(()=>r()));db.close()
 })

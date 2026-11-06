@@ -6,11 +6,11 @@
 
 构建环境：`VITE_BROWSER_API_ORIGIN=https://fishpi.cn VITE_API_TARGET=https://fishpi.cn VITE_SITE_ORIGIN=https://yui.fishpi.cn VITE_FEEDBACK_ENABLED=true npm run build`。上传客户端/SSR构建、public、server.js、server/、package*.json、feedback-service/src及其package*.json；服务器两个目录分别 `npm ci`（网站运行时依赖vite的loadEnv，所以不能省devDependencies），使用独立运行时的PATH。
 
-安装两个 `.service` 至 `/etc/systemd/system/`，创建对应系统用户并授予反馈用户数据库目录独占写权限。`/etc/fishpi-feedback.env` 由 root 管理、权限600，设置 `FEEDBACK_ADMIN_IDS=稳定用户ID列表`；未设置时不开放管理权限，不自行指定管理员。启动 `systemctl enable --now fishpi-feedback fishpi-website`。
+安装两个 `.service` 至 `/etc/systemd/system/`，创建对应系统用户并授予反馈用户数据库目录独占写权限。`/etc/fishpi-feedback.env` 由 root 管理、权限600，设置 `FEEDBACK_ADMIN_IDS=guest:开头的独立访客ID列表`；未设置时不开放管理权限，不自行指定管理员。启动 `systemctl enable --now fishpi-feedback fishpi-website`。
 
-Caddy `/api/v3` HTTP/WebSocket 和必要经典资源均反代 HTTPS fishpi.cn，SSR同样直接访问该站，上游Host为fishpi.cn以匹配其虚拟主机，实际浏览器域名由X-Forwarded-Host保留，Origin/Referer原样传递，不伪造第一方来源。现网必须已部署v3且认可该域名的认证来源策略；404或来源拒绝不能靠回退旧API绕过。`/feedback-api/v1` 走网站开关代理至独立反馈服务，反馈仅以Bearer核验 fishpi.cn/api/v3/me，不转发Cookie。
+当前浏览器直连fishpi.cn的v3 HTTP/WebSocket，本站v3转发已关闭；SSR仍直接访问该站，必要经典资源保留代理。现网必须已部署v3且认可该域名的认证来源策略；404或来源拒绝不能靠回退旧API绕过。`/feedback-api/v1` 走网站开关代理至独立反馈服务，反馈仅核验本机签发的访客Cookie，不调用Rhythm；代理只转发fp_feedback_visitor，不转发站点Cookie或Bearer。
 
-检查：HTTPS首页、静态资源、`/feedback-api/v1/health`、公开需求列表和v3端点。未登录POST应401。禁止为部署验证写入真实需求或账号数据。
+检查：HTTPS首页、静态资源、`/feedback-api/v1/health`、公开需求列表和v3端点。没有访客Cookie的写请求应401。禁止为部署验证写入真实需求或账号数据。
 
 回滚：将current重新链接到保留的旧release，重启两个服务；数据库不回滚。如需恢复Caddy，使用更改前的备份并先validate再reload。日志：`journalctl -u fishpi-website -u fishpi-feedback`。数据库在线备份/导出/恢复见feedback-service/README.md，运行命令时使用反馈服务用户和独立运行时，备份不应放在public中。
 
@@ -28,6 +28,12 @@ Caddy `/api/v3` HTTP/WebSocket 和必要经典资源均反代 HTTPS fishpi.cn，
 
 ## 浏览器直连 Rhythm
 
-生产构建设置 `VITE_BROWSER_API_ORIGIN=https://fishpi.cn`，浏览器HTTP和实时WebSocket直连fishpi.cn，不经过yui服务器v3代理；未设置时保留本地同源开发。SSR的读取仍使用VITE_API_TARGET，反馈浏览器API仍同源/feedback-api/v1，身份核验仍由反馈服务器执行。上传图床维持专用票据链路。需要fishpi.cn精确允许https://yui.fishpi.cn的CORS/OPTIONS、credentials及实际Authorization/Content-Type/Idempotency-Key等请求头，并允许WebSocket Origin；不使用no-cors、不伪造Origin、不将令牌放入URL。生产站点不再提供v3转发，旧缓存客户端访问本站/api/v3返回410提示刷新。
+生产构建设置 `VITE_BROWSER_API_ORIGIN=https://fishpi.cn`，浏览器HTTP和实时WebSocket直连fishpi.cn，不经过yui服务器v3代理；未设置时保留本地同源开发。SSR的读取仍使用VITE_API_TARGET，反馈浏览器API仍同源/feedback-api/v1，访客身份由反馈服务器本地执行。上传图床维持专用票据链路。需要fishpi.cn精确允许https://yui.fishpi.cn的CORS/OPTIONS、credentials及实际Authorization/Content-Type/Idempotency-Key等请求头，并允许WebSocket Origin；不使用no-cors、不伪造Origin、不将令牌放入URL。生产站点不再提供v3转发，旧缓存客户端访问本站/api/v3返回410提示刷新。
 
 2026-11-06 直连版本 `03c8ddb` 已发布到 `/opt/fishpi/releases/20261106-03c8ddb`；前版fd9bb2c保留，反馈数据库在线备份pre-03c8ddb-20261106-152021.sqlite。Caddy原配置备份为/etc/caddy/Caddyfile.before-direct-03c8ddb，本站v3入口已验证410，反馈health 200。HTTP/刷新/重连/实时直连专项及既有离线身份、正文断流、通知、文章实时专项通过，完整构建通过。上线直连HTTP模块与本地字节一致。浏览器登录页/重连仍失败；现网captcha-options虽200 JSON但无Access-Control-Allow-Origin，登录OPTIONS 404，跨域尚未放行，登录及真实写未验收。反馈/me服务器核验仍受服务器到fishpi.cn网络可达性限制，未改变信任模型。
+
+## 独立访客模式更新
+
+需求服务改用本地访客Cookie，已移除Rhythm身份网络依赖。更新包含数据库迁移2（仅新增visitor_sessions表），旧需求与投票保留，不按昵称认领。生产FEEDBACK_COOKIE_SECURE=true；FEEDBACK_ADMIN_IDS需guest:开头的本地访客ID，旧站点UID不会获得权限。发布前使用旧版storage.ts在线备份，再切换current、安装新版feedback unit并重启两个服务。SSR代理现在只转发fp_feedback_visitor Cookie及其Set-Cookie，不转发Rhythm Bearer/Cookie。
+
+后端类型检查及2组真实HTTP集成通过；前端API/Pinia和真实SSR访客Cookie代理通过；全量101专项通过，后续补测迟到401不影响新访客。完整构建通过。本机临时库浏览器验收未登录提交→详情→支持→刷新保留→改反对→撤销通过，未向线上写入测试需求。

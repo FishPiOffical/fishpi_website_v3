@@ -14,7 +14,7 @@ npm run sitemap      # 生成 public/sitemap.xml
 
 main 分支仅支持 Rhythm v3 接口，双版本代码已备份至本地 `v1_v3` 分支（`ce9e4dd`，包含最近两次 UI 调整）。版本切换、旧 apiKey 登录及 v1 适配器已移除；旧 `fp.apiMode` Cookie 不会改变请求目标，旧 `/api/` 端点返回 410。开发上游通过 `VITE_API_TARGET` 配置，须指向支持 v3 的 Rhythm，不自动回退现网旧接口。
 
-浏览器访问令牌只保存在内存，通过 HttpOnly 刷新 Cookie 恢复。需求反馈服务仅核验 v3 Bearer；`/feedback-api/v1` 是该独立服务自身的版本号，与已移除的网站 v1 无关。Node.js 要求 >=24.12。移除范围与验收见 [main 分支说明](docs/V3_ONLY.md)。
+浏览器访问令牌只保存在内存，通过 HttpOnly 刷新 Cookie 恢复。需求反馈服务使用独立访客 Cookie；`/feedback-api/v1` 是该独立服务自身的版本号，与已移除的网站 v1 无关。Node.js 要求 >=24.12。移除范围与验收见 [main 分支说明](docs/V3_ONLY.md)。
 
 ```sh
 npm run test:v3  # 全部 v3、反馈与仅 v3 边界专项；本地夹具，不替代构建和浏览器验收
@@ -145,7 +145,7 @@ QQ已接独立第一方本人GET/PUT，空值清除、1至12位数字保留前�
 
 ## 独立公测需求反馈（可选）
 
-左侧设置面板可开启“需求反馈”弹窗，提供提交、列表、支持/反对及管理员处理，弹窗内切换不跳转当前页面。数据由独立 Node.js 服务保存，不进入 Rhythm；仅复用 `/api/v3/me` 核验登录。默认关闭。启动、功能开关、代理、管理员 ID、备份恢复与移除方式见 [反馈服务说明](feedback-service/README.md)。
+左侧设置面板可开启“需求反馈”弹窗，提供提交、列表、支持/反对及管理员处理，弹窗内切换不跳转当前页面。数据由独立 Node.js 服务保存，不进入 Rhythm；使用服务端生成的独立访客身份，无需站点登录；昵称仅展示，不代表站点认证。默认关闭。启动、功能开关、代理、管理员 ID、备份恢复与移除方式见 [反馈服务说明](feedback-service/README.md)。
 
 
 ## 内页 UI 规范
@@ -158,4 +158,4 @@ QQ已接独立第一方本人GET/PUT，空值清除、1至12位数字保留前�
 
 接口离线处理：浏览器连接/正文断流、HTTP 502/504 或非 JSON 503 会跳转 `/offline`，保留原路径（含查询和片段）；并发失败只导航一次，旧身份请求不触发新身份跳转。JSON 503 及权限、业务错误保留当前页提示，不自动重发写操作。重新连接须收到 captcha-options 完整成功 v3 JSON 后才返回，网关响应、HTML 和断流均不算恢复。
 
-生产浏览器可通过构建变量 `VITE_BROWSER_API_ORIGIN=https://fishpi.cn` 直连 Rhythm HTTP 与实时 WebSocket；留空仍支持本地同源开发代理。刷新Cookie继续credentials=include、Bearer仅内存，需求反馈仍请求本站/feedback-api/v1。直连必须由fishpi.cn允许本站Origin的CORS/预检及WebSocket来源；前端不绕过跨域限制。SSR与反馈身份核验仍为服务端直读，网络可达性独立验证。详见deploy/yui/README.md。
+生产浏览器可通过构建变量 `VITE_BROWSER_API_ORIGIN=https://fishpi.cn` 直连 Rhythm HTTP 与实时 WebSocket；留空仍支持本地同源开发代理。刷新Cookie继续credentials=include、Bearer仅内存，需求反馈仍请求本站/feedback-api/v1。直连必须由fishpi.cn允许本站Origin的CORS/预检及WebSocket来源；前端不绕过跨域限制。SSR仍为服务端直读，反馈身份独立本地核验，网络可达性独立验证。详见deploy/yui/README.md。
