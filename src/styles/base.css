@@ -277,7 +277,7 @@ button.btn:disabled {
 }
 
 /* ==========================================================================
-   表单输入与选择器 (.fp-field / .fp-input)
+   表单输入与选择器 (.fp-field / .fp-input / 全局 select)
    ========================================================================== */
 .fp-field {
   display: block;
@@ -294,15 +294,18 @@ button.btn:disabled {
 
 .fp-input,
 select.fp-input,
-textarea.fp-input {
-  width: 100%;
-  padding: 8px 12px;
+textarea.fp-input,
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not(.search):not([class*='vditor']),
+textarea:not([class*='vditor']) {
+  min-height: 36px;
+  padding: 7px 12px;
   border: 1px solid var(--fp-border);
   border-radius: var(--fp-radius-md);
-  background: var(--fp-bg);
+  background-color: var(--fp-bg);
   color: var(--fp-text);
   font-size: 13px;
   line-height: 1.45;
+  box-sizing: border-box;
   outline: none;
   transition:
     border-color 0.16s ease,
@@ -310,17 +313,83 @@ textarea.fp-input {
     background-color 0.16s ease;
 }
 
-.fp-input:hover {
+.fp-input,
+select.fp-input,
+textarea.fp-input {
+  width: 100%;
+}
+
+.fp-input::placeholder,
+textarea::placeholder,
+input::placeholder {
+  color: var(--fp-muted);
+  opacity: 0.65;
+}
+
+.fp-input:hover:not(:disabled),
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not(.search):not([class*='vditor']):hover:not(:disabled),
+textarea:not([class*='vditor']):hover:not(:disabled) {
   border-color: var(--fp-border-strong);
 }
 
-.fp-input:focus {
+.fp-input:focus,
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not(.search):not([class*='vditor']):focus,
+textarea:not([class*='vditor']):focus {
   border-color: var(--fp-primary);
   box-shadow: var(--fp-focus-ring);
 }
 
+.fp-input:disabled,
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not(.search):not([class*='vditor']):disabled,
+textarea:not([class*='vditor']):disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 textarea.fp-input {
   resize: vertical;
+}
+
+/* 统一全站所有 <select> 下拉框外观与右侧箭头内边距，避免原生箭头贴边 */
+select,
+select.fp-input,
+select.fp-control {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  min-height: 36px;
+  padding: 7px 34px 7px 12px !important;
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-radius-md);
+  background-color: var(--fp-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a857d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 11px center !important;
+  background-size: 14px 14px !important;
+  color: var(--fp-text);
+  font-size: 13px;
+  line-height: 1.45;
+  cursor: pointer;
+  box-sizing: border-box;
+  outline: none;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
+}
+
+select:hover:not(:disabled) {
+  border-color: var(--fp-border-strong);
+}
+
+select:focus {
+  border-color: var(--fp-primary);
+  box-shadow: var(--fp-focus-ring);
+}
+
+select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* ==========================================================================

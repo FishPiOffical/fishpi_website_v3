@@ -474,8 +474,12 @@ button,
   border-radius: 8px;
   padding: 7px 12px;
   color: inherit;
-  background: var(--fp-bg);
+  background-color: var(--fp-bg);
   min-width: 0;
+}
+
+select {
+  padding-right: 34px !important;
 }
 
 textarea {

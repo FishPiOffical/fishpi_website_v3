@@ -9,7 +9,7 @@
   --fp-panel-padding: 20px;
   --fp-panel-radius: 10px;
   --fp-control-height: 36px;
-  --fp-control-radius: 6px;
+  --fp-control-radius: 8px;
   --fp-page-title-size: 24px;
 }
 
@@ -55,21 +55,28 @@
   border-radius: var(--fp-control-radius);
   font-family: inherit;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
   padding: 7px 12px;
   transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
 }
 .fp-ui :is(input.fp-control, select.fp-control, textarea.fp-control) {
   color: var(--fp-text);
-  background: var(--fp-bg);
+  background-color: var(--fp-bg);
   border: 1px solid var(--fp-border);
   min-width: 0;
+}
+.fp-ui select.fp-control {
+  padding-right: 34px !important;
 }
 .fp-ui :is(input.fp-control, select.fp-control, textarea.fp-control):hover:not(:disabled) { border-color: var(--fp-border-strong); }
 .fp-ui :is(input.fp-control, select.fp-control, textarea.fp-control):focus {
   outline: none;
   border-color: var(--fp-primary);
   box-shadow: var(--fp-focus-ring);
+}
+.fp-ui :is(input.fp-control, select.fp-control, textarea.fp-control):disabled {
+  opacity: .55;
+  cursor: not-allowed;
 }
 .fp-ui textarea.fp-control { resize: vertical; }
 .fp-ui button.fp-control { cursor: pointer; font-weight: 500; }
