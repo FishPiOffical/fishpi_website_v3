@@ -41,3 +41,5 @@
 2026-11-06 已发布访客版 `1d12de6` 至 `/opt/fishpi/releases/20261106-1d12de6`，前版03c8ddb保留。迁移前在线备份：`/var/lib/fishpi-feedback/backups/pre-1d12de6-20261106-161831.sqlite`；feedback unit已安装新版，两个服务active。公网/session建立与Cookie复用通过，Secure/HttpOnly/路径属性检查通过；空表单返回422而不是身份503，表明本地身份链路通过，未向生产创建测试需求。公开列表200，新版浏览器表单展示访客提示且无需登录。数据库迁移版本2、integrity_check正常。
 
 2026-11-06 UI更新 `e6c66bf` 已发布至 `/opt/fishpi/releases/20261106-e6c66bf`，包含排行榜、主页、会员及信息流样式。生产完整构建通过，线上TopView CSS和入口JS等4项资源与本地字节一致，浏览器总榜分类及卡片展示正常。两个Node服务及Caddy active，反馈health 200，数据库integrity_check正常；上线前备份`/var/lib/fishpi-feedback/backups/pre-e6c66bf-20261106-163537.sqlite`，前版1d12de6保留用于回滚，访客数据和管理员配置不变。未改动上游、认证或SSR网络配置，未提交生产测试需求。
+
+2026-11-06 最新 UI `0d5f39b` 已发布至 `/opt/fishpi/releases/20261106-0d5f39b`，包含紧凑积分流水、收支标识、轻量刷新按钮及此前聊天界面调整。完整生产构建通过，积分页 JS/CSS 公网字节与本地产物一致，`/points` 和反馈 health 均 200，两个服务 active。切换前已在线备份反馈数据库（`backups/pre-20261106-0d5f39b-*.sqlite`），保留前版 e6c66bf 与旧 assets。未修改 Caddy、认证或防火墙；此前部署机访问 fishpi.cn 超时的 SSR 上游网络问题仍需独立处理，不能视为本次部署已修复。未执行生产账号或需求写入。
