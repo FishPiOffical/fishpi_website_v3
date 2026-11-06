@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils/time'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useV3IdentityStore } from '@/stores/v3Identity'
@@ -6,7 +8,7 @@ const store = useV3IdentityStore(), { revision, summary, pendingKey, receipt, se
 const preview = ref(''), selectionError = ref(''), fileInput = ref<HTMLInputElement | null>(null)
 const hasPending = computed(() => records.value.some(item => item.status === 'pending'))
 const statuses = { pending: '待审核结论', approved: '审核通过', rejected: '审核驳回' }
-function date(value: number) { return new Date(value).toLocaleString() }
+const date = formatDateTime
 function closePreview() { preview.value = ''; store.revokePreview() }
 async function choose(event: Event) { const input = event.target as HTMLInputElement, files = input.files; selectionError.value = ''; if (!files?.length) return; closePreview(); if (files.length !== 1) { store.clearDraft(); selectionError.value = '每次只能选择一张图片'; input.value = ''; return } const file = files[0]!; input.value = ''; await store.select(file) }
 function showPreview() { preview.value = store.preview() }

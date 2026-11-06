@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils/time'
+
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import ProfessionGuide from '@/components/profession/ProfessionGuide.vue'
@@ -100,7 +102,7 @@ async function execute(intent: { command: ProfessionCommand; key: string }) {
 function start(command: ProfessionCommand) { if (!disabled.value) void execute({ command, key: profileOperationKey() }) }
 function savePrivacy() { if (preset.value && modules.value) start({ kind: 'privacy', preset: preset.value, ...(preset.value === 'CUSTOM' ? { moduleVisibility: { ...modules.value } } : {}) }) }
 function retry() { if (pending.value) void execute(pending.value) }
-function date(value: number) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '时间异常' : d.toLocaleString() }
+const date = formatDateTime
 onMounted(() => { mounted = true; void loadMine(1); void loadCatalog(1) })
 watch([accessToken, () => account.value?.oId], () => {
   const current = identity()

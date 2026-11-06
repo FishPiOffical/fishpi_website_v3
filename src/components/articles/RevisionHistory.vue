@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils/time'
+
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { getAuthContextVersion } from '@/api/http'
@@ -39,7 +41,7 @@ async function select(meta:RevisionMeta){
   catch(reason){if(valid())detailError.value=reason instanceof Error?reason.message:'历史正文读取失败'}
   finally{if(valid())busy.value=false}
 }
-function date(time:number|null){if(time===null)return'修改时间未知';const value=new Date(time);return Number.isFinite(value.getTime())?value.toLocaleString():String(time)}
+function date(time:number|null){return formatDateTime(time,'修改时间未知')}
 watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.targetId],()=>{const next=identity();if(next===boundary)return;boundary=next;close()},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity()})
 onBeforeUnmount(()=>{mounted.value=false;close()})

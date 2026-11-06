@@ -1,15 +1,19 @@
 <script setup lang="ts">
+import { timeISO } from '@/utils/time'
+
+import { formatDateTime } from '@/utils/time'
+
 import { RouterLink } from 'vue-router'
 import type { FollowingMoon } from '@/api/v3-following-feed'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
 defineProps<{items:FollowingMoon[];compact?:boolean}>()
 function fallback(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
-function date(value:number){return new Date(value).toISOString().replace('T',' ').replace('.000Z',' UTC')}
+const date = formatDateTime
 </script>
 <template>
   <ul class="breezemoon-list" :class="{compact}"><li v-for="item in items" :key="item.id">
-    <header><RouterLink :to="`/member/${encodeURIComponent(item.author.userName)}`" :data-user-card="item.author.userName"><img :src="avatarUrl(item.author)" :data-user-card="item.author.userName" alt="" loading="lazy" @error="fallback" /><VipNickname :user-id="item.author.id" :user-name="item.author.userName" :text="item.author.userNickname||item.author.userName" /></RouterLink><time :datetime="new Date(item.createdAt).toISOString()">{{ date(item.createdAt) }}</time><slot name="actions" :item="item" /></header>
+    <header><RouterLink :to="`/member/${encodeURIComponent(item.author.userName)}`" :data-user-card="item.author.userName"><img :src="avatarUrl(item.author)" :data-user-card="item.author.userName" alt="" loading="lazy" @error="fallback" /><VipNickname :user-id="item.author.id" :user-name="item.author.userName" :text="item.author.userNickname||item.author.userName" /></RouterLink><time :datetime="timeISO(item.createdAt)">{{ date(item.createdAt) }}</time><slot name="actions" :item="item" /></header>
     <div class="moon-body" v-html="item.contentHtml" />
   </li></ul>
 </template>

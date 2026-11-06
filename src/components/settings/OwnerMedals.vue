@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDate } from '@/utils/time'
+
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
@@ -52,7 +54,7 @@ async function execute(operation: Operation) {
 function display(medal: OwnerMedal) { if (ready.value && !loading.value && !busy.value && !pending.value) void execute({ id: medal.id, name: medal.name, kind: 'display', displayed: !medal.displayed, key: profileOperationKey() }) }
 function move(medal: OwnerMedal, direction: 'up' | 'down') { if (ready.value && !loading.value && !busy.value && !pending.value) void execute({ id: medal.id, name: medal.name, kind: 'move', direction, key: profileOperationKey() }) }
 function retry() { if (pending.value && !loading.value) void execute(pending.value) }
-function expires(value: number) { if (value <= 0) return '永久'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '到期时间异常' : date.toLocaleDateString() }
+function expires(value: number) { return value <= 0 ? '永久' : formatDate(value) }
 onMounted(() => { mounted = true; void load(1) })
 watch([accessToken, () => account.value?.oId], () => {
   const current = identity()

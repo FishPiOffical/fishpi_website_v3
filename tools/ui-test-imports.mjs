@@ -1,0 +1,8 @@
+// Compiled Vue fixtures use data: modules. Resolve the shared pure display helper
+// from that realm without replacing it with a mock or changing protocol shims.
+import { registerHooks } from 'node:module'
+const time = new URL('../src/utils/time.ts', import.meta.url).href
+registerHooks({ resolve(specifier, context, next) {
+  if (specifier === '@/utils/time') return { url: time, shortCircuit: true }
+  return next(specifier, context)
+} })

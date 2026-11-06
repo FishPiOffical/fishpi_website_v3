@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDisplayTime } from '@/utils/time'
+
 import VipNickname from '@/components/user/VipNickname.vue'
 import type {CommentLocation} from '@/api/v3-comment-location'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
@@ -577,7 +579,7 @@ function chapterTitle(c: LongArticleChapter) {
             <VipNickname :user-id="article.articleAuthorId" :user-name="article.articleAuthorName" :text="authorLabel" />
           </RouterLink>
           <span v-else class="la-author">{{ authorLabel }}</span>
-          <span>{{ article.timeAgo || article.articleCreateTimeStr }}</span>
+          <span>{{ formatDisplayTime(article.timeAgo || article.articleCreateTimeStr) }}</span>
           <template v-if="column">
             <span class="la-sep">·</span>
             <RouterLink :to="`/column/${column.column.oId}`">
@@ -696,7 +698,7 @@ function chapterTitle(c: LongArticleChapter) {
               <div class="la-paragraph-comment-head">
                 <RouterLink v-if="comment.commentAuthorId" :to="`/member/${comment.commentAuthorName}`"><VipNickname :user-id="comment.commentAuthorId" :user-name="comment.commentAuthorName" :text="comment.commentAuthorNickname || comment.commentAuthorName" /></RouterLink>
                 <span v-else>匿名用户</span>
-                <time>{{ comment.commentCreateTimeStr || '' }}</time>
+                <time>{{ formatDisplayTime(comment.commentCreateTimeStr) }}</time>
               </div>
               <p v-if="comment.commentOriginalCommentId">回复评论 {{ comment.commentOriginalCommentId }}</p>
               <p v-if="comment.commentContentVisible===false">此评论正文当前不可见</p>

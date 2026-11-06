@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/utils/time'
 import { ApiError, request } from './http'
 export type PointEntry = { time: number; amount: number; operation: '+' | '-'; balance: number; type: number; displayType: string; descriptionHtml: string }
 export type PointPage = { list: PointEntry[]; p: number; size: number; total: number; pageCount: number }
@@ -23,4 +24,4 @@ export async function fetchV3PointPage(p = 1, size = 20): Promise<PointPage> {
 }
 export async function fetchV3PointBalance(): Promise<number> { return integer((await data('/api/v3/me')).userPoint) }
 export function pointChange(row: Pick<PointEntry, 'operation' | 'amount'>): string { const change = row.operation === '-' ? -row.amount : row.amount; return `${change >= 0 ? '+' : ''}${change}` }
-export function pointTime(value: number): string { return new Date(value).toLocaleString() }
+export function pointTime(value: number): string { return formatDateTime(value) }

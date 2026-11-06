@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDisplayTime } from '@/utils/time'
+
 import {computed,nextTick,onBeforeUnmount,onMounted,ref,watch} from 'vue'
 import {storeToRefs} from 'pinia'
 import {ApiError,getAuthContextVersion} from '@/api/http'
@@ -144,13 +146,13 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
        <div class="msg-bubble">
         <div class="msg-meta-top">
          <span class="msg-author">{{ m.fromMe?(account?.userNickname||account?.userName||'我'):(other?.userNickname||other?.userName||'对方') }}</span>
-         <span class="sr-meta">{{ m.fromMe?'我':'对方' }} · {{ m.sentAt||'时间未知' }}</span>
+         <span class="sr-meta">{{ m.fromMe?'我':'对方' }} · {{ formatDisplayTime(m.sentAt) }}</span>
         </div>
         <div v-if="m.available&&m.contentHtml" class="message-body" v-html="m.contentHtml" />
         <pre v-else-if="m.available" class="message-pre">{{ m.content }}</pre>
         <p v-else class="message-unavailable">正文不可用</p>
         <div class="msg-meta-foot">
-         <time class="msg-time">{{ m.sentAt||'时间未知' }}</time>
+         <time class="msg-time">{{ formatDisplayTime(m.sentAt) }}</time>
          <button class="fp-control withdraw-btn" v-if="m.fromMe" type="button" :disabled="writes.busy||!!writes.pending" @click="withdraw(m)">撤回</button>
         </div>
        </div>

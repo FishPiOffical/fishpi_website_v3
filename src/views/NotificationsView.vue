@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDisplayTime } from '@/utils/time'
+
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -138,14 +140,7 @@ function onBodyClick(e: MouseEvent) {
   void router.push(href)
 }
 
-function noticeTime(n: NoticeItem) {
-  const raw = n.commentCreateTime || n.createTime || ''
-  const m = raw.match(/^\w{3} (\w{3}) (\d{2}) (\d{2}:\d{2}):\d{2} \w+ (\d{4})$/)
-  if (!m) return raw
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const mm = String(months.indexOf(m[1]!) + 1).padStart(2, '0')
-  return `${m[4]}-${mm}-${m[2]} ${m[3]}`
-}
+function noticeTime(n: NoticeItem) { return formatDisplayTime(n.commentCreateTime || n.createTime) }
 
 async function mark(type: NoticeType | 'all') {
   const token = accessToken.value, owner = identity()

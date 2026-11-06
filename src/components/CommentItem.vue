@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDisplayTime } from '@/utils/time'
+
 import { computed, ref } from 'vue'
 import { avatarStyle } from '@/utils/avatar'
 import { RouterLink } from 'vue-router'
@@ -47,9 +49,7 @@ const emit = defineEmits<{
 
 const zoomed = ref('')
 const author = computed(() => props.comment.commentAuthorNickname || props.comment.commentAuthorName || '匿名')
-function cleanTimeStr(raw: string): string {
-  return raw.replace(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?Z?$/, '$1 $2')
-}
+const cleanTimeStr = formatDisplayTime
 const fullTime = computed(() => cleanTimeStr(props.comment.commentCreateTimeStr || props.comment.timeAgo || ''))
 const shownTime = computed(() => cleanTimeStr(props.reply ? props.comment.timeAgo || fullTime.value : fullTime.value))
 const goodCnt = computed(() => Number(props.comment.commentGoodCnt || 0))

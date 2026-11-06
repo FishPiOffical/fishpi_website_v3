@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils/time'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -30,7 +32,7 @@ watch([accessToken, () => account.value?.oId, () => account.value?.userName, tar
 onMounted(() => { mounted.value = true; boundary = identity(); void load() })
 onBeforeUnmount(() => { mounted.value = false; clear() })
 usePageSeo(() => ({ title: title.value, path: route.path, robots: 'noindex' }))
-function date(value: number) { return new Date(value).toLocaleString() }
+const date = formatDateTime
 </script>
 <template>
   <section class="anonymous-content fp-page fp-ui fp-surface">

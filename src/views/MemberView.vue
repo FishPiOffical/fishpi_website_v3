@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDisplayTime } from '@/utils/time'
+
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -98,7 +100,7 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
             <li v-for="item in content.comments" :key="item.id">
               <div class="comment-card-head">
                 <RouterLink :to="commentLink(item.articleId,item.id)" class="comment-article-link">{{ item.article.articleTitle }}</RouterLink>
-                <time :datetime="item.comment.commentCreateTimeStr">{{ item.comment.commentCreateTimeStr }}</time>
+                <time :datetime="item.comment.commentCreateTimeStr">{{ formatDisplayTime(item.comment.commentCreateTimeStr) }}</time>
               </div>
               <div v-if="item.comment.commentContentVisible" class="comment-body" v-html="item.comment.commentContent" />
               <p v-else class="comment-private">私密评论正文不可见。</p>

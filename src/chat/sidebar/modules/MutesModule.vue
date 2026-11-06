@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { timeISO } from '@/utils/time'
+
+import { formatDateTime } from '@/utils/time'
+
 import {onMounted,onUnmounted} from 'vue'
 import {RouterLink} from 'vue-router'
 import {useAuthStore} from '@/stores/auth'
@@ -18,7 +22,7 @@ function avatarError(event:Event){const img=event.target as HTMLImageElement;if(
   <p v-if="mutes.error" role="alert">{{ mutes.error }} <button type="button" :disabled="mutes.loading" @click="mutes.retry">重试第{{ mutes.attempt }}页</button></p>
   <ul><li v-for="item in mutes.users" :key="item.id">
    <RouterLink :to="`/member/${encodeURIComponent(item.userName)}`" :data-user-card="item.userName"><img :src="item.userAvatarURL||DEFAULT_AVATAR" alt="" loading="lazy" @error="avatarError"/><span>{{ item.userNickname||item.userName }}</span></RouterLink>
-   <time :datetime="new Date(item.expiresAt).toISOString()">解除：{{ new Date(item.expiresAt).toLocaleString() }}</time>
+   <time :datetime="timeISO(item.expiresAt)">解除：{{ formatDateTime(item.expiresAt) }}</time>
   </li></ul>
   <p v-if="!mutes.loading&&!mutes.error&&mutes.total===0">当前没有被禁言的成员。</p>
   <p v-else-if="!mutes.loading&&!mutes.error&&!mutes.users.length">本页没有记录，请返回上一页或刷新。</p>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils/time'
+
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ApiError } from '@/api/http'
@@ -11,7 +13,7 @@ const query = ref(''), queryBusy = ref(false), queryError = ref(''), status = re
 let mounted = true, sequence = 0
 const inviteLink = computed(() => typeof window === 'undefined' || !account.value?.userName ? '' : `${window.location.origin}/register?r=${encodeURIComponent(account.value.userName)}`)
 const statuses = { unused: '未使用（不保证当前可注册）', used: '已使用', stopped: '已停用' }
-function date(value: number) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '时间异常' : d.toLocaleString() }
+const date = formatDateTime
 function clear() { sequence++; query.value = queried.value = queryError.value = copyMessage.value = ''; status.value = null; queryBusy.value = false }
 watch(revision, clear, { flush: 'sync' })
 async function lookup() {

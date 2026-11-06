@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils/time'
+
 import { useHead } from '@unhead/vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -85,13 +87,7 @@ async function moderate() {
 }
 function search() { page.value=1; void load() }
 function selectCategory(cat:string) { filter.category=cat; search() }
-function formatTime(raw:string) {
-  if(!raw) return ''
-  const d=new Date(raw)
-  if(Number.isNaN(d.getTime())) return raw
-  const pad=(n:number)=>String(n).padStart(2,'0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
+const formatTime = formatDateTime
 const categoryIcons:Record<string,string>={feature:'💡',bug:'🐛',experience:'✨'}
 watch(()=>route.value.fullPath,()=>{actionError.value=''; void load()})
 let identity=getFeedbackContextVersion()

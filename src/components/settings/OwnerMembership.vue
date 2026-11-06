@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils/time'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -30,7 +32,7 @@ const disabled = computed(() => busy.value || confirming.value || !!pending.valu
 const preview = computed(() => parseVipNameConfig(!!state.value?.active, { ...(draft.value.bold !== '' ? { bold: draft.value.bold } : {}), ...(draft.value.underline !== '' ? { underline: draft.value.underline } : {}), ...(membershipColor(draft.value.color) ? { color: draft.value.color } : {}) }))
 const benefitNames = { bold: '昵称加粗', underline: '昵称下划线', color: '昵称颜色', autoCheckin: '自动签到', checkinCard: '签到卡数量', metal: '勋章权益', jointVip: '联合会员权益' }
 function benefit(value: unknown) { return typeof value === 'boolean' ? value ? '是' : '否' : String(value) }
-function date(value: number) { if (!value) return '永久'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '时间异常' : d.toLocaleString() }
+function date(value: number) { return value === 0 ? '永久' : formatDateTime(value) }
 function reset() {
   generation++; stateSequence++; levelsSequence++; levels.value = []; state.value = null; levelsReady.value = false
   draft.value = { bold: '', underline: '', color: '' }; coupon.value = ''; pending.value = null

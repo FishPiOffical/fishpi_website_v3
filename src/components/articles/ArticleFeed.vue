@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDisplayTime } from '@/utils/time'
+
 import { articleTitle } from '@/utils/text'
 import { avatarStyle } from '@/utils/avatar'
 import { computed } from 'vue'
@@ -141,10 +143,10 @@ function avatarOf(a: ArticleSummary) {
                 >
                   {{ item.articleLatestCmterName }}
                 </RouterLink>
-                <span class="time-ago">{{ item.articleLatestCmtTimeAgo || item.timeAgo }}</span>
+                <span class="time-ago">{{ formatDisplayTime(item.articleLatestCmtTimeAgo || item.timeAgo) }}</span>
               </template>
               <template v-else>
-                <span class="time-ago">{{ item.timeAgo || item.articleCreateTimeStr || '刚刚' }}</span>
+                <span class="time-ago">{{ formatDisplayTime(item.timeAgo || item.articleCreateTimeStr) }}</span>
               </template>
             </div>
           </div>

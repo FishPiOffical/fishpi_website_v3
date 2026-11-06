@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils/time'
+
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useV3PostExportStore } from '@/stores/v3PostExport'
@@ -17,7 +19,7 @@ watch([accessToken, () => account.value?.oId], () => { const context = getAuthCo
 async function create() { if (busy.value || enabled.value === null) return; proofError.value = ''; try { const proof = securityProof(currentPassword.value, currentTotp.value, enabled.value); erase(); await store.create(proof) } catch (e) { proofError.value = e instanceof Error ? e.message : '请填写当前安全证明' } }
 onMounted(() => { mounted = true; void loadSecurity(); timer = setInterval(() => { now.value = Date.now() }, 1000) })
 onBeforeUnmount(() => { mounted = false; if (timer) clearInterval(timer); clear(); store.leave() })
-function date(value: number) { return new Date(value).toLocaleString() }
+const date = formatDateTime
 </script>
 <template>
   <section class="owner-export" aria-label="本人内容私有导出">

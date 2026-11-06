@@ -21,7 +21,7 @@ async function worker() {
     const started = Date.now()
     const result = await new Promise(resolve => {
       const output = createWriteStream(log)
-      const child = spawn(process.execPath, [join(root, 'tools', file)], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
+      const child = spawn(process.execPath, ['--import', join(root, 'tools/ui-test-imports.mjs'), join(root, 'tools', file)], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
       child.stdout.pipe(output, { end: false })
       child.stderr.pipe(output, { end: false })
       let expired = false, spawnError = ''

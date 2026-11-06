@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { timeISO } from '@/utils/time'
+
+import { formatDateTime } from '@/utils/time'
+
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { usePublicColumn } from '@/composables/usePublicColumn'
@@ -9,7 +13,7 @@ const title = computed(() => meta.value?.column.title || `专栏 ${columnId.valu
 watch(() => meta.value?.column.coverURL, () => { coverFailed.value = false })
 let lastPage = 1
 watch(page, data => { if (!data) return; const moved = lastPage !== data.p; lastPage = data.p; if (moved) void nextTick(() => { if (page.value === data) panel.value?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }) }) })
-function date(value: number) { return value ? new Date(value).toISOString().replace('T', ' ').replace('.000Z', ' UTC') : '' }
+const date = formatDateTime
 usePageSeo(() => ({ title: title.value, path: `/column/${encodeURIComponent(columnId.value)}`, description: `${title.value} · 摸鱼派长篇专栏` }))
 </script>
 <template>
@@ -32,7 +36,7 @@ usePageSeo(() => ({ title: title.value, path: `/column/${encodeURIComponent(colu
       <div v-else-if="pageError" role="alert"><p>{{ pageError }}</p><button class="fp-control" type="button" @click="readPage()">重试章节目录</button><button class="fp-control" v-if="p > 1" type="button" @click="readPage(1)">返回目录首页</button></div>
       <template v-else-if="page">
         <p class="hint">当前目录共 {{ page.total }} 条</p>
-        <ol class="chapters"><li v-for="item in page.list" :key="item.id"><span class="chapter-index">{{ item.chapterNo }}</span><RouterLink :to="`/article/${item.id}`">{{ item.title }}</RouterLink><time class="chapter-time" :datetime="item.createdAt ? new Date(item.createdAt).toISOString() : undefined">{{ date(item.createdAt) }}</time><span class="chapter-arrow" aria-hidden="true">›</span></li></ol>
+        <ol class="chapters"><li v-for="item in page.list" :key="item.id"><span class="chapter-index">{{ item.chapterNo }}</span><RouterLink :to="`/article/${item.id}`">{{ item.title }}</RouterLink><time class="chapter-time" :datetime="item.createdAt ? timeISO(item.createdAt) : undefined">{{ date(item.createdAt) }}</time><span class="chapter-arrow" aria-hidden="true">›</span></li></ol>
         <p v-if="!page.list.length" class="hint">本页没有可见章节。</p>
         <div class="column-pager fp-pagination"><button class="fp-control" type="button" :disabled="p <= 1" @click="readPage(p - 1)">上一页章节</button><span>第 {{ p }} 页 / 共 {{ page.pageCount }} 页</span><button class="fp-control" type="button" :disabled="p >= page.pageCount" @click="readPage(p + 1)">下一页章节</button><button class="fp-control" v-if="p > page.pageCount" type="button" @click="readPage(1)">返回目录首页</button></div>
       </template>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDisplayTime } from '@/utils/time'
+
 import RandomArticles from '@/components/discovery/RandomArticles.vue'
 import { articleTitle } from '@/utils/text'
 import { avatarStyle } from '@/utils/avatar'
@@ -574,7 +576,7 @@ function itemHandlers(c: ArticleComment) {
           </RouterLink>
           <span v-else class="meta-author">匿名用户</span>
           <span>•</span>
-          <time>{{ article.articleCreateTimeStr || article.timeAgo }}</time>
+          <time>{{ formatDisplayTime(article.articleCreateTimeStr || article.timeAgo) }}</time>
           <span>•</span>
           <span>{{ article.articleViewCntDisplayFormat || article.articleViewCount }} 浏览</span>
           <span>•</span>

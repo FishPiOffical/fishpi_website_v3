@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils/time'
+
 import {computed,ref,watch} from 'vue'
 import {storeToRefs} from 'pinia'
 import {RouterLink} from 'vue-router'
@@ -13,7 +15,7 @@ const filtered=computed(()=>{const key=query.value.trim().toLowerCase();return o
  <template v-else>
   <p>本次可见人数：{{ online.total===null?'尚未取得':online.total }} <button type="button" :disabled="online.loading" @click="online.refresh">刷新在线名单</button></p>
   <p class="scope">非全站实时人数；在线变化时，分页结果可能改变。</p>
-  <p v-if="online.nodesComplete===false" class="scope">节点采样不完整，名单可能有缺漏。</p><p v-if="online.nodesSampledAt===0" class="scope">节点尚未采样。</p><p v-else-if="online.nodesSampledAt" class="scope">节点采样时间：{{ new Date(online.nodesSampledAt).toLocaleString() }}</p>
+  <p v-if="online.nodesComplete===false" class="scope">节点采样不完整，名单可能有缺漏。</p><p v-if="online.nodesSampledAt===0" class="scope">节点尚未采样。</p><p v-else-if="online.nodesSampledAt" class="scope">节点采样时间：{{ formatDateTime(online.nodesSampledAt) }}</p>
   <p v-if="online.loading" role="status">正在读取在线名单…</p><p v-if="online.error" role="alert">{{ online.error }} <button type="button" :disabled="online.loading" @click="online.retry">重试第{{ online.attempt }}页</button></p>
   <label v-if="online.users.length">筛选本页 <input v-model="query" maxlength="64" type="search" placeholder="本页用户名" /></label>
   <ul><li v-for="user in filtered" :key="user.id"><RouterLink :to="`/member/${encodeURIComponent(user.userName)}`">{{ user.userName }}</RouterLink></li></ul>

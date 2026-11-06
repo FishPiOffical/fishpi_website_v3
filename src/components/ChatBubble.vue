@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDisplayTime } from '@/utils/time'
+
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import ImageLightbox from '@/components/ImageLightbox.vue'
@@ -74,12 +76,12 @@ function onBodyClick(e: MouseEvent) {
           <slot name="reactions" />
           <div class="foot">
             <span class="actions"><slot name="actions" /></span>
-            <time>{{ time }}</time>
+            <time>{{ formatDisplayTime(time) }}</time>
           </div>
         </template>
       </div>
       <div v-if="chatroom" class="foot">
-        <time>{{ time }}</time>
+        <time>{{ formatDisplayTime(time) }}</time>
         <div v-if="$slots.reactions" class="message-reactions"><slot name="reactions" /></div>
         <span v-if="$slots.actions" class="actions"><slot name="actions" /></span>
       </div>

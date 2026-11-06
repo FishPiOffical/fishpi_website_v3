@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { formatDateTime } from '@/utils/time'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
@@ -10,7 +12,7 @@ const profile = ref<PublicProfessionProfile | null>(null), loading = ref(false),
 let mounted = false, generation = 0
 const jobs = computed(() => [profile.value?.primaryProfession, ...(profile.value?.professions || [])].filter((value): value is PublicJob => !!value))
 function name(id: string) { return jobs.value.find(value => value.professionId === id)?.displayName || `职业编号 ${id}` }
-function date(value: number) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '时间异常' : d.toLocaleString() }
+const date = formatDateTime
 function reset() { generation++; profile.value = null; unavailable.value = false; error.value = ''; loading.value = false }
 async function load() {
   const token = accessToken.value, target = props.userName, current = ++generation
