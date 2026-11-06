@@ -61,7 +61,9 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
         throw new ApiError('实时订阅响应格式不正确', 502, 'invalid_response')
       }
       let ticket = data.ticket
-      const transport = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/v3/realtime`)
+      const endpoint = new URL('/api/v3/realtime', import.meta.env?.VITE_BROWSER_API_ORIGIN || `${window.location.protocol}//${window.location.host}`)
+      endpoint.protocol = endpoint.protocol === 'https:' ? 'wss:' : 'ws:'
+      const transport = new WebSocket(endpoint.href)
       socket = transport
       let authenticated = false, sent = false
       const valid = () => current() && turn === sequence && socket === transport

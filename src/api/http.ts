@@ -156,7 +156,7 @@ type RequestInitExtra = RequestInit & {
 }
 
 function apiBase() {
-  if (!import.meta.env.SSR) return ''
+  if (!import.meta.env.SSR) return String(import.meta.env?.VITE_BROWSER_API_ORIGIN || '').replace(/\/$/, '')
   const fromProcess =
     typeof globalThis !== 'undefined' &&
     'process' in globalThis &&

@@ -6,7 +6,13 @@ yui.fishpi.cn {
         max_size 22MB
     }
 
-    @rhythm path /api/v3 /api/v3/* /captcha /captcha/* /test /validateCaptcha /gen /gen/* /games/* /activities/*
+    @directV3 path /api/v3 /api/v3/*
+    handle @directV3 {
+        header Content-Type application/json
+        respond `{ "code":410, "msg":"API已改为浏览器直连fishpi.cn，请刷新页面" }` 410
+    }
+
+    @rhythm path /captcha /captcha/* /test /validateCaptcha /gen /gen/* /games/* /activities/*
     handle @rhythm {
         reverse_proxy https://fishpi.cn {
             # Public upstream routing needs its canonical Host; actual browser

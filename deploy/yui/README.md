@@ -4,7 +4,7 @@
 
 网站和反馈服务使用各自 systemd 系统用户，仅监听 127.0.0.1:5173/5174。发布产物位于 `/opt/fishpi/releases/<版本>`，`/opt/fishpi/current` 指向当前发布；反馈数据库独立保存在 `/var/lib/fishpi-feedback`，不随发布替换。源码和构建包不得包含 `.host`、环境文件、node_modules、本地 SQLite 或测试账号数据。
 
-构建环境：`VITE_API_TARGET=https://fishpi.cn VITE_SITE_ORIGIN=https://yui.fishpi.cn VITE_FEEDBACK_ENABLED=true npm run build`。上传客户端/SSR构建、public、server.js、server/、package*.json、feedback-service/src及其package*.json；服务器两个目录分别 `npm ci`（网站运行时依赖vite的loadEnv，所以不能省devDependencies），使用独立运行时的PATH。
+构建环境：`VITE_BROWSER_API_ORIGIN=https://fishpi.cn VITE_API_TARGET=https://fishpi.cn VITE_SITE_ORIGIN=https://yui.fishpi.cn VITE_FEEDBACK_ENABLED=true npm run build`。上传客户端/SSR构建、public、server.js、server/、package*.json、feedback-service/src及其package*.json；服务器两个目录分别 `npm ci`（网站运行时依赖vite的loadEnv，所以不能省devDependencies），使用独立运行时的PATH。
 
 安装两个 `.service` 至 `/etc/systemd/system/`，创建对应系统用户并授予反馈用户数据库目录独占写权限。`/etc/fishpi-feedback.env` 由 root 管理、权限600，设置 `FEEDBACK_ADMIN_IDS=稳定用户ID列表`；未设置时不开放管理权限，不自行指定管理员。启动 `systemctl enable --now fishpi-feedback fishpi-website`。
 
@@ -25,3 +25,7 @@ Caddy `/api/v3` HTTP/WebSocket 和必要经典资源均反代 HTTPS fishpi.cn，
 当前发布目录切换为 `/opt/fishpi/releases/20261106-fd9bb2c`，保留上一版 `20261106-015cd9a` 供回滚，两个systemd服务均已重启并确认active。切换前在线备份为 `/var/lib/fishpi-feedback/backups/pre-fd9bb2c-20261106-140810.sqlite`，数据库路径及服务器管理员环境配置保持不变。上一版assets补入新发布以兼容已打开的旧页面。
 
 生产完整构建通过；公网反馈health/公开列表及反馈页面200，抽查线上入口JS、共享chunk及HTTP模块与本地产物字节一致。浏览器确认新版分类页签、筛选区及设置内反馈弹窗；当前真实站点v3仍存在不可用情况并触发离线页，未执行登录、真实提交或投票。Caddy、上游fishpi.cn和证书配置未变；部署包排除.host和本地环境/数据库。
+
+## 浏览器直连 Rhythm
+
+生产构建设置 `VITE_BROWSER_API_ORIGIN=https://fishpi.cn`，浏览器HTTP和实时WebSocket直连fishpi.cn，不经过yui服务器v3代理；未设置时保留本地同源开发。SSR的读取仍使用VITE_API_TARGET，反馈浏览器API仍同源/feedback-api/v1，身份核验仍由反馈服务器执行。上传图床维持专用票据链路。需要fishpi.cn精确允许https://yui.fishpi.cn的CORS/OPTIONS、credentials及实际Authorization/Content-Type/Idempotency-Key等请求头，并允许WebSocket Origin；不使用no-cors、不伪造Origin、不将令牌放入URL。生产站点不再提供v3转发，旧缓存客户端访问本站/api/v3返回410提示刷新。
