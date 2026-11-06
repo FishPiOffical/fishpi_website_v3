@@ -383,7 +383,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
 }
 .edit-bar {
   position: sticky;
@@ -421,14 +421,14 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .board {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   background: transparent;
   box-shadow: none;
   border: 0;
   padding: 0;
 }
 .mod-body {
-  padding: 16px 14px 20px;
+  padding: 12px 12px 14px;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
   border-radius: 8px;
@@ -444,7 +444,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .cell {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
   padding: 0;
 }
@@ -571,17 +571,17 @@ function scrollShelf(id: string, dir: -1 | 1) {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--fp-border);
-  padding: 4px 6px 8px;
-  margin-bottom: 8px;
+  padding: 2px 4px 6px;
+  margin-bottom: 6px;
   font-size: 13px;
   color: var(--fp-head);
   gap: 8px;
 }
 .index-head.spaced {
-  margin-top: 20px;
+  margin-top: 12px;
 }
 .index-head.spaced-sm {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 .index-head b {
   font-size: 14px;
@@ -650,10 +650,10 @@ function scrollShelf(id: string, dir: -1 | 1) {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 8px;
-  min-height: 36px;
-  font-size: 14px;
+  gap: 7px;
+  padding: 5px 6px;
+  min-height: 30px;
+  font-size: 13.5px;
   border-radius: 4px;
   transition: background-color 0.15s ease;
 }
@@ -666,15 +666,15 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .hint-li {
   color: var(--fp-muted);
-  font-size: 13px;
-  padding: 12px 8px;
+  font-size: 12px;
+  padding: 8px 6px;
 }
 .title {
   flex: 1;
   color: var(--fp-title);
   text-decoration: none;
   min-width: 0;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 .title:hover {
   text-decoration: underline;
@@ -696,21 +696,21 @@ function scrollShelf(id: string, dir: -1 | 1) {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 4px 6px 14px;
-  padding: 10px 12px;
-  font-size: 13px;
+  margin: 2px 4px 10px;
+  padding: 8px 10px;
+  font-size: 12px;
   color: var(--fp-title);
   background: var(--fp-hover);
   border: 1px solid var(--fp-border);
   border-radius: 6px;
 }
 .download img {
-  width: 35px;
-  height: 35px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
 }
 .download p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--fp-muted);
 }
 .green {
@@ -760,8 +760,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 15px;
+  gap: 6px;
+  padding: 2px 4px;
 }
 .tags a {
   font-size: 12px;
@@ -791,30 +791,31 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 
 .long-read-state { margin: 0 var(--long-gutter); }
-.column-cover-placeholder { width: 100%; height: 100%; display: grid; place-items: center; font-size: 30px; color: #fff8ec; background: linear-gradient(145deg, #b38c61, #695039); }
+.column-cover-placeholder { width: 100%; height: 100%; display: grid; place-items: center; font-size: 26px; color: #fff8ec; background: linear-gradient(145deg, #b38c61, #695039); }
 .long-zone {
-  --long-gutter: 20px;
+  --long-gutter: 14px;
   background: var(--fp-card);
+  border: 1px solid var(--fp-border);
   box-shadow: var(--fp-card-shadow);
-  border-radius: 10px;
-  padding: 16px 0 18px;
+  border-radius: 8px;
+  padding: 12px 0;
 }
 .long-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 0 var(--long-gutter) 16px;
+  margin: 0 var(--long-gutter) 8px;
   font-size: 13px;
   color: var(--fp-head);
 }
 .long-heading {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
 }
 .long-head b {
-  font-weight: 700;
-  font-size: 16px;
+  font-weight: 600;
+  font-size: 14px;
   color: var(--fp-title);
 }
 .long-heading > span {
@@ -823,24 +824,25 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .long-head a {
   color: var(--fp-link);
+  font-size: 12px;
   text-decoration: none;
 }
 .long-head a span {
-  font-size: 17px;
+  font-size: 15px;
   vertical-align: -1px;
 }
 .long-tabs {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 7px;
-  margin: 0 var(--long-gutter) 10px;
+  gap: 6px;
+  margin: 0 var(--long-gutter) 8px;
 }
 .long-tabs [role='tab'] {
-  min-height: 28px;
-  padding: 3px 10px;
+  min-height: 26px;
+  padding: 2px 10px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 5px;
   background: transparent;
   color: var(--fp-muted);
   font-size: 12px;
@@ -858,8 +860,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
   margin-left: auto;
 }
 .long-nav button {
-  width: 27px;
-  height: 25px;
+  width: 26px;
+  height: 24px;
   border: 1px solid var(--fp-border);
   border-radius: 5px;
   background: var(--fp-card);
@@ -871,9 +873,9 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .long-shelf {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   overflow-x: auto;
-  padding: 0 var(--long-gutter) 7px;
+  padding: 0 var(--long-gutter) 2px;
   scroll-padding-inline: var(--long-gutter);
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
@@ -885,25 +887,25 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .long-card {
   display: grid;
-  flex: 0 0 calc((100% - 42px) / 4);
-  grid-template-columns: 72px minmax(0, 1fr);
+  flex: 0 0 calc((100% - 36px) / 4);
+  grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  min-height: 120px;
-  padding: 8px 10px 8px 0;
+  min-height: 96px;
+  padding: 4px 10px 4px 0;
   border-right: 1px solid var(--fp-border);
   scroll-snap-align: start;
 }
 .long-cover {
   display: block;
-  width: 72px;
+  width: 64px;
   aspect-ratio: 3 / 4;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--fp-hover);
   text-decoration: none;
-  box-shadow: 0 3px 10px rgb(0 0 0 / 15%);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
 }
 .long-cover img {
   display: block;
@@ -922,19 +924,19 @@ function scrollShelf(id: string, dir: -1 | 1) {
   color: var(--fp-title);
   text-decoration: none;
   font-weight: 600;
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 13.5px;
+  line-height: 1.35;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
 }
 .long-summary {
   display: -webkit-box;
   overflow: hidden;
-  margin: 9px 0 0;
+  margin: 5px 0 0;
   color: var(--fp-muted);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: 1.45;
   text-decoration: none;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -945,8 +947,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
   align-items: center;
   gap: 8px;
   margin-top: auto;
-  padding-top: 9px;
-  font-size: 12px;
+  padding-top: 6px;
+  font-size: 11.5px;
   color: var(--fp-muted);
 }
 .long-meta a {
@@ -982,9 +984,9 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
 .chat-form {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  margin: 0 15px 8px;
+  margin: 0 4px 6px;
 }
 .chat-form input {
   flex: 1;
@@ -993,8 +995,9 @@ function scrollShelf(id: string, dir: -1 | 1) {
   background: var(--fp-search-bg);
   color: var(--fp-text);
   border-radius: 4px;
-  padding: 6px 10px;
-  height: 32px;
+  padding: 4px 8px;
+  height: 28px;
+  font-size: 12.5px;
 }
 .chat-form .green {
   margin-left: 0;
@@ -1003,17 +1006,18 @@ function scrollShelf(id: string, dir: -1 | 1) {
   color: var(--fp-green);
   text-decoration: none;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12.5px;
   white-space: nowrap;
 }
 .chat-list .chat-item {
   align-items: flex-start;
+  padding: 5px 6px;
 }
 .avatar-mid {
   display: inline-block;
-  width: 36px;
-  height: 36px;
-  border-radius: 3px;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
   background: var(--fp-border) center/cover no-repeat;
   flex-shrink: 0;
 }

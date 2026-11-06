@@ -885,7 +885,7 @@ onUnmounted(() => {
 main {
   max-width: var(--fp-wrap);
   margin: 0 auto;
-  padding: 25px 15px 20px;
+  padding: 14px 15px 20px;
 }
 main.main--immersive {
   max-width: none;

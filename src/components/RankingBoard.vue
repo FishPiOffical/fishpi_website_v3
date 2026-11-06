@@ -34,7 +34,7 @@ function metricName(key: string) { if (key === 'points') return ['balance', 'con
         <li v-for="entry in value.list" :key="entry.rank" :value="entry.rank">
           <span class="ranking-number">{{ entry.rank }}</span>
           <RouterLink v-if="entry.user" :to="`/member/${encodeURIComponent(entry.user.userName)}`" class="ranking-user" :data-user-card="entry.user.userName">
-            <img v-if="entry.user.userAvatarURL" :src="entry.user.userAvatarURL" alt="" loading="lazy" referrerpolicy="no-referrer" />
+            <img :src="entry.user.userAvatarURL || '/images/user-thumbnail.png'" alt="" loading="lazy" referrerpolicy="no-referrer" />
             <VipNickname :user-id="entry.user.id" :text="entry.user.userNickname || entry.user.userName" />
           </RouterLink>
           <a v-else-if="entry.link?.url" :href="entry.link.url" target="_blank" rel="noopener noreferrer">{{ entry.link.title }}</a>
@@ -63,5 +63,11 @@ button, select { border: 1px solid var(--fp-border); border-radius: 7px; backgro
 .ranking-number { min-width: 28px; color: var(--fp-muted); }
 .ranking-user { display: flex; align-items: center; gap: 10px; flex: 1 1 180px; min-width: 0; img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; } }
 .ranking-metrics { display: flex; gap: 12px; flex-wrap: wrap; margin: 0; max-width: 100%; div { display: flex; flex-wrap: wrap; gap: 5px; } dt { color: var(--fp-muted); } dd { margin: 0; overflow-wrap: anywhere; } }
-.compact { .ranking-user { flex-basis: 100px; img { width: 24px; height: 24px; } } .ranking-rows li { gap: 6px; } .ranking-number { min-width: 18px; } .ranking-score { font-size: 12px; } }
+.compact {
+  .ranking-controls, .ranking-note { display: none; }
+  .ranking-rows li { gap: 8px; padding: 5px 6px; min-height: 30px; font-size: 13px; border-bottom: 0; border-radius: 4px; transition: background-color 0.15s ease; &:hover { background-color: var(--fp-hover); } }
+  .ranking-number { min-width: 18px; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .ranking-user { flex: 1 1 80px; gap: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; img { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; } }
+  .ranking-score { margin-left: auto; color: var(--fp-muted); font-size: 12px; background: var(--fp-hover); padding: 1px 6px; border-radius: 9px; flex-shrink: 0; }
+}
 </style>

@@ -40,5 +40,19 @@ watch([accessToken,()=>account.value?.oId],()=>{const next=`${getAuthContextVers
   </div>
 </template>
 <style scoped lang="scss">
-.moon-panel { min-width: 0; padding: 0 18px 18px; } .compact { padding: 0; font-size: 12px; } .controls,nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; } button { padding: 6px 9px; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-card); color: var(--fp-text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; } p { overflow-wrap: anywhere; } [role='alert'] { color: #c34a36; }
+.moon-panel { min-width: 0; padding: 0 18px 18px; }
+.compact {
+  padding: 0 4px;
+  font-size: 12px;
+  .controls { display: none; }
+  :deep(.moon-composer) {
+    padding: 4px 0 8px;
+    form { gap: 6px; }
+    label { font-size: 0; }
+    textarea { margin-top: 0; padding: 5px 8px; font-size: 12px; min-height: 32px; }
+    span { font-size: 11px; color: var(--fp-muted); margin-right: auto; }
+    button { padding: 3px 10px; font-size: 12px; }
+  }
+}
+.controls,nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; } button { padding: 6px 9px; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-card); color: var(--fp-text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; } p { overflow-wrap: anywhere; } [role='alert'] { color: #c34a36; }
 </style>

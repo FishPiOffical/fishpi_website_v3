@@ -14,5 +14,20 @@ function date(value:number){return new Date(value).toISOString().replace('T',' '
   </li></ul>
 </template>
 <style scoped lang="scss">
-.compact { font-size: 12px; } .compact li { padding: 10px 0; } .breezemoon-list { list-style: none; margin: 0; padding: 0; } li { padding: 18px; border-top: 1px solid var(--fp-border); min-width: 0; } header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; } header a { display: flex; align-items: center; gap: 10px; color: var(--fp-link); min-width: 0; overflow-wrap: anywhere; } img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; } time { color: var(--fp-muted); font-size: 12px; } .moon-body { margin-top: 12px; line-height: 1.7; overflow-wrap: anywhere; overflow: auto; :deep(img) { max-width: 100%; height: auto; } :deep(pre) { overflow: auto; } }
+.breezemoon-list { list-style: none; margin: 0; padding: 0; }
+li { padding: 14px 16px; border-top: 1px solid var(--fp-border); min-width: 0; }
+header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+header a { display: flex; align-items: center; gap: 8px; color: var(--fp-link); min-width: 0; overflow-wrap: anywhere; text-decoration: none; }
+img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+time { color: var(--fp-muted); font-size: 12px; margin-left: auto; }
+.moon-body { margin-top: 8px; line-height: 1.6; overflow-wrap: anywhere; overflow: auto; :deep(p) { margin: 0 0 4px; &:last-child { margin-bottom: 0; } } :deep(img) { max-width: 100%; height: auto; } :deep(pre) { overflow: auto; } }
+.compact {
+  font-size: 12px;
+  li { padding: 6px 2px; }
+  header { gap: 6px; }
+  header a { gap: 6px; }
+  img { width: 20px; height: 20px; border-radius: 4px; }
+  time { font-size: 11px; }
+  .moon-body { margin-top: 4px; line-height: 1.45; color: var(--fp-text); }
+}
 </style>

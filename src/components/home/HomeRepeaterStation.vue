@@ -10,23 +10,28 @@ const props=defineProps<{initial?:RepeaterEntry[]}>(),auth=useAuthStore(),kind=r
 watch([kind,()=>auth.account?.oId,()=>!!auth.accessToken],()=>{msg.value=''},{flush:'sync'})
 async function copy(){const item=current.value,context=getAuthContextVersion();if(!item)return;try{await navigator.clipboard.writeText(item.content);if(context===getAuthContextVersion()&&current.value?.id===item.id)msg.value='已复制'}catch{if(context===getAuthContextVersion()&&current.value?.id===item.id)msg.value='复制失败'}}
 </script>
-<template><section class="repeater"><header class="head"><b>复读机转录站</b><div class="tabs" role="tablist"><button v-for="option in REPEATER_KINDS" :key="option.value" type="button" role="tab" :aria-selected="kind===option.value" :class="{on:kind===option.value}" @click="kind=option.value">{{ option.label }}</button></div></header><p v-if="loading" role="status">正在读取复读内容…</p><p v-if="error" class="msg" role="alert">{{ error }} <button type="button" @click="feed.retry">重试读取</button></p><p v-else-if="current" class="quote">{{ current.content }}</p><p v-else-if="!loading&&ready" class="quote">暂无候选内容。</p><p v-else-if="!loading" class="quote" role="status">复读机尚未读取。</p><div v-if="current" class="meta"><span>{{ REPEATER_KINDS.find(k=>k.value===current.type)?.label }}</span><RouterLink v-if="current.author" :to="`/member/${encodeURIComponent(current.author.name)}`">{{ current.author.name }}</RouterLink></div><div class="actions"><button type="button" :disabled="loading||!current" @click="copy">复制</button><button type="button" :disabled="loading||!!error" @click="feed.next">换一个</button><button type="button" :disabled="loading" @click="feed.refresh">刷新</button><RepeaterLikeButton v-if="current" :item="current"/><RouterLink to="/repeater" class="more">更多与投稿</RouterLink></div><p v-if="msg" class="msg">{{ msg }}</p></section></template>
+<template><section class="repeater"><header class="head"><b>复读机转录站</b><div class="tabs" role="tablist"><button v-for="option in REPEATER_KINDS" :key="option.value" type="button" role="tab" :aria-selected="kind===option.value" :class="{on:kind===option.value}" @click="kind=option.value">{{ option.label }}</button></div></header><p v-if="loading" role="status">正在读取复读内容…</p><p v-if="error" class="msg" role="alert">{{ error }} <button type="button" @click="feed.retry">重试读取</button></p><p v-else-if="current" class="quote">{{ current.content }}</p><p v-else-if="!loading&&ready" class="quote">暂无候选内容。</p><p v-else-if="!loading" class="quote" role="status">复读机尚未读取。</p><div v-if="current" class="meta"><span>{{ REPEATER_KINDS.find(k=>k.value===current.type)?.label }}</span><RouterLink v-if="current.author" :to="`/member/${encodeURIComponent(current.author.name)}`">{{ current.author.name }}</RouterLink></div><div class="actions"><button type="button" :disabled="loading||!current" @click="copy">复制</button><button type="button" :disabled="loading||!!error" @click="feed.next">换一个</button><button type="button" class="refresh-btn" :disabled="loading" @click="feed.refresh">刷新</button><RepeaterLikeButton v-if="current" :item="current"/><RouterLink to="/repeater" class="more">更多与投稿</RouterLink></div><p v-if="msg" class="msg">{{ msg }}</p></section></template>
 <style scoped lang="scss">
 .repeater {
-  margin: 0 10px 8px;
-  padding: 10px 12px;
+  margin: 0 0 10px;
+  padding: 0 4px 10px;
+  border-bottom: 1px solid var(--fp-border);
 }
 .head {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--fp-border);
   font-size: 13px;
   color: var(--fp-head);
 }
 .head b {
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fp-title);
   flex-shrink: 0;
 }
 .tabs {
@@ -43,10 +48,13 @@ async function copy(){const item=current.value,context=getAuthContextVersion();i
   background: var(--fp-hover);
   color: var(--fp-text);
   border-radius: 4px;
-  padding: 2px 8px;
+  padding: 2px 7px;
   font-size: 12px;
   cursor: pointer;
   text-decoration: none;
+}
+.actions button.refresh-btn {
+  display: none;
 }
 .tabs button.on {
   color: var(--fp-link);
@@ -57,12 +65,12 @@ async function copy(){const item=current.value,context=getAuthContextVersion();i
   font-size: 13px;
   color: var(--fp-title);
   line-height: 1.45;
-  min-height: 2.8em;
+  min-height: 2.2em;
 }
 .meta {
   display: flex;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 12px;
   color: var(--fp-muted);
 }
@@ -73,14 +81,14 @@ async function copy(){const item=current.value,context=getAuthContextVersion();i
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 5px;
+  margin-top: 6px;
 }
 .actions .like {
   color: var(--fp-accent);
 }
 .msg {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   font-size: 12px;
   color: var(--fp-muted);
 }

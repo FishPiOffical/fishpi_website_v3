@@ -22,15 +22,23 @@ defineProps<{ modules: HomeModuleMeta[] }>()
 
 <style scoped>
 .home-side-widget {
-  margin-bottom: 12px;
   padding: 10px 12px;
   border: 1px solid var(--fp-border);
   border-radius: 8px;
   background: var(--fp-card);
+  box-shadow: var(--fp-card-shadow);
+}
+.home-side-widget + .home-side-widget {
+  margin-top: 10px;
 }
 .head {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   font-size: 13px;
   color: var(--fp-head);
+}
+.head b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fp-title);
 }
 </style>
