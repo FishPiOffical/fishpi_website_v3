@@ -145,9 +145,9 @@ const topCatalog = [
 </template>
 <style scoped lang="scss">
 .top-page {    }
-.top-nav { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; a { color: var(--fp-text); text-decoration: none; } .router-link-exact-active { color: var(--fp-accent, #68a84f); } }
-.top-board { background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); padding: 20px; h1 { margin-top: 0; color: var(--fp-title); } }
+.top-nav { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; box-shadow: var(--fp-card-shadow); a { color: var(--fp-text); text-decoration: none; } .router-link-exact-active { color: var(--fp-accent, #68a84f); } }
+.top-board { background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); box-shadow: var(--fp-card-shadow); padding: 20px; h1 { margin-top: 0; color: var(--fp-title); } }
 .top-catalog { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.catalog-item { display: block; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); padding: 20px; color: var(--fp-title); text-decoration: none; p { color: var(--fp-muted); font-size: 13px; } }
+.catalog-item { display: block; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); box-shadow: var(--fp-card-shadow); padding: 20px; color: var(--fp-title); text-decoration: none; transition: border-color .16s, transform .16s; &:hover { border-color: var(--fp-primary); transform: translateY(-1px); } p { color: var(--fp-muted); font-size: 13px; } }
 @media (max-width: 650px) { .top-catalog { grid-template-columns: minmax(0, 1fr); } .top-board { padding: 14px; } }
 </style>

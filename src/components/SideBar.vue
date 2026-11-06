@@ -169,12 +169,15 @@ function goDownload() {
 
 .side-module-card {
   margin-bottom: 0;
+  border-radius: var(--fp-panel-radius, 10px);
+  box-shadow: var(--fp-card-shadow);
   overflow: hidden;
 }
 
 .side-module-head {
   padding: 0 12px 0 0;
   gap: 8px;
+  background: color-mix(in srgb, var(--fp-card) 96%, var(--fp-text) 4%);
 }
 
 .side-module-card.is-collapsed .side-module-head {

@@ -713,12 +713,12 @@ function itemHandlers(c: ArticleComment) {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 1300px;
+  max-width: var(--fp-page-wide, 1200px);
   margin: 0 auto;
 }
 .toc {
   position: sticky;
-  top: calc(var(--fp-nav-h) + 16px);
+  top: calc(var(--fp-nav-h) + 14px);
   z-index: 5;
   align-self: flex-start;
   max-height: calc(100vh - var(--fp-nav-h) - 40px);
@@ -726,17 +726,17 @@ function itemHandlers(c: ArticleComment) {
   background: var(--fp-card);
   box-shadow: var(--fp-card-shadow);
   border: 1px solid var(--fp-border);
-  border-radius: 8px;
+  border-radius: var(--fp-panel-radius, 10px);
   padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .toc b {
   font-size: 13px;
-  color: var(--fp-head);
+  color: var(--fp-title);
   margin-bottom: 6px;
-  padding-bottom: 6px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--fp-border);
 }
 .toc a {
@@ -744,17 +744,20 @@ function itemHandlers(c: ArticleComment) {
   text-decoration: none;
   font-size: 13px;
   line-height: 1.5;
-  padding: 3px 0;
-  transition: color 0.15s ease;
+  padding: 5px 8px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 .toc a:hover {
-  text-decoration: underline;
+  color: var(--fp-title);
+  background: var(--fp-hover);
+  text-decoration: none;
 }
 .toc a.lv2 {
-  padding-left: 10px;
+  padding-left: 16px;
 }
 .toc a.lv3 {
-  padding-left: 20px;
+  padding-left: 24px;
   font-size: 12px;
 }
 
@@ -762,7 +765,7 @@ function itemHandlers(c: ArticleComment) {
   background: var(--fp-card);
   box-shadow: var(--fp-card-shadow);
   border: 1px solid var(--fp-border);
-  border-radius: 8px;
+  border-radius: var(--fp-panel-radius, 10px);
   overflow: hidden;
 }
 .card.post {

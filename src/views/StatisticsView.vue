@@ -30,9 +30,9 @@ const { value, loading, error, read } = useStatistics(consumeStatisticsPayload()
 
 <style scoped lang="scss">
 .statistics-page {    }
-header { margin-bottom: 24px; h1 { color: var(--fp-title); font-size: 24px; } p { color: var(--fp-muted); } > button { display: none; } }
+header { margin-bottom: 20px; padding: 18px 20px; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); box-shadow: var(--fp-card-shadow); h1 { margin: 0 0 6px; color: var(--fp-title); font-size: 22px; } p { margin: 0; color: var(--fp-muted); font-size: 13px; } > button { display: none; } }
 .statistics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0; }
-.statistic-item { min-width: 0; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); padding: 20px; dt { color: var(--fp-muted); } dd { margin: 10px 0 0; font-size: 26px; color: var(--fp-title); overflow-wrap: anywhere; } }
+.statistic-item { min-width: 0; background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); box-shadow: var(--fp-card-shadow); padding: 20px; dt { color: var(--fp-muted); font-size: 13px; } dd { margin: 10px 0 0; font-size: 26px; font-weight: 600; color: var(--fp-title); overflow-wrap: anywhere; } }
 .statistics-error { color: var(--fp-text); }
 button { padding: 8px 14px; color: var(--fp-text); background: var(--fp-card); border: 1px solid var(--fp-border); border-radius: 8px; cursor: pointer; &:disabled { cursor: wait; opacity: .6; } }
 @media (max-width: 600px) { .statistics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .statistic-item { padding: 14px; dd { font-size: 22px; } } }

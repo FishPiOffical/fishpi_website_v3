@@ -156,7 +156,16 @@
 .fp-ui .fp-state[role='alert'] { color: var(--fp-danger); }
 .fp-ui .fp-state-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
 /* Primary list panes share the same surface as their sidebar modules. */
+.fp-list-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--fp-page-gap);
+  align-items: start;
+}
 .fp-list-page > .content, .fp-list-page > .city-main {
+  margin-right: 0;
+  min-width: 0;
+  width: 100%;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
   border-radius: var(--fp-panel-radius);
@@ -164,8 +173,48 @@
   overflow: clip;
   align-self: start;
 }
-.fp-list-page .list-page-head { padding: 18px 20px; }
-.fp-list-page .list-page-head :is(h1, h2) { margin: 0; font-size: 20px; line-height: 1.4; color: var(--fp-title); }
+.fp-list-page > .side {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  position: sticky;
+  top: calc(var(--fp-nav-h) + 14px);
+  align-self: start;
+}
+/* Avoid double borders/shadows when a list page wraps one or multiple .module sections */
+.fp-list-page > .content > .module:only-child {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin-bottom: 0;
+}
+.fp-list-page > .content:has(> .module + .module) {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.fp-list-page > .content:has(> .module + .module) > .module {
+  margin-bottom: 0;
+  border-radius: var(--fp-panel-radius);
+  box-shadow: var(--fp-card-shadow);
+  overflow: clip;
+}
+/* Nested cards inside a card surface use elevated/page-bg contrast */
+:is(.fp-surface, .fp-ui .fp-card, .fp-list-page > .content) :is(.plan, .column-card) {
+  background: var(--fp-elevated, var(--fp-bg));
+}
+.fp-list-page .list-page-head {
+  padding: 14px 18px;
+  background: color-mix(in srgb, var(--fp-card) 96%, var(--fp-text) 4%);
+  border-bottom: 1px solid var(--fp-border);
+}
+.fp-list-page .list-page-head :is(h1, h2) { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.4; color: var(--fp-title); }
 .fp-list-page .fp-pagination { margin: 0 20px; padding: 16px 0; }
 .fp-settings .card { padding: var(--fp-panel-padding); border-radius: var(--fp-panel-radius); }
 .fp-settings .fp-page-title { margin-bottom: 16px; }
@@ -176,7 +225,12 @@
 .fp-ui :is(.city-meta, .member-content, .user-relations, .prose) a:hover { text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 900px) {
   .fp-page--wide { width: 100%; }
-  .fp-list-page { flex-direction: column; }
+  .fp-list-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fp-list-page > .side {
+    position: static;
+  }
 }
 @media (max-width: 640px) {
   :root { --fp-page-gap: 14px; --fp-panel-padding: 16px; --fp-page-title-size: 21px; }

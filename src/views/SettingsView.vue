@@ -224,15 +224,13 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
 .page {
   display: grid;
   /* 与现网 settings 一致：内容在左、菜单在右 */
-  grid-template-columns: minmax(0, 1fr) 200px;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: var(--fp-page-gap, 20px);
   align-items: start;
-
-
 }
 .set-side {
   position: sticky;
-  top: calc(var(--fp-nav-h) + 12px);
+  top: calc(var(--fp-nav-h) + 14px);
 }
 .set-toggle {
   display: none;
@@ -240,18 +238,21 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
 .set-menu {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  padding: 8px;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
   box-shadow: var(--fp-card-shadow);
-  border-radius: var(--fp-radius-lg, 10px);
+  border-radius: var(--fp-panel-radius, 10px);
   overflow: hidden;
 }
 .set-menu a {
-  padding: 10px 14px;
+  padding: 9px 12px;
   color: var(--fp-text);
   text-decoration: none;
-  font-size: 14px;
-  border-left: 3px solid transparent;
+  font-size: 13px;
+  border-radius: 8px;
+  border-left: 0;
   transition: background-color 0.16s ease, color 0.16s ease;
 }
 .set-menu a:hover {
@@ -259,9 +260,8 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
 }
 .set-menu a.current {
   color: var(--fp-primary);
-  border-left-color: var(--fp-primary);
   font-weight: 600;
-  background: var(--fp-hover);
+  background: color-mix(in srgb, var(--fp-primary) 10%, var(--fp-card));
 }
 .set-main {
   display: flex;
