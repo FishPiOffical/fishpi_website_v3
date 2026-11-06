@@ -21,7 +21,7 @@ export function useHomeRead<K extends HomeRead>(key: K, initial: unknown) {
     const run = sequence, context = getAuthContextVersion(), token = auth.accessToken, actor = auth.account?.oId
     const current = () => mounted && run === sequence && context === getAuthContextVersion() && token === auth.accessToken && actor === auth.account?.oId
     loading.value = data.value === null
-    try { const result = await fetchHomeRead(key); if (current()) { data.value = result; recentReads.set(key, { expires: Date.now() + 30_000, value: structuredClone(result) }) } }
+    try { const result = await fetchHomeRead(key); if (current()) { data.value = result; recentReads.set(key, { expires: Date.now() + 300_000, value: structuredClone(result) }) } }
     catch (e) { if (current()) { data.value = null; error.value = e instanceof Error ? e.message : '读取失败' } }
     finally { if (current()) loading.value = false }
   }
@@ -36,7 +36,7 @@ export function useHomeRead<K extends HomeRead>(key: K, initial: unknown) {
     const cached = recentReads.get(key)
     if (cached && cached.expires <= Date.now()) recentReads.delete(key)
     if (cached && cached.expires > Date.now()) { data.value = decodeHomeRead(key, structuredClone(cached.value)); return }
-    if (data.value !== null && !auth.accessToken) recentReads.set(key, { expires: Date.now() + 30_000, value: structuredClone(data.value) })
+    if (data.value !== null && !auth.accessToken) recentReads.set(key, { expires: Date.now() + 300_000, value: structuredClone(data.value) })
     else void read()
   })
   onScopeDispose(() => { mounted = false; stop(); clear() })

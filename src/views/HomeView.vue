@@ -350,7 +350,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <b>清风明月</b>
               <RouterLink to="/breezemoons" title="清风明月是什么？">更多</RouterLink>
             </div>
-            <BreezemoonPanel :size="8" compact ssr-scope="home" />
+            <BreezemoonPanel :size="8" compact avatar-only ssr-scope="home" />
             </aside>
             <HomeSideWidgets v-else-if="mod.sidebarId" :modules="[mod]" />
           </div>

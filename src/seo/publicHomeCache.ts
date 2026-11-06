@@ -1,5 +1,5 @@
 /** Only anonymous homepage DTOs belong here; never cache an app, HTML or private state. */
-export function createPublicHomeCache(ttlMs = 15_000, capacity = 16) {
+export function createPublicHomeCache(ttlMs = 300_000, capacity = 16) {
   const values = new Map<string, { expires: number; value: unknown }>()
   const pending = new Map<string, Promise<unknown>>()
   return async function read<T>(key: string, load: () => Promise<T>): Promise<T> {

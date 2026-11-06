@@ -6,7 +6,7 @@ const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarg
 const { createPublicHomeCache } = await import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'))
 let now = 1000, calls = 0, release
 Date.now = () => now
-const read = createPublicHomeCache(15000, 2)
+const read = createPublicHomeCache(undefined, 2)
 const load = () => { calls++; return new Promise(resolve => { release = resolve }) }
 const first = read('recent', load), second = read('recent', load)
 await Promise.resolve(); assert.equal(calls, 1)
@@ -14,9 +14,10 @@ release([{ title: '公开标题' }])
 const a = await first, b = await second
 a[0].title = '消费或修改当前请求'
 assert.equal(b[0].title, '公开标题')
+now += 60000
 assert.equal((await read('recent', load))[0].title, '公开标题')
 assert.equal(calls, 1)
-now += 15000
+now += 240000
 assert.deepEqual(await read('recent', async () => { calls++; return [] }), [])
 assert.equal(calls, 2)
 assert.deepEqual(await read('recent', load), [])
