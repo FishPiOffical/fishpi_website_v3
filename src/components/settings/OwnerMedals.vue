@@ -97,7 +97,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
     <p v-if="message" role="status">{{ message }}</p>
     <p v-if="pending && !busy" class="hint">“{{ pending.name }}”的操作结果尚未确认，重试会恢复同一次操作。</p>
     <button class="fp-control" v-if="pending" type="button" :disabled="busy || loading" @click="retry">重试未确认的勋章操作</button>
-    <button class="fp-control" type="button" :disabled="busy || loading" @click="load()">重新读取勋章</button>
+    <button class="fp-control settings-refresh" type="button" :disabled="busy || loading" @click="load()" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取勋章</span></button>
   </section>
 </template>
 

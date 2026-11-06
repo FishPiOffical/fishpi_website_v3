@@ -65,7 +65,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
 
 <template>
   <section class="owner-preferences">
-    <h2>{{ title }}</h2>
+    <header class="settings-section-head"><h2>{{ title }}</h2><button class="fp-control settings-refresh" type="button" :disabled="loading || busy" @click="load" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取{{ title }}</span></button></header>
     <p v-if="loading" role="status">正在读取设置…</p>
     <form @submit.prevent="save">
       <fieldset v-if="ready" :disabled="loading || busy">
@@ -87,7 +87,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
     </form>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="message" role="status">{{ message }}</p>
-    <button class="fp-control" type="button" :disabled="loading || busy" @click="load">重新读取{{ title }}</button>
+
   </section>
 </template>
 

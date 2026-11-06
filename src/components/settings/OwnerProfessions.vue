@@ -149,7 +149,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
       <p class="hint">跳过引导会清除当前主职业，已有经验与隐私保持；之后可重新选择。</p>
       <button class="fp-control" type="button" :disabled="disabled" @click="start({ kind: 'skip' })">跳过引导并清除主职业</button>
     </template>
-    <button class="fp-control" type="button" :disabled="mineLoading || busy || !!pending" @click="loadMine()">重新读取本人职业</button>
+    <button class="fp-control settings-refresh" type="button" :disabled="mineLoading || busy || !!pending" @click="loadMine()" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取本人职业</span></button>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <p v-if="message" role="status">{{ message }}</p>
     <p v-if="pending && !busy" class="hint">操作结果尚未确认，重试会恢复同一次设置。</p>
@@ -164,7 +164,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
         <button class="fp-control" :disabled="catalogLoading || catalog.pagination.p <= 1" @click="loadCatalog(catalog.pagination.p - 1)">上一页职业目录</button><span>第 {{ catalog.pagination.p }} / {{ catalog.pagination.pageCount }} 页，共 {{ catalog.pagination.total }} 项</span><button class="fp-control" :disabled="catalogLoading || catalog.pagination.p >= catalog.pagination.pageCount" @click="loadCatalog(catalog.pagination.p + 1)">下一页职业目录</button>
       </nav>
     </template>
-    <button class="fp-control" type="button" :disabled="catalogLoading" @click="loadCatalog()">重新读取职业目录</button>
+    <button class="fp-control settings-refresh" type="button" :disabled="catalogLoading" @click="loadCatalog()" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取职业目录</span></button>
     <ProfessionGuide v-if="guideId" :profession-id="guideId" :name="guideName" />
     <section v-if="selected" ref="detailPanel" tabindex="-1" class="details" aria-label="本人职业详情">
       <h2>职业详情与经验</h2>
@@ -174,10 +174,10 @@ onBeforeUnmount(() => { mounted = false; reset() })
         <h3>等级路线</h3><ol><li v-for="level in detail.levels" :key="level.levelCode"><strong>{{ level.displayName }}{{ level.topLevel ? '（最高等级）' : '' }}</strong> · 累计门槛 {{ level.requiredExperience }}<span>{{ level.description }} {{ level.achievementDescription }}</span></li></ol>
         <h3>贡献汇总</h3><p v-if="!detail.contributions.length">暂无贡献记录。</p><ul><li v-for="item in detail.contributions" :key="item.actionCode">{{ item.actionCode }} · {{ item.experienceSum }} 经验 · {{ item.eventCount }} 次 · 最近 {{ date(item.lastOccurredAt) }}</li></ul>
       </template>
-      <button class="fp-control" type="button" :disabled="detailLoading" @click="openDetail(selected)">重新读取职业详情</button>
+      <button class="fp-control settings-refresh" type="button" :disabled="detailLoading" @click="openDetail(selected)" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取职业详情</span></button>
       <h3>最近90天经验记录</h3><p v-if="recordsLoading" role="status">正在读取经验记录…</p><p v-if="recordsError" role="alert" class="error">{{ recordsError }}</p>
       <template v-if="records"><p v-if="records.pagination.total === 0">最近90天没有经验变化记录。</p><ul><li v-for="(item, index) in records.list" :key="index">{{ date(item.occurredAt) }} · {{ item.actionCode }} · {{ item.experienceDelta > 0 ? '+' : '' }}{{ item.experienceDelta }} 经验<span>{{ item.beforeExperience }} → {{ item.afterExperience }} · {{ item.beforeLevelCode }} → {{ item.afterLevelCode }}</span></li></ul><nav v-if="records.pagination.pageCount > 1" aria-label="职业经验分页"><button class="fp-control" :disabled="recordsLoading || records.pagination.p <= 1" @click="loadRecords(records.pagination.p - 1)">上一页经验记录</button><span>第 {{ records.pagination.p }} / {{ records.pagination.pageCount }} 页</span><button class="fp-control" :disabled="recordsLoading || records.pagination.p >= records.pagination.pageCount" @click="loadRecords(records.pagination.p + 1)">下一页经验记录</button></nav></template>
-      <button class="fp-control" type="button" :disabled="recordsLoading" @click="loadRecords()">重新读取经验记录</button>
+      <button class="fp-control settings-refresh" type="button" :disabled="recordsLoading" @click="loadRecords()" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取经验记录</span></button>
     </section>
   </div>
 </template>

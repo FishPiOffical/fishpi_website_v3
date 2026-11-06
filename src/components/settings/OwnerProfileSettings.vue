@@ -115,7 +115,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
 <template>
   <div class="owner-profile">
     <p v-if="loading" role="status">正在读取设置…</p>
-    <button class="fp-control" type="button" :disabled="loading || busy" @click="load">重新读取</button>
+    <header class="settings-section-head"><h2>{{ mode === 'avatar' ? '头像设置' : '个人资料' }}</h2><button class="fp-control settings-refresh" type="button" :disabled="loading || busy" @click="load" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取</span></button></header>
     <template v-if="mode === 'profile'">
       <form @submit.prevent="saveProfile">
         <fieldset :disabled="loading || busy || !loaded.profile">

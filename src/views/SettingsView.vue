@@ -48,6 +48,14 @@ const helpLinks = [
   { to: '/article/1631460144004', title: 'Markdown 教程', tip: '排版指南' },
 ]
 const tab = computed(() => String(route.meta.settingsTab || 'profile'))
+const descriptions:Record<string,string> = {
+  profile:'介绍一下自己，让大家更好地认识你。',avatar:'选择一个让人记住你的头像。',system:'让摸鱼派更合你的心意。',account:'管理账号、安全验证与社区身份。',function:'调整常用功能，找到适合你的使用方式。',point:'管理积分转账，查看每一笔收支。',invite:'邀请朋友，一起加入摸鱼派。',identity:'提交认证材料，查看申请进展。',data:'管理个人内容导出与游戏云存档。',i18n:'选择语言、时区与地区偏好。',privacy:'决定哪些信息可以公开展示。',profession:'探索职业成长与展示方式。',help:'找到常用功能的使用方法。',
+}
+const menuGroups = [
+  {label:'个人与外观',ids:['profile','avatar','system']},
+  {label:'社区与偏好',ids:['function','privacy','profession','i18n']},
+  {label:'账号与服务',ids:['account','point','invite','identity','data','help']},
+].map(group=>({...group,items:group.ids.map(id=>tabs.find(item=>item.id===id)!)}))
 const currentTabLabel = computed(() => tabs.find((t) => t.id === tab.value)?.label || '资料')
 
 watch(
@@ -82,22 +90,19 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
 </script>
 
 <template>
-  <div class="page fp-page fp-ui fp-settings">
+  <div class="page fp-page fp-page--wide fp-ui fp-settings">
+    <header class="settings-page-head"><div><span class="settings-eyebrow">个人设置</span><h1>{{ currentTabLabel }}</h1><p>{{ descriptions[tab] }}</p></div><RouterLink v-if="isLoggedIn && account?.userName && tab==='profile'" :to="`/member/${encodeURIComponent(account.userName)}`">查看主页 ↗</RouterLink><RouterLink v-if="tab==='point'" to="/points">积分流水 ↗</RouterLink></header>
     <div class="set-main">
       <p v-if="!isLoggedIn" class="card hint fp-card login-notice">
         <span><RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>后可修改设置。游客仍可调整本机主题外观。</span>
       </p>
 
       <section v-if="tab === 'profile'" class="card fp-card">
-        <header class="mod-head">
-          <RouterLink v-if="isLoggedIn && account?.userName" :to="`/member/${account.userName}`">{{ account.userName }}</RouterLink>
-          <h1 class="fp-page-title">资料</h1>
-        </header>
         <OwnerProfileSettings v-if="isLoggedIn" key="profile" mode="profile" />
       </section>
 
       <section v-if="tab === 'system'" class="card fp-card">
-        <h1 class="fp-page-title">个性化</h1>
+
         <p class="hint">
           主题免费。对话框和头像框的进阶样式需
           <RouterLink to="/vips">开通 VIP</RouterLink>
@@ -111,12 +116,12 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
       </section>
 
       <section v-if="tab === 'avatar'" class="card fp-card">
-        <h1 class="fp-page-title">头像</h1>
+
         <OwnerProfileSettings v-if="isLoggedIn" key="avatar" mode="avatar" />
       </section>
 
       <section v-if="tab === 'account'" class="card fp-card">
-        <h1 class="fp-page-title">账号</h1>
+
         <template v-if="isLoggedIn">
           <OwnerInventory />
 
@@ -130,7 +135,7 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
       </section>
 
       <section v-if="tab === 'function'" class="card fp-card">
-        <h1 class="fp-page-title">功能</h1>
+
         <template v-if="isLoggedIn">
           <OwnerPreferences key="functions" resource="functions" title="功能设置" />
           <OwnerPreferences key="display-modes" resource="display" title="显示设置" :fields="['commentViewMode', 'avatarViewMode']" />
@@ -140,7 +145,7 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
       </section>
 
       <section v-if="tab === 'privacy'" class="card fp-card">
-        <h1 class="fp-page-title">隐私</h1>
+
         <template v-if="isLoggedIn">
           <OwnerPreferences key="privacy" resource="privacy" title="隐私设置" />
           <OwnerPreferences key="location" resource="location" title="地理位置公开设置" />
@@ -148,45 +153,41 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
       </section>
 
       <section v-if="tab === 'profession'" class="card fp-card">
-        <h1 class="fp-page-title">职业成长</h1>
+
         <template v-if="isLoggedIn">
           <OwnerProfessions />
         </template>
       </section>
 
       <section v-if="tab === 'point'" class="card fp-card">
-        <header class="mod-head">
-          <h1 class="fp-page-title">积分转账</h1>
-          <RouterLink to="/points">流水</RouterLink>
-        </header>
         <template v-if="isLoggedIn">
           <PointTransfer :initial-recipient="typeof route.query.to === 'string' ? route.query.to : ''" />
         </template>
       </section>
 
       <section v-if="tab === 'invite'" class="card fp-card">
-        <h1 class="fp-page-title">邀请</h1><OwnerInvitations v-if="isLoggedIn" />
+<OwnerInvitations v-if="isLoggedIn" />
       </section>
 
       <section v-if="tab === 'identity'" class="card fp-card">
-        <h1 class="fp-page-title">官方身份认证</h1>
+
         <OwnerIdentityApplication v-if="isLoggedIn" />
       </section>
 
       <section v-if="tab === 'data'" class="card fp-card">
-        <h1 class="fp-page-title">本人数据</h1>
+
         <nav v-if="isLoggedIn && account" aria-label="本人匿名创作入口"><RouterLink :to="`/member/${encodeURIComponent(account.userName)}/articles/anonymous`">本人匿名文章</RouterLink> · <RouterLink :to="`/member/${encodeURIComponent(account.userName)}/comments/anonymous`">本人匿名评论</RouterLink></nav>
         <OwnerPostExport v-if="isLoggedIn" />
         <OwnerGameSaves v-if="isLoggedIn" />
       </section>
 
       <section v-if="tab === 'i18n'" class="card fp-card">
-        <h1 class="fp-page-title">语言与时区</h1>
+
         <OwnerPreferences v-if="isLoggedIn" key="locale" resource="locale" title="语言与时区" />
       </section>
 
       <section v-if="tab === 'help'" class="card fp-card">
-        <h1 class="fp-page-title">使用指南</h1>
+
         <ul class="help-list">
           <li v-for="item in helpLinks" :key="item.to">
             <RouterLink :to="item.to">{{ item.title }}</RouterLink>
@@ -206,333 +207,16 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
         <span>{{ currentTabLabel }}</span>
         <span class="chevron" :class="{ open: settingsMenuOpen }">▾</span>
       </button>
-      <nav class="set-menu" :class="{ open: settingsMenuOpen }">
-        <RouterLink
-          v-for="item in tabs"
-          :key="item.id"
-          :to="item.to"
-          :class="{ current: tab === item.id }"
-        >
-          {{ item.label }}
-        </RouterLink>
+      <nav class="set-menu" :class="{ open: settingsMenuOpen }" aria-label="设置分类">
+        <div v-for="group in menuGroups" :key="group.label" class="menu-group"><h2>{{ group.label }}</h2><RouterLink v-for="item in group.items" :key="item.id" :to="item.to" :class="{ current: tab === item.id }" :aria-current="tab===item.id?'page':undefined"><span>{{ item.label }}</span><span class="menu-arrow" aria-hidden="true">›</span></RouterLink></div>
       </nav>
     </aside>
   </div>
 </template>
 
-<style scoped lang="scss">
-.page {
-  display: grid;
-  /* 与现网 settings 一致：内容在左、菜单在右 */
-  grid-template-columns: minmax(0, 1fr) 210px;
-  gap: var(--fp-page-gap, 20px);
-  align-items: start;
-}
-.set-side {
-  position: sticky;
-  top: calc(var(--fp-nav-h) + 14px);
-}
-.set-toggle {
-  display: none;
-}
-.set-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px;
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  box-shadow: var(--fp-card-shadow);
-  border-radius: var(--fp-panel-radius, 10px);
-  overflow: hidden;
-}
-.set-menu a {
-  padding: 9px 12px;
-  color: var(--fp-text);
-  text-decoration: none;
-  font-size: 13px;
-  border-radius: 8px;
-  border-left: 0;
-  transition: background-color 0.16s ease, color 0.16s ease;
-}
-.set-menu a:hover {
-  background: var(--fp-hover);
-}
-.set-menu a.current {
-  color: var(--fp-primary);
-  font-weight: 600;
-  background: color-mix(in srgb, var(--fp-primary) 10%, var(--fp-card));
-}
-.set-main {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
-.card {
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  box-shadow: var(--fp-card-shadow);
-  border-radius: var(--fp-radius-lg, 10px);
-  padding: 20px 22px;
-}
-.mod-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.mod-head a {
-  color: var(--fp-link);
-  text-decoration: none;
-}
-h1 {
-  margin: 0 0 12px;
-  font-size: 18px;
-  color: var(--fp-title);
-}
-h2 {
-  margin: 18px 0 8px;
-  font-size: 15px;
-  color: var(--fp-title);
-}
-.hint {
-  color: var(--fp-muted);
-  font-size: 13px;
-}
-.form,
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--fp-muted);
-  font-size: 13px;
-}
-input:not([type='checkbox']):not([type='radio']):not([type='file']),
-textarea,
-select {
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  color: var(--fp-text);
-  border-radius: var(--fp-radius-md, 8px);
-  padding: 8px 12px;
-  outline: none;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
-}
-input:not([type='checkbox']):not([type='radio']):not([type='file']):hover,
-textarea:hover,
-select:hover {
-  border-color: var(--fp-border-strong, var(--fp-border));
-}
-input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
-textarea:focus,
-select:focus {
-  border-color: var(--fp-primary);
-  box-shadow: var(--fp-focus-ring);
-}
-input[readonly] {
-  opacity: 0.75;
-}
-.checks {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.check {
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border: 1px solid var(--fp-border);
-  border-radius: var(--fp-radius-md, 8px);
-  background: var(--fp-bg);
-  color: var(--fp-text);
-  cursor: pointer;
-  transition: border-color 0.16s ease, background-color 0.16s ease;
-}
-.check:hover {
-  border-color: var(--fp-border-strong, var(--fp-border));
-  background: var(--fp-hover);
-}
-.avatar-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.fp-avatar {
-  width: 72px;
-  height: 72px;
-}
-.file {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--fp-border);
-  border-radius: var(--fp-radius-sm, 6px);
-  padding: 6px 14px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--fp-text);
-  transition: border-color 0.16s ease, background-color 0.16s ease;
-}
-.file:hover {
-  border-color: var(--fp-primary);
-  background: var(--fp-hover);
-}
-.file input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-.primary {
-  align-self: flex-end;
-  border: 1px solid var(--fp-primary);
-  background: var(--fp-primary);
-  color: #fff;
-  border-radius: var(--fp-radius-sm, 6px);
-  padding: 7px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
-}
-.primary:hover:not(:disabled) {
-  background: var(--fp-primary-hover, var(--fp-primary));
-  border-color: var(--fp-primary-hover, var(--fp-primary));
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--fp-primary) 28%, transparent);
-}
-.primary:disabled,
-.ghost-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.primary.danger {
-  background: var(--fp-danger, #d9534f);
-  border-color: var(--fp-danger, #d9534f);
-}
-.primary.danger:hover:not(:disabled) {
-  background: var(--fp-danger-hover, #c6433f);
-  border-color: var(--fp-danger-hover, #c6433f);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--fp-danger) 28%, transparent);
-}
-.ghost-btn {
-  align-self: flex-end;
-  border: 1px solid var(--fp-border);
-  background: transparent;
-  color: var(--fp-text);
-  border-radius: var(--fp-radius-sm, 6px);
-  padding: 7px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
-}
-.ghost-btn:hover:not(:disabled) {
-  background: var(--fp-hover);
-  border-color: var(--fp-border-strong, var(--fp-border));
-  color: var(--fp-title);
-}
-.captcha {
-  min-height: 44px;
-}
-.mfa-qr {
-  width: 180px;
-  height: 180px;
-  object-fit: contain;
-  border: 1px solid var(--fp-border);
-  border-radius: 8px;
-  background: #fff;
-}
-.bag-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.help-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.help-list li {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--fp-border);
-}
-.help-list a {
-  color: var(--fp-link);
-  text-decoration: none;
-  font-size: 15px;
-}
-.help-list span {
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-.ok {
-  color: var(--fp-primary);
-  font-size: 13px;
-}
-.err {
-  color: var(--fp-danger);
-  font-size: 13px;
-}
-
-@media (max-width: 800px) {
-  .page {
-    grid-template-columns: 1fr;
-  }
-  .set-side {
-    position: static;
-    order: -1;
-  }
-  .set-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 12px 14px;
-    border: 0;
-    border-radius: 8px;
-    background: var(--fp-card);
-    box-shadow: var(--fp-card-shadow);
-    color: var(--fp-title);
-    font-size: 15px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-  }
-  .chevron {
-    color: var(--fp-muted);
-    transition: transform 0.15s ease;
-  }
-  .chevron.open {
-    transform: rotate(180deg);
-  }
-  .set-menu {
-    display: none;
-    margin-top: 8px;
-  }
-  .set-menu.open {
-    display: flex;
-  }
-  .set-menu a {
-    border-left: 0;
-    border-bottom: 1px solid var(--fp-border);
-  }
-  .set-menu a:last-child {
-    border-bottom: 0;
-  }
-  .set-menu a.current {
-    border-left-color: transparent;
-  }
-  .checks {
-    grid-template-columns: 1fr;
-  }
-}
+<style scoped>
+.page{display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:20px;align-items:start}.settings-page-head{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:20px;padding:4px 2px 8px}.settings-eyebrow{font-size:11px;letter-spacing:2px;color:var(--fp-muted)}.settings-page-head h1{font-size:26px;color:var(--fp-title);line-height:1.4;margin:6px 0 7px;font-weight:650}.settings-page-head p{font-size:13px;color:var(--fp-muted);margin:0;line-height:1.7}.settings-page-head>a{font-size:12px;color:var(--fp-muted);text-decoration:none}.settings-page-head>a:hover{text-decoration:underline;text-underline-offset:3px}.set-main{display:flex;flex-direction:column;gap:16px;min-width:0}.card{background:var(--fp-card);border:1px solid var(--fp-border);box-shadow:var(--fp-card-shadow);border-radius:var(--fp-panel-radius,10px);padding:24px;min-width:0}.card>.hint{color:var(--fp-muted);font-size:12px;line-height:1.8;margin:0 0 18px}.login-notice{font-size:13px;color:var(--fp-muted);padding:16px 20px}.set-side{position:sticky;top:calc(var(--fp-nav-h) + 14px)}.set-toggle{display:none}.set-menu{display:flex;flex-direction:column;gap:18px;padding:16px 10px;background:var(--fp-card);border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius,10px)}.menu-group{display:flex;flex-direction:column;gap:3px}.menu-group h2{font-size:11px;font-weight:500;color:var(--fp-muted);margin:0 12px 6px}.set-menu a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-radius:7px;color:var(--fp-text);text-decoration:none;font-size:13px;transition:background-color .16s}.set-menu a:hover{background:var(--fp-hover);text-decoration:underline;text-underline-offset:3px}.set-menu a.current{color:var(--fp-primary);font-weight:600;background:var(--fp-primary-soft)}.menu-arrow{color:var(--fp-muted);opacity:.5}.set-menu a.current .menu-arrow{color:inherit;opacity:1}.help-list{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;margin:0}.help-list li{padding:18px;border:1px solid var(--fp-border);border-radius:10px;display:flex;flex-direction:column;gap:6px}.help-list a{font-size:14px;color:var(--fp-title);font-weight:600}.help-list span{font-size:12px;color:var(--fp-muted)}.chevron{transition:transform .16s}.chevron.open{transform:rotate(180deg)}a:focus-visible,button:focus-visible{outline:2px solid var(--fp-primary);outline-offset:3px}
+@media(max-width:800px){.page{grid-template-columns:minmax(0,1fr);gap:14px}.settings-page-head{grid-row:1}.settings-page-head h1{font-size:23px}.set-side{grid-row:2;position:static}.set-main{grid-row:3}.set-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:12px 16px;border:1px solid var(--fp-border);border-radius:10px;background:var(--fp-card);color:var(--fp-title);font:inherit;font-size:13px}.set-menu{display:none;margin-top:8px}.set-menu.open{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 10px}.card{padding:18px}.settings-page-head{gap:12px}.help-list{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.set-menu a,.chevron{transition:none}}
 </style>
+<style src="../styles/settings.css"></style>

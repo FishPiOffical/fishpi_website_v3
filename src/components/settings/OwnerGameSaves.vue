@@ -65,7 +65,7 @@ onBeforeUnmount(() => { mounted = false; generation++; stopConfirmation(); clear
 <template>
   <div class="game-saves">
     <h2>游戏云存档</h2><p>Evolve完整存档，每人一个槽。只管理存档，不修改游戏分数；存档内容可复制到对应游戏导入。</p>
-    <button class="fp-control" type="button" :disabled="loading || confirming" @click="read()">重新读取云存档</button>
+    <button class="fp-control settings-refresh" type="button" :disabled="loading || confirming" @click="read()" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取云存档</span></button>
     <p v-if="loading" role="status">正在读取存档…</p><p v-if="error" role="alert">{{ error }}</p>
     <p v-if="state === 'missing'">当前没有新存档。可首次保存，或显式迁移本人旧存档。</p>
     <template v-if="current"><p>当前版本 {{ current.revision }} · {{ current.byteLength }} 字节 · {{ formatDateTime(current.updatedAt) }}</p><p class="save-hash">SHA-256：{{ current.sha256 }}</p><button class="fp-control" type="button" :disabled="blocked" @click="loadDraft()">载入当前存档到编辑框</button></template>

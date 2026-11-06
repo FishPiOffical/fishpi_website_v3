@@ -17,7 +17,7 @@ onMounted(() => { void store.load() })
 </script>
 <template>
   <section class="owner-inventory" aria-label="本人背包和用户名">
-    <h2>你的背包</h2><button class="fp-control" type="button" :disabled="loading || busy" @click="store.load">重新读取背包</button>
+    <h2>你的背包</h2><button class="fp-control settings-refresh" type="button" :disabled="loading || busy" @click="store.load" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取背包</span></button>
     <p v-if="loading">正在读取背包…</p><p v-else-if="readError" role="alert" class="error">{{ readError }}</p>
     <template v-else-if="items">
       <p v-if="!hasItems">背包暂无物品或生效中的免签天数。</p>
