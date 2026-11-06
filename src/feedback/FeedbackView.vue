@@ -127,6 +127,7 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
       <div class="head-actions">
         <a v-if="mode !== 'list' && feedbackEnabled" class="back-btn fp-link-action" href="/feedback" @click.prevent="navigate('/feedback')">← 返回需求列表</a>
         <a v-if="mode !== 'new' && feedbackEnabled" class="primary fp-link-action" href="/feedback/new" @click.prevent="navigate('/feedback/new')">＋ 提需求</a>
+        <slot name="head-end" />
       </div>
     </header>
 
@@ -424,15 +425,28 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
 .head-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
+}
+
+.head-actions > :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px !important;
+  min-height: 36px !important;
+  margin: 0;
+  box-sizing: border-box;
+  border-radius: 8px !important;
+  line-height: 1;
 }
 
 .back-btn {
   display: inline-flex;
   align-items: center;
-  height: 34px;
-  padding: 0 12px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px !important;
   border: 1px solid var(--fp-border);
   border-radius: 8px;
   background: var(--fp-elevated, var(--fp-bg));
@@ -484,13 +498,17 @@ button:disabled {
 }
 
 .primary {
-  height: 34px;
-  padding: 0 14px;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  box-sizing: border-box;
   background: var(--fp-primary);
   color: #fff;
   border-color: var(--fp-primary);
+  border-radius: 8px !important;
   font-size: 13px;
   font-weight: 500;
+  line-height: 1;
   text-decoration: none;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
@@ -566,6 +584,13 @@ button:disabled {
   margin: 0;
 }
 
+.filters :is(input.fp-control, select.fp-control, button.fp-control) {
+  height: 36px !important;
+  min-height: 36px !important;
+  box-sizing: border-box;
+  margin: 0;
+}
+
 .search-wrap {
   position: relative;
   flex: 1;
@@ -588,14 +613,14 @@ button:disabled {
 }
 
 .filter-cat-select {
-  display: none;
+  display: none !important;
 }
 
 .filter-submit {
   background: var(--fp-card);
   border-color: var(--fp-border-strong, var(--fp-border));
   color: var(--fp-title);
-  padding: 0 14px;
+  padding: 0 14px !important;
 }
 
 .filter-submit:hover {
@@ -1011,13 +1036,19 @@ button:disabled {
 }
 
 .cancel-link {
-  height: 34px;
-  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  box-sizing: border-box;
   border: 1px solid var(--fp-border);
-  border-radius: 8px;
+  border-radius: 8px !important;
   background: transparent;
   color: var(--fp-muted);
   font-size: 13px;
+  line-height: 1;
   text-decoration: none;
 }
 
