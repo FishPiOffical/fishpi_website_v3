@@ -257,7 +257,9 @@ const routes = [
     ] as const
   ).map(([sub, memberTab]) => ({
     path: `/member/:userName/${sub}`,
-    component: memberTab === 'articlesAnonymous' || memberTab === 'commentsAnonymous'
+    component: memberTab === 'points'
+      ? () => import('@/views/MemberPointsView.vue')
+      : memberTab === 'articlesAnonymous' || memberTab === 'commentsAnonymous'
       ? () => import('@/views/AnonymousContentView.vue')
       : memberTab === 'followingUsers' || memberTab === 'followers'
         ? () => import('@/views/UserRelationsView.vue')

@@ -25,7 +25,7 @@ const showTransfer = ref(false), panel = ref<HTMLElement | null>(null)
 watch([userName, () => auth.account?.oId, () => auth.accessToken], () => { showTransfer.value = false })
 let lastPage = 1
 watch(content, data => { if (!data) return; const moved = lastPage !== data.p; lastPage = data.p; if (moved) void nextTick(() => { if (content.value === data) panel.value?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }) }) })
-const tabs = computed(() => [['', '帖子'], ['long', '长文章'], ['comments', '回帖'], ['breezemoons', '清风明月'], ['profession', '职业资料'], ['medals', '公开勋章'], ['following/users', '关注用户'], ['followers', '关注者'], ['following/tags', '关注标签'], ['watching/articles', '关注帖子'], ['following/articles', '收藏帖子'], ...(viewSelf.value ? [['articles/anonymous', '匿贴'], ['comments/anonymous', '匿回']] : [])])
+
 usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的主页`, description: profile.value?.userIntro || `${userName.value} 在摸鱼派的个人主页`, path: route.path, image: profile.value?.userAvatarURL, type: 'profile' }))
 </script>
 <template>
@@ -66,10 +66,7 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
     </aside>
     <PointTransfer v-if="showTransfer && profile && auth.isLoggedIn && !viewSelf" :initial-recipient="profile.userName" />
     <main ref="panel" class="member-content">
-      <nav aria-label="用户主页栏目">
-        <RouterLink v-for="tab in tabs" :key="tab[0]" :to="`${base}${tab[0] ? '/' + tab[0] : ''}`">{{ tab[1] }}</RouterLink>
-        <RouterLink v-if="viewSelf" to="/points">我的积分</RouterLink>
-      </nav>
+
       <PublicProfessions v-if="activeTab === 'profession'" :user-name="userName" />
       <p v-else-if="activeTab === 'points'" class="member-status">积分流水仅本人可在<RouterLink to="/points">我的积分</RouterLink>查看。</p>
       <template v-else>
@@ -295,37 +292,6 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
 
   .refresh-member-btn {
     display: none;
-  }
-}
-
-nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding-bottom: 14px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--fp-divider);
-
-  a {
-    padding: 6px 12px;
-    border-radius: 8px;
-    color: var(--fp-muted);
-    font-size: 13px;
-    font-weight: 500;
-    text-decoration: none;
-    transition: background-color 0.15s, color 0.15s;
-
-    &:hover {
-      background: var(--fp-hover);
-      color: var(--fp-title);
-    }
-  }
-
-  .router-link-exact-active {
-    color: var(--fp-accent);
-    background: color-mix(in srgb, var(--fp-accent) 14%, var(--fp-card));
-    font-weight: 600;
   }
 }
 

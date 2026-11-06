@@ -13,7 +13,6 @@ const mounted = ref(false), loading = ref(false), error = ref(''), list = ref<Re
 const target = computed(() => String(route.params.userName || ''))
 const kind = computed<RelationKind>(() => route.meta.memberTab === 'followers' ? 'followers' : 'following')
 const title = computed(() => `${target.value} · ${kind.value === 'followers' ? '粉丝' : '关注用户'}`)
-const base = computed(() => `/member/${encodeURIComponent(target.value)}`)
 let sequence = 0, boundary = ''
 function identity() { return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId || ''}:${target.value}:${kind.value}` }
 function clear() { sequence++; list.value = []; total.value = null; pageCount.value = 0; loading.value = false; error.value = '' }
@@ -36,7 +35,7 @@ usePageSeo(() => ({ title: title.value, path: route.path, robots: 'noindex' }))
 <template>
   <section class="user-relations fp-page fp-ui fp-surface">
     <h1 class="fp-page-title">{{ title }}</h1>
-    <nav class="fp-tabs" aria-label="用户关系列表"><RouterLink :to="`${base}/following/users`">关注用户</RouterLink><RouterLink :to="`${base}/followers`">粉丝</RouterLink><RouterLink :to="base">用户主页</RouterLink></nav>
+
     <p v-if="!mounted">正在准备用户列表…</p>
     <template v-else>
       <button type="button" class="refresh-rel-btn fp-control" :disabled="loading" @click="load">重新读取列表</button>

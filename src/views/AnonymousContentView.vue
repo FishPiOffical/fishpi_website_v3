@@ -39,7 +39,7 @@ function date(value: number) { return new Date(value).toLocaleString() }
     <p v-else-if="!accessToken"><RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录后查看本人匿名内容</RouterLink></p>
     <template v-else-if="!self"><p>匿名创作列表仅供本人查看。</p><RouterLink v-if="account" :to="`${base}/${kind}/anonymous`">查看我自己的列表</RouterLink></template>
     <template v-else>
-      <nav class="fp-tabs" aria-label="本人匿名创作"><RouterLink :to="`${base}/articles/anonymous`">匿名文章</RouterLink><RouterLink :to="`${base}/comments/anonymous`">匿名评论</RouterLink><RouterLink :to="base">返回本人主页</RouterLink></nav>
+
       <p>这里只显示概要。正文需进入文章，按当前阅读权限查看。</p>
       <button type="button" class="refresh-anon-btn fp-control" :disabled="loading" @click="load">重新读取列表</button>
       <p class="fp-state" v-if="loading" role="status">正在读取…</p>
