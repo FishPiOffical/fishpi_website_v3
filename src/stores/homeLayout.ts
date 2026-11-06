@@ -37,8 +37,9 @@ export interface HomeRowView {
 
 function read(): HomeLayoutState {
   const base = defaultHomeLayout()
-  if (import.meta.env.SSR || typeof localStorage === 'undefined') return base
+  if (import.meta.env.SSR) return base
   try {
+    if (typeof localStorage === 'undefined') return base
     const raw = localStorage.getItem(HOME_LAYOUT_STORAGE)
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<HomeLayoutState>
@@ -66,14 +67,22 @@ function locate(rows: HomeRow[], id: HomeModuleId) {
 }
 
 export const useHomeLayoutStore = defineStore('homeLayout', () => {
-  const state = ref<HomeLayoutState>(read())
+  // The first browser tree must use the same layout as the public SSR tree.
+  const state = ref<HomeLayoutState>(defaultHomeLayout())
   const editing = ref(false)
+  let restored = false
+
+  function restore() {
+    if (import.meta.env.SSR || restored) return
+    restored = true
+    state.value = read()
+  }
 
   watch(
     state,
     (v) => {
-      if (import.meta.env.SSR || typeof localStorage === 'undefined') return
-      localStorage.setItem(HOME_LAYOUT_STORAGE, JSON.stringify(v))
+      if (import.meta.env.SSR || !restored) return
+      try { localStorage.setItem(HOME_LAYOUT_STORAGE, JSON.stringify(v)) } catch { /* Storage is optional. */ }
     },
     { deep: true },
   )
@@ -164,6 +173,7 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
 
   return {
     state,
+    restore,
     editing,
     orderedModules,
     visibleRows,

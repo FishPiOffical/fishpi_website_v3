@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { useRouteDomBoundary } from '@/composables/useRouteDomBoundary'
 import { useClientStartupStore } from '@/stores/clientStartup'
 import { useAuthStore } from '@/stores/auth'
 import { getAuthContextVersion } from '@/api/http'
@@ -262,6 +263,10 @@ function onDocClick(e: MouseEvent) {
   if (!t?.closest?.('.user-menu')) menuOpen.value = false
 }
 
+const pageHost = ref<HTMLElement | null>(null)
+const routeView = ref<ComponentPublicInstance | null>(null)
+const pageRevision = useRouteDomBoundary(pageHost, routeView, () => route.fullPath, () => route.path === '/')
+
 const apiOffline = ref(false)
 let offlineBoundary = getAuthContextVersion(), offlineActor = auth.account?.oId, offlineHasToken = Boolean(auth.accessToken)
 watch([() => auth.accessToken, () => auth.account?.oId], () => {
@@ -422,7 +427,7 @@ onUnmounted(() => {
     <SettingsDrawer />
     <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />
-    <main :class="{ 'main--cr-modern': isModernChat, 'main--immersive': immersive }">
+    <main :key="pageRevision" ref="pageHost" :class="{ 'main--cr-modern': isModernChat, 'main--immersive': immersive }">
       <div v-if="ssrAuthShell" class="auth-shell">
         <template v-if="startup.error">
           <p role="alert">{{ startup.error }}</p>
@@ -432,7 +437,7 @@ onUnmounted(() => {
       </div>
       <template v-else>
         <MemberTabs v-if="route.path.startsWith('/member/') && typeof route.params.userName === 'string'" />
-        <RouterView />
+        <RouterView ref="routeView" />
       </template>
     </main>
     <footer v-if="!isModernChat && !immersive" class="foot">
