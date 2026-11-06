@@ -19,3 +19,9 @@ Caddy `/api/v3` HTTP/WebSocket 和必要经典资源均反代 HTTPS fishpi.cn，
 发布目录：`/opt/fishpi/releases/20261106-015cd9a`。两个systemd服务均active并启用开机启动，端口仅回环监听；Let's Encrypt证书已签发。既有站点Caddy配置备份：`/etc/caddy/Caddyfile.before-fishpi-20261106-131408`。
 
 生产构建与类型检查通过。公网HTTPS首页及抽查静态CSS 200，HTTP跳HTTPS 308；反馈health 200、公开列表200且为空、未登录提交401（未写入测试数据）；旧API 410。浏览器确认设置→需求反馈→查看需求列表正常打开弹窗。fishpi.cn及本站代理的captcha-options均404，登录和真实用户写操作未验收，不代表网站部署失败；需现网v3上线后复验身份恢复、来源策略和实时连接。
+
+## 2026-11-06 更新至 fd9bb2c
+
+当前发布目录切换为 `/opt/fishpi/releases/20261106-fd9bb2c`，保留上一版 `20261106-015cd9a` 供回滚，两个systemd服务均已重启并确认active。切换前在线备份为 `/var/lib/fishpi-feedback/backups/pre-fd9bb2c-20261106-140810.sqlite`，数据库路径及服务器管理员环境配置保持不变。上一版assets补入新发布以兼容已打开的旧页面。
+
+生产完整构建通过；公网反馈health/公开列表及反馈页面200，抽查线上入口JS、共享chunk及HTTP模块与本地产物字节一致。浏览器确认新版分类页签、筛选区及设置内反馈弹窗；当前真实站点v3仍存在不可用情况并触发离线页，未执行登录、真实提交或投票。Caddy、上游fishpi.cn和证书配置未变；部署包排除.host和本地环境/数据库。
