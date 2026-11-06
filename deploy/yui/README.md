@@ -29,3 +29,5 @@ Caddy `/api/v3` HTTP/WebSocket 和必要经典资源均反代 HTTPS fishpi.cn，
 ## 浏览器直连 Rhythm
 
 生产构建设置 `VITE_BROWSER_API_ORIGIN=https://fishpi.cn`，浏览器HTTP和实时WebSocket直连fishpi.cn，不经过yui服务器v3代理；未设置时保留本地同源开发。SSR的读取仍使用VITE_API_TARGET，反馈浏览器API仍同源/feedback-api/v1，身份核验仍由反馈服务器执行。上传图床维持专用票据链路。需要fishpi.cn精确允许https://yui.fishpi.cn的CORS/OPTIONS、credentials及实际Authorization/Content-Type/Idempotency-Key等请求头，并允许WebSocket Origin；不使用no-cors、不伪造Origin、不将令牌放入URL。生产站点不再提供v3转发，旧缓存客户端访问本站/api/v3返回410提示刷新。
+
+2026-11-06 直连版本 `03c8ddb` 已发布到 `/opt/fishpi/releases/20261106-03c8ddb`；前版fd9bb2c保留，反馈数据库在线备份pre-03c8ddb-20261106-152021.sqlite。Caddy原配置备份为/etc/caddy/Caddyfile.before-direct-03c8ddb，本站v3入口已验证410，反馈health 200。HTTP/刷新/重连/实时直连专项及既有离线身份、正文断流、通知、文章实时专项通过，完整构建通过。上线直连HTTP模块与本地字节一致。浏览器登录页/重连仍失败；现网captcha-options虽200 JSON但无Access-Control-Allow-Origin，登录OPTIONS 404，跨域尚未放行，登录及真实写未验收。反馈/me服务器核验仍受服务器到fishpi.cn网络可达性限制，未改变信任模型。
