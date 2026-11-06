@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {onMounted,ref,watch} from 'vue'
+import {nextTick,onMounted,ref,watch} from 'vue'
 import {RouterLink} from 'vue-router'
 import {usePageSeo} from '@/composables/usePageSeo'
 import type {FishGame} from '@/api/v3-fish-games'
@@ -31,117 +31,64 @@ const activities = [
   { href: '/activity/character', title: '写字', tip: '认字活动' },
 ]
 
+const sections = [
+  {id:'official',number:'01',title:'官方游戏',description:'熟悉的经典，随时回来玩一局',items:official},
+  {id:'activities',number:'02',title:'活动小游戏',description:'轻松开局，把工作间隙留给一点好心情',items:activities},
+]
+const gamepad = 'M8 8h8c3 0 4 2 5 8 1 4-3 4-5 0H8c-2 4-6 4-5 0 1-6 2-8 5-8Zm-1 3v4m-2-2h4m7-1h.01m2 2h.01'
+const failedIcons=ref<string[]>([]),detailPanel=ref<HTMLElement|null>(null),communityPanel=ref<HTMLElement|null>(null),submissionOpen=ref(false)
+let lastListPage=1
+watch(games,value=>{if(!value)return;const moved=lastListPage!==value.p;lastListPage=value.p;if(moved)void nextTick(()=>{if(games.value===value)communityPanel.value?.scrollIntoView?.({behavior:'smooth',block:'start'})})})
+function failIcon(url:string){if(!failedIcons.value.includes(url))failedIcons.value=[...failedIcons.value.slice(-99),url]}
+watch(selected,id=>{if(id)void nextTick(()=>{if(selected.value===id)detailPanel.value?.scrollIntoView?.({behavior:'smooth',block:'start'})})})
 </script>
-<template><div class="page fp-page fp-ui">
-<section class="card fp-card"><h1 class="fp-page-title">游戏 / 鱼游</h1><p class="hint">官方小游戏在经典站点运行，使用该站点登录状态。社区鱼游在下方浏览和投稿。</p></section>
-<section v-for="section in [{title:'官方游戏',items:official},{title:'活动小游戏',items:activities}]" :key="section.title" class="card fp-card"><h2>{{ section.title }}</h2><ul class="grid"><li v-for="g in section.items" :key="g.href"><a class="game" :href="g.href"><strong>{{ g.title }}</strong><span>{{ g.tip }}</span></a></li></ul><RouterLink v-if="section.title==='活动小游戏'" to="/activity">签到与昨日活跃</RouterLink></section>
-<section class="card fp-card"><h2>社区鱼游</h2><label>排序<select class="fp-control" v-model="sort"><option value="votes">总投票数优先</option><option value="likes">点赞数优先</option></select></label><button type="button" class="refresh-games-btn fp-control" :disabled="listLoading" @click="feed.loadList()">刷新鱼游</button><p class="fp-state" v-if="listLoading" role="status">正在读取鱼游…</p><p v-if="listError" class="err fp-state" role="alert">{{ listError }} <button class="fp-control" type="button" @click="feed.loadList()">重试列表</button></p><ul v-if="games" class="game-list"><li v-for="g in games.list" :key="g.id"><button class="fp-control" type="button" @click="feed.select(g.id)">{{ g.name }}</button><p>{{ g.description }}</p><p>赞 {{ g.upCount }} · 踩 {{ g.downCount }}</p></li></ul><p v-if="games&&!games.list.length">本页没有鱼游。</p><div v-if="games" class="pager fp-pagination"><span>第{{ games.p }}页 / {{ games.pageCount }}页，共{{ games.total }}个</span><button class="fp-control" type="button" :disabled="listLoading||games.p<=1" @click="feed.loadList(games.p-1)">上一页鱼游</button><button class="fp-control" type="button" :disabled="listLoading||games.p>=games.pageCount" @click="feed.loadList(games.p+1)">下一页鱼游</button></div><button class="fp-control" v-if="listError&&listPage>1" type="button" @click="feed.loadList(listPage-1)">返回上一页</button></section>
-<section v-if="selected" class="card fp-card"><button class="fp-control" type="button" @click="selected=''">关闭详情</button><p v-if="detailLoading">正在读取详情…</p><p v-if="detailError" class="err fp-state" role="alert">{{ detailError }} <button class="fp-control" type="button" @click="feed.loadDetail()">重试详情</button></p><template v-if="game"><h2>{{ game.name }}</h2><img v-if="game.iconURL" :src="game.iconURL" alt="" class="game-icon" referrerpolicy="no-referrer"/><p>{{ game.description }}</p><p><RouterLink v-if="game.author.id&&game.author.userName" :to="'/member/'+encodeURIComponent(game.author.userName)">{{ game.author.userNickname||game.author.userName }}</RouterLink><span v-else>作者未展示</span></p><a v-if="game.url" :href="game.url" target="_blank" rel="noopener noreferrer">打开游戏</a><p>赞 {{ game.upCount }} · 踩 {{ game.downCount }}</p><div v-if="mounted&&auth.accessToken"><button class="fp-control" type="button" :aria-pressed="game.userVote==='like'" :disabled="store.busy||!!store.pending" @click="store.vote(game.id,'like')">点赞</button><button class="fp-control" type="button" :aria-pressed="game.userVote==='dislike'" :disabled="store.busy||!!store.pending" @click="store.vote(game.id,'dislike')">点踩</button><button class="fp-control" type="button" :disabled="store.busy||!!store.pending||!game.userVote" @click="store.vote(game.id,'')">清除投票</button><button class="fp-control" v-if="game.author.id===auth.account?.oId" type="button" @click="editing=game">申请编辑</button></div></template><FishGameEditor v-if="editing&&editing.author.id===auth.account?.oId" :game="editing" @close="editing=null"/>
-<h2>评论</h2><p v-if="commentsLoading">正在读取评论…</p><p v-if="commentsError" class="err fp-state" role="alert">{{ commentsError }} <button class="fp-control" type="button" @click="feed.loadComments()">重试评论</button></p><ul v-if="comments" class="game-list"><li v-for="c in comments.list" :key="c.id"><RouterLink v-if="c.author.id&&c.author.userName" :to="'/member/'+encodeURIComponent(c.author.userName)">{{ c.author.userNickname||c.author.userName }}</RouterLink><p>{{ c.contentAvailable?c.content:'正文不可展示' }}</p></li></ul><p v-if="comments&&!comments.list.length">暂无评论。</p><div v-if="comments" class="pager fp-pagination"><span>第{{ comments.p }}页 / {{ comments.pageCount }}页，共{{ comments.total }}条</span><button class="fp-control" type="button" :disabled="commentsLoading||comments.p<=1" @click="feed.loadComments(comments.p-1)">上一页评论</button><button class="fp-control" type="button" :disabled="commentsLoading||comments.p>=comments.pageCount" @click="feed.loadComments(comments.p+1)">下一页评论</button></div><button class="fp-control" v-if="commentsError&&commentsPage>1" type="button" @click="feed.loadComments(commentsPage-1)">返回上一页评论</button><form v-if="mounted&&auth.accessToken&&game" class="form" @submit.prevent="sendComment"><label>发表评论<textarea class="fp-control" v-model="comment" maxlength="8192" required :disabled="store.busy||!!store.pending"/></label><p class="hint">去除HTML和首尾空白后1至500字符。</p><button class="fp-control" type="submit" :disabled="store.busy||!!store.pending||!comment.trim()">发送评论</button></form></section>
-<section class="card fp-card"><FishGameEditor/><p v-if="mounted&&!auth.accessToken"><RouterLink to="/login?redirect=/games">登录</RouterLink>后可投稿、投票和评论。</p></section></div></template>
-<style scoped lang="scss">
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-
-
-}
-.card {
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  border-radius: var(--fp-panel-radius);
-  padding: 18px 20px;
-}
-h1,
-h2 {
-  margin: 0 0 10px;
-  font-size: 18px;
-  color: var(--fp-title);
-}
-h2 {
-  font-size: 16px;
-}
-.hint {
-  margin: 0 0 10px;
-  color: var(--fp-muted);
-  font-size: 13px;
-  line-height: 1.5;
-}
-.hint a {
-  color: var(--fp-link);
-}
-.grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
-}
-.game {
-  width: 100%;
-  box-sizing: border-box;
-  text-decoration: none;
-  text-align: left;
-  border: 1px solid var(--fp-border);
-  background: var(--fp-bg);
-  border-radius: 8px;
-  padding: 12px;
-  cursor: pointer;
-  color: var(--fp-text);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.game:hover {
-  border-color: var(--fp-primary);
-}
-.game strong {
-  font-size: 14px;
-}
-.game span {
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--fp-muted);
-}
-input,
-textarea {
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  color: var(--fp-text);
-  border-radius: 6px;
-  padding: 8px 10px;
-}
-.primary {
-  align-self: flex-start;
-  border: 0;
-  background: var(--fp-primary);
-  color: #fff;
-  border-radius: 6px;
-  padding: 8px 16px;
-  cursor: pointer;
-}
-.err {
-  color: var(--fp-danger);
-  font-size: 13px;
-  margin: 0;
-}
-.ok {
-  color: var(--fp-green, #3d8b6e);
-  font-size: 13px;
-  margin: 0;
-}
-.game-icon{width:64px;height:64px;object-fit:contain}.refresh-games-btn{display:none}.game-list{list-style:none;padding:0;overflow-wrap:anywhere}.game-list li{padding:10px 0;border-bottom:1px solid var(--fp-border)}.pager{display:flex;flex-wrap:wrap;align-items:center;gap:8px}button,select{font:inherit;padding:6px;margin:3px;background:var(--fp-bg);color:var(--fp-text);border:1px solid var(--fp-border);border-radius:5px}p{overflow-wrap:anywhere}
+<template>
+  <div class="games-page fp-page fp-page--wide fp-ui">
+    <header class="games-hero">
+      <div class="hero-copy"><span class="eyebrow">游戏 / 鱼游</span><h1>给摸鱼时间，添点乐趣<span>。</span></h1><p>重玩一个经典，发现一个新世界，也分享你的小小创意。</p><div class="hero-links"><a href="#community">发现社区鱼游 <span aria-hidden="true">↓</span></a><RouterLink to="/top">看看游戏榜单 <span aria-hidden="true">↗</span></RouterLink></div></div>
+      <svg class="hero-art" viewBox="0 0 200 160" fill="none" aria-hidden="true"><circle cx="104" cy="80" r="66" fill="currentColor" opacity=".06"/><g transform="translate(27 15) scale(6)"><path :d="gamepad" stroke="currentColor" stroke-width=".45" stroke-linecap="round" stroke-linejoin="round"/></g><path d="M38 29v12m-6-6h12m120 79v12m-6-6h12" stroke="currentColor" stroke-width="2" opacity=".5"/></svg>
+    </header>
+    <nav class="section-nav" aria-label="游戏分区"><a href="#official">官方游戏 <span>{{ official.length }}</span></a><a href="#activities">活动小游戏 <span>{{ activities.length }}</span></a><a href="#community">社区鱼游 <span v-if="games">{{ games.total }}</span></a><a href="#submission" class="submit-shortcut" @click="submissionOpen=true">分享游戏 <span aria-hidden="true">＋</span></a></nav>
+    <section v-for="section in sections" :id="section.id" :key="section.id" class="catalog-section" :aria-labelledby="section.id+'-title'">
+      <header class="section-head"><span class="section-number" aria-hidden="true">{{ section.number }}</span><div><h2 :id="section.id+'-title'">{{ section.title }}</h2><p>{{ section.description }}</p></div><RouterLink v-if="section.id==='activities'" to="/activity" class="section-more">签到与昨日活跃 ↗</RouterLink><span v-else class="section-more">在经典站点打开</span></header>
+      <ul class="official-grid"><li v-for="g in section.items" :key="g.href"><a class="official-game" :href="'https://fishpi.cn'+g.href"><span class="catalog-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="gamepad"/></svg></span><span class="catalog-copy"><strong>{{ g.title }}</strong><span>{{ g.tip }}</span></span><span class="card-arrow" aria-hidden="true">↗</span></a></li></ul>
+    </section>
+    <section id="community" ref="communityPanel" class="catalog-section" aria-labelledby="community-title">
+      <header class="section-head"><span class="section-number" aria-hidden="true">03</span><div><h2 id="community-title">社区鱼游</h2><p>鱼油们的创意游乐场</p></div><span v-if="games" class="section-more">{{ games.total }} 个游戏</span></header>
+      <div class="list-toolbar"><label>排序<select class="fp-control" v-model="sort"><option value="votes">总投票数优先</option><option value="likes">点赞数优先</option></select></label><button type="button" class="refresh-games-btn" :disabled="listLoading" @click="feed.loadList()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2"/></svg>刷新鱼游</button></div>
+      <p v-if="listLoading" role="status" class="read-state">正在读取鱼游…</p>
+      <div v-if="listError" role="alert" class="read-state err"><p>{{ listError }}</p><button type="button" @click="feed.loadList()">重试列表</button><button v-if="listPage>1" type="button" @click="feed.loadList(listPage-1)">返回上一页</button></div>
+      <ul v-if="games" class="community-grid"><li v-for="g in games.list" :key="g.id" class="community-card" :class="{selected:selected===g.id}"><div class="game-card-head"><span class="game-art"><img v-if="g.iconURL&&!failedIcons.includes(g.iconURL)" :src="g.iconURL" alt="" loading="lazy" referrerpolicy="no-referrer" @error="failIcon(g.iconURL)"/><svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path :d="gamepad"/></svg></span><button type="button" class="game-title" :aria-expanded="selected===g.id" @click="feed.select(g.id)">{{ g.name }}</button><span class="card-arrow" aria-hidden="true">↗</span></div><p class="game-description">{{ g.description }}</p><div class="game-meta"><span>赞 {{ g.upCount }} <span class="meta-dot">·</span> 踩 {{ g.downCount }}</span><span class="game-author" v-if="g.author.userName">{{ g.author.userNickname||g.author.userName }}</span></div></li></ul>
+      <p v-if="games&&!games.list.length" class="read-state">本页没有鱼游。</p>
+      <nav v-if="games&&(games.total||listPage>1)" class="pager" aria-label="鱼游分页"><span>第{{ games.p }}页 / {{ games.pageCount }}页，共{{ games.total }}个</span><button type="button" :disabled="listLoading||games.p<=1" @click="feed.loadList(games.p-1)">上一页鱼游</button><button type="button" :disabled="listLoading||games.p>=games.pageCount" @click="feed.loadList(games.p+1)">下一页鱼游</button></nav>
+    </section>
+    <section v-if="selected" ref="detailPanel" class="detail-card" aria-label="鱼游详情">
+      <div class="detail-toolbar"><span class="eyebrow">游戏详情</span><button type="button" @click="selected=''">关闭详情</button></div>
+      <p v-if="detailLoading" role="status" class="read-state">正在读取详情…</p><div v-if="detailError" class="read-state err" role="alert"><p>{{ detailError }}</p><button type="button" @click="feed.loadDetail()">重试详情</button></div>
+      <template v-if="game"><div class="detail-heading"><span class="game-art large"><img v-if="game.iconURL&&!failedIcons.includes(game.iconURL)" :src="game.iconURL" alt="" referrerpolicy="no-referrer" @error="failIcon(game.iconURL)"/><svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path :d="gamepad"/></svg></span><div><h2>{{ game.name }}</h2><p class="detail-author"><RouterLink v-if="game.author.id&&game.author.userName" :to="'/member/'+encodeURIComponent(game.author.userName)" :data-user-card="game.author.userName">{{ game.author.userNickname||game.author.userName }}</RouterLink><span v-else>作者未展示</span><span>赞 {{ game.upCount }} · 踩 {{ game.downCount }}</span></p></div><a v-if="game.url" class="play-button" :href="game.url" target="_blank" rel="noopener noreferrer">打开游戏 ↗</a></div><p class="detail-description">{{ game.description }}</p><div v-if="mounted&&auth.accessToken" class="vote-actions"><button type="button" :aria-pressed="game.userVote==='like'" :disabled="store.busy||!!store.pending" @click="store.vote(game.id,'like')">点赞</button><button type="button" :aria-pressed="game.userVote==='dislike'" :disabled="store.busy||!!store.pending" @click="store.vote(game.id,'dislike')">点踩</button><button type="button" :disabled="store.busy||!!store.pending||!game.userVote" @click="store.vote(game.id,'')">清除投票</button><button v-if="game.author.id===auth.account?.oId" type="button" @click="editing=game">申请编辑</button></div></template>
+      <FishGameEditor v-if="editing&&editing.author.id===auth.account?.oId" :game="editing" @close="editing=null"/>
+      <div class="comments-section"><h3>评论 <span v-if="comments">{{ comments.total }}</span></h3><p v-if="commentsLoading" role="status" class="read-state">正在读取评论…</p><div v-if="commentsError" class="read-state err" role="alert"><p>{{ commentsError }}</p><button type="button" @click="feed.loadComments()">重试评论</button></div><ul v-if="comments" class="comments-list"><li v-for="c in comments.list" :key="c.id"><RouterLink v-if="c.author.id&&c.author.userName" :to="'/member/'+encodeURIComponent(c.author.userName)" :data-user-card="c.author.userName">{{ c.author.userNickname||c.author.userName }}</RouterLink><p>{{ c.contentAvailable?c.content:'正文不可展示' }}</p></li></ul><p v-if="comments&&!comments.list.length" class="read-state">暂无评论。</p><nav v-if="comments&&(comments.total||commentsPage>1)" class="pager" aria-label="鱼游评论分页"><span>第{{ comments.p }}页 / {{ comments.pageCount }}页，共{{ comments.total }}条</span><button type="button" :disabled="commentsLoading||comments.p<=1" @click="feed.loadComments(comments.p-1)">上一页评论</button><button type="button" :disabled="commentsLoading||comments.p>=comments.pageCount" @click="feed.loadComments(comments.p+1)">下一页评论</button></nav><button v-if="commentsError&&commentsPage>1" type="button" @click="feed.loadComments(commentsPage-1)">返回上一页评论</button>
+      <form v-if="mounted&&auth.accessToken&&game" class="comment-form" @submit.prevent="sendComment"><label>发表评论<textarea class="fp-control" v-model="comment" rows="3" maxlength="8192" required :disabled="store.busy||!!store.pending" placeholder="聊聊你的游戏体验…"/></label><div><span class="hint">评论最多 500 字</span><button type="submit" :disabled="store.busy||!!store.pending||!comment.trim()">发送评论</button></div></form></div>
+    </section>
+    <section id="submission" class="submission-card"><details :open="submissionOpen" @toggle="submissionOpen=($event.target as HTMLDetailsElement).open"><summary><span><strong>分享你的游戏</strong><span>让更多鱼油发现你的作品</span></span><span class="expand-arrow" aria-hidden="true">＋</span></summary><div class="submission-body"><FishGameEditor/><p v-if="mounted&&!auth.accessToken"><RouterLink to="/login?redirect=/games">登录</RouterLink>后可投稿、投票和评论。</p></div></details></section>
+    <p class="classic-note">官方游戏与活动在经典站点运行，使用经典站点的登录状态。</p>
+  </div>
+</template>
+<style scoped>
+.games-page{padding-bottom:20px;color:var(--fp-text)}
+.games-hero{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:30px 32px;border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius);background:linear-gradient(115deg,var(--fp-card) 35%,var(--fp-primary-soft));overflow:hidden}
+.eyebrow{font-size:12px;color:var(--fp-primary);font-weight:600;letter-spacing:2px}.games-hero h1{font-size:30px;line-height:1.45;letter-spacing:-.8px;margin:10px 0 8px;color:var(--fp-title);font-weight:650}.games-hero h1>span{color:var(--fp-primary)}.games-hero p{font-size:14px;line-height:1.7;color:var(--fp-muted);margin:0}.hero-art{width:200px;height:160px;flex:none;color:var(--fp-primary)}
+.hero-links{display:flex;gap:22px;flex-wrap:wrap;margin-top:22px;font-size:12px}.hero-links a{display:flex;gap:8px;color:var(--fp-text);font-weight:600;text-decoration:none}.hero-links a:hover{text-decoration:underline;text-underline-offset:4px}
+.section-nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:14px 0;margin-bottom:16px;border-bottom:1px solid var(--fp-border)}.section-nav a{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:7px;color:var(--fp-muted);font-size:13px;text-decoration:none}.section-nav a:hover{background:var(--fp-hover);text-decoration:underline}.section-nav a>span{font-size:11px;font-variant-numeric:tabular-nums;opacity:.75}.section-nav .submit-shortcut{margin-left:auto;color:var(--fp-primary)}
+.catalog-section{margin-bottom:28px;scroll-margin-top:90px}.section-head{display:flex;align-items:center;gap:12px;margin:0 0 14px}.section-number{font-size:25px;line-height:1;letter-spacing:-1px;color:var(--fp-muted);opacity:.42;font-variant-numeric:tabular-nums}.section-head h2{font-size:17px;font-weight:600;margin:0 0 4px;color:var(--fp-title)}.section-head p{font-size:12px;line-height:1.5;color:var(--fp-muted);margin:0}.section-more{margin-left:auto;font-size:12px;color:var(--fp-muted);white-space:nowrap;text-decoration:none}.section-more:hover{text-decoration:underline}
+.official-grid,.community-grid{list-style:none;margin:0;padding:0;display:grid;gap:12px}.official-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.official-game{display:flex;align-items:center;gap:10px;height:100%;box-sizing:border-box;padding:18px 14px;border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius);background:var(--fp-card);color:var(--fp-text);text-decoration:none;transition:background-color .18s,border-color .18s}.official-game:hover{background:var(--fp-hover);border-color:color-mix(in srgb,var(--fp-primary) 35%,var(--fp-border));text-decoration:none}.official-game:hover strong{text-decoration:underline;text-underline-offset:4px}.catalog-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:9px;background:var(--fp-primary-soft);color:var(--fp-primary)}.catalog-icon svg{width:20px;height:20px}#activities .catalog-icon{color:var(--fp-accent);background:color-mix(in srgb,var(--fp-accent) 9%,var(--fp-card))}.catalog-copy{display:flex;flex-direction:column;gap:5px;min-width:0}.catalog-copy strong{font-size:13px;line-height:1.5;color:var(--fp-title)}.catalog-copy>span{font-size:11px;color:var(--fp-muted)}.card-arrow{margin-left:auto;align-self:flex-start;color:var(--fp-muted);font-size:14px;opacity:.6}
+.list-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 14px}.list-toolbar label{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--fp-muted)}select{font:inherit;color:var(--fp-text);background:var(--fp-card);border:1px solid var(--fp-border);border-radius:7px;padding:7px 10px}.refresh-games-btn{display:flex;align-items:center;gap:6px;font-size:12px}.refresh-games-btn svg{width:15px;height:15px}
+.community-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.community-card{position:relative;min-width:0;display:flex;flex-direction:column;padding:20px;background:var(--fp-card);border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius);transition:background-color .18s,border-color .18s}.community-card:hover{background:var(--fp-hover);border-color:color-mix(in srgb,var(--fp-primary) 35%,var(--fp-border))}.community-card.selected{border-color:var(--fp-primary)}.game-card-head{display:flex;align-items:center;gap:12px;min-width:0}.game-art{display:grid;place-items:center;width:44px;height:44px;border-radius:11px;overflow:hidden;flex:none;background:var(--fp-primary-soft);color:var(--fp-primary)}.game-art img{width:100%;height:100%;object-fit:contain}.game-art svg{width:26px;height:26px}.game-title{padding:0;border:0;border-radius:0;background:transparent;font-weight:600;font-size:15px;color:var(--fp-title);text-align:left;overflow-wrap:anywhere;line-height:1.5}.game-title::after{content:'';position:absolute;inset:0;border-radius:var(--fp-panel-radius)}.game-title:hover{text-decoration:underline;text-underline-offset:4px}.game-title:focus-visible{outline:none}.community-card:has(.game-title:focus-visible){outline:2px solid var(--fp-primary);outline-offset:3px}.game-description{font-size:13px;color:var(--fp-muted);line-height:1.75;margin:14px 0 18px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.game-meta{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-top:auto;font-size:11px;color:var(--fp-muted)}.meta-dot{margin:0 4px;opacity:.5}.game-author{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:45%}
+button{font:inherit;padding:7px 12px;background:var(--fp-card);color:var(--fp-text);border:1px solid var(--fp-border);border-radius:7px;cursor:pointer}button:disabled{opacity:.45;cursor:default}button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--fp-primary);outline-offset:3px}.pager{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;margin-top:20px;font-size:12px;color:var(--fp-muted)}.read-state{padding:28px 20px;text-align:center;background:var(--fp-card);border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius);color:var(--fp-muted);font-size:13px}.err{color:var(--fp-danger)}.err p{margin:0 0 10px}
+.detail-card{padding:24px;background:var(--fp-card);border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius);margin-bottom:24px;scroll-margin-top:88px}.detail-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}.detail-toolbar button{font-size:12px}.detail-heading{display:flex;align-items:center;gap:16px}.game-art.large{width:64px;height:64px;border-radius:14px}.detail-heading h2{font-size:22px;margin:0 0 8px;line-height:1.5;color:var(--fp-title);overflow-wrap:anywhere}.detail-heading>div{min-width:0}.detail-author{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--fp-muted);margin:0}.detail-author a{color:inherit}.play-button{margin-left:auto;flex:none;padding:10px 18px;background:var(--fp-primary);color:#fff;border-radius:8px;font-size:13px;text-decoration:none}.play-button:hover{text-decoration:underline}.detail-description{font-size:14px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;margin:20px 0;color:var(--fp-text)}.vote-actions{display:flex;flex-wrap:wrap;gap:8px;font-size:12px}.vote-actions [aria-pressed=true]{color:var(--fp-primary);border-color:var(--fp-primary);background:var(--fp-primary-soft)}
+.comments-section{margin-top:24px;border-top:1px solid var(--fp-border);padding-top:20px}.comments-section h3{font-size:15px;margin:0 0 14px}.comments-section h3>span{font-size:12px;color:var(--fp-muted);font-weight:400;margin-left:8px}.comments-list{list-style:none;margin:0;padding:0}.comments-list li{padding:14px 0;border-bottom:1px solid var(--fp-border)}.comments-list a{font-size:12px;color:var(--fp-muted)}.comments-list p{font-size:13px;line-height:1.75;margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}.comment-form{margin-top:20px}.comment-form label{display:flex;flex-direction:column;gap:10px;font-size:13px}.comment-form textarea{font:inherit;width:100%;box-sizing:border-box;resize:vertical;min-height:86px;padding:12px;background:var(--fp-surface-subtle);color:var(--fp-text);border:1px solid var(--fp-border);border-radius:8px}.comment-form>div{display:flex;align-items:center;justify-content:space-between;margin-top:10px}.hint{font-size:12px;color:var(--fp-muted)}
+.submission-card{scroll-margin-top:90px;border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius);background:var(--fp-card)}summary{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 24px;cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}summary>span:first-child{display:flex;align-items:center;flex-wrap:wrap;gap:14px}summary strong{font-size:15px;color:var(--fp-title)}summary span span{font-size:12px;color:var(--fp-muted)}.expand-arrow{color:var(--fp-primary);font-size:22px}details[open] .expand-arrow{transform:rotate(45deg)}.submission-body{border-top:1px solid var(--fp-border);padding:24px}.submission-body p{font-size:13px;color:var(--fp-muted)}.classic-note{text-align:center;color:var(--fp-muted);font-size:11px;margin:20px 0 0}
+@media(max-width:1100px){.official-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.community-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.games-hero{padding:22px 20px;position:relative;gap:0}.hero-copy{position:relative;z-index:1}.games-hero h1{font-size:23px;letter-spacing:-.5px}.games-hero p{font-size:12px}.hero-art{position:absolute;right:-40px;top:20px;width:150px;opacity:.22;pointer-events:none}.hero-links{gap:16px;margin-top:18px}.section-nav{gap:0;row-gap:4px}.section-nav a{font-size:12px;padding:7px 8px}.section-nav .submit-shortcut{margin-left:0}.official-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.official-game{padding:14px 12px;gap:8px}.catalog-icon{width:28px;height:28px}.official-game .card-arrow{display:none}.community-grid{grid-template-columns:minmax(0,1fr);gap:10px}.community-card{padding:18px}.section-head{gap:10px;flex-wrap:wrap}.section-more{font-size:11px}.section-head h2{font-size:16px}.detail-card{padding:18px}.detail-heading{flex-wrap:wrap;gap:12px}.detail-heading h2{font-size:19px}.play-button{margin-left:0;width:100%;box-sizing:border-box;text-align:center}.detail-author{font-size:11px;gap:8px}.game-art.large{width:48px;height:48px}.submission-body{padding:18px}summary{padding:18px}.pager{font-size:11px}.classic-note{line-height:1.7}}
+@media(prefers-reduced-motion:reduce){.official-game,.community-card{transition:none}}
 </style>
