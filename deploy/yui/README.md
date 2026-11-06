@@ -39,3 +39,5 @@
 后端类型检查及2组真实HTTP集成通过；前端API/Pinia和真实SSR访客Cookie代理通过；全量101专项通过，后续补测迟到401不影响新访客。完整构建通过。本机临时库浏览器验收未登录提交→详情→支持→刷新保留→改反对→撤销通过，未向线上写入测试需求。
 
 2026-11-06 已发布访客版 `1d12de6` 至 `/opt/fishpi/releases/20261106-1d12de6`，前版03c8ddb保留。迁移前在线备份：`/var/lib/fishpi-feedback/backups/pre-1d12de6-20261106-161831.sqlite`；feedback unit已安装新版，两个服务active。公网/session建立与Cookie复用通过，Secure/HttpOnly/路径属性检查通过；空表单返回422而不是身份503，表明本地身份链路通过，未向生产创建测试需求。公开列表200，新版浏览器表单展示访客提示且无需登录。数据库迁移版本2、integrity_check正常。
+
+2026-11-06 UI更新 `e6c66bf` 已发布至 `/opt/fishpi/releases/20261106-e6c66bf`，包含排行榜、主页、会员及信息流样式。生产完整构建通过，线上TopView CSS和入口JS等4项资源与本地字节一致，浏览器总榜分类及卡片展示正常。两个Node服务及Caddy active，反馈health 200，数据库integrity_check正常；上线前备份`/var/lib/fishpi-feedback/backups/pre-e6c66bf-20261106-163537.sqlite`，前版1d12de6保留用于回滚，访客数据和管理员配置不变。未改动上游、认证或SSR网络配置，未提交生产测试需求。
