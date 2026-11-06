@@ -30,7 +30,6 @@ const rewardStatus = { PENDING: '待发放', GRANTED: '已发放', REVOKED: '已
 
 <template>
   <section class="public-professions" aria-label="公开职业资料">
-    <h2>职业资料</h2>
     <p class="hint">仅展示当前可见资料；未显示的模块不代表没有记录。完整本人资料请前往职业设置。</p>
     <p v-if="loading" role="status">正在读取职业资料…</p><p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="unavailable">当前没有可展示的职业资料。</p>

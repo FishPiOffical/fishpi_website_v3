@@ -34,7 +34,6 @@ usePageSeo(() => ({ title: title.value, path: route.path, robots: 'noindex' }))
 </script>
 <template>
   <section class="user-relations fp-page fp-ui fp-surface">
-    <h1 class="fp-page-title">{{ title }}</h1>
 
     <p v-if="!mounted">正在准备用户列表…</p>
     <template v-else>

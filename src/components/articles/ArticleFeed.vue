@@ -13,6 +13,7 @@ const props = withDefaults(
     items: ArticleSummary[]
     empty?: string
     compact?: boolean
+    hideAuthor?: boolean
   }>(),
   {
     empty: '暂无帖子',
@@ -45,13 +46,13 @@ function avatarOf(a: ArticleSummary) {
 </script>
 
 <template>
-  <div class="article-feed-wrap">
+  <div class="article-feed-wrap" :class="{ 'author-hidden': hideAuthor }">
     <ol v-if="compact" class="feed compact">
       <li v-if="!rows.length" class="empty">{{ empty }}</li>
       <li v-for="item in rows" :key="item.oId" class="compact-item">
         <span v-if="item.stick?.active ?? Boolean(item.articleStick)" class="cb-stick" :title="item.stick?.permanent ? '永久置顶' : '置顶'" />
         <RouterLink
-          v-if="item.articleAuthorName && item.articleAnonymous !== 1"
+          v-if="!hideAuthor && item.articleAuthorName && item.articleAnonymous !== 1"
           :to="`/member/${item.articleAuthorName}`"
           class="compact-avatar-link"
         >
@@ -108,7 +109,8 @@ function avatarOf(a: ArticleSummary) {
         </h2>
 
         <!-- 作者与时间行 -->
-        <div class="item-author-row">
+        <time v-if="hideAuthor" class="publication-time">{{ formatDisplayTime(item.articleCreateTimeStr || item.timeAgo) }}</time>
+        <div v-else class="item-author-row">
           <RouterLink
             v-if="item.articleAuthorName && item.articleAnonymous !== 1"
             :to="`/member/${item.articleAuthorName}`"
@@ -160,6 +162,9 @@ function avatarOf(a: ArticleSummary) {
 .article-feed-wrap {
   width: 100%;
 }
+.publication-time { display:block; color:var(--fp-muted); font-size:12px; }
+.author-hidden .feed.full .feed-item { padding:18px 4px; }
+.author-hidden .item-title { font-weight:600; margin-bottom:8px; }
 
 .feed {
   list-style: none;

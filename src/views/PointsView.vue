@@ -7,6 +7,7 @@ import { fetchV3PointBalance, fetchV3PointPage, pointChange, pointTime, type Poi
 import { useAuthStore } from '@/stores/auth'
 import { usePageSeo } from '@/composables/usePageSeo'
 import FpLoading from '@/components/FpLoading.vue'
+defineProps<{ embedded?: boolean }>()
 const { accessToken, account } = storeToRefs(useAuthStore())
 const mounted = ref(false), items = ref<PointEntry[]>([]), balance = ref<number | null>(null)
 const page = ref(1), pageCount = ref(0), total = ref(0), loading = ref(false), balanceLoading = ref(false), error = ref(''), balanceError = ref('')
@@ -49,7 +50,7 @@ function refresh() { void loadRecords(); void loadBalance() }
 <template>
   <div class="points-view fp-page fp-ui">
     <section v-if="!loggedIn" class="card empty-state fp-card">
-      <h1 class="fp-page-title">积分流水</h1><p class="hint">请先 <RouterLink to="/login?redirect=/points">登录</RouterLink> 后查看积分余额与变动。</p>
+      <h1 v-if="!embedded" class="fp-page-title">积分流水</h1><p class="hint">请先 <RouterLink to="/login?redirect=/points">登录</RouterLink> 后查看积分余额与变动。</p>
     </section>
     <template v-else>
       <section class="balance-card">
@@ -57,7 +58,7 @@ function refresh() { void loadRecords(); void loadBalance() }
         <div class="balance-actions"><RouterLink to="/charge/point" class="action-btn primary">💰 充值积分</RouterLink><RouterLink to="/settings/point" class="action-btn">💸 积分转账</RouterLink><RouterLink to="/activity" class="action-btn">📅 活动签到</RouterLink></div>
       </section>
       <section class="card records-section fp-card">
-        <header class="section-header"><div class="section-title"><h2>积分流水</h2><span v-if="!loading && !error" class="record-count">共 {{ total.toLocaleString() }} 条</span></div><button type="button" class="refresh-points-btn" :disabled="loading || balanceLoading" :aria-busy="loading || balanceLoading" aria-label="刷新余额与流水" title="刷新余额与流水" @click="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span>{{ loading || balanceLoading ? '刷新中' : '刷新' }}</span></button></header>
+        <header class="section-header"><div class="section-title"><h2 v-if="!embedded">积分流水</h2><span v-if="!loading && !error" class="record-count">共 {{ total.toLocaleString() }} 条</span></div><button type="button" class="refresh-points-btn" :disabled="loading || balanceLoading" :aria-busy="loading || balanceLoading" aria-label="刷新余额与流水" title="刷新余额与流水" @click="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span>{{ loading || balanceLoading ? '刷新中' : '刷新' }}</span></button></header>
         <FpLoading v-if="loading" class="loading-wrap" />
         <div v-else-if="error" role="alert" class="err fp-state">{{ error }} <button class="fp-control" type="button" @click="loadRecords">重试流水读取</button></div>
         <template v-else>

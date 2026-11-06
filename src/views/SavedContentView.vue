@@ -36,7 +36,7 @@ usePageSeo(()=>({title:title.value,path:route.path,robots:'noindex'}))
 </script>
 <template>
   <section class="saved-content fp-page fp-ui fp-surface">
-    <h1 class="fp-page-title">{{ title }}</h1>
+    <h1 v-if="privatePage" class="fp-page-title">{{ title }}</h1>
     <p v-if="!mounted">正在准备列表…</p>
     <p v-else-if="privatePage && !owner"><RouterLink :to="{path:'/login',query:{redirect:route.fullPath}}">登录后查看我的收藏</RouterLink></p>
     <template v-else>

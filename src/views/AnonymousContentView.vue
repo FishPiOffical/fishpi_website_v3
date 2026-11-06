@@ -36,7 +36,6 @@ const date = formatDateTime
 </script>
 <template>
   <section class="anonymous-content fp-page fp-ui fp-surface">
-    <h1 class="fp-page-title">{{ title }}</h1>
     <p v-if="!mounted">正在准备本人内容…</p>
     <p v-else-if="!accessToken"><RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录后查看本人匿名内容</RouterLink></p>
     <template v-else-if="!self"><p>匿名创作列表仅供本人查看。</p><RouterLink v-if="account" :to="`${base}/${kind}/anonymous`">查看我自己的列表</RouterLink></template>

@@ -8,9 +8,8 @@ const own=computed(()=>mounted.value && auth.isLoggedIn && auth.account?.userNam
 onMounted(()=>{mounted.value=true})
 </script>
 <template>
-  <PointsView v-if="own" />
+  <PointsView v-if="own" embedded />
   <section v-else class="fp-page fp-ui fp-surface">
-    <h1 class="fp-page-title">积分记录</h1>
     <p v-if="!mounted">正在准备本人积分记录…</p>
     <p v-else-if="!auth.isLoggedIn"><RouterLink :to="{path:'/login',query:{redirect:route.fullPath}}">登录后查看本人积分记录</RouterLink></p>
     <p v-else>积分记录仅供本人查看。</p>

@@ -7,13 +7,13 @@ import { RouterLink } from 'vue-router'
 import type { FollowingMoon } from '@/api/v3-following-feed'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
-defineProps<{items:FollowingMoon[];compact?:boolean;avatarOnly?:boolean}>()
+defineProps<{items:FollowingMoon[];compact?:boolean;avatarOnly?:boolean;hideAuthor?:boolean}>()
 function fallback(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 const date = formatDateTime
 </script>
 <template>
-  <ul class="breezemoon-list" :class="{compact,'avatar-only':avatarOnly}"><li v-for="item in items" :key="item.id">
-    <header><RouterLink :to="`/member/${encodeURIComponent(item.author.userName)}`" :data-user-card="item.author.userName" :aria-label="`查看 ${item.author.userNickname||item.author.userName} 的主页`"><img :src="avatarUrl(item.author)" :data-user-card="item.author.userName" alt="" loading="lazy" @error="fallback" /><VipNickname v-if="!avatarOnly" :user-id="item.author.id" :user-name="item.author.userName" :text="item.author.userNickname||item.author.userName" /></RouterLink><time v-if="!avatarOnly" :datetime="timeISO(item.createdAt)">{{ date(item.createdAt) }}</time><slot name="actions" :item="item" /></header>
+  <ul class="breezemoon-list" :class="{compact,'avatar-only':avatarOnly,'author-hidden':hideAuthor}"><li v-for="item in items" :key="item.id">
+    <header><RouterLink v-if="!hideAuthor" :to="`/member/${encodeURIComponent(item.author.userName)}`" :data-user-card="item.author.userName" :aria-label="`查看 ${item.author.userNickname||item.author.userName} 的主页`"><img :src="avatarUrl(item.author)" :data-user-card="item.author.userName" alt="" loading="lazy" @error="fallback" /><VipNickname v-if="!avatarOnly" :user-id="item.author.id" :user-name="item.author.userName" :text="item.author.userNickname||item.author.userName" /></RouterLink><time v-if="!avatarOnly" :datetime="timeISO(item.createdAt)">{{ date(item.createdAt) }}</time><slot name="actions" :item="item" /></header>
     <div class="moon-body" v-html="item.contentHtml" />
   </li></ul>
 </template>
@@ -155,5 +155,13 @@ time {
   header a { display: block; }
   header img { display: block; width: 20px; height: 20px; border-radius: 6px; }
   .moon-body { grid-column: 2; grid-row: 1; margin: 0; padding: 0; font-size: 12.5px; line-height: 1.6; }
+}
+.author-hidden {
+  gap:0;
+  li { display:flex; flex-direction:column; padding:18px 4px; border:0; border-bottom:1px solid var(--fp-divider); border-radius:0; background:transparent; }
+  li:last-child { border-bottom:0; }
+  header { order:1; margin-top:10px; color:var(--fp-muted); font-size:12px; }
+  time { margin-left:0; margin-right:auto; }
+  .moon-body { margin:0; padding:0; font-size:14px; }
 }
 </style>

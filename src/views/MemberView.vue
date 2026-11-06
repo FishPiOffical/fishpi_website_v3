@@ -26,10 +26,9 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
       <p v-else-if="activeTab === 'points'" class="member-status">积分流水仅本人可在<RouterLink to="/points">我的积分</RouterLink>查看。</p>
       <template v-else>
         <div class="content-section-head">
-          <h2>{{ activeTab === 'long' ? '长文章' : activeTab === 'comments' ? '公开回帖' : activeTab === 'breezemoons' ? '清风明月' : '公开帖子' }}</h2>
           <span v-if="content" class="content-total-badge">共 {{ content.total }} 条</span>
+          <button type="button" class="refresh-member-btn fp-control" :disabled="contentLoading" aria-label="刷新用户内容" @click="readContent()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg>刷新</button>
         </div>
-        <button type="button" class="refresh-member-btn fp-control" :disabled="contentLoading" @click="readContent()">刷新用户内容</button>
         <p v-if="contentLoading" role="status" class="member-status">正在读取用户内容…</p>
         <div v-else-if="contentError" role="alert" class="member-alert">
           <p>{{ contentError }}</p>
@@ -37,14 +36,14 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
           <button class="fp-control" v-if="p > 1" type="button" @click="readContent(1)">返回第一页</button>
         </div>
         <template v-else-if="moon">
-          <BreezemoonList :items="[moon]" />
+          <BreezemoonList :items="[moon]" hide-author />
           <div class="moon-back-bar">
             <RouterLink :to="`${base}/breezemoons`" class="action-link">查看全部清风明月</RouterLink>
           </div>
         </template>
         <template v-else-if="content">
-          <ArticleFeed v-if="activeTab === 'home' || activeTab === 'long'" :items="content.articles" empty="本页没有可见文章" />
-          <BreezemoonList v-else-if="activeTab === 'breezemoons'" :items="content.moons">
+          <ArticleFeed v-if="activeTab === 'home' || activeTab === 'long'" :items="content.articles" hide-author empty="本页没有可见文章" />
+          <BreezemoonList v-else-if="activeTab === 'breezemoons'" :items="content.moons" hide-author>
             <template #actions="{ item }">
               <RouterLink :to="`${base}/breezemoons/${item.id}`">查看这条清风</RouterLink>
             </template>
@@ -81,7 +80,8 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
   padding: 20px 24px;
 
   .refresh-member-btn {
-    display: none;
+    display: inline-flex; align-items:center; gap:6px; margin-left:auto; font-size:12px;
+    svg { width:15px; height:15px; }
   }
 }
 
@@ -90,7 +90,9 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--fp-divider);
 
   h2 {
     margin: 0;
@@ -160,9 +162,10 @@ button {
 
   li {
     padding: 14px 16px;
-    background: var(--fp-surface-subtle);
-    border: 1px solid var(--fp-divider);
-    border-radius: 10px;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--fp-divider);
+    border-radius: 0;
     transition: border-color 0.16s ease;
 
     &:hover {
@@ -187,7 +190,7 @@ button {
     color: var(--fp-title);
 
     &:hover {
-      color: var(--fp-accent);
+      text-decoration: underline;
     }
   }
 
