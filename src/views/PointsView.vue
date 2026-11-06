@@ -57,7 +57,7 @@ function refresh() { void loadRecords(); void loadBalance() }
         <div class="balance-actions"><RouterLink to="/charge/point" class="action-btn primary">💰 充值积分</RouterLink><RouterLink to="/settings/point" class="action-btn">💸 积分转账</RouterLink><RouterLink to="/activity" class="action-btn">📅 活动签到</RouterLink></div>
       </section>
       <section class="card records-section fp-card">
-        <header class="section-header"><div class="section-title"><h2>积分流水</h2><span v-if="!loading && !error" class="record-count">共 {{ total.toLocaleString() }} 条</span></div><button type="button" class="refresh-points-btn fp-control" :disabled="loading || balanceLoading" @click="refresh">刷新余额与流水</button></header>
+        <header class="section-header"><div class="section-title"><h2>积分流水</h2><span v-if="!loading && !error" class="record-count">共 {{ total.toLocaleString() }} 条</span></div><button type="button" class="refresh-points-btn" :disabled="loading || balanceLoading" :aria-busy="loading || balanceLoading" aria-label="刷新余额与流水" title="刷新余额与流水" @click="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span>{{ loading || balanceLoading ? '刷新中' : '刷新' }}</span></button></header>
         <FpLoading v-if="loading" class="loading-wrap" />
         <div v-else-if="error" role="alert" class="err fp-state">{{ error }} <button class="fp-control" type="button" @click="loadRecords">重试流水读取</button></div>
         <template v-else>
@@ -91,7 +91,8 @@ function refresh() { void loadRecords(); void loadBalance() }
 .section-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; padding:15px 20px; border-bottom:1px solid var(--fp-border); }
 .section-title { display:flex; align-items:baseline; flex-wrap:wrap; gap:10px; h2 { margin:0; color:var(--fp-title); font-size:16px; font-weight:600; } }
 .record-count { color:var(--fp-muted); font-size:12px; }
-.refresh-points-btn { font-size:12px; }
+.refresh-points-btn { display:inline-flex; align-items:center; justify-content:center; gap:5px; min-height:30px; padding:5px 9px; border:1px solid transparent; border-radius:7px; background:transparent; color:var(--fp-muted); font:inherit; font-size:12px; line-height:1.5; cursor:pointer; transition:background-color .15s,color .15s; svg { width:15px; height:15px; } &:hover:not(:disabled) { background:var(--fp-hover); color:var(--fp-title); } &:focus-visible { outline:2px solid var(--fp-primary); outline-offset:2px; } &:disabled { cursor:default; opacity:.6; } &[aria-busy='true'] svg { animation:points-refresh 1s linear infinite; } }
+@keyframes points-refresh { to { transform:rotate(360deg); } }
 .loading-wrap,.empty-list,.err { padding:32px 20px; text-align:center; color:var(--fp-muted); }
 .err { color:var(--fp-danger); }
 .record-item { --flow-color:var(--fp-muted); display:flex; align-items:center; gap:12px; padding:12px 20px; border-bottom:1px solid var(--fp-border); transition:background-color .15s; &:last-child { border-bottom:0; } &:hover { background:var(--fp-hover); } &.income { --flow-color:var(--fp-income); } &.expense { --flow-color:var(--fp-danger); } }
@@ -115,5 +116,5 @@ function refresh() { void loadRecords(); void loadBalance() }
  .record-value { grid-column:2; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:3px 10px; min-width:0; text-align:left; }
  .record-change { justify-content:flex-start; gap:6px; strong { font-size:16px; } } .record-balance { margin:0; font-size:10px; }
 }
-@media(prefers-reduced-motion:reduce) { .record-item { transition:none; } }
+@media(prefers-reduced-motion:reduce) { .record-item,.refresh-points-btn { transition:none; } .refresh-points-btn svg { animation:none!important; } }
 </style>
