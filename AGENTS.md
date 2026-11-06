@@ -268,7 +268,7 @@
 
 - v3昨日奖励可选expectedDate进幂等请求，锁本人后服务器日期不符拒fresh，已提交旧键先回放；旧{}保持。CheckinPanel/useActivityStatus读真实状态与门槛，v3Activity原date/key跨SPA恢复，日期变化仅在回执未命中时释放原命令；不把旧回执当当前可领状态。见docs/api-v3-client-activity-work.md。
 
-- website_v3用户悬浮卡用v3-public-user六字段白名单，重开/轮换读当前资料，不补旧角色/在线/积分。已知公开ID传UserFollowButton.userId绑定关系目标，旧仅用户名调用保持；主页/徽章页旧消费者另迁移。见docs/api-v3-client-user-card-work.md。
+- website_v3用户悬浮卡用v3-public-user公开白名单（原六字段及cardBg/userPoint/onlineMinute），重开/轮换读当前资料，不补旧角色/在线/积分。已知公开ID传UserFollowButton.userId绑定关系目标，旧仅用户名调用保持；主页/徽章页旧消费者另迁移。见docs/api-v3-client-user-card-work.md。
 
 - v3公开勋章页使用既有用户名分页GET与usePublicMedals身份边界；历史重复授予不按定义ID去重，公开契约无图片URL，不回退旧完整用户或生成图片接口。MemberView已独立迁移公开六字段和当前栏目v3列表。
 
@@ -309,3 +309,5 @@
 - NotificationsView分类/全部已读的未知命令key绑定context+actor，普通token轮换保留页码与原key；换身份/卸载清旧，迟到结果不得invalidate新页。恢复成功后只当前GET回读，不把旧回执当当前未读数。ProfessionRanking同身份刷新须保留所选职业/提示和独立请求页码（包括未完成p2），同时重做当前GET；换身份才清旧。
 
 - 评论深链用v3-comment-location/commentLink及ArticleCommentLocation，当前位置由后端确定，不从时间/哈希猜页。当前文章、身份、页数据及DOM均绑定后再滚动；长篇沿active/orphaned分组，失位显式重查，不能回退经典站或翻扫全部分页。
+
+- 个人中心背景与统计来自v3公开资料cardBg/userPoint/onlineMinute，兼容旧服务端缺字段但不补零；SSR同一decodePublicUser二次投影，背景复用avatarStyle保留签名URL。cardBg为空才用头像封面，不能把自定义背景模糊掉。
