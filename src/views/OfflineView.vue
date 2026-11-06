@@ -15,7 +15,7 @@ usePageSeo(() => ({ title: '无法连接服务器', path: route.fullPath, robots
 
 function backTarget() {
   const from = typeof route.query.from === 'string' ? route.query.from : ''
-  if (from && from !== '/offline' && !from.startsWith('/error/')) return from
+  if (from.startsWith('/') && !from.startsWith('//') && !/^\/(?:offline|error)(?:[/?#]|$)/.test(from)) return from
   return '/'
 }
 
@@ -29,7 +29,8 @@ async function retry() {
       lastError.value = '接口仍无响应，请稍后再试'
       return
     }
-    await router.replace(backTarget())
+    const failure = await router.replace(backTarget())
+    if (failure) lastError.value = '服务已恢复，但页面跳转失败，请重试'
   } catch (e) {
     lastError.value = e instanceof Error ? e.message : '仍然连不上后端'
   } finally {

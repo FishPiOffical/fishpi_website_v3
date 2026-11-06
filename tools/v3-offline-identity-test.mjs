@@ -56,15 +56,15 @@ try{
  api.setAccessToken('synthetic-shell-reader')
  const scope=effectScope(),auth=reactive({accessToken:api.getAccessToken(),account:{oId:'1'}}),route=reactive({name:'home'})
  const stop=api.onAccessTokenChange(token=>auth.accessToken=token)
- const model=scope.run(()=>new Function('ref','watch','auth','route','getAuthContextVersion',compile(shell.slice(start,end))+';return {apiOffline,onApiOffline}')(ref,watch,auth,route,api.getAuthContextVersion))
- model.onApiOffline();assert.equal(model.apiOffline.value,true);await api.refreshAccessToken();assert.equal(model.apiOffline.value,true)
+ const model=scope.run(()=>new Function('ref','watch','auth','route','getAuthContextVersion','router',compile(shell.slice(start,end))+';return {apiOffline,onApiOffline}')(ref,watch,auth,route,api.getAuthContextVersion,{replace:()=>Promise.resolve()}))
+ await Promise.resolve();await Promise.resolve();model.onApiOffline();assert.equal(model.apiOffline.value,true);await api.refreshAccessToken();assert.equal(model.apiOffline.value,true)
  api.setAccessToken(null);assert.equal(model.apiOffline.value,false)
- model.onApiOffline();api.setAccessToken('synthetic-login-same-actor');assert.equal(model.apiOffline.value,false)
- model.onApiOffline();auth.account={oId:'2'};assert.equal(model.apiOffline.value,false)
- api.setAccessToken(null);model.onApiOffline();await api.refreshAccessToken();assert.equal(model.apiOffline.value,false,'initial restore must clear prior guest notice')
- model.onApiOffline();rejectRefresh=true;await api.refreshAccessToken();assert.equal(model.apiOffline.value,false,'definitive credential loss must clear prior signed-in notice');rejectRefresh=false
+ await Promise.resolve();await Promise.resolve();model.onApiOffline();api.setAccessToken('synthetic-login-same-actor');assert.equal(model.apiOffline.value,false)
+ await Promise.resolve();await Promise.resolve();model.onApiOffline();auth.account={oId:'2'};assert.equal(model.apiOffline.value,false)
+ api.setAccessToken(null);await Promise.resolve();await Promise.resolve();model.onApiOffline();await api.refreshAccessToken();assert.equal(model.apiOffline.value,false,'initial restore must clear prior guest notice')
+ await Promise.resolve();await Promise.resolve();model.onApiOffline();rejectRefresh=true;await api.refreshAccessToken();assert.equal(model.apiOffline.value,false,'definitive credential loss must clear prior signed-in notice');rejectRefresh=false
 
- route.name='offline';model.onApiOffline();assert.equal(model.apiOffline.value,false)
+ route.name='offline';await Promise.resolve();await Promise.resolve();model.onApiOffline();assert.equal(model.apiOffline.value,false)
  stop();scope.stop()
  console.log('PASS offline identity 5 actual shell notice survives ordinary refresh, clears on logout/relogin/actor switch, and stays hidden on offline route')
  api.setAccessToken('synthetic-before-queue');const oldNoticeCount=events.length

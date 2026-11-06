@@ -100,7 +100,7 @@ export function isCaptchaRequired(e: unknown) {
 }
 
 export function isOfflineError(e: unknown) {
-  return e instanceof ApiError && (e.code === 'offline' || e.status === 0)
+  return e instanceof ApiError && (e.code === 'offline' || (e.status === 0 && e.code !== 'aborted'))
 }
 
 type RequestIdentity = { version: number; authenticated: boolean }
@@ -122,7 +122,7 @@ function asNetworkError(e: unknown, identity: RequestIdentity): never {
   throw e instanceof Error ? e : new Error(msg)
 }
 
-/** 探测后端是否可达（能拿到任意 HTTP 响应即视为连通，含 4xx）。 */
+/** 仅完整、成功的 v3 JSON 响应表示服务恢复；代理自身的 HTTP 响应不算。 */
 export async function pingApi(timeoutMs = 8000): Promise<boolean> {
   if (import.meta.env.SSR) return true
   const ctrl = new AbortController()
@@ -134,8 +134,10 @@ export async function pingApi(timeoutMs = 8000): Promise<boolean> {
       headers: { 'User-Agent': FISHPI_UA },
       signal: ctrl.signal,
     })
-    // 连上了就行；5xx 仍算「服务异常」但不是「完全连不上」
-    return res.status > 0
+    if (!res.ok || res.redirected || !isJsonContentType(res.headers.get('content-type'))) return false
+    const body = await res.json()
+    return body?.code === 0 && body?.data?.provider === 'geetest4' &&
+      typeof body.data.captchaId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(body.data.captchaId)
   } catch {
     return false
   } finally {
@@ -187,6 +189,15 @@ function isJsonContentType(value: string | null) {
   return Boolean(value && value.includes('application/json'))
 }
 
+function checkGateway(res: Response, identity: RequestIdentity) {
+  // JSON 503 may be a resource-specific budget/business failure; retain that error locally.
+  if (res.status === 502 || res.status === 504 ||
+    (res.status === 503 && !isJsonContentType(res.headers.get('content-type')))) {
+    notifyOffline(identity)
+    throw new ApiError('摸鱼派服务暂不可用，请稍后重新连接', res.status, 'offline')
+  }
+}
+
 function isRiskCaptchaPath(path: string) {
   return path.includes('/validateCaptcha') || /(^|\/)test(\?|$)/.test(path)
 }
@@ -213,6 +224,8 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
     if (init.signal?.aborted) throw new ApiError('请求已取消', 0, 'aborted')
     asNetworkError(e, identity)
   }
+
+  checkGateway(res, identity)
 
   // Rhythm BeforeRequestHandler：IP 进入验证码黑名单时 302 → /test
   try {
@@ -339,6 +352,7 @@ async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
   } catch (e) {
     if (e instanceof ApiError) throw e
   }
+  checkGateway(res, identity)
   const text = await readNetworkBody(() => res.text(), init.signal, identity)
   if (!res.ok) throw new ApiError(text.slice(0, 120) || '请求失败', res.status)
   return text

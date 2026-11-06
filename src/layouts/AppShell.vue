@@ -269,9 +269,14 @@ watch([() => auth.accessToken, () => auth.account?.oId], () => {
   offlineBoundary = next; offlineActor = actor; offlineHasToken = hasToken
 }, { flush: 'sync' })
 
+let offlineNavigation = false
 function onApiOffline() {
-  if (route.name === 'offline') return
+  if (route.name === 'offline' || offlineNavigation) return
   apiOffline.value = true
+  offlineNavigation = true
+  // Keep a banner if navigation is rejected; never retry the failed API command.
+  void router.replace({ path: '/offline', query: { from: route.fullPath } })
+    .catch(() => {}).finally(() => { offlineNavigation = false })
 }
 
 onMounted(() => {

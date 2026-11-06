@@ -291,7 +291,7 @@
 - 文章实时票据当前明确403/404须停止重连并清绑定读者/目标的正文、目录和放大图，拒绝在途回填；验证码/503不能假称资源删除。
 - ArticleView正文/评论不进通用SWR；所有来源当前401/403/404清内容与引用，确认写入后503仅GET重试。普通Token轮换重读须保留挂载评论草稿/历史，卸载与页号迟到检查不可移除；v3Article须核对详情ID/逐条comment.articleId/页与size20并拒重复，参数先验后发请求；评论后页缩减为0页仍须保留返回第一页入口。
 
-- 客户端边界复核用website_v3的`tools/v3-client-boundary-audit.mjs`，仅AST字面量/静态导入，动态表达式单列，不当运行覆盖。DomainItem在content-types，catalog/gaps假数据已删；离线ping只用v3，任意HTTP响应仅代表可达。
+- 客户端边界复核用website_v3的`tools/v3-client-boundary-audit.mjs`，仅AST字面量/静态导入，动态表达式单列，不当运行覆盖。DomainItem在content-types，catalog/gaps假数据已删；离线ping只用v3，须完整成功的captcha-options JSON才算恢复；502/504及非JSON 503触发离线，JSON资源503仍原页报错。
 
 - Rhythm注册/文档核对用`tools/api-v3-contract-audit.mjs`，从Router.requestMapping追本类辅助注册；条件/重载歧义需复核。通过仅证明固定源码形式与API.md一致，不当作IoC/HTTP或业务完成。
 - 本机联调使用5173→Rhythm 8081，`.env.development.local`只保存本地目标，8080是其他项目。Vite对login/refresh/logout须保留浏览器Host/Origin/真实Referer，不可合成来源证明；真实代理回归用`tools/v3-credential-proxy-test.mjs`。实际首批证据见docs/api-v3-live-integration-work.md，不能用隔离测试替代业务验收。
