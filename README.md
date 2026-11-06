@@ -161,3 +161,5 @@ QQ已接独立第一方本人GET/PUT，空值清除、1至12位数字保留前�
 生产浏览器可通过构建变量 `VITE_BROWSER_API_ORIGIN=https://fishpi.cn` 直连 Rhythm HTTP 与实时 WebSocket；留空仍支持本地同源开发代理。刷新Cookie继续credentials=include、Bearer仅内存，需求反馈仍请求本站/feedback-api/v1。直连必须由fishpi.cn允许本站Origin的CORS/预检及WebSocket来源；前端不绕过跨域限制。SSR仍为服务端直读，反馈身份独立本地核验，网络可达性独立验证。详见deploy/yui/README.md。
 
 个人主页统一栏目由 `components/member/MemberTabs.vue` 在 AppShell 的 /member/:userName 路由范围挂载，帖子、回帖、勋章、关注、收藏及匿名子页共用完整导航，错误/隐私状态不移除导航。窄屏横向滚动，清风详情归属清风Tab；本人匿名与积分入口仅客户端认证后显示。/member/:userName/points 用 MemberPointsView 校验当前本人后挂载既有 PointsView，不能读取他人路径下的本人积分。/points、/stars 原独立入口保留。此次浏览器用本地503夹具验证跨子页切换与返回，真实账号私有栏目未浏览器登录验收；对应协议及身份隔离由专项覆盖。
+
+总榜入口 `/top` 按社区活跃、创作与贡献、游戏挑战分组，16项均使用原路由；入口页不请求排行榜数据。详情页为桌面分类侧栏、窄屏横向分类，复用RankingBoard/ProfessionRanking原数据与分页逻辑。此次完整构建、排行榜及职业榜专项通过，桌面/390px入口与进入榜单后返回已浏览器验证；接口错误态使用本地503夹具，未据此宣称现网榜单数据可用。
