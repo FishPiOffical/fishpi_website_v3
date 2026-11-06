@@ -37,3 +37,5 @@
 需求服务改用本地访客Cookie，已移除Rhythm身份网络依赖。更新包含数据库迁移2（仅新增visitor_sessions表），旧需求与投票保留，不按昵称认领。生产FEEDBACK_COOKIE_SECURE=true；FEEDBACK_ADMIN_IDS需guest:开头的本地访客ID，旧站点UID不会获得权限。发布前使用旧版storage.ts在线备份，再切换current、安装新版feedback unit并重启两个服务。SSR代理现在只转发fp_feedback_visitor Cookie及其Set-Cookie，不转发Rhythm Bearer/Cookie。
 
 后端类型检查及2组真实HTTP集成通过；前端API/Pinia和真实SSR访客Cookie代理通过；全量101专项通过，后续补测迟到401不影响新访客。完整构建通过。本机临时库浏览器验收未登录提交→详情→支持→刷新保留→改反对→撤销通过，未向线上写入测试需求。
+
+2026-11-06 已发布访客版 `1d12de6` 至 `/opt/fishpi/releases/20261106-1d12de6`，前版03c8ddb保留。迁移前在线备份：`/var/lib/fishpi-feedback/backups/pre-1d12de6-20261106-161831.sqlite`；feedback unit已安装新版，两个服务active。公网/session建立与Cookie复用通过，Secure/HttpOnly/路径属性检查通过；空表单返回422而不是身份503，表明本地身份链路通过，未向生产创建测试需求。公开列表200，新版浏览器表单展示访客提示且无需登录。数据库迁移版本2、integrity_check正常。
