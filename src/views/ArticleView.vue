@@ -677,7 +677,7 @@ function itemHandlers(c: ArticleComment) {
 
       <section v-if="!isLong" class="card random-card"><RandomArticles :size="10" :exclude-id="id" /></section>
     </div>
-    <ImageLightbox v-model="zoomed" />
+    <ImageLightbox v-model="zoomed" compact />
   </template>
 </template>
 
@@ -896,8 +896,11 @@ h1 {
   border-radius: 0 4px 4px 0;
 }
 .body :deep(img) {
-  max-width: 100%;
+  max-width: min(100%, 720px);
+  max-height: min(60dvh, 520px);
+  width: auto;
   height: auto;
+  object-fit: contain;
   border-radius: 4px;
   cursor: zoom-in;
 }

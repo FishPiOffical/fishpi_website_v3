@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, reactive, ref, watch } from 'vue'
 
+defineProps<{ compact?: boolean }>()
+
 const src = defineModel<string>({ default: '' })
 
 const MIN = 0.5
@@ -121,7 +123,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div
         ref="stage"
         class="stage"
-        :class="{ dragging, zoomed: scale > 1 }"
+        :class="{ compact, dragging, zoomed: scale > 1 }"
         @pointerdown="onPointerDown"
         @pointermove="onPointerMove"
         @pointerup="onPointerUp"
@@ -187,6 +189,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   transform-origin: center center;
   transition: transform 0.08s ease-out;
   pointer-events: none;
+}
+.stage.compact img {
+  max-width: min(960px, calc(100% - 32px));
+  max-height: min(72dvh, calc(100% - 112px));
 }
 .stage.dragging img {
   transition: none;

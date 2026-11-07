@@ -1209,8 +1209,11 @@ html:not([data-theme='classic-light']) .la {
   text-underline-offset: 3px;
 }
 .la-content :deep(img) {
-  max-width: 100%;
+  max-width: min(100%, 720px);
+  max-height: min(60dvh, 520px);
+  width: auto;
   height: auto;
+  object-fit: contain;
   border-radius: 4px;
   cursor: zoom-in;
 }
