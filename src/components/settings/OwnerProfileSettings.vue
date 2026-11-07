@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { memberSnapshotKey, removePublicSnapshot } from '@/utils/publicSnapshots'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { getAuthContextVersion } from '@/api/http'
@@ -51,6 +52,7 @@ async function load() {
 }
 async function write<T>(group: Resource, body: unknown, action: (key: string) => Promise<T>, apply: (value: T) => void) {
   if (busy.value || loading.value || !accessToken.value || !loaded.value[group]) return
+  const publicName = account.value?.userName
   const owner = identity(), current = generation, fingerprint = JSON.stringify(body)
   const valid = () => mounted && current === generation && owner === identity()
   busy.value = true; errors.value[group] = ''; messages.value[group] = ''
@@ -58,6 +60,7 @@ async function write<T>(group: Resource, body: unknown, action: (key: string) =>
     let intent = intentions.get(group)
     if (!intent || intent.fingerprint !== fingerprint) { intent = { fingerprint, key: profileOperationKey() }; intentions.set(group, intent) }
     const result = await action(intent.key)
+    if (publicName && (group === 'profile' || group === 'avatar')) removePublicSnapshot(memberSnapshotKey(publicName))
     if (valid()) {
       intentions.delete(group); apply(result); messages.value[group] = '已保存'
       // A refresh failure does not turn an already committed setting into a failed save.

@@ -9,11 +9,11 @@ import UserFollowButton from '@/components/user/UserFollowButton.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import PointTransfer from '@/components/settings/PointTransfer.vue'
 
-const props = defineProps<{ profile: PublicUser | null; loading: boolean; error: string }>()
+const props = defineProps<{ profile: PublicUser | null; fromCache?: boolean; loading: boolean; error: string }>()
 defineEmits<{ retry: [] }>()
 const auth = useAuthStore(), mounted = ref(false), showTransfer = ref(false)
 const self = computed(() => mounted.value && !!props.profile && auth.account?.oId === props.profile.id)
-const canAct = computed(() => mounted.value && auth.isLoggedIn)
+const canAct = computed(() => mounted.value && auth.isLoggedIn && !props.fromCache)
 const points = computed(() => props.profile?.userPoint ?? null)
 const onlineTime = computed(() => {
   const minutes = props.profile?.onlineMinute
@@ -36,7 +36,7 @@ function fallback(event: Event) {
   <aside class="member-profile" aria-label="个人资料">
     <p v-if="loading" role="status" class="profile-status">正在读取用户资料…</p>
     <div v-if="error" role="alert" class="profile-status"><p>{{ error }}</p><button type="button" @click="$emit('retry')">重试用户资料</button></div>
-    <template v-else-if="profile">
+    <template v-if="profile">
       <div class="profile-cover" :class="{ 'has-background': profile.cardBg }" :style="avatarStyle(profile.cardBg || avatarUrl(profile, 'large'))" aria-hidden="true" />
       <div class="profile-body">
         <img :key="profile.userAvatarURL" class="member-avatar" :src="avatarUrl(profile, 'large')" :data-user-card="profile.userName" alt="" @error="fallback" />
@@ -65,7 +65,6 @@ function fallback(event: Event) {
         </template>
       </div>
     </template>
-    <p v-else-if="!loading && !error" role="status" class="profile-status">用户资料尚未读取。</p>
   </aside>
 </template>
 <style scoped lang="scss">

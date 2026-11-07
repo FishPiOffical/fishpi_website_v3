@@ -8,12 +8,12 @@ import MemberTabs from './MemberTabs.vue'
 const route = useRoute()
 const userName = computed(() => String(route.params.userName || ''))
 const profileState = useMemberProfile(userName)
-const { profile, profileLoading, profileError, readProfile } = profileState
+const { profile, profileLoading, profileError, profileFromCache, readProfile } = profileState
 provide(MEMBER_PROFILE_KEY, profileState)
 </script>
 <template>
   <div class="member-layout fp-page fp-page--wide fp-ui">
-    <MemberProfileCard :profile="profile" :loading="profileLoading" :error="profileError" @retry="readProfile" />
+    <MemberProfileCard :profile="profile" :from-cache="profileFromCache" :loading="profileLoading" :error="profileError" @retry="readProfile" />
     <div class="member-main"><MemberTabs /><slot /></div>
   </div>
 </template>

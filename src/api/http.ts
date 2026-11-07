@@ -216,7 +216,7 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
   if (init.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
-  if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && accessToken && !headers.has('Authorization')) {
+  if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && init.credentials !== 'omit' && accessToken && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${accessToken}`)
   }
 
@@ -341,13 +341,13 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
     }
     return await (!import.meta.env.SSR && isCredentialPath(path) ? queueCredentialRequest(run) : run())
   } catch (e) {
-    if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && !explicitAuthorization &&
+    if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && init.credentials !== 'omit' && !explicitAuthorization &&
       e instanceof ApiError && e.status === 401 && !init.__v3Retried && version === authVersion) {
       // A late 401 may belong to the token that another request has already rotated.
       const refreshed = getAccessToken() !== sentToken && Boolean(getAccessToken()) || await refreshAccessToken()
       if (refreshed && version === authVersion) return request<T>(path, { ...init, __v3Retried: true })
     }
-    if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && !explicitAuthorization &&
+    if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && init.credentials !== 'omit' && !explicitAuthorization &&
       init.__v3Retried && version === authVersion && sentToken === getAccessToken() &&
       e instanceof ApiError && e.status === 401) publishToken(null)
     if (!import.meta.env.SSR && isCaptchaRequired(e) && !init.__captchaRetried && !isRiskCaptchaPath(path)) {

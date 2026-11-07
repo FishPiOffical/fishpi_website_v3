@@ -28,7 +28,7 @@ export function decodeDirectoryPage(value: unknown, kind: DirectoryKind, p = 1):
 }
 export async function fetchDirectoryPage(kind: DirectoryKind, p = 1): Promise<DirectoryPage> {
   if (!['domains', 'tags'].includes(kind) || !Number.isSafeInteger(p) || p < 1 || p > 42949672) throw new ApiError('目录分页参数不合法', 422)
-  const raw = await request<{ code: number; msg?: string; data?: unknown }>(`/api/v3/${kind}?p=${p}&size=50`, { cache: 'no-store' })
+  const raw = await request<{ code: number; msg?: string; data?: unknown }>(`/api/v3/${kind}?p=${p}&size=50`, { cache: 'no-store', credentials: 'omit' })
   if (raw.code !== 0) throw new ApiError(raw.msg || '目录读取失败', 400)
   const data = decodeV3ContentPage(raw.data)
   if (data.pagination.p !== p || data.pagination.size !== 50) throw invalid()

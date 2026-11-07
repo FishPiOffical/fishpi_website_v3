@@ -1,3 +1,4 @@
+import { memberSnapshotKey, removePublicSnapshot } from '@/utils/publicSnapshots'
 import { defineStore, storeToRefs } from 'pinia'
 import { onScopeDispose, ref, watch } from 'vue'
 import { ApiError, getAuthContextVersion } from '@/api/http'
@@ -34,7 +35,7 @@ export const useV3InventoryStore = defineStore('v3-inventory', () => {
       const result = await executeV3Inventory(intent.input, intent.key)
       if (!valid()) return
       pending.value = null; receipt.value = result; committed = true
-      if (result.kind === 'nameCard' || result.kind === 'points') { clearCache(); invalidateVipName(id, oldName) }
+      if (result.kind === 'nameCard' || result.kind === 'points') { clearCache(); invalidateVipName(id, oldName); if (oldName) removePublicSnapshot(memberSnapshotKey(oldName)) }
       await Promise.all([load(), auth.reloadAccount().catch(() => { if (valid()) followupError.value = '操作已确认，当前账号信息刷新失败，请稍后重新读取' })])
     } catch (e) { if (valid()) { if (committed) followupError.value = '操作已确认，后续刷新失败，请重新读取当前资料与背包'; else error.value = e instanceof Error ? e.message : '操作结果未确认'; if (!committed && !recovering && e instanceof ApiError && e.status >= 400 && e.status < 500) pending.value = null } }
     finally { if (valid()) busy.value = false }

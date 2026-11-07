@@ -24,11 +24,11 @@ export function decodePublicColumnCard(value: unknown): PublicColumn {
   if (articleCount < 1 || latest.length < 1 || latest.length > articleCount) throw invalid()
   return { id, title: text(data.title), coverURL: image(data.coverURL), articleCount, updatedAt: time(data.updatedAt), chapters: latest }
 }
-async function data(path: string) { const envelope = row(await request(path, { cache: 'no-store' })); if (envelope.code !== 0) throw invalid(); return row(envelope.data) }
+async function data(path: string, credentials?: RequestCredentials) { const envelope = row(await request(path, { cache: 'no-store', ...(credentials ? { credentials } : {}) })); if (envelope.code !== 0) throw invalid(); return row(envelope.data) }
 function paging(p: number, size: number) { if (!Number.isSafeInteger(p) || p < 1 || p > 42949672 || !Number.isSafeInteger(size) || size < 1 || size > 50) throw new ApiError('专栏页码不合法', 422) }
-export async function fetchPublicColumnCards(kind: 'latest' | 'hot', p = 1, size = 12) {
+export async function fetchPublicColumnCards(kind: 'latest' | 'hot', p = 1, size = 12, credentials?: RequestCredentials) {
   paging(p, size); if (!['latest', 'hot'].includes(kind)) throw new ApiError('专栏排序不合法', 422)
-  const page = decodeV3ContentPage(await data(`/api/v3/columns${kind === 'hot' ? '/hot' : ''}?p=${p}&size=${size}`))
+  const page = decodeV3ContentPage(await data(`/api/v3/columns${kind === 'hot' ? '/hot' : ''}?p=${p}&size=${size}`, credentials))
   if (page.pagination.p !== p || page.pagination.size !== size) throw invalid()
   const list = page.list.map(decodePublicColumnCard); if (new Set(list.map(x => x.id)).size !== list.length) throw invalid()
   return { ...page.pagination, list }

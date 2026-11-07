@@ -28,9 +28,9 @@ export function decodeHomeBootstrap(value: unknown): HomeBootstrap {
 }
 export async function fetchHomeRead<K extends HomeRead>(key: K): Promise<HomeData[K]> {
   if (!homeReadKeys.includes(key)) throw new ApiError('首页资源不合法', 422)
-  const list = key === 'recent' || key === 'hot' ? (await v3ArticleFeedPage(key, 1, limits[key])).list
-    : key === 'tags' ? (await v3Tags(1, limits[key])).tags
-    : (await fetchPublicColumnCards(key === 'columnsRecent' ? 'latest' : 'hot', 1, limits[key])).list
+  const list = key === 'recent' || key === 'hot' ? (await v3ArticleFeedPage(key, 1, limits[key], '', 'omit')).list
+    : key === 'tags' ? (await v3Tags(1, limits[key], 'omit')).tags
+    : (await fetchPublicColumnCards(key === 'columnsRecent' ? 'latest' : 'hot', 1, limits[key], 'omit')).list
   return decodeHomeRead(key, list)
 }
 /** Public SSR only. A failed resource is null; a legitimate empty result is []. */

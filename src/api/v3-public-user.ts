@@ -28,9 +28,9 @@ export function decodePublicUser(value: unknown, expectedName: string): PublicUs
   }
   return profile
 }
-export async function fetchPublicUser(userName: string): Promise<PublicUser> {
+export async function fetchPublicUser(userName: string, credentials?: RequestCredentials): Promise<PublicUser> {
   publicUserName(userName)
-  const envelope = await request<{ code: number; data: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}`, { cache: 'no-store' })
+  const envelope = await request<{ code: number; data: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}`, { cache: 'no-store', ...(credentials ? { credentials } : {}) })
   if (!envelope || envelope.code !== 0) throw new ApiError('用户资料响应格式不正确', 502)
   return decodePublicUser(envelope.data, userName)
 }

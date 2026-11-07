@@ -12,7 +12,7 @@ const label = '领域'
 usePageSeo(() => ({ title: label, path: '/' + kind, description: '摸鱼派' + label + '目录' }))
 const { value, p, loading, error, read } = useDirectory(kind, consumeDirectoryPayload(kind))
 const domains = computed(() => value.value?.list as DomainItem[] || [])
-async function page(next: number) { await read(next); document.getElementById('directory-list')?.scrollIntoView({ block: 'start' }) }
+async function page(next: number) { await read(next, true); document.getElementById('directory-list')?.scrollIntoView({ block: 'start' }) }
 </script>
 
 <template>
@@ -23,9 +23,8 @@ async function page(next: number) { await read(next); document.getElementById('d
         <button type="button" class="btn refresh-dir-btn fp-control" :disabled="loading" @click="read()">刷新目录</button>
       </div>
       <FpLoading v-if="loading" :rows="6" />
-      <div v-else-if="error" class="err fp-state" role="alert">{{ error }} <button type="button" class="btn fp-control" @click="read()">重试当前页</button></div>
-      <p v-else-if="!value" class="err fp-state">{{ label }}尚未读取</p>
-      <template v-else>
+      <div v-if="error" class="err fp-state" role="alert">{{ error }} <button type="button" class="btn fp-control" @click="read()">重试当前页</button></div>
+      <template v-if="value">
         <p v-if="!value.list.length" class="err fp-state">本页暂无{{ label }}</p>
         <ul v-if="domains.length" class="domain-list"><li v-for="item in domains" :key="item.uri"><RouterLink :to="'/domain/' + item.uri" class="domain-item"><img v-if="item.domainIconPath" :src="item.domainIconPath" alt="" /><span v-else class="domain-fallback">{{ (item.domainTitle || '域').slice(0, 1) }}</span><div class="domain-info"><strong>{{ item.domainTitle }}</strong><span v-if="item.domainDescription">{{ item.domainDescription }}</span></div></RouterLink></li></ul>
         <div class="pagination-bar fp-pagination">

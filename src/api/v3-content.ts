@@ -25,8 +25,8 @@ function params(p: number, size: number) {
   }
   return `p=${p}&size=${size}`
 }
-async function get(path: string): Promise<unknown> {
-  const envelope = row(await request(path, { cache: 'no-store' }))
+async function get(path: string, credentials?: RequestCredentials): Promise<unknown> {
+  const envelope = row(await request(path, { cache: 'no-store', ...(credentials ? { credentials } : {}) }))
   if (envelope.code !== 0) throw new ApiError(typeof envelope.msg === 'string' ? envelope.msg : '内容加载失败', 400, String(envelope.code))
   return envelope.data
 }
@@ -136,19 +136,19 @@ export async function v3ArticleFeed(kind: ArticleFeedKind, page = 1, size = 40, 
   return path ? articleList(path) : []
 }
 export type V3ArticleFeedPage = { list: ArticleSummary[]; p: number; size: number; total: number; pageCount: number }
-export async function v3ArticleFeedPage(kind: ArticleFeedKind, page = 1, size = 20, extra = ''): Promise<V3ArticleFeedPage> {
+export async function v3ArticleFeedPage(kind: ArticleFeedKind, page = 1, size = 20, extra = '', credentials?: RequestCredentials): Promise<V3ArticleFeedPage> {
   if (page > 42949672) throw new ApiError('页码不合法', 422)
   const path = await articleFeedPath(kind, page, size, extra)
   if (!path) throw new ApiError('请输入搜索关键词', 422)
-  const data = decodeV3ContentPage(await get(path))
+  const data = decodeV3ContentPage(await get(path, credentials))
   if (data.pagination.p !== page || data.pagination.size !== size) throw invalid()
   const list = data.list.map(adaptV3Article)
   if (new Set(list.map(item => item.oId)).size !== list.length) throw invalid()
   return { ...data.pagination, list }
 }
 export async function v3Domains(): Promise<DomainItem[]> { return (await directory('domains')).map(adaptV3Domain) }
-export async function v3Tags(page = 1, size = 50): Promise<{ tags: TagItem[]; total: number }> {
-  const data = decodeV3ContentPage(await get(`/api/v3/tags?${params(page, size)}`))
+export async function v3Tags(page = 1, size = 50, credentials?: RequestCredentials): Promise<{ tags: TagItem[]; total: number }> {
+  const data = decodeV3ContentPage(await get(`/api/v3/tags?${params(page, size)}`, credentials))
   return { tags: data.list.map(adaptV3Tag), total: data.pagination.total }
 }
 export async function v3Article(articleId: string, page = 1): Promise<ArticleDetail> {

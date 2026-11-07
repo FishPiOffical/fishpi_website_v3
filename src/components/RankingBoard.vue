@@ -31,14 +31,14 @@ function metricName(key: string) { if (key === 'points') return ['balance', 'con
       <button type="button" class="refresh-board-btn" :disabled="loading" @click="read()">刷新榜单</button>
     </div>
     <p v-if="loading" role="status" class="ranking-status">正在读取榜单…</p>
-    <div v-else-if="error" role="alert" class="ranking-error">
+    <div v-if="error" role="alert" class="ranking-error">
       <p>{{ error }}</p>
       <div class="ranking-error-actions">
         <button type="button" @click="read()">重试榜单</button>
         <button v-if="p > 1" type="button" @click="read(1)">返回第一页</button>
       </div>
     </div>
-    <template v-else-if="value">
+    <template v-if="value">
       <div class="ranking-meta-bar">
         <p class="ranking-note">本次榜单共 {{ value.total }} 条{{ compact ? '，预览前8条' : '' }}；范围为服务端现有榜单快照。</p>
         <p v-if="value.summary" class="ranking-summary-badge">
@@ -73,7 +73,7 @@ function metricName(key: string) { if (key === 'points') return ['balance', 'con
         <button type="button" :disabled="p >= value.pageCount" @click="read(p + 1)">下一页榜单</button>
       </div>
     </template>
-    <p v-else role="status" class="ranking-status">榜单尚未读取。</p>
+    <p v-else-if="!compact && !loading && !error" role="status" class="ranking-status">榜单尚未读取。</p>
   </div>
 </template>
 
