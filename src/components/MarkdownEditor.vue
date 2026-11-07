@@ -23,7 +23,7 @@ const props = withDefaults(
   }>(),
   { height: 500, placeholder: '', outline: false, mode: 'post', toolbarPreset: 'default', cacheId: '' },
 )
-const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: []; 'emoji-labels': [labels: Record<string, string>] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: []; 'emoji-open': [open: boolean] }>()
 
 const VDITOR_CDN = 'https://file.fishpi.cn/vditor/latest/dist'
 
@@ -140,7 +140,14 @@ const appearance = useAppearanceStore()
 const dark = computed(() => appearance.state.theme.includes('dark'))
 const CONTENT_THEME_PATH = `${VDITOR_CDN}/css/content-theme`
 
-function insertEmoji(markdown: string) { editor?.insertMD(markdown) }
+function insertEmoji(markdown: string) {
+  if (editor && ready.value) editor.insertMD(markdown)
+  else emit('update:modelValue', props.modelValue + markdown)
+}
+function toggleEmoji(anchor?: HTMLElement) {
+  if (anchor) emojiPicker.value?.toggle(anchor, 'above')
+  else emojiPicker.value?.toggle(host.value?.querySelector<HTMLElement>('[data-type="v3-emoji"]') ?? undefined, 'below')
+}
 
 function applyTheme() {
   if (!editor || !ready.value) return
@@ -170,7 +177,7 @@ onMounted(async () => {
   const resolvedToolbar = toolbar.map(item => item === 'emoji' ? {
     name: 'v3-emoji', tip: '表情', hotkey: '⌘E',
     icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><path d="M8 14q4 5 8 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
-    click: () => emojiPicker.value?.toggle(),
+    click: () => toggleEmoji(),
   } : item)
   editor = new Vditor(host.value, {
     value: props.modelValue,
@@ -203,14 +210,16 @@ onMounted(async () => {
       emit('update:modelValue', value)
     },
     after: () => {
-      // Local display labels only; insertion remains the server-provided alias.
+      // Display Unicode and bundled image labels; insertion stays the server-provided alias.
       const labels: Record<string, string> = Object.create(null)
       const local = editor?.vditor?.lute?.GetEmojis() || {}
       for (const [alias, value] of Object.entries(local)) {
-        if (/^[A-Za-z0-9_+-]{1,64}$/.test(alias) && typeof value === 'string' && value.length <= 64 && /[^\u0000-\u007f]/u.test(value) && !/[A-Za-z_<>/:.\\\u0000-\u001f\u007f]/u.test(value)) labels[alias] = value
+        if (!/^[A-Za-z0-9_+-]{1,64}$/.test(alias) || typeof value !== 'string' || value.length > 64) continue
+        const unicode = /[^\u0000-\u007f]/u.test(value) && !/[A-Za-z_<>/:.\\\u0000-\u001f\u007f]/u.test(value)
+        const bundledImage = /^\$\{emojiSite\}\/[a-z0-9_-]+\.(?:png|gif|webp)$/i.test(value)
+        if (unicode || bundledImage) labels[alias] = value
       }
       nativeEmojis.value = labels
-      emit('emoji-labels', labels)
       ready.value = true
       const cached = editor?.getValue().replace(/\n$/, '') || ''
       if (props.modelValue !== lastEmitted) editor?.setValue(props.modelValue, true)
@@ -261,28 +270,29 @@ defineExpose({
   focus() {
     editor?.focus()
   },
-  insert(text: string) {
-    if (editor && ready.value) editor.insertMD(text)
-    else emit('update:modelValue', props.modelValue + text)
-  },
+  insert: insertEmoji,
+  toggleEmoji,
 })
 </script>
 
 <template>
-  <textarea
-    v-if="fallback"
-    ref="fallbackInput"
-    class="md-fallback"
-    :value="modelValue"
-    :placeholder="placeholder"
-    :style="{ height: `${height}px` }"
-    @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
-  />
-  <div v-else class="md-editor" :class="`md-editor--${mode}`" @input.capture="clearMentions">
-    <EmojiPicker v-if="ready" ref="emojiPicker" :show-trigger="false" placement="below" :labels="nativeEmojis" @insert="insertEmoji" />
-    <div ref="host" />
-    <p v-if="mentionError" role="status">{{ mentionError }}</p>
-    <div v-if="!ready" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
+  <div class="md-editor" :class="`md-editor--${mode}`" @input.capture="clearMentions">
+    <EmojiPicker ref="emojiPicker" :show-trigger="false" placement="below" :labels="nativeEmojis"
+      @insert="insertEmoji" @open-change="emit('emoji-open', $event)" />
+    <textarea
+      v-if="fallback"
+      ref="fallbackInput"
+      class="md-fallback"
+      :value="modelValue"
+      :placeholder="placeholder"
+      :style="{ height: `${height}px` }"
+      @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
+    />
+    <template v-else>
+      <div ref="host" />
+      <p v-if="mentionError" role="status">{{ mentionError }}</p>
+      <div v-if="!ready" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
+    </template>
   </div>
 </template>
 

@@ -74,7 +74,7 @@ auth.accessToken=null;assert.equal(vm.groups.length,0);assert.equal(vm.items.len
 console.log('PASS emojis 5 actual Vue/Pinia group workflow isolates late prior-owner reads and preserves an uncertain create key through retry')
 globalThis.__emojiEmitted=[];auth.accessToken='B'
 const picker=await component('src/components/EmojiPicker.vue',['open','items','toggle','pick'])
-picker.vm.toggle();await tick();assert.equal(picker.vm.items[0].text,':smile:');picker.vm.pick(picker.vm.items[0]);assert.deepEqual(__emojiEmitted[0],['insert',':smile:']);assert.equal(picker.vm.open,false)
+picker.vm.toggle();await tick();assert.equal(picker.vm.items[0].text,':smile:');picker.vm.pick(picker.vm.items[0]);assert.deepEqual(__emojiEmitted,[['open-change',true],['insert',':smile:'],['open-change',false]]);assert.equal(picker.vm.open,false)
 picker.vm.toggle();await tick();auth.accessToken=null;assert.equal(picker.vm.open,false);assert.equal(picker.vm.items.length,0);picker.app.unmount()
 console.log('PASS emojis 6 actual picker inserts canonical alias and closes/clears on identity loss')
 

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import EmojiPicker from '@/components/EmojiPicker.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 
 const props = withDefaults(
@@ -38,7 +37,7 @@ const editorOpen=computed(()=>!props.collapsible||editorExpanded.value||Boolean(
 const sendError = ref('')
 const root = ref<HTMLElement | null>(null)
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
-const emojiLabels = ref<Record<string, string>>({})
+const emojiOpen = ref(false)
 const canSend = computed(
   () => !props.sending && !props.disabled && (props.allowEmpty || Boolean(props.modelValue.trim())),
 )
@@ -86,13 +85,17 @@ defineExpose({
       :placeholder="placeholder"
       @update:model-value="(v: string) => emit('update:modelValue', v)"
       @submit="submit"
-      @emoji-labels="emojiLabels = $event"
+      @emoji-open="emojiOpen = $event"
     />
     <p v-if="sendError" role="alert">{{ sendError }}</p>
     <div v-if="$slots.context" class="composer-context"><slot name="context" /></div>
     <div class="bar">
       <div class="tools">
-        <EmojiPicker v-if="!compact" :labels="emojiLabels" @insert="(md) => editor?.insert(md)" />
+        <button v-if="!compact" class="emoji-trigger" type="button" data-emoji-trigger aria-label="表情"
+          aria-haspopup="dialog" :aria-expanded="emojiOpen" @click="editor?.toggleEmoji($event?.currentTarget as HTMLElement)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 14c1 4 7 4 8 0M8 9h.01M16 9h.01" stroke-linecap="round"/></svg>
+          <span>表情</span>
+        </button>
         <slot name="tools" />
       </div>
       <div class="actions">
@@ -156,7 +159,9 @@ defineExpose({
   cursor: not-allowed;
 }
 .composer-context { min-width: 0; }
-.tools :deep(.emoji > .ghost) {
+.emoji-trigger {
+  background: transparent; cursor: pointer;
+  svg { width:17px; height:17px; }
   display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 9px;
   border: 1px solid transparent; border-radius: 8px; font-size: 12px; color: var(--fp-muted);
   transition: background-color .16s, color .16s;
