@@ -59,20 +59,29 @@ onBeforeUnmount(() => { cancel(); clearNotice() })
   </div>
 </template>
 <style scoped lang="scss">
-.checkin-panel { margin-bottom:10px; font-size:12px; }
-.checkin-section { padding:8px 10px; border:1px solid var(--fp-divider); border-radius:8px; background:var(--fp-surface-subtle); }
-.checkin-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
-h3 { flex:1; margin:0; color:var(--fp-title); font-size:12.5px; font-weight:600; }
-.checkin-status { color:var(--fp-accent); font-size:11px; &.is-done { color:var(--fp-success); } }
-p { margin:3px 0; color:var(--fp-muted); line-height:1.45; overflow-wrap:anywhere; }
+.checkin-panel { margin-bottom:8px; font-size:12px; }
+.checkin-section { padding:7px 10px; border:1px solid var(--fp-divider); border-radius:8px; background:var(--fp-surface-subtle); }
+.checkin-head { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+h3 { flex:1; margin:0; color:var(--fp-title); font-size:12px; font-weight:600; }
+.checkin-status { color:var(--fp-accent); font-size:11px; font-weight:600; padding:1px 6px; border-radius:999px; background:color-mix(in srgb,var(--fp-accent) 12%,transparent); &.is-done { color:var(--fp-success); background:color-mix(in srgb,var(--fp-success) 12%,transparent); } }
+p { margin:2px 0; color:var(--fp-muted); line-height:1.4; overflow-wrap:anywhere; }
 .liveness-meta { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:2px 8px; font-size:11px; font-variant-numeric:tabular-nums; }
-.progress-track { height:4px; margin:5px 0 7px; border-radius:999px; background:var(--fp-divider); overflow:hidden; div { height:100%; border-radius:inherit; background:var(--fp-primary); transition:width .3s ease; } }
-.checkin-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:5px 8px; min-height:24px; }
+.progress-track { height:4px; margin:4px 0 5px; border-radius:999px; background:var(--fp-divider); overflow:hidden; div { height:100%; border-radius:inherit; background:linear-gradient(90deg, #60b044, #e59230); transition:width .3s ease; } }
+.checkin-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px 8px; min-height:20px; }
 .checkin-streak { color:var(--fp-muted); font-size:11px; }
-button { padding:4px 8px; border:1px solid var(--fp-border); border-radius:5px; background:var(--fp-card); color:var(--fp-text); font:inherit; font-size:11px; line-height:1.4; cursor:pointer; &:hover:not(:disabled) { background:var(--fp-hover); } &:disabled { cursor:default; opacity:.5; } &:focus-visible { outline:2px solid var(--fp-primary); outline-offset:2px; } }
-.refresh-btn { display:grid; place-items:center; flex:none; width:24px; height:24px; padding:4px; border-color:transparent; background:transparent; color:var(--fp-muted); svg { width:14px; height:14px; } }
-.claim-reward-btn { margin-left:auto; border-color:transparent; background:var(--fp-accent-soft); color:var(--fp-accent); &:hover:not(:disabled) { background:color-mix(in srgb,var(--fp-accent) 18%,transparent); } }
+button { padding:3px 8px; border:1px solid var(--fp-border); border-radius:5px; background:var(--fp-card); color:var(--fp-text); font:inherit; font-size:11px; line-height:1.4; cursor:pointer; &:hover:not(:disabled) { background:var(--fp-hover); } &:disabled { cursor:default; opacity:.5; } &:focus-visible { outline:2px solid var(--fp-primary); outline-offset:2px; } }
+.refresh-btn { display:none; place-items:center; flex:none; width:22px; height:22px; padding:3px; border-color:transparent; background:transparent; color:var(--fp-muted); svg { width:13px; height:13px; } }
+.claim-reward-btn { margin-left:auto; border-color:transparent; background:var(--fp-accent-soft); color:var(--fp-accent); font-weight:600; &:hover:not(:disabled) { background:color-mix(in srgb,var(--fp-accent) 18%,transparent); } }
 [role='alert'] p { color:var(--fp-danger); }
-.reward-notice { margin-top:7px; color:var(--fp-success); font-size:11px; }
+.reward-notice { margin-top:5px; color:var(--fp-success); font-size:11px; }
+.checkin-panel.embedded-checkin {
+  margin-bottom: 0;
+  .checkin-section {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+}
 @media(prefers-reduced-motion:reduce) { .progress-track div { transition:none; } }
 </style>

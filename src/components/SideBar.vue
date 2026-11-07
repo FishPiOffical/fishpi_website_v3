@@ -244,7 +244,7 @@ function goDownload() {
 }
 
 .side-module-body {
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .embedded-checkin {
@@ -252,6 +252,15 @@ function goDownload() {
   padding: 0 !important;
   border: 0 !important;
   background: transparent !important;
+}
+
+.embedded-checkin :deep(.checkin-head h3) {
+  display: none;
+}
+
+.embedded-checkin :deep(.checkin-head) {
+  justify-content: flex-end;
+  margin-bottom: 2px;
 }
 
 .app-download {

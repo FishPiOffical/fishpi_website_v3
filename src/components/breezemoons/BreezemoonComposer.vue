@@ -32,24 +32,24 @@ onMounted(()=>{mounted.value=true});onBeforeUnmount(()=>{mounted.value=false;dra
 </template>
 <style scoped lang="scss">
 .moon-composer {
-  padding: 14px 16px;
-  margin: 12px 0;
+  padding: 10px 12px;
+  margin: 10px 0;
   background: var(--fp-surface-subtle);
   border: 1px solid var(--fp-divider);
-  border-radius: 12px;
+  border-radius: 10px;
   min-width: 0;
 }
 
 form {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
 label {
   flex: 1 1 100%;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--fp-title);
 }
@@ -58,15 +58,15 @@ textarea {
   display: block;
   box-sizing: border-box;
   width: 100%;
-  margin-top: 8px;
+  margin-top: 6px;
   resize: vertical;
-  padding: 10px 12px;
+  padding: 7px 10px;
   border: 1px solid var(--fp-border);
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--fp-card);
   color: var(--fp-text);
-  font-size: 13.5px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.5;
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
 
   &:focus {
