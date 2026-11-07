@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink,useRoute,useRouter } from 'vue-router'
+import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
 import { storeToRefs } from 'pinia'
 import ChatWeatherRecovery from '@/components/chat/ChatWeatherRecovery.vue'
 import ChatMusicRecovery from '@/components/chat/ChatMusicRecovery.vue'
-import ChatBarrageEditor from '@/components/chat/ChatBarrageEditor.vue'
 import ChatBarrageRecovery from '@/components/chat/ChatBarrageRecovery.vue'
 import {useChatMessageSource} from '@/composables/useChatMessageSource'
 import {getAuthContextVersion} from '@/api/http'
@@ -18,9 +18,7 @@ import ChatTopicEditor from '@/components/chat/ChatTopicEditor.vue'
 import ChatTopicRecovery from '@/components/chat/ChatTopicRecovery.vue'
 import ChatOnlineList from '@/components/chat/ChatOnlineList.vue'
 import ChatSidebar from '@/chat/sidebar/ChatSidebar.vue'
-import PaintPanel from '@/components/chat/PaintPanel.vue'
 import ChatRedPacketCard from '@/components/chat/ChatRedPacketCard.vue'
-import ChatRedPacketEditor from '@/components/chat/ChatRedPacketEditor.vue'
 import ChatBubble from '@/components/ChatBubble.vue'
 import ChatCard from '@/components/ChatCard.vue'
 import ChatComposer from '@/components/ChatComposer.vue'
@@ -59,22 +57,16 @@ const visibleMessages = computed(() => messages.value.filter((line) => chatFilte
 const draft = ref('')
 watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{draft.value=''},{flush:'sync'})
 const scroller = ref<HTMLElement | null>(null)
-const showPacket = ref(false)
-const showBarrage = ref(false)
-const showPaint = ref(false)
+const activeTool = ref<''|'packet'|'barrage'|'paint'>('')
 
 const chatTools = [
   { id: 'packet', label: '红包', title: '发放红包', path: 'M5 3h14v18H5z M5 8l7 4 7-4 M9 15h6' },
   { id: 'paint', label: '涂鸦', title: '涂鸦画板', path: 'm14 5 5 5 M4 20l4-1L21 6l-4-4L4 15v5Z M13 20h8' },
   { id: 'barrage', label: '弹幕', title: '发送弹幕', path: 'M4 4h16v13H9l-5 4V4Z M8 9h8 M8 13h5' },
 ] as const
-function toolOpen(id: typeof chatTools[number]['id']) { return ({ packet: showPacket.value, paint: showPaint.value, barrage: showBarrage.value })[id] }
-
-function togglePanel(panel: 'packet' | 'barrage' | 'paint') {
-  showPacket.value = panel === 'packet' && !showPacket.value
-  showBarrage.value = panel === 'barrage' && !showBarrage.value
-  showPaint.value = panel === 'paint' && !showPaint.value
-}
+function toolOpen(id: typeof chatTools[number]['id']) { return activeTool.value === id }
+function togglePanel(panel: typeof chatTools[number]['id']) { activeTool.value = activeTool.value === panel ? '' : panel }
+watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{activeTool.value=''},{flush:'sync'})
 
 const showNodes = ref(false)
 const showClassicOnlines = ref(false)
@@ -157,7 +149,7 @@ async function quoteMessage(msg:{oId:string}){
 function insertPaint(md: string) {
   if (!syncComposer()) return
   draft.value += (draft.value && !draft.value.endsWith('\n') ? '\n' : '') + md
-  showPaint.value = false
+  activeTool.value = ''
 }
 
 async function pickNode(opt: ChatNodeOption) {
@@ -243,7 +235,7 @@ function clearScreen() {
               </div>
               </template>
               <template #tools>
-                <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-pressed="toolOpen(tool.id)" @click="togglePanel(tool.id)">
+                <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-expanded="toolOpen(tool.id)" aria-haspopup="dialog" @click="togglePanel(tool.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="tool.path" /></svg><span>{{ tool.label }}</span>
                 </button>
               </template>
@@ -273,16 +265,6 @@ function clearScreen() {
             <!-- 话题编辑展开表单 -->
             <ChatTopicEditor v-if="editingTopic" @close="editingTopic=false" />
 
-            <!-- 发红包展开表单 -->
-            <ChatRedPacketEditor v-if="showPacket" @close="showPacket=false" />
-
-            <!-- 弹幕展开表单 -->
-            <ChatBarrageEditor v-if="showBarrage" @close="showBarrage=false" />
-
-            <!-- 涂鸦面板 -->
-            <div v-if="showPaint" class="paint-box-wrap">
-              <PaintPanel @insert="insertPaint" @close="showPaint = false" />
-            </div>
 
             <!-- 在线人数条与折叠面板 -->
             <div class="classic-online-bar">
@@ -485,7 +467,7 @@ function clearScreen() {
               </div>
               </template>
               <template #tools>
-                <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-pressed="toolOpen(tool.id)" @click="togglePanel(tool.id)">
+                <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-expanded="toolOpen(tool.id)" aria-haspopup="dialog" @click="togglePanel(tool.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="tool.path" /></svg><span>{{ tool.label }}</span>
                 </button>
               </template>
@@ -502,16 +484,6 @@ function clearScreen() {
             <!-- 话题编辑表单 -->
             <ChatTopicEditor v-if="editingTopic" @close="editingTopic=false" />
 
-            <!-- 发红包表单 -->
-            <ChatRedPacketEditor v-if="showPacket" @close="showPacket=false" />
-
-            <!-- 弹幕表单 -->
-            <ChatBarrageEditor v-if="showBarrage" @close="showBarrage=false" />
-
-            <!-- 涂鸦面板 -->
-            <div v-if="showPaint" class="paint-box-wrap">
-              <PaintPanel @insert="insertPaint" @close="showPaint = false" />
-            </div>
           </div>
 
           <div v-else-if="composerReady" class="guest-bottom-bar">
@@ -529,6 +501,7 @@ function clearScreen() {
 
     <!-- ==================== 浮层与弹窗 ==================== -->
     <!-- 大区节点选择弹层 -->
+    <ChatToolDialog v-if="isLoggedIn" :tool="activeTool" @close="activeTool=''" @insert="insertPaint" />
     <FpDialog :open="showNodes && isLoggedIn" title="切换聊天室大区节点" :width="520" @close="showNodes = false">
       <div class="node-grid">
         <button
@@ -1091,10 +1064,6 @@ function clearScreen() {
 .barrage-cost-hint {
   font-size: 11px;
   color: var(--fp-muted);
-}
-
-.paint-box-wrap {
-  margin-top: 10px;
 }
 
 /* =========================================================

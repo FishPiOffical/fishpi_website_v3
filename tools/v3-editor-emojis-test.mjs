@@ -66,10 +66,10 @@ assert.equal((roomSource.match(/@click="toggleChatStyle"/g)||[]).length,3);asser
 console.log('PASS editor emoji 11 layout remount preserves immediately typed or cleared buffer and blocks while editor loads')
 
 const topicHandler=roomSource.match(/function useTopic\(\)\s*{[^]*?\n}/)[0],paintHandler=roomSource.match(/function insertPaint\(md: string\)\s*{[^]*?\n}/)[0],appendRef=ref(null),appendDraft=ref(''),appendRoot={children:[]},appendApp=renderer.createApp({setup(){return()=>h(Composer,{ref:appendRef,modelValue:appendDraft.value,compact:true,'onUpdate:modelValue':v=>appendDraft.value=v})}});appendApp.use(createPinia());appendApp.mount(appendRoot)
-const discuss=ref('本次话题'),showPaint=ref(true),appendHandlers=Function('composerRef','draft','discuss','showPaint',compile(syncHandler+';'+topicHandler+';'+paintHandler)+';return{useTopic,insertPaint}')(appendRef,appendDraft,discuss,showPaint)
-appendHandlers.useTopic();appendHandlers.insertPaint('![画](https://example.invalid/a.png)');assert.equal(appendDraft.value,'');assert.equal(showPaint.value,true);await tick()
+const discuss=ref('本次话题'),activeTool=ref('paint'),appendHandlers=Function('composerRef','draft','discuss','activeTool',compile(syncHandler+';'+topicHandler+';'+paintHandler)+';return{useTopic,insertPaint}')(appendRef,appendDraft,discuss,activeTool)
+appendHandlers.useTopic();appendHandlers.insertPaint('![画](https://example.invalid/a.png)');assert.equal(appendDraft.value,'');assert.equal(activeTool.value,'paint');await tick()
 state.editors.at(-1).value='刚输入的正文 🐟';appendHandlers.useTopic();assert.equal(appendDraft.value,'刚输入的正文 🐟 # 本次话题 # ');await tick()
-state.editors.at(-1).value='涂鸦前的末尾输入';appendHandlers.insertPaint('![画](https://example.invalid/a.png)');assert.equal(appendDraft.value,'涂鸦前的末尾输入\n![画](https://example.invalid/a.png)');assert.equal(showPaint.value,false);appendApp.unmount()
+state.editors.at(-1).value='涂鸦前的末尾输入';appendHandlers.insertPaint('![画](https://example.invalid/a.png)');assert.equal(appendDraft.value,'涂鸦前的末尾输入\n![画](https://example.invalid/a.png)');assert.equal(activeTool.value,'');appendApp.unmount()
 console.log('PASS editor emoji 12 topic and paint append to latest editor buffer without discarding unsent input; loading preserves draft/panel')
 
 // The composer has a second picker outside Vditor: its labels must come from the same loaded editor.
