@@ -22,18 +22,22 @@ const inbox=usePrivateInboxStore(),{unreadTotal:unread,error:unreadError}=storeT
 const list=ref<Conversation[]>([]),page=ref(1),pages=ref(0),listBusy=ref(false),listError=ref('')
 const target=ref(''),other=ref<MessagePeer|null>(null),messages=ref<PrivateMessage[]>([]),before=ref(''),hasMore=ref(false),historyBusy=ref(false),historyError=ref(''),draft=ref(''),toName=ref(''),resolveBusy=ref(false),resolveError=ref(''),changed=ref(false),notice=ref('')
 const msgScroller=ref<HTMLElement|null>(null)
+let followLatest=true
+function trackMessageScroll(){const el=msgScroller.value;if(el)followLatest=el.scrollHeight-el.clientHeight-el.scrollTop<=48}
+function onHistoryMediaLoad(){if(followLatest)scrollBottom()}
 let eventRevision=0,listRun=0,historyRun=0,resolveRun=0,historyAbort:AbortController|null=null,confirmation:AbortController|null=null
 const canSend=computed(()=>authenticated.value&&!!target.value&&!!other.value?.available&&target.value!==account.value?.oId&&!writes.pending&&!writes.busy&&draft.value.length<=10240)
 
 function scrollBottom(){
+ followLatest=true
  if(msgScroller.value) msgScroller.value.scrollTop=msgScroller.value.scrollHeight
 }
 
-function closeTarget(){historyRun++;resolveRun++;historyAbort?.abort();historyAbort=null;confirmation?.abort();confirmation=null;target.value='';other.value=null;messages.value=[];before.value='';hasMore.value=false;historyBusy.value=false;draft.value='';historyError.value='';resolveError.value='';resolveBusy.value=false;notice.value='';changed.value=false}
+function closeTarget(){followLatest=true;historyRun++;resolveRun++;historyAbort?.abort();historyAbort=null;confirmation?.abort();confirmation=null;target.value='';other.value=null;messages.value=[];before.value='';hasMore.value=false;historyBusy.value=false;draft.value='';historyError.value='';resolveError.value='';resolveBusy.value=false;notice.value='';changed.value=false}
 async function loadList(p=page.value){if(!authenticated.value||listBusy.value)return;const run=++listRun,reader=identity(),owner=account.value!.oId;listBusy.value=true;listError.value='';try{const result=await messageConversations(owner,p);if(run===listRun&&reader===identity()&&authenticated.value){list.value=result.list;page.value=result.p;pages.value=result.pageCount;if(props.autoSelectFirst&&!props.chatroomActive&&!target.value&&!props.initialId&&!props.initialName&&result.list.length>0)select(result.list[0]!.peer)}}catch(e){if(run===listRun&&reader===identity())listError.value=e instanceof Error?e.message:'会话读取失败'}finally{if(run===listRun&&reader===identity())listBusy.value=false}}
 async function loadUnread(){await inbox.refreshUnread()}
-async function loadHistory(older=false){if(!authenticated.value||!target.value||older&&(!hasMore.value||historyBusy.value))return;historyAbort?.abort();const abort=new AbortController();historyAbort=abort;const run=++historyRun,reader=identity(),id=target.value,owner=account.value!.oId,cursor=older?before.value:'',event=eventRevision;historyBusy.value=true;historyError.value='';const valid=()=>run===historyRun&&reader===identity()&&id===target.value&&authenticated.value&&!abort.signal.aborted
- try{const result=await messageHistory(owner,id,cursor,abort.signal);if(!valid())return;other.value=result.peer;emit('peer-selected',{id:result.peer.id,userName:result.peer.userName});if(older){const known=new Set(messages.value.map(m=>m.id));messages.value=[...result.list.filter(m=>!known.has(m.id)),...messages.value]}else{messages.value=result.list;void nextTick(scrollBottom)}before.value=result.nextBefore;hasMore.value=result.hasMore;if(!older&&event===eventRevision)changed.value=false}
+async function loadHistory(older=false){if(!authenticated.value||!target.value||older&&(!hasMore.value||historyBusy.value))return;historyAbort?.abort();const abort=new AbortController();historyAbort=abort;const oldHeight=msgScroller.value?.scrollHeight||0,oldTop=msgScroller.value?.scrollTop||0;const run=++historyRun,reader=identity(),id=target.value,owner=account.value!.oId,cursor=older?before.value:'',event=eventRevision;historyBusy.value=true;historyError.value='';const valid=()=>run===historyRun&&reader===identity()&&id===target.value&&authenticated.value&&!abort.signal.aborted
+ try{const result=await messageHistory(owner,id,cursor,abort.signal);if(!valid())return;other.value=result.peer;emit('peer-selected',{id:result.peer.id,userName:result.peer.userName});if(older){const known=new Set(messages.value.map(m=>m.id));messages.value=[...result.list.filter(m=>!known.has(m.id)),...messages.value]}else messages.value=result.list;before.value=result.nextBefore;hasMore.value=result.hasMore;if(!older&&event===eventRevision)changed.value=false;await nextTick();if(!valid())return;if(older){followLatest=false;if(msgScroller.value)msgScroller.value.scrollTop=oldTop+msgScroller.value.scrollHeight-oldHeight}else scrollBottom()}
  catch(e){if(valid()){historyError.value=e instanceof Error?e.message:'历史读取失败';if(!older&&e instanceof ApiError&&[401,403,404].includes(e.status)){messages.value=[];before.value='';hasMore.value=false}}}
  finally{if(valid()){historyBusy.value=false;historyAbort=null}}}
 function select(peer:MessagePeer){if(peer.id===account.value?.oId){resolveError.value='不能给自己发信';return}closeTarget();target.value=peer.id;other.value=peer;emit('peer-selected',{id:peer.id,userName:peer.userName});void loadHistory()}
@@ -132,7 +136,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
     <p v-if="historyError" class="alert-bar" role="alert">{{ historyError }} <button class="fp-control" :disabled="historyBusy" @click="loadHistory()">重读当前历史</button></p>
     <p v-if="historyBusy&&!messages.length" class="empty-content" role="status">读取历史…</p>
 
-    <div ref="msgScroller" class="messages-scroller">
+    <div ref="msgScroller" class="messages-scroller" @scroll.passive="trackMessageScroll" @load.capture="onHistoryMediaLoad">
      <button class="fp-control more-btn" v-if="hasMore" type="button" :disabled="historyBusy" @click="loadHistory(true)">读取更早消息</button>
      <p v-if="!messages.length&&!historyBusy&&!historyError" class="empty-content">暂无消息</p>
      <ol class="messages">
@@ -230,8 +234,9 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
   display: grid;
   flex: 1;
   grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
-  height: 100%;
+  overflow: hidden;
   transition: grid-template-columns 180ms ease;
 }
 
@@ -467,6 +472,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
   min-width: 0;
   min-height: 0;
   height: 100%;
+  overflow: hidden;
   background: var(--fp-card);
 }
 
@@ -545,6 +551,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
 }
 
 .more-btn {
+  flex: none;
   align-self: center;
   min-height: 26px !important;
   height: 26px !important;
@@ -556,6 +563,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
 }
 
 .messages {
+  flex: none;
   list-style: none;
   margin: 0;
   padding: 0;
