@@ -53,3 +53,9 @@
 切换前反馈数据库在线备份为 `/var/lib/fishpi-feedback/backups/pre-20261107-29559aa-1793988294.sqlite`；当前数据库 `integrity_check` 为 ok，前版 `20261107-d7aa1ca` 和旧静态资源保留供回滚及旧页面使用。数据库、管理员环境配置与访客数据未替换，部署包未包含 `.host`。
 
 公网首页、`/games`、`/settings`、`/member/Yui/medals`、反馈 health 及公开列表均返回 200。入口 JS、SettingsView 与 GamesView 的 JS/CSS 共五项资源与本地字节一致；浏览器确认新版设置分组、鱼游引导区、十个经典入口和二十条首屏社区卡片，无运行警告或错误。网站、反馈及 Caddy 均 active。服务器直读 SSR 已能返回内容，连续缓存命中样本约 0.03 秒；不代表所有用户访问时延保证。未执行真实账号登录、投票、提交需求或其他生产写入。
+
+## 2026-11-07 前端更新至 a85489f
+
+仅发布 website 至 `/opt/fishpi/releases/20261107-a85489f`，current 已切换，保留前版 `20261107-a4abefd` 与旧 assets 供回滚及已打开页面使用。按生产直连变量完成类型检查及客户端/SSR构建，仅重启 fishpi-website；feedback-service 从线上前版原样复制，反馈进程 PID 保持不变，数据库与环境配置未修改。未部署 Rhythm、未执行其数据库迁移。部署包未包含 .host 或环境文件。
+
+公网首页、/cr、/games 与反馈 health 均为200；入口JS及三个共享模块与本地产物字节一致。浏览器确认新版紧凑首页、真实文章和排行正常显示。聊天外观新接口仍需 Rhythm 对应版本上线后才能保存，升级前历史无快照显示默认；未执行生产账号写入测试。
