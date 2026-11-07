@@ -29,97 +29,113 @@ function homeRead<T>(key: string, load: () => Promise<T>) {
   })
 }
 
+const SSR_PREFETCH_BUDGET_MS = 750
+type WithinBudget = <T>(task: Promise<T>) => Promise<T>
+
+async function prefetchHome(withinBudget: WithinBudget): Promise<SsrPayload> {
+  const settled = await Promise.allSettled([
+    fetchHomeBootstrap(key => withinBudget(homeRead(key, () => fetchHomeRead(key)))),
+    withinBudget(homeRead('ranking:checkin:8', () => fetchRanking('checkin', 1, undefined, 8))),
+    withinBudget(homeRead('ranking:online:8', () => fetchRanking('online', 1, undefined, 8))),
+    withinBudget(homeRead('recent-members', () => fetchRecentMembers())),
+    withinBudget(homeRead('breezemoons:8', () => fetchV3Breezemoons(1, 8))),
+    withinBudget(homeRead('repeater:joke', () => fetchRepeaterItems('joke'))),
+  ])
+  const val = <T>(i: number, fallback: T): T =>
+    settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
+  return {
+    homeReads: val(0, null),
+    homeCheckinRanking: val(1, null),
+    homeOnlineRanking: val(2, null),
+    recentMembers: val(3, null),
+    homeBreezemoonPage: val(4, null),
+    repeater: val(5, undefined),
+  }
+}
+
 async function prefetch(url: string): Promise<SsrPayload> {
   const path = url.split('?')[0] || '/'
   if (!shouldPrefetchSsr(path)) return {}
 
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('SSR prefetch deadline')), SSR_PREFETCH_BUDGET_MS)
+  })
+  const withinBudget: WithinBudget = task => Promise.race([task, deadline])
   try {
-    if (path === '/statistic') return { statistics: await fetchStatistics() }
-    if (path === '/milestones') return { milestonePage: await listMilestones() }
-    const articleMatch = path.match(/^\/article\/([^/]+)$/)
-    if (articleMatch) {
-      const article = await fetchArticle(articleMatch[1])
-      return { article }
-    }
-
-    const memberMatch = path.match(/^\/member\/([^/]+)$/)
-    if (memberMatch) {
-      const member = await fetchPublicUser(decodeURIComponent(memberMatch[1]))
-      return { member }
-    }
-
-    if (path === '/') {
-      const settled = await Promise.allSettled([
-        fetchHomeBootstrap(key => homeRead(key, () => fetchHomeRead(key))),
-        homeRead('ranking:checkin:8', () => fetchRanking('checkin', 1, undefined, 8)),
-        homeRead('ranking:online:8', () => fetchRanking('online', 1, undefined, 8)),
-        homeRead('recent-members', () => fetchRecentMembers()),
-        homeRead('breezemoons:8', () => fetchV3Breezemoons(1, 8)),
-        homeRead('repeater:joke', () => fetchRepeaterItems('joke')),
-      ])
-      const val = <T>(i: number, fallback: T): T =>
-        settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
-      return {
-        homeReads: val(0, null),
-        homeCheckinRanking: val(1, null),
-        homeOnlineRanking: val(2, null),
-        recentMembers: val(3, null),
-        homeBreezemoonPage: val(4, null),
-        repeater: val(5, undefined),
-      }
-    }
-
-    if (path === '/domains') {
-      return { directoryPage: await fetchDirectoryPage('domains') }
-    }
-
-    if (path === '/tags') {
-      return { directoryPage: await fetchDirectoryPage('tags') }
-    }
-
-    if (path === '/breezemoons') {
-      return { breezemoonPage: await fetchV3Breezemoons(1, 20) }
-    }
-
-    const ranking = path.match(/^\/top\/([^/]+)$/)?.[1]
-    if (ranking && Object.hasOwn(rankingTitles, ranking)) return { rankingPage: await fetchRanking(ranking as RankingType) }
-
-    if (path === '/repeater') {
-      return { repeater: await fetchRepeaterItems() }
-    }
-
-    const listMap: Record<string, ArticleFeedKind> = {
-      '/hot': 'hot',
-      '/recent': 'recent',
-      '/recent/long': 'long',
-      '/recent/hot': 'hot',
-      '/recent/good': 'good',
-      '/recent/reply': 'reply',
-      '/column': 'long',
-      '/qna': 'qna',
-      '/perfect': 'perfect',
-      '/good': 'good',
-    }
-    if (listMap[path]) {
-      const kind = listMap[path]
-      return { articleListing: await fetchArticleListing(kind) }
-    }
-
-    const domainMatch = path.match(/^\/domain\/([^/]+)$/)
-    if (domainMatch) {
-      return {
-        articleListing: await fetchArticleListing('domain', decodeURIComponent(domainMatch[1])),
-      }
-    }
-
-    const tagMatch = path.match(/^\/tag\/([^/]+)$/)
-    if (tagMatch) {
-      return {
-        articleListing: await fetchArticleListing('tag', decodeURIComponent(tagMatch[1])),
-      }
-    }
+    // Each home resource shares the deadline but keeps its own successful result.
+    if (path === '/') return await prefetchHome(withinBudget)
+    return await withinBudget(prefetchPage(path))
   } catch {
-    /* render shell even if prefetch fails */
+    return {}
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function prefetchPage(path: string): Promise<SsrPayload> {
+  if (path === '/statistic') return { statistics: await fetchStatistics() }
+  if (path === '/milestones') return { milestonePage: await listMilestones() }
+  const articleMatch = path.match(/^\/article\/([^/]+)$/)
+  if (articleMatch) {
+    const article = await fetchArticle(articleMatch[1])
+    return { article }
+  }
+
+  const memberMatch = path.match(/^\/member\/([^/]+)$/)
+  if (memberMatch) {
+    const member = await fetchPublicUser(decodeURIComponent(memberMatch[1]))
+    return { member }
+  }
+
+  if (path === '/domains') {
+    return { directoryPage: await fetchDirectoryPage('domains') }
+  }
+
+  if (path === '/tags') {
+    return { directoryPage: await fetchDirectoryPage('tags') }
+  }
+
+  if (path === '/breezemoons') {
+    return { breezemoonPage: await fetchV3Breezemoons(1, 20) }
+  }
+
+  const ranking = path.match(/^\/top\/([^/]+)$/)?.[1]
+  if (ranking && Object.hasOwn(rankingTitles, ranking)) return { rankingPage: await fetchRanking(ranking as RankingType) }
+
+  if (path === '/repeater') {
+    return { repeater: await fetchRepeaterItems() }
+  }
+
+  const listMap: Record<string, ArticleFeedKind> = {
+    '/hot': 'hot',
+    '/recent': 'recent',
+    '/recent/long': 'long',
+    '/recent/hot': 'hot',
+    '/recent/good': 'good',
+    '/recent/reply': 'reply',
+    '/column': 'long',
+    '/qna': 'qna',
+    '/perfect': 'perfect',
+    '/good': 'good',
+  }
+  if (listMap[path]) {
+    const kind = listMap[path]
+    return { articleListing: await fetchArticleListing(kind) }
+  }
+
+  const domainMatch = path.match(/^\/domain\/([^/]+)$/)
+  if (domainMatch) {
+    return {
+      articleListing: await fetchArticleListing('domain', decodeURIComponent(domainMatch[1])),
+    }
+  }
+
+  const tagMatch = path.match(/^\/tag\/([^/]+)$/)
+  if (tagMatch) {
+    return {
+      articleListing: await fetchArticleListing('tag', decodeURIComponent(tagMatch[1])),
+    }
   }
   return {}
 }
