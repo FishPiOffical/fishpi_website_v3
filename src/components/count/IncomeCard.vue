@@ -22,7 +22,7 @@ function openSettings() {
   >
     <template v-if="!loaded">
       <span class="label">上下班时间</span>
-      <span class="time">--:--:--</span>
+      <span class="time-placeholder" role="status" aria-label="正在准备上下班时间" />
     </template>
     <template v-else-if="!view">
       <span class="label">上下班时间</span>
@@ -83,4 +83,5 @@ function openSettings() {
   font-size: 12px;
   color: var(--fp-link);
 }
+.time-placeholder{display:block;width:7ch;height:32px;border-radius:5px;background:var(--fp-hover)}
 </style>

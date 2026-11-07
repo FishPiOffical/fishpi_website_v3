@@ -55,6 +55,7 @@ function avatarOf(a: ArticleSummary) {
           v-if="!hideAuthor && item.articleAuthorName && item.articleAnonymous !== 1"
           :to="`/member/${item.articleAuthorName}`"
           class="compact-avatar-link"
+          :aria-label="`查看 ${item.articleAuthorNickname || item.articleAuthorName} 的主页`"
         >
           <span
             class="avatar-small"

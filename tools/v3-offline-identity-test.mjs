@@ -56,7 +56,7 @@ try{
  api.setAccessToken('synthetic-shell-reader')
  const scope=effectScope(),auth=reactive({accessToken:api.getAccessToken(),account:{oId:'1'}}),route=reactive({name:'home'})
  const stop=api.onAccessTokenChange(token=>auth.accessToken=token)
- const model=scope.run(()=>new Function('ref','watch','auth','route','getAuthContextVersion','router',compile(shell.slice(start,end))+';return {apiOffline,onApiOffline}')(ref,watch,auth,route,api.getAuthContextVersion,{replace:()=>Promise.resolve()}))
+ const model=scope.run(()=>new Function('ref','watch','auth','route','getAuthContextVersion','router','pageHost',compile(shell.slice(start,end))+';return {apiOffline,onApiOffline}')(ref,watch,auth,route,api.getAuthContextVersion,{replace:()=>Promise.resolve()},{value:null}))
  await Promise.resolve();await Promise.resolve();model.onApiOffline();assert.equal(model.apiOffline.value,true);await api.refreshAccessToken();assert.equal(model.apiOffline.value,true)
  api.setAccessToken(null);assert.equal(model.apiOffline.value,false)
  await Promise.resolve();await Promise.resolve();model.onApiOffline();api.setAccessToken('synthetic-login-same-actor');assert.equal(model.apiOffline.value,false)

@@ -16,9 +16,16 @@ try {
  globalThis.fetch=async()=>json({code:0,data:{provider:'geetest4',captchaId:'fixture-id'}});assert.equal(await api.pingApi(),true)
  assert.equal(api.isOfflineError(new api.ApiError('cancel',0,'aborted')),false)
  console.log('PASS reconnect requires complete successful v3 response, not proxy errors or HTML')
+ let releasePublic,publicCalls=0;globalThis.fetch=()=>{publicCalls++;return new Promise(resolve=>releasePublic=resolve)}
+ const firstPublic=api.request('/api/v3/articles?p=1'),secondPublic=api.request('/api/v3/articles?p=1');assert.equal(publicCalls,1);releasePublic(json({code:0,data:{list:[{id:'1'}]}}));const [firstValue,secondValue]=await Promise.all([firstPublic,secondPublic]);firstValue.data.list[0].id='mutated';assert.equal(secondValue.data.list[0].id,'1')
+ const nextPublic=api.request('/api/v3/articles?p=1');assert.equal(publicCalls,2);releasePublic(json({code:0,data:{list:[]}}));await nextPublic
+ let privateReleases=[];globalThis.fetch=()=>{publicCalls++;return new Promise(r=>privateReleases.push(r))};const privateOne=api.request('/api/v3/me'),privateTwo=api.request('/api/v3/me');assert.equal(privateReleases.length,2);for(const resolve of privateReleases)resolve(json({code:0,data:{}}));await Promise.all([privateOne,privateTwo])
+ console.log('PASS public list requests share only concurrent reads, clone each result, never cache completed responses or merge private reads')
+
  const shell=await fs.readFile('src/layouts/AppShell.vue','utf8'),start=shell.indexOf('const apiOffline ='),end=shell.indexOf('\nonMounted(',start),route=reactive({name:'article',fullPath:'/article/123?p=2#comment456'}),calls=[]
  let finish;const router={replace:target=>{calls.push(target);return new Promise(resolve=>finish=resolve)}}
- const scope=effectScope(),model=scope.run(()=>new Function('ref','watch','auth','route','getAuthContextVersion','router',compile(shell.slice(start,end))+';return {onApiOffline,apiOffline}')(ref,watch,reactive({accessToken:null,account:null}),route,api.getAuthContextVersion,router))
- model.onApiOffline();model.onApiOffline();assert.deepEqual(calls,[{path:'/offline',query:{from:route.fullPath}}]);finish();await Promise.resolve();await Promise.resolve();route.name='offline';model.onApiOffline();assert.equal(calls.length,1);scope.stop()
+ let publicReady=false;const pageHost={value:{querySelector:()=>publicReady?{}:null}}
+ const scope=effectScope(),model=scope.run(()=>new Function('ref','watch','auth','route','getAuthContextVersion','router','pageHost',compile(shell.slice(start,end))+';return {onApiOffline,apiOffline}')(ref,watch,reactive({accessToken:null,account:null}),route,api.getAuthContextVersion,router,pageHost))
+ model.onApiOffline();model.onApiOffline();assert.deepEqual(calls,[{path:'/offline',query:{from:route.fullPath}}]);finish();await Promise.resolve();await Promise.resolve();route.name='offline';model.onApiOffline();assert.equal(calls.length,1);route.name='home';publicReady=true;model.onApiOffline();assert.equal(calls.length,1);assert.equal(model.apiOffline.value,true);publicReady=false;model.onApiOffline();assert.equal(calls.length,2);finish();scope.stop()
  console.log('PASS actual shell handler preserves full path and suppresses concurrent/recursive navigation')
 } finally {globalThis.fetch=originalFetch;globalThis.window=originalWindow}

@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { DEFAULT_AVATAR } from '@/utils/avatar'
 
+import {computed,ref} from 'vue'
 import {storeToRefs} from 'pinia'
 import {RouterLink} from 'vue-router'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ChatOnlineStore} from '@/stores/v3ChatOnline'
+const props=defineProps<{previewLimit?:number}>(),expanded=ref(false)
 const online=useV3ChatOnlineStore(),{accessToken,account}=storeToRefs(useAuthStore())
+const visibleUsers=computed(()=>props.previewLimit&&!expanded.value?online.users.slice(0,props.previewLimit):online.users)
 function avatarError(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 </script>
 <template>
@@ -18,9 +21,10 @@ function avatarError(event:Event){const image=event.target as HTMLImageElement;i
    </div>
    <p v-if="online.loading" class="empty" role="status">正在读取在线名单…</p>
    <div v-if="online.error" class="error" role="alert"><span>{{ online.error }}</span><button type="button" :disabled="online.loading" @click="online.retry">重试第 {{ online.attempt }} 页</button></div>
-   <ul v-if="online.users.length"><li v-for="user in online.users" :key="user.id"><RouterLink :to="`/member/${encodeURIComponent(user.userName)}`" :data-user-card="user.userName" :title="user.userName"><img :src="user.userAvatarURL || DEFAULT_AVATAR" alt="" loading="lazy" @error="avatarError"/><span>{{ user.userName }}</span></RouterLink></li></ul>
+   <ul v-if="online.users.length"><li v-for="user in visibleUsers" :key="user.id"><RouterLink :to="`/member/${encodeURIComponent(user.userName)}`" :data-user-card="user.userName" :title="user.userName"><img :src="user.userAvatarURL || DEFAULT_AVATAR" alt="" loading="lazy" @error="avatarError"/><span>{{ user.userName }}</span></RouterLink></li></ul>
    <p v-if="!online.loading && !online.error && !online.users.length" class="empty">本页暂无可见成员</p>
-   <nav v-if="online.pageCount || online.page > 1" aria-label="在线成员分页"><button type="button" :disabled="online.loading || !!online.error || online.page <= 1" @click="online.load(online.page-1)">上一页</button><span>{{ online.page }} / {{ online.pageCount }}</span><button type="button" :disabled="online.loading || !!online.error || !online.hasMore" @click="online.load(online.page+1)">下一页</button></nav>
+   <button v-if="previewLimit && online.users.length>previewLimit" class="expand-members" type="button" :aria-expanded="expanded" @click="expanded=!expanded">{{ expanded ? '收起名单' : '展开本页成员' }}</button>
+   <nav v-if="(!previewLimit || expanded) && (online.pageCount || online.page > 1)" aria-label="在线成员分页"><button type="button" :disabled="online.loading || !!online.error || online.page <= 1" @click="online.load(online.page-1)">上一页</button><span>{{ online.page }} / {{ online.pageCount }}</span><button type="button" :disabled="online.loading || !!online.error || !online.hasMore" @click="online.load(online.page+1)">下一页</button></nav>
   </template>
  </div>
 </template>

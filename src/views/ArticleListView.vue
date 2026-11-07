@@ -11,6 +11,7 @@ import { useArticleListing } from '@/composables/useArticleListing'
 import { consumeArticleListingPayload } from '@/seo/payload'
 import { SITE_DEFAULT_DESC } from '@/seo/site'
 import FpLoading from '@/components/FpLoading.vue'
+import { formatDate } from '@/utils/time'
 import { decodeEntities } from '@/utils/text'
 const route = useRoute()
 const kind = computed(() => (route.meta.list as ArticleFeedKind) || 'recent')
@@ -22,6 +23,7 @@ const columnShelf = ref<ColumnOrder>('recent')
 const { value, p, loading, error, read } = useArticleListing(kind, extra, columnShelf, consumeArticleListingPayload(kind.value, extra.value, columnShelf.value))
 const items = computed(() => value.value?.resource === 'articles' ? value.value.list : [])
 const columns = computed(() => value.value?.resource === 'columns' ? value.value.list : [])
+const listingNote=computed(()=>kind.value==='hot'?'按近月回帖排序，发布时间较早的文章也可能上榜。':kind.value==='perfect'?'这里汇集站点收录的优选文章，按发布时间展示；热门反映讨论，优选用于内容精选。':'')
 const isColumnPage = computed(() => kind.value === 'long')
 const heading = computed(() => kind.value === 'tag' ? `#${extra.value}` : title.value)
 const RECENT_TABS = [{ to: '/recent', label: '默认' }, { to: '/recent/hot', label: '热议' }, { to: '/recent/good', label: '👍 好评' }, { to: '/recent/reply', label: '最近回帖' }]
@@ -39,7 +41,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 </script>
 
 <template>
-  <div class="wrapper list-page-wrap fp-page fp-page--wide fp-ui fp-list-page">
+  <div :data-public-content="value ? 'ready' : undefined" class="wrapper list-page-wrap fp-page fp-page--wide fp-ui fp-list-page">
     <div class="content">
       <div ref="panel" class="list-content">
         <section v-if="isColumnPage" class="column-intro">
@@ -51,34 +53,34 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
           <div class="head-left"><h1 class="fp-page-title">{{ heading }}</h1><ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" /><span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span></div>
           <div class="head-right"><nav v-if="showRecentTabs" class="sort-tabs"><RouterLink v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to" :class="{ current: route.path === tab.to }">{{ tab.label }}</RouterLink></nav><span v-if="value" class="total-count">共 {{ value.total }} 篇</span></div>
         </div>
+        <p v-if="listingNote" class="listing-note">{{ listingNote }}</p>
         <div v-if="isColumnPage" class="column-shelf-head">
           <div><strong>专栏目录</strong><span>按当前可见章节统计</span></div>
           <div class="column-switch" role="tablist" aria-label="专栏排序"><button class="fp-control" type="button" role="tab" :aria-selected="columnShelf === 'recent'" :class="{ selected: columnShelf === 'recent' }" @click="columnShelf = 'recent'">最近更新</button><button class="fp-control" type="button" role="tab" :aria-selected="columnShelf === 'hot'" :class="{ selected: columnShelf === 'hot' }" @click="columnShelf = 'hot'">热门作品</button></div>
         </div>
         <button type="button" class="btn refresh-list fp-control" :disabled="loading" @click="read()">刷新列表</button>
-        <FpLoading v-if="loading" :rows="8" />
-        <div v-else-if="error" class="err fp-state" role="alert"><p>{{ error }}</p><button type="button" class="btn fp-control" @click="read()">重试当前页</button><button class="fp-control btn" v-if="p > 1" type="button"  @click="read(1)">返回第一页</button></div>
-        <template v-else-if="value">
+        <FpLoading v-if="loading && !value" :rows="8" />
+        <div v-if="error" class="err fp-state" role="alert"><p>{{ error }}</p><button type="button" class="btn fp-control" @click="read()">重试当前页</button><button class="fp-control btn" v-if="p > 1" type="button"  @click="read(1)">返回第一页</button></div>
+        <template v-if="value">
           <div v-if="value.resource === 'columns'" class="column-grid">
             <article v-for="column in columns" :key="column.id" class="column-card">
               <RouterLink class="column-cover-link" :to="`/column/${column.id}`" :aria-label="`阅读《${decodeEntities(column.title)}》`">
-                <img v-if="column.coverURL && !failedCovers.has(column.id)" :src="column.coverURL" alt="" loading="lazy" @error="failedCovers.add(column.id)"><span v-else class="cover-placeholder" aria-hidden="true">卷</span>
-                <span class="cover-label">{{ columnShelf === 'hot' ? '热门作品' : '最近更新' }}</span>
+                <img v-if="column.coverURL && !failedCovers.has(column.id)" :src="column.coverURL" alt="" loading="lazy" @error="failedCovers.add(column.id)"><span v-else class="cover-placeholder" aria-hidden="true" :style="{background:`hsl(${Number.parseInt(column.id.slice(-5),36)%360} 24% 38%)`}">{{ decodeEntities(column.title).slice(0,1) || '卷' }}</span>
               </RouterLink>
               <div class="column-card-copy">
                 <RouterLink class="column-title" :to="`/column/${column.id}`">{{ decodeEntities(column.title) }}</RouterLink>
                 <p v-if="column.chapters[0]?.preview" class="column-preview">{{ decodeEntities(column.chapters[0]!.preview || '') }}</p>
-                <div class="column-author-row"><span class="chapter-count">{{ column.articleCount }} 章</span></div>
-                <div v-if="column.chapters[0]" class="latest-chapter"><span>最近更新</span><RouterLink :to="`/article/${column.chapters[0]!.id}`">第 {{ column.chapters[0]!.chapterNo }} 章 · {{ decodeEntities(column.chapters[0]!.title) }}</RouterLink></div>
-                <RouterLink class="read-column" :to="`/column/${column.id}`">进入专栏 <span aria-hidden="true">→</span></RouterLink>
+                <div class="column-author-row"><span class="chapter-count">{{ column.articleCount }} 章</span><time v-if="column.updatedAt">{{ formatDate(column.updatedAt) }} 更新</time></div>
+                <div v-if="column.chapters[0]" class="latest-chapter"><span>最近更新</span><RouterLink :title="decodeEntities(column.chapters[0]!.title)" :to="`/article/${column.chapters[0]!.id}`">第 {{ column.chapters[0]!.chapterNo }} 章 · {{ decodeEntities(column.chapters[0]!.title) }}</RouterLink></div>
+                <div class="column-links"><RouterLink class="read-column" :to="`/column/${column.id}`">章节目录 →</RouterLink><RouterLink v-if="column.chapters.length" class="read-column" :to="`/article/${column.chapters[column.chapters.length-1]!.id}`">试读 ↗</RouterLink></div>
               </div>
             </article>
             <p v-if="!columns.length" class="column-empty">本页暂无可见专栏。</p>
           </div>
-          <ArticleFeed v-else :items="items" empty="该分类下暂无内容" />
+          <template v-else><ArticleFeed :items="items" :empty="kind==='search' ? '没有找到相关帖子，试试缩短关键词或更换说法。' : '该分类下暂无内容'" /><nav v-if="kind==='search' && !items.length" class="search-empty-links" aria-label="继续探索"><RouterLink to="/recent">浏览最新</RouterLink><RouterLink to="/tags">按标签查找</RouterLink></nav></template>
           <nav class="pagination-bar fp-pagination" aria-label="列表分页"><button type="button" class="btn page-btn fp-control" :disabled="p <= 1" @click="read(p - 1)">‹ 上一页</button><span v-if="value.pageCount" class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span><span v-else>暂无分页</span><button type="button" class="btn page-btn fp-control" :disabled="p >= value.pageCount" @click="read(p + 1)">下一页 ›</button><button class="fp-control btn" v-if="p > value.pageCount && p > 1" type="button"  @click="read(1)">返回第一页</button></nav>
         </template>
-        <p v-else role="status">列表尚未读取。</p>
+        <p v-else-if="!loading && !error" role="status">列表尚未读取。</p>
       </div>
     </div>
     <div class="side"><SideBar /></div>
@@ -239,7 +241,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 .column-switch button { border: 0; padding: 6px 11px; border-radius: 7px; background: transparent; color: var(--fp-muted); font: inherit; font-size: 12px; cursor: pointer; }
 .column-switch button.selected { color: var(--fp-title); background: var(--fp-card); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 .column-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; padding: 0 16px 20px; }
-.column-card { min-width: 0; display: grid; grid-template-columns: 112px minmax(0,1fr); gap: 16px; padding: 14px; border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); background: var(--fp-card); transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+.column-card { min-width: 0; display: grid; grid-template-columns: 88px minmax(0,1fr); gap: 12px; padding: 12px; border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); background: var(--fp-card); transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
 .column-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--fp-accent) 40%, var(--fp-border)); box-shadow: 0 8px 24px rgba(60,45,30,.08); }
 .column-cover-link { position: relative; display: block; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 7px; background: linear-gradient(145deg,#ead6b6,#b38c61); box-shadow: 0 5px 14px rgba(50,35,20,.17); }
 .column-cover-link::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(255,255,255,.22); border-radius: inherit; }
@@ -249,10 +251,10 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 .column-cover-link img { transform: scale(1.035); }
 .cover-label { position: absolute; z-index: 1; left: 6px; bottom: 6px; padding: 3px 6px; border-radius: 4px; color: #fff; background: rgba(43,35,29,.72); font-size: 9px; }
 .column-card-copy { min-width: 0; display: flex; flex-direction: column; }
-.column-title { color: var(--fp-title); font-size: 16px; font-weight: 700; line-height: 1.4; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.column-title { color: var(--fp-title); font-size: 15px; font-weight: 600; line-height: 1.4; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .column-title:hover,.latest-chapter a:hover { text-decoration: underline; }
 .column-preview { margin: 8px 0 10px; min-height: 36px; color: var(--fp-muted); font-size: 12px; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.column-author-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--fp-border); color: var(--fp-muted); font-size: 11px; }
+.column-author-row { flex-wrap:wrap; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--fp-border); color: var(--fp-muted); font-size: 11px; }
 .column-author { color: var(--fp-muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .column-author:hover { text-decoration: underline; }
 .chapter-count { flex: none; color: var(--fp-accent); }
@@ -275,4 +277,6 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
   .column-title { font-size: 14px; }
   .column-preview { margin: 5px 0 7px; min-height: 34px; font-size: 11px; }
 }
+.listing-note{margin:0 16px 16px;color:var(--fp-muted);font-size:12px;line-height:1.7}.column-links{display:flex;justify-content:space-between;gap:12px;margin-top:auto}.column-author-row time{font-size:10px}.search-empty-links{display:flex;justify-content:center;gap:18px;padding:0 16px 24px;font-size:13px}
+@media(min-width:1600px){.column-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>

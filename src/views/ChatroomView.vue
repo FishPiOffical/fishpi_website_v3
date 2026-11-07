@@ -213,6 +213,8 @@ function clearScreen() {
           <!-- 1. 顶部输入与控制区域 -->
           <section class="cr-classic-reply">
             <ChatComposer
+              collapsible
+              :height="100"
               v-if="composerReady && isLoggedIn"
               ref="composerRef"
               v-model="draft"
@@ -444,6 +446,8 @@ function clearScreen() {
         <div class="cr-composer-panel">
           <div v-if="composerReady && isLoggedIn" class="composer-inner">
             <ChatComposer
+              collapsible
+              :height="100"
               ref="composerRef"
               v-model="draft"
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"

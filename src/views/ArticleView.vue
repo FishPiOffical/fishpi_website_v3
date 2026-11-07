@@ -42,7 +42,9 @@ const reactionEvents=useV3ReactionsStore()
 const route = useRoute(), router = useRouter()
 const routeMounted=ref(false)
 const loginRedirect=computed(()=>routeMounted.value?route.fullPath:route.fullPath.split('#')[0])
-onMounted(()=>{routeMounted.value=true})
+function retryPublicArticle(){if(!accessToken.value&&article.value?.oId===id.value)void load(true,'public')}
+onMounted(()=>{routeMounted.value=true;if(typeof window!=='undefined')window.addEventListener('fp:retry-public',retryPublicArticle)})
+onUnmounted(()=>{if(typeof window!=='undefined')window.removeEventListener('fp:retry-public',retryPublicArticle)})
 const auth = useAuthStore()
 const commentWrites=useV3CommentsStore(),commandOrigin=Symbol('article-comment-delete'),commentRefreshError=ref('')
 const { accessToken, isLoggedIn, account } = storeToRefs(auth)
@@ -256,7 +258,7 @@ async function refreshHeat() {
  finally{if(valid())heatRequest=null}
 }
 
-async function load(force=false,reason:'comments'|'owner'|'realtime'='comments') {
+async function load(force=false,reason:'comments'|'owner'|'realtime'|'public'='comments') {
   if (!id.value) return
   const version = ++readVersion, viewer = viewerIdentity.value, reqId = id.value, requestedPage = commentPage.value
   const current = () => !disposed && reqId === id.value && requestedPage === commentPage.value && version === readVersion && viewer === viewerIdentity.value
@@ -272,7 +274,7 @@ async function load(force=false,reason:'comments'|'owner'|'realtime'='comments')
   articleReading.value = true
   if (!paging) { article.value = null; loading.value = true }
   error.value = ''
-  if(force){if(reason==='owner')ownerRefreshError.value='';else if(reason==='realtime')realtimeReadError.value='';else commentRefreshError.value=''}
+  if(force){if(reason==='owner')ownerRefreshError.value='';else if(reason==='realtime'||reason==='public')realtimeReadError.value='';else commentRefreshError.value=''}
   try {
     const data = await fetchArticle(reqId, requestedPage)
     if (!current()) return
@@ -285,7 +287,7 @@ async function load(force=false,reason:'comments'|'owner'|'realtime'='comments')
       editingId.value=''; replyId.value=''; replyComment.value=null; paragraphIdForReply.value=''
       return
     }
-    if(refreshing){if(reason==='owner')ownerRefreshError.value='置顶已确认，文章状态重新读取失败，请重试读取。';else if(reason==='realtime')realtimeReadError.value='登录状态更新后，文章读取失败，请刷新重试。';else commentRefreshError.value='操作已确认，评论重新读取失败：'+(e instanceof Error?e.message:'请重试');return}
+    if(refreshing){if(reason==='owner')ownerRefreshError.value='置顶已确认，文章状态重新读取失败，请重试读取。';else if(reason==='public')realtimeReadError.value='网络暂不可用，正在显示已加载的公开内容。';else if(reason==='realtime')realtimeReadError.value='登录状态更新后，文章读取失败，请刷新重试。';else commentRefreshError.value='操作已确认，评论重新读取失败：'+(e instanceof Error?e.message:'请重试');return}
     article.value=null; error.value=e instanceof Error?e.message:'帖子加载失败'; disconnectHeat(); toc.value=[]
   } finally { if (current()) { loading.value = false; articleReading.value = false } }
 }
@@ -423,6 +425,7 @@ function itemHandlers(c: ArticleComment) {
     </p>
   </article>
   <template v-else-if="article">
+    <span v-if="!accessToken" data-public-content="ready" hidden />
     <p v-if="realtimeReadError" role="alert">{{ realtimeReadError }}</p>
     <DefineOwnerActions>
       <ArticleOwnerActions :article-id="article.oId" :author-id="article.articleAuthorId||''" :anonymous="Number(article.articleAnonymous)===1" :permanent="article.stick?.permanent||false" @changed="ownerChanged" @deleted="ownerDeleted" />

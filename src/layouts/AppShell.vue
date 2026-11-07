@@ -275,6 +275,7 @@ const pageRevision = useRouteDomBoundary(pageHost, routeView, () => route.fullPa
 
 const apiOffline = ref(false)
 let offlineBoundary = getAuthContextVersion(), offlineActor = auth.account?.oId, offlineHasToken = Boolean(auth.accessToken)
+watch(() => route.fullPath, () => { apiOffline.value=false })
 watch([() => auth.accessToken, () => auth.account?.oId], () => {
   const next = getAuthContextVersion(), actor = auth.account?.oId, hasToken = Boolean(auth.accessToken)
   if (next !== offlineBoundary || actor !== offlineActor || hasToken !== offlineHasToken) apiOffline.value = false
@@ -282,9 +283,12 @@ watch([() => auth.accessToken, () => auth.account?.oId], () => {
 }, { flush: 'sync' })
 
 let offlineNavigation = false
+function retryPublicContent(){apiOffline.value=false;window.dispatchEvent(new CustomEvent('fp:retry-public'))}
 function onApiOffline() {
   if (route.name === 'offline' || offlineNavigation) return
   apiOffline.value = true
+  // Only already-rendered public content can stay; authentication/permission cleanup remains local.
+  if (pageHost.value?.querySelector('[data-public-content="ready"]')) return
   offlineNavigation = true
   // Keep a banner if navigation is rejected; never retry the failed API command.
   void router.replace({ path: '/offline', query: { from: route.fullPath } })
@@ -308,7 +312,8 @@ onUnmounted(() => {
 <template>
   <div class="shell">
     <div v-if="apiOffline && route.name !== 'offline'" class="offline-banner">
-      <span>连不上摸鱼派接口</span>
+      <span>网络暂不可用，已显示内容可继续浏览。</span>
+      <button type="button" @click="retryPublicContent">重试读取</button>
       <RouterLink :to="{ path: '/offline', query: { from: route.fullPath } }" @click="apiOffline = false">
         查看详情
       </RouterLink>
@@ -462,13 +467,13 @@ onUnmounted(() => {
             :href="p.href"
             target="_blank"
             rel="noopener"
-            :style="{ color: p.color, background: p.bg }"
+            :style="{ color: p.color, background: `color-mix(in srgb, ${p.bg} 55%, var(--fp-card))` }"
           >
             <span class="partner-title">
               <img v-if="p.icon" :src="p.icon" width="16" height="16" alt="" />
               {{ p.title }}
             </span>
-            <span class="partner-desc">{{ p.desc }}</span>
+            <span class="partner-desc">{{ p.desc }}</span><small class="partner-label">站点支持</small>
           </a>
           <span class="partner-divider" aria-hidden="true">丨</span>
           <a
@@ -945,6 +950,7 @@ main.main--cr-modern {
   font-size: 13px;
   transition: transform 0.2s;
 }
+.partner-label{display:block;margin-top:5px;color:var(--fp-muted);font-size:9px}
 .partner:hover {
   transform: translateY(-2px);
 }

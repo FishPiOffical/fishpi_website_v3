@@ -25,6 +25,7 @@ const tokenListeners = new Set<(token: string | null) => void>()
 function publishToken(token: string | null) {
   if (import.meta.env.SSR) return
   accessToken = token
+  publicListFlights.clear()
   for (const listener of tokenListeners) listener(token)
 }
 
@@ -280,7 +281,21 @@ export const MAX_PRIVATE_ZIP_BYTES = 32 * 1024 * 1024
 export function requestSvg(path: string, init: RequestInit = {}): Promise<Blob> { return request<Blob>(path, { ...init, __svg: true, cache: 'no-store' }) }
 export function requestZip(path: string, init: RequestInit = {}): Promise<Blob> { return request<Blob>(path, { ...init, __zip: true }) }
 
+// Browser-only, concurrent public-list GETs. No response cache, private reads, signals or writes.
+const publicListFlights = new Map<string, Promise<unknown>>()
 export async function request<T = unknown>(path: string, init: RequestInitExtra = {}): Promise<T> {
+  const share = !import.meta.env.SSR && (init.method || 'GET').toUpperCase() === 'GET' &&
+    Object.keys(init).every(key=>['method','cache','credentials','signal','headers','body'].includes(key)) &&
+    !init.signal && !init.headers && !init.body && !init.__v3Retried && !init.__captchaRetried && !init.__zip && !init.__svg &&
+    /^\/api\/v3\/(?:articles|columns(?:\/hot)?|tags|domains|breezemoons|repeater\/items)(?:\?|$)/.test(path)
+  if (!share) return requestWithRetry<T>(path, init)
+  const key = JSON.stringify([getAuthContextVersion(), getAccessToken(), path, init.credentials || 'include', init.cache || 'default'])
+  let flight = publicListFlights.get(key)
+  if (!flight) { flight = requestWithRetry(path, init); publicListFlights.set(key, flight) }
+  try { return structuredClone(await flight) as T }
+  finally { if (publicListFlights.get(key) === flight) publicListFlights.delete(key) }
+}
+async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtra = {}): Promise<T> {
   // Bound SSR reads, including body consumption; a slow upstream must not hang HTML forever.
   if (import.meta.env.SSR && (init.method || 'GET').toUpperCase() === 'GET') {
     const timeout = AbortSignal.timeout(8000)

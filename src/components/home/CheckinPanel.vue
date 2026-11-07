@@ -40,7 +40,7 @@ onBeforeUnmount(() => { cancel(); clearNotice() })
     <section class="checkin-section" aria-label="今日签到活跃状态">
       <div class="checkin-head">
         <h3>每日签到</h3>
-        <span v-if="checkin.value.value" class="checkin-status" :class="{ 'is-done': checkin.value.value.checkedIn }">{{ checkin.value.value.checkedIn ? '已签到' : '待签到' }}</span>
+        <span v-if="checkin.value.value" class="checkin-status" role="status" :class="{ 'is-done': checkin.value.value.checkedIn }">{{ checkin.value.value.checkedIn ? '已签到' : '待签到' }}</span>
         <button type="button" class="refresh-btn" aria-label="刷新签到状态" title="刷新签到状态" :disabled="checkin.loading.value || reward.loading.value" @click="checkin.read(); reward.read()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg></button>
       </div>
       <p v-if="checkin.loading.value" role="status">读取中…</p>

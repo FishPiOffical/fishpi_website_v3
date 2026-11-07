@@ -121,7 +121,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
 </script>
 
 <template>
-  <div class="home" :class="{ editing, 'is-classic': !compactHome }">
+  <div class="home" :data-public-content="recentRead.data ? 'ready' : undefined" :class="{ editing, 'is-classic': !compactHome }">
+    <h1 class="home-a11y-title">摸鱼派社区动态</h1>
     <HomePreferenceRedirect />
     <div v-if="editing" class="edit-bar" role="toolbar" aria-label="首页布局编辑">
       <span>拖动模块到任意位置：模块上下半部插入同一列，左右边缘新开一列，行间空隙新起一行</span>
@@ -1069,4 +1070,5 @@ function scrollShelf(id: string, dir: -1 | 1) {
     width: 48px;
   }
 }
+.home-a11y-title{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 </style>

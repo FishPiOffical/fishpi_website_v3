@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { rememberChapter } from '@/utils/readingProgress'
 import { formatDisplayTime } from '@/utils/time'
 
 import VipNickname from '@/components/user/VipNickname.vue'
@@ -510,6 +511,7 @@ watch(()=>commentWrites.completed,command=>{if(command?.articleId===props.articl
 watch(()=>props.targetLocation,value=>{if(value)void nextTick(()=>{if(props.targetLocation===value)locateComment(value)});else paragraphLocationId.value=''},{flush:'post'})
 
 onMounted(() => {
+  if(props.column)rememberChapter(props.column.column.oId,props.article.oId)
   readerMounted.value=true
   loadSettings()
   onResize()
@@ -536,6 +538,7 @@ onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
 })
 
+watch(()=>[props.article.oId,props.column?.column.oId],()=>{if(readerMounted.value&&props.column)rememberChapter(props.column.column.oId,props.article.oId)},{flush:'post'})
 watch(commentingEnabled,()=>updateParagraphButtons())
 defineExpose({ openComments, openComposer, scrollCommentsTop, refreshParagraphComments })
 

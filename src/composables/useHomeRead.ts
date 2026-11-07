@@ -22,7 +22,7 @@ export function useHomeRead<K extends HomeRead>(key: K, initial: unknown) {
     const current = () => mounted && run === sequence && context === getAuthContextVersion() && token === auth.accessToken && actor === auth.account?.oId
     loading.value = data.value === null
     try { const result = await fetchHomeRead(key); if (current()) { data.value = result; recentReads.set(key, { expires: Date.now() + 300_000, value: structuredClone(result) }) } }
-    catch (e) { if (current()) { data.value = null; error.value = e instanceof Error ? e.message : '读取失败' } }
+    catch (e) { if (current()) { if ((e as {code?:string})?.code !== 'offline') data.value = null; error.value = e instanceof Error ? e.message : '读取失败' } }
     finally { if (current()) loading.value = false }
   }
   const stop = watch([() => auth.accessToken, () => auth.account?.oId], () => {
@@ -39,6 +39,8 @@ export function useHomeRead<K extends HomeRead>(key: K, initial: unknown) {
     if (data.value !== null && !auth.accessToken) recentReads.set(key, { expires: Date.now() + 300_000, value: structuredClone(data.value) })
     else void read()
   })
-  onScopeDispose(() => { mounted = false; stop(); clear() })
+  const retryPublic=()=>{void read()}
+  onMounted(()=>{if(typeof window!=='undefined')window.addEventListener('fp:retry-public',retryPublic)})
+  onScopeDispose(() => { if(typeof window!=='undefined')window.removeEventListener('fp:retry-public',retryPublic); mounted = false; stop(); clear() })
   return reactive({ data, loading, error, read })
 }

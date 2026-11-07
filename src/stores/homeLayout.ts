@@ -76,7 +76,7 @@ function locate(rows: HomeRow[], id: HomeModuleId) {
 export const useHomeLayoutStore = defineStore('homeLayout', () => {
   // The first browser tree must use the same layout as the public SSR tree.
   const state = ref<HomeLayoutState>(defaultHomeLayout())
-  const mode = ref<HomeVariant>('compact')
+  const mode = ref<HomeVariant>('classic')
   const editing = ref(false)
   const layouts: Partial<Record<HomeVariant, HomeLayoutState>> = {}
   const copy = (value: HomeLayoutState): HomeLayoutState => JSON.parse(JSON.stringify(value))

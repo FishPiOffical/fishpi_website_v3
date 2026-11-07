@@ -14,7 +14,7 @@ export const useV3ChatOnlineStore=defineStore('v3-chat-online',()=>{
  try{const result=await chatOnlinePage(p,abort.signal);if(valid()){users.value=result.list;total.value=result.total;page.value=result.page;pageCount.value=result.pageCount;hasMore.value=result.hasMore;nodesSampledAt.value=result.nodesSampledAt;nodesComplete.value=result.nodesComplete;readAt.value=Date.now()}}
  catch(e){if(valid()){empty();error.value=e instanceof Error?e.message:'在线名单读取失败'}}finally{if(valid()){loading.value=false;controller=null;if(dirty){dirty=false;void load(attempt.value)}}}}
  async function refresh(){if(loading.value){dirty=true;return}await load(page.value)}
- async function connect(){wanted=true;if(active())await refresh()}
+ async function connect(){const reuse=wanted&&(loading.value||readAt.value!==null&&Date.now()-readAt.value<15000);wanted=true;if(active()&&!reuse)await refresh()}
  function disconnect(){wanted=false;clear()}
  const stop=watch([accessToken,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),actor=account.value?.oId;if(!accessToken.value||next!==boundary||actor!==owner)clear();else{generation++;sequence++;controller?.abort();controller=null;dirty=false;loading.value=false}boundary=next;owner=actor;if(wanted&&active())void load(page.value)},{flush:'sync'})
  const focus=()=>{if(wanted&&active())void refresh()};if(!import.meta.env.SSR)window.addEventListener('focus',focus)

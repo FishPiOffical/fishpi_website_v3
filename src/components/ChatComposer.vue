@@ -15,6 +15,7 @@ const props = withDefaults(
     allowEmpty?: boolean
     submitText?: string
     /** 私信等场景只保留常用的格式、链接和图片工具 */
+    collapsible?: boolean
     compact?: boolean
   }>(),
   {
@@ -26,10 +27,14 @@ const props = withDefaults(
     allowEmpty: false,
     submitText: '发 送',
     compact: false,
+    collapsible:false,
   },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
 
+const editorExpanded=ref(false)
+function onEditorFocus(event:FocusEvent){if((event.target as HTMLElement)?.closest?.('.vditor'))editorExpanded.value=true}
+const editorOpen=computed(()=>!props.collapsible||editorExpanded.value||Boolean(props.modelValue))
 const sendError = ref('')
 const root = ref<HTMLElement | null>(null)
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
@@ -68,7 +73,8 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="root" class="composer">
+  <div ref="root" class="composer" :class="{'editor-collapsed':!editorOpen}" @focusin="onEditorFocus">
+    <button v-if="collapsible && !modelValue" class="editor-toggle" type="button" :aria-expanded="editorOpen" @click="editorExpanded=!editorExpanded">{{ editorOpen ? '收起编辑器' : '展开编辑器' }}</button>
     <slot name="top" />
     <MarkdownEditor
       ref="editor"
@@ -161,4 +167,5 @@ defineExpose({
   .tools { flex: 1 1 100%; gap: 2px; }
   .actions { justify-content: flex-end; }
 }
+.editor-toggle{align-self:flex-end;border:0;background:transparent;padding:2px 0;color:var(--fp-muted);font-size:11px;cursor:pointer}.editor-collapsed{gap:6px}.editor-collapsed :deep(.vditor){height:48px!important;min-height:48px!important}.editor-collapsed :deep(.vditor-toolbar){display:none!important}.editor-collapsed :deep(.vditor-content){height:46px!important;min-height:46px!important;overflow:hidden}.editor-collapsed :deep(.vditor-ir),.editor-collapsed :deep(.vditor-sv),.editor-collapsed :deep(.vditor-wysiwyg){min-height:46px!important}.editor-collapsed :deep(.vditor-reset){padding-top:10px!important;padding-bottom:10px!important}
 </style>
