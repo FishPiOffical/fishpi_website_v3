@@ -2,11 +2,10 @@
 export function createPublicHomeCache(ttlMs = 300_000, capacity = 16) {
   const values = new Map<string, { expires: number; value: unknown }>()
   const pending = new Map<string, Promise<unknown>>()
-  return async function read<T>(key: string, load: () => Promise<T>, staleMs = 0): Promise<T> {
+  return async function read<T>(key: string, load: () => Promise<T>, serveStale = false): Promise<T> {
     const cached = values.get(key)
     if (cached && cached.expires > Date.now()) return structuredClone(cached.value) as T
-    const stale = cached && cached.expires + staleMs > Date.now() ? cached : undefined
-    if (!stale) values.delete(key)
+    const stale = serveStale ? cached : undefined
     let task = pending.get(key)
     if (!task) {
       task = Promise.resolve().then(load).then(value => {
@@ -14,7 +13,7 @@ export function createPublicHomeCache(ttlMs = 300_000, capacity = 16) {
         values.set(key, { expires: Date.now() + ttlMs, value: structuredClone(value) })
         return value
       }).catch(error => {
-        if ([401, 403, 404, 410].includes(error?.status) && values.get(key) === stale) values.delete(key)
+        if (([401, 403, 404, 410].includes(error?.status) || ['unauthorized', 'forbidden', 'not_found', 'gone'].includes(error?.code)) && values.get(key) === cached) values.delete(key)
         throw error
       }).finally(() => { pending.delete(key) })
       pending.set(key, task)

@@ -4,7 +4,7 @@ import { consumeMemberPayload } from '@/seo/payload'
 import { getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 
-import { canKeepPublicSnapshot, HOME_MAX_AGE, memberSnapshotKey, readPublicSnapshot, removePublicSnapshot, savePublicSnapshot } from '@/utils/publicSnapshots'
+import { shouldInvalidatePublicSnapshot, PUBLIC_LIST_TTL, memberSnapshotKey, readPublicSnapshot, removePublicSnapshot, savePublicSnapshot } from '@/utils/publicSnapshots'
 
 function publicCard(profile: PublicUser) {
   const { userPoint: _points, onlineMinute: _minutes, ...card } = profile
@@ -37,19 +37,24 @@ export function useMemberProfile(name: Ref<string>): MemberProfile {
     const key = memberSnapshotKey(target)
     profileError.value = ''
     if (restore && !profile.value) {
-      const snapshot = await readPublicSnapshot(key, HOME_MAX_AGE, raw => publicCard(decodePublicUser(raw, target)))
+      const snapshot = await readPublicSnapshot(key, PUBLIC_LIST_TTL, raw => publicCard(decodePublicUser(raw, target)))
       if (!valid()) return
       if (snapshot) { profile.value = snapshot.value; snapshotExpires = snapshot.expires; profileFromCache.value = true }
     }
     profileLoading.value = profile.value === null
     try {
       const result = await fetchPublicUser(target, 'omit')
-      if (valid()) { profile.value = result; snapshotExpires = 0; profileFromCache.value = false; savePublicSnapshot(key, publicCard(result)) }
+      if (valid()) {
+        const sameProfile = snapshotExpires > Date.now() && profile.value?.id === result.id
+        profile.value = sameProfile && profile.value
+          ? { ...profile.value, userPoint: result.userPoint, onlineMinute: result.onlineMinute }
+          : result
+        profileFromCache.value = false
+        if (!sameProfile) { snapshotExpires = 0; savePublicSnapshot(key, publicCard(result)) }
+      }
     } catch (error) {
       if (valid()) {
-        const keep = canKeepPublicSnapshot(error)
-        if (!keep) removePublicSnapshot(key)
-        if (!keep || snapshotExpires <= Date.now()) profile.value = null
+        if (shouldInvalidatePublicSnapshot(error)) { removePublicSnapshot(key); profile.value = null }
         profileError.value = error instanceof Error ? error.message : '用户资料读取失败'
       }
     } finally {
@@ -64,8 +69,7 @@ export function useMemberProfile(name: Ref<string>): MemberProfile {
   }, { flush: 'sync' })
   onMounted(() => {
     mounted = true
-    if (profile.value && !auth.accessToken) savePublicSnapshot(memberSnapshotKey(name.value), publicCard(profile.value))
-    else void read(true)
+    if (!profile.value || auth.accessToken) void read(true)
   })
   onScopeDispose(() => { mounted = false; sequence++; stop(); profile.value = null })
   return { profile, profileError, profileLoading, profileFromCache, readProfile }

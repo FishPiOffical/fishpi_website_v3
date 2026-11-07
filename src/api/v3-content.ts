@@ -95,24 +95,24 @@ export async function v3Search(query: string, page = 1, size = 40): Promise<Arti
   if (!q) return []
   return articleList(`/api/v3/search?${params(page, size)}&q=${encodeURIComponent(q)}&sort=latest&type=all`)
 }
-async function directory(kind: 'tags' | 'domains'): Promise<Row[]> {
+async function directory(kind: 'tags' | 'domains', credentials?: RequestCredentials): Promise<Row[]> {
   const list: Row[] = []
   for (let p = 1; ; p++) {
     // Fail explicitly rather than return a misleading truncated directory.
     if (p > 1000) throw new ApiError('目录过大，请稍后再试', 503, 'directory_unavailable')
-    const page = decodeV3ContentPage(await get(`/api/v3/${kind}?${params(p, 50)}`))
+    const page = decodeV3ContentPage(await get(`/api/v3/${kind}?${params(p, 50)}`, credentials))
     list.push(...page.list)
     if (p >= page.pagination.pageCount) return list
   }
 }
-async function resolveDirectoryId(kind: 'tags' | 'domains', value: string): Promise<string> {
+async function resolveDirectoryId(kind: 'tags' | 'domains', value: string, credentials?: RequestCredentials): Promise<string> {
   if (/^\d{1,32}$/.test(value)) return pathId(value)
-  const matches = (await directory(kind)).filter(item => item.uri === value || item.title === value)
+  const matches = (await directory(kind, credentials)).filter(item => item.uri === value || item.title === value)
   if (matches.length !== 1) throw new ApiError(matches.length ? '目录名称不唯一，请从目录重新进入' : '目录不存在', matches.length ? 409 : 404, 'not_found')
   return pathId(id(matches[0]!.id))
 }
 export async function resolveV3TagId(value: string): Promise<string> { return resolveDirectoryId('tags', value) }
-async function articleFeedPath(kind: ArticleFeedKind, page: number, size: number, extra: string): Promise<string | null> {
+async function articleFeedPath(kind: ArticleFeedKind, page: number, size: number, extra: string, credentials?: RequestCredentials): Promise<string | null> {
   const paging = params(page, size)
   if (kind === 'search') {
     const q = extra.trim()
@@ -121,7 +121,7 @@ async function articleFeedPath(kind: ArticleFeedKind, page: number, size: number
   }
   if (kind === 'domain' || kind === 'tag') {
     const plural = kind === 'domain' ? 'domains' : 'tags'
-    const resolved = await resolveDirectoryId(plural, extra)
+    const resolved = await resolveDirectoryId(plural, extra, credentials)
     return `/api/v3/${plural}/${resolved}/articles?${paging}&sort=latest&type=all`
   }
   const sort = kind === 'hot' ? 'month-comments' : kind === 'good' ? 'hot' : kind === 'reply' ? 'active' : 'latest'
@@ -138,7 +138,7 @@ export async function v3ArticleFeed(kind: ArticleFeedKind, page = 1, size = 40, 
 export type V3ArticleFeedPage = { list: ArticleSummary[]; p: number; size: number; total: number; pageCount: number }
 export async function v3ArticleFeedPage(kind: ArticleFeedKind, page = 1, size = 20, extra = '', credentials?: RequestCredentials): Promise<V3ArticleFeedPage> {
   if (page > 42949672) throw new ApiError('页码不合法', 422)
-  const path = await articleFeedPath(kind, page, size, extra)
+  const path = await articleFeedPath(kind, page, size, extra, credentials)
   if (!path) throw new ApiError('请输入搜索关键词', 422)
   const data = decodeV3ContentPage(await get(path, credentials))
   if (data.pagination.p !== page || data.pagination.size !== size) throw invalid()

@@ -37,10 +37,10 @@ export function decodeArticleListing(value: unknown, kind: ArticleFeedKind, extr
   const list = r.list.map(decodePublicArticleSummary); if (new Set(list.map(x => x.oId)).size !== list.length) throw invalid()
   return { ...meta, resource: 'articles', list }
 }
-export async function fetchArticleListing(kind: ArticleFeedKind, extra = '', order: ColumnOrder = 'recent', p = 1): Promise<ArticleListing> {
+export async function fetchArticleListing(kind: ArticleFeedKind, extra = '', order: ColumnOrder = 'recent', p = 1, credentials?: RequestCredentials): Promise<ArticleListing> {
   if (!kinds.includes(kind) || !['recent', 'hot'].includes(order) || typeof extra !== 'string' || !Number.isSafeInteger(p) || p < 1 || p > 42949672) throw new ApiError('文章列表参数不合法', 422)
   const meta = { kind, extra, order }
-  const raw = kind === 'long' ? { ...meta, resource: 'columns', ...await fetchPublicColumnCards(order === 'recent' ? 'latest' : 'hot', p, 12) }
-    : { ...meta, resource: 'articles', ...await v3ArticleFeedPage(kind, p, 20, extra) }
+  const raw = kind === 'long' ? { ...meta, resource: 'columns', ...await fetchPublicColumnCards(order === 'recent' ? 'latest' : 'hot', p, 12, credentials) }
+    : { ...meta, resource: 'articles', ...await v3ArticleFeedPage(kind, p, 20, extra, credentials) }
   return decodeArticleListing(raw, kind, extra, order, p)
 }

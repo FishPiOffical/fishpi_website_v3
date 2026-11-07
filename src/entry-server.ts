@@ -24,11 +24,12 @@ import { shouldPrefetchSsr } from './seo/ssrRoutes'
 setSsrReadGate(createSsrUpstreamGate())
 const readPublicHome = createPublicHomeCache()
 const readPublicDirectory = createPublicHomeCache(1_800_000, 8)
-const homeStaleKeys = new Set(['recent', 'hot', 'columnsRecent', 'columnsHot', 'tags', 'ranking:checkin:8', 'ranking:online:8'])
+const readPublicListing = createPublicHomeCache(300_000, 64)
+const readPublicOverview = createPublicHomeCache(300_000, 24)
+const homeStaleKeys = new Set(['recent', 'hot', 'columnsRecent', 'columnsHot', 'tags', 'ranking:checkin:8', 'ranking:online:8', 'recent-members'])
 const upstreamOrigin = () => process.env.VITE_API_TARGET || process.env.API_TARGET || 'https://fishpi.cn'
 function homeRead<T>(key: string, load: () => Promise<T>) {
-  const staleMs = homeStaleKeys.has(key) ? 120_000 : 0
-  return readPublicHome(`${upstreamOrigin()}:${key}`, load, staleMs).catch(error => {
+  return readPublicHome(`${upstreamOrigin()}:${key}`, load, homeStaleKeys.has(key)).catch(error => {
     if (error?.code === 'ssr_deferred') throw error
     // Resource and status only: never log upstream bodies, credentials or request headers.
     console.warn('[SSR homepage] preload failed', key, typeof error?.status === 'number' ? error.status : 'network')
@@ -80,9 +81,13 @@ async function prefetch(url: string): Promise<SsrPayload> {
   }
 }
 
+function publicListing(kind: ArticleFeedKind, extra = '') {
+  return readPublicListing(JSON.stringify([upstreamOrigin(), kind, extra]), () => fetchArticleListing(kind, extra), true)
+}
+
 async function prefetchPage(path: string): Promise<SsrPayload> {
   if (path === '/statistic') return { statistics: await fetchStatistics() }
-  if (path === '/milestones') return { milestonePage: await listMilestones() }
+  if (path === '/milestones') return { milestonePage: await readPublicOverview(`${upstreamOrigin()}:milestones`, () => listMilestones(), true) }
   const articleMatch = path.match(/^\/article\/([^/]+)$/)
   if (articleMatch) {
     const article = await fetchArticle(articleMatch[1])
@@ -97,7 +102,7 @@ async function prefetchPage(path: string): Promise<SsrPayload> {
 
   if (path === '/domains' || path === '/tags') {
     const kind = path === '/domains' ? 'domains' : 'tags'
-    return { directoryPage: await readPublicDirectory(`${upstreamOrigin()}:${kind}:1`, () => fetchDirectoryPage(kind), 120_000) }
+    return { directoryPage: await readPublicDirectory(`${upstreamOrigin()}:${kind}:1`, () => fetchDirectoryPage(kind), true) }
   }
 
   if (path === '/breezemoons') {
@@ -105,7 +110,7 @@ async function prefetchPage(path: string): Promise<SsrPayload> {
   }
 
   const ranking = path.match(/^\/top\/([^/]+)$/)?.[1]
-  if (ranking && Object.hasOwn(rankingTitles, ranking)) return { rankingPage: await fetchRanking(ranking as RankingType) }
+  if (ranking && Object.hasOwn(rankingTitles, ranking)) return { rankingPage: await readPublicOverview(`${upstreamOrigin()}:ranking:${ranking}`, () => fetchRanking(ranking as RankingType), true) }
 
   if (path === '/repeater') {
     return { repeater: await fetchRepeaterItems() }
@@ -125,20 +130,20 @@ async function prefetchPage(path: string): Promise<SsrPayload> {
   }
   if (listMap[path]) {
     const kind = listMap[path]
-    return { articleListing: await fetchArticleListing(kind) }
+    return { articleListing: await publicListing(kind) }
   }
 
   const domainMatch = path.match(/^\/domain\/([^/]+)$/)
   if (domainMatch) {
     return {
-      articleListing: await fetchArticleListing('domain', decodeURIComponent(domainMatch[1])),
+      articleListing: await publicListing('domain', decodeURIComponent(domainMatch[1])),
     }
   }
 
   const tagMatch = path.match(/^\/tag\/([^/]+)$/)
   if (tagMatch) {
     return {
-      articleListing: await fetchArticleListing('tag', decodeURIComponent(tagMatch[1])),
+      articleListing: await publicListing('tag', decodeURIComponent(tagMatch[1])),
     }
   }
   return {}

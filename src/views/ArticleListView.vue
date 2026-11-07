@@ -78,7 +78,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
             <p v-if="!columns.length" class="column-empty">本页暂无可见专栏。</p>
           </div>
           <template v-else><ArticleFeed :items="items" :empty="kind==='search' ? '没有找到相关帖子，试试缩短关键词或更换说法。' : '该分类下暂无内容'" /><nav v-if="kind==='search' && !items.length" class="search-empty-links" aria-label="继续探索"><RouterLink to="/recent">浏览最新</RouterLink><RouterLink to="/tags">按标签查找</RouterLink></nav></template>
-          <nav class="pagination-bar fp-pagination" aria-label="列表分页"><button type="button" class="btn page-btn fp-control" :disabled="p <= 1" @click="read(p - 1)">‹ 上一页</button><span v-if="value.pageCount" class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span><span v-else>暂无分页</span><button type="button" class="btn page-btn fp-control" :disabled="p >= value.pageCount" @click="read(p + 1)">下一页 ›</button><button class="fp-control btn" v-if="p > value.pageCount && p > 1" type="button"  @click="read(1)">返回第一页</button></nav>
+          <nav class="pagination-bar fp-pagination" aria-label="列表分页"><button type="button" class="btn page-btn fp-control" :disabled="p <= 1" @click="read(p - 1, true)">‹ 上一页</button><span v-if="value.pageCount" class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span><span v-else>暂无分页</span><button type="button" class="btn page-btn fp-control" :disabled="p >= value.pageCount" @click="read(p + 1, true)">下一页 ›</button><button class="fp-control btn" v-if="p > value.pageCount && p > 1" type="button"  @click="read(1)">返回第一页</button></nav>
         </template>
         <p v-else-if="!loading && !error" role="status">列表尚未读取。</p>
       </div>

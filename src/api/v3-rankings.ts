@@ -50,9 +50,9 @@ export function decodeRanking(value: unknown, type: RankingType, sub = rankingSu
   return result
 }
 /** SSR stores the already projected page, whereas HTTP carries nested pagination. */
-export function decodeInitialRanking(value: unknown, type: RankingType, sub: string, size: number) {
+export function decodeInitialRanking(value: unknown, type: RankingType, sub: string, size: number, page = 1) {
   const row = object(value)
-  return decodeRanking({ ...row, pagination: { p: row.p, size: row.size, total: row.total, pageCount: row.pageCount } }, type, sub, 1, size)
+  return decodeRanking({ ...row, pagination: { p: row.p, size: row.size, total: row.total, pageCount: row.pageCount } }, type, sub, page, size)
 }
 export async function fetchRanking(type: RankingType, p = 1, sub?: string, size = 20, credentials?: RequestCredentials): Promise<RankingPage> {
   rankingType(type); const normalized = rankingSubType(type, sub)

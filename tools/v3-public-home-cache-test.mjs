@@ -31,27 +31,27 @@ assert.deepEqual(await read('recent', async () => ['evicted']), ['evicted'])
 console.log('PASS public home cache: concurrent dedupe, request clone isolation, TTL, valid empty, uncached failures, origin separation and bounded eviction')
 
 const readStale = createPublicHomeCache(1000)
-await readStale('ranking', async () => ['first'], 2000)
+await readStale('ranking', async () => ['first'], true)
 now += 1000
 let refreshes = 0, finishRefresh
 const refresh = () => { refreshes++; return new Promise(resolve => { finishRefresh = resolve }) }
-assert.deepEqual(await readStale('ranking', refresh, 2000), ['first'])
-assert.deepEqual(await readStale('ranking', refresh, 2000), ['first'])
+assert.deepEqual(await readStale('ranking', refresh, true), ['first'])
+assert.deepEqual(await readStale('ranking', refresh, true), ['first'])
 assert.equal(refreshes, 1)
 finishRefresh(['second'])
 await new Promise(resolve => setImmediate(resolve))
-assert.deepEqual(await readStale('ranking', refresh, 2000), ['second'])
-now += 3000
-await assert.rejects(readStale('ranking', async () => { throw Error('expired') }, 2000), /expired/)
-console.log('PASS stale public home data: bounded window and one shared background refresh')
+assert.deepEqual(await readStale('ranking', refresh, true), ['second'])
+now += 86_400_000
+assert.deepEqual(await readStale('ranking', async () => { throw Error('temporary failure') }, true), ['second'])
+console.log('PASS stale public home data: old data remains eligible and one refresh is shared')
 
 const readOnFailure = createPublicHomeCache(1000)
-await readOnFailure('public', async () => ['last success'], 2000)
+await readOnFailure('public', async () => ['last success'], true)
 now += 1000
 const unavailable = async () => { throw Object.assign(Error('temporary'), { status: 503 }) }
-assert.deepEqual(await readOnFailure('public', unavailable, 2000), ['last success'])
+assert.deepEqual(await readOnFailure('public', unavailable, true), ['last success'])
 await new Promise(resolve => setImmediate(resolve))
-assert.deepEqual(await readOnFailure('public', async () => { throw Object.assign(Error('gone'), { status: 410 }) }, 2000), ['last success'])
+assert.deepEqual(await readOnFailure('public', async () => { throw Object.assign(Error('gone'), { status: 410 }) }, true), ['last success'])
 await new Promise(resolve => setImmediate(resolve))
-await assert.rejects(readOnFailure('public', unavailable, 2000), /temporary/)
+await assert.rejects(readOnFailure('public', unavailable, true), /temporary/)
 console.log('PASS temporary refresh failure retains old public data, confirmed removal invalidates it')

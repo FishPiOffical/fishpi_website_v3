@@ -68,9 +68,9 @@ function metricName(key: string) { if (key === 'points') return ['balance', 'con
       </ol>
       <p v-if="!value.list.length" class="ranking-empty">本页暂无排名记录。</p>
       <div v-if="!compact" class="ranking-pager">
-        <button type="button" :disabled="p <= 1" @click="read(p - 1)">上一页榜单</button>
+        <button type="button" :disabled="p <= 1" @click="read(p - 1, true)">上一页榜单</button>
         <span class="pager-status">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span>
-        <button type="button" :disabled="p >= value.pageCount" @click="read(p + 1)">下一页榜单</button>
+        <button type="button" :disabled="p >= value.pageCount" @click="read(p + 1, true)">下一页榜单</button>
       </div>
     </template>
     <p v-else-if="!compact && !loading && !error" role="status" class="ranking-status">榜单尚未读取。</p>

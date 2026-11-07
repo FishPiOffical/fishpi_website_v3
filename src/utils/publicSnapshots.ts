@@ -1,6 +1,6 @@
 type Snapshot = { key: string; savedAt: number; value: unknown }
-export const HOME_MAX_AGE = 600_000
-export const DIRECTORY_MAX_AGE = 3_600_000
+export const PUBLIC_LIST_TTL = 300_000
+export const PUBLIC_DIRECTORY_TTL = 1_800_000
 export function memberSnapshotKey(name: string) { return `member:${name.toLowerCase()}` }
 
 const storeName = 'snapshots'
@@ -28,7 +28,7 @@ function storageKey(key: string) {
   return `${import.meta.env?.VITE_BROWSER_API_ORIGIN || ''}|${key}`
 }
 
-export async function readPublicSnapshot<T>(key: string, maxAge: number, decode: (value: unknown) => T) {
+export async function readPublicSnapshot<T>(key: string, ttl: number, decode: (value: unknown) => T) {
   if (typeof indexedDB === 'undefined') return null
   let timer: ReturnType<typeof setTimeout> | undefined
   const read = async () => {
@@ -41,8 +41,8 @@ export async function readPublicSnapshot<T>(key: string, maxAge: number, decode:
     })
     if (!entry || !Number.isFinite(entry.savedAt)) return null
     const age = Date.now() - entry.savedAt
-    if (age < 0 || age >= maxAge) return null
-    return { value: decode(entry.value), expires: entry.savedAt + maxAge }
+    if (age < 0) return null
+    return { value: decode(entry.value), fresh: age < ttl, expires: entry.savedAt + ttl }
   }
   try {
     return await Promise.race([read(), new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 120) })])
@@ -71,7 +71,8 @@ export function removePublicSnapshot(key: string) {
   void database().then(db => db?.transaction(storeName, 'readwrite').objectStore(storeName).delete(storageKey(key))).catch(() => {})
 }
 
-export function canKeepPublicSnapshot(error: unknown) {
+export function shouldInvalidatePublicSnapshot(error: unknown) {
   const failure = error as { status?: number; code?: string }
-  return failure?.code === 'offline' || failure?.status === 429 || (failure?.status ?? 0) >= 500
+  return [401, 403, 404, 410].includes(failure?.status ?? 0)
+    || ['unauthorized', 'forbidden', 'not_found', 'gone'].includes(failure?.code ?? '')
 }
