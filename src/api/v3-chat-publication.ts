@@ -1,5 +1,5 @@
 import {ApiError,request} from './http'
-export type ChatPublicationCommand={content:string;client:string;key:string}
+export type ChatPublicationCommand={content:string;client:string;key:string;origin?:'repeat'}
 export type ChatPublicationReceipt={id:string;createdAt:number}
 export function chatPublicationContent(value:string){if(typeof value!=='string')throw new ApiError('消息正文不合法',422);const content=value.trim();if(!content||content.length>4096||/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(content))throw new ApiError('消息正文须为1至4096个字符',422);return content}
 export async function publishChat(command:ChatPublicationCommand):Promise<ChatPublicationReceipt>{const content=chatPublicationContent(command.content);if(command.client!=='Web/PC网页端'||typeof command.key!=='string'||!/^[A-Za-z0-9._:-]{1,128}$/.test(command.key))throw new ApiError('发送参数不合法',422)

@@ -21,7 +21,7 @@ export const useV3ChatPublicationStore=defineStore('v3-chat-publication',()=>{
  if(!valid())return null
  pending.value=null;completed.value=command;receipt.value=result;currentMessage.value=null;busy.value=false;revision.value++;void readCurrent();return result
  }
- async function send(content:string){if(pending.value||busy.value)return null;let normalized:string;try{normalized=chatPublicationContent(content)}catch(e){error.value=e instanceof Error?e.message:'正文不合法';return null}return execute({content:normalized,client:'Web/PC网页端',key:profileOperationKey()},false)}
+ async function send(content:string,origin?:'repeat'){if(pending.value||busy.value)return null;let normalized:string;try{normalized=chatPublicationContent(content)}catch(e){error.value=e instanceof Error?e.message:'正文不合法';return null}return execute({content:normalized,client:'Web/PC网页端',key:profileOperationKey(),...(origin?{origin}:{})},false)}
  async function retry(confirmed=false){if(!pending.value||needsConfirmation.value&&!confirmed)return null;return execute(pending.value,true)}
  function cancelRequestedConfirmation(){if(needsConfirmation.value&&!busy.value){pending.value=null;needsConfirmation.value=false;error.value=''}}
  return{pending,completed,receipt,busy,error,needsConfirmation,currentMessage,reading,readError,revision,send,retry,readCurrent,cancelRequestedConfirmation}

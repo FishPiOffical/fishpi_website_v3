@@ -3,15 +3,14 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink,useRoute,useRouter } from 'vue-router'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
 import { storeToRefs } from 'pinia'
-import ChatWeatherEditor from '@/components/chat/ChatWeatherEditor.vue'
 import ChatWeatherRecovery from '@/components/chat/ChatWeatherRecovery.vue'
-import ChatMusicEditor from '@/components/chat/ChatMusicEditor.vue'
 import ChatMusicRecovery from '@/components/chat/ChatMusicRecovery.vue'
 import ChatBarrageEditor from '@/components/chat/ChatBarrageEditor.vue'
 import ChatBarrageRecovery from '@/components/chat/ChatBarrageRecovery.vue'
 import {useChatMessageSource} from '@/composables/useChatMessageSource'
 import {getAuthContextVersion} from '@/api/http'
 import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
+import ChatRepeatAction from '@/components/chat/ChatRepeatAction.vue'
 import ChatRevokeAction from '@/components/chat/ChatRevokeAction.vue'
 import ChatRevokeRecovery from '@/components/chat/ChatRevokeRecovery.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
@@ -61,8 +60,6 @@ const draft = ref('')
 watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{draft.value=''},{flush:'sync'})
 const scroller = ref<HTMLElement | null>(null)
 const showPacket = ref(false)
-const showWeather=ref(false)
-const showMusic=ref(false)
 const showBarrage = ref(false)
 const showPaint = ref(false)
 
@@ -70,17 +67,13 @@ const chatTools = [
   { id: 'packet', label: '红包', title: '发放红包', path: 'M5 3h14v18H5z M5 8l7 4 7-4 M9 15h6' },
   { id: 'paint', label: '涂鸦', title: '涂鸦画板', path: 'm14 5 5 5 M4 20l4-1L21 6l-4-4L4 15v5Z M13 20h8' },
   { id: 'barrage', label: '弹幕', title: '发送弹幕', path: 'M4 4h16v13H9l-5 4V4Z M8 9h8 M8 13h5' },
-  { id: 'music', label: '音乐', title: '分享音乐', path: 'M9 18V5l11-2v13 M9 8l11-2 M9 18c0 2-6 3-6 0s6-3 6 0Z M20 16c0 2-6 3-6 0s6-3 6 0Z' },
-  { id: 'weather', label: '天气', title: '分享天气', path: 'M12 2v2 M5 5l1 1 M2 12h2 M18 5l-1 1 M9 16a5 5 0 1 1 8-5 M8 20h11a3 3 0 0 0 0-6 4 4 0 0 0-7-2 4 4 0 0 0-4 8Z' },
 ] as const
-function toolOpen(id: typeof chatTools[number]['id']) { return ({ packet: showPacket.value, paint: showPaint.value, barrage: showBarrage.value, music: showMusic.value, weather: showWeather.value })[id] }
+function toolOpen(id: typeof chatTools[number]['id']) { return ({ packet: showPacket.value, paint: showPaint.value, barrage: showBarrage.value })[id] }
 
-function togglePanel(panel: 'packet' | 'barrage' | 'paint' | 'music' | 'weather') {
+function togglePanel(panel: 'packet' | 'barrage' | 'paint') {
   showPacket.value = panel === 'packet' && !showPacket.value
   showBarrage.value = panel === 'barrage' && !showBarrage.value
   showPaint.value = panel === 'paint' && !showPaint.value
-  showMusic.value = panel === 'music' && !showMusic.value
-  showWeather.value = panel === 'weather' && !showWeather.value
 }
 
 const showNodes = ref(false)
@@ -285,8 +278,6 @@ function clearScreen() {
 
             <!-- 弹幕展开表单 -->
             <ChatBarrageEditor v-if="showBarrage" @close="showBarrage=false" />
-            <ChatMusicEditor v-if="showMusic" @close="showMusic=false" />
-            <ChatWeatherEditor v-if="showWeather" @close="showWeather=false" />
 
             <!-- 涂鸦面板 -->
             <div v-if="showPaint" class="paint-box-wrap">
@@ -339,6 +330,7 @@ function clearScreen() {
                 <V3ReactionBar kind="chat" :target-id="msg.oId" />
               </template>
               <template #actions>
+                <ChatRepeatAction v-if="!msg.redPacket && !msg.card" :id="msg.oId" />
                 <button type="button" @click="openContext(msg.oId)">上下文</button>
                 <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
                 <template v-if="!msg.redPacket && accessToken">
@@ -450,6 +442,7 @@ function clearScreen() {
                 <V3ReactionBar kind="chat" :target-id="msg.oId" />
               </template>
               <template #actions>
+                <ChatRepeatAction v-if="!msg.redPacket && !msg.card" :id="msg.oId" />
                 <button type="button" @click="openContext(msg.oId)">上下文</button>
                 <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
                 <template v-if="!msg.redPacket && accessToken">
@@ -514,8 +507,6 @@ function clearScreen() {
 
             <!-- 弹幕表单 -->
             <ChatBarrageEditor v-if="showBarrage" @close="showBarrage=false" />
-            <ChatMusicEditor v-if="showMusic" @close="showMusic=false" />
-            <ChatWeatherEditor v-if="showWeather" @close="showWeather=false" />
 
             <!-- 涂鸦面板 -->
             <div v-if="showPaint" class="paint-box-wrap">
