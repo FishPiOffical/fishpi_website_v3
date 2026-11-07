@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DEFAULT_AVATAR } from '@/utils/avatar'
 import { formatDateTime } from '@/utils/time'
 
 import {computed,ref,watch} from 'vue'
@@ -9,18 +10,55 @@ import {useV3ChatOnlineStore} from '@/stores/v3ChatOnline'
 const online=useV3ChatOnlineStore(),{accessToken,account}=storeToRefs(useAuthStore()),query=ref('')
 watch(()=>account.value?.oId,()=>{query.value=''})
 const filtered=computed(()=>{const key=query.value.trim().toLowerCase();return online.users.filter(u=>u.userName.toLowerCase().includes(key))})
+function avatarError(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 </script>
-<template><div class="online-list">
- <p v-if="!accessToken||!account?.oId">登录后可读取在线名单。</p>
- <template v-else>
-  <p>本次可见人数：{{ online.total===null?'尚未取得':online.total }} <button type="button" :disabled="online.loading" @click="online.refresh">刷新在线名单</button></p>
-  <p class="scope">非全站实时人数；在线变化时，分页结果可能改变。</p>
-  <p v-if="online.nodesComplete===false" class="scope">节点采样不完整，名单可能有缺漏。</p><p v-if="online.nodesSampledAt===0" class="scope">节点尚未采样。</p><p v-else-if="online.nodesSampledAt" class="scope">节点采样时间：{{ formatDateTime(online.nodesSampledAt) }}</p>
-  <p v-if="online.loading" role="status">正在读取在线名单…</p><p v-if="online.error" role="alert">{{ online.error }} <button type="button" :disabled="online.loading" @click="online.retry">重试第{{ online.attempt }}页</button></p>
-  <label v-if="online.users.length">筛选本页 <input v-model="query" maxlength="64" type="search" placeholder="本页用户名" /></label>
-  <ul><li v-for="user in filtered" :key="user.id"><RouterLink :to="`/member/${encodeURIComponent(user.userName)}`">{{ user.userName }}</RouterLink></li></ul>
-  <p v-if="!online.loading&&!online.error&&!online.users.length">本页暂无可见用户。</p><p v-else-if="online.users.length&&!filtered.length">本页没有匹配的用户。</p>
-  <nav v-if="online.pageCount||online.page>1"><button type="button" :disabled="online.loading||online.page<=1" @click="query='';online.load(online.page-1)">上一页在线用户</button><span>第{{ online.page }}页 / 共{{ online.pageCount }}页</span><button type="button" :disabled="online.loading||!online.hasMore" @click="query='';online.load(online.page+1)">下一页在线用户</button></nav>
- </template>
-</div></template>
-<style scoped lang="scss">.online-list{min-width:0;overflow-wrap:anywhere}p{margin:6px 0}.scope{font-size:12px;color:var(--fp-muted)}button,input{font:inherit;border:1px solid var(--fp-border);border-radius:5px;background:var(--fp-card);color:var(--fp-text);padding:4px 7px;margin:3px}button{cursor:pointer}button:disabled{opacity:.45;cursor:default}input{width:100%;box-sizing:border-box}ul{list-style:none;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}a{color:inherit;text-decoration:none}nav{display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:12px}[role=alert]{color:#bf503c}</style>
+<template>
+ <div class="online-list">
+  <p v-if="!accessToken || !account?.oId" class="empty">登录后可查看在线成员</p>
+  <template v-else>
+   <div class="online-summary">
+    <div><span class="count">{{ online.total === null ? '—' : online.total }}</span><span class="count-label">本次可见成员</span></div>
+    <button class="refresh" type="button" :disabled="online.loading" aria-label="刷新在线名单" title="刷新在线名单" @click="online.refresh"><svg :class="{ spinning: online.loading }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button>
+   </div>
+   <details class="scope"><summary>名单范围与采样信息</summary><p>仅展示本次采样可见成员，并非全站实时人数；成员变化可能影响分页。</p><p v-if="online.nodesComplete === false">节点采样不完整，名单可能有缺漏。</p><p v-if="online.nodesSampledAt === 0">节点尚未采样。</p><p v-else-if="online.nodesSampledAt">采样于 {{ formatDateTime(online.nodesSampledAt) }}</p></details>
+   <label v-if="online.users.length" class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input v-model="query" maxlength="64" type="search" aria-label="筛选本页在线成员" placeholder="搜索本页成员" /></label>
+   <p v-if="online.loading" class="empty" role="status">正在读取在线名单…</p>
+   <div v-if="online.error" class="error" role="alert"><span>{{ online.error }}</span><button type="button" :disabled="online.loading" @click="online.retry">重试第 {{ online.attempt }} 页</button></div>
+   <ul v-if="filtered.length"><li v-for="user in filtered" :key="user.id"><RouterLink :to="`/member/${encodeURIComponent(user.userName)}`" :data-user-card="user.userName" :title="user.userName"><img :src="user.userAvatarURL || DEFAULT_AVATAR" alt="" loading="lazy" @error="avatarError"/><span>{{ user.userName }}</span></RouterLink></li></ul>
+   <p v-if="!online.loading && !online.error && !online.users.length" class="empty">本页暂无可见成员</p><p v-else-if="online.users.length && !filtered.length" class="empty">本页没有匹配的成员</p>
+   <nav v-if="online.pageCount || online.page > 1" aria-label="在线成员分页"><button type="button" :disabled="online.loading || !!online.error || online.page <= 1" @click="query='';online.load(online.page-1)">上一页</button><span>{{ online.page }} / {{ online.pageCount || '—' }}</span><button type="button" :disabled="online.loading || !!online.error || !online.hasMore" @click="query='';online.load(online.page+1)">下一页</button></nav>
+  </template>
+ </div>
+</template>
+<style scoped>
+.online-list { min-width:0; overflow-wrap:anywhere; }
+.online-summary,.online-summary>div { display:flex; align-items:center; gap:8px; }
+.online-summary { justify-content:space-between; }
+.count { font-size:26px; font-weight:700; line-height:1.3; color:var(--fp-title); font-variant-numeric:tabular-nums; }
+.count-label { color:var(--fp-muted); font-size:11px; }
+button { font:inherit; border:1px solid var(--fp-border); border-radius:6px; background:var(--fp-card); color:var(--fp-text); padding:5px 9px; cursor:pointer; transition:background 150ms; }
+button:hover:not(:disabled) { background:var(--fp-hover); }
+button:disabled { opacity:.4; cursor:default; }
+.refresh { display:grid; place-items:center; width:28px; height:28px; padding:5px; border:0; background:var(--fp-hover); color:var(--fp-muted); }
+svg { flex:none; width:16px; height:16px; }
+.scope { margin:6px 0 12px; color:var(--fp-muted); font-size:11px; }
+summary { cursor:pointer; width:fit-content; }
+.scope p { margin:6px 0; line-height:1.6; }
+.search { display:flex; align-items:center; gap:7px; padding:7px 9px; border:1px solid var(--fp-border); border-radius:7px; background:var(--fp-bg); color:var(--fp-muted); }
+input { width:100%; min-width:0; padding:0; border:0; background:transparent; color:var(--fp-text); font:inherit; outline:none; }
+.search:focus-within,button:focus-visible,summary:focus-visible,a:focus-visible { outline:2px solid var(--fp-primary); outline-offset:2px; }
+ul { list-style:none; margin:10px 0; padding:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; max-height:300px; overflow:auto; }
+li { min-width:0; }
+a { display:flex; align-items:center; gap:7px; min-width:0; padding:6px 4px; border-radius:6px; color:var(--fp-text); text-decoration:none; }
+a:hover { background:var(--fp-hover); }
+a:hover span { text-decoration:underline; text-underline-offset:3px; }
+a span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+img { width:26px; height:26px; flex:none; border-radius:50%; object-fit:cover; }
+nav { display:flex; align-items:center; justify-content:space-between; gap:5px; padding-top:10px; border-top:1px solid var(--fp-border); font-size:11px; }
+nav span { color:var(--fp-muted); font-variant-numeric:tabular-nums; }
+.empty { margin:12px 0; padding:12px 0; text-align:center; color:var(--fp-muted); }
+.error { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:9px; margin:10px 0; border-radius:6px; background:var(--fp-hover); color:#bf503c; }
+.spinning { animation:spin 1.1s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { button { transition:none; }.spinning { animation:none; } }
+</style>

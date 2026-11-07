@@ -12,5 +12,23 @@ async function save(){if(!auth.accessToken||!auth.account?.oId||store.pending||s
 watch(()=>store.completed,command=>{if(command&&command.text===submitted&&draft.value.trim()===command.text){draft.value='';submitted='';emit('close')}})
 watch(identity,()=>{cancel();draft.value='';submitted=''},{flush:'sync'});onBeforeUnmount(cancel)
 </script>
-<template><form class="topic-editor" @submit.prevent="save"><label>新话题 <input v-model="draft" maxlength="64" placeholder="输入新话题，最多64个UTF-16单位" :disabled="store.busy||!!store.pending||confirming" /></label><button type="submit" :disabled="!draft.trim()||store.busy||!!store.pending||confirming">保存话题（16积分）</button><button type="button" @click="emit('close')">取消</button></form></template>
-<style scoped lang="scss">.topic-editor{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 0}label{flex:1;min-width:160px;font-size:13px}input{box-sizing:border-box;width:100%}button,input{font:inherit;border:1px solid var(--fp-border);border-radius:5px;padding:6px;background:var(--fp-card);color:var(--fp-text)}button:disabled,input:disabled{opacity:.5}</style>
+<template>
+ <form class="topic-editor" @submit.prevent="save">
+  <label>编辑话题<input v-model="draft" maxlength="64" placeholder="想和大家聊点什么？" :disabled="store.busy||!!store.pending||confirming" /></label>
+  <div class="editor-meta"><span>最多 64 字符 · 修改需 16 积分</span><span>{{ draft.length }}/64</span></div>
+  <div class="editor-actions"><button type="button" @click="emit('close')">取消</button><button class="save" type="submit" :disabled="!draft.trim()||store.busy||!!store.pending||confirming">{{ store.busy ? '保存中…' : '保存话题' }}</button></div>
+ </form>
+</template>
+<style scoped>
+.topic-editor { display:flex; flex-direction:column; gap:8px; padding-top:12px; }
+label { font-size:12px; font-weight:600; color:var(--fp-head); }
+input { display:block; box-sizing:border-box; width:100%; margin-top:6px; padding:9px 10px; border:1px solid var(--fp-border); border-radius:7px; background:var(--fp-bg); color:var(--fp-text); font:inherit; font-weight:400; }
+.editor-meta { display:flex; justify-content:space-between; gap:6px; color:var(--fp-muted); font-size:10px; }
+.editor-actions { display:flex; justify-content:flex-end; gap:6px; }
+button { padding:6px 10px; border:1px solid var(--fp-border); border-radius:6px; background:var(--fp-card); color:var(--fp-text); font:inherit; font-size:12px; cursor:pointer; }
+button:hover:not(:disabled) { background:var(--fp-hover); }
+button.save { background:var(--fp-primary); border-color:var(--fp-primary); color:#fff; }
+button.save:hover:not(:disabled) { filter:brightness(.96); background:var(--fp-primary); }
+button:disabled,input:disabled { opacity:.5; cursor:default; }
+button:focus-visible,input:focus-visible { outline:2px solid var(--fp-primary); outline-offset:2px; }
+</style>
