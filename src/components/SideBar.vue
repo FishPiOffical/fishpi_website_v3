@@ -10,7 +10,6 @@ import PersonInfoCard from '@/components/sidebar/PersonInfoCard.vue'
 import BreezemoonFeed from '@/components/sidebar/BreezemoonFeed.vue'
 import IncomeModule from '@/chat/sidebar/modules/IncomeModule.vue'
 import AppearanceModule from '@/chat/sidebar/modules/AppearanceModule.vue'
-import BarrageModule from '@/chat/sidebar/modules/BarrageModule.vue'
 import AdModule from '@/chat/sidebar/modules/AdModule.vue'
 
 const router = useRouter()
@@ -30,7 +29,6 @@ const ICONS: Record<PageSidebarModuleId, string> = {
   breezemoons: '🌙',
   income: '🕒',
   appearance: '🎨',
-  barrage: '💬',
   ad: '✨',
 }
 
@@ -106,7 +104,6 @@ function goDownload() {
             <BreezemoonFeed v-else-if="mod.id === 'breezemoons'" />
             <IncomeModule v-else-if="mod.id === 'income'" />
             <AppearanceModule v-else-if="mod.id === 'appearance'" />
-            <BarrageModule v-else-if="mod.id === 'barrage'" />
             <AdModule v-else-if="mod.id === 'ad'" />
           </div>
         </section>

@@ -9,16 +9,13 @@ import {useAuthStore} from '@/stores/auth'
 import {useV3ChatRedPacketsStore} from '@/stores/v3ChatRedPackets'
 import {getAuthContextVersion} from '@/api/http'
 import {packetRisk,type ClaimInput} from '@/api/v3-chat-red-packets'
-import {fpConfirm} from '@/composables/useDialog'
 const auth=useAuthStore(),store=useV3ChatRedPacketsStore(),gesture=ref<number|string>(''),confirming=ref(false),localError=ref('')
 const canClaim=computed(()=>{const d=store.detail;return!!d&&!d.currentUserClaim&&d.got<d.count&&!(d.type==='rockPaperScissors'&&d.sender.id===auth.account?.oId)})
 let abort:AbortController|null=null
 function cancel(){abort?.abort();abort=null;confirming.value=false}
 const identity=()=>JSON.stringify([getAuthContextVersion(),!!auth.accessToken,auth.account?.oId||''])
 async function claim(){const d=store.detail;if(!d||!canClaim.value||store.busy||store.pending||confirming.value)return;localError.value='';if(d.type==='rockPaperScissors'&&!(typeof gesture.value==='number'&&Number.isInteger(gesture.value)&&gesture.value>=0&&gesture.value<=2)){localError.value='请先明确选择出拳';return}cancel();const controller=new AbortController();abort=controller;const reader=identity(),choice=gesture.value;confirming.value=true
- const warning=d.type==='heartbeat'?`心跳可能领取负积分并扣款，领取前余额至少为初始奖池${d.poolPoints}积分。` :d.type==='rockPaperScissors'?`猜拳胜者得${d.poolPoints}积分，败者扣${d.poolPoints}积分，平局本人不增减；发送者按结算收回相应积分，税不退。领取前余额至少为${d.poolPoints}积分。`:'将领取一份红包，实际积分以结算结果为准，允许为0。'
- const yes=await fpConfirm({title:packetRisk(d.type)?'确认领取风险':'确认领取红包',message:warning+' 每人只能领取一次，是否继续？',confirmText:packetRisk(d.type)?'接受风险并领取':'确认领取',signal:controller.signal})
- if(yes&&!controller.signal.aborted&&reader===identity()&&store.detail===d){const input:ClaimInput={};if(packetRisk(d.type))input.riskAccepted=true;if(d.type==='rockPaperScissors')input.gesture=choice as number;await store.claim(d.id,d.type,input)}if(abort===controller){abort=null;confirming.value=false}}
+ if(!controller.signal.aborted&&reader===identity()&&store.detail===d){const input:ClaimInput={};if(packetRisk(d.type))input.riskAccepted=true;if(d.type==='rockPaperScissors')input.gesture=choice as number;await store.claim(d.id,d.type,input)}if(abort===controller){abort=null;confirming.value=false}}
 watch(()=>store.detail,()=>{cancel();gesture.value='';localError.value=''});watch(identity,cancel,{flush:'sync'});onBeforeUnmount(cancel)
 const hands=[{value:0,label:'石头',image:'/images/redpacket/gesture/rock.png'},{value:1,label:'剪刀',image:'/images/redpacket/gesture/scissors.png'},{value:2,label:'布',image:'/images/redpacket/gesture/paper.png'}] as const
 const hand=(g:number)=>hands[g]?.label||'未知'
@@ -32,7 +29,7 @@ const duelResult=computed(()=>{
  if(!result)return''
  return d?.sender.id===auth.account?.oId?({win:'挑战方胜出',lose:'发起方胜出',tie:'双方平局'})[result]:({win:'你赢了',lose:'这次惜败',tie:'平局'})[result]
 })
-function selectHand(value:number){if(store.busy||store.pending||confirming.value)return;gesture.value=value;localError.value=''}
+function selectHand(value:number){if(store.busy||store.pending||confirming.value)return;gesture.value=value;localError.value='';void claim()}
 const signed=(amount:number)=>amount>0?`+${amount}`:String(amount)
 const resultLabel=(result?:string)=>({win:'获胜',lose:'失利',tie:'平局'}[result||'']||'已结算')
 function fallback(event:Event){const img=event.target as HTMLImageElement;if(img.getAttribute('src')!==DEFAULT_AVATAR)img.src=DEFAULT_AVATAR}
@@ -71,15 +68,15 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
           <div class="duel-center"><span>VS</span><small v-if="duelResult">{{ duelResult }}</small><small v-else>{{ detail.poolPoints }} 积分对局</small></div>
           <div class="duel-player"><span>{{ detail.got?'挑战方':'你的出拳' }}</span><img v-if="opponentHand!==undefined" :src="hands[opponentHand]?.image" :alt="hand(opponentHand)" /><span v-else class="unknown-hand" aria-label="尚未选择出拳">?</span><small>{{ opponentHand!==undefined?hand(opponentHand):'等待出拳' }}</small></div>
         </div>
-        <div v-if="canClaim" class="hand-picker" role="group" aria-label="选择你的出拳">
-          <button v-for="option in hands" :key="option.value" type="button" :aria-pressed="gesture===option.value" :disabled="store.busy||!!store.pending||confirming" @click="selectHand(option.value)"><img :src="option.image" alt="" /><span>{{ option.label }}</span><i v-if="gesture===option.value" aria-hidden="true">✓</i></button>
+        <div v-if="canClaim" class="hand-picker" role="group" aria-label="选择出拳并领取">
+          <button v-for="option in hands" :key="option.value" type="button" :aria-pressed="gesture===option.value" :disabled="store.busy||!!store.pending||confirming" @click="selectHand(option.value)"><img :src="option.image" alt="" /><span>{{ option.label }} · 领取</span><i v-if="gesture===option.value" aria-hidden="true">✓</i></button>
         </div>
         <p v-if="canClaim" class="risk-note">胜得 {{ detail.poolPoints }}，负扣 {{ detail.poolPoints }}，平局不增减。领取前余额需至少 {{ detail.poolPoints }} 积分。</p>
         <p v-else-if="detail.sender.id===auth.account?.oId&&!detail.got" class="quiet-note">这是你发起的挑战，等待其他鱼油出拳。</p>
       </section>
       <p v-else-if="canClaim&&detail.type==='heartbeat'" class="risk-note">心跳红包可能领取负积分并扣款，领取前余额需至少 {{ detail.poolPoints }} 积分。</p>
 
-      <div v-if="canClaim" class="claim-action"><button type="button" class="claim-button" :disabled="store.busy||!!store.pending||confirming" @click="claim">{{ store.busy?'正在领取…':confirming?'等待确认…':packetRisk(detail.type)?'确认风险后领取':'领取一份' }}</button></div>
+      <div v-if="canClaim && !isDuel" class="claim-action"><button type="button" class="claim-button" :disabled="store.busy||!!store.pending||confirming" @click="claim">{{ store.busy?'正在领取…':confirming?'等待确认…':packetRisk(detail.type)?'接受扣分风险并领取':'领取一份' }}</button></div>
       <p v-if="store.pending" class="quiet-note" role="status">有红包操作结果待确认，请先通过红包操作提示恢复原操作。</p>
       <p v-if="localError||store.error" class="inline-error" role="alert">{{ localError||store.error }}</p>
 

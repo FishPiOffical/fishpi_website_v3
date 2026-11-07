@@ -3,7 +3,6 @@ import {onBeforeUnmount,ref,watch} from 'vue'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ChatBarrageStore} from '@/stores/v3ChatBarrage'
 import {getAuthContextVersion} from '@/api/http'
-import {fpConfirm} from '@/composables/useDialog'
 import ChatBarragePrice from './ChatBarragePrice.vue'
 import {useV3ChatBarragePriceStore} from '@/stores/v3ChatBarragePrice'
 const price=useV3ChatBarragePriceStore(),color=ref('#FFFFFF')
@@ -16,8 +15,7 @@ async function save(){
  cancel();const controller=new AbortController();abort=controller;const reader=identity(),content=draft.value,tint=color.value.toUpperCase();confirming.value=true
  await price.read()
  if(controller.signal.aborted||reader!==identity()||!price.price){if(abort===controller){abort=null;confirming.value=false}return}
- const yes=await fpConfirm({title:'发送聊天室弹幕',message:`当前价格为${price.price.amount} ${price.price.unit}，实际费用以发送时为准。弹幕即时播放，不保证送达；恢复原操作不会重复扣费或补播。是否发送？`,confirmText:'确认发送弹幕',signal:controller.signal})
- if(yes&&!controller.signal.aborted&&reader===identity()){submitted=JSON.stringify([content,tint]);await store.save(content,tint)}
+ if(!controller.signal.aborted&&reader===identity()){submitted=JSON.stringify([content,tint]);await store.save(content,tint)}
  if(abort===controller){abort=null;confirming.value=false}
 }
 watch(()=>store.completed,command=>{if(command&&JSON.stringify([command.content,command.color])===submitted&&JSON.stringify([draft.value,color.value.toUpperCase()])===submitted){draft.value='';submitted='';emit('close')}})

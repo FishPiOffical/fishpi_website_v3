@@ -97,7 +97,22 @@ async function submit() {
   err.value = ''
   const currentUpload = () => !disposed && upload === abort && !abort.signal.aborted && loggedIn.value && owner === auth.account?.oId && context === getAuthContextVersion()
   try {
-    const blob = await new Promise<Blob | null>((resolve) => c.toBlob(resolve, 'image/png'))
+    // Export only the drawn area, with a small margin, instead of the entire white canvas.
+    let left = c.width, top = c.height, right = 0, bottom = 0
+    for (const stroke of strokes.value) for (const point of stroke.points) {
+      const radius = stroke.size / 2 + 12
+      left = Math.min(left, point.x - radius); top = Math.min(top, point.y - radius)
+      right = Math.max(right, point.x + radius); bottom = Math.max(bottom, point.y + radius)
+    }
+    left = Math.max(0, Math.floor(left)); top = Math.max(0, Math.floor(top))
+    right = Math.min(c.width, Math.ceil(right)); bottom = Math.min(c.height, Math.ceil(bottom))
+    const cropped = document.createElement('canvas')
+    cropped.width = Math.max(1, right - left)
+    cropped.height = Math.max(1, bottom - top)
+    const target = cropped.getContext('2d')
+    if (!target) throw new Error('无法导出涂鸦，请重试')
+    target.drawImage(c, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height)
+    const blob = await new Promise<Blob | null>((resolve) => cropped.toBlob(resolve, 'image/png'))
     if (!currentUpload()) return
     if (!blob || blob.type !== 'image/png' || !blob.size) throw new Error('无法导出PNG画布，请重试')
     const file = new File([blob], `paint-${Date.now()}.png`, { type: 'image/png' })

@@ -355,7 +355,8 @@ function onBodyClick(e: MouseEvent) {
   background: transparent;
   box-shadow: none;
 }
-.is-room.is-image .body { line-height: 0; }
+.is-room.is-image .body { line-height: 0; max-width: 280px; }
+.is-room.is-self.is-image .body { margin-left: auto; }
 .is-room.is-image .body :deep(img:not(.emoji)) {
   display: block;
   max-width: min(280px, 100%);
