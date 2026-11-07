@@ -65,7 +65,7 @@ header a {
 img {
   width: 34px;
   height: 34px;
-  border-radius: 9px;
+  border-radius: var(--fp-avatar-radius);
   object-fit: cover;
   border: 1px solid var(--fp-divider);
   flex-shrink: 0;
@@ -133,7 +133,7 @@ time {
   img {
     width: 20px;
     height: 20px;
-    border-radius: 4px;
+    border-radius: var(--fp-avatar-radius);
   }
 
   time {
@@ -153,7 +153,7 @@ time {
   li { display: grid; grid-template-columns: 20px minmax(0,1fr); align-items: start; column-gap: 7px; padding: 6px 0; }
   header { grid-column: 1; grid-row: 1; margin-top: 1px; }
   header a { display: block; }
-  header img { display: block; width: 20px; height: 20px; border-radius: 5px; }
+  header img { display: block; width: 20px; height: 20px; }
   .moon-body { grid-column: 2; grid-row: 1; margin: 0; padding: 0; font-size: 12px; line-height: 1.45; }
 }
 .author-hidden {

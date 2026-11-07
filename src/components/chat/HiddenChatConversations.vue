@@ -245,7 +245,7 @@ function preview(line: (typeof messages.value)[number]) {
   width: 30px;
   height: 30px;
   flex: none;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
   object-fit: cover;
 }
 .conversation-copy {

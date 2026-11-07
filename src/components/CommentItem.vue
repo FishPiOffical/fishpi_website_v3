@@ -127,7 +127,7 @@ function onBodyClick(e: MouseEvent) {
   display: block;
   width: 36px;
   height: 36px;
-  border-radius: 6px;
+  border-radius: var(--fp-avatar-radius);
   background: var(--fp-border) center / cover;
 }
 .reply .cmt-self {
@@ -136,7 +136,7 @@ function onBodyClick(e: MouseEvent) {
 .reply .avatar {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
 }
 .cmt-main {
   flex: 1;

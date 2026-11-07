@@ -73,7 +73,7 @@ function fallback(event: Event) {
 .profile-cover { height:112px; background-size:cover; background-position:center 38%; position:relative; &::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.06),color-mix(in srgb,var(--fp-card) 45%,transparent) 75%,var(--fp-card)); backdrop-filter:blur(3px); } }
 .profile-cover.has-background::after { background:linear-gradient(180deg,transparent 65%,rgba(0,0,0,.08)); backdrop-filter:none; }
 .profile-body { position:relative; padding:0 20px 18px; text-align:center; }
-.member-avatar { display:block; position:relative; width:80px; height:80px; margin:-40px auto 12px; border:4px solid var(--fp-card); border-radius:50%; object-fit:cover; box-shadow:0 4px 14px rgba(0,0,0,.1); }
+.member-avatar { display:block; position:relative; width:80px; height:80px; margin:-40px auto 12px; border:4px solid var(--fp-card); border-radius:var(--fp-avatar-radius); object-fit:cover; box-shadow:0 4px 14px rgba(0,0,0,.1); }
 h1 { margin:0; color:var(--fp-title); font-size:20px; line-height:1.4; font-weight:650; }
 .profile-handle { margin:4px 0 0; color:var(--fp-muted); font-size:12px; }
 .profile-intro { margin:14px 0 0; font-size:13px; line-height:1.65; color:var(--fp-text); white-space:pre-wrap; }

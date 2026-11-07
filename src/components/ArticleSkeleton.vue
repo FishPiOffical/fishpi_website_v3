@@ -87,13 +87,13 @@ const PARAGRAPHS = [
 .avatar {
   width: 20px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
   flex: none;
 }
 .avatar.lg {
   width: 36px;
   height: 36px;
-  border-radius: 6px;
+  border-radius: var(--fp-avatar-radius);
 }
 .w-50 {
   width: 50px;

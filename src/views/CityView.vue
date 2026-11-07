@@ -109,7 +109,7 @@ function fallback(event:Event){const image=event.target as HTMLImageElement;if(i
 .city-avatar {
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
   object-fit: cover;
   display: block;
 }

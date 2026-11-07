@@ -119,7 +119,7 @@ em {
 .free { background: var(--fp-primary-soft); color: var(--fp-primary); }
 .hint { margin:0; color:var(--fp-muted); font-size:11px; line-height:1.6; }
 button[aria-disabled='true'] { opacity:.5; cursor:default; }
-.appearance-preview { padding:10px 5px; }.appearance-preview .fp-msg { display:flex; gap:10px; align-items:center; }.appearance-preview .fp-avatar { display:block; width:28px; height:28px; border-radius:8px; }.appearance-preview .fp-avatar-frame { flex:none; }.appearance-preview .fp-bubble { position:relative; font-size:11px; padding:8px 12px; background:var(--fp-hover); border-radius:8px; }
+.appearance-preview { padding:10px 5px; }.appearance-preview .fp-msg { display:flex; gap:10px; align-items:center; }.appearance-preview .fp-avatar { display:block; width:28px; height:28px; border-radius:var(--fp-avatar-radius); }.appearance-preview .fp-avatar-frame { flex:none; }.appearance-preview .fp-bubble { position:relative; font-size:11px; padding:8px 12px; background:var(--fp-hover); border-radius:8px; }
 .notice {
   margin: 0;
   font-size: 12px;

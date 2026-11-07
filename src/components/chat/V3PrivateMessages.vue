@@ -387,7 +387,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
   display: block;
   width: 36px;
   height: 36px;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
   object-fit: cover;
   background: var(--fp-hover);
   transition: width 180ms ease, height 180ms ease;
@@ -397,7 +397,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
   display: grid;
   place-items: center;
   overflow: hidden;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
   background: var(--fp-primary);
   color: #fff;
 }
@@ -599,7 +599,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
 .msg-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: var(--fp-avatar-radius);
   object-fit: cover;
   flex: none;
   background: var(--fp-hover);

@@ -773,12 +773,12 @@ onUnmounted(() => {
   border: 0;
   background: transparent;
   cursor: pointer;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
 }
 .avatar {
   width: 34px;
   height: 34px;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
   object-fit: cover;
   display: block;
   box-shadow: 0 0 0 2px transparent;
@@ -848,7 +848,7 @@ onUnmounted(() => {
 .menu-user img {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
   object-fit: cover;
   flex-shrink: 0;
 }

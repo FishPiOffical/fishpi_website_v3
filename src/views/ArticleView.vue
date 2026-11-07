@@ -824,7 +824,7 @@ h1 {
 .avatar-small {
   width: 22px;
   height: 22px;
-  border-radius: 4px;
+  border-radius: var(--fp-avatar-radius);
   background-size: cover;
   background-position: center;
   background-color: var(--fp-border);
@@ -1037,7 +1037,7 @@ h1 {
   display: block;
   width: 44px;
   height: 44px;
-  border-radius: 6px;
+  border-radius: var(--fp-avatar-radius);
   background-size: cover;
   background-position: center;
   background-color: var(--fp-border);
@@ -1362,7 +1362,7 @@ h1 {
   flex: none;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
   background: var(--fp-border) center / cover;
 }
 </style>

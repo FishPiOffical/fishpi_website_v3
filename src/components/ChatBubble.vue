@@ -280,7 +280,7 @@ function onBodyClick(e: MouseEvent) {
 .is-room .fp-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--fp-avatar-radius);
 }
 .is-room .message-stack {
   display: flex;
@@ -419,7 +419,7 @@ function onBodyClick(e: MouseEvent) {
 }
 @media (max-width: 600px) {
   .fp-msg.is-room { gap: 8px; max-width: 100%; }
-  .is-room .fp-avatar { width: 30px; height: 30px; border-radius: 8px; }
+  .is-room .fp-avatar { width: 30px; height: 30px; }
   .is-room .fp-bubble { padding: 8px 11px; }
   .is-room .name { font-size: 11px; }
   .is-room .name small { font-size: 9px; }

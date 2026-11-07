@@ -82,7 +82,7 @@ withDefaults(
   width: 36px;
   height: 36px;
   flex: none;
-  border-radius: 6px;
+  border-radius: var(--fp-avatar-radius);
 }
 .sk-lines {
   flex: 1;

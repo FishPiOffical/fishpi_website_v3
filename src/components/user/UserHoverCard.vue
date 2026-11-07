@@ -333,7 +333,7 @@ onUnmounted(() => {
 .avatar-link {
   align-self: flex-start;
   flex: 0 0 auto;
-  border-radius: 8px;
+  border-radius: var(--fp-avatar-radius);
 }
 .card-avatar {
   display: block;
@@ -341,7 +341,7 @@ onUnmounted(() => {
   height: 72px;
   box-sizing: border-box;
   border: 3px solid var(--fp-card);
-  border-radius: 8px;
+  border-radius: var(--fp-avatar-radius);
   background: var(--fp-hover);
   object-fit: cover;
 }
@@ -470,7 +470,7 @@ onUnmounted(() => {
 .avatar-skeleton {
   width: 72px;
   height: 72px;
-  border-radius: 8px;
+  border-radius: var(--fp-avatar-radius);
 }
 .line {
   width: 70%;

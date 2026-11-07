@@ -180,5 +180,5 @@ input, textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--f
 button { width: fit-content; border: 1px solid var(--fp-border); border-radius: 8px; background: transparent; color: var(--fp-text); padding: 7px 14px; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
 .error { color: var(--fp-danger); }
-.owner-avatar { display: block; width: 80px; height: 80px; object-fit: cover; border-radius: 50%; margin: 16px 0; }
+.owner-avatar { display: block; width: 80px; height: 80px; object-fit: cover; border-radius: var(--fp-avatar-radius); margin: 16px 0; }
 </style>

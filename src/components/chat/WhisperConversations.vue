@@ -723,7 +723,7 @@ onUnmounted(() => {
   display: block;
   width: 30px;
   height: 30px;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
   object-fit: cover;
   transition: width 180ms ease, height 180ms ease;
 }
@@ -731,7 +731,7 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   overflow: hidden;
-  border-radius: 50%;
+  border-radius: var(--fp-avatar-radius);
   background: var(--fp-primary);
   color: #fff;
 }

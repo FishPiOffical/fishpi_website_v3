@@ -41,6 +41,7 @@
 }
 
 :root {
+  --fp-avatar-radius: 8px;
   --fp-bg: #282a2a;
   --fp-nav: #242525;
   --fp-card: #282a2a;
@@ -541,13 +542,13 @@ input[type='radio']:disabled {
 .fp-avatar-frame {
   position: relative;
   display: inline-flex;
-  border-radius: 4px;
+  border-radius: var(--fp-avatar-radius);
 }
 
 .fp-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 4px;
+  border-radius: var(--fp-avatar-radius);
   object-fit: cover;
   display: block;
 }
@@ -556,7 +557,7 @@ input[type='radio']:disabled {
   display: inline-block;
   width: 20px;
   height: 20px;
-  border-radius: 4px;
+  border-radius: var(--fp-avatar-radius);
   background: var(--fp-hover) center / cover no-repeat;
   flex-shrink: 0;
 }

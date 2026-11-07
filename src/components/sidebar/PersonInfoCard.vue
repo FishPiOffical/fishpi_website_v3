@@ -57,7 +57,7 @@ const { account, isLoggedIn } = storeToRefs(useAuthStore())
 <style scoped>
 .person-card { padding: 2px 0 0; }
 .person-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.person-avatar { display: block; width: 44px; height: 44px; border: 2px solid var(--fp-border); border-radius: 50%; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.person-avatar { display: block; width: 44px; height: 44px; border: 2px solid var(--fp-border); border-radius: var(--fp-avatar-radius); object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 .person-meta { flex: 1; min-width: 0; }
 .person-name { display: block; overflow: hidden; color: var(--fp-title); font-size: 15px; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
 .person-name:hover { text-decoration: underline; text-underline-offset: 3px; }

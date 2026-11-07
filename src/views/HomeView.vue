@@ -697,7 +697,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   display: block;
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 4px;
+  border-radius: var(--fp-avatar-radius);
   background-size: cover;
   background-position: center;
   background-color: var(--fp-border);
@@ -965,7 +965,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   display: inline-block;
   width: 28px;
   height: 28px;
-  border-radius: 4px;
+  border-radius: var(--fp-avatar-radius);
   background: var(--fp-border) center/cover no-repeat;
   flex-shrink: 0;
 }

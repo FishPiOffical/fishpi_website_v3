@@ -302,7 +302,7 @@ function avatarOf(a: ArticleSummary) {
   display: block;
   width: 36px;
   height: 36px;
-  border-radius: 4px;
+  border-radius: var(--fp-avatar-radius);
   background: var(--fp-hover) center / cover no-repeat;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }

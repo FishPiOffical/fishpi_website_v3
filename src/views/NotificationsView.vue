@@ -298,6 +298,7 @@ h2 { margin: 0; color: var(--fp-title); font-size: 17px; font-weight: 500; }
 .notice.unread { background: color-mix(in srgb, var(--fp-accent) 4%, var(--fp-card)); margin: 0 -24px; padding: 22px 24px; }
 .notice.unread::before { content: ''; position: absolute; top: 22px; bottom: 22px; left: 0; width: 3px; background: var(--fp-accent); border-radius: 0 3px 3px 0; }
 .avatar, .notice-symbol { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 50%; overflow: hidden; }
+.avatar { border-radius: var(--fp-avatar-radius); }
 .avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .notice-symbol { color: var(--fp-muted); background: var(--fp-hover); border: 1px solid var(--fp-border); }
 .notice-symbol svg { width: 19px; height: 19px; }

@@ -249,7 +249,7 @@ select {
   img {
     width: 40px;
     height: 40px;
-    border-radius: 10px;
+    border-radius: var(--fp-avatar-radius);
     object-fit: cover;
     border: 1px solid var(--fp-divider);
     flex-shrink: 0;
@@ -399,7 +399,7 @@ select {
     img {
       width: 20px;
       height: 20px;
-      border-radius: 4px;
+      border-radius: var(--fp-avatar-radius);
       flex-shrink: 0;
     }
 

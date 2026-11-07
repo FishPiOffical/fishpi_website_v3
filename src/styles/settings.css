@@ -33,7 +33,7 @@
 .fp-settings .set-main .owner-profile form+form{margin-top:24px;padding-top:24px;border-top:1px solid var(--fp-border)}
 .fp-settings .set-main .owner-profile form fieldset{grid-template-columns:repeat(2,minmax(0,1fr))}
 .fp-settings .set-main .owner-profile form fieldset>label:has(textarea),.fp-settings .set-main .owner-profile form fieldset>button{grid-column:1/-1}
-.fp-settings .set-main .owner-profile .owner-avatar{width:88px;height:88px;border-radius:18px;margin:4px 0 20px;object-fit:cover;border:1px solid var(--fp-border)}
+.fp-settings .set-main .owner-profile .owner-avatar {width:88px;height:88px;border-radius:var(--fp-avatar-radius);margin:4px 0 20px;object-fit:cover;border:1px solid var(--fp-border)}
 .fp-settings .set-main .owner-preferences fieldset{grid-template-columns:repeat(2,minmax(0,1fr))}
 .fp-settings .set-main .owner-preferences fieldset>button{grid-column:1/-1;margin-top:6px}
 .fp-settings .set-main .owner-security>nav{display:flex;flex-wrap:wrap;gap:4px;margin:12px 0 18px;padding:4px;background:var(--fp-surface-subtle);border:1px solid var(--fp-border);border-radius:9px}
