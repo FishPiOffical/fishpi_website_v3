@@ -1,0 +1,25 @@
+/* Warm orange and white echo the original FishPi mark; never wrap standalone media. */
+html[data-bubble='paipai-orange'] .fp-msg.is-room:not(.is-standalone) .fp-bubble {
+  padding: 11px 34px 11px 14px;
+  border: 1px solid color-mix(in srgb, #ec9222 38%, var(--fp-border));
+  border-radius: 5px 17px 17px 17px;
+  background: linear-gradient(145deg, color-mix(in srgb, #ef9829 8%, var(--fp-card)), color-mix(in srgb, #ef9829 16%, var(--fp-card)));
+  color: var(--fp-text);
+  box-shadow: 0 2px 0 color-mix(in srgb, #a65d15 14%, transparent);
+}
+html[data-bubble='paipai-orange'] .fp-msg.is-room.is-self:not(.is-standalone) .fp-bubble {
+  border-radius: 17px 5px 17px 17px;
+  background: linear-gradient(145deg, color-mix(in srgb, #ef9829 19%, var(--fp-card)), color-mix(in srgb, #ef9829 30%, var(--fp-card)));
+}
+html[data-bubble='paipai-orange'] .fp-msg.is-room:not(.is-standalone) .fp-bubble::after {
+  content: '';
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--fp-card);
+  border-radius: 8px;
+  background: #f4d963 url('/logo.png') center / contain no-repeat;
+  pointer-events: none;
+}

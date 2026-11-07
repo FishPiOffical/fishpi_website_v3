@@ -38,6 +38,7 @@ function selected(kind: PackKind) {
           <i :style="{ background: pack.preview }" />
           <span>{{ pack.name }}</span>
           <em v-if="pack.vip">VIP</em>
+          <em v-else-if="group.kind !== 'theme' && pack.id !== 'classic' && pack.id !== 'none'" class="free">免费</em>
         </button>
       </div>
     </section>
@@ -99,6 +100,7 @@ em {
   border-radius: 4px;
   padding: 0 4px;
 }
+.free { background: var(--fp-primary-soft); color: var(--fp-primary); }
 .notice {
   margin: 0;
   font-size: 12px;
