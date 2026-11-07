@@ -22,6 +22,8 @@ const inbox=usePrivateInboxStore(),{unreadTotal:unread,error:unreadError}=storeT
 const list=ref<Conversation[]>([]),page=ref(1),pages=ref(0),listBusy=ref(false),listError=ref('')
 const target=ref(''),other=ref<MessagePeer|null>(null),messages=ref<PrivateMessage[]>([]),before=ref(''),hasMore=ref(false),historyBusy=ref(false),historyError=ref(''),draft=ref(''),toName=ref(''),resolveBusy=ref(false),resolveError=ref(''),changed=ref(false),notice=ref('')
 const msgScroller=ref<HTMLElement|null>(null)
+const displayedTarget=ref('')
+let autoReadAttempt=''
 let followLatest=true
 function trackMessageScroll(){const el=msgScroller.value;if(el)followLatest=el.scrollHeight-el.clientHeight-el.scrollTop<=48}
 function onHistoryMediaLoad(){if(followLatest)scrollBottom()}
@@ -33,13 +35,24 @@ function scrollBottom(){
  if(msgScroller.value) msgScroller.value.scrollTop=msgScroller.value.scrollHeight
 }
 
-function closeTarget(){followLatest=true;historyRun++;resolveRun++;historyAbort?.abort();historyAbort=null;confirmation?.abort();confirmation=null;target.value='';other.value=null;messages.value=[];before.value='';hasMore.value=false;historyBusy.value=false;draft.value='';historyError.value='';resolveError.value='';resolveBusy.value=false;notice.value='';changed.value=false}
+function closeTarget(){displayedTarget.value='';autoReadAttempt='';followLatest=true;historyRun++;resolveRun++;historyAbort?.abort();historyAbort=null;confirmation?.abort();confirmation=null;target.value='';other.value=null;messages.value=[];before.value='';hasMore.value=false;historyBusy.value=false;draft.value='';historyError.value='';resolveError.value='';resolveBusy.value=false;notice.value='';changed.value=false}
 async function loadList(p=page.value){if(!authenticated.value||listBusy.value)return;const run=++listRun,reader=identity(),owner=account.value!.oId;listBusy.value=true;listError.value='';try{const result=await messageConversations(owner,p);if(run===listRun&&reader===identity()&&authenticated.value){list.value=result.list;page.value=result.p;pages.value=result.pageCount;if(props.autoSelectFirst&&!props.chatroomActive&&!target.value&&!props.initialId&&!props.initialName&&result.list.length>0)select(result.list[0]!.peer)}}catch(e){if(run===listRun&&reader===identity())listError.value=e instanceof Error?e.message:'会话读取失败'}finally{if(run===listRun&&reader===identity())listBusy.value=false}}
 async function loadUnread(){await inbox.refreshUnread()}
-async function loadHistory(older=false){if(!authenticated.value||!target.value||older&&(!hasMore.value||historyBusy.value))return;historyAbort?.abort();const abort=new AbortController();historyAbort=abort;const oldHeight=msgScroller.value?.scrollHeight||0,oldTop=msgScroller.value?.scrollTop||0;const run=++historyRun,reader=identity(),id=target.value,owner=account.value!.oId,cursor=older?before.value:'',event=eventRevision;historyBusy.value=true;historyError.value='';const valid=()=>run===historyRun&&reader===identity()&&id===target.value&&authenticated.value&&!abort.signal.aborted
- try{const result=await messageHistory(owner,id,cursor,abort.signal);if(!valid())return;other.value=result.peer;emit('peer-selected',{id:result.peer.id,userName:result.peer.userName});if(older){const known=new Set(messages.value.map(m=>m.id));messages.value=[...result.list.filter(m=>!known.has(m.id)),...messages.value]}else messages.value=result.list;before.value=result.nextBefore;hasMore.value=result.hasMore;if(!older&&event===eventRevision)changed.value=false;await nextTick();if(!valid())return;if(older){followLatest=false;if(msgScroller.value)msgScroller.value.scrollTop=oldTop+msgScroller.value.scrollHeight-oldHeight}else scrollBottom()}
+async function loadHistory(older=false){if(!authenticated.value||!target.value||older&&(!hasMore.value||historyBusy.value))return;historyAbort?.abort();const abort=new AbortController();historyAbort=abort;const oldHeight=msgScroller.value?.scrollHeight||0,oldTop=msgScroller.value?.scrollTop||0;const run=++historyRun,reader=identity(),id=target.value,owner=account.value!.oId,cursor=older?before.value:'',event=eventRevision;historyBusy.value=true;historyError.value='';if(!older)displayedTarget.value='';const valid=()=>run===historyRun&&reader===identity()&&id===target.value&&authenticated.value&&!abort.signal.aborted
+ try{const result=await messageHistory(owner,id,cursor,abort.signal);if(!valid())return;other.value=result.peer;emit('peer-selected',{id:result.peer.id,userName:result.peer.userName});if(older){const known=new Set(messages.value.map(m=>m.id));messages.value=[...result.list.filter(m=>!known.has(m.id)),...messages.value]}else messages.value=result.list;before.value=result.nextBefore;hasMore.value=result.hasMore;if(!older&&event===eventRevision)changed.value=false;await nextTick();if(!valid())return;if(older){followLatest=false;if(msgScroller.value)msgScroller.value.scrollTop=oldTop+msgScroller.value.scrollHeight-oldHeight}else{scrollBottom();displayedTarget.value=id}}
  catch(e){if(valid()){historyError.value=e instanceof Error?e.message:'历史读取失败';if(!older&&e instanceof ApiError&&[401,403,404].includes(e.status)){messages.value=[];before.value='';hasMore.value=false}}}
  finally{if(valid()){historyBusy.value=false;historyAbort=null}}}
+// Mark only a successfully displayed unread conversation, never a failed/stale history read.
+async function autoMarkRead(){
+ if(!authenticated.value||props.chatroomActive||historyBusy.value||historyError.value||changed.value||displayedTarget.value!==target.value||!target.value||writes.busy||writes.pending)return
+ if(list.value.find(item=>item.peerId===target.value)?.unreadCount===0)return
+ const latest=messages.value.at(-1)?.id
+ if(!latest)return
+ const attempt=JSON.stringify([identity(),target.value,latest]);if(autoReadAttempt===attempt)return
+ autoReadAttempt=attempt;const reader=identity(),id=target.value
+ if(await writes.start('read',id)){if(authenticated.value&&reader===identity())await refresh()}
+}
+watch([displayedTarget,()=>list.value,historyBusy,changed,()=>props.chatroomActive,()=>writes.busy,()=>writes.pending],()=>{void autoMarkRead()},{flush:'post'})
 function select(peer:MessagePeer){if(peer.id===account.value?.oId){resolveError.value='不能给自己发信';return}closeTarget();target.value=peer.id;other.value=peer;emit('peer-selected',{id:peer.id,userName:peer.userName});void loadHistory()}
 async function resolve(name=toName.value){if(!authenticated.value)return;const run=++resolveRun,reader=identity();resolveBusy.value=true;resolveError.value='';try{const peer=await resolveMessagePeer(name);if(run===resolveRun&&reader===identity()&&authenticated.value){toName.value='';select(peer)}}catch(e){if(run===resolveRun&&reader===identity())resolveError.value=e instanceof Error?e.message:'用户读取失败'}finally{if(run===resolveRun&&reader===identity())resolveBusy.value=false}}
 async function initial(){if(!authenticated.value)return;if(props.initialId){try{messageId(props.initialId);closeTarget();target.value=props.initialId;await loadHistory()}catch{resolveError.value='会话ID不合法'}}else if(props.initialName)await resolve(props.initialName)}
@@ -127,7 +140,6 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
      </div>
      <div class="head-ops">
       <button v-if="changed" class="fp-control head-op-btn is-accent" type="button" :disabled="historyBusy" @click="loadHistory()">有新消息 · 刷新</button>
-      <button class="fp-control head-op-btn" type="button" :disabled="writes.busy||!!writes.pending" @click="markRead()">本会话标记已读</button>
      </div>
     </header>
 
@@ -170,7 +182,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
     </div>
    </section>
    <div v-else class="conversation-content empty-pane">
-    <p class="empty-content">选择会话或查找用户开始私信。读取不会自动标记已读。</p>
+    <p class="empty-content">选择会话或查找用户开始私信。</p>
    </div>
   </div>
  </div>
