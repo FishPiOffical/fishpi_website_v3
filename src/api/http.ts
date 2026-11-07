@@ -7,11 +7,18 @@ export class ApiError extends Error {
   status: number
   /** captcha：Rhythm 风控要求人机验证（302 → /test） */
   code?: string
+  retryAfter?: string
   constructor(message: string, status = 0, code?: string) {
     super(message)
     this.status = status
     this.code = code
   }
+}
+
+type SsrReadGate = <T>(load: () => Promise<T>) => Promise<T>
+let ssrReadGate: SsrReadGate | undefined
+export function setSsrReadGate(gate: SsrReadGate) {
+  if (import.meta.env.SSR) ssrReadGate = gate
 }
 
 // Browser-only transport state. SSR requests never read or mutate a shared identity.
@@ -214,10 +221,12 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
   }
 
   const { __captchaRetried: _, __v3Retried: __, __authVersion: ___, __zip: ____, __svg: _____, ...fetchInit } = init
+  const ssrRead = import.meta.env.SSR && ssrReadGate && (init.method || 'GET').toUpperCase() === 'GET'
   let res: Response
   try {
     res = await fetch(resolveUrl(path), {
       ...fetchInit,
+      ...(ssrRead ? { redirect: 'manual' as const } : {}),
       credentials: init.credentials ?? 'include',
       headers,
     })
@@ -226,12 +235,21 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
     asNetworkError(e, identity)
   }
 
+  if (import.meta.env.SSR && res.status === 429) {
+    void res.body?.cancel().catch(() => {})
+    const error = new ApiError('上游请求频率受限', 429)
+    error.retryAfter = res.headers.get('Retry-After') ?? undefined
+    throw error
+  }
+
   checkGateway(res, identity)
 
   // Rhythm BeforeRequestHandler：IP 进入验证码黑名单时 302 → /test
   try {
-    const pathname = new URL(res.url).pathname
+    const redirect = ssrRead && res.status >= 300 && res.status < 400 ? res.headers.get('Location') : null
+    const pathname = (redirect ? new URL(redirect, resolveUrl(path)) : new URL(res.url)).pathname
     if (/^\/test\/?$/.test(pathname)) {
+      if (ssrRead) void res.body?.cancel().catch(() => {})
       throw new ApiError('访问过于频繁，请完成人机验证后再试', 302, 'captcha')
     }
   } catch (e) {
@@ -297,10 +315,10 @@ export async function request<T = unknown>(path: string, init: RequestInitExtra 
 }
 async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtra = {}): Promise<T> {
   // Bound SSR reads, including body consumption; a slow upstream must not hang HTML forever.
-  if (import.meta.env.SSR && (init.method || 'GET').toUpperCase() === 'GET') {
-    const timeout = AbortSignal.timeout(8000)
-    init = { ...init, signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout }
-  }
+  const timeout = import.meta.env.SSR && (init.method || 'GET').toUpperCase() === 'GET'
+    ? AbortSignal.timeout(8000)
+    : undefined
+  if (timeout) init = { ...init, signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout }
   const identity = requestIdentity()
   const version = identity.version
   const sentToken = getAccessToken()
@@ -312,6 +330,15 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
     return requestOnce<T>(path, init, identity)
   }
   try {
+    if (timeout && ssrReadGate) {
+      return await ssrReadGate(async () => {
+        try { return await run() }
+        catch (error) {
+          if (timeout.aborted) throw new ApiError('SSR 上游请求超时', 0, 'ssr_timeout')
+          throw error
+        }
+      })
+    }
     return await (!import.meta.env.SSR && isCredentialPath(path) ? queueCredentialRequest(run) : run())
   } catch (e) {
     if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && !explicitAuthorization &&

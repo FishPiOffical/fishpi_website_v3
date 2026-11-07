@@ -1,3 +1,5 @@
+import { setSsrReadGate } from './api/http'
+import { createSsrUpstreamGate } from './seo/ssrUpstreamGate'
 import { fetchDirectoryPage } from './api/v3-directory'
 import { fetchHomeBootstrap, fetchHomeRead } from './api/v3-home-reads'
 import { createPublicHomeCache } from './seo/publicHomeCache'
@@ -19,10 +21,13 @@ import { fetchV3Breezemoons } from './api/v3-breezemoons'
 import { listMilestones } from './api/v3-milestones'
 import { shouldPrefetchSsr } from './seo/ssrRoutes'
 
+setSsrReadGate(createSsrUpstreamGate())
 const readPublicHome = createPublicHomeCache()
 function homeRead<T>(key: string, load: () => Promise<T>) {
   const origin = process.env.VITE_API_TARGET || process.env.API_TARGET || 'https://fishpi.cn'
-  return readPublicHome(`${origin}:${key}`, load).catch(error => {
+  const staleMs = key === 'tags' || key.startsWith('ranking:') ? 120_000 : 0
+  return readPublicHome(`${origin}:${key}`, load, staleMs).catch(error => {
+    if (error?.code === 'ssr_deferred') throw error
     // Resource and status only: never log upstream bodies, credentials or request headers.
     console.warn('[SSR homepage] preload failed', key, typeof error?.status === 'number' ? error.status : 'network')
     throw error

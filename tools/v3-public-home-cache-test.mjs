@@ -29,3 +29,18 @@ assert.deepEqual(await read('recent', load), [])
 await read('third', async () => ['third'])
 assert.deepEqual(await read('recent', async () => ['evicted']), ['evicted'])
 console.log('PASS public home cache: concurrent dedupe, request clone isolation, TTL, valid empty, uncached failures, origin separation and bounded eviction')
+
+const readStale = createPublicHomeCache(1000)
+await readStale('ranking', async () => ['first'], 2000)
+now += 1000
+let refreshes = 0, finishRefresh
+const refresh = () => { refreshes++; return new Promise(resolve => { finishRefresh = resolve }) }
+assert.deepEqual(await readStale('ranking', refresh, 2000), ['first'])
+assert.deepEqual(await readStale('ranking', refresh, 2000), ['first'])
+assert.equal(refreshes, 1)
+finishRefresh(['second'])
+await new Promise(resolve => setImmediate(resolve))
+assert.deepEqual(await readStale('ranking', refresh, 2000), ['second'])
+now += 3000
+await assert.rejects(readStale('ranking', async () => { throw Error('expired') }, 2000), /expired/)
+console.log('PASS stale public home data: bounded window and one shared background refresh')
