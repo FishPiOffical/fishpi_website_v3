@@ -1,5 +1,6 @@
 import { computed, type MaybeRefOrGetter, toValue, watchEffect } from 'vue'
 import { useHead, useSeoMeta } from '@unhead/vue'
+import { useLocalBrandingStore } from '@/stores/localBranding'
 import { absoluteUrl, pageTitle, SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
 
 export interface PageSeoInput {
@@ -13,6 +14,7 @@ export interface PageSeoInput {
 }
 
 export function usePageSeo(input: MaybeRefOrGetter<PageSeoInput>) {
+  const branding = useLocalBrandingStore()
   const resolved = computed(() => toValue(input))
 
   useSeoMeta({
@@ -53,6 +55,6 @@ export function usePageSeo(input: MaybeRefOrGetter<PageSeoInput>) {
   // Keep document title in sync for CSR navigations without SSR.
   watchEffect(() => {
     if (typeof document === 'undefined') return
-    document.title = pageTitle(resolved.value.title)
+    document.title = branding.name || pageTitle(resolved.value.title)
   })
 }

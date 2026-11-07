@@ -11,6 +11,7 @@ import { useNoticeStore } from '@/stores/notices'
 import { usePrivateInboxStore } from '@/stores/privateInbox'
 import { useChatStore } from '@/stores/chat'
 import AdSlot from '@/components/ads/AdSlot.vue'
+import { useLocalBrandingStore } from '@/stores/localBranding'
 import LogoMark from '@/components/LogoMark.vue'
 import NavIcon from '@/components/navigation/NavIcon.vue'
 import FpConfirmHost from '@/components/FpConfirmHost.vue'
@@ -32,6 +33,10 @@ import MemberLayout from '@/components/member/MemberLayout.vue'
 import UserHoverCard from '@/components/user/UserHoverCard.vue'
 import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import { useLayoutStore } from '@/stores/layout'
+
+const branding = useLocalBrandingStore()
+const logoFailed = ref(false)
+watch(() => branding.logo, () => { logoFailed.value = false })
 
 const baseNav = [
   { to: '/', label: '最新' },
@@ -287,6 +292,7 @@ function onApiOffline() {
 
 onMounted(() => {
   mounted.value = true
+  branding.restore()
   appearance.restore()
   chat.restoreStyle()
   document.addEventListener('click', onDocClick)
@@ -308,8 +314,10 @@ onUnmounted(() => {
       <button type="button" class="dismiss" aria-label="关闭" @click="apiOffline = false">×</button>
     </div>
     <header v-if="!immersive" class="nav">
-      <RouterLink to="/" class="logo" aria-label="摸鱼派">
-        <LogoMark />
+      <RouterLink to="/" class="logo" :aria-label="branding.name || '摸鱼派'">
+        <img v-if="branding.logo && !logoFailed" class="custom-logo" :src="branding.logo" alt="" @error="logoFailed = true" />
+        <LogoMark v-else />
+        <span v-if="branding.name" class="custom-site-name">{{ branding.name }}</span>
       </RouterLink>
       <nav class="nav-tabs">
         <RouterLink
@@ -516,8 +524,8 @@ onUnmounted(() => {
 
         <div class="foot-bottom">
           <div class="slogan-box">
-            <img src="/logo.png" alt="" class="foot-logo" width="24" height="24" />
-            <span class="slogan">摸鱼派 - 鱼油专属摸鱼社区</span>
+            <img :src="branding.logo && !logoFailed ? branding.logo : '/logo.png'" @error="logoFailed = true" alt="" class="foot-logo" width="24" height="24" />
+            <span class="slogan">{{ branding.name || '摸鱼派 - 鱼油专属摸鱼社区' }}</span>
           </div>
           <div class="copy">
             <p>Copyright © 2021 - 2026 W&amp;P Tech. All Rights Reserved. 北京白与画科技有限公司 版权所有</p>
@@ -599,6 +607,8 @@ onUnmounted(() => {
   align-items: center;
   flex-shrink: 0;
 }
+.custom-logo { width:36px; height:36px; object-fit:contain; }
+.custom-site-name { max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-left:8px; font-size:15px; color:var(--fp-title); }
 .logo :deep(.logo-animate) {
   display: block;
 }

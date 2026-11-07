@@ -13,6 +13,7 @@ import { useCountStore } from '@/stores/count'
 import { feedbackEnabled } from '@/feedback/api'
 import FeedbackDialog from '@/feedback/FeedbackDialog.vue'
 import { useFeedbackPanelStore } from '@/feedback/panel'
+import LocalBrandingSettings from './LocalBrandingSettings.vue'
 import IncomeCard from '@/components/count/IncomeCard.vue'
 import HiddenChatConversations from '@/components/chat/HiddenChatConversations.vue'
 import WhisperConversations from '@/components/chat/WhisperConversations.vue'
@@ -48,6 +49,7 @@ watch([showHiddenHandle], ([visible]) => {
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
   ...(feedbackEnabled ? [{ id: 'feedback' as const, label: '需求反馈', icon: '💡' }] : []),
+  { id: 'branding', label: '站点外观', icon: '🎨' },
   { id: 'home', label: '首页模块', icon: '🏠' },
   { id: 'pageSidebar', label: '内页侧栏', icon: '📑' },
   { id: 'chatSidebar', label: '聊天室侧栏', icon: '💬' },
@@ -274,6 +276,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
             <button class="drag-entry" @click="drawer.hide(); feedbackPanel.show('/feedback/new')"><b>提需求</b><span>描述你的想法或遇到的问题</span></button>
             <button class="drag-entry" @click="drawer.hide(); feedbackPanel.show('/feedback')"><b>查看需求列表</b><span>查看处理进展，为感兴趣的需求投票</span></button>
           </div>
+          <div v-else-if="section === 'branding'" class="content"><LocalBrandingSettings /></div>
           <div v-else-if="section === 'home'" class="content">
             <button type="button" class="drag-entry" @click="startHomeEdit">
               <b>⠿ 拖动调整布局</b>
