@@ -69,7 +69,6 @@ function togglePanel(panel: typeof chatTools[number]['id']) { activeTool.value =
 watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{activeTool.value=''},{flush:'sync'})
 
 const showNodes = ref(false)
-const showClassicOnlines = ref(false)
 const {quote,quoteBusy,quoteErr,quoteMessage:readQuote,clearQuote,buildQuoteSuffix}=useChatMessageSource()
 const editingTopic = ref(false)
 
@@ -267,22 +266,10 @@ function clearScreen() {
             <ChatTopicEditor v-if="editingTopic" @close="editingTopic=false" />
 
 
-            <!-- 在线人数条与折叠面板 -->
-            <div class="classic-online-bar">
-              <div class="online-stat">
-                <span>本次可见人数: <b>{{ onlineTotal===null?'—':onlineTotal }}</b></span>
-                <button
-                  type="button"
-                  class="online-toggle-btn"
-                  @click="showClassicOnlines = !showClassicOnlines"
-                >
-                  {{ showClassicOnlines ? '收起在线列表 ▲' : '展开在线列表 ▼' }}
-                </button>
-              </div>
-              <span v-if="error" class="top-error-tip">{{ error }}</span>
+            <div v-if="isLoggedIn" class="classic-online-bar" aria-label="在线成员" role="region">
+              <ChatOnlineList avatars-only />
             </div>
-
-            <div v-if="showClassicOnlines"><ChatOnlineList /></div>
+            <span v-if="error" class="top-error-tip">{{ error }}</span>
           </section>
 
           <!-- 2. 下方消息列表：与输入区在同一个卡片中，自上而下阅读，最新在最上方 -->
@@ -638,63 +625,9 @@ function clearScreen() {
 }
 @media(max-width:600px){.composer-tool-btn { padding: 6px 10px; gap: 0; span { display: none; } }.classic-topic-pill { gap: 6px; }}
 
-/* 在线人数条 */
 .classic-online-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 14px;
-  padding-top: 10px;
+  margin-top: 12px;
   border-top: 1px dashed var(--fp-border);
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-
-.online-stat b {
-  color: var(--fp-accent);
-}
-
-.online-toggle-btn {
-  background: transparent;
-  border: 0;
-  color: var(--fp-link);
-  cursor: pointer;
-  margin-left: 8px;
-  font-size: 12px;
-}
-
-.classic-online-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-  padding: 10px;
-  background: var(--fp-bg);
-  border-radius: 6px;
-  max-height: 140px;
-  overflow-y: auto;
-}
-
-.classic-online-user {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background: var(--fp-card);
-  border: 1px solid var(--fp-border);
-  font-size: 12px;
-  color: var(--fp-title);
-  text-decoration: none;
-}
-
-.avatar-tiny {
-  width: 18px;
-  height: 18px;
-  border-radius: 3px;
-  background-size: cover;
-  background-position: center;
-  background-color: var(--fp-border);
 }
 
 /* 下方消息列表 */
