@@ -1,9 +1,11 @@
-html[data-bubble='classic'] .fp-bubble {
+html[data-bubble='classic'] .fp-msg:not([data-appearance-snapshot]) .fp-bubble,
+.fp-msg[data-appearance-snapshot][data-bubble='classic'] .fp-bubble {
   background: var(--fp-hover);
   border-radius: 12px 12px 12px 4px;
 }
 
-html[data-bubble='classic'] .fp-msg.is-self .fp-bubble {
+html[data-bubble='classic'] .fp-msg:not([data-appearance-snapshot]).is-self .fp-bubble,
+.fp-msg[data-appearance-snapshot][data-bubble='classic'].is-self .fp-bubble {
   background: var(--fp-self);
   border-radius: 12px 12px 4px 12px;
 }

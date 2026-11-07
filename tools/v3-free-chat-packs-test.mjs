@@ -9,7 +9,7 @@ for(const folder of ['themes','bubbles','frames'])for(const id of await fs.readd
  if(['paipai-orange','fishpond-blue'].includes(id)){
   assert.equal(pack.vip,false)
   const css=await fs.readFile(`src/packs/${folder}/${id}/style.css`,'utf8')
-  assert.ok(css.includes('.fp-msg.is-room'));assert.ok(css.includes("url('/logo.png')"))
+  assert.ok(css.includes('.is-room'));assert.ok(css.includes('[data-appearance-snapshot]'));assert.ok(css.includes("url('/logo.png')"))
   if(folder==='bubbles')assert.ok(css.includes(':not(.is-standalone)'))
  }
 }

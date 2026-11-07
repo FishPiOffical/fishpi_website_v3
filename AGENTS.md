@@ -311,3 +311,5 @@
 - 评论深链用v3-comment-location/commentLink及ArticleCommentLocation，当前位置由后端确定，不从时间/哈希猜页。当前文章、身份、页数据及DOM均绑定后再滚动；长篇沿active/orphaned分组，失位显式重查，不能回退经典站或翻扫全部分页。
 
 - 个人中心背景与统计来自v3公开资料cardBg/userPoint/onlineMinute，兼容旧服务端缺字段但不补零；SSR同一decodePublicUser二次投影，背景复用avatarStyle保留签名URL。cardBg为空才用头像封面，不能把自定义背景模糊掉。
+
+- 聊天外观由v3ChatAppearance保存本人ID对；共享ChatMessageMgmtService在消息写入事务固化appearance，ChatBubble/Home按消息快照渲染，禁止当前用户外观或逐作者查询覆盖历史。v1目录/CSS保持稳定，升级先迁移Rhythm独立偏好表，见docs/chat-appearance-sync-plan.md。

@@ -25,6 +25,7 @@ import HomeSideWidgets from '@/components/home/HomeSideWidgets.vue'
 import HomeRepeaterStation from '@/components/home/HomeRepeaterStation.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
+import { chatAppearanceSnapshot } from '@/utils/chatAppearance'
 import { avatarStyle, avatarUrl } from '@/utils/avatar'
 
 const auth = useAuthStore(), chat = useChatStore(), publication = useV3ChatPublicationStore(), layout = useHomeLayoutStore()
@@ -54,7 +55,7 @@ const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeO
 const { messages: liveChatMessages } = storeToRefs(chat)
 let homeMounted = false, longShelfTimer: ReturnType<typeof setInterval> | undefined
 function syncLiveChatMessages() {
-  chatLines.value = liveChatMessages.value.slice(-10).reverse().map(line => ({ oId: line.oId, userOId: line.userOId, userName: line.userName,
+  chatLines.value = liveChatMessages.value.slice(-10).reverse().map(line => ({ appearance:line.appearance, oId: line.oId, userOId: line.userOId, userName: line.userName,
     userNickname: line.userNickname, userAvatarURL: line.userAvatarURL,
     content: line.redPacket || (line.card?.msgType === 'music' ? line.card.title || '音乐分享' : line.card ? '天气信息' : line.html || ''), time: line.time }))
 }
@@ -285,8 +286,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <p v-if="chat.error" role="alert">{{ chat.error }} <button type="button" :disabled="chat.loading" @click="chat.refreshMessages">重读聊天室消息</button></p>
               <p v-if="chatMsg" class="hint">{{ chatMsg }}</p>
               <ol class="module-list chat-list">
-                <li v-for="m in chatLines" :key="m.oId" class="chat-item">
-                  <RouterLink v-if="m.userName" :to="`/member/${m.userName}`">
+                <li v-for="m in chatLines" :key="m.oId" class="chat-item fp-msg is-room" data-appearance-snapshot="v1" :data-bubble="chatAppearanceSnapshot(m.appearance).bubbleId" :data-frame="chatAppearanceSnapshot(m.appearance).frameId">
+                  <RouterLink v-if="m.userName" class="fp-avatar-frame" :to="`/member/${m.userName}`">
                     <span
                       class="avatar-mid"
                       :style="avatarStyle(chatAvatar(m))"
@@ -298,7 +299,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                       <VipNickname :user-name="m.userName">{{ m.userNickname || m.userName }}</VipNickname>
                       <span v-if="m.userNickname && m.userName" class="chat-uname">({{ m.userName }})</span>
                     </RouterLink>
-                    <div class="chat-text">{{ chatPreview(m) }}</div>
+                    <div class="chat-text fp-bubble">{{ chatPreview(m) }}</div>
                   </div>
                 </li>
                 <li v-if="!chatLines.length&&!chat.loading&&!chat.error" class="hint-li">{{ isLoggedIn?'暂无消息，去聊天室看看':'登录后可读取聊天室消息' }}</li>
@@ -997,6 +998,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .chat-uname {
   opacity: 0.75;
 }
+.chat-item .fp-bubble { position:relative; }
 .chat-text {
   margin-top: 2px;
   font-size: 13px;

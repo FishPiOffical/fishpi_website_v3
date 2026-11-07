@@ -1,5 +1,6 @@
 /* Pond ripples are decorative CSS; the original brand asset stays unchanged. */
-html[data-bubble='fishpond-blue'] .fp-msg.is-room:not(.is-standalone) .fp-bubble {
+html[data-bubble='fishpond-blue'] .fp-msg:not([data-appearance-snapshot]).is-room:not(.is-standalone) .fp-bubble,
+.fp-msg[data-appearance-snapshot][data-bubble='fishpond-blue'].is-room:not(.is-standalone) .fp-bubble {
   padding: 11px 34px 13px 14px;
   border: 1px solid color-mix(in srgb, #53a7c2 40%, var(--fp-border));
   border-radius: 5px 17px 17px 17px;
@@ -7,11 +8,13 @@ html[data-bubble='fishpond-blue'] .fp-msg.is-room:not(.is-standalone) .fp-bubble
   color: var(--fp-text);
   box-shadow: inset 0 -3px color-mix(in srgb, #5eb6cd 15%, transparent);
 }
-html[data-bubble='fishpond-blue'] .fp-msg.is-room.is-self:not(.is-standalone) .fp-bubble {
+html[data-bubble='fishpond-blue'] .fp-msg:not([data-appearance-snapshot]).is-room.is-self:not(.is-standalone) .fp-bubble,
+.fp-msg[data-appearance-snapshot][data-bubble='fishpond-blue'].is-room.is-self:not(.is-standalone) .fp-bubble {
   border-radius: 17px 5px 17px 17px;
   background: radial-gradient(ellipse at 100% 100%, color-mix(in srgb, #6ac6db 28%, transparent), transparent 70%), color-mix(in srgb, #69c0d8 18%, var(--fp-card));
 }
-html[data-bubble='fishpond-blue'] .fp-msg.is-room:not(.is-standalone) .fp-bubble::after {
+html[data-bubble='fishpond-blue'] .fp-msg:not([data-appearance-snapshot]).is-room:not(.is-standalone) .fp-bubble::after,
+.fp-msg[data-appearance-snapshot][data-bubble='fishpond-blue'].is-room:not(.is-standalone) .fp-bubble::after {
   content: '';
   position: absolute;
   right: -5px;

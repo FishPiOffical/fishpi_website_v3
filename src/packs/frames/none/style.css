@@ -1,3 +1,4 @@
-html[data-frame='none'] .fp-avatar-frame {
+html[data-frame='none'] .fp-msg:not([data-appearance-snapshot]) .fp-avatar-frame,
+.fp-msg[data-appearance-snapshot][data-frame='none'] .fp-avatar-frame {
   box-shadow: none;
 }

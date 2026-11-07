@@ -1,4 +1,5 @@
-html[data-frame='fishpond-blue'] .fp-msg.is-room .fp-avatar-frame {
+html[data-frame='fishpond-blue'] .fp-msg:not([data-appearance-snapshot]).is-room .fp-avatar-frame,
+.fp-msg[data-appearance-snapshot][data-frame='fishpond-blue'].is-room .fp-avatar-frame {
   position: relative;
   padding: 3px;
   border: 1px solid color-mix(in srgb, #4a9fb9 55%, var(--fp-border));
@@ -6,7 +7,8 @@ html[data-frame='fishpond-blue'] .fp-msg.is-room .fp-avatar-frame {
   background: linear-gradient(155deg, #d5f6ff, #72c4dc 55%, #4394b4);
   box-shadow: 0 0 0 3px color-mix(in srgb, #71bfd6 14%, transparent);
 }
-html[data-frame='fishpond-blue'] .fp-msg.is-room .fp-avatar-frame::after {
+html[data-frame='fishpond-blue'] .fp-msg:not([data-appearance-snapshot]).is-room .fp-avatar-frame::after,
+.fp-msg[data-appearance-snapshot][data-frame='fishpond-blue'].is-room .fp-avatar-frame::after {
   content: '';
   position: absolute;
   width: 17px;

@@ -26,4 +26,4 @@
 
 站点主题免费。对话框与头像框按各包 `vip` 字段判断权限；免费包使用 `"vip": false`，VIP 包使用 `"vip": true`。派派橘（`paipai-orange`）与摸鱼蓝（`fishpond-blue`）各提供一款免费气泡和头像框，复用原始 `/logo.png`，不改写品牌资产。
 
-新免费包仅作用于 `.fp-msg.is-room`；单独图片/红包不附加气泡背景与徽记。当前 `fp.appearance` 为本机阅读外观，选择会影响本机看到的全部聊天室消息，并未保存发送者个人外观。
+新免费包仅作用于 `.fp-msg.is-room`；单独图片/红包不附加气泡背景与徽记。主题仍为本机偏好；聊天室气泡与头像框由本人 v3 配置决定，仅固化到之后发送的消息。历史不随换装更新，详见 `docs/chat-appearance-sync-plan.md`。消息使用 `.fp-msg[data-appearance-snapshot="v1"][data-bubble="id"]` / `[data-frame="id"]`，本机 html 外观仅作用于无快照节点。v1 样式必须保持稳定；未来改版新增版本并保留旧版样式。

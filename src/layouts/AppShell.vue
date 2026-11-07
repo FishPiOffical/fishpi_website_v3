@@ -20,6 +20,7 @@ import SystemAlertDialog from '@/components/SystemAlertDialog.vue'
 import WarnBroadcastDialog from '@/components/WarnBroadcastDialog.vue'
 import CountToast from '@/components/count/CountToast.vue'
 import ChatRedPacketDialog from '@/components/chat/ChatRedPacketDialog.vue'
+import ChatAppearanceRecovery from '@/components/chat/ChatAppearanceRecovery.vue'
 import ChatRedPacketRecovery from '@/components/chat/ChatRedPacketRecovery.vue'
 import ReportRecovery from '@/components/ReportRecovery.vue'
 import ActivityRecovery from '@/components/ActivityRecovery.vue'
@@ -426,6 +427,7 @@ onUnmounted(() => {
     <ChatBarrageOverlay />
     <ChatRedPacketDialog />
     <ChatRedPacketRecovery />
+    <ChatAppearanceRecovery />
     <ReportRecovery />
     <RepeaterRecovery />
     <FishGameRecovery />

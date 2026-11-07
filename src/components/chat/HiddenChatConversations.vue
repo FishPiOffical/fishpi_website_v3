@@ -132,6 +132,7 @@ function preview(line: (typeof messages.value)[number]) {
                   v-for="line in selectedMessages"
                   :key="line.oId"
                   :user-id="line.userOId"
+                  :appearance="line.appearance"
                   :user-name="line.userName"
                   :nickname="line.userNickname"
                   :avatar="line.userAvatarURL"

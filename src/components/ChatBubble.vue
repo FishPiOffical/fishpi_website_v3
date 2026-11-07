@@ -7,10 +7,12 @@ import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { DEFAULT_AVATAR } from '@/utils/avatar'
+import { chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
 import { isSingleImageMessage } from '@/utils/chatMessage'
 
 const props = withDefaults(
   defineProps<{
+    appearance?: ChatAppearance
     userId?: string
     userName: string
     nickname?: string
@@ -27,6 +29,7 @@ const props = withDefaults(
   { userId: '', nickname: '', avatar: '', time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
+const snapshot = computed(() => chatAppearanceSnapshot(props.appearance))
 const zoomed = ref('')
 const singleImage = computed(() => props.chatroom && isSingleImageMessage(props.html))
 const isStandalone = computed(() => props.chatroom && (props.standalone || singleImage.value))
@@ -45,7 +48,7 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <article class="fp-msg" :class="{ 'is-self': self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
+  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? snapshot.bubbleId : undefined" :data-frame="chatroom ? snapshot.frameId : undefined" class="fp-msg" :class="{ 'is-self': self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
     <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`">
       <img class="fp-avatar" :src="avatar || DEFAULT_AVATAR" alt="" loading="lazy" @error="onAvatarError" />
     </RouterLink>

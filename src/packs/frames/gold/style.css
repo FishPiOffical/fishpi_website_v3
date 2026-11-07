@@ -1,10 +1,12 @@
-html[data-frame='gold'] .fp-avatar-frame {
+html[data-frame='gold'] .fp-msg:not([data-appearance-snapshot]) .fp-avatar-frame,
+.fp-msg[data-appearance-snapshot][data-frame='gold'] .fp-avatar-frame {
   padding: 3px;
   background: conic-gradient(from 90deg, #8a5a12, #f6e27a, #fff8d0, #d4a017, #8a5a12);
   box-shadow: 0 0 0 1px #f6c85f, 0 0 12px rgba(246, 200, 95, 0.45);
 }
 
-html[data-frame='gold'] .fp-avatar-frame::after {
+html[data-frame='gold'] .fp-msg:not([data-appearance-snapshot]) .fp-avatar-frame::after,
+.fp-msg[data-appearance-snapshot][data-frame='gold'] .fp-avatar-frame::after {
   content: '';
   position: absolute;
   inset: -4px;

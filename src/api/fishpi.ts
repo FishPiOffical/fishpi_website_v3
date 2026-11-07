@@ -662,6 +662,7 @@ export interface HomeColumnCard {
 }
 
 export interface ChatHistoryItem {
+  appearance?: import('@/utils/chatAppearance').ChatAppearance
   oId: string
   userOId?: string
   userName: string

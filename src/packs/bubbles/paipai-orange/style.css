@@ -1,5 +1,6 @@
 /* Warm orange and white echo the original FishPi mark; never wrap standalone media. */
-html[data-bubble='paipai-orange'] .fp-msg.is-room:not(.is-standalone) .fp-bubble {
+html[data-bubble='paipai-orange'] .fp-msg:not([data-appearance-snapshot]).is-room:not(.is-standalone) .fp-bubble,
+.fp-msg[data-appearance-snapshot][data-bubble='paipai-orange'].is-room:not(.is-standalone) .fp-bubble {
   padding: 11px 34px 11px 14px;
   border: 1px solid color-mix(in srgb, #ec9222 38%, var(--fp-border));
   border-radius: 5px 17px 17px 17px;
@@ -7,11 +8,13 @@ html[data-bubble='paipai-orange'] .fp-msg.is-room:not(.is-standalone) .fp-bubble
   color: var(--fp-text);
   box-shadow: 0 2px 0 color-mix(in srgb, #a65d15 14%, transparent);
 }
-html[data-bubble='paipai-orange'] .fp-msg.is-room.is-self:not(.is-standalone) .fp-bubble {
+html[data-bubble='paipai-orange'] .fp-msg:not([data-appearance-snapshot]).is-room.is-self:not(.is-standalone) .fp-bubble,
+.fp-msg[data-appearance-snapshot][data-bubble='paipai-orange'].is-room.is-self:not(.is-standalone) .fp-bubble {
   border-radius: 17px 5px 17px 17px;
   background: linear-gradient(145deg, color-mix(in srgb, #ef9829 19%, var(--fp-card)), color-mix(in srgb, #ef9829 30%, var(--fp-card)));
 }
-html[data-bubble='paipai-orange'] .fp-msg.is-room:not(.is-standalone) .fp-bubble::after {
+html[data-bubble='paipai-orange'] .fp-msg:not([data-appearance-snapshot]).is-room:not(.is-standalone) .fp-bubble::after,
+.fp-msg[data-appearance-snapshot][data-bubble='paipai-orange'].is-room:not(.is-standalone) .fp-bubble::after {
   content: '';
   position: absolute;
   right: -5px;
