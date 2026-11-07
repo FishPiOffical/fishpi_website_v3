@@ -7,7 +7,6 @@ import { RouterLink } from 'vue-router'
 import type { ArticleComment } from '@/api/fishpi'
 import ArticleInteraction from '@/components/articles/ArticleInteraction.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
-import RevisionHistory from '@/components/articles/RevisionHistory.vue'
 import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
@@ -103,7 +102,6 @@ function onBodyClick(e: MouseEvent) {
             <span v-if="goodCnt" class="op static">👍{{ goodCnt }}</span>
             <span v-if="thankCnt" class="op static">❤️{{ thankCnt }}</span>
           </template>
-          <RevisionHistory kind="comment" :target-id="comment.oId" class="cmt-history" />
           <span v-if="interactive && !own" class="op-report idle"><ReportDialog :data-id="comment.oId" :data-type="1" /></span>
         </footer>
       </div>

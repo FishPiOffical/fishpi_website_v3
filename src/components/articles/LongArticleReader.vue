@@ -14,7 +14,6 @@ import {
 import { fetchV3ParagraphSummary, fetchV3ParagraphComments } from '@/api/v3-comments'
 import { useAuthStore } from '@/stores/auth'
 import { useV3CommentsStore } from '@/stores/v3Comments'
-import RevisionHistory from './RevisionHistory.vue'
 import ArticleColumnNavigation from './ArticleColumnNavigation.vue'
 import ArticleReadRegistration from './ArticleReadRegistration.vue'
 import CommentComposer from './CommentComposer.vue'
@@ -40,7 +39,6 @@ const props = defineProps<{
 const commentingEnabled = computed(() => props.article.articleCommentable === true)
 
 const emit = defineEmits<{
-  revisions: []
   contentClick: [e: MouseEvent]
   reply: []
   paragraphReply: [paragraphId: string, commentId: string, comment?: ArticleComment]
@@ -429,11 +427,6 @@ function refreshParagraphComments() {
   void loadParagraphSummary()
 }
 
-function moreAction(name: 'revisions') {
-  moreOpen.value = false
-  emit(name)
-}
-
 /** 现网 formatParagraphIndentation：段内 <br> 拆成独立缩进行 */
 function formatParagraphs() {
   const root = contentEl.value
@@ -709,7 +702,6 @@ function chapterTitle(c: LongArticleChapter) {
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="thanks" :article-id="comment.oId" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="accept" :article-id="comment.oId" />
               <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
-              <RevisionHistory kind="comment" :target-id="comment.oId" />
               </div>
               <template v-if="ownParagraphComment(comment)">
                 <button v-if="commentingEnabled" type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="commentingEnabled && (paragraphEditingId=comment.oId)">编辑</button>
@@ -894,13 +886,6 @@ function chapterTitle(c: LongArticleChapter) {
           <template v-if="loggedIn">
             <ArticleInteraction kind="vote" :article-id="article.oId" />
             <ArticleInteraction kind="thanks" :article-id="article.oId" />
-            <button
-              type="button"
-              class="la-more-item"
-              @click="moreAction('revisions')"
-            >
-              🕘 <span>历史</span>
-            </button>
             <div class="la-owner-actions"><slot name="owner-actions" /></div>
             <RouterLink v-if="canEdit" :to="`/post/${article.oId}`" class="la-more-item">✏️ <span>编辑</span></RouterLink>
             <span class="la-more-item la-more-report">

@@ -313,3 +313,5 @@
 - 个人中心背景与统计来自v3公开资料cardBg/userPoint/onlineMinute，兼容旧服务端缺字段但不补零；SSR同一decodePublicUser二次投影，背景复用avatarStyle保留签名URL。cardBg为空才用头像封面，不能把自定义背景模糊掉。
 
 - 聊天外观由v3ChatAppearance保存本人ID对；共享ChatMessageMgmtService在消息写入事务固化appearance，ChatBubble/Home按消息快照渲染，禁止当前用户外观或逐作者查询覆盖历史。v1目录/CSS保持稳定，升级先迁移Rhythm独立偏好表，见docs/chat-appearance-sync-plan.md。
+
+- 用户站不展示文章/评论/长篇段评修订历史入口，也不展示文章实时变更的“读取最新内容”提示。历史API权限保持Rhythm既有规则，不收紧为仅管理员；管理操作仍走/admin，不因前端隐藏而更改后端授权。

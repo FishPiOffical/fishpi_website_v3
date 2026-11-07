@@ -15,7 +15,6 @@ import {
 import ContentRelationButton from '@/components/articles/ContentRelationButton.vue'
 import ArticleInteraction from '@/components/articles/ArticleInteraction.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
-import RevisionHistory from '@/components/articles/RevisionHistory.vue'
 import {articleHeat} from '@/api/v3-article-heat'
 import {subscribeArticleChanges} from '@/api/v3-realtime'
 import ArticleOwnerActions from '@/components/articles/ArticleOwnerActions.vue'
@@ -60,14 +59,12 @@ const paragraphIdForReply = ref('')
 const commentPage = ref(1)
 const locatedComment=ref<CommentLocation|null>(null)
 function positionComment(value:CommentLocation){locatedComment.value=value;if(value.type===0){commentPage.value=value.page;readerRef.value?.openComments()}}
-const heat = ref<number|null>(null),heatError=ref(''),articleChanged=ref(false),realtimeReadError=ref(''),realtimeReading=ref(false)
+const heat = ref<number|null>(null),heatError=ref(''),realtimeReadError=ref('')
 const editingId = ref('')
 const bodyEl = ref<HTMLElement | null>(null)
 const toc = ref<{ id: string; text: string; level: number }[]>([])
-const showRevisions = ref(false)
-const historyRef=ref<InstanceType<typeof RevisionHistory>|null>(null)
 const viewerIdentity=computed(()=>`${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}`)
-let stopArticle:(()=>void)|null=null,subscriptionKey='',heatRequest:AbortController|null=null,heatSequence=0,changeRevision=0,liveReadVersion=0
+let stopArticle:(()=>void)|null=null,subscriptionKey='',heatRequest:AbortController|null=null,heatSequence=0
 let readVersion = 0, disposed = false
 
 const id = computed(() => String(route.params.id || ''))
@@ -98,8 +95,6 @@ async function buildToc() {
 function jumpToc(anchor: string) {
   document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
-
-function toggleRevisions(){historyRef.value?.toggle()}
 
 const comments = computed<ArticleComment[]>(() => article.value?.articleComments || [])
 const replyAuthor = computed(() => replyComment.value?.commentAuthorName || comments.value.find((c) => c.oId === replyId.value)?.commentAuthorName || replyId.value)
@@ -155,9 +150,7 @@ const statementLabel = computed(() => article.value?.articleStatement == null ? 
 const composerRef = ref<InstanceType<typeof CommentComposer> | null>(null)
 const readerRef = ref<InstanceType<typeof LongArticleReader> | null>(null)
 const [DefineOwnerActions, ReuseOwnerActions] = createReusableTemplate()
-const [DefineLiveStatus,ReuseLiveStatus]=createReusableTemplate()
 const [DefineReward, ReuseReward] = createReusableTemplate()
-const [DefineRevisions, ReuseRevisions] = createReusableTemplate()
 const [DefineComments, ReuseComments] = createReusableTemplate()
 const [DefineComposer, ReuseComposer] = createReusableTemplate()
 const shareCopied = ref(false)
@@ -227,7 +220,7 @@ function isOwnComment(c: ArticleComment) {
 }
 
 function disconnectHeat() {
- stopArticle?.();stopArticle=null;subscriptionKey='';heatSequence++;heatRequest?.abort();heatRequest=null;heat.value=null;heatError.value='';articleChanged.value=false;liveReadVersion++;realtimeReading.value=false
+ stopArticle?.();stopArticle=null;subscriptionKey='';heatSequence++;heatRequest?.abort();heatRequest=null;heat.value=null;heatError.value=''
 }
 function articleUnavailable(target:string,reader:string) {
  if(disposed||target!==id.value||reader!==viewerIdentity.value)return
@@ -241,19 +234,10 @@ function connectHeat() {
  stopArticle?.();subscriptionKey=key
  stopArticle=subscribeArticleChanges(target,()=>{
   if(subscriptionKey!==key||reader!==viewerIdentity.value||target!==id.value)return
-  changeRevision++;articleChanged.value=true
   reactionEvents.invalidate('article',target)
   for(const comment of article.value?.articleComments||[])reactionEvents.invalidate('comment',comment.oId)
   if(!heatRequest)void refreshHeat()
  },()=>articleUnavailable(target,reader))
-}
-async function readArticleChanges(){
- if(realtimeReading.value)return
- const target=id.value,reader=viewerIdentity.value,revision=changeRevision,run=++liveReadVersion
- realtimeReading.value=true
- try{await load(true,'realtime')
-  if(run===liveReadVersion&&target===id.value&&reader===viewerIdentity.value&&revision===changeRevision&&!realtimeReadError.value)articleChanged.value=false
- }finally{if(run===liveReadVersion)realtimeReading.value=false}
 }
 async function ownerChanged(target:string){if(target===id.value)await load(true,'owner')}
 async function ownerDeleted(target:string){
@@ -298,10 +282,10 @@ async function load(force=false,reason:'comments'|'owner'|'realtime'='comments')
     if (!current()) return
     if(e instanceof ApiError&&[401,403,404].includes(e.status)) {
       article.value=null; error.value='文章不存在或当前已无权阅读'; disconnectHeat(); toc.value=[]; zoomed.value=''
-      editingId.value=''; replyId.value=''; replyComment.value=null; paragraphIdForReply.value=''; showRevisions.value=false
+      editingId.value=''; replyId.value=''; replyComment.value=null; paragraphIdForReply.value=''
       return
     }
-    if(refreshing){if(reason==='owner')ownerRefreshError.value='置顶已确认，文章状态重新读取失败，请重试读取。';else if(reason==='realtime')realtimeReadError.value='文章变更读取失败，请重试。';else commentRefreshError.value='操作已确认，评论重新读取失败：'+(e instanceof Error?e.message:'请重试');return}
+    if(refreshing){if(reason==='owner')ownerRefreshError.value='置顶已确认，文章状态重新读取失败，请重试读取。';else if(reason==='realtime')realtimeReadError.value='登录状态更新后，文章读取失败，请刷新重试。';else commentRefreshError.value='操作已确认，评论重新读取失败：'+(e instanceof Error?e.message:'请重试');return}
     article.value=null; error.value=e instanceof Error?e.message:'帖子加载失败'; disconnectHeat(); toc.value=[]
   } finally { if (current()) { loading.value = false; articleReading.value = false } }
 }
@@ -337,7 +321,6 @@ watch(viewerIdentity, () => {
   ++readVersion
   article.value = null; articleReading.value = false
   editingId.value='';replyId.value='';replyComment.value=null;paragraphIdForReply.value='';commentRefreshError.value=''
-  showRevisions.value=false
   commentPage.value = 1
   disconnectHeat()
 }, { flush: 'sync' })
@@ -440,11 +423,7 @@ function itemHandlers(c: ArticleComment) {
     </p>
   </article>
   <template v-else-if="article">
-    <DefineLiveStatus>
-      <p v-if="articleChanged" role="status">文章或评论有更新 <button type="button"  :disabled="realtimeReading" @click="readArticleChanges">读取最新内容</button></p>
-      <p v-if="realtimeReadError" role="alert">{{ realtimeReadError }}</p>
-    </DefineLiveStatus>
-    <ReuseLiveStatus v-if="!isLong" />
+    <p v-if="realtimeReadError" role="alert">{{ realtimeReadError }}</p>
     <DefineOwnerActions>
       <ArticleOwnerActions :article-id="article.oId" :author-id="article.articleAuthorId||''" :anonymous="Number(article.articleAnonymous)===1" :permanent="article.stick?.permanent||false" @changed="ownerChanged" @deleted="ownerDeleted" />
       <p v-if="ownerRefreshError" role="alert">{{ ownerRefreshError }} <button type="button" @click="load(true,'owner')">重读文章状态</button></p>
@@ -452,9 +431,6 @@ function itemHandlers(c: ArticleComment) {
     <DefineReward>
       <ArticleInteraction kind="reward" :article-id="article.oId" :initial-price="Number(article.articleRewardPoint || 0)" @content-click="onContentClick" />
     </DefineReward>
-    <DefineRevisions>
-      <RevisionHistory ref="historyRef" kind="article" :target-id="article.oId" :trigger="false" @open-change="showRevisions=$event" />
-    </DefineRevisions>
     <DefineComments>
       <p v-if="articleReading" role="status">正在读取第 {{ commentPage }} 页评论，当前内容尚未更新。</p>
       <p v-if="commentRefreshError" role="alert">{{ commentRefreshError }}<button type="button" @click="load(true)">重读评论</button></p>
@@ -520,15 +496,13 @@ function itemHandlers(c: ArticleComment) {
       :can-edit="canEdit"
       :statement="statementLabel"
       :action-msg="actionMsg"
-      @revisions="toggleRevisions"
       @content-click="onContentClick"
       @reply="clearReplyTarget"
       @paragraph-reply="onParagraphReply"
     >
       <template #owner-actions><ReuseOwnerActions /></template>
-      <template #live-status><ReuseLiveStatus /><span v-if="heat!==null">本节点约 {{ heat }} 个连接</span><span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span></template>
+      <template #live-status><span v-if="heat!==null">本节点约 {{ heat }} 个连接</span><span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span></template>
       <template #reward><ReuseReward /></template>
-      <template #extra><ReuseRevisions /></template>
       <template #comments><ReuseComments /></template>
       <template #composer><ReuseComposer /></template>
     </LongArticleReader>
@@ -596,7 +570,6 @@ function itemHandlers(c: ArticleComment) {
           <MedalList :items="metals" />
         </div>
 
-
         <p v-if="statementLabel" class="statement">创作声明：{{ statementLabel }}</p>
 
         <audio v-if="article.articleAudioURL" class="article-audio" :src="article.articleAudioURL" controls preload="none" />
@@ -628,9 +601,6 @@ function itemHandlers(c: ArticleComment) {
               <template v-if="isLoggedIn">
                 <ReuseOwnerActions />
                 <RouterLink v-if="canEdit" class="btn small edit-btn" :to="`/post/${article.oId}`">编辑</RouterLink>
-                <button type="button" class="btn small history-btn" @click="toggleRevisions">
-                  {{ showRevisions ? '收起历史' : '修订历史' }}
-                </button>
                 <ReportDialog :data-id="article.oId" :data-type="0" />
               </template>
             </div>
@@ -643,8 +613,6 @@ function itemHandlers(c: ArticleComment) {
           </div>
           <p v-if="actionMsg" class="action-alert">{{ actionMsg }}</p>
         </div>
-
-        <ReuseRevisions />
 
         <!-- 表情回应栏 -->
         <div class="reaction-wrap">
