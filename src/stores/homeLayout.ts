@@ -2,6 +2,8 @@ import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import {
   HOME_LAYOUT_STORAGE,
+  HOME_VARIANTS_STORAGE,
+  type HomeVariant,
   HOME_LAYOUT_STORAGE_V1,
   HOME_MAX_CELLS_PER_ROW,
   HOME_MODULES,
@@ -74,20 +76,36 @@ function locate(rows: HomeRow[], id: HomeModuleId) {
 export const useHomeLayoutStore = defineStore('homeLayout', () => {
   // The first browser tree must use the same layout as the public SSR tree.
   const state = ref<HomeLayoutState>(defaultHomeLayout())
+  const mode = ref<HomeVariant>('compact')
   const editing = ref(false)
+  const layouts: Partial<Record<HomeVariant, HomeLayoutState>> = {}
+  const copy = (value: HomeLayoutState): HomeLayoutState => JSON.parse(JSON.stringify(value))
   let restored = false
 
   function restore() {
     if (import.meta.env.SSR || restored) return
     restored = true
     state.value = read()
+    try {
+      const raw = localStorage.getItem(HOME_VARIANTS_STORAGE)
+      if (raw) {
+        const saved = JSON.parse(raw)
+        for (const variant of ['compact', 'classic'] as const) {
+          const value = saved.layouts?.[variant]
+          if (value && Array.isArray(value.rows) && value.hidden && typeof value.hidden === 'object' && !Array.isArray(value.hidden)) layouts[variant] = { rows: normalizeRows(value.rows, variant), hidden: { ...defaultHomeLayout(variant).hidden, ...value.hidden } }
+        }
+        if (saved.mode === 'classic' || saved.mode === 'compact') mode.value = saved.mode
+        state.value = copy(layouts[mode.value] || defaultHomeLayout(mode.value))
+      }
+    } catch { /* Local preferences are optional. */ }
+    layouts[mode.value] = copy(state.value)
   }
 
   watch(
-    state,
-    (v) => {
+    [state, mode],
+    ([v]) => {
       if (import.meta.env.SSR || !restored) return
-      try { localStorage.setItem(HOME_LAYOUT_STORAGE, JSON.stringify(v)) } catch { /* Storage is optional. */ }
+      try { layouts[mode.value] = copy(v); localStorage.setItem(HOME_LAYOUT_STORAGE, JSON.stringify(v)); localStorage.setItem(HOME_VARIANTS_STORAGE, JSON.stringify({ mode: mode.value, layouts })) } catch { /* Storage is optional. */ }
     },
     { deep: true },
   )
@@ -111,7 +129,7 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
         return {
           key: row.flat().join('|'),
           cells,
-          columns: cells.map((c) => (cells.length > 1 && c.modules.some(m => m.id === 'recentA') && c.modules.some(m => m.id === 'recentB') ? 'minmax(0, 1.5fr)' : c.narrow && cells.length > 1 ? 'minmax(0, 0.85fr)' : 'minmax(0, 1fr)')).join(' '),
+          columns: cells.map((c) => mode.value === 'classic' ? (c.narrow && cells.length > 1 ? 'minmax(0, 0.95fr)' : 'minmax(0, 1fr)') : (cells.length > 1 && c.modules.some(m => m.id === 'recentA') && c.modules.some(m => m.id === 'recentB') ? 'minmax(0, 1.5fr)' : c.narrow && cells.length > 1 ? 'minmax(0, 0.85fr)' : 'minmax(0, 1fr)')).join(' '),
         }
       })
       .filter((r) => r.cells.length),
@@ -165,11 +183,19 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
   }
 
   function reset() {
-    state.value = defaultHomeLayout()
+    state.value = defaultHomeLayout(mode.value)
   }
 
   function resetPositions() {
-    state.value.rows = defaultHomeLayout().rows
+    state.value.rows = defaultHomeLayout(mode.value).rows
+  }
+
+  function setMode(next: HomeVariant) {
+    if ((next !== 'classic' && next !== 'compact') || next === mode.value) return
+    layouts[mode.value] = copy(state.value)
+    state.value = copy(layouts[next] || defaultHomeLayout(next))
+    mode.value = next
+    editing.value = false
   }
 
   function isHidden(id: HomeModuleId) {
@@ -178,6 +204,8 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
 
   return {
     state,
+    mode,
+    setMode,
     restore,
     editing,
     orderedModules,

@@ -278,6 +278,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
           <div v-else-if="section === 'branding'" class="content"><LocalBrandingSettings /></div>
           <div v-else-if="section === 'home'" class="content">
+            <fieldset class="home-variants"><legend>首页版本</legend><label :class="{ selected: home.mode === 'compact' }"><input type="radio" name="home-variant" value="compact" :checked="home.mode === 'compact'" @change="home.setMode('compact')" /><span><b>紧凑版</b><small>最新、长篇和聊天优先进入首屏</small></span></label><label :class="{ selected: home.mode === 'classic' }"><input type="radio" name="home-variant" value="classic" :checked="home.mode === 'classic'" @change="home.setMode('classic')" /><span><b>经典版</b><small>保留原来的双列最新与分行布局</small></span></label><p>两个版本分别保存模块位置与显隐，仅在此浏览器生效。</p></fieldset>
             <button type="button" class="drag-entry" @click="startHomeEdit">
               <b>⠿ 拖动调整布局</b>
               <span>在首页直接拖动模块，左中右、上下任意摆放</span>
@@ -460,6 +461,15 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
     <FeedbackDialog v-if="feedbackEnabled && feedbackPanel.open" />
   </Teleport>
 </template>
+
+<style scoped>
+.home-variants { display:flex; flex-direction:column; gap:8px; margin:0 0 16px; padding:0; border:0; }
+.home-variants legend { margin-bottom:8px; font-size:13px; font-weight:600; color:var(--fp-title); }
+.home-variants label { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--fp-border); border-radius:8px; cursor:pointer; }
+.home-variants label.selected { border-color:var(--fp-primary); background:color-mix(in srgb,var(--fp-primary) 6%,var(--fp-card)); }
+.home-variants span { display:flex; flex-direction:column; gap:4px; }.home-variants b { font-size:13px; color:var(--fp-title); }.home-variants small,.home-variants p { margin:0; font-size:11px; color:var(--fp-muted); line-height:1.6; }
+.home-variants input { accent-color:var(--fp-primary); }
+</style>
 
 <style scoped>
 .fp-set-handle {

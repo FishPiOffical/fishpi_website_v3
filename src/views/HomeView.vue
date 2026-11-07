@@ -34,8 +34,9 @@ const recentRead = useHomeRead('recent', boot.recent), hotRead = useHomeRead('ho
 const columnsRecentRead = useHomeRead('columnsRecent', boot.columnsRecent), columnsHotRead = useHomeRead('columnsHot', boot.columnsHot)
 const homeReady = ref(false)
 onMounted(() => { homeReady.value = true })
-const left = computed(() => { const rows = recentRead.data || []; return rows.slice(0, 8) })
-const right = computed(() => { const rows = recentRead.data || []; return rows.slice(8, 16) })
+const compactHome = computed(() => layout.mode !== 'classic')
+const left = computed(() => { const rows = recentRead.data || []; return rows.slice(0, compactHome.value ? 8 : Math.ceil(rows.length / 2)) })
+const right = computed(() => { const rows = recentRead.data || []; return compactHome.value ? rows.slice(8, 16) : rows.slice(Math.ceil(rows.length / 2)) })
 const hot = computed(() => hotRead.data || []), tags = computed(() => tagsRead.data || [])
 const repeaterItems = ref(consumeRepeaterPayload() || undefined)
 const homeRanks = ref(consumeHomeRankingPayload())
@@ -119,7 +120,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 </script>
 
 <template>
-  <div class="home" :class="{ editing }">
+  <div class="home" :class="{ editing, 'is-classic': !compactHome }">
     <HomePreferenceRedirect />
     <div v-if="editing" class="edit-bar" role="toolbar" aria-label="首页布局编辑">
       <span>拖动模块到任意位置：模块上下半部插入同一列，左右边缘新开一列，行间空隙新起一行</span>
@@ -176,7 +177,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
             <section v-else-if="mod.id === 'recentB'" class="mod-body">
               <div class="index-head">
-                <b>更多最新</b>
+                <b>{{ compactHome ? '更多最新' : '\u00a0' }}</b>
                 <RouterLink to="/recent">更多</RouterLink>
               </div>
               <HomeReadStatus label="最新文章（续）" :loading="recentRead.loading" :error="recentRead.error" :ready="recentRead.data !== null" :empty="!right.length" :empty-text="left.length ? '本列暂无文章。' : '暂无可见文章。'" @retry="recentRead.read" />
@@ -199,7 +200,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
             </section>
 
             <aside v-else-if="mod.id === 'rank'" class="mod-body">
-              <div v-if="homeReady" class="home-person"><PersonInfoCard /></div>
+              <div v-if="!compactHome" class="download"><img src="https://file.fishpi.cn/logo_app.png" width="35" height="35" alt="" /><div><b>随时随地摸鱼？</b><p>下载摸鱼派客户端，想摸就摸！</p></div><RouterLink to="/download" class="green-link">下载</RouterLink></div>
+              <div v-if="compactHome && homeReady" class="home-person"><PersonInfoCard /></div>
               <CheckinPanel />
               <div class="index-head">
                 <b>今日连签排行</b>
@@ -322,12 +324,12 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <ol v-else class="module-list"><li v-for="col in columnsRecentRead.data || []" :key="col.id"><RouterLink class="title fn-ellipsis" :to="`/column/${col.id}`">{{ decodeEntities(col.title) }}</RouterLink><span class="count">{{ col.articleCount }} 章</span></li></ol>
             </section>
 
-            <aside v-else-if="mod.id === 'community'" class="mod-body">
-            <div class="index-head spaced">
+            <aside v-else-if="mod.id === 'community'" class="mod-body community-body">
+            <div class="home-moons"><div class="index-head spaced">
               <b>清风明月</b>
               <RouterLink to="/breezemoons" title="清风明月是什么？">更多</RouterLink>
             </div>
-            <BreezemoonPanel :size="8" :preview-limit="3" compact avatar-only ssr-scope="home" />
+            <BreezemoonPanel :size="8" :preview-limit="compactHome ? 3 : undefined" compact avatar-only ssr-scope="home" /></div>
               <HomeRepeaterStation :initial="repeaterItems" />
 
               <RecentMembers />
@@ -1001,6 +1003,29 @@ function scrollShelf(id: string, dir: -1 | 1) {
   color: var(--fp-title);
   line-height: 1.4;
   word-break: break-word;
+}
+
+.community-body { display:flex; flex-direction:column; }
+.is-classic {
+  gap:12px;
+  .board { align-items:stretch; gap:12px; }
+  .cell { gap:12px; order:initial; }
+  .mod-body { padding:12px 12px 14px; }
+  .home-moons { order:1; }
+  .mod:last-child { flex:1; display:flex; flex-direction:column; }
+  .mod:last-child > .mod-body { flex:1; display:flex; flex-direction:column; }
+  .mod[data-home-module='recentA']:last-child > .mod-body > .module-list:last-child,
+  .mod[data-home-module='recentB']:last-child > .mod-body > .module-list:last-child { flex:1; display:flex; flex-direction:column; justify-content:space-between; }
+  .module-list li { padding:5px 6px; min-height:30px; }
+  .long-card { flex-basis:calc((100% - 36px) / 4); grid-template-columns:64px minmax(0,1fr); min-height:96px; }
+  .long-cover { width:64px; }
+  .long-summary { -webkit-line-clamp:2; }
+  .home-moons :deep(.moon-body) { display:block; overflow:visible; }
+  .download { display:flex; align-items:center; gap:10px; margin:2px 4px 10px; padding:8px 10px; border:1px solid var(--fp-border); border-radius:6px; background:var(--fp-hover); font-size:12px; }
+  .download p { margin:2px 0 0; color:var(--fp-muted); }
+  .download img { width:32px; height:32px; flex:none; }
+  @media(max-width:1100px) { .long-card { flex-basis:calc((100% - 28px) / 3); } }
+  @media(max-width:680px) { .long-card { flex-basis:82%; min-height:112px; }.long-cover { width:68px; } }
 }
 
 @media (max-width: 960px) {

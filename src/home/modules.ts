@@ -50,13 +50,17 @@ export const HOME_MAX_CELLS_PER_ROW = 4
 export const HOME_LAYOUT_STORAGE = 'fishpi.home.layout.v2'
 export const HOME_LAYOUT_STORAGE_V1 = 'fishpi.home.modules.v1'
 
+export type HomeVariant = 'compact' | 'classic'
+export const HOME_VARIANTS_STORAGE = 'fishpi.home.variants.v1'
+
 export interface HomeLayoutState {
   hidden: Record<string, boolean>
   rows: HomeRow[]
 }
 
 /** 首页默认三列独立堆叠，最新与聊天优先进入首屏。 */
-export function defaultHomeRows(): HomeRow[] {
+export function defaultHomeRows(variant: HomeVariant = 'compact'): HomeRow[] {
+  if (variant === 'classic') return [[['recentA'], ['recentB'], [...SIDE_MODULES.map(m => m.id), 'rank']], [['long']], [['chat'], ['hotQna'], ['community']]]
   return [[
     ['rank', ...SIDE_MODULES.map(m => m.id)],
     ['recentA', 'long', 'recentB', 'hotQna'],
@@ -71,15 +75,15 @@ export function isPreviousDefaultLayout(rows: HomeRow[], hidden: Record<string, 
   return HOME_MODULES.every(m => !!hidden[m.id] === (!!m.sidebarId && m.id !== 'side:income'))
 }
 
-export function defaultHomeLayout(): HomeLayoutState {
+export function defaultHomeLayout(variant: HomeVariant = 'compact'): HomeLayoutState {
   return {
-    hidden: Object.fromEntries(HOME_MODULES.filter((m) => m.defaultHidden).map((m) => [m.id, true])),
-    rows: defaultHomeRows(),
+    hidden: Object.fromEntries(HOME_MODULES.filter((m) => m.defaultHidden && !(variant === 'classic' && m.id === 'side:income')).map((m) => [m.id, true])),
+    rows: defaultHomeRows(variant),
   }
 }
 
 /** 去掉未知/重复 id 与空列空行；新增模块按默认位置补回 */
-export function normalizeRows(input: unknown): HomeRow[] {
+export function normalizeRows(input: unknown, variant: HomeVariant = 'compact'): HomeRow[] {
   const seen = new Set<string>()
   const rows: HomeRow[] = []
   if (Array.isArray(input)) {
@@ -97,9 +101,9 @@ export function normalizeRows(input: unknown): HomeRow[] {
       if (cells.length) rows.push(cells)
     }
   }
-  if (!rows.length) return defaultHomeRows()
+  if (!rows.length) return defaultHomeRows(variant)
 
-  const defaults = defaultHomeRows()
+  const defaults = defaultHomeRows(variant)
   for (const m of HOME_MODULES) {
     if (seen.has(m.id)) continue
     const neighbours = defaults.flat().find((cell) => cell.includes(m.id))?.filter((id) => id !== m.id) || []
