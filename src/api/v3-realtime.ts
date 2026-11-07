@@ -21,7 +21,7 @@ function barrageEvent(value:unknown):ChatBarrageEvent|null{
 }
 export type ChatRealtimeState='connecting'|'ready'|'closed'|'blocked'
 export function subscribeChatChanges(event:(value:ChatRealtimeEvent)=>void,state:(value:ChatRealtimeState)=>void):()=>void{
- return subscribeChanges('chat','/api/v3/chat/realtime-ticket',()=>event({type:'sync'}),undefined,event,state)
+ return subscribeChanges('chat','/api/v3/chat/realtime-ticket',()=>{},undefined,event,state)
 }
 function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',path:string,changed:()=>void,articleId?:string,chatEvent?:(value:ChatRealtimeEvent)=>void,connectionState?:(value:ChatRealtimeState)=>void,unavailable?:()=>void):()=>void {
   if (import.meta.env.SSR || typeof WebSocket === 'undefined') return () => {}

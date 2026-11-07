@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import ts from 'typescript';import{ref,nextTick}from'vue';import{createPinia,defineStore}from'pinia'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`);return s}
 const state=globalThis.__timeline={context:1,calls:[],dispatch:null,subscriptions:[],reactions:[]};const http=url(`export class ApiError extends Error{constructor(m,status=0,code){super(m);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__timeline.context}export async function request(path,init){globalThis.__timeline.calls.push({path,init});return globalThis.__timeline.dispatch(path,init)}`),{ApiError}=await import(http)
-const apiURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replace("from './http'",`from '${http}'`)),api=await import(apiURL)
-const auth=defineStore('timeline-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__timelineAuth=auth;const authURL=url('export const useAuthStore=globalThis.__timelineAuth'),rtURL=url('export function subscribeChatChanges(event,state){const sub={event,state,closed:false};globalThis.__timeline.subscriptions.push(sub);return()=>sub.closed=true}'),reactionURL=url('export function useV3ReactionsStore(){return{invalidate(kind,id){globalThis.__timeline.reactions.push([kind,id])}}}')
+const appearanceURL=url(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')))
+const apiURL=url(replace(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')),[['./http',http],['@/utils/chatAppearance',appearanceURL]])),api=await import(apiURL)
+const auth=defineStore('timeline-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__timelineAuth=auth;const authURL=url('export const useAuthStore=globalThis.__timelineAuth'),rtURL=url('export function subscribeChatChanges(event,state){const sub={event,state,closed:false};globalThis.__timeline.subscriptions.push(sub);queueMicrotask(()=>{if(!sub.closed&&globalThis.__timeline.autoReady!==false)state("ready")});return()=>sub.closed=true}'),reactionURL=url('export function useV3ReactionsStore(){return{invalidate(kind,id){globalThis.__timeline.reactions.push([kind,id])}}}')
 const storeURL=url(replace(compile((await fs.readFile('src/stores/v3ChatTimeline.ts','utf8')).replaceAll('import.meta.env.SSR','false')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-chat-messages',apiURL],['@/api/v3-realtime',rtURL],['@/stores/auth',authURL],['@/stores/v3Reactions',reactionURL]])),{useV3ChatTimelineStore}=await import(storeURL),tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()},env=data=>({code:0,data})
 const msg=(id,content='body '+id)=>({id,createdAt:Number(id),type:'text',content,contentHtml:'<p>'+content+'</p>',author:{id:'2',userName:'other',userNickname:'',userAvatarURL:''},client:'Web/Website',card:{}}),page=(list=[msg('11'),msg('12')],hasMore=true)=>({list,hasMore,nextBefore:list[0]?.id||'',nextAfter:list.at(-1)?.id||''})
 let latest=[msg('11'),msg('12')],older=[msg('9'),msg('10')],details=new Map(),historyFail=false;const dispatch=async path=>{if(path==='/api/v3/chat/topic')return env({text:'current topic'});if(path.includes('/messages?')){if(historyFail)throw new ApiError('history503',503);return env(path.includes('before=')?page(older,false):page(latest,true))}const id=path.split('/').at(-1),value=details.get(id);if(value instanceof Error)throw value;return env(value||msg(id))};state.dispatch=dispatch
 await api.chatMessagePage({before:'11'});assert.equal(state.calls.at(-1).path,'/api/v3/chat/messages?size=20&before=11');let count=state.calls.length;await assert.rejects(api.chatMessagePage({before:'11',after:'12'}),e=>e.status===422);assert.equal(state.calls.length,count);for(const data of [page([msg('12'),msg('11')]),page([msg('11'),msg('11')]),{...page(),nextBefore:'9'}]){state.dispatch=async()=>env(data);await assert.rejects(api.chatMessagePage(),e=>e.status===502)}state.dispatch=dispatch
 console.log('PASS timeline 1 actual cursor API validates order, boundaries, duplicate IDs and matching next cursors')
 function setup(){const pinia=createPinia(),store=useV3ChatTimelineStore(pinia);return{pinia,store,user:auth(pinia)}}
-let view=setup();await view.store.connect();assert.deepEqual(view.store.messages.map(m=>m.id),['11','12']);assert.equal(view.store.topic,'current topic');assert.equal(view.store.connected,false);state.subscriptions.at(-1).state('ready');assert.equal(view.store.connected,true);const subscriptions=state.subscriptions.length;await view.store.connect();assert.equal(state.subscriptions.length,subscriptions);view.store.$dispose()
+let view=setup();count=state.calls.length;await view.store.connect();assert.deepEqual(view.store.messages.map(m=>m.id),['11','12']);assert.equal(view.store.topic,'current topic');assert.equal(view.store.connected,true);assert.deepEqual(state.calls.slice(count).map(c=>c.path),['/api/v3/chat/messages?size=20','/api/v3/chat/topic']);const subscriptions=state.subscriptions.length;await view.store.connect();assert.equal(state.subscriptions.length,subscriptions);view.store.$dispose()
 console.log('PASS timeline 2 current HTTP history/topic, ready is transport authentication, repeated connect shares subscription')
 view=setup();await view.store.connect();await view.store.loadMore();assert.deepEqual(view.store.messages.map(m=>m.id),['9','10','11','12']);assert.equal(view.store.hasMore,false);assert.ok(state.calls.some(c=>c.path.includes('before=11')));view.store.$dispose()
 console.log('PASS timeline 3 older cursor prepends ascending rows with server hasMore rather than page guesses')
@@ -43,3 +44,17 @@ console.log('PASS timeline 16 confirmed deletion tombstone survives stale histor
 
 view=setup();await view.store.connect();const barrageCalls=state.calls.length,history=view.store.messages.map(m=>m.id),hint=view.store.changeHint,barrage={id:'12345678-1234-1234-1234-123456789abc',content:'hello',color:'#FFFFFF',createdAt:1,author:{id:'1',userName:'name',userNickname:'',userAvatarURL:''}};state.subscriptions.at(-1).event({type:'barrage',barrage});await tick();assert.deepEqual(view.store.barrage,barrage);assert.equal(state.calls.length,barrageCalls);assert.deepEqual(view.store.messages.map(m=>m.id),history);assert.equal(view.store.changeHint,hint);const barrageSub=state.subscriptions.at(-1);view.user.accessToken=null;assert.equal(view.store.barrage,null);barrageSub.event({type:'barrage',barrage});assert.equal(view.store.barrage,null);view.store.$dispose()
 console.log('PASS timeline 17 barrage remains ephemeral without detail/history/context invalidation; logout clears and rejects old subscription')
+
+state.autoReady=false
+view=setup()
+count=state.calls.length
+await view.store.connect()
+assert.equal(view.store.connected,false)
+assert.equal(state.calls.length-count,2)
+const recovering=state.subscriptions.at(-1)
+recovering.state('ready')
+assert.deepEqual(view.store.messages.map(m=>m.id),['11','12'])
+await tick()
+assert.equal(state.calls.length-count,4)
+view.store.$dispose()
+console.log('PASS timeline 18 slow socket falls back to HTTP once, then reconciles once without clearing visible messages')

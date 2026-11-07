@@ -14,7 +14,7 @@ import { articleTitle, decodeEntities } from '@/utils/text'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import type { ArticleSummary, ChatHistoryItem, TagItem } from '@/api/fishpi'
+import type { ArticleSummary, TagItem } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useHomeLayoutStore, type HomeRowView } from '@/stores/homeLayout'
@@ -42,7 +42,7 @@ const hot = computed(() => hotRead.data || []), tags = computed(() => tagsRead.d
 const repeaterItems = ref(consumeRepeaterPayload() || undefined)
 const homeRanks = ref(consumeHomeRankingPayload())
 onMounted(() => { homeRanks.value = { checkin: null, online: null }; repeaterItems.value = undefined })
-const chatLines = ref<ChatHistoryItem[]>([]), chatDraft = ref(''), chatBusy = ref(false), chatMsg = ref('')
+const chatDraft = ref(''), chatBusy = ref(false), chatMsg = ref('')
 const onlineChatCnt = computed(() => chat.onlineTotal), discussing = computed(() => chat.discuss)
 const hotMode = ref<'hot' | 'column'>('hot'), activeLongShelf = ref<'recent' | 'hot'>('recent')
 const hotState = computed(() => hotMode.value === 'hot' ? hotRead : columnsRecentRead)
@@ -54,14 +54,9 @@ const { editing } = storeToRefs(layout)
 const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive } = useHomeDrag()
 const { messages: liveChatMessages } = storeToRefs(chat)
 let homeMounted = false, longShelfTimer: ReturnType<typeof setInterval> | undefined
-function syncLiveChatMessages() {
-  chatLines.value = liveChatMessages.value.slice(-10).reverse().map(line => ({ appearance:line.appearance, oId: line.oId, userOId: line.userOId, userName: line.userName,
-    userNickname: line.userNickname, userAvatarURL: line.userAvatarURL,
-    content: line.redPacket || (line.card?.msgType === 'music' ? line.card.title || '音乐分享' : line.card ? '天气信息' : line.html || ''), time: line.time }))
-}
-watch(liveChatMessages, syncLiveChatMessages, { immediate: true })
-watch(() => JSON.stringify([getAuthContextVersion(), !!accessToken.value, auth.account?.oId || '']), () => { chatDraft.value = ''; chatLines.value = []; chatMsg.value = '' }, { flush: 'sync' })
-watch(accessToken, () => { chatLines.value = []; if (homeMounted) { if (accessToken.value) void chat.connect(); else chat.disconnect() } }, { flush: 'sync' })
+const chatLines = computed(() => liveChatMessages.value.slice(-10).reverse())
+watch(() => JSON.stringify([getAuthContextVersion(), !!accessToken.value, auth.account?.oId || '']), () => { chatDraft.value = ''; chatMsg.value = '' }, { flush: 'sync' })
+watch(accessToken, () => { if (homeMounted) { if (accessToken.value) void chat.connect(); else chat.disconnect() } }, { flush: 'sync' })
 onMounted(() => { homeMounted = true; if (accessToken.value) void chat.connect(); longShelfTimer = setInterval(() => scrollShelf('long-active', 1), 6000) })
 onUnmounted(() => { homeMounted = false; editing.value = false; if (longShelfTimer) clearInterval(longShelfTimer); if (!chat.floatingChatroomOpen) chat.disconnect() })
 function isBareRow(row: HomeRowView) { return row.cells.length === 1 && row.cells[0].modules.every(m => m.id === 'long') }
@@ -81,21 +76,6 @@ function tagPath(tag: TagItem) {
   }
 }
 
-
-function stripHtml(html: string, max = 60) {
-  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text
-}
-
-function chatPreview(item: ChatHistoryItem) {
-  if (typeof item.content === 'string') return stripHtml(item.content, 80)
-  if (item.content && typeof item.content === 'object') return '[红包]'
-  return ''
-}
-
-function chatAvatar(item: ChatHistoryItem) {
-  return avatarUrl(item)
-}
 
 async function postChat(){
  const content=chatDraft.value.trim()
@@ -287,11 +267,11 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <p v-if="chat.error" role="alert">{{ chat.error }} <button type="button" :disabled="chat.loading" @click="chat.refreshMessages">重读聊天室消息</button></p>
               <p v-if="chatMsg" class="hint">{{ chatMsg }}</p>
               <ol class="module-list chat-list">
-                <li v-for="m in chatLines" :key="m.oId" class="chat-item fp-msg is-room" data-appearance-snapshot="v1" :data-bubble="chatAppearanceSnapshot(m.appearance).bubbleId" :data-frame="chatAppearanceSnapshot(m.appearance).frameId">
+                <li v-for="m in chatLines" :key="m.oId" class="chat-item fp-msg is-room" data-appearance-snapshot="v1" :data-frame="chatAppearanceSnapshot(m.appearance).frameId">
                   <RouterLink v-if="m.userName" class="fp-avatar-frame" :to="`/member/${m.userName}`">
                     <span
                       class="avatar-mid"
-                      :style="avatarStyle(chatAvatar(m))"
+                      :style="avatarStyle(avatarUrl(m))"
                       :aria-label="m.userName"
                     />
                   </RouterLink>
@@ -300,7 +280,9 @@ function scrollShelf(id: string, dir: -1 | 1) {
                       <VipNickname :user-name="m.userName">{{ m.userNickname || m.userName }}</VipNickname>
                       <span v-if="m.userNickname && m.userName" class="chat-uname">({{ m.userName }})</span>
                     </RouterLink>
-                    <div class="chat-text fp-bubble">{{ chatPreview(m) }}</div>
+                    <div v-if="m.html" class="chat-text" v-html="m.html"></div>
+                    <div v-else-if="m.redPacket" class="chat-text">[红包]</div>
+                    <div v-else-if="m.card" class="chat-text">{{ m.card.msgType === 'music' ? m.card.title || '音乐分享' : '天气信息' }}</div>
                   </div>
                 </li>
                 <li v-if="!chatLines.length&&!chat.loading&&!chat.error" class="hint-li">{{ isLoggedIn?'暂无消息，去聊天室看看':'登录后可读取聊天室消息' }}</li>
@@ -999,7 +981,6 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .chat-uname {
   opacity: 0.75;
 }
-.chat-item .fp-bubble { position:relative; }
 .chat-text {
   margin-top: 2px;
   font-size: 13px;
@@ -1007,6 +988,17 @@ function scrollShelf(id: string, dir: -1 | 1) {
   line-height: 1.4;
   word-break: break-word;
 }
+
+.chat-text :deep(p) { margin: 0 0 4px; }
+.chat-text :deep(p:last-child) { margin-bottom: 0; }
+.chat-text :deep(img) {
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+.chat-text :deep(img.emoji) { max-height: 1.4em; }
+.chat-text :deep(pre) { overflow-x: auto; }
 
 .community-body { display:flex; flex-direction:column; }
 .is-classic {

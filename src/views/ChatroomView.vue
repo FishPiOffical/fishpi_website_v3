@@ -287,7 +287,7 @@ function clearScreen() {
 
           <!-- 2. 下方消息列表：与输入区在同一个卡片中，自上而下阅读，最新在最上方 -->
           <section class="cr-classic-list">
-            <FpLoading v-if="loading && !messages.length" />
+            <FpLoading v-if="(loading || chat.connecting) && !messages.length" />
             <p v-else-if="messages.length && !visibleMessages.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
             <p v-else-if="!messages.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
 
@@ -397,7 +397,7 @@ function clearScreen() {
             {{ loadingMore ? '加载中…' : '查看更早记录' }}
           </button>
 
-          <FpLoading v-if="loading && !messages.length" />
+          <FpLoading v-if="(loading || chat.connecting) && !messages.length" />
           <p v-else-if="messages.length && !visibleMessages.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
           <p v-else-if="!messages.length" class="empty-hint">暂无新消息，快来打破宁静吧！</p>
 

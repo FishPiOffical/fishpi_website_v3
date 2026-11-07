@@ -61,7 +61,7 @@ export const useChatStore = defineStore('chat', () => {
   const nodeName=computed(()=>timeline.connected?'当前站点':'未连接')
   const nodeOptions = ref<ChatNodeOption[]>([])
   async function connect(){await Promise.all([timeline.connect(),online.connect()])}
-  watch(()=>timeline.connected,value=>{if(value)void online.refresh()})
+  watch(()=>timeline.connected,value=>{if(value)void online.connect()})
 
   async function loadMore(){await timeline.loadMore()}
   function disconnect(){timeline.disconnect();online.disconnect()}
