@@ -70,7 +70,7 @@ watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.va
 
 const showNodes = ref(false)
 const showClassicOnlines = ref(false)
-const {quote,quoteBusy,quoteErr,rawText,rawError,rawLoading,rawOpen,quoteMessage:readQuote,showRaw,clearQuote,closeRaw,buildQuoteSuffix}=useChatMessageSource()
+const {quote,quoteBusy,quoteErr,quoteMessage:readQuote,clearQuote,buildQuoteSuffix}=useChatMessageSource()
 const editingTopic = ref(false)
 
 const me = computed(() => account.value?.userName)
@@ -81,7 +81,6 @@ const classicMessages = computed(() => [...visibleMessages.value].reverse())
 const route=useRoute(),router=useRouter(),contextId=ref('')
 function syncContextHash(){const match=/^#chatroom(\d{1,32})$/.exec(route.hash);contextId.value=accessToken.value&&account.value?.oId&&match?match[1]!:''}
 watch(()=>JSON.stringify([route.hash,!!accessToken.value,account.value?.oId||'']),syncContextHash,{immediate:true})
-function openContext(id:string){void router.push({hash:'#chatroom'+id})}
 function closeContext(){contextId.value='';if(/^#chatroom\d{1,32}$/.test(route.hash))void router.replace({hash:''})}
 async function latestFromContext(){closeContext();await chat.refreshMessages();await nextTick();if(chatStyle.value==='modern')scrollBottom()}
 
@@ -313,13 +312,11 @@ function clearScreen() {
               </template>
               <template #actions>
                 <ChatRepeatAction v-if="!msg.redPacket && !msg.card" :id="msg.oId" />
-                <button type="button" @click="openContext(msg.oId)">上下文</button>
                 <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
                 <template v-if="!msg.redPacket && accessToken">
                   <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
                     {{ quoteBusy === msg.oId ? '…' : '引用' }}
                   </button>
-                  <button type="button" title="查看原文" @click="showRaw(msg.oId)">原文</button>
                 </template>
                 <ReportDialog v-if="msg.userOId !== auth.account?.oId && auth.accessToken" :data-id="msg.oId" :data-type="3" />
               </template>
@@ -425,13 +422,11 @@ function clearScreen() {
               </template>
               <template #actions>
                 <ChatRepeatAction v-if="!msg.redPacket && !msg.card" :id="msg.oId" />
-                <button type="button" @click="openContext(msg.oId)">上下文</button>
                 <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
                 <template v-if="!msg.redPacket && accessToken">
                   <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
                     {{ quoteBusy === msg.oId ? '…' : '引用' }}
                   </button>
-                  <button type="button" title="查看原文" @click="showRaw(msg.oId)">原文</button>
                 </template>
                 <ReportDialog v-if="msg.userOId !== auth.account?.oId && auth.accessToken" :data-id="msg.oId" :data-type="3" />
               </template>
@@ -518,12 +513,7 @@ function clearScreen() {
       </div>
     </FpDialog>
 
-    <!-- Markdown 原文弹窗 -->
-    <FpDialog :open="rawOpen" title="消息原文 / 卡片公开摘要" :width="560" @close="closeRaw">
-      <FpLoading v-if="rawLoading" small />
-      <p v-else-if="rawError" role="alert">{{ rawError }}</p>
-      <pre v-else class="raw-pre">{{ rawText||'当前消息原文为空。' }}</pre>
-    </FpDialog>
+
 
 
   </div>
@@ -1112,18 +1102,7 @@ function clearScreen() {
 
 
 
-.raw-pre {
-  margin: 0;
-  background: var(--fp-bg);
-  border: 1px solid var(--fp-border);
-  padding: 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  max-height: 50vh;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
+
 
 .packet-detail-list {
   list-style: none;
