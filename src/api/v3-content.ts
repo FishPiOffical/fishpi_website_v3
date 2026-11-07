@@ -105,14 +105,50 @@ async function directory(kind: 'tags' | 'domains', credentials?: RequestCredenti
     if (p >= page.pagination.pageCount) return list
   }
 }
-async function resolveDirectoryId(kind: 'tags' | 'domains', value: string, credentials?: RequestCredentials): Promise<string> {
+// Published system-announcement tag ID. Keep old permalinks working without a directory read.
+const ANNOUNCEMENT_TAG_ID = '1630398858319'
+const ALIAS_PAGE_LIMIT = 4
+const aliasCache = new Map<string, { id: string; expires: number }>()
+const aliasFlights = new Map<string, Promise<string>>()
+
+async function findDirectoryId(kind: 'tags' | 'domains', value: string) {
+  const titleMatches = new Set<string>()
+  for (let p = 1; p <= ALIAS_PAGE_LIMIT; p++) {
+    const page = decodeV3ContentPage(await get(`/api/v3/${kind}?${params(p, 50)}`, 'omit'))
+    if (page.pagination.p !== p || page.pagination.size !== 50) throw invalid()
+    const uriMatches = page.list.filter(item => item.uri === value)
+    if (uriMatches.length === 1) return pathId(id(uriMatches[0]!.id))
+    if (uriMatches.length > 1) throw new ApiError('目录别名不唯一，请从目录重新进入', 409)
+    for (const item of page.list) if (item.title === value) titleMatches.add(pathId(id(item.id)))
+    if (p >= page.pagination.pageCount) {
+      if (titleMatches.size === 1) return [...titleMatches][0]!
+      if (titleMatches.size > 1) throw new ApiError('目录名称不唯一，请从目录重新进入', 409)
+      throw new ApiError('目录不存在', 404, 'not_found')
+    }
+  }
+  throw new ApiError('无法快速解析旧目录链接，请从标签或领域目录重新进入', 422, 'directory_alias_unresolved')
+}
+
+async function resolveDirectoryId(kind: 'tags' | 'domains', value: string) {
   if (/^\d{1,32}$/.test(value)) return pathId(value)
-  const matches = (await directory(kind, credentials)).filter(item => item.uri === value || item.title === value)
-  if (matches.length !== 1) throw new ApiError(matches.length ? '目录名称不唯一，请从目录重新进入' : '目录不存在', matches.length ? 409 : 404, 'not_found')
-  return pathId(id(matches[0]!.id))
+  if (kind === 'tags' && value === 'announcement') return ANNOUNCEMENT_TAG_ID
+  const key = JSON.stringify([kind, value])
+  const cached = aliasCache.get(key)
+  if (cached && cached.expires > Date.now()) return cached.id
+  let flight = aliasFlights.get(key)
+  if (!flight) {
+    flight = findDirectoryId(kind, value).then(id => {
+      aliasCache.delete(key)
+      if (aliasCache.size >= 128) aliasCache.delete(aliasCache.keys().next().value!)
+      aliasCache.set(key, { id, expires: Date.now() + 300_000 })
+      return id
+    }).finally(() => aliasFlights.delete(key))
+    aliasFlights.set(key, flight)
+  }
+  return flight
 }
 export async function resolveV3TagId(value: string): Promise<string> { return resolveDirectoryId('tags', value) }
-async function articleFeedPath(kind: ArticleFeedKind, page: number, size: number, extra: string, credentials?: RequestCredentials): Promise<string | null> {
+async function articleFeedPath(kind: ArticleFeedKind, page: number, size: number, extra: string): Promise<string | null> {
   const paging = params(page, size)
   if (kind === 'search') {
     const q = extra.trim()
@@ -121,7 +157,7 @@ async function articleFeedPath(kind: ArticleFeedKind, page: number, size: number
   }
   if (kind === 'domain' || kind === 'tag') {
     const plural = kind === 'domain' ? 'domains' : 'tags'
-    const resolved = await resolveDirectoryId(plural, extra, credentials)
+    const resolved = await resolveDirectoryId(plural, extra)
     return `/api/v3/${plural}/${resolved}/articles?${paging}&sort=latest&type=all`
   }
   const sort = kind === 'hot' ? 'month-comments' : kind === 'good' ? 'hot' : kind === 'reply' ? 'active' : 'latest'
@@ -138,7 +174,7 @@ export async function v3ArticleFeed(kind: ArticleFeedKind, page = 1, size = 40, 
 export type V3ArticleFeedPage = { list: ArticleSummary[]; p: number; size: number; total: number; pageCount: number }
 export async function v3ArticleFeedPage(kind: ArticleFeedKind, page = 1, size = 20, extra = '', credentials?: RequestCredentials): Promise<V3ArticleFeedPage> {
   if (page > 42949672) throw new ApiError('页码不合法', 422)
-  const path = await articleFeedPath(kind, page, size, extra, credentials)
+  const path = await articleFeedPath(kind, page, size, extra)
   if (!path) throw new ApiError('请输入搜索关键词', 422)
   const data = decodeV3ContentPage(await get(path, credentials))
   if (data.pagination.p !== page || data.pagination.size !== size) throw invalid()
