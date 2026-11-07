@@ -13,7 +13,7 @@ export interface ChatSidebarModuleMeta {
 export const CHAT_SIDEBAR_META: ChatSidebarModuleMeta[] = [
   { id: 'profile', title: '我的资料', defaultOn: true, portable: true },
   { id: 'breezemoons', title: '清风明月', defaultOn: true, portable: true },
-  { id: 'income', title: '上下班时间', defaultOn: true, portable: true, homeDefaultOn: true },
+  { id: 'income', title: '上下班时间', defaultOn: true, portable: true },
   { id: 'topic', title: '当前话题', defaultOn: true, portable: false },
   { id: 'online', title: '在线成员', defaultOn: true, portable: false },
   { id: 'activity', title: '当前活跃情况', defaultOn: true, portable: false },

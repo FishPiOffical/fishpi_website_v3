@@ -6,6 +6,7 @@ import {
   HOME_MAX_CELLS_PER_ROW,
   HOME_MODULES,
   defaultHomeLayout,
+  isPreviousDefaultLayout,
   normalizeRows,
   type HomeLayoutState,
   type HomeModuleId,
@@ -43,7 +44,11 @@ function read(): HomeLayoutState {
     const raw = localStorage.getItem(HOME_LAYOUT_STORAGE)
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<HomeLayoutState>
-      return { hidden: { ...base.hidden, ...(parsed.hidden || {}) }, rows: normalizeRows(parsed.rows) }
+      const rows = normalizeRows(parsed.rows)
+      const hidden = { ...base.hidden, ...(parsed.hidden || {}) }
+      // The previous shipped default showed income; an absent key meant visible.
+      const oldHidden = { ...hidden, 'side:income': parsed.hidden?.['side:income'] ?? false }
+      return isPreviousDefaultLayout(rows, oldHidden) ? base : { hidden, rows }
     }
     const v1 = localStorage.getItem(HOME_LAYOUT_STORAGE_V1)
     if (v1) {
@@ -106,7 +111,7 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
         return {
           key: row.flat().join('|'),
           cells,
-          columns: cells.map((c) => (c.narrow && cells.length > 1 ? 'minmax(0, 0.95fr)' : 'minmax(0, 1fr)')).join(' '),
+          columns: cells.map((c) => (cells.length > 1 && c.modules.some(m => m.id === 'recentA') && c.modules.some(m => m.id === 'recentB') ? 'minmax(0, 1.5fr)' : c.narrow && cells.length > 1 ? 'minmax(0, 0.85fr)' : 'minmax(0, 1fr)')).join(' '),
         }
       })
       .filter((r) => r.cells.length),

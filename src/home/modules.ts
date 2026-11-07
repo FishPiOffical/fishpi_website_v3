@@ -55,13 +55,20 @@ export interface HomeLayoutState {
   rows: HomeRow[]
 }
 
-/** 对齐现网：最新两栏 + 排行 / 长篇专区 / 聊天室 + 热议 + 社区 */
+/** 首页默认三列独立堆叠，最新与聊天优先进入首屏。 */
 export function defaultHomeRows(): HomeRow[] {
-  return [
-    [['recentA'], ['recentB'], [...SIDE_MODULES.map((m) => m.id), 'rank']],
-    [['long']],
-    [['chat'], ['hotQna'], ['community']],
-  ]
+  return [[
+    ['rank', ...SIDE_MODULES.map(m => m.id)],
+    ['recentA', 'long', 'recentB', 'hotQna'],
+    ['chat', 'community'],
+  ]]
+}
+
+/** 只升级原默认布局；移动、显隐等自定义偏好不重置。 */
+export function isPreviousDefaultLayout(rows: HomeRow[], hidden: Record<string, boolean>): boolean {
+  const oldRows = [[['recentA'], ['recentB'], [...SIDE_MODULES.map(m => m.id), 'rank']], [['long']], [['chat'], ['hotQna'], ['community']]]
+  if (JSON.stringify(rows) !== JSON.stringify(oldRows)) return false
+  return HOME_MODULES.every(m => !!hidden[m.id] === (!!m.sidebarId && m.id !== 'side:income'))
 }
 
 export function defaultHomeLayout(): HomeLayoutState {

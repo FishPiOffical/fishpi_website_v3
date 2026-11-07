@@ -12,14 +12,14 @@ import { useV3ChatPublicationStore } from '@/stores/v3ChatPublication'
 import BreezemoonPanel from '@/components/breezemoons/BreezemoonPanel.vue'
 import { articleTitle, decodeEntities } from '@/utils/text'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import type { ArticleSummary, ChatHistoryItem, TagItem } from '@/api/fishpi'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useHomeLayoutStore, type HomeRowView } from '@/stores/homeLayout'
 import { useHomeDrag } from '@/home/useHomeDrag'
-import AdSlot from '@/components/ads/AdSlot.vue'
+import PersonInfoCard from '@/components/sidebar/PersonInfoCard.vue'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
 import HomeSideWidgets from '@/components/home/HomeSideWidgets.vue'
 import HomeRepeaterStation from '@/components/home/HomeRepeaterStation.vue'
@@ -27,13 +27,15 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
 import { avatarStyle, avatarUrl } from '@/utils/avatar'
 
-const auth = useAuthStore(), chat = useChatStore(), publication = useV3ChatPublicationStore(), layout = useHomeLayoutStore(), router = useRouter()
+const auth = useAuthStore(), chat = useChatStore(), publication = useV3ChatPublicationStore(), layout = useHomeLayoutStore()
 const { accessToken, isLoggedIn } = storeToRefs(auth)
 const boot = consumeHomeReadsPayload()
 const recentRead = useHomeRead('recent', boot.recent), hotRead = useHomeRead('hot', boot.hot), tagsRead = useHomeRead('tags', boot.tags)
 const columnsRecentRead = useHomeRead('columnsRecent', boot.columnsRecent), columnsHotRead = useHomeRead('columnsHot', boot.columnsHot)
-const left = computed(() => { const rows = recentRead.data || []; return rows.slice(0, Math.ceil(rows.length / 2)) })
-const right = computed(() => { const rows = recentRead.data || []; return rows.slice(Math.ceil(rows.length / 2)) })
+const homeReady = ref(false)
+onMounted(() => { homeReady.value = true })
+const left = computed(() => { const rows = recentRead.data || []; return rows.slice(0, 8) })
+const right = computed(() => { const rows = recentRead.data || []; return rows.slice(8, 16) })
 const hot = computed(() => hotRead.data || []), tags = computed(() => tagsRead.data || [])
 const repeaterItems = ref(consumeRepeaterPayload() || undefined)
 const homeRanks = ref(consumeHomeRankingPayload())
@@ -77,9 +79,6 @@ function tagPath(tag: TagItem) {
   }
 }
 
-function goDownload() {
-  void router.push('/download')
-}
 
 function stripHtml(html: string, max = 60) {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -136,7 +135,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
         @drop="onDrop"
       />
       <div class="board" :class="{ bare: isBareRow(row) }" :style="{ gridTemplateColumns: row.columns }">
-        <div v-for="cell in row.cells" :key="cell.key" class="cell" :class="{ 'cell--narrow': cell.narrow }">
+        <div v-for="cell in row.cells" :key="cell.key" class="cell" :class="{ 'cell--narrow': cell.narrow, 'cell--feed': cell.modules.some(m => m.id === 'recentA') }">
           <div
             v-for="mod in cell.modules"
             :key="mod.id"
@@ -154,6 +153,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             <section v-if="mod.id === 'recentA'" class="mod-body">
               <div class="index-head">
                 <b>最新</b>
+                <RouterLink to="/recent">全部帖子</RouterLink>
               </div>
               <HomeReadStatus label="最新文章" :loading="recentRead.loading" :error="recentRead.error" :ready="recentRead.data !== null" :empty="!left.length" empty-text="暂无可见文章。" @retry="recentRead.read" />
               <ol class="module-list">
@@ -176,7 +176,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
             <section v-else-if="mod.id === 'recentB'" class="mod-body">
               <div class="index-head">
-                <b>&nbsp;</b>
+                <b>更多最新</b>
                 <RouterLink to="/recent">更多</RouterLink>
               </div>
               <HomeReadStatus label="最新文章（续）" :loading="recentRead.loading" :error="recentRead.error" :ready="recentRead.data !== null" :empty="!right.length" :empty-text="left.length ? '本列暂无文章。' : '暂无可见文章。'" @retry="recentRead.read" />
@@ -199,15 +199,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             </section>
 
             <aside v-else-if="mod.id === 'rank'" class="mod-body">
-              <div class="download">
-                <img src="https://file.fishpi.cn/logo_app.png" width="35" height="35" alt="" />
-                <div>
-                  <b>随时随地摸鱼？</b>
-                  <p>下载摸鱼派客户端，想摸就摸！</p>
-                </div>
-                <button type="button" class="green" @click="goDownload">下载</button>
-              </div>
-              <AdSlot slot-key="home.sidebar" />
+              <div v-if="homeReady" class="home-person"><PersonInfoCard /></div>
               <CheckinPanel />
               <div class="index-head">
                 <b>今日连签排行</b>
@@ -331,6 +323,11 @@ function scrollShelf(id: string, dir: -1 | 1) {
             </section>
 
             <aside v-else-if="mod.id === 'community'" class="mod-body">
+            <div class="index-head spaced">
+              <b>清风明月</b>
+              <RouterLink to="/breezemoons" title="清风明月是什么？">更多</RouterLink>
+            </div>
+            <BreezemoonPanel :size="8" :preview-limit="3" compact avatar-only ssr-scope="home" />
               <HomeRepeaterStation :initial="repeaterItems" />
 
               <RecentMembers />
@@ -346,11 +343,6 @@ function scrollShelf(id: string, dir: -1 | 1) {
                 </RouterLink>
               </div>
 
-            <div class="index-head spaced">
-              <b>清风明月</b>
-              <RouterLink to="/breezemoons" title="清风明月是什么？">更多</RouterLink>
-            </div>
-            <BreezemoonPanel :size="8" compact avatar-only ssr-scope="home" />
             </aside>
             <HomeSideWidgets v-else-if="mod.sidebarId" :modules="[mod]" />
           </div>
@@ -380,7 +372,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 .edit-bar {
   position: sticky;
@@ -418,14 +410,14 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .board {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   background: transparent;
   box-shadow: none;
   border: 0;
   padding: 0;
 }
 .mod-body {
-  padding: 12px 12px 14px;
+  padding: 10px;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
   border-radius: 8px;
@@ -441,7 +433,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .cell {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   padding: 0;
 }
@@ -455,25 +447,19 @@ function scrollShelf(id: string, dir: -1 | 1) {
   position: relative;
   min-width: 0;
 }
-/* 列内最后一个模块撑满剩余高度，列表均匀铺开，避免与相邻列高度不齐时底部留白 */
-.mod:last-child {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.mod:last-child > .mod-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-/* 仅「最新」两栏把列表行距拉开；热议/专栏等保持自然高度，底部留白 */
-.mod[data-home-module='recentA']:last-child > .mod-body > .module-list:last-child,
-.mod[data-home-module='recentB']:last-child > .mod-body > .module-list:last-child {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
+/* 模块按内容自然排布，避免相邻长列将整个首屏撑高。 */
+.board { align-items: start; }
+.home-person { margin-bottom: 10px; }
+.home-person :deep(.person-head) { margin-bottom: 8px; gap: 8px; }
+.home-person :deep(.person-avatar) { width: 34px; height: 34px; }
+.home-person :deep(.person-stats) { padding-top: 6px; }
+.home-person :deep(.stat-col span) { display: none; }
+.home-person :deep(.person-sub) { font-size: 10px; }
+.home-person :deep(.guest-slogan) { margin-bottom: 8px; }
+.home-person :deep(.role-tag) { display: none; }
+.home :deep(.checkin-panel) { margin: 10px 0 12px; }
+.home :deep(.checkin-section) { padding: 7px 8px; }
+.home :deep(.breezemoon-list .moon-body) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 
 .home.editing .mod {
   cursor: grab;
@@ -648,8 +634,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 6px;
-  min-height: 30px;
+  padding: 4px 5px;
+  min-height: 26px;
   font-size: 13.5px;
   border-radius: 4px;
   transition: background-color 0.15s ease;
@@ -688,27 +674,6 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .count.heat {
   color: var(--fp-accent);
   background: transparent;
-}
-.download {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 2px 4px 10px;
-  padding: 8px 10px;
-  font-size: 12px;
-  color: var(--fp-title);
-  background: var(--fp-hover);
-  border: 1px solid var(--fp-border);
-  border-radius: 6px;
-}
-.download img {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-}
-.download p {
-  margin: 2px 0 0;
-  color: var(--fp-muted);
 }
 .green {
   margin-left: auto;
@@ -870,7 +835,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .long-shelf {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   overflow-x: auto;
   padding: 0 var(--long-gutter) 2px;
   scroll-padding-inline: var(--long-gutter);
@@ -884,19 +849,19 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .long-card {
   display: grid;
-  flex: 0 0 calc((100% - 36px) / 4);
-  grid-template-columns: 64px minmax(0, 1fr);
+  flex: 0 0 calc((100% - 10px) / 2);
+  grid-template-columns: 48px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   min-width: 0;
-  min-height: 96px;
+  min-height: 72px;
   padding: 4px 10px 4px 0;
   border-right: 1px solid var(--fp-border);
   scroll-snap-align: start;
 }
 .long-cover {
   display: block;
-  width: 64px;
+  width: 48px;
   aspect-ratio: 3 / 4;
   overflow: hidden;
   border-radius: 3px;
@@ -936,7 +901,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   line-height: 1.45;
   text-decoration: none;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
 }
 .long-meta {
   display: flex;
@@ -1008,7 +973,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .chat-list .chat-item {
   align-items: flex-start;
-  padding: 5px 6px;
+  padding: 4px 5px;
 }
 .avatar-mid {
   display: inline-block;
@@ -1042,7 +1007,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   .board {
     grid-template-columns: minmax(0, 1fr) !important;
     padding: 0;
-    gap: 12px;
+    gap: 10px;
   }
   .cell {
     padding: 0;
@@ -1057,10 +1022,10 @@ function scrollShelf(id: string, dir: -1 | 1) {
     --long-gutter: 14px;
   }
   .long-card {
-    flex-basis: calc((100% - 28px) / 3);
+    flex-basis: calc((100% - 10px) / 2);
   }
   .long-card {
-    flex-basis: calc((100% - 28px) / 3);
+    flex-basis: calc((100% - 10px) / 2);
   }
   .long-heading > span {
     display: none;
@@ -1068,12 +1033,13 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 
 @media (max-width: 680px) {
+  .cell--feed { order: -1; }
   .long-card {
     flex-basis: 82%;
-    min-height: 112px;
+    min-height: 72px;
   }
   .long-cover {
-    width: 68px;
+    width: 48px;
   }
 }
 </style>
