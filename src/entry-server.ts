@@ -23,10 +23,12 @@ import { shouldPrefetchSsr } from './seo/ssrRoutes'
 
 setSsrReadGate(createSsrUpstreamGate())
 const readPublicHome = createPublicHomeCache()
+const readPublicDirectory = createPublicHomeCache(1_800_000, 8)
+const homeStaleKeys = new Set(['recent', 'hot', 'columnsRecent', 'columnsHot', 'tags', 'ranking:checkin:8', 'ranking:online:8'])
+const upstreamOrigin = () => process.env.VITE_API_TARGET || process.env.API_TARGET || 'https://fishpi.cn'
 function homeRead<T>(key: string, load: () => Promise<T>) {
-  const origin = process.env.VITE_API_TARGET || process.env.API_TARGET || 'https://fishpi.cn'
-  const staleMs = key === 'tags' || key.startsWith('ranking:') ? 120_000 : 0
-  return readPublicHome(`${origin}:${key}`, load, staleMs).catch(error => {
+  const staleMs = homeStaleKeys.has(key) ? 120_000 : 0
+  return readPublicHome(`${upstreamOrigin()}:${key}`, load, staleMs).catch(error => {
     if (error?.code === 'ssr_deferred') throw error
     // Resource and status only: never log upstream bodies, credentials or request headers.
     console.warn('[SSR homepage] preload failed', key, typeof error?.status === 'number' ? error.status : 'network')
@@ -93,12 +95,9 @@ async function prefetchPage(path: string): Promise<SsrPayload> {
     return { member }
   }
 
-  if (path === '/domains') {
-    return { directoryPage: await fetchDirectoryPage('domains') }
-  }
-
-  if (path === '/tags') {
-    return { directoryPage: await fetchDirectoryPage('tags') }
+  if (path === '/domains' || path === '/tags') {
+    const kind = path === '/domains' ? 'domains' : 'tags'
+    return { directoryPage: await readPublicDirectory(`${upstreamOrigin()}:${kind}:1`, () => fetchDirectoryPage(kind), 120_000) }
   }
 
   if (path === '/breezemoons') {

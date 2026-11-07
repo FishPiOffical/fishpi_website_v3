@@ -41,7 +41,14 @@ const right = computed(() => { const rows = recentRead.data || []; return compac
 const hot = computed(() => hotRead.data || []), tags = computed(() => tagsRead.data || [])
 const repeaterItems = ref(consumeRepeaterPayload() || undefined)
 const homeRanks = ref(consumeHomeRankingPayload())
-onMounted(() => { homeRanks.value = { checkin: null, online: null }; repeaterItems.value = undefined })
+let rankingSeedTimer: ReturnType<typeof setTimeout> | undefined
+onMounted(() => {
+  repeaterItems.value = undefined
+  // A saved layout may mount a ranking after hydration; keep its SSR seed until it ages out.
+  if (homeRanks.value.checkin || homeRanks.value.online) {
+    rankingSeedTimer = setTimeout(() => { homeRanks.value = { checkin: null, online: null } }, 300_000)
+  }
+})
 const chatDraft = ref(''), chatBusy = ref(false), chatMsg = ref('')
 const onlineChatCnt = computed(() => chat.onlineTotal), discussing = computed(() => chat.discuss)
 const hotMode = ref<'hot' | 'column'>('hot'), activeLongShelf = ref<'recent' | 'hot'>('recent')
@@ -58,7 +65,7 @@ const chatLines = computed(() => liveChatMessages.value.slice(-10).reverse())
 watch(() => JSON.stringify([getAuthContextVersion(), !!accessToken.value, auth.account?.oId || '']), () => { chatDraft.value = ''; chatMsg.value = '' }, { flush: 'sync' })
 watch(accessToken, () => { if (homeMounted) { if (accessToken.value) void chat.connect(); else chat.disconnect() } }, { flush: 'sync' })
 onMounted(() => { homeMounted = true; if (accessToken.value) void chat.connect(); longShelfTimer = setInterval(() => scrollShelf('long-active', 1), 6000) })
-onUnmounted(() => { homeMounted = false; editing.value = false; if (longShelfTimer) clearInterval(longShelfTimer); if (!chat.floatingChatroomOpen) chat.disconnect() })
+onUnmounted(() => { clearTimeout(rankingSeedTimer); homeMounted = false; editing.value = false; if (longShelfTimer) clearInterval(longShelfTimer); if (!chat.floatingChatroomOpen) chat.disconnect() })
 function isBareRow(row: HomeRowView) { return row.cells.length === 1 && row.cells[0].modules.every(m => m.id === 'long') }
 watch(activeLongShelf, async () => { await nextTick(); document.getElementById('long-active')?.scrollTo({ left: 0 }) })
 usePageSeo(() => ({ title: SITE_NAME, description: SITE_DEFAULT_DESC, path: '/' }))

@@ -1,4 +1,4 @@
-/** Only anonymous homepage DTOs belong here; never cache an app, HTML or private state. */
+/** Only anonymous public DTOs belong here; never cache an app, HTML or private state. */
 export function createPublicHomeCache(ttlMs = 300_000, capacity = 16) {
   const values = new Map<string, { expires: number; value: unknown }>()
   const pending = new Map<string, Promise<unknown>>()
@@ -14,7 +14,7 @@ export function createPublicHomeCache(ttlMs = 300_000, capacity = 16) {
         values.set(key, { expires: Date.now() + ttlMs, value: structuredClone(value) })
         return value
       }).catch(error => {
-        if ([401, 403, 404].includes(error?.status) && values.get(key) === stale) values.delete(key)
+        if ([401, 403, 404, 410].includes(error?.status) && values.get(key) === stale) values.delete(key)
         throw error
       }).finally(() => { pending.delete(key) })
       pending.set(key, task)

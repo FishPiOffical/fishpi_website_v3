@@ -44,3 +44,14 @@ assert.deepEqual(await readStale('ranking', refresh, 2000), ['second'])
 now += 3000
 await assert.rejects(readStale('ranking', async () => { throw Error('expired') }, 2000), /expired/)
 console.log('PASS stale public home data: bounded window and one shared background refresh')
+
+const readOnFailure = createPublicHomeCache(1000)
+await readOnFailure('public', async () => ['last success'], 2000)
+now += 1000
+const unavailable = async () => { throw Object.assign(Error('temporary'), { status: 503 }) }
+assert.deepEqual(await readOnFailure('public', unavailable, 2000), ['last success'])
+await new Promise(resolve => setImmediate(resolve))
+assert.deepEqual(await readOnFailure('public', async () => { throw Object.assign(Error('gone'), { status: 410 }) }, 2000), ['last success'])
+await new Promise(resolve => setImmediate(resolve))
+await assert.rejects(readOnFailure('public', unavailable, 2000), /temporary/)
+console.log('PASS temporary refresh failure retains old public data, confirmed removal invalidates it')
