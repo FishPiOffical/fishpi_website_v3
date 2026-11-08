@@ -473,7 +473,7 @@ onUnmounted(() => {
               <img v-if="p.icon" :src="p.icon" width="16" height="16" alt="" />
               {{ p.title }}
             </span>
-            <span class="partner-desc">{{ p.desc }}</span><small class="partner-label">站点支持</small>
+            <span class="partner-desc">{{ p.desc }}</span>
           </a>
           <span class="partner-divider" aria-hidden="true">丨</span>
           <a
@@ -950,7 +950,6 @@ main.main--cr-modern {
   font-size: 13px;
   transition: transform 0.2s;
 }
-.partner-label{display:block;margin-top:5px;color:var(--fp-muted);font-size:9px}
 .partner:hover {
   transform: translateY(-2px);
 }

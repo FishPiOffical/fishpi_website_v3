@@ -211,8 +211,8 @@ function saveFrequency(resetDefaults = false) {
     <p v-else-if="!loading && !error" class="hint">还没有图片分组，添加第一张图片会建立“全部”。</p>
     <button v-if="groupPage < groupPages" type="button" class="ghost" :disabled="busy || loading" @click="moreGroups">更多分组</button>
     <form v-if="selectedGroup?.type === 0" class="row" @submit.prevent="onUpdateGroup">
-      <input v-model="editGroupName" :disabled="busy" maxlength="64" aria-label="分组名称" />
-      <input v-model.number="editGroupSort" :disabled="busy" type="number" step="1" min="-2147483648" max="2147483647" aria-label="分组排序" />
+      <label>分组名称<input v-model="editGroupName" :disabled="busy" maxlength="64" aria-label="分组名称" /></label>
+      <label>排序<input v-model.number="editGroupSort" :disabled="busy" type="number" step="1" min="-2147483648" max="2147483647" aria-label="分组排序" /></label>
       <button type="submit" :disabled="busy || loading || !editGroupName.trim()">保存分组</button>
       <button type="button" :disabled="busy || loading || itemTotal === 0" @click="onShare">生成分享码</button>
     </form>
@@ -227,25 +227,25 @@ function saveFrequency(resetDefaults = false) {
       </figure>
     </div>
     <form v-if="editItemId" class="row" @submit.prevent="onUpdateItem">
-      <input v-model="editItemName" :disabled="busy" maxlength="64" aria-label="成员名称" placeholder="名称（可空）" />
-      <input v-model.number="editItemSort" :disabled="busy" type="number" step="1" min="-2147483648" max="2147483647" aria-label="成员排序" />
+      <label>图片名称<input v-model="editItemName" :disabled="busy" maxlength="64" aria-label="成员名称" placeholder="名称（可空）" /></label>
+      <label>排序<input v-model.number="editItemSort" :disabled="busy" type="number" step="1" min="-2147483648" max="2147483647" aria-label="成员排序" /></label>
       <button type="submit" :disabled="busy || loading">保存图片信息</button>
       <button type="button" :disabled="busy" @click="editItemId = ''">取消编辑</button>
     </form>
     <button v-if="itemPage < itemPages" type="button" class="ghost" :disabled="busy || loading" @click="loadItems(true)">更多图片</button>
     <form class="row" @submit.prevent="onAddUrl">
-      <input v-model="newUrl" :disabled="busy" maxlength="512" aria-label="表情图片URL" placeholder="HTTPS图片 URL" />
-      <input v-model="newName" :disabled="busy" maxlength="64" aria-label="表情图片名称" placeholder="名称（可选）" />
+      <label>图片地址<input v-model="newUrl" :disabled="busy" maxlength="512" aria-label="表情图片URL" placeholder="HTTPS图片 URL" /></label>
+      <label>图片名称<input v-model="newName" :disabled="busy" maxlength="64" aria-label="表情图片名称" placeholder="名称（可选）" /></label>
       <button type="submit" :disabled="busy || loading || !newUrl.trim()">{{ groupId ? '添加到分组' : '添加到全部' }}</button>
     </form>
     <form class="row" @submit.prevent="onCreate">
-      <input v-model="newGroup" :disabled="busy" maxlength="64" aria-label="新分组名称" placeholder="新分组名称" />
+      <label>分组名称<input v-model="newGroup" :disabled="busy" maxlength="64" aria-label="新分组名称" placeholder="新分组名称" /></label>
       <button type="submit" :disabled="busy || loading || !newGroup.trim()">新建分组</button>
       <button type="button" class="ghost" :disabled="busy || loading || selectedGroup?.type !== 0" @click="onDeleteGroup">删除当前分组</button>
     </form>
     <h3>导入与迁移</h3>
     <form class="row" @submit.prevent="onImport">
-      <input v-model="importCode" :disabled="busy" maxlength="16" aria-label="表情分享码" placeholder="输入分享码" />
+      <label>分享码<input v-model="importCode" :disabled="busy" maxlength="16" aria-label="表情分享码" placeholder="输入分享码" /></label>
       <button type="submit" :disabled="busy || loading || !importCode.trim()">导入新分组</button>
     </form>
     <p class="hint">每次成功导入建立独立新组。旧云表情只迁移本人的图片，遇到不符合规则的项目整批失败。</p>

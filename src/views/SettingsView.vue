@@ -97,94 +97,66 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
         <span><RouterLink :to="{ path: '/login', query: { redirect: route.fullPath } }">登录</RouterLink>后可修改设置。游客仍可调整本机主题外观。</span>
       </p>
 
-      <section v-if="tab === 'profile'" class="card fp-card">
-        <OwnerProfileSettings v-if="isLoggedIn" key="profile" mode="profile" />
+      <section v-if="tab === 'profile' && isLoggedIn" class="card fp-card">
+        <OwnerProfileSettings key="profile" mode="profile" />
       </section>
 
-      <section v-if="tab === 'system'" class="card fp-card">
+      <div v-if="tab === 'system'" class="settings-stack">
+        <section class="card fp-card">
+          <p class="hint">主题免费。对话框和头像框的进阶样式需<RouterLink to="/vips">开通 VIP</RouterLink>。</p>
+          <AppearancePicker />
+        </section>
+        <OwnerPreferences v-if="isLoggedIn" key="site-skins" resource="display" title="站点皮肤" :fields="['skin', 'mobileSkin']" />
+      </div>
 
-        <p class="hint">
-          主题免费。对话框和头像框的进阶样式需
-          <RouterLink to="/vips">开通 VIP</RouterLink>
-          。
-        </p>
-        <AppearancePicker />
-        <template v-if="isLoggedIn">
-          <p class="hint">以下皮肤选项用于经典页面的桌面与移动显示。</p>
-          <OwnerPreferences key="site-skins" resource="display" title="站点皮肤" :fields="['skin', 'mobileSkin']" />
-        </template>
+      <section v-if="tab === 'avatar' && isLoggedIn" class="card fp-card">
+        <OwnerProfileSettings key="avatar" mode="avatar" />
       </section>
 
-      <section v-if="tab === 'avatar'" class="card fp-card">
+      <div v-if="tab === 'account' && isLoggedIn" class="settings-stack">
+        <OwnerInventory />
+        <OwnerMedals />
+        <OwnerSecurity />
+        <OwnerAppLogin />
+      </div>
 
-        <OwnerProfileSettings v-if="isLoggedIn" key="avatar" mode="avatar" />
+      <div v-if="tab === 'function' && isLoggedIn" class="settings-stack">
+        <OwnerPreferences key="functions" resource="functions" title="功能设置" />
+        <OwnerPreferences key="display-modes" resource="display" title="显示设置" :fields="['commentViewMode', 'avatarViewMode']" />
+        <section class="card fp-card"><h2>表情包</h2><EmojiPacks /></section>
+      </div>
+
+      <div v-if="tab === 'privacy' && isLoggedIn" class="settings-stack">
+        <OwnerPreferences key="privacy" resource="privacy" title="隐私设置" />
+        <OwnerPreferences key="location" resource="location" title="地理位置公开设置" />
+      </div>
+
+      <section v-if="tab === 'profession' && isLoggedIn" class="card fp-card">
+        <OwnerProfessions />
       </section>
 
-      <section v-if="tab === 'account'" class="card fp-card">
-
-        <template v-if="isLoggedIn">
-          <OwnerInventory />
-
-          <OwnerMedals />
-
-          <OwnerSecurity />
-
-          <OwnerAppLogin />
-
-        </template>
+      <section v-if="tab === 'point' && isLoggedIn" class="card fp-card">
+        <PointTransfer :initial-recipient="typeof route.query.to === 'string' ? route.query.to : ''" />
       </section>
 
-      <section v-if="tab === 'function'" class="card fp-card">
-
-        <template v-if="isLoggedIn">
-          <OwnerPreferences key="functions" resource="functions" title="功能设置" />
-          <OwnerPreferences key="display-modes" resource="display" title="显示设置" :fields="['commentViewMode', 'avatarViewMode']" />
-          <h2>表情包</h2>
-          <EmojiPacks />
-        </template>
+      <section v-if="tab === 'invite' && isLoggedIn" class="card fp-card">
+        <OwnerInvitations />
       </section>
 
-      <section v-if="tab === 'privacy'" class="card fp-card">
-
-        <template v-if="isLoggedIn">
-          <OwnerPreferences key="privacy" resource="privacy" title="隐私设置" />
-          <OwnerPreferences key="location" resource="location" title="地理位置公开设置" />
-        </template>
+      <section v-if="tab === 'identity' && isLoggedIn" class="card fp-card">
+        <OwnerIdentityApplication />
       </section>
 
-      <section v-if="tab === 'profession'" class="card fp-card">
+      <div v-if="tab === 'data' && isLoggedIn" class="settings-stack">
+        <nav v-if="account" class="card fp-card settings-quick-links" aria-label="本人匿名创作入口">
+          <RouterLink :to="`/member/${encodeURIComponent(account.userName)}/articles/anonymous`">本人匿名文章</RouterLink>
+          <RouterLink :to="`/member/${encodeURIComponent(account.userName)}/comments/anonymous`">本人匿名评论</RouterLink>
+        </nav>
+        <div class="card fp-card"><OwnerPostExport /></div>
+        <OwnerGameSaves />
+      </div>
 
-        <template v-if="isLoggedIn">
-          <OwnerProfessions />
-        </template>
-      </section>
-
-      <section v-if="tab === 'point'" class="card fp-card">
-        <template v-if="isLoggedIn">
-          <PointTransfer :initial-recipient="typeof route.query.to === 'string' ? route.query.to : ''" />
-        </template>
-      </section>
-
-      <section v-if="tab === 'invite'" class="card fp-card">
-<OwnerInvitations v-if="isLoggedIn" />
-      </section>
-
-      <section v-if="tab === 'identity'" class="card fp-card">
-
-        <OwnerIdentityApplication v-if="isLoggedIn" />
-      </section>
-
-      <section v-if="tab === 'data'" class="card fp-card">
-
-        <nav v-if="isLoggedIn && account" aria-label="本人匿名创作入口"><RouterLink :to="`/member/${encodeURIComponent(account.userName)}/articles/anonymous`">本人匿名文章</RouterLink> · <RouterLink :to="`/member/${encodeURIComponent(account.userName)}/comments/anonymous`">本人匿名评论</RouterLink></nav>
-        <OwnerPostExport v-if="isLoggedIn" />
-        <OwnerGameSaves v-if="isLoggedIn" />
-      </section>
-
-      <section v-if="tab === 'i18n'" class="card fp-card">
-
-        <OwnerPreferences v-if="isLoggedIn" key="locale" resource="locale" title="语言与时区" />
-      </section>
+      <OwnerPreferences v-if="tab === 'i18n' && isLoggedIn" key="locale" resource="locale" title="语言与时区" />
 
       <section v-if="tab === 'help'" class="card fp-card">
 

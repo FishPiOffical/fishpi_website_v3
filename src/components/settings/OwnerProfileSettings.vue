@@ -120,7 +120,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
     <p v-if="loading" role="status">正在读取设置…</p>
     <header class="settings-section-head"><h2>{{ mode === 'avatar' ? '头像设置' : '个人资料' }}</h2><button class="fp-control settings-refresh" type="button" :disabled="loading || busy" @click="load" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取</span></button></header>
     <template v-if="mode === 'profile'">
-      <form @submit.prevent="saveProfile">
+      <form @submit.prevent="saveProfile" aria-label="公开资料">
         <fieldset :disabled="loading || busy || !loaded.profile">
           <label>昵称<input class="fp-control" v-model="nickname" maxlength="20" /></label>
           <label>网址<input class="fp-control" v-model="website" maxlength="100" placeholder="https://" /></label>
@@ -130,7 +130,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
         <p v-if="errors.profile" role="alert" class="error">{{ errors.profile }}</p>
         <p v-if="messages.profile" role="status">{{ messages.profile }}</p>
       </form>
-      <form @submit.prevent="savePersonality">
+      <form @submit.prevent="savePersonality" aria-label="MBTI">
         <fieldset :disabled="loading || busy || !loaded.personality">
           <label>MBTI<input class="fp-control" v-model="mbti" list="owner-mbti-options" maxlength="6" placeholder="如 ENFP-A，留空清除" /></label>
           <datalist id="owner-mbti-options"><option v-for="choice in options" :key="choice" :value="choice" /></datalist>
@@ -139,7 +139,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
         <p v-if="errors.personality" role="alert" class="error">{{ errors.personality }}</p>
         <p v-if="messages.personality" role="status">{{ messages.personality }}</p>
       </form>
-      <form @submit.prevent="saveTags">
+      <form @submit.prevent="saveTags" aria-label="个人标签">
         <fieldset :disabled="loading || busy || !loaded.tags">
           <label>个人标签<input class="fp-control" v-model="tags" maxlength="128" placeholder="逗号分隔，留空清除" /></label>
           <button data-tone="primary" class="fp-control" type="submit">保存个人标签</button>
@@ -148,7 +148,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
         <p v-if="errors.tags" role="alert" class="error">{{ errors.tags }}</p>
         <p v-if="messages.tags" role="status">{{ messages.tags }}</p>
       </form>
-      <form @submit.prevent="saveQq">
+      <form @submit.prevent="saveQq" aria-label="QQ">
         <fieldset :disabled="loading || busy || !loaded.qq">
           <label>QQ<input class="fp-control" v-model="qq" inputmode="numeric" maxlength="12" placeholder="留空清除" /></label>
           <button data-tone="primary" class="fp-control" type="submit">保存 QQ</button>
@@ -162,9 +162,9 @@ onBeforeUnmount(() => { mounted = false; reset() })
       <img class="owner-avatar" :src="displayAvatar(avatar) || '/favicon.svg'" alt="当前头像" />
       <form @submit.prevent="saveAvatar">
         <fieldset :disabled="loading || busy || !loaded.avatar">
-          <label>头像图片地址<input class="fp-control" v-model="avatarDraft" maxlength="255" placeholder="https://" /></label>
-          <button data-tone="primary" class="fp-control" type="submit">保存头像地址</button>
+          <label class="settings-wide-field">头像图片地址<input class="fp-control" v-model="avatarDraft" maxlength="255" placeholder="https://" /></label>
           <label>上传头像<input type="file" accept="image/jpeg,image/png,image/gif" @change="onUpload" /></label>
+          <button data-tone="primary" class="fp-control" type="submit">保存头像地址</button>
         </fieldset>
       </form>
       <p>支持 JPEG、PNG、GIF，也可填写 HTTPS 图片地址。</p>
