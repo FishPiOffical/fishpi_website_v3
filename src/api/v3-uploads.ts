@@ -34,7 +34,7 @@ export async function uploadV3Files(files: File[], signal: AbortSignal): Promise
   catch (error) { if (signal.aborted) throw error; throw new ApiError('上传结果未确认，请检查网络后再选择文件', 0) }
   signal.throwIfAborted()
   let result: Row
-  try { result = row(await response.json()) } catch { throw new ApiError('图床响应无法解析，上传结果未确认', response.status) }
+  try { result = row(await response.json()) } catch { throw new ApiError('上传结果未确认，请检查后再试', response.status) }
   signal.throwIfAborted()
   if (!response.ok || result.code !== 0) throw new ApiError('图床上传失败，请检查文件后重试', response.status)
   const data = row(result.data), successes = row(data.succMap), failures = data.errFiles

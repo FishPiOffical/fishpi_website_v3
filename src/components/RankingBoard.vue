@@ -40,7 +40,7 @@ function metricName(key: string) { if (key === 'points') return ['balance', 'con
     </div>
     <template v-if="value">
       <div class="ranking-meta-bar">
-        <p class="ranking-note">本次榜单共 {{ value.total }} 条{{ compact ? '，预览前8条' : '' }}；范围为服务端现有榜单快照。</p>
+        <p class="ranking-note">本次榜单共 {{ value.total }} 条{{ compact ? '，预览前8条' : '' }}。</p>
         <p v-if="value.summary" class="ranking-summary-badge">
           💰 赞助总金额 {{ value.summary.amount.toLocaleString('zh-CN') }} 元 · 支持运营 {{ value.summary.supportedDays.toLocaleString('zh-CN') }} 天
         </p>

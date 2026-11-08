@@ -26,7 +26,7 @@ async function retry() {
   try {
     const ok = await pingApi()
     if (!ok) {
-      lastError.value = '接口仍无响应，请稍后再试'
+      lastError.value = '暂时连不上摸鱼派，请稍后再试'
       return
     }
     const failure = await router.replace(backTarget())
@@ -58,9 +58,9 @@ onUnmounted(() => {
 <template>
   <section class="page">
     <p class="mark">offline</p>
-    <h1>连不上摸鱼派接口</h1>
+    <h1>连不上摸鱼派</h1>
     <p class="desc">
-      浏览器能打开本站页面，但请求后端时失败了。常见原因是本机网络中断、代理未启动，或后端接口维护中。<br/>等恢复的功夫，先摸几竿鱼吧。
+      请检查网络连接，或稍后再试。<br/>等恢复的功夫，先摸几竿鱼吧。
     </p>
     <p v-if="!onlineHint" class="warn">⚠️ 检测到浏览器处于离线状态，请先恢复网络。</p>
     <p v-if="lastError" class="err">❌ {{ lastError }}</p>

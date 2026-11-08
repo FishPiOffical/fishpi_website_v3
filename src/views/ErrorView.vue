@@ -30,7 +30,7 @@ usePageSeo(() => ({ title: info.value.title, path: route.fullPath, robots: 'noin
       反馈问题以帮助我们进行改进，非常感谢 ♥
     </p>
     <p class="hint">
-      若是接口连不上，请打开
+      如果暂时连不上摸鱼派，可以打开
       <RouterLink to="/offline">网络故障页</RouterLink>；页面不存在请看
       <RouterLink to="/error/404">404 页</RouterLink>。
     </p>

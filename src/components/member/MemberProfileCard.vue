@@ -47,8 +47,8 @@ function fallback(event: Event) {
         <p v-if="profile.userIntro" class="profile-intro">{{ profile.userIntro }}</p>
         <a v-if="profile.userURL" :href="profile.userURL" class="profile-website" target="_blank" rel="noopener noreferrer" :title="profile.userURL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2" /></svg><span>{{ websiteLabel }}</span><span aria-hidden="true">↗</span></a>
         <dl class="profile-stats">
-          <div :title="points === null ? '当前公开资料接口未提供积分' : undefined"><dt>积分</dt><dd>{{ points === null ? '—' : points?.toLocaleString() }}</dd></div>
-          <div :title="profile.onlineMinute === undefined ? '当前公开资料接口未提供在线时长' : `累计 ${profile.onlineMinute.toLocaleString()} 分钟`"><dt>在线时长</dt><dd>{{ onlineTime }}</dd></div>
+          <div><dt>积分</dt><dd>{{ points === null ? '—' : points?.toLocaleString() }}</dd></div>
+          <div :title="profile.onlineMinute === undefined ? undefined : `累计 ${profile.onlineMinute.toLocaleString()} 分钟`"><dt>在线时长</dt><dd>{{ onlineTime }}</dd></div>
         </dl>
         <template v-if="canAct">
           <RouterLink v-if="self" to="/settings" class="profile-edit">编辑资料</RouterLink>

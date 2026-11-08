@@ -13,6 +13,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.url==='/api/v3/auth/refresh'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{"code":0,"data":{"accessToken":"synthetic-rotated"}}');return}
  const format=req.url.split('/').pop()
  if(format==='error'){res.writeHead(422,{'Content-Type':'application/json'});res.end('{"code":"invalid_request","msg":"Rejected"}');return}
+ if(format==='html'){res.writeHead(404,{'Content-Type':'text/html'});res.end('<p>Internal route missing</p>');return}
  if(format==='malformed'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{');return}
  const types={json:'application/json',zip:'application/zip',svg:'image/svg+xml',text:'text/plain',abort:'application/json',reward:'application/json'}
  const bodies={json:'{"code":0,"data":{"id":"2","rewarded":true}}',zip:'fixture private zip',svg:'<svg xmlns="http://www.w3.org/2000/svg"></svg>',text:'complete text',abort:'{"code":0}',reward:'{"code":0,"data":{"id":"2","rewarded":true}}'}
@@ -54,8 +55,9 @@ try{
  await ready;controller.abort();await rejection;assert.equal(offline.length,before);bodyReadStarted=null
  console.log('PASS HTTP body 3 cancellation during body read remains aborted and does not publish an offline event')
  await assert.rejects(api.request('/api/v3/fixture/error'),e=>e instanceof api.ApiError&&e.status===422&&e.code==='invalid_request')
- await assert.rejects(api.request('/api/v3/fixture/malformed'),e=>e instanceof api.ApiError&&e.status===200&&e.code!=='offline')
+ await assert.rejects(api.request('/api/v3/fixture/malformed'),e=>e instanceof api.ApiError&&e.status===200&&e.code==='invalid_response'&&e.message==='服务暂不可用，请稍后重试'&&e.diagnosticMessage==='无法解析接口响应')
  assert.equal(offline.length,before)
+ await assert.rejects(api.request('/api/v3/fixture/html'),e=>e.status===404&&e.code==='invalid_response'&&e.message==='服务暂不可用，请稍后重试')
  console.log('PASS HTTP body 4 complete business errors and malformed complete JSON retain existing classification, not network failure')
  const interactionURL=url(compile(await fs.readFile('src/api/v3-article-interactions.ts','utf8')).replace("from './http'",`from '${httpURL}'`))
  const useWireAuth=defineStore('wire-auth',()=>({accessToken:ref(api.getAccessToken()),account:ref({oId:'1'}),async reloadAccount(){}}))
@@ -67,7 +69,7 @@ try{
  const stop=api.onAccessTokenChange(value=>owner.accessToken=value)
  const route='/api/v3/articles/2/reward';cut=true
  await assert.rejects(store.set('reward','2',null),e=>e instanceof api.ApiError&&e.code==='offline')
- assert.equal(store.commands['reward:2'].key,'wire-original-key');assert.equal(store.commands['reward:2'].busy,false);assert.match(store.commands['reward:2'].error,/读取中断/)
+ assert.equal(store.commands['reward:2'].key,'wire-original-key');assert.equal(store.commands['reward:2'].busy,false);assert.match(store.commands['reward:2'].error,/连接中断/)
  const revision=api.getAuthContextVersion();assert.equal(await api.refreshAccessToken(),true);assert.equal(api.getAuthContextVersion(),revision);assert.equal(owner.accessToken,'synthetic-rotated');assert.equal(store.commands['reward:2'].key,'wire-original-key')
  assert.equal(received.filter(x=>x.path===route).length,1)
  cut=false;await store.set('reward','2',null);assert.equal(store.commands['reward:2'],undefined);assert.equal(store.lastChange.targetId,'2')

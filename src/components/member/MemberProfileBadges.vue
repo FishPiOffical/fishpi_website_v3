@@ -18,7 +18,7 @@ const showMedals = ref(false)
 const showProfession = ref(false)
 const openMedal = ref<number | null>(null)
 const summary = ref<Awaited<ReturnType<typeof fetchV3ProfessionSummary>>>(null)
-const summaryError = ref('')
+const summaryFailed = ref(false)
 const shownMedals = computed(() => showMedals.value ? value.value?.list : value.value?.list.slice(0, previewCount))
 const remaining = computed(() => Math.max(0, (value.value?.total ?? 0) - previewCount))
 let mounted = false
@@ -27,15 +27,15 @@ let pending: AbortController | undefined
 async function loadProfession() {
   pending?.abort()
   summary.value = null
-  summaryError.value = ''
+  summaryFailed.value = false
   if (!mounted || !auth.initialized) return
   const controller = new AbortController()
   pending = controller
   try {
     const result = await fetchV3ProfessionSummary(props.userName, controller.signal)
     if (!controller.signal.aborted) summary.value = result
-  } catch (failure) {
-    if (!controller.signal.aborted) summaryError.value = failure instanceof Error ? failure.message : '主职业读取失败'
+  } catch {
+    if (!controller.signal.aborted) summaryFailed.value = true
   }
 }
 function toggleMedals() {
@@ -90,7 +90,7 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
         <img v-if="summary.iconUrl" :src="summary.iconUrl" referrerpolicy="no-referrer" alt="" />
         <span><strong>{{ summary.job.displayName }}</strong><small v-if="summary.job.state !== 'SELECTED'">{{ summary.job.levelName }}</small></span>
       </button>
-      <div v-if="summaryError" class="badge-error"><small role="alert">{{ summaryError }}</small><button type="button" @click="loadProfession">重试职业</button></div>
+      <div v-if="summaryFailed && !showProfession" class="badge-error"><small role="alert">职业资料暂不可用</small><button type="button" @click="loadProfession">重试职业</button></div>
       <template v-if="showProfession">
         <button v-if="!summary" type="button" @click="showProfession = false">收起职业资料</button>
         <PublicProfessions :user-name="userName" />

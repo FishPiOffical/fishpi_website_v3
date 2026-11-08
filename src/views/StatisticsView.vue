@@ -12,7 +12,7 @@ const { value, loading, error, read } = useStatistics(consumeStatisticsPayload()
   <main class="statistics-page fp-page fp-ui">
     <header>
       <h1 class="fp-page-title">数据统计</h1>
-      <p>社区统计快照；在线数据随服务端统计更新。</p>
+      <p>社区数据概览</p>
       <button class="fp-control" type="button" :disabled="loading" @click="read()">刷新统计</button>
     </header>
     <p class="fp-state" v-if="loading" role="status">正在读取统计…</p>

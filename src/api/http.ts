@@ -8,8 +8,11 @@ export class ApiError extends Error {
   /** captcha：Rhythm 风控要求人机验证（302 → /test） */
   code?: string
   retryAfter?: string
+  readonly diagnosticMessage?: string
   constructor(message: string, status = 0, code?: string) {
-    super(message)
+    const invalidResponse = code === 'invalid_response' || status === 502 && !code
+    super(invalidResponse ? '服务暂不可用，请稍后重试' : message)
+    if (invalidResponse) this.diagnosticMessage = message
     this.status = status
     this.code = code
   }
@@ -125,7 +128,7 @@ function asNetworkError(e: unknown, identity: RequestIdentity): never {
   const msg = e instanceof Error ? e.message : String(e)
   if (/Failed to fetch|NetworkError|Load failed|network|ECONNREFUSED|ETIMEDOUT|fetch|aborted/i.test(msg)) {
     notifyOffline(identity)
-    throw new ApiError('无法连接摸鱼派接口，请检查网络或稍后重试', 0, 'offline')
+    throw new ApiError('无法连接摸鱼派，请检查网络或稍后重试', 0, 'offline')
   }
   throw e instanceof Error ? e : new Error(msg)
 }
@@ -189,7 +192,7 @@ async function readNetworkBody<T>(read: () => Promise<T>, signal: AbortSignal | 
   } catch {
     if (signal?.aborted) throw new ApiError('请求已取消', 0, 'aborted')
     notifyOffline(identity)
-    throw new ApiError('接口响应读取中断，请检查网络或稍后重试', 0, 'offline')
+    throw new ApiError('连接中断，请检查网络或稍后重试', 0, 'offline')
   }
 }
 
@@ -237,7 +240,7 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
 
   if (import.meta.env.SSR && res.status === 429) {
     void res.body?.cancel().catch(() => {})
-    const error = new ApiError('上游请求频率受限', 429)
+    const error = new ApiError('操作过于频繁，请稍后重试', 429)
     error.retryAfter = res.headers.get('Retry-After') ?? undefined
     throw error
   }
@@ -273,14 +276,15 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
   const text = await readNetworkBody(() => res.text(), init.signal, identity)
   const looksJson = isJsonContentType(res.headers.get('content-type')) || text.startsWith('{') || text.startsWith('[')
   if (!looksJson) {
-    throw new ApiError(res.status === 401 ? '需要登录或完成验证码后才能调用接口' : '接口返回了非 JSON', res.status)
+    if (res.status === 401) throw new ApiError('请登录后重试', res.status)
+    throw new ApiError('接口返回了非 JSON', res.status, 'invalid_response')
   }
 
   let data: T
   try {
     data = JSON.parse(text) as T
   } catch {
-    throw new ApiError('无法解析接口响应', res.status)
+    throw new ApiError('无法解析接口响应', res.status, 'invalid_response')
   }
 
   if (!res.ok) {
@@ -401,6 +405,6 @@ async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
   }
   checkGateway(res, identity)
   const text = await readNetworkBody(() => res.text(), init.signal, identity)
-  if (!res.ok) throw new ApiError(text.slice(0, 120) || '请求失败', res.status)
+  if (!res.ok) throw new ApiError('读取失败，请稍后重试', res.status)
   return text
 }

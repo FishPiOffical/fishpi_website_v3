@@ -35,6 +35,7 @@ setActivePinia(createPinia());const auth=defineStore('public-profession-auth',()
 const authURL=url('export const useAuthStore=globalThis.__publicAuth'),apiURL=url('export const fetchV3PublicProfessions=(...args)=>globalThis.__publicAPI.fetchV3PublicProfessions(...args)')
 const source=await fs.readFile('src/components/profession/PublicProfessions.vue','utf8'),descriptor=parse(source).descriptor
 let componentCode=compile(compileScript(descriptor,{id:'public-profession-test',inlineTemplate:true}).content).replace(/from ['"]vue['"]/g,`from '${import.meta.resolve('vue')}'`).replace(/from ['"]pinia['"]/g,`from '${import.meta.resolve('pinia')}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-profession-public'",`from '${apiURL}'`)
+componentCode=componentCode.replace("from '@/utils/time'",`from '${url('export const formatDateTime=String')}'`)
 const component=(await import(url(componentCode))).default
 const tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()}
 const insert=(node,parent,anchor)=>{if(node.parent){const i=node.parent.children.indexOf(node);if(i>=0)node.parent.children.splice(i,1)}const i=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(i<0?parent.children.length:i,0,node);node.parent=parent}
@@ -51,6 +52,6 @@ let releaseOld;__publicAPI.fetchV3PublicProfessions=async name=>name==='Alice'?n
 let releaseReader;__publicAPI.fetchV3PublicProfessions=async()=>auth.accessToken==='private'?new Promise(resolve=>releaseReader=resolve):{ranking:[]};auth.accessToken='private';await tick();auth.accessToken=null;await tick();releaseReader(full);await tick();assert.ok(!view.text().includes('初学者')&&!view.text().includes('80.00%'));assert.match(view.text(),/当前无可展示的名次/);view.app.unmount()
 console.log('PASS public professions 6 actual target/credential changes replace reader-bound output and reject delayed old target/private summaries')
 __publicAPI.fetchV3PublicProfessions=async()=>{throw new ApiError('concealed',404)};view=mount();await tick();assert.match(view.text(),/当前没有可展示的职业资料/);assert.ok(!view.text().includes('concealed'));view.app.unmount()
-__publicAPI.fetchV3PublicProfessions=async()=>{throw new ApiError('temporary unavailable',503)};view=mount();await tick();assert.match(view.text(),/temporary unavailable/);assert.ok(!view.text().includes('当前没有可展示的职业资料'));view.app.unmount()
-const member=await fs.readFile('src/views/MemberView.vue','utf8');assert.ok(!member.includes('fetchPublicProfession')&&!member.includes('profession?.primaryProfession'));assert.match(member,/<PublicProfessions v-if="activeTab === 'profession'"/)
+__publicAPI.fetchV3PublicProfessions=async()=>{throw new ApiError('temporary unavailable',503)};view=mount();await tick();assert.match(view.text(),/职业详情暂不可用/);assert.ok(!view.text().includes('temporary unavailable'));assert.ok(!view.text().includes('当前没有可展示的职业资料'));view.app.unmount()
+const member=await fs.readFile('src/components/member/MemberProfileBadges.vue','utf8');assert.match(member,/<PublicProfessions :user-name="userName"/);assert.ok(!source.includes('重新读取公开职业资料'))
 console.log('PASS public professions 7 concealed 404 and real failures remain distinct; member tab is no longer gated by visible primary profession or old profession API')
