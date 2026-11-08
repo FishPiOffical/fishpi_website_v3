@@ -8,7 +8,6 @@ import { usePageSeo } from '@/composables/usePageSeo'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
 import { commentLink } from '@/api/v3-comment-location'
 import BreezemoonList from '@/components/breezemoons/BreezemoonList.vue'
-import PublicProfessions from '@/components/profession/PublicProfessions.vue'
 const route = useRoute(), userName = computed(() => String(route.params.userName || ''))
 const activeTab = computed(() => String(route.meta.memberTab || 'home')), moonId = computed(() => String(route.params.breezemoonId || ''))
 const { profile, content, moon, contentError, contentLoading, p, readContent } = useMemberPage(userName, activeTab, moonId)
@@ -22,8 +21,7 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
 <template>
     <main ref="panel" class="member-content">
 
-      <PublicProfessions v-if="activeTab === 'profession'" :user-name="userName" />
-      <p v-else-if="activeTab === 'points'" class="member-status">积分流水仅本人可在<RouterLink to="/points">我的积分</RouterLink>查看。</p>
+      <p v-if="activeTab === 'points'" class="member-status">积分流水仅本人可在<RouterLink to="/points">我的积分</RouterLink>查看。</p>
       <template v-else>
         <div class="content-section-head">
           <span v-if="content" class="content-total-badge">共 {{ content.total }} 条</span>

@@ -42,6 +42,18 @@ function contribution(value: unknown): Contribution {
   const row = object(value)
   return { professionId: id(row.professionId), eventCount: integer(row.eventCount), lastOccurredAt: integer(row.lastOccurredAt), ...('experienceSum' in row ? { experienceSum: integer(row.experienceSum, true) } : {}) }
 }
+export async function fetchV3ProfessionSummary(userName: string, signal: AbortSignal): Promise<{ job: PublicJob; iconUrl: string } | null> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(userName)) throw new ApiError('用户名不合法', 422)
+  const response = await request<{ code: number; msg?: string; data?: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}/professions/summary`, { signal, cache: 'no-store' })
+  if (response.code !== 0) throw new ApiError(response.msg || '主职业读取失败', 400)
+  const source = object(response.data)
+  if (!('primaryProfession' in source)) return null
+  const primary = object(source.primaryProfession)
+  const icon = typeof primary.iconUrl === 'string' ? primary.iconUrl : ''
+  const iconUrl = /^\/(?![\/\\])/.test(icon) ? new URL(icon, import.meta.env.VITE_SITE_ORIGIN || 'https://fishpi.cn').href
+    : /^https:\/\//i.test(icon) ? icon : ''
+  return { job: job(primary, true), iconUrl }
+}
 export async function fetchV3PublicProfessions(userName: string): Promise<PublicProfessionProfile> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(userName)) throw new ApiError('用户名不合法', 422)
   const response = await request<{ code: number; msg?: string; data?: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}/professions`)

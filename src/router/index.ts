@@ -253,7 +253,6 @@ const routes = [
       ['breezemoons', 'breezemoons'],
       ['breezemoons/:breezemoonId', 'breezemoons'],
       ['points', 'points'],
-      ['profession', 'profession'],
     ] as const
   ).map(([sub, memberTab]) => ({
     path: `/member/:userName/${sub}`,
@@ -268,11 +267,10 @@ const routes = [
           : () => import('@/views/MemberView.vue'),
     meta: { memberTab },
   })),
-  {
-    path: '/member/:userName/medals',
-    name: 'medals',
-    component: () => import('@/views/MedalsView.vue'),
-  },
+  ...(['profession', 'medals'] as const).map(section => ({
+    path: `/member/:userName/${section}`,
+    redirect: (to: RouteLocation) => ({ path: `/member/${encodeURIComponent(String(to.params.userName))}`, query: to.query, hash: `#member-${section}` }),
+  })),
   { path: '/domains', component: () => import('@/views/DomainView.vue') },
   { path: '/tags', component: () => import('@/views/TagsView.vue') },
   { path: '/breezemoons', component: () => import('@/views/BreezemoonView.vue') },

@@ -7,7 +7,7 @@ const target=computed(()=>String(route.params.userName||''))
 const base=computed(()=>`/member/${encodeURIComponent(target.value)}`)
 const self=computed(()=>mounted.value && auth.isLoggedIn && auth.account?.userName===target.value)
 const tabs=computed(()=>[
-  ['', '帖子'],['long','长文章'],['comments','回帖'],['breezemoons','清风明月'],['profession','职业资料'],['medals','公开勋章'],
+  ['', '帖子'],['long','长文章'],['comments','回帖'],['breezemoons','清风明月'],
   ['following/users','关注用户'],['followers','关注者'],['following/tags','关注标签'],['watching/articles','关注帖子'],['following/articles','收藏帖子'],
   ...(self.value?[['articles/anonymous','匿贴'],['comments/anonymous','匿回'],['points','我的积分']]:[]),
 ])

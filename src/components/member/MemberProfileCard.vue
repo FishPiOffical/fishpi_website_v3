@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import type { PublicUser } from '@/api/v3-public-user'
 import { useAuthStore } from '@/stores/auth'
 import { avatarStyle, avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
+import MemberProfileBadges from './MemberProfileBadges.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
 import UserFollowButton from '@/components/user/UserFollowButton.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -42,6 +43,7 @@ function fallback(event: Event) {
         <img :key="profile.userAvatarURL" class="member-avatar" :src="avatarUrl(profile, 'large')" :data-user-card="profile.userName" alt="" @error="fallback" />
         <h1><VipNickname :user-id="profile.id" :user-name="profile.userName" :text="profile.userNickname || profile.userName" /></h1>
         <p class="profile-handle">@{{ profile.userName }}</p>
+        <MemberProfileBadges :key="profile.id" :user-name="profile.userName" />
         <p v-if="profile.userIntro" class="profile-intro">{{ profile.userIntro }}</p>
         <a v-if="profile.userURL" :href="profile.userURL" class="profile-website" target="_blank" rel="noopener noreferrer" :title="profile.userURL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2" /></svg><span>{{ websiteLabel }}</span><span aria-hidden="true">↗</span></a>
         <dl class="profile-stats">
@@ -68,7 +70,7 @@ function fallback(event: Event) {
   </aside>
 </template>
 <style scoped lang="scss">
-.member-profile { position:sticky; top:calc(var(--fp-nav-h) + 14px); overflow:hidden; min-width:0; border:1px solid var(--fp-border); border-radius:12px; background:var(--fp-card); box-shadow:var(--fp-card-shadow); overflow-wrap:anywhere; }
+.member-profile {  overflow:hidden; min-width:0; border:1px solid var(--fp-border); border-radius:12px; background:var(--fp-card); box-shadow:var(--fp-card-shadow); overflow-wrap:anywhere; }
 .profile-cover { height:112px; background-size:cover; background-position:center 38%; position:relative; &::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.06),color-mix(in srgb,var(--fp-card) 45%,transparent) 75%,var(--fp-card)); backdrop-filter:blur(3px); } }
 .profile-cover.has-background::after { background:linear-gradient(180deg,transparent 65%,rgba(0,0,0,.08)); backdrop-filter:none; }
 .profile-body { position:relative; padding:0 20px 18px; text-align:center; }
