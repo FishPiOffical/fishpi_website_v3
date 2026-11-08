@@ -675,7 +675,7 @@ function itemHandlers(c: ArticleComment) {
         <ReuseComposer />
       </section>
 
-      <section v-if="!isLong" class="card random-card"><RandomArticles :size="10" :exclude-id="id" /></section>
+      <section v-if="!isLong" class="card"><RandomArticles :size="10" :exclude-id="id" /></section>
     </div>
     <ImageLightbox v-model="zoomed" compact />
   </template>
@@ -1334,38 +1334,5 @@ h1 {
 }
 #articleCommentsPanel {
   scroll-margin-top: calc(var(--fp-nav-h) + 12px);
-}
-.random-card .module-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.random-list {
-  list-style: none;
-  margin: 0;
-  padding: 8px 16px 12px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 8px 24px;
-}
-.random-list li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.random-list a {
-  color: var(--fp-text);
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.avatar-mini {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--fp-avatar-radius);
-  background: var(--fp-border) center / cover;
 }
 </style>
