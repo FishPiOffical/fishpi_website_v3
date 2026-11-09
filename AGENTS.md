@@ -14,7 +14,7 @@
 
 ## 接口与认证
 
-- main仅支持v3；v1/v3兼容实现备份在v1_v3分支。不恢复版本切换、旧apiKey认证或旧协议适配，不修改Rhythm。需求反馈独立服务改用服务端签发的独立访客Cookie，不核验Rhythm身份、不接受站点UID或Bearer授权；其/feedback-api/v1是反馈服务自身版本号。
+- main仅支持v3；v1/v3兼容实现备份在v1_v3分支。不恢复版本切换、旧apiKey认证或旧协议适配，不修改Rhythm。需求反馈提交和投票用服务端签发的独立访客Cookie；仅审核路由转发内存Bearer，服务端固定直查Rhythm /api/v3/me的isAdmin，每次核验且不转发站点Cookie。其/feedback-api/v1是反馈服务自身版本号。
 
 - 通知中的操作人actor与目标文章/评论author含义不同；操作类通知缺少actor时保留无身份状态，不得回退为目标作者。普通内容通知的作者及匿名规则独立保留。
 

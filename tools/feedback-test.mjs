@@ -24,5 +24,8 @@ try{
  console.log('PASS expired visitor boundary clears unknown command; new visitor never replays old command; private and public use only feedback cookie')
  let release;handler=()=>new Promise(r=>release=r);const delayed=api.feedbackApi('/requests/old/me',{private:true});await new Promise(r=>setImmediate(r));handler=()=>response({error:'expired'},401);await assert.rejects(api.feedbackApi('/requests/current/me',{private:true}));release(response({vote:'support',canModerate:true}));await assert.rejects(delayed,/身份已变化/)
  handler=()=>new Promise(r=>release=r);await api.ensureFeedbackVisitor();const stale=api.feedbackApi('/requests/stale/me',{private:true});await new Promise(r=>setImmediate(r));handler=()=>response({error:'expired'},401);await assert.rejects(api.feedbackApi('/requests/new/me',{private:true}));session='guest:00000000-0000-4000-8000-000000000003';await api.ensureFeedbackVisitor();const count=sessions;release(response({error:'old unauthorized'},401));await assert.rejects(stale);await api.ensureFeedbackVisitor();assert.equal(sessions,count)
+ handler=()=>response({canModerate:true});assert.equal((await api.feedbackModerationApi('/access','fixture-only')).canModerate,true)
+ assert.equal(calls.at(-1).path,'/feedback-api/v1/moderation/access');assert.equal(calls.at(-1).options.headers.Authorization,'Bearer fixture-only')
+ await assert.rejects(api.feedbackModerationApi('/../requests','fixture-only'))
  console.log('PASS late personal state cannot populate a changed visitor; old admin flag and vote are rejected')
 }finally{globalThis.fetch=oldFetch}

@@ -5,10 +5,24 @@ import { openDatabase } from '../src/db.ts'
 import { createApp } from '../src/app.ts'
 
 test('独立访客真实HTTP：Cookie、身份隔离、昵称、投票去重、幂等、管理与隐藏',async()=>{
- const db=openDatabase(':memory:'),admins=new Set<string>(),server=createApp({db,admins,limits:false}).listen(0,'127.0.0.1');await once(server,'listening')
+ const db=openDatabase(':memory:'), adminToken='a'.repeat(43), userToken='b'.repeat(43)
+ let revoked=false, unavailable=false, verifyCalls=0
+ const rhythmFetch:typeof fetch=async (url,init)=>{
+  verifyCalls++
+  assert.equal(url,'https://fishpi.cn/api/v3/me')
+  assert.equal(init?.redirect,'error')
+  assert.equal(init?.credentials,'omit')
+  const headers=new Headers(init?.headers)
+  assert.equal(headers.get('Cookie'),null)
+  const credential=headers.get('Authorization')
+  if(unavailable) return Response.json({}, {status:503})
+  if(credential!==`Bearer ${adminToken}` && credential!==`Bearer ${userToken}`) return Response.json({}, {status:401})
+  return Response.json({code:0,data:{id:'100',isAdmin:!revoked && credential===`Bearer ${adminToken}`}})
+ }
+ const server=createApp({db,rhythmFetch,limits:false}).listen(0,'127.0.0.1');await once(server,'listening')
  const base=`http://127.0.0.1:${(server.address() as {port:number}).port}`,api=base+'/feedback-api/v1'
- async function call(path:string,method='GET',body?:unknown,cookie='',key='') {
-  const r=await fetch(api+path,{method,headers:{Origin:base,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{}),...(key?{'Idempotency-Key':key}:{})},body:body===undefined?undefined:JSON.stringify(body)})
+ async function call(path:string,method='GET',body?:unknown,cookie='',key='',token='') {
+  const r=await fetch(api+path,{method,headers:{Origin:base,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{}),...(key?{'Idempotency-Key':key}:{}),...(token?{Authorization:`Bearer ${token}`}:{})},body:body===undefined?undefined:JSON.stringify(body)})
   return{status:r.status,data:await r.json() as any,cookie:r.headers.get('set-cookie')}
  }
  try{
@@ -30,12 +44,28 @@ test('独立访客真实HTTP：Cookie、身份隔离、昵称、投票去重、�
   await call('/requests/'+id+'/vote','PUT',{choice:'oppose'},cb);assert.equal((await call('/requests/'+id)).data.oppose,1)
   assert.equal((await call('/requests/'+id+'/me','GET',undefined,cb)).data.vote,'oppose')
   await call('/requests/'+id+'/vote','PUT',{choice:'none'},cb);assert.equal((await call('/requests/'+id)).data.oppose,0)
-  const mod={status:'planned',note:'排入计划',hidden:true};assert.equal((await call('/requests/'+id+'/moderation','PATCH',mod,ca,'moderate-1')).status,403)
-  admins.add(a.data.id);assert.equal((await call('/requests/'+id+'/me','GET',undefined,ca)).data.canModerate,true)
-  assert.equal((await call('/requests/'+id+'/moderation','PATCH',mod,ca,'moderate-1')).status,200)
-  assert.equal((await call('/requests/'+id)).status,404);assert.equal((await call('/requests/'+id+'/me','GET',undefined,cb)).status,404)
-  assert.equal((await call('/requests/'+id+'/me','GET',undefined,ca)).data.moderation.hidden,true)
-  await call('/requests/'+id+'/moderation','PATCH',{...mod,hidden:false},ca,'moderate-2')
+  const mod={status:'planned',note:'排入计划',hidden:true}, adminPath='/moderation/requests/'+id
+  assert.equal(verifyCalls,0)
+  assert.equal((await call('/moderation/requests','GET',undefined,ca)).status,401)
+  assert.equal((await call('/moderation/access','GET',undefined,'','',userToken)).status,403)
+  assert.equal((await call('/moderation/access','GET',undefined,'','',adminToken)).data.canModerate,true)
+  assert.equal((await call(adminPath,'PATCH',mod,ca,'moderate-1',userToken)).status,403)
+  assert.equal((await call(adminPath,'PATCH',mod,ca,'moderate-1',adminToken)).status,200)
+  assert.equal((await call('/requests/'+id)).status,404)
+  assert.equal((await call('/requests?visibility=hidden')).data.total,0)
+  assert.equal((await call('/requests/'+id+'/me','GET',undefined,cb)).status,404)
+  assert.equal((await call('/moderation/requests?visibility=hidden','GET',undefined,'','',adminToken)).data.items[0].hidden,true)
+  assert.equal((await call(adminPath,'GET',undefined,'','',adminToken)).data.hidden,true)
+  revoked=true
+  assert.equal((await call(adminPath,'PATCH',mod,'','moderate-1',adminToken)).status,403)
+  assert.equal((await call(adminPath,'GET',undefined,'','',adminToken)).status,403)
+  revoked=false; unavailable=true
+  assert.equal((await call(adminPath,'PATCH',{...mod,hidden:false},'','moderate-2',adminToken)).status,503)
+  unavailable=false
+  assert.equal((await call(adminPath,'PATCH',{...mod,hidden:false},'','moderate-2',adminToken)).status,200)
+  assert.equal((await call('/requests/'+id)).data.status,'planned')
+  assert.equal((await call(adminPath,'PATCH',{...mod,hidden:false},'','moderate-2',adminToken)).status,200)
+  assert.equal(db.prepare('SELECT count(*) AS n FROM moderation_log WHERE actor=?').get('rhythm:100')!.n,2)
   await call('/requests','POST',{...body,title:'第二条不同需求标题'},ca,'create-key-2')
   assert.equal((await call('/requests?size=1&page=2')).data.items.length,1);assert.equal((await call('/requests?q=不存在')).data.total,0);assert.equal((await call('/requests?page=0')).status,422)
   const cross=await fetch(api+'/session',{method:'POST',headers:{Origin:'https://evil.example'}});assert.equal(cross.status,403)
@@ -50,7 +80,7 @@ test('独立访客真实HTTP：Cookie、身份隔离、昵称、投票去重、�
 test('访客创建限流、功能关闭与旧数据兼容',async()=>{
  const db=openDatabase(':memory:')
  db.prepare('INSERT INTO requests VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run('legacy','旧需求测试标题','feature','旧说明内容','site-uid','legacy','旧昵称','pending','',0,'now','now')
- const server=createApp({db,admins:new Set(['site-uid']),cookieSecure:false}).listen(0,'127.0.0.1');await once(server,'listening');const base=`http://127.0.0.1:${(server.address() as {port:number}).port}`
+ const server=createApp({db,cookieSecure:false}).listen(0,'127.0.0.1');await once(server,'listening');const base=`http://127.0.0.1:${(server.address() as {port:number}).port}`
  try{const old=await(await fetch(base+'/feedback-api/v1/requests')).json() as any;assert.equal(old.items[0].authorNickname,'旧昵称');let status=0;for(let i=0;i<21;i++)status=(await fetch(base+'/feedback-api/v1/session',{method:'POST',headers:{Origin:base}})).status;assert.equal(status,429)}finally{await new Promise<void>(r=>server.close(()=>r()))}
- const closed=createApp({db,admins:new Set(),enabled:false}).listen(0,'127.0.0.1');await once(closed,'listening');assert.equal((await fetch(`http://127.0.0.1:${(closed.address() as {port:number}).port}/feedback-api/v1/health`)).status,503);await new Promise<void>(r=>closed.close(()=>r()));db.close()
+ const closed=createApp({db,enabled:false}).listen(0,'127.0.0.1');await once(closed,'listening');assert.equal((await fetch(`http://127.0.0.1:${(closed.address() as {port:number}).port}/feedback-api/v1/health`)).status,503);await new Promise<void>(r=>closed.close(()=>r()));db.close()
 })

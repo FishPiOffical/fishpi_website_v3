@@ -25,8 +25,9 @@ const projection = `SELECT r.id,r.title,r.category,r.description,r.author_name A
   r.status,r.note,r.created_at AS createdAt,r.updated_at AS updatedAt,
   (SELECT count(*) FROM votes WHERE request_id=r.id AND choice='support') AS support,
   (SELECT count(*) FROM votes WHERE request_id=r.id AND choice='oppose') AS oppose FROM requests r`
-export function createApp(options: { db: DB; admins: Set<string>; enabled?: boolean; limits?: boolean; cookieSecure?: boolean }) {
-  const { db, admins } = options
+const moderationProjection = projection.replace('SELECT r.id,','SELECT r.hidden,r.id,')
+export function createApp(options: { db: DB; rhythmFetch?: typeof fetch; enabled?: boolean; limits?: boolean; cookieSecure?: boolean }) {
+  const { db, rhythmFetch = fetch } = options
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', 'loopback')
@@ -66,6 +67,34 @@ export function createApp(options: { db: DB; admins: Set<string>; enabled?: bool
     limit(`user:${user!.id}:${req.method === 'POST' ? 'create' : 'other'}`, req.method === 'POST' ? 10 : 90)
     return user!
   }
+  async function administrator(req: Request): Promise<Identity> {
+    const credential = req.headers.authorization
+    if (!credential || !/^Bearer [A-Za-z0-9_-]{43,256}$/.test(credential)) fail(401, '请先登录摸鱼派')
+    limit(`moderation:${req.ip}`, 60)
+    let response: globalThis.Response
+    try {
+      response = await rhythmFetch('https://fishpi.cn/api/v3/me', {
+        headers: { Authorization: credential, Accept: 'application/json' },
+        redirect: 'error', cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(5000),
+      })
+    } catch { fail(503, '暂时无法核验管理员权限，请稍后重试') }
+    if (response.status === 401 || response.status === 403) {
+      void response.body?.cancel().catch(() => {})
+      fail(response.status, response.status === 401 ? '登录已失效，请重新登录' : '仅管理员可处理需求')
+    }
+    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+      void response.body?.cancel().catch(() => {})
+      fail(503, '暂时无法核验管理员权限，请稍后重试')
+    }
+    let result: { code?: unknown; data?: { id?: unknown; isAdmin?: unknown } }
+    try { result = await response.json() } catch { fail(503, '暂时无法核验管理员权限，请稍后重试') }
+    const user = result?.data
+    if (result?.code !== 0 || typeof user?.id !== 'string' || !/^[1-9][0-9]{0,18}$/.test(user.id) || typeof user.isAdmin !== 'boolean') {
+      fail(503, '暂时无法核验管理员权限，请稍后重试')
+    }
+    if (!user.isAdmin) fail(403, '仅管理员可处理需求')
+    return { id: `rhythm:${user.id}`, userName: '' }
+  }
   router.post('/session', (req,res) => {
     let user = visitor(req)
     if (!user) {
@@ -89,26 +118,42 @@ export function createApp(options: { db: DB; admins: Set<string>; enabled?: bool
       return result
     })
   }
-  router.get('/requests', (req, res) => {
+  function listRequests(req: Request, res: Response, reviewing = false) {
     const page = Number(req.query.page ?? 1), size = Number(req.query.size ?? 20)
     if (!Number.isSafeInteger(page) || page < 1 || page > 1000000 || !Number.isSafeInteger(size) || size < 1 || size > 50) fail(422, '分页参数不合法')
     const category = req.query.category ? choice(req.query.category,categories) : ''
     const status = req.query.status ? choice(req.query.status,statuses) : ''
     const q = req.query.q ? text(req.query.q,1,100) : ''
     const sort = choice(req.query.sort ?? 'latest',['latest','support'])
-    const where = ` WHERE r.hidden=0 AND (?='' OR r.category=?) AND (?='' OR r.status=?) AND (?='' OR instr(lower(r.title || ' ' || r.description),lower(?))>0)`
+    const visibility = reviewing ? choice(req.query.visibility ?? 'all', ['all','visible','hidden']) : 'visible'
+    const where = ` WHERE ${visibility === 'all' ? '1=1' : visibility === 'hidden' ? 'r.hidden=1' : 'r.hidden=0'} AND (?='' OR r.category=?) AND (?='' OR r.status=?) AND (?='' OR instr(lower(r.title || ' ' || r.description),lower(?))>0)`
     const args = [category,category,status,status,q,q]
     const total = Number(db.prepare('SELECT count(*) AS n FROM requests r' + where).get(...args)!.n)
-    const items = db.prepare(projection + where + ` ORDER BY ${sort === 'support' ? 'support DESC,' : ''} r.created_at DESC,r.id DESC LIMIT ? OFFSET ?`).all(...args,size,(page-1)*size)
+    const fields = reviewing ? moderationProjection : projection
+    const rows = db.prepare(fields + where + ` ORDER BY ${sort === 'support' ? 'support DESC,' : ''} r.created_at DESC,r.id DESC LIMIT ? OFFSET ?`).all(...args,size,(page-1)*size)
+    const items = reviewing ? rows.map(row => ({ ...row, hidden: Boolean(row.hidden) })) : rows
     res.json({ items, page, size, total, pageCount: Math.ceil(total/size) })
+  }
+  router.get('/requests', (req, res) => listRequests(req, res))
+  router.get('/moderation/access', async (req, res) => {
+    await administrator(req)
+    res.json({ canModerate: true })
+  })
+  router.get('/moderation/requests', async (req, res) => {
+    await administrator(req)
+    listRequests(req, res, true)
+  })
+  router.get('/moderation/requests/:id', async (req, res) => {
+    await administrator(req)
+    const row = db.prepare(moderationProjection + ' WHERE r.id=?').get(String(req.params.id))
+    if (!row) fail(404,'需求不存在')
+    res.json({ ...row, hidden: Boolean(row.hidden) })
   })
   router.get('/requests/:id', (req, res) => { res.json(current(String(req.params.id))) })
   router.get('/requests/:id/me', async (req, res) => {
-    const user = await identity(req); const id = String(req.params.id); const admin = user.id.startsWith('guest:') && admins.has(user.id)
-    const row = db.prepare('SELECT hidden,status,note FROM requests WHERE id=?').get(id)
-    if (!row || (row.hidden && !admin)) fail(404,'需求不存在或已隐藏')
-    res.json({ vote: db.prepare('SELECT choice FROM votes WHERE request_id=? AND user_id=?').get(id,user.id)?.choice ?? 'none', canModerate: admin,
-      ...(admin ? { moderation: { hidden: Boolean(row.hidden), status: row.status, note: row.note } } : {}) })
+    const user = await identity(req), id = String(req.params.id)
+    current(id)
+    res.json({ vote: db.prepare('SELECT choice FROM votes WHERE request_id=? AND user_id=?').get(id,user.id)?.choice ?? 'none', canModerate: false })
   })
   router.post('/requests', async (req, res) => {
     const user = await identity(req)
@@ -129,9 +174,8 @@ export function createApp(options: { db: DB; admins: Set<string>; enabled?: bool
     })
     res.json({ ok: true })
   })
-  router.patch('/requests/:id/moderation', async (req, res) => {
-    const user = await identity(req)
-    if (!(user.id.startsWith('guest:') && admins.has(user.id))) fail(403,'仅管理员可处理需求')
+  router.patch('/moderation/requests/:id', async (req, res) => {
+    const user = await administrator(req)
     const id = String(req.params.id)
     const input = { status: choice(req.body?.status,statuses), note: text(req.body?.note,0,2000), hidden: req.body?.hidden }
     if (typeof input.hidden !== 'boolean') fail(422,'隐藏状态不合法')

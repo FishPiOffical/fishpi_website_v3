@@ -1,6 +1,6 @@
 # 公测需求反馈服务
 
-独立 Node.js + TypeScript + Express + SQLite 服务，不写 Rhythm 数据库。当前采用服务端生成的独立访客身份，不调用 Rhythm，不使用站点 Bearer、UID 或登录状态授权。需要 Node.js >=24.12，运行时使用内建 node:sqlite 和 TypeScript 类型擦除。
+独立 Node.js + TypeScript + Express + SQLite 服务，不写 Rhythm 数据库。提交与投票使用服务端生成的独立访客身份，审核由 Rhythm 授权。需要 Node.js >=24.12，运行时使用内建 node:sqlite 和 TypeScript 类型擦除。
 
 ## 运行和部署
 
@@ -13,7 +13,7 @@ npm start
 
 本机 HTTP 开发设置 `FEEDBACK_COOKIE_SECURE=false`；生产 HTTPS 必须 true，默认 true。服务仅监听127.0.0.1:5174，`FEEDBACK_DB` 指向持久数据库绝对路径，目录权限限制为服务用户可读写。网站构建及SSR设置 `VITE_FEEDBACK_ENABLED=true`、`FEEDBACK_TARGET=http://127.0.0.1:5174`。设置→需求反馈打开弹窗，独立/feedback路由也保留。开关改变后需重启和重新构建，不启用时反馈API返回503。
 
-反向代理保留真实Host、Origin和受信任客户端地址；所有写入必须有与本站Host匹配的Origin。只向需求服务转发独立fp_feedback_visitor Cookie，不转发站点Cookie或Authorization；响应只允许此Cookie回传。SSR及SPA开发代理均已适配。服务端口不公开，TLS在Caddy/nginx终止。部署见deploy/yui/README.md。
+反向代理保留真实Host、Origin和受信任客户端地址；所有写入必须有与本站Host匹配的Origin。代理仅转发独立 fp_feedback_visitor Cookie，站点 Cookie 不转发；只有审核接口允许转发 Authorization。响应只允许独立访客 Cookie 回传。SSR及SPA开发代理均已适配。服务端口不公开，TLS在Caddy/nginx终止。部署见deploy/yui/README.md。
 
 ## 访客身份及权限
 
@@ -23,7 +23,7 @@ npm start
 
 自填displayName最多40字，仅作展示，未经站点身份认证，不影响真实作者ID、幂等主体或管理权限。站点登录/退出不影响访客草稿；访客401会清除旧身份未确认命令，新身份不能重放旧命令，草稿保留以便用户明确重新提交。普通网络失败保留冻结正文和幂等键，不自动重发写请求。
 
-`FEEDBACK_ADMIN_IDS` 由服务器配置guest:开头的独立访客ID白名单；空值没有管理员，旧站点UID无效，不能按昵称认领权限。管理员访客ID可从本人/session响应取得，只有运维能配置并重启服务。清除管理员Cookie会失去原身份，需运维重新核实授权。首版没有独立管理账号页，管理面板位于需求详情。
+审核仅面向通过 Rhythm `GET https://fishpi.cn/api/v3/me` 核验的管理员。审核入口位于反馈弹窗，支持公开/隐藏筛选、处理状态、说明及隐藏/恢复。审核读写逐次向固定 Rhythm 地址核验第一方 Bearer，记录审核者为 `rhythm:<用户ID>`。公开读取、提交和投票沿用原访客模式；旧访客审核白名单不再授权。发布前先升级 Rhythm，再发布网站代理与反馈服务。
 
 ## 接口
 
@@ -35,10 +35,13 @@ npm start
 | GET /health | 数据库健康检查 |
 | GET /requests | 公开分页、搜索、分类、状态、排序 |
 | GET /requests/:id | 公开详情，隐藏需求404 |
-| GET /requests/:id/me | 本访客投票和管理权限，需访客Cookie |
+| GET /requests/:id/me | 本访客投票，需访客 Cookie |
 | POST /requests | 新建，需访客Cookie及幂等键 |
 | PUT /requests/:id/vote | 明确设置support/oppose/none，需访客Cookie |
-| PATCH /requests/:id/moderation | 管理员修改status/note/hidden，需Cookie及幂等键 |
+| GET /moderation/access | 核验当前审核权限，需站点 Bearer |
+| GET /moderation/requests | 审核列表，支持 visibility=all/visible/hidden，需站点 Bearer |
+| GET /moderation/requests/:id | 审核详情，含隐藏需求，需站点 Bearer |
+| PATCH /moderation/requests/:id | 修改状态、说明和可见性，需站点 Bearer 及幂等键 |
 
 列表page从1开始，size 1～50（默认20），q最多100字，category=feature/bug/experience，status=pending/planned/in_progress/done/declined，sort=latest/support。返回items/page/size/total/pageCount；合法空结果pageCount=0。
 

@@ -20,6 +20,7 @@ export interface AccountInfo {
   userQQ?: string
   /** Rhythm 角色，如 adminRole / defaultRole */
   roleId?: string
+  isAdmin?: boolean
   userRole?: string
   userAppRole?: number
   userArticleCount?: number
@@ -59,9 +60,17 @@ export interface AccountInfo {
   chatRoomPictureStatus?: number
 }
 
-/** `/api/v3/me` 的最小公开账户表示，不包含联系方式、会话或旧 apiKey。 */
+/** `/api/v3/me` 的本人账户资料，不包含联系方式、会话或旧 apiKey。 */
 export interface V3AccountInfo {
   id: string
+  isAdmin?: boolean
+  userRole?: string
+  userRoleId?: string
+  userNo?: string
+  userAppRole?: number
+  userCity?: string
+  userOnlineFlag?: boolean
+  onlineMinute?: number
   userName: string
   userNickname?: string
   userAvatarURL?: string

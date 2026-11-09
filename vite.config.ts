@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => {
           target: env.FEEDBACK_TARGET || 'http://127.0.0.1:5174',
           changeOrigin: false,
           configure(server) {
-            server.on('proxyReq', (proxyReq, req) => { const visitor = (req.headers.cookie || '').split(';').map(v => v.trim()).filter(v => /^fp_feedback_visitor=[A-Za-z0-9_-]{43}$/.test(v)); proxyReq.removeHeader('cookie'); proxyReq.removeHeader('authorization'); if(visitor.length===1)proxyReq.setHeader('cookie',visitor[0]!); proxyReq.setHeader('X-Forwarded-For', req.socket.remoteAddress || '127.0.0.1') })
+            server.on('proxyReq', (proxyReq, req) => { const visitor = (req.headers.cookie || '').split(';').map(v => v.trim()).filter(v => /^fp_feedback_visitor=[A-Za-z0-9_-]{43}$/.test(v)); proxyReq.removeHeader('cookie'); if(!/^\/feedback-api\/v1\/moderation\/(?:access|requests(?:\/[a-f0-9-]{36})?)(?:\?|$)/.test(req.url || ''))proxyReq.removeHeader('authorization'); if(visitor.length===1)proxyReq.setHeader('cookie',visitor[0]!); proxyReq.setHeader('X-Forwarded-For', req.socket.remoteAddress || '127.0.0.1') })
           },
         },
         '/api/v3/realtime': { ...proxy, ws: true },

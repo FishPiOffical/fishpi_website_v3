@@ -1,50 +1,87 @@
 <script setup lang="ts">
 import { formatDateTime } from '@/utils/time'
 
+import { useAuthStore } from '@/stores/auth'
+import { getAuthContextVersion } from '@/api/http'
 import { useHead } from '@unhead/vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { categories, statuses, feedbackEnabled, feedbackApi, ensureFeedbackVisitor, getFeedbackContextVersion, onFeedbackIdentityChange, type Feedback, type FeedbackList, type Personal, type Vote } from './api'
+import { categories, statuses, feedbackEnabled, feedbackApi, feedbackModerationApi, FeedbackError, ensureFeedbackVisitor, getFeedbackContextVersion, onFeedbackIdentityChange, type Feedback, type FeedbackList, type Personal, type Vote } from './api'
 import { useFeedbackStore } from './store'
 import { useFeedbackPanelStore } from './panel'
 const props=defineProps<{embedded?:boolean}>()
 if(!props.embedded) useHead({ title: '需求反馈 - 摸鱼派', meta: [{ name: 'robots', content: 'noindex' }] })
-const browserRoute=useRoute(), router=useRouter(), store=useFeedbackStore(), panel=useFeedbackPanelStore()
+const browserRoute=useRoute(), router=useRouter(), store=useFeedbackStore(), panel=useFeedbackPanelStore(), auth=useAuthStore()
 const route=computed(()=>props.embedded?panel.location:browserRoute)
 async function navigate(path:string) {if(props.embedded) {panel.navigate(path);return} return router.push(path)}
 const mounted=ref(false), loading=ref(false), error=ref(''), actionError=ref(''), personalError=ref(''), voting=ref(false)
 const list=ref<FeedbackList|null>(null), item=ref<Feedback|null>(null), personal=ref<Personal|null>(null)
 const filter=reactive({q:'',category:'',status:'',sort:'latest'}), page=ref(1)
 const moderation=reactive({status:'pending',note:'',hidden:false})
+const canModerate=ref(false), reviewing=ref(false), visibility=ref('all'), adminBusy=ref(false), adminAccessError=ref('')
+const adminPending=ref<{id:string;key:string;body:typeof moderation}|null>(null)
+let adminSequence=0
+const adminIdentity=()=>`${getAuthContextVersion()}:${auth.account?.oId || ''}:${!!auth.accessToken}`
+async function loadAdminAccess() {
+  const seq=++adminSequence, identity=adminIdentity(), token=auth.accessToken
+  adminAccessError.value=''
+  if(!mounted.value || !feedbackEnabled || !token || auth.account?.isAdmin!==true) return
+  try {
+    const result=await feedbackModerationApi<{canModerate:boolean}>('/access',token)
+    if(seq===adminSequence && identity===adminIdentity()) canModerate.value=result.canModerate===true
+  } catch(e) {
+    if(seq!==adminSequence || identity!==adminIdentity()) return
+    canModerate.value=false
+    if(!(e instanceof FeedbackError) || ![401,403].includes(e.status)) adminAccessError.value=message(e)
+  }
+}
+function toggleReview() {
+  if(!canModerate.value) return
+  reviewing.value=!reviewing.value
+  page.value=1
+  void load()
+}
+function adminDenied(error:unknown) {
+  if(!(error instanceof FeedbackError) || ![401,403].includes(error.status)) return
+  canModerate.value=false; reviewing.value=false; adminPending.value=null; page.value=1
+  void load()
+}
 const mode=computed(()=>route.value.path==='/feedback/new'?'new':route.value.params.id?'detail':'list')
-let sequence=0, personalSequence=0, controller:AbortController|null=null, moderationOwner=''
+let sequence=0, personalSequence=0, controller:AbortController|null=null
 const message=(e:unknown)=>e instanceof Error?e.message:'请求失败，请重试'
 async function loadPersonal() {
   const seq=++personalSequence, id=String(route.value.params.id || '')
   personal.value=null; personalError.value=''
-  if(mode.value!=='detail' || !id) return
+  if(reviewing.value || mode.value!=='detail' || !id || !item.value) return
   try {
     const value=await feedbackApi<Personal>(`/requests/${encodeURIComponent(id)}/me`,{private:true})
     if(seq!==personalSequence) return
     personal.value=value
-    if(value.moderation && moderationOwner!==`${getFeedbackContextVersion()}:${id}`) { Object.assign(moderation,value.moderation); moderationOwner=`${getFeedbackContextVersion()}:${id}` }
   } catch(e) { if(seq===personalSequence) personalError.value=message(e) }
 }
 async function load() {
   if(!mounted.value || !feedbackEnabled) return
-  const seq=++sequence; personalSequence++; controller?.abort(); controller=new AbortController()
+  const seq=++sequence, token=auth.accessToken, identity=adminIdentity(); personalSequence++; controller?.abort(); controller=new AbortController()
+  const review=reviewing.value && token && canModerate.value
   loading.value=true; error.value=''; list.value=null; item.value=null; personal.value=null
   try {
     if(mode.value==='detail') {
-      const data=await feedbackApi<Feedback>(`/requests/${encodeURIComponent(String(route.value.params.id))}`,{signal:controller.signal})
-      if(seq===sequence) item.value=data
+      const path=`/requests/${encodeURIComponent(String(route.value.params.id))}`
+      const data=review ? await feedbackModerationApi<Feedback>(path,token,{signal:controller.signal})
+        : await feedbackApi<Feedback>(path,{signal:controller.signal})
+      if(seq===sequence && (!review || identity===adminIdentity())) {
+        item.value=data
+        if(review) Object.assign(moderation,{status:data.status,note:data.note,hidden:data.hidden===true})
+      }
     } else if(mode.value==='list') {
       const query=new URLSearchParams({page:String(page.value),size:'20',sort:filter.sort})
       for(const key of ['q','category','status'] as const) if(filter[key]) query.set(key,filter[key])
-      const data=await feedbackApi<FeedbackList>('/requests?'+query,{signal:controller.signal})
-      if(seq===sequence) list.value=data
+      if(review) query.set('visibility',visibility.value)
+      const data=review ? await feedbackModerationApi<FeedbackList>('/requests?'+query,token,{signal:controller.signal})
+        : await feedbackApi<FeedbackList>('/requests?'+query,{signal:controller.signal})
+      if(seq===sequence && (!review || identity===adminIdentity())) list.value=data
     }
-  } catch(e) { if(seq===sequence) error.value=message(e) }
+  } catch(e) { if(seq===sequence) { error.value=message(e); if(review) adminDenied(e) } }
   finally { if(seq===sequence) { loading.value=false; void loadPersonal() } }
 }
 async function navigateResult(id:string) {
@@ -80,23 +117,39 @@ async function vote(value:Vote) {
   finally { voting.value=false }
 }
 async function moderate() {
-  if(!personal.value?.canModerate || !route.value.params.id) return
-  const context=getFeedbackContextVersion()
-  actionError.value=''
-  try { const result=await store.run({path:`/requests/${encodeURIComponent(String(route.value.params.id))}/moderation`,method:'PATCH',body:moderation}); if(result) {store.acknowledge(); await load()} } catch(e) {if(context===getFeedbackContextVersion()) actionError.value=message(e)}
+  const id=item.value?.id, token=auth.accessToken, identity=adminIdentity()
+  if(!reviewing.value || !canModerate.value || !id || !token || adminBusy.value || adminPending.value && adminPending.value.id!==id) return
+  const command=adminPending.value ?? {id,key:crypto.randomUUID(),body:{...moderation}}
+  adminPending.value=command
+  adminBusy.value=true; actionError.value=''
+  try {
+    await feedbackModerationApi(`/requests/${id}`,token,{method:'PATCH',body:command.body,key:command.key})
+    if(identity===adminIdentity()) {adminPending.value=null; await load()}
+  } catch(e) {
+    if(identity===adminIdentity()) {
+      if(e instanceof FeedbackError && e.status===422) adminPending.value=null
+      actionError.value=message(e); adminDenied(e)
+    }
+  } finally { if(identity===adminIdentity()) adminBusy.value=false }
 }
 function search() { page.value=1; void load() }
 function selectCategory(cat:string) { filter.category=cat; search() }
 const formatTime = formatDateTime
 const categoryIcons:Record<string,string>={feature:'💡',bug:'🐛',experience:'✨'}
 watch(()=>route.value.fullPath,()=>{actionError.value=''; void load()})
+watch([adminIdentity,()=>auth.account?.isAdmin],()=>{
+  const wasReviewing=reviewing.value
+  canModerate.value=false; reviewing.value=false; adminPending.value=null; adminBusy.value=false; adminAccessError.value=''
+  if(wasReviewing) {page.value=1; void load()}
+  void loadAdminAccess()
+},{flush:'sync'})
 let identity=getFeedbackContextVersion()
 const off=onFeedbackIdentityChange(()=>{
-  if(identity!==getFeedbackContextVersion()) {identity=getFeedbackContextVersion(); personalSequence++; personal.value=null; personalError.value=''; actionError.value=''; moderationOwner=''; Object.assign(moderation,{status:'pending',note:'',hidden:false})}
+  if(identity!==getFeedbackContextVersion()) {identity=getFeedbackContextVersion(); personalSequence++; personal.value=null; personalError.value=''; actionError.value='';}
   if(mounted.value) void loadPersonal()
 })
-onMounted(()=>{mounted.value=true; void load()})
-onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
+onMounted(()=>{mounted.value=true; void load(); void loadAdminAccess()})
+onUnmounted(()=>{adminSequence++;sequence++;personalSequence++;controller?.abort();off()})
 </script>
 <template>
   <main class="feedback fp-page fp-ui" :class="{'is-embedded': embedded}">
@@ -114,6 +167,7 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
       <div class="head-actions">
         <a v-if="mode !== 'list' && feedbackEnabled" class="back-btn fp-link-action" href="/feedback" @click.prevent="navigate('/feedback')">← 返回需求列表</a>
         <a v-if="mode !== 'new' && feedbackEnabled" class="primary fp-link-action" href="/feedback/new" @click.prevent="navigate('/feedback/new')">＋ 提需求</a>
+        <button v-if="mode==='list' && canModerate" type="button" class="fp-control" :aria-pressed="reviewing" @click="toggleReview">{{ reviewing ? '返回公开列表' : '审核管理' }}</button>
         <slot name="head-end" />
       </div>
     </header>
@@ -125,6 +179,8 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
           <span class="notice-text">{{ store.result ? '操作已保存，可查看结果。' : '有一项操作尚未确认，重试会使用原内容和操作键。' }}</span>
           <button class="fp-control primary-ghost" :disabled="store.busy" @click="resume">{{ store.result ? '查看结果' : '重试原操作' }}</button>
         </div>
+        <p v-if="adminAccessError" class="notice" role="status">{{ adminAccessError }} <button type="button" class="fp-control" @click="loadAdminAccess">重试</button></p>
+        <p v-if="reviewing && adminPending && adminPending.id!==item?.id" class="notice" role="status">有一条审核结果尚未确认。<button type="button" class="fp-control" @click="navigate('/feedback/'+adminPending.id)">返回该需求</button></p>
         <p v-if="actionError" role="alert" class="notice error">{{ actionError }}</p>
 
         <form v-if="mode==='new'" class="panel form fp-card" @submit.prevent="submit">
@@ -208,6 +264,9 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
                 <option value="">全部状态</option>
                 <option v-for="(name,key) in statuses" :key="key" :value="key">{{ name }}</option>
               </select>
+              <select v-if="reviewing" class="fp-control" v-model="visibility" aria-label="需求可见性" @change="search">
+                <option value="all">全部可见性</option><option value="visible">公开</option><option value="hidden">已隐藏</option>
+              </select>
               <select class="fp-control" v-model="filter.sort" aria-label="排序方式" @change="search">
                 <option value="latest">最新发布</option>
                 <option value="support">最多支持</option>
@@ -243,6 +302,7 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
                     <div class="badges">
                       <span class="badge badge-cat" :data-category="row.category">{{ categoryIcons[row.category] }} {{ categories[row.category] || row.category }}</span>
                       <span class="badge badge-status" :data-status="row.status">{{ statuses[row.status] || row.status }}</span>
+                      <span v-if="row.hidden" class="badge badge-status">已隐藏</span>
                     </div>
                     <small class="meta-inline muted">{{ row.authorNickname || row.authorName }} · {{ formatTime(row.createdAt) }}</small>
                   </div>
@@ -263,6 +323,7 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
               <div class="badges">
                 <span class="badge badge-cat" :data-category="item.category">{{ categoryIcons[item.category] }} {{ categories[item.category] || item.category }}</span>
                 <span class="badge badge-status" :data-status="item.status">{{ statuses[item.status] || item.status }}</span>
+                <span v-if="item.hidden" class="badge badge-status">已隐藏</span>
               </div>
               <h2>{{ item.title }}</h2>
               <p class="detail-meta muted">
@@ -274,7 +335,7 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
 
             <div class="prose">{{ item.description }}</div>
 
-            <div class="votes">
+            <div v-if="!reviewing" class="votes">
               <button
                 class="fp-control vote-btn vote-support"
                 :aria-pressed="personal?.vote==='support'"
@@ -311,28 +372,28 @@ onUnmounted(()=>{sequence++;personalSequence++;controller?.abort();off()})
             <button class="fp-control" @click="loadPersonal">重试</button>
           </p>
 
-          <form v-if="mode==='detail' && personal?.canModerate" class="panel form moderate-form fp-card" @submit.prevent="moderate">
+          <form v-if="mode==='detail' && reviewing && canModerate && item" class="panel form moderate-form fp-card" @submit.prevent="moderate">
             <div class="form-head">
               <h2>⚙️ 处理需求（管理员）</h2>
             </div>
             <div class="moderate-grid">
               <label class="field-group">
                 <span class="field-label">状态</span>
-                <select class="fp-control" v-model="moderation.status">
+                <select class="fp-control" v-model="moderation.status" :disabled="adminBusy || !!adminPending">
                   <option v-for="(name,key) in statuses" :key="key" :value="key">{{ name }}</option>
                 </select>
               </label>
               <label class="check">
-                <input v-model="moderation.hidden" type="checkbox">
+                <input v-model="moderation.hidden" type="checkbox" :disabled="adminBusy || !!adminPending">
                 <span>隐藏此需求（公开列表和详情均不可见）</span>
               </label>
             </div>
             <label class="field-group">
               <span class="field-label">处理说明</span>
-              <textarea class="fp-control" v-model="moderation.note" maxlength="2000" rows="3" placeholder="填写处理进展或回复说明（选填）" />
+              <textarea class="fp-control" v-model="moderation.note" :disabled="adminBusy || !!adminPending" maxlength="2000" rows="3" placeholder="填写处理进展或回复说明（选填）" />
             </label>
             <div class="form-footer">
-              <button class="primary fp-control" :disabled="store.busy || !!store.pending || !!store.result">保存处理结果</button>
+              <button class="primary fp-control" :disabled="adminBusy || !!adminPending && adminPending.id!==item.id">{{ adminPending?.id===item.id ? '重试原审核操作' : '保存处理结果' }}</button>
             </div>
           </form>
         </template>

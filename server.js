@@ -150,7 +150,7 @@ async function createServer() {
   const app = express()
   app.set('trust proxy', 'loopback')
   app.use(v3Only)
-  // Independent feedback service: do not send Rhythm cookies or use its API proxy.
+  // Forward Rhythm credentials only for the dedicated feedback moderation endpoints.
   app.use((req, res, next) => {
     if (!/^\/feedback-api(?:\/|$)/.test(req.url || '')) return next()
     res.setHeader('Cache-Control', 'no-store')
@@ -161,6 +161,9 @@ async function createServer() {
     const headers = { host: req.headers.host, accept: 'application/json', 'x-forwarded-for': req.ip }
     for (const name of ['content-type', 'content-length', 'idempotency-key', 'origin']) {
       if (req.headers[name]) headers[name] = req.headers[name]
+    }
+    if (/^\/feedback-api\/v1\/moderation\/(?:access|requests(?:\/[a-f0-9-]{36})?)(?:\?|$)/.test(req.url) && req.headers.authorization) {
+      headers.authorization = req.headers.authorization
     }
     const visitor = (req.headers.cookie || '').split(';').map(value => value.trim()).filter(value => value.startsWith('fp_feedback_visitor='))
     if (visitor.length === 1 && /^fp_feedback_visitor=[A-Za-z0-9_-]{43}$/.test(visitor[0])) headers.cookie = visitor[0]

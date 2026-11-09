@@ -11,5 +11,7 @@ try{
  const response=await fetch(base+'/feedback-api/v1/session',{method:'POST',headers:{Origin:base,Cookie:`LATKE_SESSION_ID=NEVER_FORWARD; fp_v3_refresh=NEVER_FORWARD; fp_feedback_visitor=${token}`,Authorization:'Bearer NEVER_FORWARD'}})
  assert.equal(response.status,200);assert.equal(calls.at(-1).cookie,`fp_feedback_visitor=${token}`);assert.equal(calls.at(-1).authorization,undefined)
  const cookie=response.headers.get('set-cookie');assert.ok(cookie.startsWith('fp_feedback_visitor='));assert.ok(!cookie.includes('fp_v3_refresh'))
- console.log('PASS actual production SSR proxy forwards only feedback visitor cookie and Set-Cookie, excludes Rhythm Cookie/Bearer')
+ const admin=await fetch(base+'/feedback-api/v1/moderation/requests?visibility=hidden',{headers:{Authorization:'Bearer fixture-admin',Cookie:'fp_v3_refresh=NEVER_FORWARD'}})
+ assert.equal(admin.status,200);assert.equal(calls.at(-1).authorization,'Bearer fixture-admin');assert.equal(calls.at(-1).cookie,undefined)
+ console.log('PASS actual production SSR proxy forwards only feedback visitor cookie and Set-Cookie, excludes Rhythm cookies and forwards Bearer only for moderation')
 }finally{const done=new Promise(r=>child.once('exit',r));child.kill();await done;await new Promise(r=>fixture.close(r))}

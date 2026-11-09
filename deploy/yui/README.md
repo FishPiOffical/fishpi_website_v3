@@ -6,9 +6,9 @@
 
 构建环境：`VITE_BROWSER_API_ORIGIN=https://fishpi.cn VITE_API_TARGET=https://fishpi.cn VITE_SITE_ORIGIN=https://yui.fishpi.cn VITE_FEEDBACK_ENABLED=true npm run build`。上传客户端/SSR构建、public、server.js、server/、package*.json、feedback-service/src及其package*.json；服务器两个目录分别 `npm ci`（网站运行时依赖vite的loadEnv，所以不能省devDependencies），使用独立运行时的PATH。
 
-安装两个 `.service` 至 `/etc/systemd/system/`，创建对应系统用户并授予反馈用户数据库目录独占写权限。`/etc/fishpi-feedback.env` 由 root 管理、权限600，设置 `FEEDBACK_ADMIN_IDS=guest:开头的独立访客ID列表`；未设置时不开放管理权限，不自行指定管理员。启动 `systemctl enable --now fishpi-feedback fishpi-website`。
+安装两个 `.service` 至 `/etc/systemd/system/`，创建对应系统用户并授予反馈用户数据库目录独占写权限。`/etc/fishpi-feedback.env` 由 root 管理、权限600。反馈审核权限来自 Rhythm 的 `/api/v3/me`，先上线 Rhythm 的 `isAdmin` 字段。启动 `systemctl enable --now fishpi-feedback fishpi-website`。
 
-当前浏览器直连fishpi.cn的v3 HTTP/WebSocket，本站v3转发已关闭；SSR仍直接访问该站，必要经典资源保留代理。现网必须已部署v3且认可该域名的认证来源策略；404或来源拒绝不能靠回退旧API绕过。`/feedback-api/v1` 走网站开关代理至独立反馈服务，反馈仅核验本机签发的访客Cookie，不调用Rhythm；代理只转发fp_feedback_visitor，不转发站点Cookie或Bearer。
+当前浏览器直连fishpi.cn的v3 HTTP/WebSocket，本站v3转发已关闭；SSR仍直接访问该站，必要经典资源保留代理。现网必须已部署v3且认可该域名的认证来源策略；404或来源拒绝不能靠回退旧API绕过。`/feedback-api/v1` 走网站开关代理至独立反馈服务，提交、投票仅核验本机访客 Cookie。只有审核路径转发 Bearer，反馈服务向固定 Rhythm 地址逐次核验权限，站点 Cookie 不转发。
 
 检查：HTTPS首页、静态资源、`/feedback-api/v1/health`、公开需求列表和v3端点。没有访客Cookie的写请求应401。禁止为部署验证写入真实需求或账号数据。
 
