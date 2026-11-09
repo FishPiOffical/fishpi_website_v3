@@ -47,15 +47,16 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
    if(value.type==='topic'){void readTopic();return}
    if(removed.has(value.id))return
    if(value.type==='reactions'){
-     if (value.snapshot) {
+     if (value.snapshot || value.reactionsUnavailable) {
        const message = messages.value.find(item => item.id === value.id)
        if (message && message.type !== 'unavailable') {
-         const next = {...message,reactions:value.snapshot,reactionReadStarted:performance.now()}
+         const next = {...message,reactions:value.snapshot,reactionsUnavailable:value.reactionsUnavailable,
+           reactionReadStarted:performance.now()}
          localChanges.set(value.id,{version:++version,message:next})
          merge(next)
        }
      }
-     reactions.invalidate('chat',value.id,false,value.snapshot)
+     if (!value.reactionsUnavailable) reactions.invalidate('chat',value.id,false,value.snapshot)
      return
    }
    if(value.type==='deleted'){removeConfirmed(value.id);return}

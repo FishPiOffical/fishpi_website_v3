@@ -5,7 +5,7 @@ import { getAuthContextVersion } from '@/api/http'
 import { readReactions, type ReactionState, type ReactionTarget } from '@/api/v3-reactions'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ReactionsStore } from '@/stores/v3Reactions'
-const props=withDefaults(defineProps<{kind:ReactionTarget;targetId:string;readonly?:boolean;initialReadStarted?: number; initialState?:ReactionState|null}>(),{readonly:false})
+const props=withDefaults(defineProps<{kind:ReactionTarget;targetId:string;readonly?:boolean;initialReadStarted?: number; initialState?:ReactionState|null;reactionsUnavailable?:boolean}>(),{readonly:false})
 const {accessToken,account,initialized}=storeToRefs(useAuthStore()),operations=useV3ReactionsStore()
 const mounted=ref(false),state=ref<ReactionState|null>(null),loading=ref(false),error=ref(''),open=ref(false)
 const root=ref<HTMLElement|null>(null),trigger=ref<HTMLButtonElement|null>(null)
@@ -49,7 +49,7 @@ let lastReceiptAt = -1
 function identity(){return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${props.kind}:${props.targetId}`}
 function clear(keepState=false){sequence++;if(!keepState)state.value=null;loading.value=false;error.value='';if(!keepState)open.value=false}
 async function load(confirmed=false){
-  if(!readable.value)return
+  if(!readable.value||props.reactionsUnavailable)return
   const current=++sequence,reader=identity(),kind=props.kind,id=props.targetId
   const valid=()=>mounted.value&&readable.value&&current===sequence&&reader===identity()
   loading.value=true;error.value=''
@@ -92,13 +92,13 @@ async function restore(){
 watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.targetId],()=>{const next=identity();if(next===boundary)return;boundary=next;lastReceiptAt=-1;clear();if(authenticated.value&&props.initialState===undefined)void load()},{flush:'sync'})
 watch(()=>operations.lastChange,change=>{if(change.kind===props.kind&&change.id===props.targetId){if(authenticated.value){clear(true);if(change.snapshot!==undefined){lastReceiptAt=performance.now();state.value=change.snapshot;}else void load(change.confirmed)}else clear()}},{flush:'sync'})
 function applyInitial() {
-  state.value = props.initialState ?? null
-  if (!authenticated.value) return
+  state.value = props.reactionsUnavailable ? null : props.initialState ?? null
+  if (!authenticated.value || props.reactionsUnavailable) return
   if (props.initialState === undefined) void load()
   else if (props.kind === 'article' && props.initialState) void operations.loadOptions().catch(() => {})
 }
-watch(() => props.initialState, () => {
-  if (props.initialState && (props.initialReadStarted ?? Infinity) <= lastReceiptAt) return
+watch([() => props.initialState, () => props.reactionsUnavailable], () => {
+  if (!props.reactionsUnavailable && props.initialState && (props.initialReadStarted ?? Infinity) <= lastReceiptAt) return
   clear()
   applyInitial()
 })
@@ -109,7 +109,8 @@ onBeforeUnmount(()=>{mounted.value=false;clear();if(typeof document!=='undefined
   <section v-if="kind!=='chat'||authenticated" ref="root" class="v3-reactions" :class="`kind-${kind}`" :aria-label="`${kind==='article'?'文章':kind==='comment'?'评论':'消息'}表态`">
     <button v-if="readable&&!authenticated&&!loading&&!error&&initialState===undefined" type="button" class="guest-rx-btn" :class="{'is-refresh':!!state}" @click="load()">{{ state?'刷新表态':'查看表态' }}</button>
     <p v-if="loading" class="rx-loading" role="status">正在读取表态…</p>
-    <div v-if="state || (writable && kind !== 'chat')" class="rx">
+    <p v-if="reactionsUnavailable" role="status">表态暂不可用</p>
+    <div v-else-if="state || (writable && kind !== 'chat')" class="rx">
       <template v-for="item in state?.summary" :key="item.value">
         <button v-if="writable" type="button" class="chip" :title="item.users.join(', ')" :aria-pressed="item.selected" :aria-disabled="blocked" :aria-busy="loading||!!pending?.busy" @click="choose(item.value)">{{ item.emoji }} {{ item.count }}</button>
         <span v-else class="chip" :title="item.users.join(', ')">{{ item.emoji }} {{ item.count }}</span>
@@ -122,7 +123,7 @@ onBeforeUnmount(()=>{mounted.value=false;clear();if(typeof document!=='undefined
     </div></Teleport>
     <template v-if="writable&&pending"><button type="button" :aria-disabled="pending.busy" @click="restore()">{{ pending.busy?'正在提交…':'恢复本次表态' }}</button><p v-if="!pending.busy">操作结果待确认，请恢复同一次操作；刷新页面或退出会清除本地恢复信息。</p></template>
     <p v-if="error||pending?.error" role="alert">{{ error||pending?.error }}</p>
-    <button v-if="readable&&!loading&&error" type="button" @click="load()">重读当前表态</button>
+    <button v-if="readable&&!loading&&error&&!reactionsUnavailable" type="button" @click="load()">重读当前表态</button>
   </section>
 </template>
 <style scoped lang="scss">

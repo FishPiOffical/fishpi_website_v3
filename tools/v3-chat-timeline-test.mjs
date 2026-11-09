@@ -101,4 +101,29 @@ frame('chat.message.reactions',{messageId:'12',revision:'4',reactions:summary})
 assert.equal(delivered.at(-1).snapshot.currentUserReaction,'heart')
 frame('chat.message.reactions',{messageId:'12',revision:'5'})
 assert.equal(delivered.at(-1).snapshot,undefined)
+frame('chat.message.created',{messageId:'12',revision:'6',message:{...msg('12'),reactionsUnavailable:true}})
+assert.equal(delivered.at(-1).message.content,'body 12')
+assert.equal(delivered.at(-1).message.reactionsUnavailable,true)
+frame('chat.message.reactions',{messageId:'12',revision:'7',reactionsUnavailable:true})
+assert.equal(delivered.at(-1).reactionsUnavailable,true)
 unsubscribe()
+
+const faultMessage={...msg('12'),reactionsUnavailable:true}
+state.dispatch=async path=>env(path.includes('?')?page([faultMessage],false):faultMessage)
+assert.equal((await api.chatMessagePage()).list[0].reactionsUnavailable,true)
+assert.equal((await api.chatMessageDetail('12')).content,'body 12')
+assert.equal((await api.chatMessageDetail('12')).reactionsUnavailable,true)
+
+state.dispatch=dispatch
+view=setup()
+await view.store.connect()
+const readsBeforeFault=state.calls.length
+const invalidationsBeforeFault=state.reactions.length
+state.subscriptions.at(-1).event(delivered.at(-1))
+await tick()
+assert.equal(view.store.messages.at(-1).content,'body 12')
+assert.equal(view.store.messages.at(-1).reactionsUnavailable,true)
+assert.equal(state.calls.length,readsBeforeFault)
+assert.equal(state.reactions.length,invalidationsBeforeFault)
+view.store.$dispose()
+console.log('PASS 表态故障推送保留正文并跳过逐条补查')

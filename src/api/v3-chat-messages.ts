@@ -2,7 +2,7 @@ import {chatAppearanceSnapshot,type ChatAppearance} from '@/utils/chatAppearance
 import {ApiError,request} from './http'
 import {decodeReactionSnapshot,type ReactionState} from './v3-reactions'
 export type ChatMessageType='text'|'music'|'weather'|'redPacket'|'unavailable'
-export interface ChatMessage{appearance?:ChatAppearance;reactions?:ReactionState|null;reactionReadStarted?:number;id:string;createdAt:number;type:ChatMessageType;content:string;contentHtml:string;author:{id:string;userName:string;userNickname:string;userAvatarURL:string};client:string;card:Record<string,string|number>}
+export interface ChatMessage{appearance?:ChatAppearance;reactions?:ReactionState|null;reactionsUnavailable?:boolean;reactionReadStarted?:number;id:string;createdAt:number;type:ChatMessageType;content:string;contentHtml:string;author:{id:string;userName:string;userNickname:string;userAvatarURL:string};client:string;card:Record<string,string|number>}
 export {decodeReactionSnapshot}
 const invalid=()=>new ApiError('聊天室消息响应不正确',502)
 function row(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw invalid();return v as Record<string,unknown>}
@@ -13,8 +13,9 @@ export function decodeChatMessage(value:unknown):ChatMessage{const r=row(value),
  if(type==='unavailable')return{id,createdAt,type,reactions:null,content:'',contentHtml:'',author:{id:'',userName:'',userNickname:'',userAvatarURL:''},client:'',card:{}}
  const a=row(r.author),authorId=text(a.id);if(authorId&&!/^\d{1,32}$/.test(authorId))throw invalid();const author={id:authorId,userName:text(a.userName),userNickname:text(a.userNickname),userAvatarURL:text(a.userAvatarURL)},client=text(r.client),card:Record<string,string|number>={}
  if(type!=='text'){const c=row(r.card);for(const field of type==='music'?['title','source','coverURL','from']:type==='weather'?['date','weatherCode','max','min','t','st']:['type','message'])card[field]=text(c[field]);if(type==='redPacket')for(const field of ['money','count','got'])card[field]=integer(c[field])}
- const reactions = r.reactions === undefined ? undefined : decodeReactionSnapshot(r.reactions, 'chat', id)
- return{...(reactions ? {reactions,reactionReadStarted:performance.now()} : {}),...(r.appearance===undefined?{}:{appearance:chatAppearanceSnapshot(r.appearance)}),id,createdAt,type,author,client,content:type==='text'?text(r.content):'',contentHtml:type==='text'?text(r.contentHtml):'',card}}
+ const reactionsUnavailable = r.reactionsUnavailable === true
+ const reactions = reactionsUnavailable || r.reactions === undefined ? undefined : decodeReactionSnapshot(r.reactions, 'chat', id)
+ return{...(reactionsUnavailable ? {reactionsUnavailable:true} : {}),...(reactions ? {reactions,reactionReadStarted:performance.now()} : {}),...(r.appearance===undefined?{}:{appearance:chatAppearanceSnapshot(r.appearance)}),id,createdAt,type,author,client,content:type==='text'?text(r.content):'',contentHtml:type==='text'?text(r.contentHtml):'',card}}
 export async function chatMessageDetail(id:string,signal?:AbortSignal):Promise<ChatMessage>{chatMessageId(id);const started=performance.now();const r=row(await request(`/api/v3/chat/messages/${id}`,{signal,cache:'no-store'}));if(r.code!==0)throw invalid();const message=decodeChatMessage(r.data);if(message.id!==id)throw invalid();return message.reactions ? {...message,reactionReadStarted:started} : message}
 /** Card summaries are projected public fields, never the stored transport envelope. */
 export function chatSourceText(message:ChatMessage){if(message.type==='unavailable')throw new ApiError('当前消息不可读取',404);return message.type==='text'?message.content:`【${message.type==='music'?'音乐':message.type==='weather'?'天气':'红包'}卡片公开摘要】\n${JSON.stringify(message.card,null,2)}`}

@@ -17,7 +17,7 @@ export type ChatRealtimeEvent =
   | { type: 'topic'; revision: string }
   | { type: 'message'; id: string; revision: string; message?: ChatMessage }
   | { type: 'deleted'; id: string; revision: string }
-  | { type: 'reactions'; id: string; revision: string; snapshot?: import('./v3-reactions').ReactionState }
+  | { type: 'reactions'; id: string; revision: string; snapshot?: import('./v3-reactions').ReactionState; reactionsUnavailable?: boolean }
   | { type: 'barrage'; barrage: ChatBarrageEvent }
 function barrageEvent(value:unknown):ChatBarrageEvent|null{
  if(!value||typeof value!=='object'||Array.isArray(value))return null
@@ -97,7 +97,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
       transport.onmessage = (event) => {
         if (!valid()) return
         try {
-          const message = JSON.parse(event.data) as { type?: unknown; data?: { channel?: unknown; articleId?:unknown;messageId?:unknown;revision?:unknown;message?:unknown;reactions?:unknown } }
+          const message = JSON.parse(event.data) as { type?: unknown; data?: { channel?: unknown; articleId?:unknown;messageId?:unknown;revision?:unknown;message?:unknown;reactions?:unknown;reactionsUnavailable?:unknown } }
           if (message.type === 'authentication.required') { authenticate(); return }
           if (message.type === 'ready') {
             if (authenticated || !sent || message.data?.channel !== channel || (articleId!==undefined&&message.data?.articleId!==articleId)) { reconnect(); return }
@@ -118,6 +118,10 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
             if(message.type==='chat.topic_changed'){chatEvent?.({type:'topic',revision});return}
             const id=message.data?.messageId;if(typeof id!=='string'||!/^\d{1,32}$/.test(id))return
             if(message.type==='chat.message.reactions'){
+              if (message.data?.reactionsUnavailable === true) {
+                chatEvent?.({type:'reactions',id,revision,reactionsUnavailable:true})
+                return
+              }
               let snapshot
               try { snapshot = chatMessages.decodeReactionSnapshot(message.data?.reactions, 'chat', id) }
               catch { /* 旧服务仅发送失效提示，按消息 ID 补读。 */ }
