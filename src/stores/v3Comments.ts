@@ -16,7 +16,7 @@ export const useV3CommentsStore=defineStore('v3-comments',()=>{
   async function execute(command:CommentCommand){
     const valid=capture();if(!valid()||busy.value)return false
     const recovering=!!pending.value;pending.value=command;busy.value=true;error.value=message.value=''
-    try{const result=await writeV3Comment(command);if(!valid())return false;completed.value={...command};receipt.value={articleId:command.articleId,id:result.id,operation:command.operation};pending.value=null;message.value='操作已确认，请以重新读取的评论为准。';lastOperation.value=command.operation;revision.value++;try{await auth.reloadAccount()}catch{if(valid())message.value='操作已确认，余额刷新失败，请到积分页核对。'}return true}
+    try{const result=await writeV3Comment(command);if(!valid())return false;completed.value={...command};receipt.value={articleId:command.articleId,id:result.id,operation:command.operation};pending.value=null;lastOperation.value=command.operation;revision.value++;try{await auth.reloadAccount()}catch{if(valid())message.value='操作已确认，余额刷新失败，请到积分页核对。'}return true}
     catch(err){if(valid()){error.value=err instanceof Error?err.message:'评论操作失败';if(!recovering&&err instanceof ApiError&&err.status>=400&&err.status<500)pending.value=null}return false}
     finally{if(valid())busy.value=false}
   }

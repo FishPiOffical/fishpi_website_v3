@@ -42,7 +42,20 @@ async function load(confirmed=false){
   const current=++sequence,reader=identity(),kind=props.kind,id=props.targetId
   const valid=()=>mounted.value&&readable.value&&current===sequence&&reader===identity()
   loading.value=true;error.value=''
-  try{const options=await operations.loadOptions();if(!valid())return;const result=await readReactions(kind,id,options);if(valid()){if(!authenticated.value&&result.currentUserReaction)throw Error('游客表态状态不正确');state.value=result}}
+  try {
+    let result
+    if (kind === 'article') {
+      result = await operations.readArticle(id)
+    } else {
+      const options = await operations.loadOptions()
+      if (!valid()) return
+      result = await readReactions(kind, id, options)
+    }
+    if (valid()) {
+      if (!authenticated.value && result.currentUserReaction) throw Error('游客表态状态不正确')
+      state.value = result
+    }
+  }
   catch(reason){if(valid()){state.value=null;error.value=(confirmed?'操作已确认，读取当前表态失败：':'')+(reason instanceof Error?reason.message:'表态读取失败')}}
   finally{if(valid())loading.value=false}
 }

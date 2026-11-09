@@ -16,6 +16,7 @@ const props = withDefaults(
     /** 私信等场景只保留常用的格式、链接和图片工具 */
     collapsible?: boolean
     compact?: boolean
+    adaptiveHeight?: boolean
   }>(),
   {
     cacheId: '',
@@ -91,6 +92,7 @@ defineExpose({
       ref="editor"
       :model-value="modelValue"
       :height="height"
+      :adaptive-height="adaptiveHeight"
       mode="reply"
       :toolbar-preset="compact ? 'message' : 'default'"
       :cache-id="cacheId"

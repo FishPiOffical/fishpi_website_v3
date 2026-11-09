@@ -23,7 +23,10 @@ function decode(raw:unknown,kind:ReactionTarget,id:string,options:ReactionOption
   if(current&&!seen.has(current))throw bad()
   return{targetId:id,targetType:kind,currentUserReaction:current,summary}
 }
-export async function readReactions(kind:ReactionTarget,id:string,options:ReactionOption[]){return decode(await request(path(kind,id),{cache:'no-store'}),kind,id,options)}
+export async function readReactions(kind:ReactionTarget,id:string,options:ReactionOption[] | Promise<ReactionOption[]>){
+  const [response, catalog] = await Promise.all([request(path(kind,id),{cache:'no-store'}), options])
+  return decode(response,kind,id,catalog)
+}
 export async function writeReaction(kind:ReactionTarget,id:string,choice:string|null,key:string,options:ReactionOption[]):Promise<void>{
   if(!/^[A-Za-z0-9._:-]{1,128}$/.test(key)||choice!==null&&!options.some(o=>o.value===choice))throw new ApiError('表态参数不合法',422)
   const raw=await request(path(kind,id),{method:choice===null?'DELETE':'PUT',headers:{'Idempotency-Key':key},...(choice===null?{}:{body:JSON.stringify({value:choice})})})

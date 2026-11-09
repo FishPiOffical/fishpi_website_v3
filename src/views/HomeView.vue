@@ -1049,8 +1049,6 @@ function scrollShelf(id: string, dir: -1 | 1) {
   .home-moons { order:1; }
   .mod:last-child { flex:1; display:flex; flex-direction:column; }
   .mod:last-child > .mod-body { flex:1; display:flex; flex-direction:column; }
-  .mod[data-home-module='recentA']:last-child > .mod-body > .module-list:last-child,
-  .mod[data-home-module='recentB']:last-child > .mod-body > .module-list:last-child { flex:1; display:flex; flex-direction:column; justify-content:space-between; }
   .module-list li { padding:5px 6px; min-height:30px; }
   .long-card { flex-basis:calc((100% - 36px) / 4); grid-template-columns:64px minmax(0,1fr); min-height:96px; }
   .long-cover { width:64px; }

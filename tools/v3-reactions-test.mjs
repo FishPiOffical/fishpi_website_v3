@@ -81,3 +81,29 @@ console.log('PASS reactions 15 late catalog from a prior identity cannot populat
 // No fan-out of anonymous state reads before restored identity or without the guest's explicit request.
 let guestCalls=0;const requestIndex=state.requests.length;setup(()=>{guestCalls++;return response('')});pinia=createPinia();auth(pinia).accessToken=null;auth(pinia).account=null;auth(pinia).initialized=false;view=mount(pinia);await tick();assert.equal(guestCalls,0);assert.equal(state.requests.length,requestIndex);assert.ok(!view.text().includes('查看表态'));view.user.initialized=true;await tick();assert.equal(guestCalls,0);assert.equal(state.requests.length,requestIndex);click(view,'查看表态');await tick();assert.equal(guestCalls,1);assert.match(view.text(),/刷新表态/);useV3ReactionsStore(pinia).invalidate('article','2');await tick();assert.equal(guestCalls,1);assert.match(view.text(),/查看表态/);view.app.unmount()
 console.log('PASS reactions 16 anonymous reads wait for restored identity and explicit request; realtime cannot trigger guest request fan-out')
+
+const slowPinia = createPinia()
+const slowStore = useV3ReactionsStore(slowPinia)
+let releaseCatalog
+const articleReads = []
+state.dispatch = path => path === '/api/v3/reactions/emojis'
+  ? new Promise(resolve => { releaseCatalog = resolve })
+  : new Promise(resolve => { articleReads.push(resolve) })
+const firstReader = mount(slowPinia, 'article', '2')
+const secondReader = mount(slowPinia, 'article', '2')
+await tick()
+assert.equal(articleReads.length, 1, 'same article shares a request while the catalog is pending')
+slowStore.invalidate('article', '2')
+await tick()
+assert.equal(articleReads.length, 2, 'invalidation starts a current request even while the old one is pending')
+releaseCatalog(env({list: options}))
+articleReads[1](response('fire'))
+await tick()
+articleReads[0](response('heart'))
+await tick()
+for (const reader of [firstReader, secondReader]) {
+  assert.match(reader.text(), /🔥 1/)
+  assert.doesNotMatch(reader.text(), /❤️ 1/)
+  reader.app.unmount()
+}
+console.log('PASS article reactions fetch state alongside the catalog, share the in-flight read and reject stale updates')

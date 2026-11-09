@@ -126,7 +126,7 @@ watch(latestVisibleId, async (id, previous) => {
   if (!el) return
   if (!id) { hasNewMessages.value = false; return }
   // Measure against the previous layout before Vue inserts the new message.
-  const follow = !previous || nearLatest(el)
+  const follow = !previous || followingLatest
   await nextTick()
   if (el !== scroller.value || id !== latestVisibleId.value) return
   if (follow) scrollBottom()
@@ -519,6 +519,7 @@ function clearScreen() {
           <div v-if="composerReady && isLoggedIn" class="composer-inner">
             <ChatComposer
               collapsible
+              adaptive-height
               :height="150"
               ref="composerRef"
               v-model="draft"
@@ -782,8 +783,8 @@ function clearScreen() {
 .cr-modern-layout {
   display: flex;
   gap: 16px;
-  height: calc(100vh - var(--fp-nav-h) - 24px);
-  min-height: 520px;
+  height: calc(100dvh - var(--fp-nav-h) - 24px);
+  min-height: 0;
   padding-bottom: 8px;
 }
 
@@ -971,7 +972,6 @@ function clearScreen() {
   bottom: 100%;
   margin-bottom: 6px;
 }
-.cr-composer-panel :deep(.vditor:not(.vditor--fullscreen)) { max-height: clamp(150px, 36dvh, 300px); }
 
 /* 现代版吸底输入区域 */
 .cr-composer-panel {
@@ -1198,7 +1198,9 @@ function clearScreen() {
   }
 
   .cr-modern-main {
-    height: calc(100vh - var(--fp-nav-h) - 20px);
+    flex: none;
+    min-height: 0;
+    height: calc(100dvh - var(--fp-nav-h) - 20px);
   }
 
   .modern-sidebar {

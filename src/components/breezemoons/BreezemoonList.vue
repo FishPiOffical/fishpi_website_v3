@@ -11,7 +11,7 @@ import { avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
 defineProps<{items:FollowingMoon[];compact?:boolean;avatarOnly?:boolean;hideAuthor?:boolean}>()
 function fallback(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 const date = formatDateTime
-const chatQuote = inject<{ enabled: Ref<boolean>; insert: (id: string, author: string, excerpt: string) => void }>('quoteBreezemoonInChat')
+const chatQuote = inject<{ enabled: Ref<boolean>; insert: (id: string, author: string, excerpt: string) => void } | null>('quoteBreezemoonInChat', null)
 function share(item: FollowingMoon, event: MouseEvent | DragEvent) {
   const target = event.currentTarget as HTMLElement
   const excerpt = (target.closest('li')?.querySelector<HTMLElement>('.moon-body')?.innerText ?? '').trim()

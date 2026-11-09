@@ -12,6 +12,7 @@ const props = withDefaults(
   defineProps<{
     modelValue: string
     height?: number
+    adaptiveHeight?: boolean
     placeholder?: string
     outline?: boolean
     /** reply：聊天室 / 私信 / 回帖共用的短文工具栏，仅编辑区；post：发帖的长文工具栏，分屏预览 */
@@ -188,7 +189,7 @@ onMounted(async () => {
     lang: 'zh_CN',
     theme: dark.value ? 'dark' : 'classic',
     outline: { enable: props.outline, position: 'left' },
-    resize: { enable: !narrow, position: 'bottom' },
+    resize: { enable: props.adaptiveHeight || !narrow, position: 'bottom' },
     preview: { delay: 750, mode: inline ? 'editor' : 'both', transform: preview.transform, parse: preview.parse },
     counter: { enable: !inline },
     toolbar: resolvedToolbar,
@@ -278,7 +279,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="md-editor" :class="`md-editor--${mode}`" @input.capture="clearMentions">
+  <div class="md-editor" :class="[`md-editor--${mode}`, { 'md-adaptive': adaptiveHeight }]" @input.capture="clearMentions">
     <EmojiPicker ref="emojiPicker" :show-trigger="false" placement="below" :labels="nativeEmojis"
       @insert="insertEmoji" @open-change="emit('emoji-open', $event)" />
     <textarea
@@ -311,6 +312,31 @@ defineExpose({
   border-radius: 6px;
   background: var(--fp-bg);
 }
+/* The root can resize without clipping the toolbar or the editor's own scrollbar. */
+.md-adaptive :deep(.vditor:not(.vditor--fullscreen)),
+.md-adaptive .md-fallback {
+  min-height: 100px;
+  max-height: clamp(120px, 40dvh, 360px);
+}
+.md-adaptive :deep(.vditor-content) { min-height: 0; }
+.md-adaptive :deep(.vditor-toolbar) { flex-shrink: 0; }
+.md-adaptive :deep(.vditor-resize) { z-index: 1; }
+.md-adaptive :deep(.vditor-resize > div) { height: 10px; display: grid; place-items: center; }
+
+@media (max-width: 767px) {
+  .md-adaptive :deep(.vditor:not(.vditor--fullscreen)),
+  .md-adaptive .md-fallback { height: auto !important; }
+  .md-adaptive .md-fallback { field-sizing: content; resize: none; }
+  .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-resize) { display: none; }
+  .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-content) { flex: 0 1 auto; }
+  .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-content [contenteditable="true"]) {
+    height: auto;
+    min-height: 64px;
+    max-height: 25dvh;
+    overflow-y: auto;
+  }
+}
+
 .md-fallback {
   width: 100%;
   box-sizing: border-box;

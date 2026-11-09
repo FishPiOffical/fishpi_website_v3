@@ -435,11 +435,10 @@ function itemHandlers(c: ArticleComment) {
       <ArticleInteraction kind="reward" :article-id="article.oId" :initial-price="Number(article.articleRewardPoint || 0)" @content-click="onContentClick" />
     </DefineReward>
     <DefineComments>
-      <p v-if="articleReading" role="status">正在读取第 {{ commentPage }} 页评论，当前内容尚未更新。</p>
       <p v-if="commentRefreshError" role="alert">{{ commentRefreshError }}<button type="button" @click="load(true)">重读评论</button></p>
       <p v-if="commentWrites.error" role="alert">{{ commentWrites.error }}</p>
-      <p v-if="commentWrites.message" role="status">{{ commentWrites.message }}</p>
-      <div class="comments-list">
+      <p v-if="commentWrites.receipt?.articleId === article.oId && commentWrites.message" role="status">{{ commentWrites.message }}</p>
+      <div class="comments-list" :aria-busy="articleReading">
         <CommentItem
           v-for="t in threads"
           :key="t.c.oId"
@@ -1021,6 +1020,7 @@ h1 {
 
 .reaction-wrap {
   margin-top: 12px;
+  min-height: 28px;
 }
 
 .author-summary-card {

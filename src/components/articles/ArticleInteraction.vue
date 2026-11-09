@@ -86,6 +86,11 @@ onBeforeUnmount(()=>{mounted.value=false;clear()})
           <button v-else type="button" class="act-btn act-reward" :aria-disabled="busy || !!pending || price < 1" :aria-busy="busy" @click="submit()">{{ price > 0 ? `打赏 ${price} 积分` : '当前未启用打赏' }}</button>
         </template>
       </template>
+      <template v-else-if="loading && !pending && (kind === 'vote' || kind === 'thanks')">
+        <button v-if="kind === 'vote'" type="button" class="act-btn vote-up" disabled>赞同 · —</button>
+        <button v-if="kind === 'vote'" type="button" class="act-btn vote-down" disabled>反对 · —</button>
+        <button v-else type="button" class="act-btn act-thanks" disabled>感谢 · —</button>
+      </template>
       <button v-else-if="!loading && !pending" type="button" class="reread-btn" :class="{ 'is-hidden': !error }" :disabled="busy" @click="load()">重读{{ label }}状态</button>
       <template v-if="reward?.rewarded && !loading && !error"><div v-if="html" class="reward-content" v-html="html" @click="emit('contentClick',$event)" /><p v-else>打赏区暂无内容</p></template>
       <p v-if="error || pending?.error" role="alert">{{ error || pending?.error }}</p>
