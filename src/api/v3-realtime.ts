@@ -60,7 +60,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
   function reconnect() {
     retire()
     if (!current() || retry) return
-    // Without a live subscription, still give the unread badges one HTTP read.
+    // 实时订阅暂不可用时，先通过 HTTP 读取一次未读数。
     if (initialRead && !hasConnected && !initialUnreadFallback) {
       initialUnreadFallback = true
       initialRead()
@@ -106,7 +106,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
             heartbeat = setInterval(() => { if (valid() && transport.readyState === WebSocket.OPEN) transport.send('{"type":"ping"}') }, 25_000)
             const reconnecting = hasConnected
             hasConnected = true
-            // For unread badges, ready starts the initial read or reconciles a disconnected interval.
+            // 未读数在首次订阅就绪后读取，重连就绪后补读断线期间的变更。
             if (unreadChannel && !reconnecting && !initialUnreadFallback && initialRead) initialRead()
             else if (channel !== 'article' || reconnecting) changed()
           } else if(authenticated&&channel==='chat'){

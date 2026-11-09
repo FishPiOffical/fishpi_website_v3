@@ -39,7 +39,7 @@ async function load(afterWrite=false){
   const valid=()=>mounted.value && loggedIn.value && current === sequence && reader === identity()
   loading.value=true; error.value=''; if(!afterWrite)state.value=null; html.value=''
   try {
-    // A confirmed purchase still needs a current authorized read of its unlocked HTML.
+    // 打赏确认后，仍须按当前阅读权限读取已解锁的正文。
     if (afterWrite && kind === 'reward' && props.initialState?.kind === 'reward') {
       const result = await readArticleRewardDetail(id)
       if (valid()) { lastReceiptAt = performance.now(); state.value = result.state; html.value = result.html }
