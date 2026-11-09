@@ -152,6 +152,8 @@ const ssrAuthShell = computed(() => Boolean(route.meta.auth) && (!mounted.value 
 const router = useRouter()
 const auth = useAuthStore()
 const appearance = useAppearanceStore()
+const isDarkTheme = computed(() => appearance.state.theme === 'classic-dark')
+const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到浅色主题' : '切换到暗色主题')
 const notices = useNoticeStore()
 const whispers = usePrivateInboxStore()
 const chat = useChatStore()
@@ -341,8 +343,8 @@ onUnmounted(() => {
           <RouterLink to="/games" class="bar-icon" title="活动" aria-label="活动">
             <NavIcon name="game" />
           </RouterLink>
-          <button type="button" class="bar-icon theme" title="切换颜色模式" aria-label="切换颜色模式" @click="appearance.toggleTheme()">
-            <NavIcon name="theme" />
+          <button type="button" class="bar-icon theme" :title="themeToggleLabel" :aria-label="themeToggleLabel" @click="appearance.toggleTheme()">
+            <NavIcon :name="isDarkTheme ? 'theme-dark' : 'theme'" />
           </button>
           <span class="tool-divider" aria-hidden="true" />
           <RouterLink
@@ -422,8 +424,8 @@ onUnmounted(() => {
         <template v-else>
           <RouterLink to="/login">登录</RouterLink>
           <RouterLink to="/register">注册</RouterLink>
-          <button type="button" class="bar-icon theme" title="切换颜色模式" aria-label="切换颜色模式" @click="appearance.toggleTheme()">
-            <NavIcon name="theme" />
+          <button type="button" class="bar-icon theme" :title="themeToggleLabel" :aria-label="themeToggleLabel" @click="appearance.toggleTheme()">
+            <NavIcon :name="isDarkTheme ? 'theme-dark' : 'theme'" />
           </button>
         </template>
       </div>
