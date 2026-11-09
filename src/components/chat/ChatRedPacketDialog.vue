@@ -10,18 +10,18 @@ import {useV3ChatRedPacketsStore} from '@/stores/v3ChatRedPackets'
 import {getAuthContextVersion} from '@/api/http'
 import {packetRisk,type ClaimInput} from '@/api/v3-chat-red-packets'
 const auth=useAuthStore(),store=useV3ChatRedPacketsStore(),gesture=ref<number|string>(''),confirming=ref(false),localError=ref('')
-const canClaim=computed(()=>{const d=store.detail;return!!d&&!d.currentUserClaim&&d.got<d.count&&!(d.type==='rockPaperScissors'&&d.sender.id===auth.account?.oId)})
+const canClaim=computed(()=>{const d=store.detail;return!!d&&!d.legacy&&!d.currentUserClaim&&d.got<d.count&&!(d.type==='rockPaperScissors'&&d.sender.id===auth.account?.oId)})
 let abort:AbortController|null=null
 function cancel(){abort?.abort();abort=null;confirming.value=false}
 const identity=()=>JSON.stringify([getAuthContextVersion(),!!auth.accessToken,auth.account?.oId||''])
-async function claim(){const d=store.detail;if(!d||!canClaim.value||store.busy||store.pending||confirming.value)return;localError.value='';if(d.type==='rockPaperScissors'&&!(typeof gesture.value==='number'&&Number.isInteger(gesture.value)&&gesture.value>=0&&gesture.value<=2)){localError.value='请先明确选择出拳';return}cancel();const controller=new AbortController();abort=controller;const reader=identity(),choice=gesture.value;confirming.value=true
+async function claim(){const d=store.detail;if(!d||d.legacy||!canClaim.value||store.busy||store.pending||confirming.value)return;localError.value='';if(d.type==='rockPaperScissors'&&!(typeof gesture.value==='number'&&Number.isInteger(gesture.value)&&gesture.value>=0&&gesture.value<=2)){localError.value='请先明确选择出拳';return}cancel();const controller=new AbortController();abort=controller;const reader=identity(),choice=gesture.value;confirming.value=true
  if(!controller.signal.aborted&&reader===identity()&&store.detail===d){const input:ClaimInput={};if(packetRisk(d.type))input.riskAccepted=true;if(d.type==='rockPaperScissors')input.gesture=choice as number;await store.claim(d.id,d.type,input)}if(abort===controller){abort=null;confirming.value=false}}
 watch(()=>store.detail,()=>{cancel();gesture.value='';localError.value=''});watch(identity,cancel,{flush:'sync'});onBeforeUnmount(cancel)
 const hands=[{value:0,label:'石头',image:'/images/redpacket/gesture/rock.png'},{value:1,label:'剪刀',image:'/images/redpacket/gesture/scissors.png'},{value:2,label:'布',image:'/images/redpacket/gesture/paper.png'}] as const
 const hand=(g:number)=>hands[g]?.label||'未知'
 const detail=computed(()=>store.detail)
 const isDuel=computed(()=>detail.value?.type==='rockPaperScissors')
-const typeLabel=computed(()=>detail.value?({random:'拼手气红包',average:'普通红包',specify:'专属红包',heartbeat:'心跳红包',rockPaperScissors:'猜拳红包'})[detail.value.type]:'红包详情')
+const typeLabel=computed(()=>detail.value?({random:'拼手气红包',average:'普通红包',specify:'专属红包',heartbeat:'心跳红包',rockPaperScissors:'猜拳红包',dice:'骰子红包'})[detail.value.type]:'红包详情')
 const progress=computed(()=>detail.value?Math.min(100,detail.value.got/detail.value.count*100):0)
 const opponentHand=computed(()=>detail.value?.claims[0]?.gesture??(typeof gesture.value==='number'?gesture.value:undefined))
 const duelResult=computed(()=>{
@@ -50,19 +50,20 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
         <h2>{{ detail.message||typeLabel }}</h2>
         <div v-if="detail.currentUserClaim" class="claim-result" aria-live="polite">
           <strong>{{ signed(detail.currentUserClaim.amount) }}</strong><span>积分</span>
-          <p>{{ detail.currentUserClaim.amount<0?'本次扣款':isDuel?duelResult:'已领取' }}</p>
+          <p>{{ detail.currentUserClaim.amount<0?'本次扣款':isDuel&&duelResult?duelResult:'已领取' }}</p>
         </div>
         <p v-else class="hero-caption">{{ isDuel?'石头 · 剪刀 · 布，一局定胜负':detail.got===detail.count?'红包已领完':'祝你收获一份好手气' }}</p>
       </section>
 
       <div class="packet-stats">
         <div><span>已领取</span><strong>{{ detail.got }}<small> / {{ detail.count }} 份</small></strong></div>
-        <div><span>初始奖池</span><strong>{{ detail.poolPoints }}<small> 积分</small></strong></div>
-        <div><span>税额</span><strong>{{ detail.taxPoints }}<small> 积分</small></strong></div>
+        <div v-if="detail.legacy && detail.money!==undefined"><span>{{ detail.type==='average'||detail.type==='specify'?'每份积分':'红包积分' }}</span><strong>{{ detail.money }}<small> 积分</small></strong></div>
+        <div v-if="!detail.legacy"><span>初始奖池</span><strong>{{ detail.poolPoints }}<small> 积分</small></strong></div>
+        <div v-if="!detail.legacy"><span>税额</span><strong>{{ detail.taxPoints }}<small> 积分</small></strong></div>
       </div>
       <div class="claim-progress" role="progressbar" aria-label="红包领取进度" :aria-valuenow="detail.got" :aria-valuemin="0" :aria-valuemax="detail.count"><i :style="{width:`${progress}%`}" /></div>
 
-      <section v-if="isDuel" class="duel-section" aria-label="猜拳对局">
+      <section v-if="isDuel && !detail.legacy" class="duel-section" aria-label="猜拳对局">
         <div class="duel-arena">
           <div class="duel-player"><span>发起方</span><img v-if="detail.senderGesture!==undefined" :src="hands[detail.senderGesture]?.image" :alt="hand(detail.senderGesture)" /><span v-else class="unknown-hand" aria-label="出拳尚未揭晓">?</span><small>{{ detail.senderGesture!==undefined?hand(detail.senderGesture):'待揭晓' }}</small></div>
           <div class="duel-center"><span>VS</span><small v-if="duelResult">{{ duelResult }}</small><small v-else>{{ detail.poolPoints }} 积分对局</small></div>
@@ -76,7 +77,7 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
       </section>
       <p v-else-if="canClaim&&detail.type==='heartbeat'" class="risk-note">心跳红包可能领取负积分并扣款，领取前余额需至少 {{ detail.poolPoints }} 积分。</p>
 
-      <div v-if="canClaim && !isDuel" class="claim-action"><button type="button" class="claim-button" :disabled="store.busy||!!store.pending||confirming" @click="claim">{{ store.busy?'正在领取…':confirming?'等待确认…':packetRisk(detail.type)?'接受扣分风险并领取':'领取一份' }}</button></div>
+      <div v-if="canClaim && !isDuel" class="claim-action"><button type="button" class="claim-button" :disabled="store.busy||!!store.pending||confirming" @click="claim">{{ store.busy?'正在领取…':confirming?'等待确认…':detail.type==='heartbeat'?'接受扣分风险并领取':'领取一份' }}</button></div>
       <p v-if="store.pending" class="quiet-note" role="status">有红包操作结果待确认，请先通过红包操作提示恢复原操作。</p>
       <p v-if="localError||store.error" class="inline-error" role="alert">{{ localError||store.error }}</p>
 
@@ -84,13 +85,14 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
         <header><h3>领取记录 <span>{{ detail.got }}</span></h3><button type="button" class="refresh-button" :disabled="store.loading" @click="store.open()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5 M4 17v-5h5 M6 7a7 7 0 0 1 12-2l2 2 M4 17l2 2a7 7 0 0 0 12-2" /></svg>刷新详情</button></header>
         <ul v-if="detail.claims.length"><li v-for="row in detail.claims" :key="row.user.id">
           <RouterLink v-if="row.user.userName" :to="`/member/${encodeURIComponent(row.user.userName)}`" :data-user-card="row.user.userName" class="record-avatar" @click="store.close" :aria-label="`查看 ${row.user.userNickname||row.user.userName} 的主页`"><img :src="avatarUrl(row.user)" alt="" @error="fallback" /></RouterLink><img v-else class="record-avatar" :src="avatarUrl(row.user)" alt="" @error="fallback" />
-          <div class="record-person"><strong>{{ row.user.userNickname||row.user.userName||row.user.id }}</strong><time>{{ formatDateTime(row.claimedAt) }}</time><small v-if="row.gesture!==undefined" class="record-duel">{{ hand(row.gesture) }} · {{ resultLabel(row.outcome) }}<span v-if="row.senderRefundPoints!==undefined"> · 退回发送者 {{ row.senderRefundPoints }} 积分</span></small></div>
+          <div class="record-person"><strong>{{ row.user.userNickname||row.user.userName||row.user.id }}</strong><time v-if="row.claimedAt">{{ formatDateTime(row.claimedAt) }}</time><small v-if="row.gesture!==undefined" class="record-duel">{{ hand(row.gesture) }} · {{ resultLabel(row.outcome) }}<span v-if="row.senderRefundPoints!==undefined"> · 退回发送者 {{ row.senderRefundPoints }} 积分</span></small></div>
           <div class="record-amount" :class="{'is-debit':row.amount<0}"><strong>{{ signed(row.amount) }}</strong><small>{{ row.amount<0?'积分 · 扣款':'积分' }}</small></div>
         </li></ul>
         <p v-else class="records-empty">{{ detail.got===detail.count?'红包已领完':'还没有人领取，等一份好手气。' }}</p>
       </section>
       <details v-if="detail.recipientIds?.length" class="recipients"><summary>指定接收人 · {{ detail.recipientIds.length }} 人</summary><p>{{ detail.recipientIds.join('、') }}</p></details>
-      <p class="packet-footnote">{{ detail.got===detail.count?'红包已领完 · ':'' }}查看详情不会领取，领取结果以实际结算为准。</p>
+      <p v-if="detail.legacy" class="packet-footnote">经典红包 · 仅查看领取记录</p>
+      <p v-else class="packet-footnote">{{ detail.got===detail.count?'红包已领完 · ':'' }}查看详情不会领取，领取结果以实际结算为准。</p>
     </div>
     <div v-else class="packet-state"><p>红包详情尚未就绪。</p></div>
   </FpDialog>

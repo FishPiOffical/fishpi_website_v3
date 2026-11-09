@@ -7,7 +7,24 @@ export interface PacketUser{id:string;userName:string;userNickname:string;userAv
 export interface ClaimResult{amount:number;claimedAt:number;gesture?:number;outcome?:'win'|'lose'|'tie';senderRefundPoints?:number}
 export interface ClaimReceipt extends ClaimResult{id:string}
 export interface CreateReceipt{id:string;createdAt:number;principalPoints:number;poolPoints:number;taxPoints:number}
-export interface PacketDetail extends CreateReceipt{type:PacketType;message:string;money:number;count:number;got:number;sender:PacketUser;claims:(ClaimResult&{user:PacketUser})[];currentUserClaim:ClaimResult|null;senderGesture?:number;recipientIds?:string[]}
+interface SettledPacketDetail extends CreateReceipt{legacy?:false;type:PacketType;message:string;money:number;count:number;got:number;sender:PacketUser;claims:(ClaimResult&{user:PacketUser})[];currentUserClaim:ClaimResult|null;senderGesture?:number;recipientIds?:string[]}
+interface ClassicPacketDetail {
+  legacy:true
+  id:string
+  type:PacketType|'dice'
+  message:string
+  money?:number
+  count:number
+  got:number
+  sender:PacketUser
+  claims:(ClaimResult&{user:PacketUser})[]
+  currentUserClaim:ClaimResult|null
+  senderGesture?:number
+  recipientIds?:never
+  poolPoints?:never
+  taxPoints?:never
+}
+export type PacketDetail = SettledPacketDetail | ClassicPacketDetail
 const invalid=()=>new ApiError('红包参数不合法',422),bad=()=>new ApiError('红包响应不正确',502)
 const unicode=(s:string)=>!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(s)
 export const packetRisk=(type:PacketType)=>type==='heartbeat'||type==='rockPaperScissors'
@@ -42,13 +59,28 @@ function user(value:unknown):PacketUser{const d=row(value),avatar=str(d.userAvat
 function keyHeaders(key:string){if(typeof key!=='string'||!/^[A-Za-z0-9._:-]{1,128}$/.test(key))throw invalid();return{'Idempotency-Key':key}}
 export async function createPacket(input:PacketInput,key:string,owner:string){const body=packetInput(input,owner),d=response(await request('/api/v3/chat/red-packets',{method:'POST',headers:keyHeaders(key),body:JSON.stringify(body)})),r=moneyData(d);if(r.principalPoints!==packetPrincipal(body))throw bad();return r}
 export async function claimPacket(id:string,type:PacketType,input:ClaimInput,key:string):Promise<ClaimReceipt>{packetId(id);const d=response(await request(`/api/v3/chat/red-packets/${id}/claims`,{method:'POST',headers:keyHeaders(key),body:JSON.stringify(packetClaimInput(type,input))}));if(d.id!==id)throw bad();return{id,...claimData(d,type)}}
-export async function packetDetail(id:string,owner:string,signal?:AbortSignal):Promise<PacketDetail>{packetId(id);const d=response(await request(`/api/v3/chat/red-packets/${id}`,{cache:'no-store',signal})),base=moneyData(d),type=d.type as PacketType;if(base.id!==id||!PACKET_TYPES.includes(type))throw bad();const count=num(d.count,type==='heartbeat'?5:1,100),got=num(d.got,0,count),sender=user(d.sender);if(!Array.isArray(d.claims)||d.claims.length!==got)throw bad()
+export async function packetDetail(id:string,owner:string,signal?:AbortSignal):Promise<PacketDetail>{packetId(id);const d=response(await request(`/api/v3/chat/red-packets/${id}`,{cache:'no-store',signal}));if(d.legacy===true)return classicDetail(d,id,owner);const base=moneyData(d),type=d.type as PacketType;if(base.id!==id||!PACKET_TYPES.includes(type))throw bad();const count=num(d.count,type==='heartbeat'?5:1,100),got=num(d.got,0,count),sender=user(d.sender);if(!Array.isArray(d.claims)||d.claims.length!==got)throw bad()
  const claims=d.claims.map(c=>{const value=row(c);return{...claimData(value,type),user:user(value.user)}});if(new Set(claims.map(c=>c.user.id)).size!==claims.length||claims.some((c,i)=>i>0&&c.claimedAt<claims[i-1]!.claimedAt))throw bad()
  const currentUserClaim=d.currentUserClaim===null?null:claimData(row(d.currentUserClaim),type),mine=claims.find(c=>c.user.id===owner);if(!!mine!==!!currentUserClaim||mine&&currentUserClaim&&JSON.stringify(claimData(row(mine),type))!==JSON.stringify(currentUserClaim))throw bad()
  if(type==='rockPaperScissors'&&claims.some(c=>![base.poolPoints,0,-base.poolPoints].includes(c.amount)||c.senderRefundPoints!==base.poolPoints-c.amount))throw bad()
  const money=num(d.money,type==='rockPaperScissors'?256:32,10240);if(type==='rockPaperScissors'&&count!==1||base.principalPoints!==money*(type==='average'||type==='specify'?count:1))throw bad()
- const result:PacketDetail={...base,type,message:str(d.message,20),money,count,got,sender,claims,currentUserClaim}
+ const result:SettledPacketDetail={...base,type,message:str(d.message,20),money,count,got,sender,claims,currentUserClaim}
  if(d.senderGesture!==undefined){if(type!=='rockPaperScissors'||sender.id!==owner&&got!==count)throw bad();result.senderGesture=num(d.senderGesture,0,2)}
  if(d.recipientIds!==undefined){if(type!=='specify'||sender.id!==owner||!Array.isArray(d.recipientIds)||d.recipientIds.length!==count)throw bad();result.recipientIds=d.recipientIds.map(identity);if(new Set(result.recipientIds).size!==count||result.recipientIds.includes(sender.id))throw bad()}
  return result
+}
+
+
+function classicDetail(d:Record<string,unknown>,id:string,owner:string):ClassicPacketDetail {
+  const type=d.type as ClassicPacketDetail['type']
+  if(d.id!==id || (type!=='dice'&&!PACKET_TYPES.includes(type)) || !Array.isArray(d.claims) || d.claims.length>1000)throw bad()
+  const count=num(d.count,1,2147483647),got=num(d.got,0,count)
+  const claims=d.claims.map(entry=>{
+    const value=row(entry)
+    return { user:user(value.user), amount:num(value.amount,-2147483648,2147483647), claimedAt:num(value.claimedAt) }
+  })
+  const mine=claims.find(claim=>claim.user.id===owner)
+  return {legacy:true,id,type,message:str(d.message),money:d.money===undefined?undefined:num(d.money,0,2147483647),count,got,sender:user(d.sender),claims,
+    currentUserClaim:mine?{amount:mine.amount,claimedAt:mine.claimedAt}:null,
+    ...(type==='rockPaperScissors'&&got===count&&d.senderGesture!==undefined?{senderGesture:num(d.senderGesture,0,2)}:{})}
 }
