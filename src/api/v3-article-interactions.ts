@@ -26,20 +26,27 @@ export async function writeArticleInteraction(kind:ArticleInteractionKind,id:str
   const result=data(await request(path(kind,id,resource),{method:kind === 'vote' ? choice === null ? 'DELETE' : 'PUT' : 'POST',headers:{'Idempotency-Key':key},...(kind === 'vote' && choice !== null ? {body:JSON.stringify({vote:choice})} : {})}),id)
   if (kind === 'vote') { if (voteState(result,id).vote !== choice) throw invalid() }
   else if (result[kind === 'thanks' ? 'thanked' : kind === 'accept' ? 'accepted' : 'rewarded'] !== true) throw invalid()
-  if (resource !== 'comments' || result.interaction === undefined) return
+  if (result.interaction === undefined) return
   if (result.interaction === null) return null
   const state = row(result.interaction)
   if (state.id !== id) throw invalid()
   if (kind === 'vote') return voteState(state, id)
   if (kind === 'thanks') {
-    return { kind, id, thanked: boolean(state.thanked), canThank: boolean(state.canThank),
+    return { kind, id, thanked: boolean(state.thanked), ...(resource === 'comments' ? {canThank:boolean(state.canThank)} : {}),
       thankCount: integer(state.thankCount), thankPoint: integer(state.thankPoint) }
   }
 }
 /** Reward HTML is only accepted from a fresh, currently authorized article detail. */
-export async function readArticleRewardHtml(id:string):Promise<string> {
+async function authorizedRewardDetail(id:string) {
   path('reward',id)
   const result=data(await request(`/api/v3/articles/${id}`,{cache:'no-store'}),id)
   if (result.rewarded !== true || typeof result.rewardContentHtml !== 'string') throw invalid()
-  return result.rewardContentHtml
+  return { html:result.rewardContentHtml, rewardPoint:result.rewardPoint }
+}
+export async function readArticleRewardDetail(id:string):Promise<{state:RewardState;html:string}> {
+  const { html, rewardPoint } = await authorizedRewardDetail(id)
+  return { state:{kind:'reward',id,rewarded:true,rewardPoint:integer(rewardPoint,Number.MIN_SAFE_INTEGER)}, html }
+}
+export async function readArticleRewardHtml(id:string):Promise<string> {
+  return (await authorizedRewardDetail(id)).html
 }

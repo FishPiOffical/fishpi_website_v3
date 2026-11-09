@@ -66,18 +66,53 @@ socket.onmessage({data:JSON.stringify({type:'notifications.changed',data:{}})});
 for(const ping of interval.values())ping();assert.equal(socket.sent.at(-1).type,'ping')
 stop();assert.equal(socket.closed,true);assert.equal(interval.size,0);assert.equal(timeout.size,0)
 console.log('PASS notices 4 exact query-free socket URL, ticket once in auth frame, ready/invalidation refresh, heartbeat and cleanup')
+for (const [channel, subscribe] of [['notifications', rt.subscribeNotificationChanges], ['messages', rt.subscribeMessageChanges]]) {
+  const ticket = {code:0,data:{ticket:'T'.repeat(43),path:'/api/v3/realtime',channel}}
+  let initialReads = 0, updates = 0
+  __noticeResponses.push(ticket)
+  const dispose = subscribe(() => updates++, () => initialReads++)
+  await tick()
+  const first = Socket.all.at(-1)
+  assert.equal(initialReads, 0)
+  first.onopen()
+  const ready = {data: JSON.stringify({type:'ready',data:{channel}})}
+  first.onmessage(ready)
+  assert.deepEqual([initialReads, updates], [1, 0])
+  first.onmessage({data: JSON.stringify({type:channel+'.changed'})})
+  assert.equal(updates, 1)
+  first.onclose()
+  __noticeResponses.push(ticket)
+  const [retryId, retry] = timeout.entries().next().value
+  timeout.delete(retryId)
+  retry()
+  await tick()
+  const next = Socket.all.at(-1)
+  next.onopen()
+  next.onmessage(ready)
+  assert.deepEqual([initialReads, updates], [1, 2])
+  dispose()
+
+  __noticeResponses.push(ticket)
+  const disposeFailed = subscribe(() => updates++, () => initialReads++)
+  await tick()
+  Socket.all.at(-1).onclose()
+  assert.equal(initialReads, 2)
+  disposeFailed()
+}
+console.log('PASS first ready reads each unread count once; events, reconnect and initial connection failure still reconcile')
+
 let resolveTicket;__noticeResponses.push(new Promise(resolve=>resolveTicket=resolve));const before=Socket.all.length
 const late=rt.subscribeNotificationChanges(()=>{});await tick();__noticeToken='B';late();resolveTicket({code:0,data:{ticket:'T'.repeat(43),path:'/api/v3/realtime',channel:'notifications'}});await tick();assert.equal(Socket.all.length,before)
 __noticeResponses.push({code:0,data:{ticket:'T'.repeat(43),path:'https://evil/realtime',channel:'notifications'}});const bad=rt.subscribeNotificationChanges(()=>{});await tick();assert.equal(Socket.all.length,before);bad();assert.equal(timeout.size,0)
 console.log('PASS notices 5 stale ticket cannot create a socket for a new identity; foreign path rejected and retry cancelled')
-const subRealm=moduleUrl('export function subscribeNotificationChanges(fn){globalThis.__noticeSubscriptions.push(fn);return()=>globalThis.__noticeClosed++}')
+const subRealm=moduleUrl('export function subscribeNotificationChanges(fn, initial){globalThis.__noticeSubscriptions.push({fn, initial});return()=>globalThis.__noticeClosed++}')
 const countRealm=moduleUrl('export async function fetchV3UnreadCount(){return globalThis.__noticeCountResponses.shift()}')
 globalThis.__noticeSubscriptions=[];globalThis.__noticeClosed=0;globalThis.__noticeCountResponses=[];__noticeToken=null
 let storeSource=env(await fs.readFile('src/stores/notices.ts','utf8')).replace("from '@/api/http'",`from '${shim}'`).replace("from '@/api/v3-notifications'",`from '${countRealm}'`).replace("from '@/api/v3-realtime'",`from '${subRealm}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`)
 const {useNoticeStore}=await import(moduleUrl(storeSource));setActivePinia(createPinia());const store=useNoticeStore()
 const publish=token=>{__noticeToken=token;for(const fn of __noticeListeners)fn(token)}
 let resolveA,resolveB;__noticeCountResponses.push(new Promise(r=>resolveA=r),new Promise(r=>resolveB=r))
-publish('A');publish('B');resolveB({unreadNotificationCnt:2});await tick();resolveA({unreadNotificationCnt:99});await tick();assert.equal(store.total,2)
+publish('A');__noticeSubscriptions.at(-1).initial();publish('B');__noticeSubscriptions.at(-1).initial();resolveB({unreadNotificationCnt:2});await tick();resolveA({unreadNotificationCnt:99});await tick();assert.equal(store.total,2)
 publish(null);assert.equal(store.total,0);assert.equal(store.loading,false);assert.equal(store.error,'');assert.ok(__noticeClosed>=2)
 store.$dispose();assert.equal(__noticeListeners.size,0)
 console.log('PASS notices 6 actual Pinia store clears synchronously and refuses late prior-owner unread responses after identity changes/logout/disposal')

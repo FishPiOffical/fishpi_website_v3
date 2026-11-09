@@ -316,6 +316,15 @@ export interface ParagraphCommentPage {
 }
 
 export interface ArticleDetail extends ArticleSummary {
+  interactionReadStarted?: number
+  interactions?: {
+    vote?: import('./v3-article-interactions').VoteState
+    thanks?: import('./v3-article-interactions').ThanksState
+    reward: import('./v3-article-interactions').RewardState
+    reactions?: import('./v3-reactions').ReactionState
+    collection?: boolean
+    subscription?: boolean
+  }
   articleContent?: string
   articleOriginalContent?: string
   articleToC?: string
@@ -561,8 +570,8 @@ export interface TagItem {
 export type RepeaterItem = RepeaterEntry
 export function fetchRepeaterItems(type = '') { return repeaterList(type as import('./v3-repeater').RepeaterKind) }
 
-export async function fetchArticle(id: string, page = 1): Promise<ArticleDetail> {
-  return v3Article(id, page)
+export async function fetchArticle(id: string, page = 1, includeInteractions = false): Promise<ArticleDetail> {
+  return v3Article(id, page, includeInteractions)
 }
 
 

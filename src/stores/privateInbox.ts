@@ -28,7 +28,7 @@ export const usePrivateInboxStore=defineStore('private-inbox',()=>{
  function disconnect(){clearTimeout(refreshTimer);refreshTimer=undefined;stopSubscription?.();stopSubscription=null}
  function clear(){generation++;sequence++;dirty=false;loading.value=false;unreadTotal.value=null;error.value='';revision.value=0;inboxOpen.value=false;inboxPeer.value='';inboxPeerId.value='';disconnect()}
  function showInbox(name='',id=''){if(!active())return;inboxPeer.value=name;inboxPeerId.value=id;inboxOpen.value=true}
- function bind(){const next=getAuthContextVersion(),actor=account.value?.oId;if(!active()||next!==boundary||actor!==owner)clear();else{generation++;sequence++;dirty=false;loading.value=false;disconnect()}boundary=next;owner=actor;if(active()){void refreshUnread();const run=generation;stopSubscription=subscribeMessageChanges(()=>{if(run===generation)scheduleRefresh()})}}
+ function bind(){const next=getAuthContextVersion(),actor=account.value?.oId;if(!active()||next!==boundary||actor!==owner)clear();else{generation++;sequence++;dirty=false;loading.value=false;disconnect()}boundary=next;owner=actor;if(active()){const run=generation;stopSubscription=subscribeMessageChanges(()=>{if(run===generation)scheduleRefresh()},()=>{if(run===generation)void refreshUnread()})}}
  const stopAuth=watch([accessToken,()=>account.value?.oId],bind,{flush:'sync',immediate:true})
  const stopWrites=watch(()=>writes.revision,()=>{if(writes.completed)invalidate()},{flush:'post'})
  const focus=scheduleRefresh;if(!import.meta.env.SSR)window.addEventListener('focus',focus)

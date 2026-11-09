@@ -224,12 +224,39 @@ export async function v3Tags(page = 1, size = 50, credentials?: RequestCredentia
   const data = decodeV3ContentPage(await get(`/api/v3/tags?${params(page, size)}`, credentials))
   return { tags: data.list.map(adaptV3Tag), total: data.pagination.total }
 }
-export async function v3Article(articleId: string, page = 1): Promise<ArticleDetail> {
+async function articleInteractions(detail: Row, articleId: string): Promise<ArticleDetail['interactions']> {
+  if (detail.interactions === undefined) return
+  const snapshot = row(detail.interactions)
+  const result: NonNullable<ArticleDetail['interactions']> = {
+    reward: { kind: 'reward', id: articleId, rewarded: bool(detail.rewarded), rewardPoint: number(detail.rewardPoint) },
+  }
+  if (snapshot.vote !== undefined) {
+    const vote = row(snapshot.vote)
+    if (vote.id !== articleId || (vote.vote !== null && vote.vote !== 'up' && vote.vote !== 'down')) throw invalid()
+    result.vote = { kind: 'vote', id: articleId, vote: vote.vote, upCount: number(vote.upCount), downCount: number(vote.downCount) }
+  }
+  if (snapshot.thanks !== undefined) {
+    const thanks = row(snapshot.thanks)
+    if (thanks.id !== articleId) throw invalid()
+    result.thanks = { kind: 'thanks', id: articleId, thanked: bool(thanks.thanked),
+      thankCount: number(thanks.thankCount), thankPoint: number(thanks.thankPoint) }
+  }
+  if (snapshot.reactions !== undefined) result.reactions = (await import('./v3-reactions')).decodeArticleReactionSnapshot(snapshot.reactions, articleId)
+  for (const kind of ['collection', 'subscription'] as const) {
+    if (snapshot[kind] === undefined) continue
+    const relation = row(snapshot[kind])
+    if (relation.targetId !== articleId) throw invalid()
+    result[kind] = bool(relation.following)
+  }
+  return result
+}
+
+export async function v3Article(articleId: string, page = 1, includeInteractions = false): Promise<ArticleDetail> {
   const path = pathId(articleId), paging = params(page, 20)
   if (page > 42949672) throw new ApiError('页码不合法', 422)
   const interactionReadStarted = performance.now()
   const [raw, rawComments] = await Promise.all([
-    get(`/api/v3/articles/${path}`),
+    get(`/api/v3/articles/${path}${includeInteractions ? '?includeInteractions=true' : ''}`),
     get(`/api/v3/articles/${path}/comments?${paging}&sort=oldest`),
   ])
   const detail = row(raw), comments = decodeV3ContentPage(rawComments)
@@ -265,6 +292,7 @@ export async function v3Article(articleId: string, page = 1): Promise<ArticleDet
     articleRewardPoint: number(detail.rewardPoint), rewarded,
     articleRewardContent: rewarded ? text(detail.rewardContentHtml) : '',
     ...question,
+    ...(includeInteractions ? { interactions: await articleInteractions(detail, articleId), interactionReadStarted } : {}),
     articleComments: commentList,
     pagination: { paginationCurrentPageNum: comments.pagination.p, paginationPageCount: comments.pagination.pageCount },
   }

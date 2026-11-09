@@ -2,14 +2,14 @@ import { ApiError, getAccessToken, request } from './http'
 import { decodeChatMessage, type ChatMessage } from './v3-chat-messages'
 
 /** A ticket goes only in the first socket frame, never in a URL or persistent storage. */
-export function subscribeNotificationChanges(changed: () => void): () => void {
-  return subscribeChanges('notifications','/api/v3/realtime/tickets',changed)
+export function subscribeNotificationChanges(changed: () => void, initialRead?: () => void): () => void {
+  return subscribeChanges('notifications','/api/v3/realtime/tickets',changed,undefined,undefined,undefined,undefined,initialRead)
 }
 export function subscribeArticleChanges(articleId:string,changed:()=>void,unavailable?:()=>void):()=>void {
   if(!/^[0-9]{1,32}$/.test(articleId))throw new ApiError('文章ID不合法',422)
   return subscribeChanges('article',`/api/v3/articles/${articleId}/realtime-ticket`,changed,articleId,undefined,undefined,unavailable)
 }
-export function subscribeMessageChanges(changed:()=>void):()=>void {return subscribeChanges('messages','/api/v3/me/messages/realtime-ticket',changed)}
+export function subscribeMessageChanges(changed:()=>void,initialRead?:()=>void):()=>void {return subscribeChanges('messages','/api/v3/me/messages/realtime-ticket',changed,undefined,undefined,undefined,undefined,initialRead)}
 export interface ChatBarrageEvent{id:string;content:string;color:string;createdAt:number;author:{id:string;userName:string;userNickname:string;userAvatarURL:string}}
 export type ChatRealtimeEvent =
   | { type: 'sync' }
@@ -30,12 +30,17 @@ export type ChatRealtimeState='connecting'|'ready'|'closed'|'blocked'
 export function subscribeChatChanges(event:(value:ChatRealtimeEvent)=>void,state:(value:ChatRealtimeState)=>void):()=>void{
  return subscribeChanges('chat','/api/v3/chat/realtime-ticket',()=>{},undefined,event,state)
 }
-function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',path:string,changed:()=>void,articleId?:string,chatEvent?:(value:ChatRealtimeEvent)=>void,connectionState?:(value:ChatRealtimeState)=>void,unavailable?:()=>void):()=>void {
-  if (import.meta.env.SSR || typeof WebSocket === 'undefined') return () => {}
+function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',path:string,changed:()=>void,articleId?:string,chatEvent?:(value:ChatRealtimeEvent)=>void,connectionState?:(value:ChatRealtimeState)=>void,unavailable?:()=>void,initialRead?:()=>void):()=>void {
+  if (import.meta.env.SSR) return () => {}
+  const unreadChannel = channel === 'notifications' || channel === 'messages'
+  if (typeof WebSocket === 'undefined') {
+    if (getAccessToken()) initialRead?.()
+    return () => {}
+  }
   const token = getAccessToken()
   if (!token) return () => {}
   let stopped = false, attempts = 0, sequence = 0
-  let hasConnected = false
+  let hasConnected = false, initialUnreadFallback = false
   let socket: WebSocket | null = null
   let retry: ReturnType<typeof setTimeout> | null = null
   let deadline: ReturnType<typeof setTimeout> | null = null
@@ -55,6 +60,11 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
   function reconnect() {
     retire()
     if (!current() || retry) return
+    // Without a live subscription, still give the unread badges one HTTP read.
+    if (initialRead && !hasConnected && !initialUnreadFallback) {
+      initialUnreadFallback = true
+      initialRead()
+    }
     retry = setTimeout(() => { retry = null; void connect() }, Math.min(1000 * 2 ** Math.min(attempts++, 5), 30_000))
   }
   async function connect() {
@@ -96,8 +106,9 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
             heartbeat = setInterval(() => { if (valid() && transport.readyState === WebSocket.OPEN) transport.send('{"type":"ping"}') }, 25_000)
             const reconnecting = hasConnected
             hasConnected = true
-            // Article reads already start on page load. Reconcile only after an established connection drops.
-            if (channel !== 'article' || reconnecting) changed()
+            // For unread badges, ready starts the initial read or reconciles a disconnected interval.
+            if (unreadChannel && !reconnecting && !initialUnreadFallback && initialRead) initialRead()
+            else if (channel !== 'article' || reconnecting) changed()
           } else if(authenticated&&channel==='chat'){
             if(message.type==='chat.barrager'){const barrage=barrageEvent(message.data);if(barrage)chatEvent?.({type:'barrage',barrage});return}
             if(message.type==='chat.sync_required'){chatEvent?.({type:'sync'});return}
@@ -127,7 +138,12 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
         unavailable?.()
         return
       }
-      if (error instanceof ApiError && ([401, 403, 429].includes(error.status) || error.code === 'captcha' || error.code === 'home_reads_paused')) { retire(); connectionState?.('blocked'); return }
+      if (error instanceof ApiError && ([401, 403, 429].includes(error.status) || error.code === 'captcha' || error.code === 'home_reads_paused')) {
+        retire()
+        connectionState?.('blocked')
+        if (error.status === 403 && error.code !== 'captcha' && !hasConnected && !initialUnreadFallback) initialRead?.()
+        return
+      }
       reconnect()
     }
   }

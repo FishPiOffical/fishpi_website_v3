@@ -651,7 +651,7 @@ function chapterTitle(c: LongArticleChapter) {
         </section>
 
         <div class="la-reaction">
-          <V3ReactionBar kind="article" :target-id="article.oId" />
+          <V3ReactionBar kind="article" :target-id="article.oId" :initial-state="article.interactions?.reactions" :initial-read-started="article.interactionReadStarted" />
         </div>
 
         <p v-if="actionMsg" class="la-action-msg">{{ actionMsg }}</p>
@@ -883,11 +883,11 @@ function chapterTitle(c: LongArticleChapter) {
           <span>更多</span>
         </button>
         <div class="la-more" :class="{ open: moreOpen }" :aria-hidden="!moreOpen">
-          <ContentRelationButton kind="collection" :target="article.oId" />
-          <ContentRelationButton kind="subscription" :target="article.oId" />
+          <ContentRelationButton kind="collection" :target="article.oId" :initial-following="article.interactions?.collection" :initial-read-started="article.interactionReadStarted" />
+          <ContentRelationButton kind="subscription" :target="article.oId" :initial-following="article.interactions?.subscription" :initial-read-started="article.interactionReadStarted" />
           <template v-if="loggedIn">
-            <ArticleInteraction kind="vote" :article-id="article.oId" />
-            <ArticleInteraction kind="thanks" :article-id="article.oId" />
+            <ArticleInteraction kind="vote" :article-id="article.oId" :initial-state="article.interactions?.vote" :initial-read-started="article.interactionReadStarted" />
+            <ArticleInteraction kind="thanks" :article-id="article.oId" :initial-state="article.interactions?.thanks" :initial-read-started="article.interactionReadStarted" />
             <div class="la-owner-actions"><slot name="owner-actions" /></div>
             <RouterLink v-if="canEdit" :to="`/post/${article.oId}`" class="la-more-item">✏️ <span>编辑</span></RouterLink>
             <span class="la-more-item la-more-report">

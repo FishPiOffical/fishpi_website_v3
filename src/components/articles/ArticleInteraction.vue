@@ -3,11 +3,11 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { getAuthContextVersion } from '@/api/http'
-import { readArticleInteraction, readArticleRewardHtml, type ArticleInteractionKind, type ArticleInteractionState, type VoteChoice, type InteractionResource } from '@/api/v3-article-interactions'
+import { readArticleInteraction, readArticleRewardDetail, readArticleRewardHtml, type ArticleInteractionKind, type ArticleInteractionState, type VoteChoice, type InteractionResource } from '@/api/v3-article-interactions'
 import { fpConfirm } from '@/composables/useDialog'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ArticleInteractionsStore } from '@/stores/v3ArticleInteractions'
-const props = withDefaults(defineProps<{ kind:ArticleInteractionKind; articleId:string; initialPrice?:number; resource?:InteractionResource; initialReadStarted?: number; initialState?: ArticleInteractionState | null }>(),{initialPrice:0,resource:'articles'})
+const props = withDefaults(defineProps<{ kind:ArticleInteractionKind; articleId:string; initialPrice?:number; initialHtml?:string; resource?:InteractionResource; initialReadStarted?: number; initialState?: ArticleInteractionState | null }>(),{initialPrice:0,resource:'articles'})
 const emit = defineEmits<{ contentClick:[event:MouseEvent]; accepted:[] }>()
 const route = useRoute(), { accessToken, account } = storeToRefs(useAuthStore()), operations = useV3ArticleInteractionsStore()
 const mounted=ref(false), state=ref<ArticleInteractionState|null>(null), loading=ref(false), confirming=ref(false), error=ref(''), html=ref('')
@@ -30,6 +30,7 @@ function applyInitial() {
     return
   }
   state.value = loggedIn.value ? props.initialState : null
+  html.value = state.value?.kind === 'reward' && state.value.rewarded ? props.initialHtml ?? '' : ''
 }
 function clear(keepState=false){ confirmation?.abort(); confirmation=null; sequence++; if(!keepState)state.value=null; html.value=''; error.value=''; loading.value=false; confirming.value=false }
 async function load(afterWrite=false){
@@ -38,6 +39,12 @@ async function load(afterWrite=false){
   const valid=()=>mounted.value && loggedIn.value && current === sequence && reader === identity()
   loading.value=true; error.value=''; if(!afterWrite)state.value=null; html.value=''
   try {
+    // A confirmed purchase still needs a current authorized read of its unlocked HTML.
+    if (afterWrite && kind === 'reward' && props.initialState?.kind === 'reward') {
+      const result = await readArticleRewardDetail(id)
+      if (valid()) { lastReceiptAt = performance.now(); state.value = result.state; html.value = result.html }
+      return
+    }
     const result=await readArticleInteraction(kind,id,props.resource)
     if (!valid()) return
     const content=result.kind === 'reward' && result.rewarded ? await readArticleRewardHtml(id) : ''

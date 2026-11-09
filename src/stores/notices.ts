@@ -41,13 +41,13 @@ export const useNoticeStore = defineStore('notices', () => {
     refreshTimer = setTimeout(invalidate, 100)
   }
   function disconnect() { stopSubscription?.(); stopSubscription = null }
-  function connect() { disconnect(); stopSubscription = subscribeNotificationChanges(scheduleRefresh) }
+  function connect() { disconnect(); stopSubscription = subscribeNotificationChanges(scheduleRefresh, refresh) }
   function clear() {
     clearTimeout(refreshTimer); refreshTimer = undefined
     generation++; sequence++; unread.value = {}; error.value = ''; loading.value = false; warnBroadcast.value = null
     revision.value++; disconnect()
   }
-  const unsubscribe = onAccessTokenChange((token) => { clear(); if (token) { void refresh(); connect() } })
+  const unsubscribe = onAccessTokenChange((token) => { clear(); if (token) connect() })
   const focus = scheduleRefresh
   if (!import.meta.env.SSR) window.addEventListener('focus', focus)
   onScopeDispose(() => { unsubscribe(); clear(); if (!import.meta.env.SSR) window.removeEventListener('focus', focus) })

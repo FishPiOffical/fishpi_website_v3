@@ -91,13 +91,18 @@ async function restore(){
 }
 watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.targetId],()=>{const next=identity();if(next===boundary)return;boundary=next;lastReceiptAt=-1;clear();if(authenticated.value&&props.initialState===undefined)void load()},{flush:'sync'})
 watch(()=>operations.lastChange,change=>{if(change.kind===props.kind&&change.id===props.targetId){if(authenticated.value){clear(true);if(change.snapshot!==undefined){lastReceiptAt=performance.now();state.value=change.snapshot;}else void load(change.confirmed)}else clear()}},{flush:'sync'})
+function applyInitial() {
+  state.value = props.initialState ?? null
+  if (!authenticated.value) return
+  if (props.initialState === undefined) void load()
+  else if (props.kind === 'article' && props.initialState) void operations.loadOptions().catch(() => {})
+}
 watch(() => props.initialState, () => {
   if (props.initialState && (props.initialReadStarted ?? Infinity) <= lastReceiptAt) return
   clear()
-  state.value = props.initialState ?? null
-  if (authenticated.value && props.initialState === undefined) void load()
+  applyInitial()
 })
-onMounted(()=>{mounted.value=true;boundary=identity();state.value=props.initialState??null;if(authenticated.value&&props.initialState===undefined)void load();if(typeof document!=='undefined'){document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);document.addEventListener('scroll',scrollOutside,true)}if(typeof window!=='undefined')window.addEventListener?.('resize',resize)})
+onMounted(()=>{mounted.value=true;boundary=identity();applyInitial();if(typeof document!=='undefined'){document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);document.addEventListener('scroll',scrollOutside,true)}if(typeof window!=='undefined')window.addEventListener?.('resize',resize)})
 onBeforeUnmount(()=>{mounted.value=false;clear();if(typeof document!=='undefined'){document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);document.removeEventListener('scroll',scrollOutside,true)}if(typeof window!=='undefined')window.removeEventListener?.('resize',resize)})
 </script>
 <template>

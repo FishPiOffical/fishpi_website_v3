@@ -5,16 +5,22 @@ import { getAuthContextVersion } from '@/api/http'
 import { readContentRelation, resolveContentRelationTarget, type ContentRelationKind } from '@/api/v3-content-relations'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ContentRelationsStore } from '@/stores/v3ContentRelations'
-const props = defineProps<{ kind:ContentRelationKind;target:string }>()
+const props = withDefaults(defineProps<{ kind:ContentRelationKind;target:string;initialFollowing?:boolean;initialReadStarted?:number }>(), { initialFollowing: undefined })
 const { accessToken, account } = storeToRefs(useAuthStore()), operations = useV3ContentRelationsStore()
 const mounted = ref(false), targetId = ref(''), following = ref<boolean | null>(null), loading = ref(false), error = ref('')
 const visible = computed(() => mounted.value && !!accessToken.value && !!account.value)
 const pending = computed(() => operations.commands[props.kind+':'+targetId.value])
 const action=computed(()=>props.kind==='tag'?'关注标签':props.kind==='collection'?'收藏':'订阅')
 const label=computed(()=>pending.value?pending.value.busy?'正在提交…':`重试本次${pending.value.following?'':'取消'}${action.value}`:following.value!==null?`${following.value?'取消':''}${action.value}`:loading.value?'读取状态…':'重读状态')
-let sequence = 0, boundary = ''
+let sequence = 0, boundary = '', lastReceiptAt = -1
 function identity() { return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId || ''}:${props.kind}:${props.target}` }
 function clear(keepTarget=false) { sequence++; if(!keepTarget)targetId.value = ''; following.value = null; loading.value = false; error.value = '' }
+function applyInitial() {
+  if (!visible.value) return
+  if (props.initialFollowing === undefined || props.kind === 'tag') { void load(); return }
+  targetId.value = props.target
+  following.value = props.initialFollowing
+}
 async function load(afterWrite = false) {
   if (!visible.value || loading.value) return
   const current = ++sequence, reader = identity(), target = props.target, kind=props.kind
@@ -37,9 +43,20 @@ async function submit() {
   catch (err) { if (mounted.value && reader === identity()) error.value = err instanceof Error ? err.message : '关系操作失败' }
 }
 function activate() { if (loading.value || pending.value?.busy) return; if (pending.value || following.value !== null) void submit(); else void load() }
-watch([accessToken, () => account.value?.oId, () => props.target, () => props.kind], () => { const next = identity(); if (next === boundary) return; boundary = next; clear(); void load() }, {flush:'sync'})
-watch(() => operations.lastChange, change => { if (change.kind===props.kind && change.targetId && change.targetId === targetId.value) { clear(true); void load(true) } }, {flush:'sync'})
-onMounted(() => { mounted.value = true; boundary = identity(); void load() })
+watch([accessToken, () => account.value?.oId, () => props.target, () => props.kind], () => { const next = identity(); if (next === boundary) return; boundary = next; lastReceiptAt = -1; clear(); if (props.initialFollowing === undefined) void load() }, {flush:'sync'})
+watch(() => operations.lastChange, change => {
+  if (change.kind !== props.kind || !change.targetId || change.targetId !== targetId.value) return
+  clear(true)
+  if (change.following === undefined) { void load(true); return }
+  lastReceiptAt = performance.now()
+  following.value = change.following
+}, {flush:'sync'})
+watch([() => props.initialFollowing, () => props.initialReadStarted], () => {
+  if ((props.initialReadStarted ?? Infinity) <= lastReceiptAt) return
+  clear()
+  applyInitial()
+})
+onMounted(() => { mounted.value = true; boundary = identity(); applyInitial() })
 onBeforeUnmount(() => { mounted.value = false; clear() })
 </script>
 <template>

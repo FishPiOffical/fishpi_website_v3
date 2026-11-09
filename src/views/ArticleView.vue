@@ -236,9 +236,9 @@ function connectHeat() {
  stopArticle?.();subscriptionKey=key
  stopArticle=subscribeArticleChanges(target,()=>{
   if(subscriptionKey!==key||reader!==viewerIdentity.value||target!==id.value)return
-  reactionEvents.invalidate('article',target)
+  if (!article.value?.interactions?.reactions) reactionEvents.invalidate('article',target)
   const comments = article.value?.articleComments || []
-  if (comments.some(comment => comment.interactions !== undefined)) {
+  if (article.value?.interactions || comments.some(comment => comment.interactions !== undefined)) {
     void load(true, 'realtime')
     readerRef.value?.refreshParagraphComments()
     return
@@ -282,7 +282,7 @@ async function load(force=false,reason:'comments'|'owner'|'realtime'|'public'='c
   error.value = ''
   if(force){if(reason==='owner')ownerRefreshError.value='';else if(reason==='realtime'||reason==='public')realtimeReadError.value='';else commentRefreshError.value=''}
   try {
-    const data = await fetchArticle(reqId, requestedPage)
+    const data = await fetchArticle(reqId, requestedPage, !!accessToken.value)
     if (!current()) return
     article.value = data; heat.value = null; loading.value = false
     void buildToc(); void refreshHeat(); connectHeat()
@@ -439,7 +439,7 @@ function itemHandlers(c: ArticleComment) {
       <p v-if="ownerRefreshError" role="alert">{{ ownerRefreshError }} <button type="button" @click="load(true,'owner')">重读文章状态</button></p>
     </DefineOwnerActions>
     <DefineReward>
-      <ArticleInteraction kind="reward" :article-id="article.oId" :initial-price="Number(article.articleRewardPoint || 0)" @content-click="onContentClick" />
+      <ArticleInteraction kind="reward" :article-id="article.oId" :initial-price="Number(article.articleRewardPoint || 0)" :initial-state="article.interactions?.reward" :initial-html="article.articleRewardContent" :initial-read-started="article.interactionReadStarted" @content-click="onContentClick" />
     </DefineReward>
     <DefineComments>
       <p v-if="commentRefreshError" role="alert">{{ commentRefreshError }}<button type="button" @click="load(true)">重读评论</button></p>
@@ -602,11 +602,11 @@ function itemHandlers(c: ArticleComment) {
           <div class="tail-main-row">
             <div class="actions">
               <template v-if="isLoggedIn">
-                <ArticleInteraction kind="vote" :article-id="article.oId" />
-                <ArticleInteraction kind="thanks" :article-id="article.oId" />
+                <ArticleInteraction kind="vote" :article-id="article.oId" :initial-state="article.interactions?.vote" :initial-read-started="article.interactionReadStarted" />
+                <ArticleInteraction kind="thanks" :article-id="article.oId" :initial-state="article.interactions?.thanks" :initial-read-started="article.interactionReadStarted" />
               </template>
-              <ContentRelationButton kind="collection" :target="article.oId" />
-              <ContentRelationButton kind="subscription" :target="article.oId" />
+              <ContentRelationButton kind="collection" :target="article.oId" :initial-following="article.interactions?.collection" :initial-read-started="article.interactionReadStarted" />
+              <ContentRelationButton kind="subscription" :target="article.oId" :initial-following="article.interactions?.subscription" :initial-read-started="article.interactionReadStarted" />
               <template v-if="isLoggedIn">
                 <ReuseOwnerActions />
                 <RouterLink v-if="canEdit" class="btn small edit-btn" :to="`/post/${article.oId}`">编辑</RouterLink>
@@ -625,7 +625,7 @@ function itemHandlers(c: ArticleComment) {
 
         <!-- 表情回应栏 -->
         <div class="reaction-wrap">
-          <V3ReactionBar kind="article" :target-id="article.oId" />
+          <V3ReactionBar kind="article" :target-id="article.oId" :initial-state="article.interactions?.reactions" :initial-read-started="article.interactionReadStarted" />
         </div>
 
         <!-- 作者信息卡片 (对齐现网 Rhythm .article__meta) -->

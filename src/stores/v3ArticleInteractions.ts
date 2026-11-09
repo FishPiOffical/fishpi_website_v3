@@ -37,7 +37,7 @@ export const useV3ArticleInteractionsStore = defineStore('v3-article-interaction
     try {
       const snapshot = await writeArticleInteraction(kind,targetId,choice,stored.key,resource)
       if (valid()) { delete commands.value[identity]; lastChange.value = { targetId, kind, resource, revision:lastChange.value.revision + 1, snapshot }
-        if (kind !== 'vote' && snapshot === undefined) {
+        if (kind !== 'vote' && (resource === 'articles' || snapshot === undefined)) {
           try { await auth.reloadAccount() }
           catch { if (valid()) balanceError.value = '操作已确认，当前余额刷新失败，请到积分页核对。' }
         }

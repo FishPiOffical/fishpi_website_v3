@@ -8,9 +8,9 @@ type Command = { following: boolean; key: string; busy: boolean; error: string }
 /** Only unresolved explicit commands persist across SPA views; never persist credentials or relationship snapshots. */
 export const useV3ContentRelationsStore = defineStore('v3-content-relations', () => {
   const { accessToken, account } = storeToRefs(useAuthStore())
-  const commands = ref<Record<string,Command>>({}), lastChange = ref({ targetId:'', kind:'' as ContentRelationKind|'', revision:0 })
+  const commands = ref<Record<string,Command>>({}), lastChange = ref({ targetId:'', kind:'' as ContentRelationKind|'', revision:0, following:undefined as boolean | null | undefined })
   let generation = 0, boundary = getAuthContextVersion(), owner = account.value?.oId
-  function reset() { generation++; commands.value = {}; lastChange.value = { targetId:'', kind:'', revision:lastChange.value.revision + 1 } }
+  function reset() { generation++; commands.value = {}; lastChange.value = { targetId:'', kind:'', revision:lastChange.value.revision + 1, following:undefined } }
   const stop = watch([accessToken, () => account.value?.oId], () => {
     const next = getAuthContextVersion(), id = account.value?.oId
     if (!accessToken.value || next !== boundary || id !== owner) reset()
@@ -32,8 +32,8 @@ export const useV3ContentRelationsStore = defineStore('v3-content-relations', ()
     const stored = commands.value[identity]!
     stored.busy = true; stored.error = ''
     try {
-      await setContentRelation(kind,targetId,following,stored.key)
-      if (valid()) { delete commands.value[identity]; lastChange.value = { targetId, kind, revision:lastChange.value.revision + 1 } }
+      const snapshot = await setContentRelation(kind,targetId,following,stored.key)
+      if (valid()) { delete commands.value[identity]; lastChange.value = { targetId, kind, revision:lastChange.value.revision + 1, following:snapshot } }
     } catch (error) {
       if (valid()) {
         stored.error = error instanceof Error ? error.message : '关系操作失败'

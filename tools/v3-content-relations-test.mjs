@@ -37,7 +37,7 @@ const renderer=createRenderer({patchProp(el,k,old,v){el.props[k]=v},insert,remov
 const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' ')
 const find=(n,fn)=>fn(n)?n:(n.children||[]).map(c=>find(c,fn)).find(Boolean)
 const tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()}
-function mount(pinia=createPinia(),target='2',kind='collection'){const root={children:[]},app=renderer.createApp(component,{target,kind});app.use(pinia);const user=auth(pinia);app.mount(root);return{root,app,user,text:()=>text(root),click:()=>find(root,n=>n.tag==='button').props.onClick()}}
+function mount(pinia=createPinia(),target='2',kind='collection',extra={}){const root={children:[]},app=renderer.createApp(component,{target,kind,...extra});app.use(pinia);const user=auth(pinia);app.mount(root);return{root,app,user,text:()=>text(root),click:()=>find(root,n=>n.tag==='button').props.onClick()}}
 
 const click=(view,label)=>{const button=find(view.root,n=>n.tag==='button'&&text(n).trim()===label);assert.ok(button,'Missing '+label);button.props.onClick()}
 let actual=false,writes=[],lose=true,readFail=false;state.dispatch=async(path,init)=>{if(init?.method){writes.push({method:init.method,key:init.headers['Idempotency-Key']});if(lose){lose=false;actual=true;throw Error('响应丢失')}return env({following:init.method==='PUT',changed:true})}if(readFail)throw Error('状态读取503');return env({targetId:path.endsWith('/2')?'2':'3',following:actual})}
@@ -62,3 +62,21 @@ console.log('PASS content relations 8 tag directory resolution and all resource 
 
 pinia=createPinia();store=useV3ContentRelationsStore(pinia);let releaseRead,readCalls=0;state.dispatch=(path,init)=>{if(init?.method)return env({following:true,changed:true});readCalls++;if(readCalls===1)return new Promise(resolve=>releaseRead=resolve);return env({targetId:'2',following:false})};view=mount(pinia);await tick();assert.ok(releaseRead);await store.set('collection','2',true);await tick();assert.equal(readCalls,2);releaseRead(env({targetId:'2',following:true}));await tick();assert.ok(!view.text().includes('取消收藏'));assert.match(view.text(),/收藏/);view.app.unmount();
 console.log('PASS content relations 9 another component commit invalidates an in-flight state read, re-reads and rejects the delayed earlier snapshot')
+
+pinia=createPinia()
+store=useV3ContentRelationsStore(pinia)
+readCalls=0
+state.dispatch=(path,init)=>{
+  if(init?.method)return env({following:true,changed:true,interaction:{targetId:'2',following:true}})
+  readCalls++
+  return env({targetId:'2',following:false})
+}
+view=mount(pinia,'2','collection',{initialFollowing:false,initialReadStarted:performance.now()})
+await tick()
+assert.equal(readCalls,0)
+await store.set('collection','2',true)
+await tick()
+assert.equal(readCalls,0)
+assert.match(view.text(),/取消收藏/)
+view.app.unmount()
+console.log('PASS article relation snapshots and write receipts avoid standalone reads')
