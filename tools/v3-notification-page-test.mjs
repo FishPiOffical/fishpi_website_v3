@@ -22,10 +22,10 @@ async function mount(){
  const source=(await fs.readFile('src/views/NotificationsView.vue','utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
  let js=compile(source).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`).replace("from 'vue-router'",`from '${router}'`).replace("from '@/api/http'",`from '${http}'`).replace("from '@/stores/auth'",`from '${authModule}'`).replace("from '@/stores/notices'",`from '${noticeModule}'`).replace("from '@/api/v3-notifications'",`from '${api}'`).replace("from '@/components/FpLoading.vue'",`from '${empty}'`).replace("from '@/components/notifications/NoticeIcon.vue'",`from '${empty}'`).replace("from '@/utils/avatar'",`from '${avatar}'`)
  const imports=[...js.matchAll(/^import .+;$/gm)].map(m=>m[0]).join('\n');js=js.replace(/^import .+;$/gm,'')
- const mod=await import(url(`${imports}\nexport default{setup(){${js}\nreturn{type,page,items,error,marking,readType,readAll,pendingReadKeys}},render(){return null}}`))
+ const mod=await import(url(`${imports}\nexport default{setup(){${js}\nreturn{type,page,items,error,marking,readFailed,readType,readAll,pendingReadKeys,selectType,tabs}},render(){return null}}`))
  const app=renderer.createApp(mod.default);app.use(createPinia());return{app,vm:app.mount({})}
 }
-let view=await mount();await tick();view.vm.page=2;await tick();await view.vm.readType();assert.match(view.vm.error,/ACK/);const original=state.writes[0];auth.accessToken='A-refreshed';await tick();assert.equal(view.vm.page,2,'normal refresh reset notification pagination');await view.vm.readType();assert.deepEqual(state.writes[1],original,'normal refresh changed unknown bulk-read recovery key');view.app.unmount()
+let view=await mount();await tick();view.vm.page=2;await tick();await view.vm.readType();assert.equal(view.vm.readFailed,'commented');const original=state.writes[0];auth.accessToken='A-refreshed';await tick();assert.equal(view.vm.page,2,'normal refresh reset notification pagination');await view.vm.readType();assert.deepEqual(state.writes[1],original,'normal refresh changed unknown bulk-read recovery key');view.app.unmount()
 console.log('PASS notification page 1 normal token rotation preserves pagination and uncertain bulk-read key rather than acting on later arrivals as a new operation')
 let finishWrite;state.mark=async(category,key)=>{state.writes.push({category,key});auth.accessToken='rotation-in-flight';return new Promise(resolve=>finishWrite=resolve)}
 view=await mount();await tick();const flight=view.vm.readAll();await tick();assert.equal(view.vm.marking,true);const before=notices.revision;finishWrite();await flight;assert.equal(view.vm.marking,false);assert.equal(view.vm.pendingReadKeys.size,0);assert.equal(notices.revision,before+1);view.app.unmount()
@@ -34,3 +34,26 @@ let finishOld;state.mark=async()=>new Promise(resolve=>finishOld=resolve);view=a
 console.log('PASS notification page 3 same-token actor changes and same-actor new login clear private data/keys and discard old write feedback')
 state.mark=async()=>new Promise(resolve=>finishOld=resolve);view=await mount();await tick();const unmounted=view.vm.readAll();await tick();const beforeUnmount=notices.revision;view.app.unmount();finishOld();await unmounted;assert.equal(notices.revision,beforeUnmount);assert.equal(view.vm.pendingReadKeys.size,0)
 console.log('PASS notification page 4 unmounted bulk-read results cannot invalidate a later page or retain old recovery commands')
+
+state.mark=async(category,key)=>{state.writes.push({category,key})}
+notices.unread={unreadCommentedNotificationCnt:1,unreadAtNotificationCnt:2,unreadReplyNotificationCnt:1,unreadPointNotificationCnt:0}
+view=await mount();await tick()
+const select=id=>view.vm.selectType(view.vm.tabs.find(tab=>tab.id===id))
+const initialWrites=state.writes.length
+await select('commented')
+await select('point')
+assert.equal(state.writes.length,initialWrites)
+let completeAt
+state.mark=async(category,key)=>{
+ state.writes.push({category,key})
+ if(category==='at')await new Promise(resolve=>completeAt=resolve)
+}
+const atRead=select('at')
+await select('at')
+await select('reply')
+assert.deepEqual(state.writes.slice(initialWrites).map(write=>write.category),['at','reply'])
+assert.equal(view.vm.type,'reply')
+completeAt();await atRead
+assert.equal(view.vm.type,'reply')
+view.app.unmount()
+console.log('PASS notification page 5 explicit category clicks auto-read unread categories except commented, without dropping rapid switches or duplicating in-flight writes')

@@ -44,10 +44,15 @@ const pageCount = ref(0)
 let requestVersion = 0, active = true
 function identity() { return JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId || '']) }
 let boundary = identity()
-const pendingReadKeys = new Map<string, string>()
+type ReadTarget = NoticeType | 'all'
+const pendingReadKeys = ref(new Map<ReadTarget, string>())
+const reading = ref(new Set<ReadTarget>())
 const loading = ref(false)
 const error = ref('')
-const marking = ref(false)
+const marking = computed(() => reading.value.size > 0)
+const readFailed = computed(() => [type.value, 'all' as const].find(
+  target => pendingReadKeys.value.has(target) && !reading.value.has(target),
+))
 const currentTab = computed(() => tabs.find((tab) => tab.id === type.value)!)
 const currentUnread = computed(() => tabUnread(currentTab.value.unreadKey))
 const canReadType = computed(() => currentUnread.value > 0 || items.value.some((n) => n.hasRead === false))
@@ -60,9 +65,14 @@ function countLabel(count: number) {
   return count > 99 ? '99+' : String(count)
 }
 
-function selectType(next: NoticeType) {
+function selectType(tab: typeof tabs[number]) {
+  const shouldMark = tab.id !== 'commented' && (
+    pendingReadKeys.value.has(tab.id) || unread.value[tab.unreadKey] !== 0 ||
+    (type.value === tab.id && canReadType.value)
+  )
   page.value = 1
-  type.value = next
+  type.value = tab.id
+  if (shouldMark) return mark(tab.id)
 }
 
 async function load() {
@@ -84,14 +94,14 @@ watch([accessToken, () => account.value?.oId], () => {
   const current = identity()
   if (current === boundary) return
   boundary = current
-  requestVersion++; pendingReadKeys.clear(); marking.value = false; items.value = []; pageCount.value = 0; page.value = 1; error.value = ''
+  requestVersion++; pendingReadKeys.value.clear(); reading.value.clear(); items.value = []; pageCount.value = 0; page.value = 1; error.value = ''
 }, { flush: 'sync' })
 watch(
   () => [accessToken.value, account.value?.oId, type.value, page.value, notices.revision],
   () => { items.value = []; void load() },
   { immediate: true },
 )
-onBeforeUnmount(() => { active = false; requestVersion++; pendingReadKeys.clear() })
+onBeforeUnmount(() => { active = false; requestVersion++; pendingReadKeys.value.clear() })
 
 const router = useRouter()
 const SITE = /^https?:\/\/fishpi\.cn(?=\/|$)/
@@ -142,21 +152,27 @@ function onBodyClick(e: MouseEvent) {
 
 function noticeTime(n: NoticeItem) { return formatDisplayTime(n.commentCreateTime || n.createTime) }
 
-async function mark(type: NoticeType | 'all') {
-  const token = accessToken.value, owner = identity()
-  if (!token || marking.value) return
+async function mark(target: ReadTarget) {
+  const owner = identity()
+  if (!accessToken.value || reading.value.has(target) || reading.value.has('all') ||
+    (target === 'all' && marking.value)) return
   const current = () => active && owner === identity()
-  marking.value = true
+  reading.value.add(target)
   try {
-    let key = pendingReadKeys.get(type)
-    if (!key) { key = notificationReadKey(); pendingReadKeys.set(type, key) }
-    await markV3NotificationsRead(type, key)
+    let key = pendingReadKeys.value.get(target)
+    if (!key) {
+      key = notificationReadKey()
+      pendingReadKeys.value.set(target, key)
+    }
+    await markV3NotificationsRead(target, key)
     if (!current()) return
-    pendingReadKeys.delete(type)
+    pendingReadKeys.value.delete(target)
     notices.invalidate()
-  } catch (failure) {
-    if (current()) error.value = failure instanceof Error ? failure.message : '标记已读失败'
-  } finally { if (current()) marking.value = false }
+  } catch {
+    // Keep the original key for an explicit retry of this category.
+  } finally {
+    if (current()) reading.value.delete(target)
+  }
 }
 function readType() { return mark(type.value) }
 function readAll() { return mark('all') }
@@ -192,7 +208,7 @@ function readAll() { return mark('all') }
             :class="{ selected: type === tab.id }"
             :aria-pressed="type === tab.id"
             aria-controls="notification-list"
-            @click="selectType(tab.id)"
+            @click="selectType(tab)"
           >
             <NoticeIcon :name="tab.id" />
             <span>{{ tab.label }}</span>
@@ -208,10 +224,14 @@ function readAll() { return mark('all') }
             <p>{{ currentTab.hint }}</p>
           </div>
           <div class="list-actions">
-            <button type="button" class="read-button fp-control" :disabled="marking || !canReadType || loading" @click="readType">本类已读</button>
+            <button v-if="type === 'commented'" type="button" class="read-button fp-control" :disabled="marking || (!canReadType && !pendingReadKeys.has(type)) || loading" @click="readType">本类已读</button>
             <button type="button" class="refresh-button fp-control" aria-label="刷新通知" title="刷新通知" :disabled="loading || marking" @click="load"><NoticeIcon name="refresh" /></button>
           </div>
         </header>
+        <p v-if="readFailed" class="read-error" role="alert">
+          标记已读失败
+          <button type="button" class="fp-control" :disabled="marking" @click="mark(readFailed)">重试</button>
+        </p>
         <FpLoading v-if="loading" :rows="5" />
         <div v-else-if="error" class="empty-state error-state" role="alert">
           <span class="empty-icon"><NoticeIcon name="inbox" /></span>
@@ -257,6 +277,7 @@ function readAll() { return mark('all') }
 
 <style scoped>
 .notifications-page {   }
+.read-error { display: flex; align-items: center; gap: 8px; margin: 8px 16px; color: var(--fp-muted); }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 0 var(--fp-page-gap); }
 h1 { margin: 0; color: var(--fp-title); font-size: 24px; font-weight: 600; letter-spacing: .02em; }
 .page-summary { margin: 7px 0 0; color: var(--fp-muted); font-size: 13px; }
