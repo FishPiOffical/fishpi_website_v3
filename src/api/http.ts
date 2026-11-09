@@ -142,7 +142,6 @@ export async function pingApi(timeoutMs = 8000): Promise<boolean> {
     const res = await fetch(resolveUrl('/api/v3/auth/captcha-options'), {
       method: 'GET',
       credentials: 'include',
-      headers: { 'User-Agent': FISHPI_UA },
       signal: ctrl.signal,
     })
     if (!res.ok || res.redirected || !isJsonContentType(res.headers.get('content-type'))) return false
@@ -215,7 +214,7 @@ function isRiskCaptchaPath(path: string) {
 
 async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, identity: RequestIdentity): Promise<T> {
   const headers = new Headers(init.headers)
-  if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
+  if (import.meta.env.SSR && !headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
   if (init.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
@@ -383,7 +382,7 @@ export async function requestText(path: string, init: RequestInitExtra = {}): Pr
 async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
   const identity = requestIdentity()
   const headers = new Headers(init.headers)
-  if (!headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
+  if (import.meta.env.SSR && !headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
   const { __captchaRetried: _, ...fetchInit } = init
   let res: Response
   try {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 
 const props = withDefaults(
@@ -32,7 +32,16 @@ const props = withDefaults(
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: [] }>()
 
 const editorExpanded=ref(false)
-function onEditorFocus(event:FocusEvent){if((event.target as HTMLElement)?.closest?.('.vditor'))editorExpanded.value=true}
+function onEditorFocus(event: FocusEvent) {
+  if ((event.target as HTMLElement)?.matches('.vditor [contenteditable], .md-fallback')) editorExpanded.value = true
+}
+async function toggleEditor() {
+  editorExpanded.value = !editorExpanded.value
+  if (editorExpanded.value) {
+    await nextTick()
+    editor.value?.focus()
+  }
+}
 const editorOpen=computed(()=>!props.collapsible||editorExpanded.value||Boolean(props.modelValue))
 const sendError = ref('')
 const root = ref<HTMLElement | null>(null)
@@ -59,8 +68,11 @@ function submit() {
 }
 
 function reveal() {
-  editor.value?.focus()
-  root.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  editorExpanded.value = true
+  void nextTick(() => {
+    root.value?.scrollIntoView({ block: 'nearest' })
+    editor.value?.focus()
+  })
 }
 
 defineExpose({
@@ -72,8 +84,8 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="root" class="composer" :class="{'editor-collapsed':!editorOpen}" @focusin="onEditorFocus">
-    <button v-if="collapsible && !modelValue" class="editor-toggle" type="button" :aria-expanded="editorOpen" @click="editorExpanded=!editorExpanded">{{ editorOpen ? '收起编辑器' : '展开编辑器' }}</button>
+  <div ref="root" class="composer" :class="{'editor-collapsed':!editorOpen, 'editor-collapsible':collapsible}" @focusin="onEditorFocus">
+    <button v-if="collapsible && !modelValue" class="editor-toggle" type="button" :aria-expanded="editorOpen" @click="toggleEditor">{{ editorOpen ? '收起编辑器' : '展开编辑器' }}</button>
     <slot name="top" />
     <MarkdownEditor
       ref="editor"
@@ -173,4 +185,5 @@ defineExpose({
   .actions { justify-content: flex-end; }
 }
 .editor-toggle{align-self:flex-end;border:0;background:transparent;padding:2px 0;color:var(--fp-muted);font-size:11px;cursor:pointer}.editor-collapsed{gap:6px}.editor-collapsed :deep(.vditor){height:48px!important;min-height:48px!important}.editor-collapsed :deep(.vditor-toolbar){display:none!important}.editor-collapsed :deep(.vditor-content){height:46px!important;min-height:46px!important;overflow:hidden}.editor-collapsed :deep(.vditor-ir),.editor-collapsed :deep(.vditor-sv),.editor-collapsed :deep(.vditor-wysiwyg){min-height:46px!important}.editor-collapsed :deep(.vditor-reset){padding-top:10px!important;padding-bottom:10px!important}
+.editor-collapsible :deep(.vditor) { overflow: visible; }
 </style>

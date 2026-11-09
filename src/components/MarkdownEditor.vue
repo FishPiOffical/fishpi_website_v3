@@ -132,7 +132,8 @@ const mentionError = ref('')
 const mentions = createMentionHints(message => { mentionError.value = message })
 function clearMentions() {
   mentions.cancel()
-  host.value?.querySelectorAll<HTMLElement>('.vditor-hint').forEach(element => { element.replaceChildren(); element.style.display = 'none' })
+  // Toolbar dropdowns also use .vditor-hint; only clear the editor's suggestion panel.
+  host.value?.querySelectorAll<HTMLElement>('.vditor-content > .vditor-hint').forEach(element => { element.replaceChildren(); element.style.display = 'none' })
 }
 let stopPreviewAuth: (() => void) | undefined
 
@@ -268,7 +269,8 @@ defineExpose({
     return value
   },
   focus() {
-    editor?.focus()
+    if (fallback.value) fallbackInput.value?.focus()
+    else if (!host.value?.contains(document.activeElement) || !document.activeElement?.matches('[contenteditable]')) editor?.focus()
   },
   insert: insertEmoji,
   toggleEmoji,

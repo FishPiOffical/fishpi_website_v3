@@ -83,45 +83,57 @@ watch(()=>JSON.stringify([route.hash,!!accessToken.value,account.value?.oId||'']
 function closeContext(){contextId.value='';if(/^#chatroom\d{1,32}$/.test(route.hash))void router.replace({hash:''})}
 async function latestFromContext(){closeContext();await chat.refreshMessages();await nextTick();if(chatStyle.value==='modern')scrollBottom()}
 
-onMounted(async () => {
+onMounted(() => {
   composerReady.value = true
-  if (!chat.connected && !chat.connecting && !chat.loading) await chat.connect()
-  await nextTick()
-  if (chatStyle.value === 'modern') {
-    scrollBottom()
-  }
-
+  if (!chat.connected && !chat.connecting && !chat.loading) void chat.connect()
 })
 
 onUnmounted(() => {
   if (!chat.floatingChatroomOpen) chat.disconnect()
 })
 
-watch(
-  () => messages.value.length,
-  async () => {
-    if (chatStyle.value === 'modern') {
-      await nextTick()
-      const el = scroller.value
-      if (!el) return
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 150) {
-        scrollBottom()
-      }
-    }
-  },
-)
+const hasNewMessages = ref(false)
+let followingLatest = true
+const firstVisibleId = computed(() => visibleMessages.value[0]?.oId)
+const latestVisibleId = computed(() => visibleMessages.value.at(-1)?.oId)
 
-watch(chatStyle, async (newVal) => {
-  if (newVal === 'modern') {
-    await nextTick()
-    scrollBottom()
-  }
+function nearLatest(el: HTMLElement) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 100
+}
+
+watch(latestVisibleId, async (id, previous) => {
+  const el = scroller.value
+  if (!el) return
+  if (!id) { hasNewMessages.value = false; return }
+  // Measure against the previous layout before Vue inserts the new message.
+  const follow = !previous || nearLatest(el)
+  await nextTick()
+  if (el !== scroller.value || id !== latestVisibleId.value) return
+  if (follow) scrollBottom()
+  else if (visibleMessages.value.some(message => message.oId === previous)) hasNewMessages.value = true
 })
 
+watch(scroller, (el, _, onCleanup) => {
+  scrollBottom()
+  if (!el || typeof ResizeObserver === 'undefined') return
+  // Images and editor expansion can change the scroll range after the message DOM is patched.
+  const observer = new ResizeObserver(() => {
+    if (el === scroller.value && followingLatest) scrollBottom()
+  })
+  observer.observe(el)
+  const content = el.querySelector('.messages-container')
+  if (content) observer.observe(content)
+  onCleanup(() => observer.disconnect())
+}, { flush: 'post' })
+
 function scrollBottom() {
-  if (scroller.value) {
-    scroller.value.scrollTop = scroller.value.scrollHeight
-  }
+  followingLatest = true
+  if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
+  hasNewMessages.value = false
+}
+
+function revealComposer() {
+  composerRef.value?.reveal()
 }
 
 async function submit() {
@@ -129,10 +141,6 @@ async function submit() {
   if (!text.trim() && !quote.value) return
   const content = `${text}${buildQuoteSuffix()}`,reader=JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])
   if(await chat.send(content)&&reader===JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']))acceptConfirmed(content.trim())
-  if (chatStyle.value === 'modern') {
-    await nextTick()
-    scrollBottom()
-  }
 }
 
 function acceptConfirmed(content:string){if(`${draft.value}${buildQuoteSuffix()}`.trim()===content){draft.value='';clearQuote()}}
@@ -161,13 +169,25 @@ async function openNodePicker() {
 }
 
 
-async function onModernScroll() {
+function onModernScroll() {
   const el = scroller.value
-  if (!el || el.scrollTop > 50 || loadingMore.value || !hasMore.value) return
-  const prev = el.scrollHeight
+  if (!el) return
+  followingLatest = nearLatest(el)
+  if (followingLatest) hasNewMessages.value = false
+  else if (el.scrollTop <= 50) void loadOlder()
+}
+
+async function loadOlder() {
+  const el = scroller.value
+  if (!el || loading.value || loadingMore.value || !hasMore.value) return
+  const first = firstVisibleId.value
+  const anchor = first && document.getElementById(`chatroom${first}`)
+  const offset = anchor && anchor.getBoundingClientRect().top - el.getBoundingClientRect().top
   await chat.loadMore()
   await nextTick()
-  el.scrollTop = el.scrollHeight - prev
+  if (el === scroller.value && anchor && anchor.isConnected && first !== firstVisibleId.value && typeof offset === 'number') {
+    el.scrollTop += anchor.getBoundingClientRect().top - el.getBoundingClientRect().top - offset
+  }
 }
 
 function useTopic() {
@@ -274,6 +294,9 @@ function clearScreen() {
 
           <!-- 2. 下方消息列表：与输入区在同一个卡片中，自上而下阅读，最新在最上方 -->
           <section class="cr-classic-list">
+            <div v-if="isLoggedIn && visibleMessages.length" class="composer-return">
+              <button type="button" class="cr-top-btn" @click="revealComposer">↑ 回到输入框</button>
+            </div>
             <FpLoading v-if="(loading || chat.connecting) && !messages.length" />
             <p v-else-if="messages.length && !visibleMessages.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
             <p v-else-if="!messages.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
@@ -356,6 +379,7 @@ function clearScreen() {
           </div>
 
           <div class="cr-header-right">
+            <button v-if="isLoggedIn" type="button" class="cr-top-btn" @click="revealComposer">回到输入框</button>
             <span v-if="error" class="top-error-tip">{{ error }}</span>
             <button
               type="button"
@@ -379,7 +403,7 @@ function clearScreen() {
             type="button"
             class="more-btn"
             :disabled="loadingMore"
-            @click="onModernScroll"
+            @click="loadOlder"
           >
             {{ loadingMore ? '加载中…' : '查看更早记录' }}
           </button>
@@ -431,10 +455,11 @@ function clearScreen() {
 
         <!-- 底部吸底输入与工具区 -->
         <div class="cr-composer-panel">
+          <button v-if="hasNewMessages" type="button" class="cr-top-btn jump-latest" @click="scrollBottom">↓ 查看新消息</button>
           <div v-if="composerReady && isLoggedIn" class="composer-inner">
             <ChatComposer
               collapsible
-              :height="100"
+              :height="150"
               ref="composerRef"
               v-model="draft"
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"
@@ -688,7 +713,6 @@ function clearScreen() {
   gap: 16px;
   height: calc(100vh - var(--fp-nav-h) - 24px);
   min-height: 520px;
-  overflow: hidden;
   padding-bottom: 8px;
 }
 
@@ -702,7 +726,6 @@ function clearScreen() {
   border: 1px solid var(--fp-border);
   border-radius: 8px;
   box-shadow: var(--fp-card-shadow);
-  overflow: hidden;
   position: relative;
 }
 
@@ -861,8 +884,27 @@ function clearScreen() {
   margin-top: 16px;
 }
 
+.cr-classic-list { overflow-anchor: none; }
+.composer-return {
+  position: sticky;
+  top: calc(var(--fp-nav-h) + 8px);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 2;
+  pointer-events: none;
+}
+.composer-return button { pointer-events: auto; }
+.jump-latest { position: absolute; right: 16px; bottom: calc(100% + 8px); }
+.cr-composer-panel :deep(.vditor:not(.vditor--fullscreen) .vditor-toolbar__item > .vditor-panel--arrow) {
+  top: auto;
+  bottom: 100%;
+  margin-bottom: 6px;
+}
+.cr-composer-panel :deep(.vditor:not(.vditor--fullscreen)) { max-height: clamp(150px, 36dvh, 300px); }
+
 /* 现代版吸底输入区域 */
 .cr-composer-panel {
+  position: relative;
   border-top: 1px solid var(--fp-border);
   background: var(--fp-card);
   padding: 12px 16px;
