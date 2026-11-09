@@ -1,7 +1,7 @@
 import { setSsrReadGate } from './api/http'
 import { createSsrUpstreamGate } from './seo/ssrUpstreamGate'
 import { fetchDirectoryPage } from './api/v3-directory'
-import { fetchHomeBootstrap, fetchHomeRead } from './api/v3-home-reads'
+import { fetchHomeBootstrap, fetchHomeRead, type HomeRead } from './api/v3-home-reads'
 import { createPublicHomeCache } from './seo/publicHomeCache'
 import { fetchArticleListing } from './api/v3-article-list'
 import { fetchRecentMembers } from './api/v3-discovery-extras'
@@ -28,8 +28,8 @@ const readPublicListing = createPublicHomeCache(300_000, 64)
 const readPublicOverview = createPublicHomeCache(300_000, 24)
 const homeStaleKeys = new Set(['recent', 'hot', 'columnsRecent', 'columnsHot', 'tags', 'ranking:checkin:8', 'ranking:online:8', 'recent-members'])
 const upstreamOrigin = () => process.env.VITE_API_TARGET || process.env.API_TARGET || 'https://fishpi.cn'
-function homeRead<T>(key: string, load: () => Promise<T>) {
-  return readPublicHome(`${upstreamOrigin()}:${key}`, load, homeStaleKeys.has(key)).catch(error => {
+function homeRead<T>(key: string, load: () => Promise<T>, onExpiry?: (expires: number) => void) {
+  return readPublicHome(`${upstreamOrigin()}:${key}`, load, homeStaleKeys.has(key), onExpiry).catch(error => {
     if (error?.code === 'ssr_deferred') throw error
     // Resource and status only: never log upstream bodies, credentials or request headers.
     console.warn('[SSR homepage] preload failed', key, typeof error?.status === 'number' ? error.status : 'network')
@@ -41,8 +41,10 @@ const SSR_PREFETCH_BUDGET_MS = 750
 type WithinBudget = <T>(task: Promise<T>) => Promise<T>
 
 async function prefetchHome(withinBudget: WithinBudget): Promise<SsrPayload> {
+  const expires: Partial<Record<HomeRead, number>> = {}
+  // The gate admits requests in start order. Recent and hot must reach it before secondary modules.
   const settled = await Promise.allSettled([
-    fetchHomeBootstrap(key => withinBudget(homeRead(key, () => fetchHomeRead(key)))),
+    fetchHomeBootstrap(key => withinBudget(homeRead(key, () => fetchHomeRead(key), expiry => { expires[key] = expiry }))),
     withinBudget(homeRead('ranking:checkin:8', () => fetchRanking('checkin', 1, undefined, 8))),
     withinBudget(homeRead('ranking:online:8', () => fetchRanking('online', 1, undefined, 8))),
     withinBudget(homeRead('recent-members', () => fetchRecentMembers())),
@@ -53,6 +55,7 @@ async function prefetchHome(withinBudget: WithinBudget): Promise<SsrPayload> {
     settled[i].status === 'fulfilled' ? (settled[i] as PromiseFulfilledResult<T>).value : fallback
   return {
     homeReads: val(0, null),
+    homeReadExpires: { ...expires },
     homeCheckinRanking: val(1, null),
     homeOnlineRanking: val(2, null),
     recentMembers: val(3, null),

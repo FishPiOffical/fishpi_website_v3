@@ -6,7 +6,7 @@ import { shouldInvalidatePublicSnapshot, PUBLIC_DIRECTORY_TTL, PUBLIC_LIST_TTL, 
 // Browser memory only. Stable identity boundaries invalidate every entry, token rotation does not.
 const recentReads = new Map<HomeRead, { expires: number; value: unknown }>()
 let cacheBoundary = ''
-export function useHomeRead<K extends HomeRead>(key: K, initial: unknown) {
+export function useHomeRead<K extends HomeRead>(key: K, initial: unknown, initialExpires = 0) {
   const auth = useAuthStore(), data = shallowRef<HomeData[K] | null>(null), loading = ref(false), error = ref('')
   try { data.value = decodeHomeRead(key, initial) } catch { /* A current read follows mount. */ }
   const snapshotKey = `home:${key}`
@@ -53,9 +53,14 @@ export function useHomeRead<K extends HomeRead>(key: K, initial: unknown) {
   onMounted(() => {
     mounted = true; syncCache()
     const cached = recentReads.get(key)
-    if (cached && cached.expires > Date.now()) { data.value = decodeHomeRead(key, structuredClone(cached.value)); return }
+    if (cached && cached.expires > Date.now() && cached.expires >= initialExpires) { data.value = decodeHomeRead(key, structuredClone(cached.value)); return }
     if (data.value !== null && !auth.accessToken) {
-      recentReads.set(key, { expires: Date.now() + 300_000, value: structuredClone(data.value) })
+      if (initialExpires > Date.now()) {
+        recentReads.set(key, { expires: initialExpires, value: structuredClone(data.value) })
+      } else {
+        fromSnapshot = true
+        void read()
+      }
     } else void restoreAndRead()
   })
   const retryPublic=()=>{void read()}

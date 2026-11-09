@@ -148,7 +148,7 @@ async function resolveDirectoryId(kind: 'tags' | 'domains', value: string) {
   return flight
 }
 export async function resolveV3TagId(value: string): Promise<string> { return resolveDirectoryId('tags', value) }
-async function articleFeedPath(kind: ArticleFeedKind, page: number, size: number, extra: string): Promise<string | null> {
+function articleFeedPath(kind: ArticleFeedKind, page: number, size: number, extra: string): string | null | Promise<string> {
   const paging = params(page, size)
   if (kind === 'search') {
     const q = extra.trim()
@@ -157,8 +157,7 @@ async function articleFeedPath(kind: ArticleFeedKind, page: number, size: number
   }
   if (kind === 'domain' || kind === 'tag') {
     const plural = kind === 'domain' ? 'domains' : 'tags'
-    const resolved = await resolveDirectoryId(plural, extra)
-    return `/api/v3/${plural}/${resolved}/articles?${paging}&sort=latest&type=all`
+    return resolveDirectoryId(plural, extra).then(resolved => `/api/v3/${plural}/${resolved}/articles?${paging}&sort=latest&type=all`)
   }
   const sort = kind === 'hot' ? 'month-comments' : kind === 'good' ? 'hot' : kind === 'reply' ? 'active' : 'latest'
   const type = kind === 'long' || kind === 'qna' || kind === 'perfect' ? kind : 'recent'
@@ -168,13 +167,15 @@ async function articleFeedPath(kind: ArticleFeedKind, page: number, size: number
   return `/api/v3/articles?${paging}&sort=${sort}&type=${type}`
 }
 export async function v3ArticleFeed(kind: ArticleFeedKind, page = 1, size = 40, extra = ''): Promise<ArticleSummary[]> {
-  const path = await articleFeedPath(kind, page, size, extra)
+  const target = articleFeedPath(kind, page, size, extra)
+  const path = typeof target === 'string' ? target : await target
   return path ? articleList(path) : []
 }
 export type V3ArticleFeedPage = { list: ArticleSummary[]; p: number; size: number; total: number; pageCount: number }
 export async function v3ArticleFeedPage(kind: ArticleFeedKind, page = 1, size = 20, extra = '', credentials?: RequestCredentials): Promise<V3ArticleFeedPage> {
   if (page > 42949672) throw new ApiError('页码不合法', 422)
-  const path = await articleFeedPath(kind, page, size, extra)
+  const target = articleFeedPath(kind, page, size, extra)
+  const path = typeof target === 'string' ? target : await target
   if (!path) throw new ApiError('请输入搜索关键词', 422)
   const data = decodeV3ContentPage(await get(path, credentials))
   if (data.pagination.p !== page || data.pagination.size !== size) throw invalid()

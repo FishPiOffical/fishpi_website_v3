@@ -31,16 +31,22 @@ assert.deepEqual(await read('recent', async () => ['evicted']), ['evicted'])
 console.log('PASS public home cache: concurrent dedupe, request clone isolation, TTL, valid empty, uncached failures, origin separation and bounded eviction')
 
 const readStale = createPublicHomeCache(1000)
-await readStale('ranking', async () => ['first'], true)
+let originalExpiry
+await readStale('ranking', async () => ['first'], true, expires => { originalExpiry = expires })
+assert.equal(originalExpiry, now + 1000)
 now += 1000
 let refreshes = 0, finishRefresh
 const refresh = () => { refreshes++; return new Promise(resolve => { finishRefresh = resolve }) }
-assert.deepEqual(await readStale('ranking', refresh, true), ['first'])
+let staleExpiry
+assert.deepEqual(await readStale('ranking', refresh, true, expires => { staleExpiry = expires }), ['first'])
+assert.equal(staleExpiry, originalExpiry)
 assert.deepEqual(await readStale('ranking', refresh, true), ['first'])
 assert.equal(refreshes, 1)
 finishRefresh(['second'])
 await new Promise(resolve => setImmediate(resolve))
-assert.deepEqual(await readStale('ranking', refresh, true), ['second'])
+let refreshedExpiry
+assert.deepEqual(await readStale('ranking', refresh, true, expires => { refreshedExpiry = expires }), ['second'])
+assert.equal(refreshedExpiry, now + 1000)
 now += 86_400_000
 assert.deepEqual(await readStale('ranking', async () => { throw Error('temporary failure') }, true), ['second'])
 console.log('PASS stale public home data: old data remains eligible and one refresh is shared')

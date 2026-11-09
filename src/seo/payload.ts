@@ -1,5 +1,5 @@
 import { decodeDirectoryPage, type DirectoryKind } from '@/api/v3-directory'
-import { decodeHomeBootstrap } from '@/api/v3-home-reads'
+import { decodeHomeBootstrap, homeReadKeys, type HomeRead } from '@/api/v3-home-reads'
 import { decodeArticleListing, type ColumnOrder } from '@/api/v3-article-list'
 import type { ArticleFeedKind } from '@/api/fishpi'
 import { decodeRecentMembers } from '@/api/v3-discovery-extras'
@@ -22,6 +22,7 @@ import type {
 export interface SsrPayload {
   directoryPage?: unknown
   homeReads?: unknown
+  homeReadExpires?: Partial<Record<HomeRead, number>>
   articleListing?: unknown
   recentMembers?: RelationUser[] | null
   statistics?: CommunityStatistics | null
@@ -179,7 +180,16 @@ export function consumeArticleListingPayload(kind: ArticleFeedKind, extra: strin
   try { return decodeArticleListing(value, kind, extra, order) } catch { return null }
 }
 
-export function consumeHomeReadsPayload() { return decodeHomeBootstrap(takeField('homeReads')) }
+export function consumeHomeReadsPayload() {
+  const data = decodeHomeBootstrap(takeField('homeReads'))
+  const raw = takeField('homeReadExpires')
+  const expires: Partial<Record<HomeRead, number>> = {}
+  for (const key of homeReadKeys) {
+    const time = raw?.[key]
+    if (typeof time === 'number' && Number.isSafeInteger(time) && time > 0) expires[key] = time
+  }
+  return { ...data, expires }
+}
 
 export function consumeDirectoryPayload(kind: DirectoryKind) {
   try { return decodeDirectoryPage(takeField('directoryPage'), kind) } catch { return null }
