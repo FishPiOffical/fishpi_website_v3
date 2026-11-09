@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { inject, type Ref } from 'vue'
 import { timeISO } from '@/utils/time'
 
 import { formatDateTime } from '@/utils/time'
@@ -10,11 +11,24 @@ import { avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
 defineProps<{items:FollowingMoon[];compact?:boolean;avatarOnly?:boolean;hideAuthor?:boolean}>()
 function fallback(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 const date = formatDateTime
+const chatQuote = inject<{ enabled: Ref<boolean>; insert: (id: string, author: string, excerpt: string) => void }>('quoteBreezemoonInChat')
+function share(item: FollowingMoon, event: MouseEvent | DragEvent) {
+  const target = event.currentTarget as HTMLElement
+  const excerpt = (target.closest('li')?.querySelector<HTMLElement>('.moon-body')?.innerText ?? '').trim()
+  if ('dataTransfer' in event && event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'copy'
+    event.dataTransfer.setData('application/x-fishpi-breezemoon', JSON.stringify([item.id, item.author.userName, excerpt]))
+  } else {
+    chatQuote?.insert(item.id, item.author.userName, excerpt)
+  }
+}
 </script>
 <template>
   <ul class="breezemoon-list" :class="{compact,'avatar-only':avatarOnly,'author-hidden':hideAuthor}"><li v-for="item in items" :key="item.id">
     <header><RouterLink v-if="!hideAuthor" :to="`/member/${encodeURIComponent(item.author.userName)}`" :data-user-card="item.author.userName" :aria-label="`查看 ${item.author.userNickname||item.author.userName} 的主页`"><img :src="avatarUrl(item.author)" :data-user-card="item.author.userName" alt="" loading="lazy" @error="fallback" /><VipNickname v-if="!avatarOnly" :user-id="item.author.id" :user-name="item.author.userName" :text="item.author.userNickname||item.author.userName" /></RouterLink><time v-if="!avatarOnly" :datetime="timeISO(item.createdAt)">{{ date(item.createdAt) }}</time><slot name="actions" :item="item" /></header>
-    <div class="moon-body" v-html="item.contentHtml" />
+    <div class="moon-body" :draggable="chatQuote?.enabled.value" @dragstart="chatQuote?.enabled.value && share(item, $event)" v-html="item.contentHtml" />
+    <button v-if="chatQuote?.enabled.value" type="button" class="moon-share" draggable="true"
+      @dragstart="share(item, $event)" @click="share(item, $event)">引用到聊天室</button>
   </li></ul>
 </template>
 <style scoped lang="scss">
@@ -156,6 +170,18 @@ time {
   header img { display: block; width: 20px; height: 20px; }
   .moon-body { grid-column: 2; grid-row: 1; margin: 0; padding: 0; font-size: 12px; line-height: 1.45; }
 }
+.moon-share {
+  grid-column: 2;
+  justify-self: start;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fp-link);
+  font-size: 11px;
+  cursor: grab;
+}
+.moon-share:hover { text-decoration: underline; }
+
 .author-hidden {
   gap:0;
   li { display:flex; flex-direction:column; padding:18px 4px; border:0; border-bottom:1px solid var(--fp-divider); border-radius:0; background:transparent; }

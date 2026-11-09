@@ -18,11 +18,11 @@ defineProps<{ content: string; color: string; avatar?: string; author?: string }
   align-items: center;
   gap: 7px;
   max-width: 100%;
+  box-sizing: border-box;
   padding: 5px 11px 5px 5px;
   border: 1px solid rgb(255 255 255 / 24%);
   border-radius: 999px;
   background: rgb(35 42 51 / 36%);
-  backdrop-filter: blur(6px);
   font-size: 14px;
   line-height: 22px;
   text-shadow: 0 1px 3px rgb(0 0 0 / 75%);

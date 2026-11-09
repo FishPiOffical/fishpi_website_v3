@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink,useRoute,useRouter } from 'vue-router'
 import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
@@ -172,6 +172,38 @@ async function quoteMessage(msg:{oId:string}){
  if(quote.value?.messageId===msg.oId)composerRef.value?.reveal()
 }
 
+function quoteBreezemoon(id: string, author: string, excerpt: string) {
+  if (!/^[1-9][0-9]{0,18}$/.test(id) || !/^[A-Za-z0-9_-]{1,64}$/.test(author) || !composerRef.value || !isLoggedIn.value || !syncComposer()) return
+  const link = new URL(router.resolve(`/member/${author}/breezemoons/${id}`).href, window.location.origin).href
+  const plain = Array.from(excerpt).slice(0, 280).join('').replace(/\r\n?/g, '\n')
+    .replace(/[&<>]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[character]!)
+    .replace(/[\\`*_~[\]{}()!#|]/g, '\\$&')
+  const quoted = plain ? `\n${plain.split('\n').map(line => `> ${line}`).join('\n')}` : ''
+  draft.value += `${draft.value ? '\n\n' : ''}> [清风明月](${link})${quoted}\n`
+  revealComposer()
+}
+provide('quoteBreezemoonInChat', { enabled: isLoggedIn, insert: quoteBreezemoon })
+
+function onBreezemoonDragOver(event: DragEvent) {
+  if (event.dataTransfer?.types.includes('application/x-fishpi-breezemoon')) {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+}
+
+function onBreezemoonDrop(event: DragEvent) {
+  const payload = event.dataTransfer?.getData('application/x-fishpi-breezemoon')
+  if (!payload) return
+  event.preventDefault()
+  event.stopPropagation()
+  try {
+    const values: unknown = JSON.parse(payload)
+    if (!Array.isArray(values) || values.length !== 3) return
+    const [id, author, excerpt] = values
+    if (typeof id === 'string' && typeof author === 'string' && typeof excerpt === 'string') quoteBreezemoon(id, author, excerpt)
+  } catch { /* Ignore malformed drag data. */ }
+}
+
 function insertPaint(md: string) {
   if (!syncComposer()) return
   draft.value += (draft.value && !draft.value.endsWith('\n') ? '\n' : '') + md
@@ -250,7 +282,7 @@ function clearScreen() {
         <!-- 整合在一个白色大卡片内，输入框在上，消息在下 -->
         <div class="cr-classic-card">
           <!-- 1. 顶部输入与控制区域 -->
-          <section class="cr-classic-reply">
+          <section class="cr-classic-reply" @dragover.capture="onBreezemoonDragOver" @drop.capture="onBreezemoonDrop">
             <ChatComposer
               collapsible
               :height="100"
@@ -482,7 +514,7 @@ function clearScreen() {
         </div>
 
         <!-- 底部吸底输入与工具区 -->
-        <div class="cr-composer-panel">
+        <div class="cr-composer-panel" @dragover.capture="onBreezemoonDragOver" @drop.capture="onBreezemoonDrop">
           <button v-if="hasNewMessages" type="button" class="cr-top-btn jump-latest" @click="scrollBottom">↓ 查看新消息</button>
           <div v-if="composerReady && isLoggedIn" class="composer-inner">
             <ChatComposer

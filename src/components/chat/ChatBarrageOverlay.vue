@@ -16,7 +16,10 @@ watch(()=>timeline.barrage,event=>{
  if(rows.value.length>=laneCount)remove(rows.value[0]!.id)
  const freeLanes=Array.from({length:laneCount},(_,i)=>i).filter(i=>!rows.value.some(row=>row.lane===i))
  const lane=freeLanes[Math.floor(Math.random()*freeLanes.length)]!
- rows.value=[...rows.value,{...event,lane,duration:10+Math.random()*10}]
+ const viewport = typeof window === 'undefined' ? 1280 : window.innerWidth || 1280
+ // Include the maximum bubble width so the visible travel never exceeds 120px/s.
+ const distance = viewport + Math.min(420, viewport * .9)
+ rows.value=[...rows.value,{...event,lane,duration:Math.max(10, distance / (85 + Math.random() * 35))}]
 },{flush:'sync'})
 watch(()=>timeline.connected,value=>{if(!value)clear()},{flush:'sync'})
 watch(()=>JSON.stringify([getAuthContextVersion(),!!auth.accessToken,auth.account?.oId||'']),()=>{clear();seen.clear()},{flush:'sync'})
@@ -55,6 +58,7 @@ onBeforeUnmount(()=>{clear();seen.clear()})
   position: absolute;
   left: 0;
   width: max-content;
+  max-width: min(420px, 90vw);
   white-space: nowrap;
   pointer-events: auto;
   animation: barrage-travel linear both;
