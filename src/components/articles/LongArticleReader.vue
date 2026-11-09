@@ -703,7 +703,6 @@ function chapterTitle(c: LongArticleChapter) {
               <V3ReactionBar kind="comment" :target-id="comment.oId" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="vote" :article-id="comment.oId" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="thanks" :article-id="comment.oId" />
-              <ArticleInteraction v-if="loggedIn" resource="comments" kind="accept" :article-id="comment.oId" />
               <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
               </div>
               <template v-if="ownParagraphComment(comment)">

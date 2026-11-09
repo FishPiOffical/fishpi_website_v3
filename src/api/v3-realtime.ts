@@ -35,6 +35,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
   const token = getAccessToken()
   if (!token) return () => {}
   let stopped = false, attempts = 0, sequence = 0
+  let hasConnected = false
   let socket: WebSocket | null = null
   let retry: ReturnType<typeof setTimeout> | null = null
   let deadline: ReturnType<typeof setTimeout> | null = null
@@ -93,7 +94,10 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
             connectionState?.('ready')
             if (deadline) clearTimeout(deadline); deadline = null
             heartbeat = setInterval(() => { if (valid() && transport.readyState === WebSocket.OPEN) transport.send('{"type":"ping"}') }, 25_000)
-            changed() // Recover missed invalidations after every reconnect.
+            const reconnecting = hasConnected
+            hasConnected = true
+            // Article reads already start on page load. Reconcile only after an established connection drops.
+            if (channel !== 'article' || reconnecting) changed()
           } else if(authenticated&&channel==='chat'){
             if(message.type==='chat.barrager'){const barrage=barrageEvent(message.data);if(barrage)chatEvent?.({type:'barrage',barrage});return}
             if(message.type==='chat.sync_required'){chatEvent?.({type:'sync'});return}

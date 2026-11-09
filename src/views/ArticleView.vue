@@ -396,6 +396,7 @@ function itemProps(c: ArticleComment) {
     comment: c,
     loggedIn: isLoggedIn.value,
     commentingEnabled: commentingEnabled.value,
+    canAcceptAnswer: isQnA.value,
     own,
     editing: editingId.value === c.oId,
     hideMedals: isLong.value,

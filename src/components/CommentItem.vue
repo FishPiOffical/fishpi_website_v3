@@ -21,6 +21,7 @@ const props = withDefaults(
     loggedIn?: boolean
     commentingEnabled?: boolean
     own?: boolean
+    canAcceptAnswer?: boolean
     /** 只展示，不提供任何操作（如优质回帖） */
     readonly?: boolean
     editing?: boolean
@@ -92,7 +93,7 @@ function onBodyClick(e: MouseEvent) {
           <template v-if="interactive">
             <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" />
             <ArticleInteraction resource="comments" kind="thanks" :article-id="comment.oId" />
-            <ArticleInteraction resource="comments" kind="accept" :article-id="comment.oId" @accepted="emit('accepted')" />
+            <ArticleInteraction v-if="canAcceptAnswer" resource="comments" kind="accept" :article-id="comment.oId" @accepted="emit('accepted')" />
             <button v-if="commentingEnabled" type="button" class="op op-reply idle" @click="commentingEnabled && emit('reply')">回复</button>
             <button v-if="own && commentingEnabled" type="button" class="op op-edit idle" @click="commentingEnabled && emit('edit')">编辑</button>
             <button v-if="own" type="button" class="op op-del idle danger" @click="emit('remove')">删除</button>

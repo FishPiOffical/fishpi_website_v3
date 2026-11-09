@@ -13,6 +13,7 @@ export const useNoticeStore = defineStore('notices', () => {
   /** Legacy urgent broadcast is not part of the notification invalidation protocol. */
   const warnBroadcast = ref<{ text: string; who: string } | null>(null)
   let generation = 0, sequence = 0
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined
   let stopSubscription: (() => void) | null = null
   const total = computed(() => Number(unread.value.unreadNotificationCnt || 0))
 
@@ -29,15 +30,25 @@ export const useNoticeStore = defineStore('notices', () => {
       }
     } finally { if (id === sequence && version === generation) loading.value = false }
   }
-  function invalidate() { revision.value++; void refresh() }
+  function invalidate() {
+    clearTimeout(refreshTimer)
+    refreshTimer = undefined
+    revision.value++
+    void refresh()
+  }
+  function scheduleRefresh() {
+    if (!getAccessToken() || refreshTimer !== undefined) return
+    refreshTimer = setTimeout(invalidate, 100)
+  }
   function disconnect() { stopSubscription?.(); stopSubscription = null }
-  function connect() { disconnect(); stopSubscription = subscribeNotificationChanges(invalidate) }
+  function connect() { disconnect(); stopSubscription = subscribeNotificationChanges(scheduleRefresh) }
   function clear() {
+    clearTimeout(refreshTimer); refreshTimer = undefined
     generation++; sequence++; unread.value = {}; error.value = ''; loading.value = false; warnBroadcast.value = null
     revision.value++; disconnect()
   }
   const unsubscribe = onAccessTokenChange((token) => { clear(); if (token) { void refresh(); connect() } })
-  const focus = () => { if (getAccessToken()) invalidate() }
+  const focus = scheduleRefresh
   if (!import.meta.env.SSR) window.addEventListener('focus', focus)
   onScopeDispose(() => { unsubscribe(); clear(); if (!import.meta.env.SSR) window.removeEventListener('focus', focus) })
   return { unread, loading, error, revision, total, warnBroadcast, refresh, invalidate, clear, connect, disconnect }
