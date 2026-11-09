@@ -423,9 +423,11 @@ function locateComment(value:CommentLocation){
   void loadParagraphComments(value.page)
 }
 
-function refreshParagraphComments() {
-  if (activeParagraphId.value) void loadParagraphComments(paragraphPage.value)
-  void loadParagraphSummary()
+async function refreshParagraphComments() {
+  await Promise.all([
+    activeParagraphId.value ? loadParagraphComments(paragraphPage.value) : undefined,
+    loadParagraphSummary(),
+  ])
 }
 
 /** 现网 formatParagraphIndentation：段内 <br> 拆成独立缩进行 */

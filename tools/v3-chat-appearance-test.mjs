@@ -31,7 +31,7 @@ console.log('PASS appearance client 4 old owner read cannot restore another acco
 state.ssr=true;view=mount();let count=state.calls.length;await view.store.load();assert.equal(state.calls.length,count);view.store.$dispose();state.ssr=false
 view=mount();view.user.accessToken=null;count=state.calls.length;await view.store.load();assert.equal(state.calls.length,count);view.store.$dispose()
 console.log('PASS appearance client 5 SSR and guests issue no personal requests')
-const messageURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replace("from './http'",`from '${http}'`)),{decodeChatMessage}=await import(messageURL)
+const messageURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'").replace("from './http'",`from '${http}'`)),{decodeChatMessage}=await import(messageURL)
 const base={id:'10',createdAt:10,type:'text',content:'text',contentHtml:'<p>text</p>',author:{id:'1',userName:'same-owner',userNickname:'',userAvatarURL:''},client:'',card:{}}
 const messages=[orange,orange,blue,blue].map((appearance,i)=>decodeChatMessage({...base,id:String(10+i),appearance:{...appearance,privateField:'SECRET'}}))
 assert.ok(!JSON.stringify(messages).includes('SECRET'));assert.equal(decodeChatMessage({...base,appearance:{version:99,bubbleId:'x',frameId:'url(evil)'}}).appearance.bubbleId,'classic')

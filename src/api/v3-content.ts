@@ -241,7 +241,7 @@ async function articleInteractions(detail: Row, articleId: string): Promise<Arti
     result.thanks = { kind: 'thanks', id: articleId, thanked: bool(thanks.thanked),
       thankCount: number(thanks.thankCount), thankPoint: number(thanks.thankPoint) }
   }
-  if (snapshot.reactions !== undefined) result.reactions = (await import('./v3-reactions')).decodeArticleReactionSnapshot(snapshot.reactions, articleId)
+  if (snapshot.reactions !== undefined) result.reactions = (await import('./v3-reactions')).decodeReactionSnapshot(snapshot.reactions, 'article', articleId)
   for (const kind of ['collection', 'subscription'] as const) {
     if (snapshot[kind] === undefined) continue
     const relation = row(snapshot[kind])

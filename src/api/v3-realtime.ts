@@ -1,5 +1,6 @@
 import { ApiError, getAccessToken, request } from './http'
-import { decodeChatMessage, type ChatMessage } from './v3-chat-messages'
+import * as chatMessages from './v3-chat-messages'
+import type { ChatMessage } from './v3-chat-messages'
 
 /** A ticket goes only in the first socket frame, never in a URL or persistent storage. */
 export function subscribeNotificationChanges(changed: () => void, initialRead?: () => void): () => void {
@@ -16,7 +17,7 @@ export type ChatRealtimeEvent =
   | { type: 'topic'; revision: string }
   | { type: 'message'; id: string; revision: string; message?: ChatMessage }
   | { type: 'deleted'; id: string; revision: string }
-  | { type: 'reactions'; id: string; revision: string }
+  | { type: 'reactions'; id: string; revision: string; snapshot?: import('./v3-reactions').ReactionState }
   | { type: 'barrage'; barrage: ChatBarrageEvent }
 function barrageEvent(value:unknown):ChatBarrageEvent|null{
  if(!value||typeof value!=='object'||Array.isArray(value))return null
@@ -96,7 +97,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
       transport.onmessage = (event) => {
         if (!valid()) return
         try {
-          const message = JSON.parse(event.data) as { type?: unknown; data?: { channel?: unknown; articleId?:unknown;messageId?:unknown;revision?:unknown;message?:unknown } }
+          const message = JSON.parse(event.data) as { type?: unknown; data?: { channel?: unknown; articleId?:unknown;messageId?:unknown;revision?:unknown;message?:unknown;reactions?:unknown } }
           if (message.type === 'authentication.required') { authenticate(); return }
           if (message.type === 'ready') {
             if (authenticated || !sent || message.data?.channel !== channel || (articleId!==undefined&&message.data?.articleId!==articleId)) { reconnect(); return }
@@ -116,12 +117,17 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
             if(typeof revision!=='string'||!revision||revision.length>128||/[\u0000-\u001f\u007f]/.test(revision))return
             if(message.type==='chat.topic_changed'){chatEvent?.({type:'topic',revision});return}
             const id=message.data?.messageId;if(typeof id!=='string'||!/^\d{1,32}$/.test(id))return
-            if(message.type==='chat.message.reactions')chatEvent?.({type:'reactions',id,revision})
+            if(message.type==='chat.message.reactions'){
+              let snapshot
+              try { snapshot = chatMessages.decodeReactionSnapshot(message.data?.reactions, 'chat', id) }
+              catch { /* 旧服务仅发送失效提示，按消息 ID 补读。 */ }
+              chatEvent?.({type:'reactions',id,revision,...(snapshot ? {snapshot} : {})})
+            }
             else if(message.type==='chat.message.deleted')chatEvent?.({type:'deleted',id,revision})
             else if(message.type==='chat.message.created'||message.type==='chat.message.updated'){
               let snapshot: ChatMessage | undefined
               try {
-                const decoded = decodeChatMessage(message.data?.message)
+                const decoded = chatMessages.decodeChatMessage(message.data?.message)
                 if (decoded.id === id) snapshot = decoded
               } catch { /* Older servers and invalid snapshots require history reconciliation. */ }
               chatEvent?.({type:'message',id,revision,...(snapshot ? {message:snapshot} : {})})

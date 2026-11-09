@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { DEFAULT_AVATAR } from '@/utils/avatar'
 
-import {computed,ref,watch} from 'vue'
+import {computed,onScopeDispose,ref,watch} from 'vue'
 import {storeToRefs} from 'pinia'
 import {RouterLink} from 'vue-router'
 import {getAuthContextVersion} from '@/api/http'
@@ -15,31 +15,45 @@ const allLoading = ref(false)
 const allError = ref('')
 const retryAll = ref(0)
 const identity = () => JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId])
-watch(identity, () => {
-  if (props.avatarsOnly) expanded.value = false
-}, { flush: 'sync' })
-watch([expanded, accessToken, retryAll], async ([open, token], _, onCleanup) => {
-  if (!props.avatarsOnly) return
+let allReadAt = 0
+let allRequest: AbortController | undefined
+function clearAll() {
+  allRequest?.abort()
+  allRequest = undefined
+  allReadAt = 0
   allUsers.value = []
   allError.value = ''
   allLoading.value = false
-  if (!open || !token || !account.value?.oId) return
-  const currentIdentity = identity()
+}
+watch(identity, () => {
+  clearAll()
+  if (props.avatarsOnly) expanded.value = false
+}, { flush: 'sync' })
+onScopeDispose(clearAll)
+watch([expanded, retryAll], async ([open]) => {
+  if (!props.avatarsOnly || !open || !accessToken.value || !account.value?.oId ||
+      allRequest || Date.now() - allReadAt < 15_000) return
   const controller = new AbortController()
-  onCleanup(() => controller.abort())
-  const current = () => !controller.signal.aborted && identity() === currentIdentity
+  allRequest = controller
+  allUsers.value = []
+  allError.value = ''
   allLoading.value = true
   try {
     const users = await chatOnlineAll(controller.signal)
-    if (current()) allUsers.value = users
+    if (allRequest !== controller) return
+    allUsers.value = users
+    allReadAt = Date.now()
   } catch {
-    if (current()) allError.value = '在线名单读取失败'
+    if (allRequest === controller) allError.value = '在线名单读取失败'
   } finally {
-    if (current()) allLoading.value = false
+    if (allRequest === controller) {
+      allRequest = undefined
+      allLoading.value = false
+    }
   }
-}, { flush: 'sync' })
+})
 const visibleUsers=computed(()=>{
-  if (props.avatarsOnly) return allUsers.value
+  if (props.avatarsOnly) return expanded.value ? allUsers.value : []
   return props.previewLimit && !expanded.value ? online.users.slice(0,props.previewLimit) : online.users
 })
 function avatarError(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';import fs from 'node:fs/promises';import
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`);return s}
 const state=globalThis.__timeline={context:1,calls:[],dispatch:null,subscriptions:[],reactions:[]};const http=url(`export class ApiError extends Error{constructor(m,status=0,code){super(m);this.status=status;this.code=code}}export function getAccessToken(){return 'fixture-token'}export function getAuthContextVersion(){return globalThis.__timeline.context}export async function request(path,init){globalThis.__timeline.calls.push({path,init});return globalThis.__timeline.dispatch(path,init)}`),{ApiError}=await import(http)
 const appearanceURL=url(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')))
-const apiURL=url(replace(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')),[['./http',http],['@/utils/chatAppearance',appearanceURL]])),api=await import(apiURL)
+const apiURL=url(replace(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'"),[['./http',http],['@/utils/chatAppearance',appearanceURL]])),api=await import(apiURL)
 const auth=defineStore('timeline-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__timelineAuth=auth;const authURL=url('export const useAuthStore=globalThis.__timelineAuth'),rtURL=url('export function subscribeChatChanges(event,state){const sub={event,state,closed:false};globalThis.__timeline.subscriptions.push(sub);queueMicrotask(()=>{if(!sub.closed&&globalThis.__timeline.autoReady!==false)state("ready")});return()=>sub.closed=true}'),reactionURL=url('export function useV3ReactionsStore(){return{invalidate(kind,id){globalThis.__timeline.reactions.push([kind,id])}}}')
 const storeURL=url(replace(compile((await fs.readFile('src/stores/v3ChatTimeline.ts','utf8')).replaceAll('import.meta.env.SSR','false')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-chat-messages',apiURL],['@/api/v3-realtime',rtURL],['@/stores/auth',authURL],['@/stores/v3Reactions',reactionURL]])),{useV3ChatTimelineStore}=await import(storeURL),tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()},env=data=>({code:0,data})
 const msg=(id,content='body '+id)=>({id,createdAt:Number(id),type:'text',content,contentHtml:'<p>'+content+'</p>',author:{id:'2',userName:'other',userNickname:'',userAvatarURL:''},client:'Web/Website',card:{}}),page=(list=[msg('11'),msg('12')],hasMore=true)=>({list,hasMore,nextBefore:list[0]?.id||'',nextAfter:list.at(-1)?.id||''})
@@ -88,5 +88,17 @@ assert.deepEqual(delivered,[
   {type:'deleted',id:'12',revision:'3'},
 ])
 assert.deepEqual(delivered[0].message.appearance,payload.message.appearance)
-unsubscribe()
 console.log('PASS timeline 19 authenticated transport decodes HTTP-equivalent snapshot, rejects mismatched IDs, ignores deletion bodies')
+
+const summary = {targetId:'12',targetType:'chat',groupType:'emoji',currentUserReaction:'heart',
+  summary:[{value:'heart',emoji:'❤️',count:2,selected:true,users:[]}]}
+assert.equal(api.decodeChatMessage({...msg('12'),reactions:summary}).reactions.currentUserReaction,'heart')
+assert.throws(()=>api.decodeChatMessage({...msg('12'),reactions:{...summary,targetId:'99'}}))
+assert.equal(api.decodeChatMessage({...msg('12'),type:'unavailable',reactions:summary}).reactions,null)
+console.log('PASS 聊天表态快照绑定消息 ID，过滤不可读消息')
+
+frame('chat.message.reactions',{messageId:'12',revision:'4',reactions:summary})
+assert.equal(delivered.at(-1).snapshot.currentUserReaction,'heart')
+frame('chat.message.reactions',{messageId:'12',revision:'5'})
+assert.equal(delivered.at(-1).snapshot,undefined)
+unsubscribe()

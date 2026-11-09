@@ -1,24 +1,31 @@
 import {chatAppearanceSnapshot,type ChatAppearance} from '@/utils/chatAppearance'
 import {ApiError,request} from './http'
+import {decodeReactionSnapshot,type ReactionState} from './v3-reactions'
 export type ChatMessageType='text'|'music'|'weather'|'redPacket'|'unavailable'
-export interface ChatMessage{appearance?:ChatAppearance;id:string;createdAt:number;type:ChatMessageType;content:string;contentHtml:string;author:{id:string;userName:string;userNickname:string;userAvatarURL:string};client:string;card:Record<string,string|number>}
+export interface ChatMessage{appearance?:ChatAppearance;reactions?:ReactionState|null;reactionReadStarted?:number;id:string;createdAt:number;type:ChatMessageType;content:string;contentHtml:string;author:{id:string;userName:string;userNickname:string;userAvatarURL:string};client:string;card:Record<string,string|number>}
+export {decodeReactionSnapshot}
 const invalid=()=>new ApiError('聊天室消息响应不正确',502)
 function row(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw invalid();return v as Record<string,unknown>}
 function text(v:unknown){if(typeof v!=='string')throw invalid();return v}
 function integer(v:unknown){if(typeof v!=='number'||!Number.isSafeInteger(v)||v<0)throw invalid();return v}
 export function chatMessageId(id:string){if(typeof id!=='string'||!/^\d{1,32}$/.test(id))throw new ApiError('消息ID不合法',422);return id}
 export function decodeChatMessage(value:unknown):ChatMessage{const r=row(value),id=text(r.id);if(!/^\d{1,32}$/.test(id))throw invalid();const createdAt=integer(r.createdAt),type=text(r.type) as ChatMessageType;if(!['text','music','weather','redPacket','unavailable'].includes(type))throw invalid()
- if(type==='unavailable')return{id,createdAt,type,content:'',contentHtml:'',author:{id:'',userName:'',userNickname:'',userAvatarURL:''},client:'',card:{}}
+ if(type==='unavailable')return{id,createdAt,type,reactions:null,content:'',contentHtml:'',author:{id:'',userName:'',userNickname:'',userAvatarURL:''},client:'',card:{}}
  const a=row(r.author),authorId=text(a.id);if(authorId&&!/^\d{1,32}$/.test(authorId))throw invalid();const author={id:authorId,userName:text(a.userName),userNickname:text(a.userNickname),userAvatarURL:text(a.userAvatarURL)},client=text(r.client),card:Record<string,string|number>={}
  if(type!=='text'){const c=row(r.card);for(const field of type==='music'?['title','source','coverURL','from']:type==='weather'?['date','weatherCode','max','min','t','st']:['type','message'])card[field]=text(c[field]);if(type==='redPacket')for(const field of ['money','count','got'])card[field]=integer(c[field])}
- return{...(r.appearance===undefined?{}:{appearance:chatAppearanceSnapshot(r.appearance)}),id,createdAt,type,author,client,content:type==='text'?text(r.content):'',contentHtml:type==='text'?text(r.contentHtml):'',card}}
-export async function chatMessageDetail(id:string,signal?:AbortSignal):Promise<ChatMessage>{chatMessageId(id);const r=row(await request(`/api/v3/chat/messages/${id}`,{signal,cache:'no-store'}));if(r.code!==0)throw invalid();const message=decodeChatMessage(r.data);if(message.id!==id)throw invalid();return message}
+ const reactions = r.reactions === undefined ? undefined : decodeReactionSnapshot(r.reactions, 'chat', id)
+ return{...(reactions ? {reactions,reactionReadStarted:performance.now()} : {}),...(r.appearance===undefined?{}:{appearance:chatAppearanceSnapshot(r.appearance)}),id,createdAt,type,author,client,content:type==='text'?text(r.content):'',contentHtml:type==='text'?text(r.contentHtml):'',card}}
+export async function chatMessageDetail(id:string,signal?:AbortSignal):Promise<ChatMessage>{chatMessageId(id);const started=performance.now();const r=row(await request(`/api/v3/chat/messages/${id}`,{signal,cache:'no-store'}));if(r.code!==0)throw invalid();const message=decodeChatMessage(r.data);if(message.id!==id)throw invalid();return message.reactions ? {...message,reactionReadStarted:started} : message}
 /** Card summaries are projected public fields, never the stored transport envelope. */
 export function chatSourceText(message:ChatMessage){if(message.type==='unavailable')throw new ApiError('当前消息不可读取',404);return message.type==='text'?message.content:`【${message.type==='music'?'音乐':message.type==='weather'?'天气':'红包'}卡片公开摘要】\n${JSON.stringify(message.card,null,2)}`}
 export interface ChatMessagePage{list:ChatMessage[];hasMore:boolean;nextBefore:string;nextAfter:string}
 export async function chatMessagePage(options:{before?:string;after?:string;size?:number}={},signal?:AbortSignal):Promise<ChatMessagePage>{const {before,after,size=20}=options;if(before!==undefined)chatMessageId(before);if(after!==undefined)chatMessageId(after);if(before!==undefined&&after!==undefined||!Number.isSafeInteger(size)||size<1||size>50)throw new ApiError('消息游标不合法',422)
  const params=new URLSearchParams({size:String(size)});if(before!==undefined)params.set('before',before);if(after!==undefined)params.set('after',after)
- const r=row(await request(`/api/v3/chat/messages?${params}`,{signal,cache:'no-store'}));if(r.code!==0)throw invalid();const d=row(r.data);if(!Array.isArray(d.list)||d.list.length>size||typeof d.hasMore!=='boolean')throw invalid();const list=d.list.map(decodeChatMessage)
+ const started=performance.now()
+ const r=row(await request(`/api/v3/chat/messages?${params}`,{signal,cache:'no-store'}));if(r.code!==0)throw invalid();const d=row(r.data);if(!Array.isArray(d.list)||d.list.length>size||typeof d.hasMore!=='boolean')throw invalid();const list=d.list.map(value=>{
+   const message=decodeChatMessage(value)
+   return message.reactions ? {...message,reactionReadStarted:started} : message
+ })
  for(let i=0;i<list.length;i++){const id=BigInt(list[i]!.id);if(i&&BigInt(list[i-1]!.id)>=id||before!==undefined&&id>=BigInt(before)||after!==undefined&&id<=BigInt(after))throw invalid()}
  if(d.nextBefore!==(list[0]?.id||'')||d.nextAfter!==(list.at(-1)?.id||'')||d.hasMore&&!list.length)throw invalid();return{list,hasMore:d.hasMore,nextBefore:d.nextBefore as string,nextAfter:d.nextAfter as string}}
 export async function chatTopic(signal?:AbortSignal){const r=row(await request('/api/v3/chat/topic',{signal,cache:'no-store'}));if(r.code!==0)throw invalid();return text(row(r.data).text)}

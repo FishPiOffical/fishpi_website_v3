@@ -361,7 +361,7 @@ function clearScreen() {
               <ChatRedPacketCard v-if="msg.redPacket" :packet="msg.redPacket" :packet-id="msg.oId" />
               <ChatCard v-else-if="msg.card" :card="msg.card" />
               <template #reactions>
-                <V3ReactionBar kind="chat" :target-id="msg.oId" />
+                <V3ReactionBar kind="chat" :target-id="msg.oId" :initial-state="msg.reactions" :initial-read-started="msg.reactionReadStarted" />
               </template>
               <template #actions>
                 <ChatRepeatAction v-if="!msg.redPacket && !msg.card" :id="msg.oId" />
@@ -472,7 +472,7 @@ function clearScreen() {
               <ChatRedPacketCard v-if="msg.redPacket" :packet="msg.redPacket" :packet-id="msg.oId" />
               <ChatCard v-else-if="msg.card" :card="msg.card" />
               <template #reactions>
-                <V3ReactionBar kind="chat" :target-id="msg.oId" />
+                <V3ReactionBar kind="chat" :target-id="msg.oId" :initial-state="msg.reactions" :initial-read-started="msg.reactionReadStarted" />
               </template>
               <template #actions>
                 <ChatRepeatAction v-if="!msg.redPacket && !msg.card" :id="msg.oId" />

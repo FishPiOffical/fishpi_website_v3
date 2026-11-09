@@ -305,7 +305,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                   </RouterLink>
                   <div class="chat-body">
                     <RouterLink v-if="m.userName" class="chat-who" :to="`/member/${m.userName}`">
-                      <VipNickname :user-name="m.userName">{{ m.userNickname || m.userName }}</VipNickname>
+                      <VipNickname :user-id="m.userOId" :user-name="m.userName">{{ m.userNickname || m.userName }}</VipNickname>
                       <span v-if="m.userNickname && m.userName" class="chat-uname">({{ m.userName }})</span>
                     </RouterLink>
                     <div v-if="m.html" class="chat-text" v-html="m.html"></div>

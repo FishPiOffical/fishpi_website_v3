@@ -221,7 +221,38 @@ function isOwnComment(c: ArticleComment) {
   return Boolean(account.value && c.commentAuthorId && c.commentAuthorId === account.value.oId)
 }
 
+let realtimeTimer: ReturnType<typeof setTimeout> | undefined
+let realtimeDirty = false
+let realtimeRunning = false
+
+function queueArticleRefresh(key: string, refresh: () => Promise<void>) {
+  if (subscriptionKey !== key) return
+  realtimeDirty = true
+  if (realtimeTimer !== undefined || realtimeRunning) return
+  realtimeTimer = setTimeout(async () => {
+    realtimeTimer = undefined
+    if (subscriptionKey !== key || !realtimeDirty) return
+    realtimeDirty = false
+    realtimeRunning = true
+    try { await refresh() }
+    finally {
+      if (subscriptionKey === key) {
+        realtimeRunning = false
+        if (realtimeDirty) queueArticleRefresh(key, refresh)
+      }
+    }
+  }, 300)
+}
+
+function clearArticleRefresh() {
+  clearTimeout(realtimeTimer)
+  realtimeTimer = undefined
+  realtimeDirty = false
+  realtimeRunning = false
+}
+
 function disconnectHeat() {
+ clearArticleRefresh()
  stopArticle?.();stopArticle=null;subscriptionKey='';heatSequence++;heatRequest?.abort();heatRequest=null;heat.value=null;heatError.value=''
 }
 function articleUnavailable(target:string,reader:string) {
@@ -233,18 +264,19 @@ function connectHeat() {
  if(import.meta.env.SSR||!accessToken.value||!article.value||article.value.oId!==id.value)return
  const target=id.value,reader=viewerIdentity.value,key=JSON.stringify([target,reader,accessToken.value])
  if(subscriptionKey===key)return
- stopArticle?.();subscriptionKey=key
+ stopArticle?.();clearArticleRefresh();subscriptionKey=key
  stopArticle=subscribeArticleChanges(target,()=>{
   if(subscriptionKey!==key||reader!==viewerIdentity.value||target!==id.value)return
-  if (!article.value?.interactions?.reactions) reactionEvents.invalidate('article',target)
-  const comments = article.value?.articleComments || []
-  if (article.value?.interactions || comments.some(comment => comment.interactions !== undefined)) {
-    void load(true, 'realtime')
-    readerRef.value?.refreshParagraphComments()
-    return
-  }
-  for (const comment of comments) reactionEvents.invalidate('comment', comment.oId)
-  if(!heatRequest)void refreshHeat()
+  queueArticleRefresh(key, async () => {
+   if (!article.value?.interactions?.reactions) reactionEvents.invalidate('article',target)
+   const comments = article.value?.articleComments || []
+   if (article.value?.interactions || comments.some(comment => comment.interactions !== undefined)) {
+     await Promise.all([load(true, 'realtime'), readerRef.value?.refreshParagraphComments()])
+     return
+   }
+   for (const comment of comments) reactionEvents.invalidate('comment', comment.oId)
+   if (!heatRequest) await refreshHeat()
+  })
  },()=>articleUnavailable(target,reader))
 }
 async function ownerChanged(target:string){if(target===id.value)await load(true,'owner')}
@@ -285,7 +317,10 @@ async function load(force=false,reason:'comments'|'owner'|'realtime'|'public'='c
     const data = await fetchArticle(reqId, requestedPage, !!accessToken.value)
     if (!current()) return
     article.value = data; heat.value = null; loading.value = false
-    void buildToc(); void refreshHeat(); connectHeat()
+    void buildToc()
+    const heatRead = refreshHeat()
+    connectHeat()
+    if (reason === 'realtime') await heatRead
   } catch (e) {
     if (!current()) return
     if(e instanceof ApiError&&[401,403,404].includes(e.status)) {
@@ -322,7 +357,7 @@ watch(
   { immediate: true },
 )
 
-watch(accessToken,(token,old)=>{if(!import.meta.env.SSR){stopArticle?.();stopArticle=null;subscriptionKey='';if(token&&old)void load(true,'realtime');else{connectHeat();void refreshHeat()}}},{flush:'post'})
+watch(accessToken,(token,old)=>{if(!import.meta.env.SSR){stopArticle?.();clearArticleRefresh();stopArticle=null;subscriptionKey='';if(token&&old)void load(true,'realtime');else{connectHeat();void refreshHeat()}}},{flush:'post'})
 
 watch(viewerIdentity, () => {
   ownerRefreshError.value='';ownerDeletedId.value='';realtimeReadError.value=''

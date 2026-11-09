@@ -23,14 +23,14 @@ function decode(raw:unknown,kind:ReactionTarget,id:string,options:ReactionOption
   if(current&&!seen.has(current))throw bad()
   return{targetId:id,targetType:kind,currentUserReaction:current,summary}
 }
-export function decodeArticleReactionSnapshot(raw: unknown, id: string): ReactionState {
+export function decodeReactionSnapshot(raw: unknown, kind: 'article' | 'chat', id: string): ReactionState {
   const summary = row(raw).summary
   if (!Array.isArray(summary) || summary.length > 256) throw bad()
   const options = summary.map(entry => {
     const item = row(entry)
     return { value: string(item.value, 32), emoji: string(item.emoji, 128) }
   })
-  return decode({ code: 0, data: raw }, 'article', id, options)
+  return decode({ code: 0, data: raw }, kind, id, options)
 }
 export async function readReactions(kind:ReactionTarget,id:string,options:ReactionOption[] | Promise<ReactionOption[]>){
   const [response, catalog] = await Promise.all([request(path(kind,id),{cache:'no-store'}), options])
@@ -42,7 +42,7 @@ export async function writeReaction(kind:ReactionTarget,id:string,choice:string|
   const state=decode(raw,kind,id,options)
   const receipt = data(raw)
   if(typeof receipt.changed!=='boolean'||state.currentUserReaction!==(choice??''))throw bad()
-  if (kind !== 'chat' && receipt.interaction !== undefined) {
+  if (receipt.interaction !== undefined) {
     return receipt.interaction === null ? null : decode({ code: 0, data: receipt.interaction }, kind, id, options)
   }
 }
