@@ -39,6 +39,18 @@ const online = useV3ChatOnlineStore()
 const { account, isLoggedIn, accessToken } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 const composerReady = ref(false)
+const classicComposerArea = ref<HTMLElement | null>(null)
+const classicComposerAboveView = ref(false)
+
+watch(classicComposerArea, (area, _, onCleanup) => {
+  classicComposerAboveView.value = false
+  if (!area || typeof IntersectionObserver === 'undefined') return
+  const observer = new IntersectionObserver(([entry]) => {
+    classicComposerAboveView.value = !!entry && !entry.isIntersecting && entry.boundingClientRect.bottom <= 0
+  })
+  observer.observe(area)
+  onCleanup(() => observer.disconnect())
+}, { flush: 'post' })
 const {
   messages,
   sending,
@@ -282,7 +294,7 @@ function clearScreen() {
         <!-- 整合在一个白色大卡片内，输入框在上，消息在下 -->
         <div class="cr-classic-card">
           <!-- 1. 顶部输入与控制区域 -->
-          <section class="cr-classic-reply" @dragover.capture="onBreezemoonDragOver" @drop.capture="onBreezemoonDrop">
+          <section ref="classicComposerArea" class="cr-classic-reply" @dragover.capture="onBreezemoonDragOver" @drop.capture="onBreezemoonDrop">
             <ChatComposer
               collapsible
               :height="100"
@@ -354,9 +366,6 @@ function clearScreen() {
 
           <!-- 2. 下方消息列表：与输入区在同一个卡片中，自上而下阅读，最新在最上方 -->
           <section class="cr-classic-list">
-            <div v-if="isLoggedIn && visibleMessages.length" class="composer-return">
-              <button type="button" class="cr-top-btn" @click="revealComposer">↑ 回到输入框</button>
-            </div>
             <FpLoading v-if="(loading || chat.connecting) && !messages.length" />
             <p v-else-if="messages.length && !visibleMessages.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
             <p v-else-if="!messages.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
@@ -439,7 +448,6 @@ function clearScreen() {
           </div>
 
           <div class="cr-header-right">
-            <button v-if="isLoggedIn" type="button" class="cr-top-btn" @click="revealComposer">回到输入框</button>
             <span v-if="error" class="top-error-tip">{{ error }}</span>
             <button
               type="button"
@@ -572,6 +580,17 @@ function clearScreen() {
         <ChatSidebar />
       </aside>
     </div>
+
+    <button
+      v-if="composerReady && isLoggedIn && (chatStyle === 'modern' || classicComposerAboveView)"
+      type="button"
+      class="composer-return"
+      aria-label="回到输入框"
+      title="回到输入框"
+      @click="revealComposer"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 15h4v6h6v-6h4l-7-8zM4 3h16v2H4z" /></svg>
+    </button>
 
     <!-- ==================== 浮层与弹窗 ==================== -->
     <FpDialog :open="onlineListOpen && isLoggedIn" title="在线成员" :width="460" @close="closeOnlineList">
@@ -958,14 +977,24 @@ function clearScreen() {
 
 .cr-classic-list { overflow-anchor: none; }
 .composer-return {
-  position: sticky;
-  top: calc(var(--fp-nav-h) + 8px);
-  display: flex;
-  justify-content: flex-end;
-  z-index: 2;
-  pointer-events: none;
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  background: var(--fp-card);
+  box-shadow: var(--fp-card-shadow);
+  color: var(--fp-text);
+  cursor: pointer;
 }
-.composer-return button { pointer-events: auto; }
+.composer-return:hover { background: var(--fp-hover); }
+.composer-return svg { width: 18px; height: 18px; }
 .jump-latest { position: absolute; right: 16px; bottom: calc(100% + 8px); }
 .cr-composer-panel :deep(.vditor:not(.vditor--fullscreen) .vditor-toolbar__item > .vditor-panel--arrow) {
   top: auto;
@@ -1201,6 +1230,10 @@ function clearScreen() {
     flex: none;
     min-height: 0;
     height: calc(100dvh - var(--fp-nav-h) - 20px);
+  }
+
+  .cr-composer-panel :deep(.bar) {
+    padding-right: calc(52px + env(safe-area-inset-right));
   }
 
   .modern-sidebar {
