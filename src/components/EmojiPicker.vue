@@ -14,6 +14,19 @@ const identity = () => JSON.stringify([getAuthContextVersion(), !!accessToken.va
 const open = ref(false), loading = ref(false), error = ref('')
 const root = ref<HTMLElement | null>(null), selection = ref<HTMLElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
+const previewMode = ref(false)
+const previewItem = ref<EmojiItem | null>(null)
+
+function togglePreview() {
+  previewMode.value = !previewMode.value
+  previewItem.value = null
+}
+
+function choose(item: EmojiItem) {
+  if (!previewMode.value || !previewImage(item)) return pick(item)
+  if (selection.value) selection.value.scrollTop = 0
+  previewItem.value = item
+}
 const position = ref<{ left: string; top: string; width: string; height: string }>()
 let anchor: HTMLElement | null = null
 let preferred: 'above' | 'below' = props.placement
@@ -64,6 +77,7 @@ async function load<T>(fetcher: () => Promise<T>, apply: (value: T) => void) {
   finally { if (request === version) loading.value = false }
 }
 function loadFrequent() {
+  previewItem.value = null
   if (selection.value) selection.value.scrollTop = 0
   groupId.value = ''; items.value = []; itemPage.value = itemPages.value = 0
   return load(fetchV3FrequentEmotions, frequent => { items.value = frequent })
@@ -87,6 +101,7 @@ async function loadCatalog(p = 1) {
 }
 
 function loadGroup(id: string) {
+  previewItem.value = null
   if (selection.value) selection.value.scrollTop = 0
   groupId.value = id; items.value = []; itemPage.value = itemPages.value = 0
   return load(() => fetchV3GroupEmojis(id), page => { items.value = page.list; itemPage.value = page.p; itemPages.value = page.pageCount })
@@ -111,6 +126,8 @@ function toggle(trigger?: HTMLElement, placement = props.placement) {
   void loadCatalog()
 }
 function close() {
+  previewMode.value = false
+  previewItem.value = null
   retryItems = undefined
   if (open.value) emit('open-change', false)
   open.value = false
@@ -169,18 +186,28 @@ defineExpose({ toggle })
         </button>
       </nav>
       <section ref="selection" class="selection" :aria-label="selectedName" :aria-busy="loading">
-        <h3>{{ selectedName }}</h3>
+        <div class="selection-header">
+          <h3>{{ selectedName }}</h3>
+          <button type="button" class="preview-toggle" :aria-pressed="previewMode" @click="togglePreview">大图预览</button>
+        </div>
         <p v-if="error" class="hint" role="alert">{{ error }} <button v-if="retryItems" type="button" @click="retryItems()">重试</button></p>
         <FpLoading v-if="loading && !items.length" small />
+        <div v-else-if="previewItem" class="large-preview">
+          <img :src="previewImage(previewItem)" :alt="previewItem.name" />
+          <div class="preview-actions">
+            <button type="button" class="ghost" @click="previewItem = null">返回列表</button>
+            <button type="button" class="ghost" @click="pick(previewItem)">插入表情</button>
+          </div>
+        </div>
         <div v-else class="grid">
           <button v-for="(item, index) in items" :key="item.oId || `${item.name}:${index}`"
-            :disabled="Boolean(item.oId && !item.url)" type="button" :title="item.name" :aria-label="item.name" @click="pick(item)">
+            :disabled="Boolean(item.oId && !item.url)" type="button" :title="item.name" :aria-label="item.name" @click="choose(item)">
             <img v-if="previewImage(item)" :src="previewImage(item)" alt="" />
             <span v-else>{{ props.labels[item.name] || '⋯' }}</span>
           </button>
           <p v-if="!items.length && !error" class="hint">暂无表情</p>
         </div>
-        <button v-if="groupId && itemPage < itemPages && !error" type="button" class="ghost more" :disabled="loading" @click="moreItems">更多表情</button>
+        <button v-if="groupId && itemPage < itemPages && !error && !previewItem" type="button" class="ghost more" :disabled="loading" @click="moreItems">更多表情</button>
       </section>
     </div>
     </Teleport>
@@ -246,7 +273,8 @@ defineExpose({ toggle })
   font-weight: 600;
 }
 .selection { padding: 7px; }
-.selection h3 { margin: 0 0 5px; color: var(--fp-muted); font-size: 12px; font-weight: 600; }
+.selection-header { display: flex; justify-content: space-between; align-items: center; gap: 4px; margin-bottom: 5px; }
+.selection h3 { margin: 0; color: var(--fp-muted); font-size: 12px; font-weight: 600; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, 22px); gap: 2px; }
 .grid button {
   display: grid;
@@ -263,6 +291,21 @@ defineExpose({ toggle })
   line-height: 1;
 }
 .grid img { width: 20px; height: 20px; object-fit: contain; }
+.preview-toggle {
+  flex: none;
+  border: 0;
+  border-radius: 5px;
+  padding: 3px 5px;
+  background: transparent;
+  color: var(--fp-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.preview-toggle:hover, .preview-toggle[aria-pressed="true"] { background: var(--fp-hover); color: var(--fp-link); }
+.large-preview { display: grid; gap: 6px; justify-items: center; }
+.large-preview img { width: 100%; max-width: 168px; height: 104px; object-fit: contain; }
+.preview-actions { display: flex; gap: 4px; }
+.preview-actions button { font-size: 11px; padding: 3px 6px; }
 .more { display: block; margin: 5px auto 0; font-size: 12px; }
 .hint { margin: 0; color: var(--fp-muted); font-size: 12px; grid-column: 1 / -1; }
 </style>

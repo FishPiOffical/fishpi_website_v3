@@ -5,13 +5,19 @@ import { ApiError, getAuthContextVersion } from '@/api/http'
 import type { EmojiGroup, EmojiItem } from '@/api/fishpi'
 import { addV3EmojiURL, createV3EmojiGroup, deleteV3EmojiGroup, fetchV3EmojiGroups, fetchV3GroupEmojis,
   fetchV3FrequentAliases, fetchV3EmotionOptions, saveV3FrequentEmotions, removeV3GroupEmoji, emojiOperationKey, updateV3EmojiGroup, updateV3EmojiItem, shareV3EmojiGroup, importV3EmojiGroup, migrateV3LegacyEmojis } from '@/api/v3-emojis'
+import { uploadV3Files } from '@/api/v3-uploads'
 import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
 
 const { accessToken, account } = storeToRefs(useAuthStore())
 const groups = ref<EmojiGroup[]>([]), items = ref<EmojiItem[]>([]), groupId = ref('')
-const loading = ref(false), busy = ref(false), error = ref(''), frequencyLoading = ref(false), catalogLoaded = ref(false)
+const loading = ref(false), mutating = ref(false), error = ref(''), frequencyLoading = ref(false), catalogLoaded = ref(false)
 const newGroup = ref(''), newUrl = ref(''), newName = ref(''), frequency = ref('')
+const fileInput = ref<HTMLInputElement | null>(null)
+const imageFile = ref<File | null>(null), imageGroup = ref(''), imageName = ref(''), uploadedUrl = ref('')
+const uploading = ref(false)
+const busy = computed(() => uploading.value || mutating.value)
+let uploadController: AbortController | null = null
 const catalog = ref<string[][]>([])
 const editGroupName = ref(''), editGroupSort = ref(0), editItemId = ref(''), editItemName = ref(''), editItemSort = ref(0)
 const importCode = ref(''), sharedCode = ref(''), transferNotice = ref('')
@@ -101,7 +107,12 @@ function reset() {
   groupPage.value = groupPages.value = groupTotal.value = itemPage.value = itemPages.value = itemTotal.value = 0
   editGroupName.value = editItemId.value = editItemName.value = importCode.value = sharedCode.value = transferNotice.value = ''
   editGroupSort.value = editItemSort.value = 0
-  loading.value = frequencyLoading.value = busy.value = false
+  uploadController?.abort()
+  uploadController = null
+  imageFile.value = null
+  imageGroup.value = imageName.value = uploadedUrl.value = ''
+  if (fileInput.value) fileInput.value.value = ''
+  loading.value = frequencyLoading.value = mutating.value = uploading.value = false
 }
 onMounted(() => { mounted = true; if (accessToken.value) { void loadGroups(); void loadFrequency() } })
 watch([accessToken, () => account.value?.oId], () => {
@@ -114,7 +125,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
 async function mutate<T>(operation: string, payload: unknown, action: (key: string) => Promise<T>, done: (result: T) => Promise<unknown> | void) {
   const owner = identity(), currentEpoch = epoch
   if (!accessToken.value || busy.value) return
-  busy.value = true; error.value = ''
+  mutating.value = true; error.value = ''
   try {
     const fingerprint = JSON.stringify(payload)
     let intent = intentions.get(operation)
@@ -122,7 +133,7 @@ async function mutate<T>(operation: string, payload: unknown, action: (key: stri
     const result = await action(intent.key)
     if (mounted && owner === identity() && currentEpoch === epoch) { intentions.delete(operation); await done(result) }
   } catch (failure) { if (mounted && owner === identity() && currentEpoch === epoch) error.value = failure instanceof Error ? failure.message : '表情操作失败' }
-  finally { if (currentEpoch === epoch && owner === identity()) busy.value = false }
+  finally { if (currentEpoch === epoch && owner === identity()) mutating.value = false }
 }
 function onCreate() {
   const name = newGroup.value.trim(), sort = groupTotal.value
@@ -141,6 +152,62 @@ function onAddUrl() {
     newUrl.value = newName.value = ''; groupId.value = result.groupId; await loadGroups()
   })
 }
+function selectImage(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  uploadedUrl.value = ''
+  imageFile.value = null
+  error.value = ''
+  if (!file) return
+  if (!/\.(?:png|jpe?g|gif|webp)$/i.test(file.name) ||
+      (file.type && !/^image\/(?:png|jpeg|gif|webp)$/.test(file.type)) || !file.size) {
+    input.value = ''
+    error.value = '请选择有效的 PNG、JPEG、GIF 或 WebP 图片'
+    return
+  }
+  imageFile.value = file
+}
+
+async function addLocalImage() {
+  const file = imageFile.value
+  if (!file || busy.value || loading.value || !accessToken.value) return
+  const owner = identity(), currentEpoch = epoch
+  const id = imageGroup.value, name = imageName.value.trim()
+  let url = uploadedUrl.value
+  if (!url) {
+    const controller = new AbortController()
+    uploadController = controller
+    uploading.value = true
+    error.value = ''
+    try {
+      const [image] = await uploadV3Files([file], controller.signal)
+      if (controller.signal.aborted || owner !== identity() || currentEpoch !== epoch) return
+      if (!image?.url) throw new Error('图片上传失败，请重试')
+      url = uploadedUrl.value = image.url
+    } catch (failure) {
+      if (!controller.signal.aborted && owner === identity() && currentEpoch === epoch) {
+        error.value = failure instanceof Error ? failure.message : '图片上传失败'
+      }
+      return
+    } finally {
+      if (uploadController === controller) {
+        uploadController = null
+        uploading.value = false
+      }
+    }
+  }
+  if (owner !== identity() || currentEpoch !== epoch) return
+  await mutate('add-local-image', { id, url, name }, key => addV3EmojiURL(id, url, 0, name, key), async result => {
+    imageFile.value = null
+    uploadedUrl.value = imageName.value = ''
+    if (fileInput.value) fileInput.value.value = ''
+    transferNotice.value = '图片已添加到表情包'
+    const target = groups.value.find(group => group.oId === result.groupId)
+    if (target) await loadGroups(target)
+    else await loadTransferredGroup(result.groupId)
+  })
+}
+
 function onRemove(item: EmojiItem) {
   const group = groupId.value, id = item.oId
   if (!group || !id) return
@@ -233,6 +300,16 @@ function saveFrequency(resetDefaults = false) {
       <button type="button" :disabled="busy" @click="editItemId = ''">取消编辑</button>
     </form>
     <button v-if="itemPage < itemPages" type="button" class="ghost" :disabled="busy || loading" @click="loadItems(true)">更多图片</button>
+    <h3>添加本地图片</h3>
+    <form class="row" @submit.prevent="addLocalImage">
+      <label>本地图片<input ref="fileInput" type="file" accept=".png,.jpg,.jpeg,.gif,.webp" :disabled="busy" @change="selectImage" /></label>
+      <label>添加到分类<select v-model="imageGroup" :disabled="busy || loading">
+        <option value="">全部</option>
+        <option v-for="group in groups.filter(group => group.type === 0)" :key="group.oId" :value="group.oId">{{ group.name || '分组' }}</option>
+      </select></label>
+      <label>图片名称<input v-model="imageName" :disabled="busy" maxlength="64" placeholder="名称（可选）" /></label>
+      <button type="submit" :disabled="busy || loading || !imageFile">{{ uploading ? '上传中…' : uploadedUrl ? '重试添加' : '上传并添加' }}</button>
+    </form>
     <form class="row" @submit.prevent="onAddUrl">
       <label>图片地址<input v-model="newUrl" :disabled="busy" maxlength="512" aria-label="表情图片URL" placeholder="HTTPS图片 URL" /></label>
       <label>图片名称<input v-model="newName" :disabled="busy" maxlength="64" aria-label="表情图片名称" placeholder="名称（可选）" /></label>
@@ -313,7 +390,8 @@ img {
   gap: 8px;
   margin-top: 8px;
 }
-.row input {
+.row input,
+.row select {
   flex: 1;
   min-width: 140px;
   background: var(--fp-bg);

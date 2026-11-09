@@ -47,7 +47,7 @@ const apiURL=url(apiNames.map(name=>`export const ${name}=(...args)=>globalThis.
 const fishpiURL=url(transpile(markdown));const loadingURL=url('export default {}')
 async function component(file,exposed){
  let source=(await fs.readFile(file,'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
- let js=transpile(source).replace("from '@/api/v3-emojis'",`from '${apiURL}'`).replace("from '@/api/fishpi'",`from '${fishpiURL}'`).replace("from '@/api/http'",`from '${shim}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from '@/components/FpLoading.vue'",`from '${loadingURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`).replace(/const props = withDefaults\([^]*?\);/, 'const props={showTrigger:true,placement:"above",labels:{}};').replace('defineExpose({ toggle });','').replace('const emit = defineEmits();','const emit=(...args)=>globalThis.__emojiEmitted.push(args);')
+ let js=transpile(source).replace("from '@/api/v3-uploads'",`from '${url('export const uploadV3Files=(...args)=>globalThis.__emojiUpload(...args)')}'`).replace("from '@/api/v3-emojis'",`from '${apiURL}'`).replace("from '@/api/fishpi'",`from '${fishpiURL}'`).replace("from '@/api/http'",`from '${shim}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from '@/components/FpLoading.vue'",`from '${loadingURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`).replace(/const props = withDefaults\([^]*?\);/, 'const props={showTrigger:true,placement:"above",labels:{}};').replace('defineExpose({ toggle });','').replace('const emit = defineEmits();','const emit=(...args)=>globalThis.__emojiEmitted.push(args);')
  const imports=[...js.matchAll(/^import .+;$/gm)].map(m=>m[0]).join('\n');js=js.replace(/^import .+;$/gm,'')
  const loaded=await import(url(`${imports}\nexport default {setup(){${js}\nreturn {${exposed.join(',')}}},render(){return null}}`))
  const app=renderer.createApp(loaded.default);app.use(createPinia());const vm=app.mount({});return {app,vm}
@@ -129,3 +129,34 @@ rotation=await component('src/components/EmojiPacks.vue',['importCode','busy','o
 console.log('PASS emojis 11 token rotation inside import retains committed feedback and reloads the real group')
 rotation=await component('src/components/EmojiPacks.vue',['newGroup','groups','items','importCode']);await tick();rotation.vm.newGroup='PRIVATE';rotation.vm.importCode='ABCDEFGHIJ12';auth.account={oId:'2'};assert.equal(rotation.vm.newGroup,'');assert.equal(rotation.vm.importCode,'');assert.deepEqual(rotation.vm.groups,[]);await tick();rotation.vm.newGroup='new-session-draft';globalThis.__emojiContext++;auth.accessToken='new-login-same-owner';assert.equal(rotation.vm.newGroup,'');rotation.app.unmount()
 console.log('PASS emojis 12 same-token actor change and same-actor new session clear prior-owner drafts and transfers')
+
+auth.accessToken = 'B'
+let uploads = 0
+const additions = []
+globalThis.__emojiUpload = async ([file], signal) => {
+  assert.equal(file.name, 'caption.png')
+  assert.equal(signal.aborted, false)
+  uploads++
+  return [{ url: signed }]
+}
+globalThis.__emojiAPI.fetchV3EmojiGroups = async () => valuePage([groupB])
+globalThis.__emojiAPI.addV3EmojiURL = async (...args) => {
+  additions.push(args)
+  if (additions.length === 1) throw Error('lost save response')
+  return { groupId: groupB.oId }
+}
+const local = await component('src/components/EmojiPacks.vue', ['imageFile', 'imageGroup', 'imageName', 'groupId', 'selectImage', 'addLocalImage'])
+await tick()
+const file = new File(['fixture'], 'caption.png', { type: 'image/png' })
+local.vm.selectImage({ target: { files: [file] } })
+local.vm.imageGroup = groupB.oId
+local.vm.imageName = 'Caption'
+await local.vm.addLocalImage()
+await local.vm.addLocalImage()
+assert.equal(uploads, 1)
+assert.deepEqual(additions[0], additions[1])
+assert.deepEqual(additions[1].slice(0, 4), [groupB.oId, signed, 0, 'Caption'])
+assert.equal(local.vm.groupId, groupB.oId)
+assert.equal(local.vm.imageFile, null)
+local.app.unmount()
+console.log('PASS local emoji upload adds to the selected group and retries the same write without reuploading')
