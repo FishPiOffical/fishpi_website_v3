@@ -26,7 +26,6 @@ import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
-import { useV3ChatOnlineStore } from '@/stores/v3ChatOnline'
 import { useChatFilterStore } from '@/stores/chatFilter'
 import type { ChatNodeOption } from '@/api/fishpi'
 import FpLoading from '@/components/FpLoading.vue'
@@ -35,7 +34,6 @@ import FpDialog from '@/components/FpDialog.vue'
 const auth = useAuthStore()
 const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const chatFilter = useChatFilterStore()
-const online = useV3ChatOnlineStore()
 const { account, isLoggedIn, accessToken } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 const composerReady = ref(false)
@@ -72,25 +70,6 @@ const draft = ref('')
 watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{draft.value=''},{flush:'sync'})
 const scroller = ref<HTMLElement | null>(null)
 const activeTool = ref<''|'packet'|'barrage'|'paint'>('')
-const onlineListOpen = ref(false)
-const onlineListTrigger = ref<HTMLButtonElement | null>(null)
-const onlineListContent = ref<HTMLElement | null>(null)
-
-function openOnlineList() {
-  onlineListOpen.value = true
-  if (online.attempt !== 1) void online.load(1)
-  void nextTick(() => onlineListContent.value?.focus())
-}
-
-function closeOnlineList() {
-  onlineListOpen.value = false
-  void nextTick(() => onlineListTrigger.value?.focus())
-}
-
-watch(() => [isLoggedIn.value, account.value?.oId, chatStyle.value], () => {
-  onlineListOpen.value = false
-}, { flush: 'sync' })
-
 const chatTools = [
   { id: 'packet', label: '红包', title: '发放红包', path: 'M5 3h14v18H5z M5 8l7 4 7-4 M9 15h6' },
   { id: 'paint', label: '涂鸦', title: '涂鸦画板', path: 'm14 5 5 5 M4 20l4-1L21 6l-4-4L4 15v5Z M13 20h8' },
@@ -352,14 +331,6 @@ function clearScreen() {
 
             <div v-if="isLoggedIn" class="classic-online-bar" aria-label="在线成员" role="region">
               <ChatOnlineList avatars-only />
-              <button
-                v-if="online.firstPageUsers?.length"
-                ref="onlineListTrigger"
-                type="button"
-                class="classic-btn online-list-trigger"
-                aria-haspopup="dialog"
-                @click="openOnlineList"
-              >查看全部<span v-if="online.total !== null"> · {{ online.total }} 人</span></button>
             </div>
             <span v-if="error" class="top-error-tip">{{ error }}</span>
           </section>
@@ -593,11 +564,6 @@ function clearScreen() {
     </button>
 
     <!-- ==================== 浮层与弹窗 ==================== -->
-    <FpDialog :open="onlineListOpen && isLoggedIn" title="在线成员" :width="460" @close="closeOnlineList">
-      <div ref="onlineListContent" tabindex="-1">
-        <ChatOnlineList />
-      </div>
-    </FpDialog>
     <!-- 大区节点选择弹层 -->
     <ChatToolDialog v-if="isLoggedIn" :tool="activeTool" @close="activeTool=''" @insert="insertPaint" />
     <FpDialog :open="showNodes && isLoggedIn" title="切换聊天室大区节点" :width="520" @close="showNodes = false">
@@ -738,12 +704,6 @@ function clearScreen() {
 .classic-online-bar {
   margin-top: 12px;
   border-top: 1px dashed var(--fp-border);
-}
-
-.online-list-trigger {
-  margin-top: 4px;
-  min-height: 28px;
-  font-size: 12px;
 }
 
 /* 下方消息列表 */

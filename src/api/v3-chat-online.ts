@@ -10,3 +10,15 @@ export async function chatOnlinePage(page=1,signal?:AbortSignal):Promise<ChatOnl
  const list=d.list.map(v=>{const u=row(v),id=text(u.id),userName=text(u.userName);if(!/^\d{1,32}$/.test(id)||!userName)throw invalid();return{id,userName,userAvatarURL:text(u.userAvatarURL)}});if(new Set(list.map(u=>u.id)).size!==list.length)throw invalid()
  const nodesSampledAt=count(d.nodesSampledAt);if(!Number.isFinite(new Date(nodesSampledAt).getTime())||typeof d.nodesComplete!=='boolean')throw invalid();return{list,page,size:20,total,pageCount,hasMore:d.hasMore,nodesSampledAt,nodesComplete:d.nodesComplete}
 }
+
+export async function chatOnlineAll(signal: AbortSignal): Promise<ChatOnlineUser[]> {
+  let result = await chatOnlinePage(1, signal)
+  const pageCount = result.pageCount
+  const users = new Map(result.list.map(user => [user.id, user]))
+  for (let page = 2; page <= pageCount && result.hasMore; page++) {
+    signal.throwIfAborted()
+    result = await chatOnlinePage(page, signal)
+    for (const user of result.list) users.set(user.id, user)
+  }
+  return [...users.values()]
+}

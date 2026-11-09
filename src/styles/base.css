@@ -42,6 +42,7 @@
 
 :root {
   --fp-avatar-radius: 8px;
+  --fp-avatar-radius-small: 4px;
   --fp-bg: #282a2a;
   --fp-nav: #242525;
   --fp-card: #282a2a;
@@ -557,7 +558,7 @@ input[type='radio']:disabled {
   display: inline-block;
   width: 20px;
   height: 20px;
-  border-radius: var(--fp-avatar-radius);
+  border-radius: var(--fp-avatar-radius-small);
   background: var(--fp-hover) center / cover no-repeat;
   flex-shrink: 0;
 }

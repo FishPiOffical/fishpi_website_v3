@@ -1,29 +1,67 @@
 <script setup lang="ts">
 import { DEFAULT_AVATAR } from '@/utils/avatar'
 
-import {computed,ref} from 'vue'
+import {computed,ref,watch} from 'vue'
 import {storeToRefs} from 'pinia'
 import {RouterLink} from 'vue-router'
+import {getAuthContextVersion} from '@/api/http'
+import {chatOnlineAll,type ChatOnlineUser} from '@/api/v3-chat-online'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ChatOnlineStore} from '@/stores/v3ChatOnline'
 const props=defineProps<{previewLimit?:number; avatarsOnly?:boolean}>(),expanded=ref(false)
 const online=useV3ChatOnlineStore(),{accessToken,account}=storeToRefs(useAuthStore())
+const allUsers = ref<ChatOnlineUser[]>([])
+const allLoading = ref(false)
+const allError = ref('')
+const retryAll = ref(0)
+const identity = () => JSON.stringify([getAuthContextVersion(), !!accessToken.value, account.value?.oId])
+watch(identity, () => {
+  if (props.avatarsOnly) expanded.value = false
+}, { flush: 'sync' })
+watch([expanded, accessToken, retryAll], async ([open, token], _, onCleanup) => {
+  if (!props.avatarsOnly) return
+  allUsers.value = []
+  allError.value = ''
+  allLoading.value = false
+  if (!open || !token || !account.value?.oId) return
+  const currentIdentity = identity()
+  const controller = new AbortController()
+  onCleanup(() => controller.abort())
+  const current = () => !controller.signal.aborted && identity() === currentIdentity
+  allLoading.value = true
+  try {
+    const users = await chatOnlineAll(controller.signal)
+    if (current()) allUsers.value = users
+  } catch {
+    if (current()) allError.value = '在线名单读取失败'
+  } finally {
+    if (current()) allLoading.value = false
+  }
+}, { flush: 'sync' })
 const visibleUsers=computed(()=>{
-  if (props.avatarsOnly) return online.firstPageUsers ?? []
+  if (props.avatarsOnly) return allUsers.value
   return props.previewLimit && !expanded.value ? online.users.slice(0,props.previewLimit) : online.users
 })
-const showError=computed(()=>online.error && (!props.avatarsOnly || online.attempt === 1))
 function avatarError(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 </script>
 <template>
- <div class="online-list" :class="{ 'avatars-only': avatarsOnly }" :aria-busy="online.loading && (!avatarsOnly || online.attempt === 1)">
+ <div class="online-list" :class="{ 'avatars-only': avatarsOnly }" :aria-busy="avatarsOnly ? allLoading : online.loading">
   <p v-if="!accessToken || !account?.oId" class="empty">登录后可查看在线成员</p>
   <template v-else>
+   <button v-if="avatarsOnly" class="online-toggle" type="button" :aria-expanded="expanded" @click="expanded = !expanded">
+    在线人数<span v-if="online.total !== null"> · {{ online.total }} 人</span>
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+   </button>
+   <template v-if="avatarsOnly && expanded">
+    <p v-if="allLoading" class="inline-status" role="status">正在读取在线名单…</p>
+    <div v-else-if="allError" class="error" role="alert"><span>{{ allError }}</span><button type="button" @click="retryAll++">重试</button></div>
+    <p v-else-if="!allUsers.length" class="inline-status">暂无可见成员</p>
+   </template>
    <div v-if="!avatarsOnly" class="online-summary">
     <div><span class="count">{{ online.total === null ? '—' : online.total }}</span><span class="count-label">本次可见成员</span></div>
     <button class="refresh" type="button" :disabled="online.loading" aria-label="刷新在线名单" title="刷新在线名单" @click="online.refresh"><svg :class="{ spinning: online.loading }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button>
    </div>
-   <div v-if="showError" class="error" role="alert"><span>{{ online.error }}</span><button type="button" :disabled="online.loading" @click="online.retry">{{ avatarsOnly ? '重试' : `重试第 ${online.attempt} 页` }}</button></div>
+   <div v-if="!avatarsOnly && online.error" class="error" role="alert"><span>{{ online.error }}</span><button type="button" :disabled="online.loading" @click="online.retry">重试第 {{ online.attempt }} 页</button></div>
    <ul v-if="visibleUsers.length"><li v-for="user in visibleUsers" :key="user.id"><RouterLink :to="`/member/${encodeURIComponent(user.userName)}`" :data-user-card="user.userName" :title="user.userName" :aria-label="user.userName"><img :src="user.userAvatarURL || DEFAULT_AVATAR" alt="" loading="lazy" @error="avatarError"/><span v-if="!avatarsOnly">{{ user.userName }}</span></RouterLink></li></ul>
    <p v-if="!avatarsOnly && !online.loading && !online.error && !visibleUsers.length" class="empty">本页暂无可见成员</p>
    <button v-if="!avatarsOnly && previewLimit && online.users.length>previewLimit" class="expand-members" type="button" :aria-expanded="expanded" @click="expanded=!expanded">{{ expanded ? '收起名单' : '展开本页成员' }}</button>
@@ -50,9 +88,13 @@ a:hover { background:var(--fp-hover); }
 a:hover span { text-decoration:underline; text-underline-offset:3px; }
 a span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
 img { width:26px; height:26px; flex:none; border-radius:var(--fp-avatar-radius); object-fit:cover; }
-.avatars-only ul { display:flex; flex-wrap:wrap; gap:5px; margin:8px 0 0; padding:2px; }
-.avatars-only a { padding:0; border-radius:var(--fp-avatar-radius); }
-.avatars-only img { display:block; width:20px; height:20px; }
+.online-toggle { display:inline-flex; align-items:center; gap:4px; min-height:28px; margin-top:4px; padding:3px 6px; border:0; background:transparent; color:var(--fp-muted); font-size:12px; }
+.online-toggle svg { width:14px; height:14px; }
+.online-toggle[aria-expanded='true'] svg { transform:rotate(180deg); }
+.inline-status { margin:6px 0 0; color:var(--fp-muted); font-size:12px; }
+.avatars-only ul { display:flex; flex-wrap:wrap; gap:5px; max-height:none; overflow:visible; margin:6px 0 0; padding:2px; }
+.avatars-only a { padding:0; border-radius:var(--fp-avatar-radius-small); }
+.avatars-only img { display:block; width:20px; height:20px; border-radius:inherit; }
 nav { display:flex; align-items:center; justify-content:space-between; gap:5px; padding-top:10px; border-top:1px solid var(--fp-border); font-size:11px; }
 nav span { color:var(--fp-muted); font-variant-numeric:tabular-nums; }
 .empty { margin:12px 0; padding:12px 0; text-align:center; color:var(--fp-muted); }

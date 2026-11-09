@@ -4,7 +4,7 @@ const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.E
 const state=globalThis.__online={context:1,calls:[],dispatch:null,ssr:false};const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAuthContextVersion(){return globalThis.__online.context}export async function request(path,init){globalThis.__online.calls.push({path,init});return globalThis.__online.dispatch(path,init)}`),{ApiError}=await import(http),apiURL=url(compile(await fs.readFile('src/api/v3-chat-online.ts','utf8')).replace("from './http'",`from '${http}'`)),api=await import(apiURL)
 const auth=defineStore('online-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__onlineAuth=auth;const authURL=url('export const useAuthStore=globalThis.__onlineAuth');globalThis.window={addEventListener(){},removeEventListener(){}}
 const storeURL=url(replace(compile((await fs.readFile('src/stores/v3ChatOnline.ts','utf8')).replaceAll('import.meta.env.SSR','globalThis.__online.ssr')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-chat-online',apiURL],['@/stores/auth',authURL]])),{useV3ChatOnlineStore}=await import(storeURL)
-const routerURL=url(`import{h}from'${import.meta.resolve('vue')}';export const RouterLink={props:['to'],setup(p,{slots}){return()=>h('a',{href:p.to},slots.default?.())}}`),d=parse(await fs.readFile('src/components/chat/ChatOnlineList.vue','utf8')).descriptor,Component=(await import(url(replace(compile(compileScript(d,{id:'online',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['vue-router',routerURL],['@/stores/auth',authURL],['@/stores/v3ChatOnline',storeURL],['@/utils/avatar',url("export const DEFAULT_AVATAR='/default.png'")]])))).default
+const routerURL=url(`import{h}from'${import.meta.resolve('vue')}';export const RouterLink={props:['to'],setup(p,{slots}){return()=>h('a',{href:p.to},slots.default?.())}}`),d=parse(await fs.readFile('src/components/chat/ChatOnlineList.vue','utf8')).descriptor,Component=(await import(url(replace(compile(compileScript(d,{id:'online',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['vue-router',routerURL],['@/stores/auth',authURL],['@/stores/v3ChatOnline',storeURL],['@/api/http',http],['@/api/v3-chat-online',apiURL],['@/utils/avatar',url("export const DEFAULT_AVATAR='/default.png'")]])))).default
 const insert=(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}const i=a?p.children.indexOf(a):-1;p.children.splice(i<0?p.children.length:i,0,n);n.parent=p},renderer=createRenderer({patchProp(n,k,o,v){n.props[k]=v},insert,remove(n){if(n.parent)n.parent.children=n.parent.children.filter(c=>c!==n)},createElement(tag){return{tag,tagName:tag.toUpperCase(),props:{},children:[],value:'',addEventListener(){},removeEventListener(){},getRootNode(){return{activeElement:null}}}},createText(text){return{text,children:[]}},createComment(){return{children:[]}},setText(n,t){n.text=t},setElementText(n,t){n.children=[{text:t,children:[]}]},parentNode:n=>n.parent,nextSibling(n){const c=n.parent?.children||[];return c[c.indexOf(n)+1]||null},insertStaticContent(t,p,a){const n={text:t,children:[]};insert(n,p,a);return[n,n]}})
 const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' '),find=(n,f)=>f(n)?n:(n.children||[]).map(c=>find(c,f)).find(Boolean),tick=async()=>{for(let i=0;i<30;i++)await Promise.resolve();await nextTick()},env=data=>({code:0,data})
 function mount(pinia=createPinia(),props={}){const root={children:[]},app=renderer.createApp(Component,props);app.use(pinia);app.mount(root);return{app,root,pinia,store:useV3ChatOnlineStore(pinia),user:auth(pinia),text:()=>text(root)}}
@@ -38,18 +38,31 @@ view=mount();await view.store.connect();await view.store.load(2);state.dispatch=
 console.log('PASS chat online 13 shrinking membership keeps empty requested page explicit with a working route back to page1')
 
 view=mount(createPinia(),{avatarsOnly:true});await view.store.connect();await tick()
-const avatarLink=find(view.root,n=>n.tag==='a'&&n.props['aria-label']==='user03')
-assert.ok(avatarLink)
-assert.ok(find(avatarLink,n=>n.tag==='img'))
-assert.ok(!text(avatarLink).includes('user03'))
-assert.ok(!view.text().includes('本次可见成员'))
+const stripToggle=()=>find(view.root,n=>n.tag==='button'&&n.props.class==='online-toggle')
+assert.equal(stripToggle().props['aria-expanded'],false)
+assert.match(view.text(),/在线人数.*21 人/)
+assert.ok(!find(view.root,n=>n.tag==='img'))
+const summaryCalls=state.calls.length
+stripToggle().props.onClick();await tick()
+assert.equal(stripToggle().props['aria-expanded'],true)
+assert.equal(state.calls.length-summaryCalls,2)
+const avatarLink=find(view.root,n=>n.tag==='a'&&n.props['aria-label']==='<literal-user>')
+assert.ok(avatarLink&&find(avatarLink,n=>n.tag==='img'))
+assert.ok(!text(avatarLink).includes('<literal-user>'))
 assert.ok(!find(view.root,n=>n.tag==='nav'))
-const sidebarPaging=view.store.load(2);await nextTick()
-assert.ok(!view.text().includes('正在读取'))
-await sidebarPaging;await tick();assert.equal(view.store.page,2)
-assert.ok(find(view.root,n=>n.tag==='a'&&n.props['aria-label']==='user03'))
-assert.ok(!find(view.root,n=>n.tag==='nav'))
+assert.equal(view.store.page,1)
+stripToggle().props.onClick();await tick()
+assert.ok(!find(view.root,n=>n.tag==='img'))
+state.dispatch=()=>new Promise(r=>release=r)
+stripToggle().props.onClick();await tick()
+const stripSignal=state.calls.at(-1).init.signal
+stripToggle().props.onClick();await tick()
+assert.equal(stripSignal.aborted,true)
+release(env(page()));await tick()
+assert.ok(!find(view.root,n=>n.tag==='img'))
+state.dispatch=dispatch
+stripToggle().props.onClick();await tick()
 view.user.accessToken=null;await tick()
 assert.ok(!find(view.root,n=>n.tag==='img'))
 view.app.unmount();view.store.$dispose()
-console.log('PASS chat online 14 avatar strip stays on the first sample during sidebar pagination, without paging or loading text')
+console.log('PASS chat online 14 collapsed strip lazily renders all pages inline, aborts on close and clears on logout')
