@@ -108,7 +108,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
         unavailable?.()
         return
       }
-      if (error instanceof ApiError && ([401, 403].includes(error.status) || error.code === 'captcha')) { retire(); connectionState?.('blocked'); return }
+      if (error instanceof ApiError && ([401, 403, 429].includes(error.status) || error.code === 'captcha' || error.code === 'home_reads_paused')) { retire(); connectionState?.('blocked'); return }
       reconnect()
     }
   }

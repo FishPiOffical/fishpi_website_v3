@@ -4,7 +4,7 @@ import RecentMembers from '@/components/discovery/RecentMembers.vue'
 import RankingBoard from '@/components/RankingBoard.vue'
 import HomeReadStatus from '@/components/home/HomeReadStatus.vue'
 import { consumeHomeRankingPayload, consumeHomeReadsPayload, consumeRepeaterPayload } from '@/seo/payload'
-import { getAuthContextVersion } from '@/api/http'
+import { getAuthContextVersion, getHomeReadPause, resumeHomeReads } from '@/api/http'
 import { useHomeRead } from '@/composables/useHomeRead'
 import VipNickname from '@/components/user/VipNickname.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
@@ -31,10 +31,27 @@ import { avatarStyle, avatarUrl } from '@/utils/avatar'
 const auth = useAuthStore(), chat = useChatStore(), publication = useV3ChatPublicationStore(), layout = useHomeLayoutStore()
 const { accessToken, isLoggedIn } = storeToRefs(auth)
 const boot = consumeHomeReadsPayload()
+const activeLongShelf = ref<'recent' | 'hot'>('recent')
 const recentRead = useHomeRead('recent', boot.recent, boot.expires.recent), hotRead = useHomeRead('hot', boot.hot, boot.expires.hot), tagsRead = useHomeRead('tags', boot.tags, boot.expires.tags)
-const columnsRecentRead = useHomeRead('columnsRecent', boot.columnsRecent, boot.expires.columnsRecent), columnsHotRead = useHomeRead('columnsHot', boot.columnsHot, boot.expires.columnsHot)
+const columnsRecentRead = useHomeRead('columnsRecent', boot.columnsRecent, boot.expires.columnsRecent), columnsHotRead = useHomeRead('columnsHot', boot.columnsHot, boot.expires.columnsHot, () => activeLongShelf.value === 'hot')
 const homeReady = ref(false)
-onMounted(() => { homeReady.value = true })
+const readPause = ref<ReturnType<typeof getHomeReadPause>>(null)
+const retryTip = ref('')
+function syncReadPause() { readPause.value = getHomeReadPause(); retryTip.value = '' }
+function retryHomeReads() {
+  if (!readPause.value) return
+  if (!resumeHomeReads()) {
+    retryTip.value = '请在 ' + new Date(readPause.value.until).toLocaleTimeString('zh-CN') + ' 后重试。'
+    return
+  }
+  window.dispatchEvent(new Event('fp:retry-public'))
+}
+onMounted(() => {
+  homeReady.value = true
+  syncReadPause()
+  if (typeof window !== 'undefined') window.addEventListener('fp:home-reads-paused', syncReadPause)
+})
+onUnmounted(() => { if (typeof window !== 'undefined') window.removeEventListener('fp:home-reads-paused', syncReadPause) })
 const compactHome = computed(() => layout.mode !== 'classic')
 const left = computed(() => { const rows = recentRead.data || []; return rows.slice(0, compactHome.value ? 8 : Math.ceil(rows.length / 2)) })
 const right = computed(() => { const rows = recentRead.data || []; return compactHome.value ? rows.slice(8, 16) : rows.slice(Math.ceil(rows.length / 2)) })
@@ -51,7 +68,7 @@ onMounted(() => {
 })
 const chatDraft = ref(''), chatBusy = ref(false), chatMsg = ref('')
 const onlineChatCnt = computed(() => chat.onlineTotal), discussing = computed(() => chat.discuss)
-const hotMode = ref<'hot' | 'column'>('hot'), activeLongShelf = ref<'recent' | 'hot'>('recent')
+const hotMode = ref<'hot' | 'column'>('hot')
 const hotState = computed(() => hotMode.value === 'hot' ? hotRead : columnsRecentRead)
 const activeColumnsRead = computed(() => activeLongShelf.value === 'recent' ? columnsRecentRead : columnsHotRead)
 const activeColumnsShelf = computed(() => activeColumnsRead.value.data || [])
@@ -111,6 +128,10 @@ function scrollShelf(id: string, dir: -1 | 1) {
   <div class="home" :data-public-content="recentRead.data ? 'ready' : undefined" :class="{ editing, 'is-classic': !compactHome }">
     <h1 class="home-a11y-title">摸鱼派社区动态</h1>
     <HomePreferenceRedirect />
+    <div v-if="readPause" class="home-read-pause" role="status">
+      <span>{{ readPause.message }}{{ retryTip }}</span>
+      <button type="button" class="green" @click="retryHomeReads">重试首页读取</button>
+    </div>
     <div v-if="editing" class="edit-bar" role="toolbar" aria-label="首页布局编辑">
       <span>拖动模块到任意位置：模块上下半部插入同一列，左右边缘新开一列，行间空隙新起一行</span>
       <button type="button" @click="layout.resetPositions()">恢复默认位置</button>
@@ -349,6 +370,18 @@ function scrollShelf(id: string, dir: -1 | 1) {
 </template>
 
 <style scoped lang="scss">
+.home-read-pause {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  background: var(--fp-card);
+}
+
 .banner,
 .hint {
   color: var(--fp-muted);

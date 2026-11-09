@@ -69,6 +69,97 @@ function isV3Path(path: string) {
   return /^\/api\/v3(?:\/|$)/.test(path)
 }
 
+let homeReadsActive = false
+let homeReadGeneration = 0
+let homeReadQueue: Promise<unknown> = Promise.resolve()
+let nextHomeReadAt = 0
+let homeReadRunning = false
+let priorityHomeRefresh: Promise<unknown> | null = null
+let homeReadPause: { until: number; message: string } | null = null
+const HOME_READ_PAUSE_KEY = 'fp.home-read-pause-until'
+
+export function setHomeReadsActive(active: boolean) {
+  if (homeReadsActive === active) return
+  homeReadsActive = active
+  homeReadGeneration++
+  if (active && !homeReadPause) {
+    try {
+      const until = Number(window.sessionStorage.getItem(HOME_READ_PAUSE_KEY))
+      if (Number.isFinite(until) && until > Date.now()) {
+        homeReadPause = { until, message: '首页读取仍在暂停中。' }
+      }
+    } catch { /* Storage may be disabled. */ }
+  }
+}
+
+export function getHomeReadPause() { return homeReadPause }
+
+export function resumeHomeReads() {
+  if (!homeReadPause || Date.now() < homeReadPause.until) return false
+  homeReadPause = null
+  homeReadGeneration++
+  try { window.sessionStorage.removeItem(HOME_READ_PAUSE_KEY) } catch { /* Storage may be disabled. */ }
+  window.dispatchEvent(new Event('fp:home-reads-paused'))
+  return true
+}
+
+function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promise<T>): Promise<T> {
+  const generation = homeReadGeneration, version = authVersion
+  const check = () => {
+    if (generation !== homeReadGeneration || version !== authVersion || init.signal?.aborted) {
+      throw new ApiError('请求已取消', 0, 'aborted')
+    }
+    if (homeReadPause) throw new ApiError(homeReadPause.message, 0, 'home_reads_paused')
+  }
+  const execute = async (priority = false) => {
+    while (true) {
+      check()
+      if (!priority && priorityHomeRefresh) {
+        await priorityHomeRefresh
+        continue
+      }
+      const wait = nextHomeReadAt - Date.now()
+      if (wait <= 0) break
+      await new Promise(resolve => setTimeout(resolve, wait))
+    }
+    homeReadRunning = true
+    nextHomeReadAt = Date.now() + 250
+    try {
+      return await run()
+    } catch (error) {
+      // Rhythm uses structured unauthorized when a visitor has no refresh cookie.
+      const guestRefresh = path === '/api/v3/auth/refresh' && !accessToken &&
+        error instanceof ApiError && error.status === 401 && error.code === 'unauthorized'
+      if (generation === homeReadGeneration && version === authVersion && !guestRefresh &&
+        error instanceof ApiError && (error.status === 401 || error.status === 429 || error.code === 'offline' || isCaptchaRequired(error))) {
+        const now = Date.now()
+        const header = error.retryAfter
+        const retryAt = header && /^\d+$/.test(header) ? now + Number(header) * 1000 : Date.parse(header ?? '')
+        homeReadPause = {
+          until: Math.max(now + (error.status === 429 ? 60_000 : 15_000), Number.isFinite(retryAt) ? retryAt : 0),
+          message: error.status === 429 ? '请求过于频繁，首页已暂停读取。'
+            : error.code === 'offline' ? '连接暂不可用，首页已暂停读取。' : '访问暂时受限，首页已暂停读取。',
+        }
+        try { window.sessionStorage.setItem(HOME_READ_PAUSE_KEY, String(homeReadPause.until)) } catch { /* Storage may be disabled. */ }
+        window.dispatchEvent(new Event('fp:home-reads-paused'))
+        throw new ApiError(homeReadPause.message, 0, 'home_reads_paused')
+      }
+      throw error
+    } finally {
+      homeReadRunning = false
+    }
+  }
+  // Startup queues public reads during mount. Give the refresh cookie probe the first turn.
+  if (path === '/api/v3/auth/refresh' && !homeReadRunning && !priorityHomeRefresh && Date.now() >= nextHomeReadAt) {
+    const refresh = execute(true).finally(() => { priorityHomeRefresh = null })
+    priorityHomeRefresh = refresh.catch(() => {})
+    return refresh
+  }
+  const next = homeReadQueue.then(() => execute())
+  homeReadQueue = next.catch(() => {})
+  return next
+}
+
 function isCredentialPath(path: string) {
   return /^\/api\/v3\/auth\/(?:login|refresh|logout)(?:\?|$)/.test(path)
 }
@@ -237,7 +328,7 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
     asNetworkError(e, identity)
   }
 
-  if (import.meta.env.SSR && res.status === 429) {
+  if (res.status === 429) {
     void res.body?.cancel().catch(() => {})
     const error = new ApiError('操作过于频繁，请稍后重试', 429)
     error.retryAfter = res.headers.get('Retry-After') ?? undefined
@@ -310,7 +401,7 @@ export async function request<T = unknown>(path: string, init: RequestInitExtra 
     !init.signal && !init.headers && !init.body && !init.__v3Retried && !init.__captchaRetried && !init.__zip && !init.__svg &&
     /^\/api\/v3\/(?:articles|columns(?:\/hot)?|tags|domains|breezemoons|repeater\/items)(?:\?|$)/.test(path)
   if (!share) return requestWithRetry<T>(path, init)
-  const key = JSON.stringify([getAuthContextVersion(), getAccessToken(), path, init.credentials || 'include', init.cache || 'default'])
+  const key = JSON.stringify([getAuthContextVersion(), init.credentials === 'omit' ? null : getAccessToken(), homeReadsActive ? homeReadGeneration : null, path, init.credentials || 'include', init.cache || 'default'])
   let flight = publicListFlights.get(key)
   if (!flight) { flight = requestWithRetry(path, init); publicListFlights.set(key, flight) }
   try { return structuredClone(await flight) as T }
@@ -331,6 +422,14 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
       throw new ApiError('登录状态已变更', 401, 'stale_session')
     }
     return requestOnce<T>(path, init, identity)
+  }
+  if (!import.meta.env.SSR && homeReadsActive && isV3Path(path)) {
+    const method = (init.method || 'GET').toUpperCase()
+    const refresh = path === '/api/v3/auth/refresh'
+    const ticket = /\/(?:realtime-ticket|realtime\/tickets)$/.test(path)
+    if (method === 'GET' || refresh || ticket) {
+      return queueHomeRead(path, init, refresh ? () => queueCredentialRequest(run) : run)
+    }
   }
   try {
     if (timeout && ssrReadGate) {

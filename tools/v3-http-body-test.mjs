@@ -6,13 +6,17 @@ import { ref } from 'vue'
 import { createPinia, defineStore } from 'pinia'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64')
-const received=[];let cut=true,bodyReadStarted,challenged=false
+const received=[];let cut=true,bodyReadStarted,challenged=false,guestRefresh=false
 let captchaCalls=0
 globalThis.__testRiskCaptcha=async()=>{captchaCalls++;challenged=true}
 const server=http.createServer(async(req,res)=>{
  const chunks=[];for await(const chunk of req)chunks.push(chunk)
  received.push({path:req.url,method:req.method,key:req.headers['idempotency-key'],body:Buffer.concat(chunks).toString()})
- if(req.url==='/api/v3/auth/refresh'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{"code":0,"data":{"accessToken":"synthetic-rotated"}}');return}
+ if(req.url==='/api/v3/auth/refresh'){
+  res.writeHead(guestRefresh?401:200,{'Content-Type':'application/json'})
+  res.end(guestRefresh?'{"code":"unauthorized"}':'{"code":0,"data":{"accessToken":"synthetic-rotated"}}')
+  return
+ }
  if(req.url==='/api/v3/fixture/guest-401'){
   res.writeHead(401,{'Content-Type':'text/html'});res.end('<p>Unauthorized</p>');return
  }
@@ -20,6 +24,9 @@ const server=http.createServer(async(req,res)=>{
   res.writeHead(challenged?200:401,{'Content-Type':'application/json'})
   res.end(challenged?'{"code":0}':'{"code":"captcha","msg":"Complete verification"}')
   return
+ }
+ if(req.url==='/api/v3/fixture/rate'){
+  res.writeHead(429,{'Content-Type':'text/plain','Retry-After':'120'});res.end('Slow down');return
  }
  const format=req.url.split('/').pop()
  if(format==='error'){res.writeHead(422,{'Content-Type':'application/json'});res.end('{"code":"invalid_request","msg":"Rejected"}');return}
@@ -99,5 +106,42 @@ try{
  assert.equal(captchaCalls,1)
  assert.equal(api.getAccessToken(),'synthetic-test-only')
  console.log('PASS HTTP guest 401 skips refresh and a structured captcha opens verification before retry')
+
+ const pauseStart=received.length
+ api.setHomeReadsActive(true)
+ await Promise.all(['/api/v3/fixture/guest-401','/api/v3/fixture/json'].map(path=>
+  assert.rejects(api.request(path),error=>error.code==='home_reads_paused')))
+ assert.deepEqual(received.slice(pauseStart).map(entry=>entry.path),['/api/v3/fixture/guest-401'])
+ assert.equal(api.resumeHomeReads(),false)
+ const originalNow=Date.now
+ try {
+  const wallStart=originalNow()
+  let now=wallStart
+  Date.now=()=>now+originalNow()-wallStart
+  now+=16_000
+  assert.equal(api.resumeHomeReads(),true)
+  const rateStart=received.length
+  await Promise.all(['/api/v3/fixture/rate','/api/v3/fixture/json'].map(path=>
+   assert.rejects(api.request(path),error=>error.code==='home_reads_paused')))
+  assert.deepEqual(received.slice(rateStart).map(entry=>entry.path),['/api/v3/fixture/rate'])
+  now+=118_000
+  assert.equal(api.resumeHomeReads(),false)
+  now+=2000
+  assert.equal(api.resumeHomeReads(),true)
+  assert.equal((await api.request('/api/v3/fixture/json')).code,0)
+  now+=1000
+  guestRefresh=true
+  api.setAccessToken(null)
+  const priorityStart=received.length
+  const read=api.request('/api/v3/fixture/json')
+  assert.equal(await api.refreshAccessToken(),false)
+  assert.equal(await read.then(value=>value.code),0)
+  assert.deepEqual(received.slice(priorityStart).map(entry=>entry.path),['/api/v3/auth/refresh','/api/v3/fixture/json'])
+  assert.equal(api.getHomeReadPause(),null)
+ } finally {
+  Date.now=originalNow
+  api.setHomeReadsActive(false)
+ }
+ console.log('PASS homepage queue stops on 401/429, respects Retry-After and requires explicit resume')
 
 }finally{globalThis.fetch=nativeFetch;globalThis.window=oldWindow;server.closeAllConnections();await new Promise(resolve=>server.close(resolve))}
