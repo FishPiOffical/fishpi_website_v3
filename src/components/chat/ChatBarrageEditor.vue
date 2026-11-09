@@ -3,6 +3,7 @@ import {onBeforeUnmount,ref,watch} from 'vue'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ChatBarrageStore} from '@/stores/v3ChatBarrage'
 import {getAuthContextVersion} from '@/api/http'
+import ChatBarrageBubble from './ChatBarrageBubble.vue'
 import ChatBarragePrice from './ChatBarragePrice.vue'
 import {useV3ChatBarragePriceStore} from '@/stores/v3ChatBarragePrice'
 const price=useV3ChatBarragePriceStore(),color=ref('#FFFFFF')
@@ -21,5 +22,36 @@ async function save(){
 watch(()=>store.completed,command=>{if(command&&JSON.stringify([command.content,command.color])===submitted&&JSON.stringify([draft.value,color.value.toUpperCase()])===submitted){draft.value='';submitted='';emit('close')}})
 watch(identity,()=>{cancel();draft.value='';submitted=''},{flush:'sync'});onBeforeUnmount(cancel)
 </script>
-<template><div><ChatBarragePrice /><form class="barrage-editor" @submit.prevent="save"><label>弹幕正文 <input v-model="draft" maxlength="4096" placeholder="说点什么，让大家看到…" :disabled="store.busy||!!store.pending||confirming" /></label><label class="color">颜色 <input v-model="color" type="color" :disabled="store.busy||!!store.pending||confirming" /></label><p class="barrage-preview" :style="{color}">{{ draft || '弹幕预览' }}</p><button type="submit" :disabled="!draft.trim()||store.busy||!!store.pending||confirming">发送弹幕</button><button type="button" @click="emit('close')">取消</button></form></div></template>
-<style scoped lang="scss">.barrage-editor{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 0}label{flex:1;min-width:160px;font-size:13px}.color{flex:0;min-width:60px}input{box-sizing:border-box;width:100%}input[type=color]{height:34px;padding:2px}button,input{font:inherit;border:1px solid var(--fp-border);border-radius:5px;padding:6px;background:var(--fp-card);color:var(--fp-text)}button:disabled,input:disabled{opacity:.5}</style>
+<template>
+  <form class="barrage-editor" @submit.prevent="save">
+    <label class="barrage-content">弹幕正文
+      <input v-model="draft" maxlength="4096" placeholder="说点什么，让大家看到…" :disabled="store.busy || !!store.pending || confirming" />
+    </label>
+    <div class="barrage-sample">
+      <label class="barrage-color">颜色
+        <input v-model="color" type="color" :disabled="store.busy || !!store.pending || confirming" />
+      </label>
+      <ChatBarrageBubble :avatar="auth.account?.userAvatarURL" :color="color" :content="draft || '弹幕预览'" />
+    </div>
+    <div class="barrage-footer">
+      <ChatBarragePrice />
+      <div class="barrage-actions">
+        <button type="button" @click="emit('close')">取消</button>
+        <button type="submit" :disabled="!auth.accessToken || !draft.trim() || store.busy || !!store.pending || confirming">发送弹幕</button>
+      </div>
+    </div>
+  </form>
+</template>
+
+<style scoped>
+.barrage-editor { display: grid; gap: 14px; }
+.barrage-content { display: flex; flex-direction: column; }
+.barrage-content input { min-width: 0; }
+.barrage-sample, .barrage-footer, .barrage-actions, .barrage-color { display: flex; align-items: center; gap: 8px; }
+.barrage-sample { gap: 14px; }
+.barrage-sample > :last-child { min-width: 0; }
+.barrage-color { flex: none; }
+.barrage-color input { width: 36px; height: 28px; padding: 2px; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-card); }
+.barrage-footer { flex-wrap: wrap; border-top: 1px solid var(--fp-border); padding-top: 12px; }
+.barrage-actions { margin-inline-start: auto; }
+</style>

@@ -43,7 +43,7 @@ onBeforeUnmount(()=>{disposed=true;sequence++;unlock();if(trigger?.isConnected)t
 <template>
   <FpDialog :open="!!tool" :title="info.title" :width="tool==='paint'?620:480" :persistent="Boolean(activeDialogState)" :closable="!activeDialogState" @close="emit('close')">
     <div v-if="tool" ref="content" class="chat-tool-content" :class="'tool-'+tool" tabindex="-1">
-      <p class="tool-intro">{{ info.hint }}</p>
+      <p v-if="tool!=='barrage'" class="tool-intro">{{ info.hint }}</p>
       <ChatRedPacketEditor v-if="tool==='packet'" @close="emit('close')" />
       <ChatBarrageEditor v-else-if="tool==='barrage'" @close="emit('close')" />
       <PaintPanel v-else @insert="md=>emit('insert',md)" @close="emit('close')" />
@@ -60,9 +60,6 @@ onBeforeUnmount(()=>{disposed=true;sequence++;unlock();if(trigger?.isConnected)t
 .chat-tool-content :deep(.packet-editor){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:0}.chat-tool-content :deep(.packet-editor>label:first-child),.chat-tool-content :deep(.packet-editor>label:has(input[maxlength])),.chat-tool-content :deep(.packet-editor>p),.chat-tool-content :deep(.packet-editor>div){grid-column:1/-1}
 .chat-tool-content :deep(.packet-editor>div){display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid var(--fp-border)}
 .chat-tool-content :deep(.packet-editor>p){font-size:11px;line-height:1.8}
-.chat-tool-content :deep(.barrage-editor){display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;padding:18px 0 0}.chat-tool-content :deep(.barrage-editor>label:first-child){grid-column:1/-1;display:flex;flex-direction:column}.chat-tool-content :deep(.barrage-editor>.color){grid-column:1/-1;display:flex;align-items:center;gap:12px;min-width:0}.chat-tool-content :deep(input[type=color]){width:44px;height:32px;border:1px solid var(--fp-border);border-radius:7px;padding:3px}.chat-tool-content :deep(.barrage-preview){grid-column:1/-1;margin:0;padding:12px 14px;background:#25272c;border-radius:8px;font-size:15px;line-height:1.6;overflow-wrap:anywhere}
-.chat-tool-content :deep(.barrage-editor>button){margin-top:4px}
-.chat-tool-content :deep(.barrage-price){padding:12px 14px;background:var(--fp-primary-soft);border-radius:9px}.chat-tool-content :deep(.barrage-price p){margin:0;font-size:12px;line-height:1.7}.chat-tool-content :deep(.barrage-price button){margin-top:8px;font-size:11px;padding:3px 8px;background:transparent}
 .chat-tool-content :deep(.paint){display:flex;flex-direction:column;gap:16px;margin:0;padding:0}.chat-tool-content :deep(.paint canvas){max-width:100%;border-radius:10px;order:0}.chat-tool-content :deep(.paint .tools){order:1;margin:0;padding-top:16px;border-top:1px solid var(--fp-border);gap:10px}.chat-tool-content :deep(.paint .tools .green){margin-left:auto}.chat-tool-content :deep(.paint .err){order:2}
 @media(max-width:480px){.chat-tool-content :deep(.packet-editor){gap:12px}.chat-tool-content :deep(.paint .tools .green){margin-left:0}.chat-tool-content :deep(.packet-editor>div){flex-wrap:wrap}}
 </style>

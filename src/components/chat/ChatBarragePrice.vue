@@ -5,5 +5,18 @@ import {useV3ChatBarragePriceStore} from '@/stores/v3ChatBarragePrice'
 const auth=useAuthStore(),store=useV3ChatBarragePriceStore()
 onMounted(()=>{void store.read()});watch([()=>auth.accessToken,()=>auth.account?.oId],()=>{void store.read()})
 </script>
-<template><div class="barrage-price"><p v-if="!auth.accessToken">登录后可查看弹幕价格。</p><p v-else-if="store.loading" role="status">正在读取弹幕价格…</p><p v-else-if="store.error" role="alert">{{ store.error }}</p><p v-else-if="store.price">当前发送花费 {{ store.price.amount }} {{ store.price.unit }}，实际以发送时为准。</p><p v-else>弹幕价格尚未读取。</p><button v-if="auth.accessToken" type="button" :disabled="store.loading" @click="store.read">重新读取价格</button></div></template>
-<style scoped lang="scss">.barrage-price{font-size:12px;color:var(--fp-muted)}p{margin:6px 0}button{font:inherit;color:var(--fp-text);background:var(--fp-card);border:1px solid var(--fp-border);border-radius:5px;padding:4px 8px}</style>
+<template>
+  <div class="barrage-price">
+    <span v-if="!auth.accessToken">登录后可发送</span>
+    <span v-else-if="store.loading" role="status">读取价格中…</span>
+    <template v-else-if="!store.price">
+      <span role="status">价格暂不可用</span>
+      <button type="button" aria-label="重新读取弹幕价格" @click="store.read">重试</button>
+    </template>
+    <span v-else title="实际扣费以发送时为准">本次预计 {{ store.price.amount }} {{ store.price.unit }}</span>
+  </div>
+</template>
+
+<style scoped>
+.barrage-price { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fp-muted); }
+</style>
