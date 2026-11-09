@@ -12,7 +12,7 @@ try {
  assert.deepEqual(calls.map(c=>c.path),['https://fishpi.cn/api/v3/statistics','https://fishpi.cn/api/v3/auth/refresh','https://fishpi.cn/api/v3/auth/captcha-options']);assert.ok(calls.every(c=>c.init.credentials==='include'));assert.equal(calls[0].init.headers.get('Authorization'),'Bearer memory-token');assert.equal(calls[1].init.headers.has('Authorization'),false)
  const sockets=[];globalThis.WebSocket=class{constructor(path){this.path=path;sockets.push(this)}close(){}}
  const shim=url(`export class ApiError extends Error{};export const getAccessToken=()=>"token";export async function request(){return {code:0,data:{channel:'messages',path:'/api/v3/realtime',ticket:'FIRST_FRAME_ONLY'}}}`)
- const rt=await import(url(env(compile(await fs.readFile('src/api/v3-realtime.ts','utf8'))).replace("from './http'",`from '${shim}'`)))
+ const rt=await import(url(env(compile(await fs.readFile('src/api/v3-realtime.ts','utf8'))).replace("from './http'",`from '${shim}'`).replace("from './v3-chat-messages'",`from '${url('export function decodeChatMessage(){throw Error("unexpected chat frame")}')}'`)))
  const stop=rt.subscribeMessageChanges(()=>{});await new Promise(r=>setImmediate(r));assert.equal(sockets[0].path,'wss://fishpi.cn/api/v3/realtime');assert.ok(!sockets[0].path.includes('FIRST_FRAME'));stop()
  const feedback=await fs.readFile('src/feedback/api.ts','utf8');assert.ok(feedback.includes("fetch('/feedback-api/v1'+path"))
  console.log('PASS production HTTP/refresh/ping and WS directly target fishpi.cn; credentials remain memory/cookie, feedback stays same-origin')

@@ -226,7 +226,7 @@
 
 - 普通聊天室send→v3ChatPublication，原content/client/key跨SPA；confirmation_required明确确认原键，成功只metadata后当前GET，读取失败不重发。Chatroom/抽屉输入匹配才清，当前详情投影去重。旧特殊按钮走独立legacy临时链，禁止普通正文隐式回退旧语法执行器；消息历史/实时已接v3ChatTimeline；在线已接v3ChatOnline，其他剩余链另迁移。
 
-- 聊天室消息统一v3ChatTimeline游标/首帧chat事件；WS仅ID/revision，当前GET合并，旧响应/旧页不覆盖更新或复活删除，401/403清授权并拒迟到投影。ready/sync重读窗口，清屏不自动重灌；Home/SSR不取旧chat正文，节点密钥链已从消息消费者移除。在线已接v3ChatOnline；mutes/特殊写等仍单独迁移。
+- 聊天室消息统一v3ChatTimeline游标/首帧chat事件；WS新增/更新快照用详情解码器直接合并，撤回按ID处理，无快照合并重读历史；旧响应/旧页不覆盖更新或复活删除，401/403清授权并拒迟到投影。ready/sync重读窗口，清屏不自动重灌；Home/SSR不取旧chat正文，节点密钥链已从消息消费者移除。在线已接v3ChatOnline；mutes/特殊写等仍单独迁移。
 
 - 在线名单统一v3ChatOnline/ChatOnlineList；total不可用users.length替代，错误未知与0区分，筛选仅本页。保留采样范围限制与原页重试，换身份清除/轮换当前页重读，SSR不取旧online载荷。
 

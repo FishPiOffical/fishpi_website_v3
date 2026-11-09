@@ -1,4 +1,5 @@
 import { ApiError, getAccessToken, request } from './http'
+import { decodeChatMessage, type ChatMessage } from './v3-chat-messages'
 
 /** A ticket goes only in the first socket frame, never in a URL or persistent storage. */
 export function subscribeNotificationChanges(changed: () => void): () => void {
@@ -10,7 +11,13 @@ export function subscribeArticleChanges(articleId:string,changed:()=>void,unavai
 }
 export function subscribeMessageChanges(changed:()=>void):()=>void {return subscribeChanges('messages','/api/v3/me/messages/realtime-ticket',changed)}
 export interface ChatBarrageEvent{id:string;content:string;color:string;createdAt:number;author:{id:string;userName:string;userNickname:string;userAvatarURL:string}}
-export type ChatRealtimeEvent={type:'sync'|'topic'|'message'|'reactions';id?:string;revision?:string}|{type:'barrage';barrage:ChatBarrageEvent}
+export type ChatRealtimeEvent =
+  | { type: 'sync' }
+  | { type: 'topic'; revision: string }
+  | { type: 'message'; id: string; revision: string; message?: ChatMessage }
+  | { type: 'deleted'; id: string; revision: string }
+  | { type: 'reactions'; id: string; revision: string }
+  | { type: 'barrage'; barrage: ChatBarrageEvent }
 function barrageEvent(value:unknown):ChatBarrageEvent|null{
  if(!value||typeof value!=='object'||Array.isArray(value))return null
  const d=value as Record<string,unknown>,a=d.author as Record<string,unknown>|null
@@ -78,7 +85,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
       transport.onmessage = (event) => {
         if (!valid()) return
         try {
-          const message = JSON.parse(event.data) as { type?: unknown; data?: { channel?: unknown; articleId?:unknown;messageId?:unknown;revision?:unknown } }
+          const message = JSON.parse(event.data) as { type?: unknown; data?: { channel?: unknown; articleId?:unknown;messageId?:unknown;revision?:unknown;message?:unknown } }
           if (message.type === 'authentication.required') { authenticate(); return }
           if (message.type === 'ready') {
             if (authenticated || !sent || message.data?.channel !== channel || (articleId!==undefined&&message.data?.articleId!==articleId)) { reconnect(); return }
@@ -95,7 +102,15 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
             if(message.type==='chat.topic_changed'){chatEvent?.({type:'topic',revision});return}
             const id=message.data?.messageId;if(typeof id!=='string'||!/^\d{1,32}$/.test(id))return
             if(message.type==='chat.message.reactions')chatEvent?.({type:'reactions',id,revision})
-            else if(['chat.message.created','chat.message.updated','chat.message.deleted'].includes(String(message.type)))chatEvent?.({type:'message',id,revision})
+            else if(message.type==='chat.message.deleted')chatEvent?.({type:'deleted',id,revision})
+            else if(message.type==='chat.message.created'||message.type==='chat.message.updated'){
+              let snapshot: ChatMessage | undefined
+              try {
+                const decoded = decodeChatMessage(message.data?.message)
+                if (decoded.id === id) snapshot = decoded
+              } catch { /* Older servers and invalid snapshots require history reconciliation. */ }
+              chatEvent?.({type:'message',id,revision,...(snapshot ? {message:snapshot} : {})})
+            }
           } else if (authenticated && (channel==='article'?message.type==='article.changed'&&message.data?.articleId===articleId:message.type===`${channel}.changed`)) changed()
         } catch { reconnect() }
       }

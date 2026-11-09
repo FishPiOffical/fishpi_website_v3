@@ -53,7 +53,7 @@ globalThis.__noticeTimers=timers
 class Socket {static OPEN=1;static all=[];readyState=1;sent=[];closed=false;constructor(url){this.url=url;Socket.all.push(this)}send(value){this.sent.push(JSON.parse(value))}close(){this.closed=true}}
 globalThis.WebSocket=Socket
 const tick=async()=>{for(let i=0;i<8;i++)await Promise.resolve()}
-let realtime=env(await fs.readFile('src/api/v3-realtime.ts','utf8')).replace("from './http'",`from '${shim}'`)
+let realtime=env(await fs.readFile('src/api/v3-realtime.ts','utf8')).replace("from './http'",`from '${shim}'`).replace("from './v3-chat-messages'",`from '${moduleUrl('export function decodeChatMessage(){throw Error("unexpected chat frame")}')}'`)
 realtime='const __timers=globalThis.__noticeTimers;\n'+realtime.replaceAll('setTimeout(', '__timers.timeout(').replaceAll('setInterval(', '__timers.interval(').replaceAll('clearTimeout(', '__timers.clearTimeout(').replaceAll('clearInterval(', '__timers.clearInterval(')
 const rt=await import(moduleUrl(realtime));let invalidations=0
 __noticeResponses.push({code:0,data:{ticket:'T'.repeat(43),path:'/api/v3/realtime',channel:'notifications'}})
