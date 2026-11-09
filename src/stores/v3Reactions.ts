@@ -8,10 +8,10 @@ type Command={choice:string|null;key:string;busy:boolean;error:string}
 export const useV3ReactionsStore=defineStore('v3-reactions',()=>{
   const { accessToken,account }=storeToRefs(useAuthStore())
   const options=ref<ReactionOption[]>([]),commands=ref<Record<string,Command>>({})
-  const lastChange=ref({kind:'' as ReactionTarget|'',id:'',confirmed:false,revision:0})
+  const lastChange=ref({kind:'' as ReactionTarget|'',id:'',confirmed:false,revision:0,snapshot:undefined as ReactionState | null | undefined})
   let generation=0,boundary=getAuthContextVersion(),owner=account.value?.oId,flight:Promise<ReactionOption[]>|null=null
   const targetReads = new Map<string, Promise<ReactionState>>()
-  function reset(){targetReads.clear();generation++;commands.value={};options.value=[];flight=null;lastChange.value={kind:'',id:'',confirmed:false,revision:lastChange.value.revision+1}}
+  function reset(){targetReads.clear();generation++;commands.value={};options.value=[];flight=null;lastChange.value={kind:'',id:'',confirmed:false,revision:lastChange.value.revision+1,snapshot:undefined}}
   const stop=watch([accessToken,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),actor=account.value?.oId;if(!accessToken.value||next!==boundary||owner!==actor)reset();boundary=next;owner=actor},{flush:'sync'})
   onScopeDispose(()=>{stop();reset()})
   async function loadOptions(){
@@ -32,7 +32,7 @@ export const useV3ReactionsStore=defineStore('v3-reactions',()=>{
     try { return await task }
     finally { if (targetReads.get(key) === task) targetReads.delete(key) }
   }
-  function invalidate(kind:ReactionTarget,id:string,confirmed=false){if(!['article','comment','chat'].includes(kind)||typeof id!=='string'||! /^[1-9][0-9]{0,18}$/.test(id))return;targetReads.delete(kind+':'+id);lastChange.value={kind,id,confirmed,revision:lastChange.value.revision+1}}
+  function invalidate(kind:ReactionTarget,id:string,confirmed=false,snapshot?:ReactionState|null){if(!['article','comment','chat'].includes(kind)||typeof id!=='string'||! /^[1-9][0-9]{0,18}$/.test(id))return;targetReads.delete(kind+':'+id);lastChange.value={kind,id,confirmed,revision:lastChange.value.revision+1,snapshot}}
   async function set(kind:ReactionTarget,id:string,choice:string|null){
     const actor=account.value?.oId,current=generation,context=getAuthContextVersion()
     const valid=()=>!import.meta.env.SSR&&!!accessToken.value&&!!actor&&actor===account.value?.oId&&current===generation&&context===getAuthContextVersion()
@@ -45,7 +45,7 @@ export const useV3ReactionsStore=defineStore('v3-reactions',()=>{
     if(!previous&&choice!==null&&!options.value.some(o=>o.value===choice))throw new ApiError('请选择目录中的表情',422)
     commands.value[identity]=previous||{choice,key:profileOperationKey(),busy:false,error:''}
     const command=commands.value[identity]!;command.busy=true;command.error=''
-    try{await writeReaction(kind,id,command.choice,command.key,options.value);if(valid()){delete commands.value[identity];invalidate(kind,id,true)}}
+    try{const snapshot=await writeReaction(kind,id,command.choice,command.key,options.value);if(valid()){delete commands.value[identity];invalidate(kind,id,true,snapshot)}}
     catch(reason){if(valid()){command.error=reason instanceof Error?reason.message:'表态失败';if(!recovering&&reason instanceof ApiError&&reason.status>=400&&reason.status<500)delete commands.value[identity];throw reason}}
     finally{if(valid()&&commands.value[identity]===command)command.busy=false}
   }

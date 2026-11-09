@@ -21,11 +21,20 @@ export async function readArticleInteraction(kind:ArticleInteractionKind,id:stri
   if (kind === 'thanks') return {kind,id,thanked:boolean(result.thanked),thankCount:integer(result.thankCount),thankPoint:integer(result.thankPoint),...(resource === 'comments' ? {canThank:boolean(result.canThank)} : {})}
   return {kind,id,rewarded:boolean(result.rewarded),rewardPoint:integer(result.rewardPoint,Number.MIN_SAFE_INTEGER)}
 }
-export async function writeArticleInteraction(kind:ArticleInteractionKind,id:string,choice:VoteChoice,key:string,resource:InteractionResource='articles'):Promise<void> {
+export async function writeArticleInteraction(kind:ArticleInteractionKind,id:string,choice:VoteChoice,key:string,resource:InteractionResource='articles'):Promise<VoteState | ThanksState | null | undefined> {
   if (!/^[A-Za-z0-9._:-]{1,128}$/.test(key) || (kind === 'vote' ? choice !== null && choice !== 'up' && choice !== 'down' : choice !== null)) throw new ApiError('互动参数不合法',422)
   const result=data(await request(path(kind,id,resource),{method:kind === 'vote' ? choice === null ? 'DELETE' : 'PUT' : 'POST',headers:{'Idempotency-Key':key},...(kind === 'vote' && choice !== null ? {body:JSON.stringify({vote:choice})} : {})}),id)
   if (kind === 'vote') { if (voteState(result,id).vote !== choice) throw invalid() }
   else if (result[kind === 'thanks' ? 'thanked' : kind === 'accept' ? 'accepted' : 'rewarded'] !== true) throw invalid()
+  if (resource !== 'comments' || result.interaction === undefined) return
+  if (result.interaction === null) return null
+  const state = row(result.interaction)
+  if (state.id !== id) throw invalid()
+  if (kind === 'vote') return voteState(state, id)
+  if (kind === 'thanks') {
+    return { kind, id, thanked: boolean(state.thanked), canThank: boolean(state.canThank),
+      thankCount: integer(state.thankCount), thankPoint: integer(state.thankPoint) }
+  }
 }
 /** Reward HTML is only accepted from a fresh, currently authorized article detail. */
 export async function readArticleRewardHtml(id:string):Promise<string> {

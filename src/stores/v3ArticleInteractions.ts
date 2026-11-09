@@ -2,7 +2,7 @@ import { defineStore, storeToRefs } from 'pinia'
 import { onScopeDispose, ref, watch } from 'vue'
 import { ApiError, getAuthContextVersion } from '@/api/http'
 import { profileOperationKey } from '@/api/v3-profile'
-import { writeArticleInteraction, type ArticleInteractionKind, type VoteChoice, type InteractionResource } from '@/api/v3-article-interactions'
+import { writeArticleInteraction, type ArticleInteractionKind, type VoteState, type ThanksState, type VoteChoice, type InteractionResource } from '@/api/v3-article-interactions'
 import { useAuthStore } from '@/stores/auth'
 type Command = { choice: VoteChoice; key: string; busy: boolean; error: string }
 /** Only unresolved explicit commands persist across SPA views; never persist credentials or relationship snapshots. */
@@ -10,9 +10,9 @@ export const useV3ArticleInteractionsStore = defineStore('v3-article-interaction
   const auth = useAuthStore()
   const { accessToken, account } = storeToRefs(auth)
   const balanceError = ref('')
-  const commands = ref<Record<string,Command>>({}), lastChange = ref({ targetId:'', kind:'' as ArticleInteractionKind|'', resource:'articles' as InteractionResource, revision:0 })
+  const commands = ref<Record<string,Command>>({}), lastChange = ref({ targetId:'', kind:'' as ArticleInteractionKind|'', resource:'articles' as InteractionResource, revision:0, snapshot:undefined as VoteState | ThanksState | null | undefined })
   let generation = 0, boundary = getAuthContextVersion(), owner = account.value?.oId
-  function reset() { generation++; commands.value = {}; balanceError.value = ''; lastChange.value = { targetId:'', kind:'', resource:'articles', revision:lastChange.value.revision + 1 } }
+  function reset() { generation++; commands.value = {}; balanceError.value = ''; lastChange.value = { targetId:'', kind:'', resource:'articles', revision:lastChange.value.revision + 1, snapshot:undefined } }
   const stop = watch([accessToken, () => account.value?.oId], () => {
     const next = getAuthContextVersion(), id = account.value?.oId
     if (!accessToken.value || next !== boundary || id !== owner) reset()
@@ -35,9 +35,9 @@ export const useV3ArticleInteractionsStore = defineStore('v3-article-interaction
     const stored = commands.value[identity]!
     stored.busy = true; stored.error = ''; balanceError.value = ''
     try {
-      await writeArticleInteraction(kind,targetId,choice,stored.key,resource)
-      if (valid()) { delete commands.value[identity]; lastChange.value = { targetId, kind, resource, revision:lastChange.value.revision + 1 }
-        if (kind !== 'vote') {
+      const snapshot = await writeArticleInteraction(kind,targetId,choice,stored.key,resource)
+      if (valid()) { delete commands.value[identity]; lastChange.value = { targetId, kind, resource, revision:lastChange.value.revision + 1, snapshot }
+        if (kind !== 'vote' && snapshot === undefined) {
           try { await auth.reloadAccount() }
           catch { if (valid()) balanceError.value = '操作已确认，当前余额刷新失败，请到积分页核对。' }
         }

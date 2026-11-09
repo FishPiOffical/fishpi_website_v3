@@ -89,10 +89,10 @@ function onBodyClick(e: MouseEvent) {
         <div v-else class="cmt-body" @click="onBodyClick" v-html="comment.commentContent || ''" />
 
         <footer class="cmt-ops">
-          <V3ReactionBar kind="comment" :target-id="comment.oId" :readonly="readonly" />
+          <V3ReactionBar kind="comment" :target-id="comment.oId" :initial-read-started="comment.interactionReadStarted" :initial-state="comment.interactions === null ? null : comment.interactions?.reactions" :readonly="readonly" />
           <template v-if="interactive">
-            <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" />
-            <ArticleInteraction resource="comments" kind="thanks" :article-id="comment.oId" />
+            <ArticleInteraction resource="comments" kind="vote" :article-id="comment.oId" :initial-read-started="comment.interactionReadStarted" :initial-state="comment.interactions === null ? null : comment.interactions?.vote" />
+            <ArticleInteraction resource="comments" kind="thanks" :article-id="comment.oId" :initial-read-started="comment.interactionReadStarted" :initial-state="comment.interactions === null ? null : comment.interactions?.thanks" />
             <ArticleInteraction v-if="canAcceptAnswer" resource="comments" kind="accept" :article-id="comment.oId" @accepted="emit('accepted')" />
             <button v-if="commentingEnabled" type="button" class="op op-reply idle" @click="commentingEnabled && emit('reply')">回复</button>
             <button v-if="own && commentingEnabled" type="button" class="op op-edit idle" @click="commentingEnabled && emit('edit')">编辑</button>

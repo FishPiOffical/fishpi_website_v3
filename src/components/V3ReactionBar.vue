@@ -5,7 +5,7 @@ import { getAuthContextVersion } from '@/api/http'
 import { readReactions, type ReactionState, type ReactionTarget } from '@/api/v3-reactions'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ReactionsStore } from '@/stores/v3Reactions'
-const props=withDefaults(defineProps<{kind:ReactionTarget;targetId:string;readonly?:boolean}>(),{readonly:false})
+const props=withDefaults(defineProps<{kind:ReactionTarget;targetId:string;readonly?:boolean;initialReadStarted?: number; initialState?:ReactionState|null}>(),{readonly:false})
 const {accessToken,account,initialized}=storeToRefs(useAuthStore()),operations=useV3ReactionsStore()
 const mounted=ref(false),state=ref<ReactionState|null>(null),loading=ref(false),error=ref(''),open=ref(false)
 const root=ref<HTMLElement|null>(null),trigger=ref<HTMLButtonElement|null>(null)
@@ -17,6 +17,15 @@ function escape(event:KeyboardEvent){if(open.value&&event.key==='Escape'){event.
 function togglePalette(){
   if(open.value){close();return}
   if (blocked.value || !state.value) return
+  if (!operations.options.length && props.initialState !== undefined) {
+    const reader = identity()
+    void operations.loadOptions().then(() => {
+      if (mounted.value && reader === identity() && !open.value) togglePalette()
+    }).catch(() => {
+      if (mounted.value && reader === identity()) error.value = '表情目录读取失败，请重试'
+    })
+    return
+  }
   open.value=true
   void nextTick(()=>{
     const rect=root.value?.getBoundingClientRect?.()
@@ -36,6 +45,7 @@ const writable=computed(()=>authenticated.value&&!props.readonly)
 const pending=computed(()=>operations.commands[props.kind+':'+props.targetId])
 const blocked=computed(()=>loading.value||!!pending.value)
 let sequence=0,boundary=''
+let lastReceiptAt = -1
 function identity(){return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${props.kind}:${props.targetId}`}
 function clear(keepState=false){sequence++;if(!keepState)state.value=null;loading.value=false;error.value='';if(!keepState)open.value=false}
 async function load(confirmed=false){
@@ -61,8 +71,14 @@ async function load(confirmed=false){
   finally{if(valid())loading.value=false}
 }
 async function choose(value:string){
-  if(!writable.value||blocked.value||!state.value||!operations.options.some(o=>o.value===value))return
-  const reader=identity(),choice=state.value.currentUserReaction===value?null:value
+  if(!writable.value||blocked.value||!state.value)return
+  const reader=identity()
+  if (!operations.options.length && props.initialState !== undefined) {
+    try { await operations.loadOptions() }
+    catch { if (reader === identity()) error.value = '表情目录读取失败，请重试'; return }
+  }
+  if (!mounted.value || reader !== identity() || blocked.value || !state.value || !operations.options.some(o=>o.value===value)) return
+  const choice=state.value.currentUserReaction===value?null:value
   if(open.value)close(true)
   error.value=''
   try{await operations.set(props.kind,props.targetId,choice)}catch(reason){if(mounted.value&&reader===identity())error.value=reason instanceof Error?reason.message:'表态失败'}
@@ -73,14 +89,20 @@ async function restore(){
   error.value=''
   try{await operations.set(props.kind,props.targetId,command.choice)}catch(reason){if(mounted.value&&reader===identity())error.value=reason instanceof Error?reason.message:'表态恢复失败'}
 }
-watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.targetId],()=>{const next=identity();if(next===boundary)return;boundary=next;clear();if(authenticated.value)void load()},{flush:'sync'})
-watch(()=>operations.lastChange,change=>{if(change.kind===props.kind&&change.id===props.targetId){if(authenticated.value){clear(true);void load(change.confirmed)}else clear()}},{flush:'sync'})
-onMounted(()=>{mounted.value=true;boundary=identity();if(authenticated.value)void load();if(typeof document!=='undefined'){document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);document.addEventListener('scroll',scrollOutside,true)}if(typeof window!=='undefined')window.addEventListener?.('resize',resize)})
+watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.targetId],()=>{const next=identity();if(next===boundary)return;boundary=next;lastReceiptAt=-1;clear();if(authenticated.value&&props.initialState===undefined)void load()},{flush:'sync'})
+watch(()=>operations.lastChange,change=>{if(change.kind===props.kind&&change.id===props.targetId){if(authenticated.value){clear(true);if(change.snapshot!==undefined){lastReceiptAt=performance.now();state.value=change.snapshot;}else void load(change.confirmed)}else clear()}},{flush:'sync'})
+watch(() => props.initialState, () => {
+  if (props.initialState && (props.initialReadStarted ?? Infinity) <= lastReceiptAt) return
+  clear()
+  state.value = props.initialState ?? null
+  if (authenticated.value && props.initialState === undefined) void load()
+})
+onMounted(()=>{mounted.value=true;boundary=identity();state.value=props.initialState??null;if(authenticated.value&&props.initialState===undefined)void load();if(typeof document!=='undefined'){document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);document.addEventListener('scroll',scrollOutside,true)}if(typeof window!=='undefined')window.addEventListener?.('resize',resize)})
 onBeforeUnmount(()=>{mounted.value=false;clear();if(typeof document!=='undefined'){document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);document.removeEventListener('scroll',scrollOutside,true)}if(typeof window!=='undefined')window.removeEventListener?.('resize',resize)})
 </script>
 <template>
   <section v-if="kind!=='chat'||authenticated" ref="root" class="v3-reactions" :class="`kind-${kind}`" :aria-label="`${kind==='article'?'文章':kind==='comment'?'评论':'消息'}表态`">
-    <button v-if="readable&&!authenticated&&!loading&&!error" type="button" class="guest-rx-btn" :class="{'is-refresh':!!state}" @click="load()">{{ state?'刷新表态':'查看表态' }}</button>
+    <button v-if="readable&&!authenticated&&!loading&&!error&&initialState===undefined" type="button" class="guest-rx-btn" :class="{'is-refresh':!!state}" @click="load()">{{ state?'刷新表态':'查看表态' }}</button>
     <p v-if="loading" class="rx-loading" role="status">正在读取表态…</p>
     <div v-if="state || (writable && kind !== 'chat')" class="rx">
       <template v-for="item in state?.summary" :key="item.value">

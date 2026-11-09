@@ -27,9 +27,13 @@ export async function readReactions(kind:ReactionTarget,id:string,options:Reacti
   const [response, catalog] = await Promise.all([request(path(kind,id),{cache:'no-store'}), options])
   return decode(response,kind,id,catalog)
 }
-export async function writeReaction(kind:ReactionTarget,id:string,choice:string|null,key:string,options:ReactionOption[]):Promise<void>{
+export async function writeReaction(kind:ReactionTarget,id:string,choice:string|null,key:string,options:ReactionOption[]):Promise<ReactionState | null | undefined>{
   if(!/^[A-Za-z0-9._:-]{1,128}$/.test(key)||choice!==null&&!options.some(o=>o.value===choice))throw new ApiError('表态参数不合法',422)
   const raw=await request(path(kind,id),{method:choice===null?'DELETE':'PUT',headers:{'Idempotency-Key':key},...(choice===null?{}:{body:JSON.stringify({value:choice})})})
   const state=decode(raw,kind,id,options)
-  if(typeof data(raw).changed!=='boolean'||state.currentUserReaction!==(choice??''))throw bad()
+  const receipt = data(raw)
+  if(typeof receipt.changed!=='boolean'||state.currentUserReaction!==(choice??''))throw bad()
+  if (kind === 'comment' && receipt.interaction !== undefined) {
+    return receipt.interaction === null ? null : decode({ code: 0, data: receipt.interaction }, kind, id, options)
+  }
 }

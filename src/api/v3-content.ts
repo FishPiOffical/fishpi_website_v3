@@ -66,9 +66,45 @@ export function adaptV3Article(value: unknown): ArticleSummary {
     articleAuthorThumbnailURL20: anonymous ? '' : text(author.userAvatarURL),
   }
 }
-export function adaptV3Comment(value: unknown): ArticleComment {
+export function adaptV3Comment(value: unknown, interactionReadStarted?: number): ArticleComment {
   const data = row(value), author = row(data.author), visible = bool(data.contentVisible), anonymous = bool(data.anonymous)
+  const commentId = id(data.id)
+  const snapshot = data.interactions == null ? null : row(data.interactions)
+  let interactions: ArticleComment['interactions']
+  let totals: Pick<ArticleComment, 'commentGoodCnt' | 'commentThankCnt'> = {}
+  if (snapshot && visible) {
+    const vote = row(snapshot.vote), thanks = row(snapshot.thanks), reactions = row(snapshot.reactions)
+    const upCount = number(vote.upCount), downCount = number(vote.downCount), thankCount = number(thanks.thankCount)
+    if (vote.id !== commentId || thanks.id !== commentId || reactions.targetId !== commentId ||
+        reactions.targetType !== 'comment' || reactions.groupType !== 'emoji' ||
+        (vote.vote !== undefined && vote.vote !== null && vote.vote !== 'up' && vote.vote !== 'down') ||
+        !Array.isArray(reactions.summary) || reactions.summary.length > 256) throw invalid()
+    const selected = text(reactions.currentUserReaction)
+    const seen = new Set<string>()
+    const summary = reactions.summary.map(entry => {
+      const item = row(entry)
+      const value = text(item.value), emoji = text(item.emoji), count = number(item.count)
+      if (!value || value.length > 32 || !emoji || emoji.length > 128 || !count || seen.has(value) ||
+          item.selected !== (value === selected)) throw invalid()
+      seen.add(value)
+      return { value, emoji, count, selected: value === selected, users: [] }
+    })
+    if (selected && !seen.has(selected)) throw invalid()
+    interactions = {
+      vote: vote.vote === undefined ? null : { kind: 'vote', id: commentId, vote: vote.vote, upCount, downCount },
+      thanks: thanks.thanked === undefined ? null : {
+        kind: 'thanks', id: commentId, thanked: bool(thanks.thanked), canThank: bool(thanks.canThank),
+        thankCount, thankPoint: number(thanks.thankPoint),
+      },
+      reactions: { targetId: commentId, targetType: 'comment', currentUserReaction: selected, summary },
+    }
+    totals = { commentGoodCnt: upCount, commentThankCnt: thankCount }
+  } else if (data.interactions !== undefined) {
+    interactions = null
+  }
   return {
+    ...totals,
+    ...(interactions !== undefined ? { interactions, interactionReadStarted } : {}),
     commentContentVisible: visible,
     oId: id(data.id), commentOriginalCommentId: text(data.parentId),
     commentContent: visible ? text(data.contentHtml) : '', commentCreateTimeStr: date(data.createdAt),
@@ -191,6 +227,7 @@ export async function v3Tags(page = 1, size = 50, credentials?: RequestCredentia
 export async function v3Article(articleId: string, page = 1): Promise<ArticleDetail> {
   const path = pathId(articleId), paging = params(page, 20)
   if (page > 42949672) throw new ApiError('页码不合法', 422)
+  const interactionReadStarted = performance.now()
   const [raw, rawComments] = await Promise.all([
     get(`/api/v3/articles/${path}`),
     get(`/api/v3/articles/${path}/comments?${paging}&sort=oldest`),
@@ -200,7 +237,7 @@ export async function v3Article(articleId: string, page = 1): Promise<ArticleDet
   const seen = new Set<string>()
   const commentList = comments.list.map(item => {
     if (item.articleId !== articleId) throw invalid()
-    const result = adaptV3Comment(item)
+    const result = adaptV3Comment(item, interactionReadStarted)
     if (seen.has(result.oId)) throw invalid()
     seen.add(result.oId)
     return result

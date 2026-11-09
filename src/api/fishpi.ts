@@ -274,6 +274,12 @@ export interface ArticleSummary {
 }
 
 export interface ArticleComment {
+  interactionReadStarted?: number
+  interactions?: {
+    vote: import('./v3-article-interactions').VoteState | null
+    thanks: import('./v3-article-interactions').ThanksState | null
+    reactions: import('./v3-reactions').ReactionState
+  } | null
   commentContentVisible?: boolean
   oId: string
   commentAuthorName?: string

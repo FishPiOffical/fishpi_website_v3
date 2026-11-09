@@ -237,7 +237,13 @@ function connectHeat() {
  stopArticle=subscribeArticleChanges(target,()=>{
   if(subscriptionKey!==key||reader!==viewerIdentity.value||target!==id.value)return
   reactionEvents.invalidate('article',target)
-  for(const comment of article.value?.articleComments||[])reactionEvents.invalidate('comment',comment.oId)
+  const comments = article.value?.articleComments || []
+  if (comments.some(comment => comment.interactions !== undefined)) {
+    void load(true, 'realtime')
+    readerRef.value?.refreshParagraphComments()
+    return
+  }
+  for (const comment of comments) reactionEvents.invalidate('comment', comment.oId)
   if(!heatRequest)void refreshHeat()
  },()=>articleUnavailable(target,reader))
 }

@@ -7,7 +7,7 @@ import { readArticleInteraction, readArticleRewardHtml, type ArticleInteractionK
 import { fpConfirm } from '@/composables/useDialog'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ArticleInteractionsStore } from '@/stores/v3ArticleInteractions'
-const props = withDefaults(defineProps<{ kind:ArticleInteractionKind; articleId:string; initialPrice?:number; resource?:InteractionResource }>(),{initialPrice:0,resource:'articles'})
+const props = withDefaults(defineProps<{ kind:ArticleInteractionKind; articleId:string; initialPrice?:number; resource?:InteractionResource; initialReadStarted?: number; initialState?: ArticleInteractionState | null }>(),{initialPrice:0,resource:'articles'})
 const emit = defineEmits<{ contentClick:[event:MouseEvent]; accepted:[] }>()
 const route = useRoute(), { accessToken, account } = storeToRefs(useAuthStore()), operations = useV3ArticleInteractionsStore()
 const mounted=ref(false), state=ref<ArticleInteractionState|null>(null), loading=ref(false), confirming=ref(false), error=ref(''), html=ref('')
@@ -21,8 +21,16 @@ const price=computed(()=>reward.value?.rewardPoint ?? props.initialPrice)
 const busy=computed(()=>loading.value || confirming.value || !!pending.value?.busy)
 const label=computed(()=>props.kind === 'vote' ? '投票' : props.kind === 'thanks' ? '感谢' : props.kind === 'accept' ? '采纳' : '打赏')
 let sequence=0,boundary=''
+let lastReceiptAt = -1
 let confirmation:AbortController|null=null
 function identity(){ return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId || ''}:${props.resource}:${props.kind}:${props.articleId}` }
+function applyInitial() {
+  if (props.initialState === undefined) {
+    void load()
+    return
+  }
+  state.value = loggedIn.value ? props.initialState : null
+}
 function clear(keepState=false){ confirmation?.abort(); confirmation=null; sequence++; if(!keepState)state.value=null; html.value=''; error.value=''; loading.value=false; confirming.value=false }
 async function load(afterWrite=false){
   if (!loggedIn.value || loading.value || props.kind === 'reward' && props.initialPrice < 1) return
@@ -57,9 +65,14 @@ async function submit(choice:VoteChoice=null,recover=false){
   } catch(reason){ if(valid()) error.value=reason instanceof Error ? reason.message : '互动失败' }
   finally { if(valid()) confirming.value=false }
 }
-watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.articleId,()=>props.resource],()=>{ const next=identity(); if(next === boundary)return; boundary=next; clear(); void load() },{flush:'sync'})
-watch(()=>operations.lastChange,change=>{if(change.resource === props.resource && change.kind === props.kind && (change.targetId === props.articleId || change.kind === 'accept' && change.resource === 'comments')){clear(true);void load(true);if(change.kind === 'accept' && change.targetId === props.articleId)emit('accepted')}},{flush:'sync'})
-onMounted(()=>{mounted.value=true;boundary=identity();void load()})
+watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.articleId,()=>props.resource],()=>{ const next=identity(); if(next === boundary)return; boundary=next; lastReceiptAt=-1; clear(); if (props.initialState === undefined) void load() },{flush:'sync'})
+watch(()=>operations.lastChange,change=>{if(change.resource === props.resource && change.kind === props.kind && (change.targetId === props.articleId || change.kind === 'accept' && change.resource === 'comments')){clear(true);if(change.snapshot!==undefined){lastReceiptAt=performance.now();state.value=change.snapshot;}else void load(true);if(change.kind === 'accept' && change.targetId === props.articleId)emit('accepted')}},{flush:'sync'})
+watch(() => props.initialState, () => {
+  if (props.initialState && (props.initialReadStarted ?? Infinity) <= lastReceiptAt) return
+  clear()
+  applyInitial()
+})
+onMounted(()=>{mounted.value=true;boundary=identity();applyInitial()})
 onBeforeUnmount(()=>{mounted.value=false;clear()})
 </script>
 <template>

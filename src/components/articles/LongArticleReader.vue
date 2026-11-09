@@ -700,9 +700,9 @@ function chapterTitle(c: LongArticleChapter) {
               <p v-if="comment.commentContentVisible===false">此评论正文当前不可见</p>
               <div v-else class="la-paragraph-comment-body" v-html="comment.commentContent || ''" />
               <div class="la-paragraph-ops">
-              <V3ReactionBar kind="comment" :target-id="comment.oId" />
-              <ArticleInteraction v-if="loggedIn" resource="comments" kind="vote" :article-id="comment.oId" />
-              <ArticleInteraction v-if="loggedIn" resource="comments" kind="thanks" :article-id="comment.oId" />
+              <V3ReactionBar kind="comment" :target-id="comment.oId" :initial-read-started="comment.interactionReadStarted" :initial-state="comment.interactions === null ? null : comment.interactions?.reactions" />
+              <ArticleInteraction v-if="loggedIn" resource="comments" kind="vote" :article-id="comment.oId" :initial-read-started="comment.interactionReadStarted" :initial-state="comment.interactions === null ? null : comment.interactions?.vote" />
+              <ArticleInteraction v-if="loggedIn" resource="comments" kind="thanks" :article-id="comment.oId" :initial-read-started="comment.interactionReadStarted" :initial-state="comment.interactions === null ? null : comment.interactions?.thanks" />
               <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
               </div>
               <template v-if="ownParagraphComment(comment)">
