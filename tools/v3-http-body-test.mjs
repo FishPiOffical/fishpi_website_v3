@@ -6,11 +6,21 @@ import { ref } from 'vue'
 import { createPinia, defineStore } from 'pinia'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64')
-const received=[];let cut=true,bodyReadStarted
+const received=[];let cut=true,bodyReadStarted,challenged=false
+let captchaCalls=0
+globalThis.__testRiskCaptcha=async()=>{captchaCalls++;challenged=true}
 const server=http.createServer(async(req,res)=>{
  const chunks=[];for await(const chunk of req)chunks.push(chunk)
  received.push({path:req.url,method:req.method,key:req.headers['idempotency-key'],body:Buffer.concat(chunks).toString()})
  if(req.url==='/api/v3/auth/refresh'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{"code":0,"data":{"accessToken":"synthetic-rotated"}}');return}
+ if(req.url==='/api/v3/fixture/guest-401'){
+  res.writeHead(401,{'Content-Type':'text/html'});res.end('<p>Unauthorized</p>');return
+ }
+ if(req.url==='/api/v3/fixture/challenge'){
+  res.writeHead(challenged?200:401,{'Content-Type':'application/json'})
+  res.end(challenged?'{"code":0}':'{"code":"captcha","msg":"Complete verification"}')
+  return
+ }
  const format=req.url.split('/').pop()
  if(format==='error'){res.writeHead(422,{'Content-Type':'application/json'});res.end('{"code":"invalid_request","msg":"Rejected"}');return}
  if(format==='html'){res.writeHead(404,{'Content-Type':'text/html'});res.end('<p>Internal route missing</p>');return}
@@ -34,7 +44,7 @@ globalThis.fetch=async(path,init)=>{
  return response
 }
 globalThis.window={dispatchEvent:event=>offline.push(event.type)}
-const source=compile(await fs.readFile('src/api/http.ts','utf8')).replaceAll('import.meta.env.SSR','false').replaceAll('import.meta.env.VITE_API_TARGET',"''").replace("from '@/utils/riskCaptcha'",`from '${url('export async function ensureRiskCaptcha(){throw Error("Unexpected captcha")}')}'`)
+const source=compile(await fs.readFile('src/api/http.ts','utf8')).replaceAll('import.meta.env.SSR','false').replaceAll('import.meta.env.VITE_API_TARGET',"''").replace("from '@/utils/riskCaptcha'",`from '${url('export const ensureRiskCaptcha=globalThis.__testRiskCaptcha')}'`)
 try{
  const httpURL=url(source),api=await import(httpURL);api.setAccessToken('synthetic-test-only')
  await assert.rejects(api.request('/api/v3/fixture/json',{method:'POST',headers:{'Idempotency-Key':'original-key'},body:'{}'}),e=>e instanceof api.ApiError&&e.status===0&&e.code==='offline')
@@ -76,5 +86,18 @@ try{
  const writes=received.filter(x=>x.path===route);assert.equal(writes.length,2);assert.ok(writes.every(x=>x.key==='wire-original-key'&&x.body===''))
  stop();store.$dispose();delete globalThis.__wireAuth
  console.log('PASS HTTP body 5 actual Pinia + production API/transport retain the unknown purchase key across real socket loss and normal token refresh, then explicit same-key recovery clears it')
+
+ const beforeGuest=received.length
+ api.setAccessToken(null)
+ await Promise.all(Array.from({length:5},()=>assert.rejects(api.request('/api/v3/fixture/guest-401'),error=>error.status===401)))
+ assert.ok(received.slice(beforeGuest).every(entry=>entry.path==='/api/v3/fixture/guest-401'))
+ assert.equal(captchaCalls,0)
+ api.setAccessToken('synthetic-test-only')
+ const beforeChallenge=received.length
+ assert.deepEqual(await api.request('/api/v3/fixture/challenge'),{code:0})
+ assert.deepEqual(received.slice(beforeChallenge).map(entry=>entry.path),['/api/v3/fixture/challenge','/api/v3/fixture/challenge'])
+ assert.equal(captchaCalls,1)
+ assert.equal(api.getAccessToken(),'synthetic-test-only')
+ console.log('PASS HTTP guest 401 skips refresh and a structured captcha opens verification before retry')
 
 }finally{globalThis.fetch=nativeFetch;globalThis.window=oldWindow;server.closeAllConnections();await new Promise(resolve=>server.close(resolve))}

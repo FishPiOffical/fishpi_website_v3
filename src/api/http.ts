@@ -344,8 +344,15 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
     }
     return await (!import.meta.env.SSR && isCredentialPath(path) ? queueCredentialRequest(run) : run())
   } catch (e) {
+    if (!import.meta.env.SSR && isCaptchaRequired(e)) {
+      if (init.__captchaRetried || isRiskCaptchaPath(path) || version !== authVersion || init.signal?.aborted) throw e
+      await ensureRiskCaptcha()
+      if (version !== authVersion || init.signal?.aborted) throw e
+      return request<T>(path, { ...init, __captchaRetried: true })
+    }
+    // A guest 401 can come from the anonymous shield. Session restore owns refresh-cookie probing.
     if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && init.credentials !== 'omit' && !explicitAuthorization &&
-      e instanceof ApiError && e.status === 401 && !init.__v3Retried && version === authVersion) {
+      (sentToken || getAccessToken()) && e instanceof ApiError && e.status === 401 && !init.__v3Retried && version === authVersion) {
       // A late 401 may belong to the token that another request has already rotated.
       const refreshed = getAccessToken() !== sentToken && Boolean(getAccessToken()) || await refreshAccessToken()
       if (refreshed && version === authVersion) return request<T>(path, { ...init, __v3Retried: true })
@@ -353,11 +360,6 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
     if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && init.credentials !== 'omit' && !explicitAuthorization &&
       init.__v3Retried && version === authVersion && sentToken === getAccessToken() &&
       e instanceof ApiError && e.status === 401) publishToken(null)
-    if (!import.meta.env.SSR && isCaptchaRequired(e) && !init.__captchaRetried && !isRiskCaptchaPath(path)) {
-      await ensureRiskCaptcha()
-      if (version !== authVersion) throw e
-      return request<T>(path, { ...init, __captchaRetried: true })
-    }
     throw e
   }
 }
