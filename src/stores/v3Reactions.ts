@@ -10,8 +10,8 @@ export const useV3ReactionsStore=defineStore('v3-reactions',()=>{
   const options=ref<ReactionOption[]>([]),commands=ref<Record<string,Command>>({})
   const lastChange=ref({kind:'' as ReactionTarget|'',id:'',confirmed:false,revision:0})
   let generation=0,boundary=getAuthContextVersion(),owner=account.value?.oId,flight:Promise<ReactionOption[]>|null=null
-  const articleReads = new Map<string, Promise<ReactionState>>()
-  function reset(){articleReads.clear();generation++;commands.value={};options.value=[];flight=null;lastChange.value={kind:'',id:'',confirmed:false,revision:lastChange.value.revision+1}}
+  const targetReads = new Map<string, Promise<ReactionState>>()
+  function reset(){targetReads.clear();generation++;commands.value={};options.value=[];flight=null;lastChange.value={kind:'',id:'',confirmed:false,revision:lastChange.value.revision+1}}
   const stop=watch([accessToken,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),actor=account.value?.oId;if(!accessToken.value||next!==boundary||owner!==actor)reset();boundary=next;owner=actor},{flush:'sync'})
   onScopeDispose(()=>{stop();reset()})
   async function loadOptions(){
@@ -23,15 +23,16 @@ export const useV3ReactionsStore=defineStore('v3-reactions',()=>{
     flight=task
     try{return await task}finally{if(flight===task)flight=null}
   }
-  async function readArticle(id: string) {
-    const existing = articleReads.get(id)
+  async function readContent(kind: 'article' | 'comment', id: string) {
+    const key = kind + ':' + id
+    const existing = targetReads.get(key)
     if (existing) return existing
-    const task = readReactions('article', id, loadOptions())
-    articleReads.set(id, task)
+    const task = readReactions(kind, id, loadOptions())
+    targetReads.set(key, task)
     try { return await task }
-    finally { if (articleReads.get(id) === task) articleReads.delete(id) }
+    finally { if (targetReads.get(key) === task) targetReads.delete(key) }
   }
-  function invalidate(kind:ReactionTarget,id:string,confirmed=false){if(!['article','comment','chat'].includes(kind)||typeof id!=='string'||! /^[1-9][0-9]{0,18}$/.test(id))return;if(kind==='article')articleReads.delete(id);lastChange.value={kind,id,confirmed,revision:lastChange.value.revision+1}}
+  function invalidate(kind:ReactionTarget,id:string,confirmed=false){if(!['article','comment','chat'].includes(kind)||typeof id!=='string'||! /^[1-9][0-9]{0,18}$/.test(id))return;targetReads.delete(kind+':'+id);lastChange.value={kind,id,confirmed,revision:lastChange.value.revision+1}}
   async function set(kind:ReactionTarget,id:string,choice:string|null){
     const actor=account.value?.oId,current=generation,context=getAuthContextVersion()
     const valid=()=>!import.meta.env.SSR&&!!accessToken.value&&!!actor&&actor===account.value?.oId&&current===generation&&context===getAuthContextVersion()
@@ -48,5 +49,5 @@ export const useV3ReactionsStore=defineStore('v3-reactions',()=>{
     catch(reason){if(valid()){command.error=reason instanceof Error?reason.message:'表态失败';if(!recovering&&reason instanceof ApiError&&reason.status>=400&&reason.status<500)delete commands.value[identity];throw reason}}
     finally{if(valid()&&commands.value[identity]===command)command.busy=false}
   }
-  return{options,commands,lastChange,loadOptions,readArticle,invalidate,set}
+  return{options,commands,lastChange,loadOptions,readContent,invalidate,set}
 })

@@ -16,6 +16,7 @@ function outside(event:Event){if(open.value&&event.target instanceof Node&&!root
 function escape(event:KeyboardEvent){if(open.value&&event.key==='Escape'){event.preventDefault();close(true)}}
 function togglePalette(){
   if(open.value){close();return}
+  if (blocked.value || !state.value) return
   open.value=true
   void nextTick(()=>{
     const rect=root.value?.getBoundingClientRect?.()
@@ -44,8 +45,8 @@ async function load(confirmed=false){
   loading.value=true;error.value=''
   try {
     let result
-    if (kind === 'article') {
-      result = await operations.readArticle(id)
+    if (kind !== 'chat') {
+      result = await operations.readContent(kind, id)
     } else {
       const options = await operations.loadOptions()
       if (!valid()) return
@@ -81,13 +82,13 @@ onBeforeUnmount(()=>{mounted.value=false;clear();if(typeof document!=='undefined
   <section v-if="kind!=='chat'||authenticated" ref="root" class="v3-reactions" :class="`kind-${kind}`" :aria-label="`${kind==='article'?'文章':kind==='comment'?'评论':'消息'}表态`">
     <button v-if="readable&&!authenticated&&!loading&&!error" type="button" class="guest-rx-btn" :class="{'is-refresh':!!state}" @click="load()">{{ state?'刷新表态':'查看表态' }}</button>
     <p v-if="loading" class="rx-loading" role="status">正在读取表态…</p>
-    <div v-if="state" class="rx">
-      <template v-for="item in state.summary" :key="item.value">
+    <div v-if="state || (writable && kind !== 'chat')" class="rx">
+      <template v-for="item in state?.summary" :key="item.value">
         <button v-if="writable" type="button" class="chip" :title="item.users.join(', ')" :aria-pressed="item.selected" :aria-disabled="blocked" :aria-busy="loading||!!pending?.busy" @click="choose(item.value)">{{ item.emoji }} {{ item.count }}</button>
         <span v-else class="chip" :title="item.users.join(', ')">{{ item.emoji }} {{ item.count }}</span>
       </template>
-      <button v-if="writable" ref="trigger" type="button" class="ghost" :class="{'icon-only':kind==='chat'}" :aria-expanded="open" :aria-label="open?'收起表情':'添加表情'" :title="open?'收起表情':'添加表情'" @click="togglePalette"><span v-if="kind==='chat'" aria-hidden="true">😊</span><template v-else>{{ open?'收起表情':'添加表情' }}</template></button>
-      <p v-if="!state.summary.length&&!writable" class="rx-empty">暂无表态</p>
+      <button v-if="writable" ref="trigger" type="button" class="ghost" :class="{'icon-only':kind==='chat'}" :aria-disabled="blocked || !state" :aria-expanded="open" :aria-label="open?'收起表情':'添加表情'" :title="open?'收起表情':'添加表情'" @click="togglePalette"><span v-if="kind==='chat'" aria-hidden="true">😊</span><template v-else>{{ open?'收起表情':'添加表情' }}</template></button>
+      <p v-if="state && !state.summary.length && !writable" class="rx-empty">暂无表态</p>
     </div>
     <Teleport v-if="mounted&&writable&&operations.options.length" to="body"><div ref="palette" v-show="open" class="palette" :style="paletteStyle" aria-label="选择表情">
       <button v-for="option in operations.options" :key="option.value" type="button" :title="option.value" :aria-pressed="state?.currentUserReaction===option.value" :aria-disabled="blocked||!state" :aria-busy="loading||!!pending?.busy" @click="choose(option.value)">{{ option.emoji }}</button>

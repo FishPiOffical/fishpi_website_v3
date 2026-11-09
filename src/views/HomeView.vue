@@ -1043,12 +1043,10 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .community-body { display:flex; flex-direction:column; }
 .is-classic {
   gap:12px;
-  .board { align-items:stretch; gap:12px; }
+  .board { gap:12px; }
   .cell { gap:12px; order:initial; }
   .mod-body { padding:12px 12px 14px; }
   .home-moons { order:1; }
-  .mod:last-child { flex:1; display:flex; flex-direction:column; }
-  .mod:last-child > .mod-body { flex:1; display:flex; flex-direction:column; }
   .module-list li { padding:5px 6px; min-height:30px; }
   .long-card { flex-basis:calc((100% - 36px) / 4); grid-template-columns:64px minmax(0,1fr); min-height:96px; }
   .long-cover { width:64px; }

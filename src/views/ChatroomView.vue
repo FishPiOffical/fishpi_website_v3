@@ -752,6 +752,12 @@ function clearScreen() {
 }
 
 .classic-sidebar {
+  position: sticky;
+  top: calc(var(--fp-nav-h) + 12px);
+  max-height: calc(100dvh - var(--fp-nav-h) - 24px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overflow-anchor: none;
   flex: 0 0 280px;
   width: 280px;
 }
@@ -935,7 +941,6 @@ function clearScreen() {
   margin-top: 16px;
 }
 
-.cr-classic-list { overflow-anchor: none; }
 .composer-return {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
@@ -1177,6 +1182,9 @@ function clearScreen() {
   }
 
   .classic-sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
     width: 100%;
     flex: auto;
   }
