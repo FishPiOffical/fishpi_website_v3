@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useScrollPagination } from '@/composables/useScrollPagination'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { emojiToMarkdown, type EmojiItem, type EmojiGroup } from '@/api/fishpi'
@@ -132,9 +133,18 @@ function loadGroup(id: string) {
   return load(() => fetchV3GroupEmojis(id), page => { items.value = page.list; itemPage.value = page.p; itemPages.value = page.pageCount })
 }
 function moreItems() {
+  if (!groupId.value || loading.value || itemPage.value >= itemPages.value) return
   const id = groupId.value, p = itemPage.value + 1
   return load(() => fetchV3GroupEmojis(id, p), page => { items.value = [...items.value, ...page.list]; itemPage.value = page.p; itemPages.value = page.pageCount })
 }
+const itemsEnd = ref<HTMLElement | null>(null)
+const groupsEnd = ref<HTMLElement | null>(null)
+const categories = ref<HTMLElement | null>(null)
+useScrollPagination(itemsEnd, () => open.value && !!groupId.value && !loading.value && !error.value && itemPage.value < itemPages.value,
+  moreItems, () => identity() + ':' + groupId.value, selection)
+useScrollPagination(groupsEnd, () => open.value && !catalogLoading.value && !catalogError.value && groupPage.value < groupPages.value,
+  () => loadCatalog(groupPage.value + 1), identity, categories)
+
 function toggle(trigger?: HTMLElement, placement = props.placement) {
   const target = trigger ?? root.value
   if (open.value && anchor === target) { close(); return }
@@ -198,13 +208,13 @@ defineExpose({ toggle })
     <Teleport :to="position ? 'body' : undefined" :disabled="!position">
     <div v-if="open" ref="panel" class="panel" role="dialog" aria-label="选择表情" :style="position"
       :class="{ 'panel--fixed': position, 'panel--below': !position && preferred === 'below' }">
-      <nav class="categories" aria-label="表情分类">
+      <nav ref="categories" class="categories" aria-label="表情分类">
         <button type="button" :aria-pressed="!groupId" @click="loadFrequent">常用</button>
         <button v-for="group in orderedGroups" :key="group.oId" type="button" :aria-pressed="groupId === group.oId"
           :title="group.name" @click="loadGroup(group.oId)">
           {{ group.name || '分组' }}
         </button>
-        <button v-if="catalogError || groupPage < groupPages" type="button" :disabled="catalogLoading"
+        <button v-if="catalogError || groupPage < groupPages" ref="groupsEnd" type="button" :disabled="catalogLoading"
           :title="catalogError || undefined" @click="loadCatalog(groupPage + 1)">
           {{ catalogError ? '重试分组' : '更多分组' }}
         </button>
@@ -222,7 +232,7 @@ defineExpose({ toggle })
           </button>
           <p v-if="!items.length && !error" class="hint">暂无表情</p>
         </div>
-        <button v-if="groupId && itemPage < itemPages && !error" type="button" class="ghost more" :disabled="loading" @click="moreItems">更多表情</button>
+        <button v-if="groupId && itemPage < itemPages && !error" ref="itemsEnd" type="button" class="ghost more" :disabled="loading" @click="moreItems">更多表情</button>
       </section>
     </div>
     <div v-if="hoverPreview" class="hover-preview" :style="hoverPreview.style" aria-hidden="true">

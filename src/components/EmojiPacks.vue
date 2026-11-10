@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useScrollPagination } from '@/composables/useScrollPagination'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ApiError, getAuthContextVersion } from '@/api/http'
@@ -31,17 +32,18 @@ const intentions = new Map<string, { fingerprint: string; key: string }>()
 function mergeGroups(values: EmojiGroup[]) {
   return Array.from(new Map(values.map(g => [g.oId, g])).values()).sort((a,b) => (a.sort ?? 0) - (b.sort ?? 0) || (a.oId < b.oId ? -1 : a.oId > b.oId ? 1 : 0))
 }
-async function read<T>(fetcher: () => Promise<T>, apply: (value: T) => void, failed?: (error: unknown) => void) {
+async function read<T>(fetcher: () => Promise<T>, apply: (value: T) => void, failed?: (error: unknown) => void, preserveItems = false) {
   const owner = identity(), currentEpoch = epoch, request = ++sequence
   if (!accessToken.value) return false
   loading.value = true; error.value = ''
   const current = () => mounted && currentEpoch === epoch && request === sequence && owner === identity()
   try { const result = await fetcher(); if (current()) { apply(result); return true } }
-  catch (failure) { if (current()) { items.value = []; error.value = failure instanceof Error ? failure.message : '表情加载失败'; failed?.(failure) } }
+  catch (failure) { if (current()) { if (!preserveItems) items.value = []; error.value = failure instanceof Error ? failure.message : '表情加载失败'; failed?.(failure) } }
   finally { if (current()) loading.value = false }
   return false
 }
 function loadItems(more = false) {
+  if (more && (busy.value || loading.value || itemPage.value >= itemPages.value)) return Promise.resolve(false)
   const id = groupId.value
   if (!id) { items.value = []; itemTotal.value = itemPage.value = itemPages.value = 0; return Promise.resolve() }
   if (!more) { items.value = []; itemPage.value = itemPages.value = 0 }
@@ -49,8 +51,8 @@ function loadItems(more = false) {
     items.value = more ? [...items.value, ...page.list] : page.list
     itemPage.value = page.p; itemPages.value = page.pageCount; itemTotal.value = page.total
   }, failure => {
-    if (failure instanceof ApiError && failure.status === 404) { groups.value = groups.value.filter(g => g.oId !== id); groupId.value = ''; itemTotal.value = 0 }
-  })
+    if (failure instanceof ApiError && failure.status === 404) { groups.value = groups.value.filter(g => g.oId !== id); groupId.value = ''; items.value = []; itemTotal.value = itemPage.value = itemPages.value = 0 }
+  }, more)
 }
 async function loadGroups(preferred?: EmojiGroup) {
   const keep = preferred ?? selectedGroup.value, owner = identity(), currentEpoch = epoch
@@ -89,6 +91,13 @@ function moreGroups() {
     groups.value = mergeGroups([...groups.value, ...page.list]); groupPage.value = page.p; groupPages.value = page.pageCount; groupTotal.value = page.total
   })
 }
+const itemsEnd = ref<HTMLElement | null>(null)
+useScrollPagination(
+  itemsEnd,
+  () => !!groupId.value && !busy.value && !loading.value && !error.value && itemPage.value < itemPages.value,
+  () => loadItems(true),
+  () => identity() + ':' + groupId.value,
+)
 function selectGroup(id: string) { groupId.value = id; void loadItems() }
 async function loadFrequency() {
   const owner = identity(), currentEpoch = epoch, request = ++frequencySequence
@@ -299,7 +308,7 @@ function saveFrequency(resetDefaults = false) {
       <button type="submit" :disabled="busy || loading">保存图片信息</button>
       <button type="button" :disabled="busy" @click="editItemId = ''">取消编辑</button>
     </form>
-    <button v-if="itemPage < itemPages" type="button" class="ghost" :disabled="busy || loading" @click="loadItems(true)">更多图片</button>
+    <button v-if="itemPage < itemPages" ref="itemsEnd" type="button" class="ghost" :disabled="busy || loading" @click="loadItems(true)">更多图片</button>
     <h3>添加本地图片</h3>
     <form class="row" @submit.prevent="addLocalImage">
       <label>本地图片<input ref="fileInput" type="file" accept=".png,.jpg,.jpeg,.gif,.webp" :disabled="busy" @change="selectImage" /></label>

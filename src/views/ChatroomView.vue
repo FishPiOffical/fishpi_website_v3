@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useScrollPagination } from '@/composables/useScrollPagination'
 import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink,useRoute,useRouter } from 'vue-router'
 import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
@@ -66,6 +67,15 @@ const {
 } = storeToRefs(chat)
 const visibleMessages = computed(() => messages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
 
+const route=useRoute(),router=useRouter(),contextId=ref('')
+const classicHistoryEnd = ref<HTMLElement | null>(null)
+useScrollPagination(
+  classicHistoryEnd,
+  () => chatStyle.value === 'classic' && !contextId.value && !loading.value && !loadingMore.value && !error.value && hasMore.value,
+  () => chat.loadMore(),
+  () => [route.fullPath, getAuthContextVersion(), account.value?.oId || ''].join(':'),
+)
+
 const draft = ref('')
 watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{draft.value=''},{flush:'sync'})
 const scroller = ref<HTMLElement | null>(null)
@@ -88,7 +98,6 @@ const me = computed(() => account.value?.userName)
 // 经典版：最新消息排在最上面！
 const classicMessages = computed(() => [...visibleMessages.value].reverse())
 
-const route=useRoute(),router=useRouter(),contextId=ref('')
 function syncContextHash(){const match=/^#chatroom(\d{1,32})$/.exec(route.hash);contextId.value=accessToken.value&&account.value?.oId&&match?match[1]!:''}
 watch(()=>JSON.stringify([route.hash,!!accessToken.value,account.value?.oId||'']),syncContextHash,{immediate:true})
 function closeContext(){contextId.value='';if(/^#chatroom\d{1,32}$/.test(route.hash))void router.replace({hash:''})}
@@ -379,6 +388,7 @@ function clearScreen() {
             <div class="classic-load-bottom">
               <button
                 v-if="hasMore && messages.length"
+                ref="classicHistoryEnd"
                 type="button"
                 class="classic-more-btn"
                 :disabled="loadingMore"
