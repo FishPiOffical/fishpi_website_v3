@@ -3,6 +3,7 @@ import { formatDisplayTime } from '@/utils/time'
 
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import CollectChatEmoji from '@/components/chat/CollectChatEmoji.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
@@ -85,6 +86,7 @@ function onBodyClick(e: MouseEvent) {
       </div>
       <div v-if="chatroom" class="foot">
         <time>{{ formatDisplayTime(time) }}</time>
+        <CollectChatEmoji v-if="/<img\b/i.test(html)" :html="html" />
         <div v-if="$slots.reactions" class="message-reactions"><slot name="reactions" /></div>
         <span v-if="$slots.actions" class="actions"><slot name="actions" /></span>
       </div>
