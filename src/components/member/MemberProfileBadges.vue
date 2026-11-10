@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { fetchV3ProfessionSummary } from '@/api/v3-profession-public'
 import { usePublicMedals } from '@/composables/usePublicMedals'
 import { useAuthStore } from '@/stores/auth'
+import { rhyPicThumbnail } from '@/utils/avatar'
 import { formatDateTime } from '@/utils/time'
 import V3MedalImage from '@/components/medal/V3MedalImage.vue'
 
@@ -82,7 +83,7 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
 
     <section id="member-profession" aria-label="职业">
       <RouterLink v-if="summary" to="/top/profession" class="profession-badge" aria-label="查看职业排行榜">
-        <img v-if="summary.iconUrl" :src="summary.iconUrl" referrerpolicy="no-referrer" alt="" />
+        <img v-if="summary.iconUrl" :src="rhyPicThumbnail(summary.iconUrl, 32)" referrerpolicy="no-referrer" alt="" />
         <span><strong>{{ summary.job.displayName }}</strong><small v-if="summary.job.state !== 'SELECTED'">{{ summary.job.levelName }}</small></span>
         <span class="profession-arrow" aria-hidden="true">›</span>
       </RouterLink>
