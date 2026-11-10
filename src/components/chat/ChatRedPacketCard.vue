@@ -29,6 +29,11 @@ function cancelCheck() {
   checking.value = false
 }
 
+function hasPendingClaim() {
+  const command = store.pending
+  return command?.kind === 'claim' && command.id === props.packetId
+}
+
 async function open(gesture?: number) {
   if (gesture === undefined) {
     void store.open(props.packetId, true)
@@ -49,6 +54,10 @@ async function open(gesture?: number) {
       notice.value = '请先完成当前红包操作'
     } else if (result?.kind === 'claim') {
       detailsOnly.value = true
+    } else if (hasPendingClaim()) {
+      notice.value = '暂未确认出拳结果，请打开此红包查看'
+    } else if (store.error) {
+      notice.value = store.error
     }
   } catch {
     if (!controller.signal.aborted) notice.value = '暂时无法核对红包，请重试'

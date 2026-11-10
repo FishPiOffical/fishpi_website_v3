@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FishGameRecovery from '@/components/FishGameRecovery.vue'
 import {nextTick,onMounted,ref,watch} from 'vue'
 import {RouterLink} from 'vue-router'
 import {usePageSeo} from '@/composables/usePageSeo'
@@ -54,6 +55,7 @@ watch(selected,id=>{if(id)void nextTick(()=>{if(selected.value===id)detailPanel.
       <ul class="official-grid"><li v-for="g in section.items" :key="g.href"><a class="official-game" :href="'https://fishpi.cn'+g.href" target="_blank" rel="noopener noreferrer"><span class="catalog-icon"><img :src="g.icon" alt="" width="34" height="34" referrerpolicy="no-referrer" /></span><span class="catalog-copy"><strong>{{ g.title }}</strong><span>{{ g.tip }}</span></span><span class="card-arrow" aria-hidden="true">↗</span></a></li></ul>
     </section>
     <section id="community" ref="communityPanel" class="catalog-section" aria-labelledby="community-title">
+      <FishGameRecovery />
       <header class="section-head"><span class="section-number" aria-hidden="true">03</span><div><h2 id="community-title">社区鱼游</h2><p>鱼油们的创意游乐场</p></div><span v-if="games" class="section-more">{{ games.total }} 个游戏</span></header>
       <div class="list-toolbar"><label>排序<select class="fp-control" v-model="sort"><option value="votes">总投票数优先</option><option value="likes">点赞数优先</option></select></label><button type="button" class="refresh-games-btn" :disabled="listLoading" @click="feed.loadList()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2"/></svg>刷新鱼游</button></div>
       <p v-if="listLoading" role="status" class="read-state">正在读取鱼游…</p>

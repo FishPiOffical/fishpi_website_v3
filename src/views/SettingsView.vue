@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GameSaveRecovery from '@/components/GameSaveRecovery.vue'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -153,6 +154,7 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
           <RouterLink :to="`/member/${encodeURIComponent(account.userName)}/comments/anonymous`">本人匿名评论</RouterLink>
         </nav>
         <div class="card fp-card"><OwnerPostExport /></div>
+        <GameSaveRecovery />
         <OwnerGameSaves />
       </div>
 

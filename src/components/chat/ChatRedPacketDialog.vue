@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ChatRedPacketRecovery from './ChatRedPacketRecovery.vue'
 import { formatDateTime } from '@/utils/time'
 
 import {computed,onBeforeUnmount,ref,watch} from 'vue'
@@ -95,6 +96,7 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
       <p v-else class="packet-footnote">{{ detail.got===detail.count?'红包已领完 · ':'' }}查看详情不会领取，领取结果以实际结算为准。</p>
     </div>
     <div v-else class="packet-state"><p>红包详情尚未就绪。</p></div>
+    <ChatRedPacketRecovery kind="claim" :packet-id="store.selectedId" />
   </FpDialog>
 </template>
 

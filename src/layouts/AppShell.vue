@@ -20,14 +20,6 @@ import SystemAlertDialog from '@/components/SystemAlertDialog.vue'
 import WarnBroadcastDialog from '@/components/WarnBroadcastDialog.vue'
 import CountToast from '@/components/count/CountToast.vue'
 import ChatRedPacketDialog from '@/components/chat/ChatRedPacketDialog.vue'
-import ChatAppearanceRecovery from '@/components/chat/ChatAppearanceRecovery.vue'
-import ChatRedPacketRecovery from '@/components/chat/ChatRedPacketRecovery.vue'
-import ReportRecovery from '@/components/ReportRecovery.vue'
-import ActivityRecovery from '@/components/ActivityRecovery.vue'
-import GameSaveRecovery from '@/components/GameSaveRecovery.vue'
-import MilestoneRecovery from '@/components/MilestoneRecovery.vue'
-import FishGameRecovery from '@/components/FishGameRecovery.vue'
-import RepeaterRecovery from '@/components/RepeaterRecovery.vue'
 import ChatBarrageOverlay from '@/components/chat/ChatBarrageOverlay.vue'
 import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
 import MemberLayout from '@/components/member/MemberLayout.vue'
@@ -433,14 +425,6 @@ onUnmounted(() => {
     <CountToast />
     <ChatBarrageOverlay />
     <ChatRedPacketDialog />
-    <ChatRedPacketRecovery />
-    <ChatAppearanceRecovery />
-    <ReportRecovery />
-    <RepeaterRecovery />
-    <FishGameRecovery />
-    <MilestoneRecovery />
-    <GameSaveRecovery />
-    <ActivityRecovery />
     <SettingsDrawer />
     <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />

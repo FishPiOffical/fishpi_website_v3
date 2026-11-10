@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActivityRecovery from '@/components/ActivityRecovery.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ActivityStore } from '@/stores/v3Activity'
@@ -74,6 +75,7 @@ onBeforeUnmount(() => { cancel(); clearNotice() })
         <button v-if="reward.value.value?.claimable" type="button" class="claim-reward-btn" aria-label="领取昨日活跃奖励" :disabled="writes.busy || !!writes.pending || confirming" @click="collect()">{{ writes.busy ? '领取中…' : confirming ? '待确认…' : '领昨日奖励' }}</button>
       </div>
       <div v-if="reward.error.value" role="alert"><p>{{ reward.error.value }}</p><button type="button" @click="reward.read()">重试奖励状态</button></div>
+      <ActivityRecovery />
       <p v-if="rewardNotice" class="reward-notice" role="status">{{ rewardNotice }}</p>
     </section>
   </div>

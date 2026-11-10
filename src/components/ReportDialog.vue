@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ReportRecovery from '@/components/ReportRecovery.vue'
 import {computed,ref,useId,watch} from 'vue'
 import {getAuthContextVersion} from '@/api/http'
 import {reportInput,reportTarget} from '@/api/v3-reports'
@@ -25,8 +26,7 @@ watch(()=>JSON.stringify([getAuthContextVersion(),!!auth.accessToken,auth.accoun
    <label>备注（可空）<textarea v-model="memo" class="fp-input" rows="3" maxlength="10240" :disabled="frozen" placeholder="补充需要核实的信息；保存时去除HTML"/></label>
   </form>
   <p v-if="error" role="alert">{{ error }}</p>
-  <p v-if="store.error" role="alert">{{ store.error }}</p>
-  <p v-if="store.pending" role="status">已有举报等待确认，请从全局恢复提示处理原操作。</p>
+  <ReportRecovery />
   <template #footer><button type="button" class="fp-btn fp-btn--ghost" @click="close">关闭</button><button type="submit" :form="formId" class="fp-btn fp-btn--primary" :disabled="!canSubmit">{{ store.busy?'提交中…':'提交举报' }}</button></template>
  </FpDialog>
 </template>

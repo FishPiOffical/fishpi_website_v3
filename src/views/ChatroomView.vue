@@ -5,9 +5,6 @@ import { RouterLink,useRoute,useRouter } from 'vue-router'
 import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
 import { storeToRefs } from 'pinia'
-import ChatWeatherRecovery from '@/components/chat/ChatWeatherRecovery.vue'
-import ChatMusicRecovery from '@/components/chat/ChatMusicRecovery.vue'
-import ChatBarrageRecovery from '@/components/chat/ChatBarrageRecovery.vue'
 import {useChatMessageSource} from '@/composables/useChatMessageSource'
 import {getAuthContextVersion} from '@/api/http'
 import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
@@ -266,12 +263,6 @@ function clearScreen() {
 
 <template>
   <div class="cr-page" :class="`theme-${chatStyle}`">
-    <ChatPublicationRecovery @confirmed="acceptConfirmed" />
-    <ChatRevokeRecovery />
-    <ChatTopicRecovery />
-    <ChatBarrageRecovery />
-    <ChatMusicRecovery />
-    <ChatWeatherRecovery />
     <ChatContextPanel :message-id="contextId" @close="closeContext" @latest="latestFromContext" />
     <p v-if="isLoggedIn" class="timeline-controls"><button type="button" :disabled="loading" @click="chat.refreshMessages">重读当前消息</button><span v-if="chat.topicError" role="alert">{{ chat.topicError }}</span></p>
     <p v-else>登录后可读取聊天室消息。</p>
@@ -283,6 +274,8 @@ function clearScreen() {
         <div class="cr-classic-card">
           <!-- 1. 顶部输入与控制区域 -->
           <section ref="classicComposerArea" class="cr-classic-reply" @dragover.capture="onBreezemoonDragOver" @drop.capture="onBreezemoonDrop">
+            <ChatPublicationRecovery @confirmed="acceptConfirmed" />
+            <ChatRevokeRecovery />
             <ChatComposer
               collapsible
               :height="100"
@@ -336,6 +329,7 @@ function clearScreen() {
 
             <!-- 话题编辑展开表单 -->
             <ChatTopicEditor v-if="editingTopic" @close="editingTopic=false" />
+            <ChatTopicRecovery />
 
 
             <div v-if="isLoggedIn" class="classic-online-bar" aria-label="在线成员" role="region">
@@ -506,6 +500,8 @@ function clearScreen() {
         <div class="cr-composer-panel" @dragover.capture="onBreezemoonDragOver" @drop.capture="onBreezemoonDrop">
           <button v-if="hasNewMessages" type="button" class="cr-top-btn jump-latest" @click="scrollBottom">↓ 查看新消息</button>
           <div v-if="composerReady && isLoggedIn" class="composer-inner">
+            <ChatPublicationRecovery @confirmed="acceptConfirmed" />
+            <ChatRevokeRecovery />
             <ChatComposer
               collapsible
               adaptive-height
@@ -546,6 +542,7 @@ function clearScreen() {
 
             <!-- 话题编辑表单 -->
             <ChatTopicEditor v-if="editingTopic" @close="editingTopic=false" />
+            <ChatTopicRecovery />
 
           </div>
 

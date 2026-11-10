@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ChatBarrageRecovery from './ChatBarrageRecovery.vue'
+import ChatRedPacketRecovery from './ChatRedPacketRecovery.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import FpDialog from '@/components/FpDialog.vue'
 import { activeDialogState } from '@/composables/useDialog'
@@ -47,6 +49,8 @@ onBeforeUnmount(()=>{disposed=true;sequence++;unlock();if(trigger?.isConnected)t
       <ChatRedPacketEditor v-if="tool==='packet'" @close="emit('close')" />
       <ChatBarrageEditor v-else-if="tool==='barrage'" @close="emit('close')" />
       <PaintPanel v-else @insert="md=>emit('insert',md)" @close="emit('close')" />
+      <ChatRedPacketRecovery v-if="tool==='packet'" kind="create" />
+      <ChatBarrageRecovery v-if="tool==='barrage'" />
     </div>
   </FpDialog>
 </template>

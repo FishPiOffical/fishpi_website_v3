@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ChatAppearanceRecovery from '@/components/chat/ChatAppearanceRecovery.vue'
 import { computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ChatAppearanceStore } from '@/stores/v3ChatAppearance'
@@ -31,6 +32,7 @@ function selected(kind: PackKind) {
 
 <template>
   <div class="picker" :class="{ compact }">
+    <ChatAppearanceRecovery />
     <section v-for="group in groups" :key="group.kind">
       <h4>{{ group.title }}</h4>
       <div class="grid">
