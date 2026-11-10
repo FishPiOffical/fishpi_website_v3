@@ -36,9 +36,9 @@ defineExpose({reveal:()=>props.writable&&editor.value?.reveal()})
   <div class="comment-composer">
     <p v-if="!ready">正在准备评论…</p>
     <template v-else>
-      <template v-if="operations.pending && !operations.busy"><p>上次{{ operations.pending.operation==='delete'?'删除':operations.pending.operation==='update'?'编辑':'发布' }}评论结果待确认，所属文章 {{ operations.pending.articleId }}。请恢复同一次操作。</p><p v-if="operations.pending.input.content" class="pending-content">{{ operations.pending.input.content }}</p><button type="button" :disabled="operations.busy" @click="operations.retry()">{{ operations.busy?'正在确认…':'恢复本次评论操作' }}</button><p v-if="!applicable">恢复成功后请返回原文章核对，当前文章不会套用原结果。</p></template>
+      <template v-if="operations.pending && !operations.busy"><p class="fp-retry-copy">上次{{ operations.pending.operation==='delete'?'删除':operations.pending.operation==='update'?'编辑':'发布' }}评论结果待确认，所属文章 {{ operations.pending.articleId }}。请恢复同一次操作。</p><button class="fp-retry-icon" type="button" :disabled="operations.busy" @click="operations.retry()" :title="operations.busy?'正在确认…':'恢复本次评论操作'">{{ operations.busy?'正在确认…':'恢复本次评论操作' }}</button><p v-if="operations.pending.input.content" class="pending-content">{{ operations.pending.input.content }}</p><p v-if="!applicable">恢复成功后请返回原文章核对，当前文章不会套用原结果。</p></template>
       <p v-else-if="!writable">当前不可发布或编辑评论，已有操作仍可恢复。</p>
-      <template v-else-if="editId&&!sourceReady"><p v-if="sourceLoading">正在读取评论原文…</p><button v-else type="button" @click="source()">重读评论原文</button></template>
+      <template v-else-if="editId&&!sourceReady"><p v-if="sourceLoading">正在读取评论原文…</p><button class="fp-retry-icon" v-else type="button" @click="source()" title="重读评论原文">重读评论原文</button></template>
       <template v-else>
         <p v-if="parentId">回复 {{ replyLabel || `评论 ${parentId}` }}<button type="button" :disabled="locked" @click="emit('clearReply')">取消回复</button></p>
         <p v-else-if="paragraphId">发表当前段落的独立段评</p>

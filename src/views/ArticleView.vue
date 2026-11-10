@@ -477,7 +477,7 @@ function itemHandlers(c: ArticleComment) {
       <ArticleInteraction kind="reward" :article-id="article.oId" :initial-price="Number(article.articleRewardPoint || 0)" :initial-state="article.interactions?.reward" :initial-html="article.articleRewardContent" :initial-read-started="article.interactionReadStarted" @content-click="onContentClick" />
     </DefineReward>
     <DefineComments>
-      <p v-if="commentRefreshError" role="alert">{{ commentRefreshError }}<button type="button" @click="load(true)">重读评论</button></p>
+      <p v-if="commentRefreshError" role="alert">{{ commentRefreshError }}<button class="fp-retry-icon" type="button" @click="load(true)" title="重读评论">重读评论</button></p>
       <p v-if="commentWrites.error" role="alert">{{ commentWrites.error }}</p>
       <p v-if="commentWrites.receipt?.articleId === article.oId && commentWrites.message" role="status">{{ commentWrites.message }}</p>
       <div class="comments-list" :aria-busy="articleReading">

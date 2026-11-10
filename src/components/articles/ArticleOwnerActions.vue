@@ -42,9 +42,9 @@ onBeforeUnmount(()=>{mounted.value=false;close()})
   <button v-if="candidate" type="button" :disabled="operations.busy||operations.confirming" :aria-expanded="opened" @click="opened?close():check()">本人文章操作</button>
   <p v-if="operations.accountError&&(operations.pending?.id===articleId||currentReceipt)" role="status">{{ operations.accountError }}</p>
   <div v-if="operations.pending && !operations.busy" class="recovery">
-   <p>文章 {{ operations.pending.id }} 的{{ operations.pending.kind==='stick'?'置顶':'删除' }}结果未确认，请先恢复本次操作。</p>
+   <p class="fp-retry-copy">文章 {{ operations.pending.id }} 的{{ operations.pending.kind==='stick'?'置顶':'删除' }}结果未确认，请先恢复本次操作。</p>
+   <button class="fp-retry-icon" type="button" :disabled="operations.busy||operations.confirming" @click="recover" title="恢复本次文章操作">恢复本次文章操作</button>
    <p v-if="operations.error" role="alert">{{ operations.error }}</p>
-   <button type="button" :disabled="operations.busy||operations.confirming" @click="recover">恢复本次文章操作</button>
   </div>
   <div v-if="opened">
    <p v-if="loading" role="status">正在核验本人文章…</p>

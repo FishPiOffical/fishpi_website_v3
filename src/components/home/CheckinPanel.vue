@@ -52,7 +52,7 @@ onBeforeUnmount(() => { cancel(); clearNotice() })
         <button type="button" class="refresh-btn" aria-label="刷新签到状态" title="刷新签到状态" :disabled="checkin.loading.value || reward.loading.value" @click="checkin.read(); reward.read()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg></button>
       </div>
       <p v-if="checkin.loading.value" role="status">读取中…</p>
-      <div v-else-if="checkin.error.value" role="alert"><p>{{ checkin.error.value }}</p><button type="button" @click="checkin.read()">重试签到状态</button></div>
+      <div v-else-if="checkin.error.value" role="alert"><p class="fp-retry-copy">{{ checkin.error.value }}</p><button class="fp-retry-icon" type="button" @click="checkin.read()" title="重试签到状态">重试签到状态</button></div>
       <div v-else-if="today" class="activity-meter" :class="{ 'is-done': today.checkedIn }">
         <div class="activity-ring" role="progressbar" aria-label="今日活跃目标进度" :aria-valuenow="Math.round(goalProgress)"
           :aria-valuetext="`当前活跃 ${today.liveness}%，自动签到门槛 ${today.threshold}%`">
@@ -74,7 +74,7 @@ onBeforeUnmount(() => { cancel(); clearNotice() })
         <span v-if="today" class="checkin-streak">连续 <strong>{{ today.streak }}</strong> 天</span>
         <button v-if="reward.value.value?.claimable" type="button" class="claim-reward-btn" aria-label="领取昨日活跃奖励" :disabled="writes.busy || !!writes.pending || confirming" @click="collect()">{{ writes.busy ? '领取中…' : confirming ? '待确认…' : '领昨日奖励' }}</button>
       </div>
-      <div v-if="reward.error.value" role="alert"><p>{{ reward.error.value }}</p><button type="button" @click="reward.read()">重试奖励状态</button></div>
+      <div v-if="reward.error.value" role="alert"><p class="fp-retry-copy">{{ reward.error.value }}</p><button class="fp-retry-icon" type="button" @click="reward.read()" title="重试奖励状态">重试奖励状态</button></div>
       <ActivityRecovery />
       <p v-if="rewardNotice" class="reward-notice" role="status">{{ rewardNotice }}</p>
     </section>

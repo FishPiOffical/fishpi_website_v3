@@ -75,10 +75,10 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
    <button class="fp-control" type="button" :disabled="listBusy||historyBusy" @click="refresh">刷新当前状态</button>
    <button class="fp-control" type="button" :disabled="writes.busy||!!writes.pending" @click="markRead(true)">全部标记已读</button>
   </div>
-  <p v-if="unreadError" class="alert-bar" role="alert">{{ unreadError }} <button class="fp-control" @click="loadUnread">重读未读数</button></p>
+  <p v-if="unreadError" class="alert-bar" role="alert">{{ unreadError }} <button class="fp-retry-icon" type="button" @click="loadUnread" title="重读未读数">重读未读数</button></p>
   <div v-if="writes.pending && !writes.busy" class="pending-banner" role="status">
-   <p>暂未确认私信操作是否成功，请重试。</p>
-   <button class="fp-control" :disabled="writes.busy" @click="retry">恢复本次私信操作</button>
+   <p class="fp-retry-copy">暂未确认私信操作是否成功，请重试。</p>
+   <button class="fp-retry-icon" type="button" :disabled="writes.busy" @click="retry" title="恢复本次私信操作">恢复本次私信操作</button>
    <p class="pending-sub">整页刷新或退出会清除本地恢复信息，请先核对原操作。</p>
   </div>
   <p v-if="writes.error" class="alert-bar" role="alert">{{ writes.error }}</p>
@@ -144,7 +144,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
 
     <p v-if="other&&!other.available" class="unavailable-banner">该账号资料不可用，仍可阅读本人历史。</p>
     <p v-if="changed" class="sr-changed" role="status">私信状态有更新 <button class="fp-control" :disabled="historyBusy" @click="loadHistory()">读取当前历史</button></p>
-    <p v-if="historyError" class="alert-bar" role="alert">{{ historyError }} <button class="fp-control" :disabled="historyBusy" @click="loadHistory()">重读当前历史</button></p>
+    <p v-if="historyError" class="alert-bar" role="alert">{{ historyError }} <button class="fp-retry-icon" type="button" :disabled="historyBusy" @click="loadHistory()" title="重读当前历史">重读当前历史</button></p>
     <p v-if="historyBusy&&!messages.length" class="empty-content" role="status">读取历史…</p>
 
     <div ref="msgScroller" class="messages-scroller" @scroll.passive="trackMessageScroll" @load.capture="onHistoryMediaLoad">

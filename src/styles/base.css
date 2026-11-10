@@ -730,3 +730,51 @@ input[type='radio']:disabled {
     max-width: 100%;
   }
 }
+
+/* Keep retry actions next to the status, with the original text as the button's accessible name. */
+.fp-retry-copy.fp-retry-copy {
+  display: inline;
+  margin: 0;
+}
+
+.fp-retry-icon.fp-retry-icon {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 26px;
+  block-size: 26px;
+  padding: 0;
+  margin: 0 0 0 4px;
+  vertical-align: middle;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fp-muted);
+  font-size: 0;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.fp-retry-icon::before {
+  content: '';
+  grid-area: 1 / 1;
+  inline-size: 15px;
+  block-size: 15px;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.fp-retry-icon.fp-retry-icon:hover:not(:disabled),
+.fp-retry-icon.fp-retry-icon:focus-visible {
+  background: var(--fp-hover);
+  color: var(--fp-text);
+}
+
+.fp-retry-icon.fp-retry-icon:focus-visible {
+  outline: 2px solid var(--fp-primary);
+  outline-offset: 1px;
+}
+
+.fp-retry-icon.fp-retry-icon:disabled {
+  opacity: .5;
+  cursor: default;
+}

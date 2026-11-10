@@ -13,7 +13,7 @@ watch(identity,cancel,{flush:'sync'});onBeforeUnmount(cancel)
 </script>
 <template><div v-if="auth.accessToken&&!store.busy&&(store.pending||store.error)" class="report-recovery">
  <p v-if="store.error" role="alert">{{ store.error }}</p>
- <div v-if="store.pending" role="status"><p>{{ store.needsConfirmation ? '请再次确认举报。' : '暂未确认举报是否提交成功，请重试本次举报。' }}</p><button type="button" :disabled="store.busy" @click="retry">{{ store.needsConfirmation?'再次确认原举报':'恢复本次举报' }}</button><button v-if="store.needsConfirmation" type="button" :disabled="store.busy" @click="store.cancelConfirmation">取消待确认举报</button></div>
+ <div v-if="store.pending" role="status"><p class="fp-retry-copy">{{ store.needsConfirmation ? '请再次确认举报。' : '暂未确认举报是否提交成功，请重试本次举报。' }}</p><button class="fp-retry-icon" type="button" :disabled="store.busy" @click="retry" :title="store.needsConfirmation?'再次确认原举报':'恢复本次举报'">{{ store.needsConfirmation?'再次确认原举报':'恢复本次举报' }}</button><button v-if="store.needsConfirmation" type="button" :disabled="store.busy" @click="store.cancelConfirmation">取消待确认举报</button></div>
  <button v-if="!store.pending&&!store.busy" type="button" @click="store.dismiss">关闭举报提示</button>
 </div></template>
 <style scoped lang="scss">.report-recovery{box-sizing:border-box;max-width:1100px;width:calc(100% - 24px);margin:8px auto;overflow-wrap:anywhere;font-size:13px}p{margin:6px 0}[role=alert]{color:#bd503c}button{font:inherit;margin:3px;padding:5px 8px;border:1px solid var(--fp-border);border-radius:5px;background:var(--fp-card);color:var(--fp-text)}</style>
