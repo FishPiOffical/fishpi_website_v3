@@ -14,7 +14,7 @@ async function load() {
   const controller = pending = new AbortController()
   const valid = () => mounted && run === seq && version === getAuthContextVersion() && token === auth.accessToken && actor === auth.account?.oId
   loading.value = true
-  try { const blob = await fetchMedalImage(props.id, props.owner ? '' : props.userName, props.mini, controller.signal); if (valid()) source.value = URL.createObjectURL(blob) }
+  try { const blob = await fetchMedalImage(props.id, props.owner ? '' : props.userName, props.mini, controller.signal); if (valid() && blob) source.value = URL.createObjectURL(blob) }
   catch (e) { if (valid()) error.value = e instanceof Error ? e.message : '图片读取失败' }
   finally { if (valid()) { loading.value = false; pending = null } }
 }
