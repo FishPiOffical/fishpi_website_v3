@@ -5,6 +5,7 @@ import type { RedPacketContent } from '@/api/fishpi'
 const props = withDefaults(
   defineProps<{
     detailsOnly?: boolean
+    gesturesDisabled?: boolean
     packet: RedPacketContent
     /** 当前用户是否为发红包的人 */
     isSender?: boolean
@@ -19,7 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const empty = computed(
-  () => Number(props.packet.count || 0) > 0 && Number(props.packet.count) === Number(props.packet.got || 0),
+  () => Number(props.packet.count || 0) > 0 && Number(props.packet.got || 0) >= Number(props.packet.count),
 )
 
 const alreadyJoined = computed(() => {
@@ -58,53 +59,38 @@ const desc = computed(() => {
   return props.packet.type === 'dice' ? '已开盘' : '已经被抢光啦'
 })
 
-function onCardClick() {
-  if (showGestures.value) return
-  emit('open')
-}
-
-function onGesture(g: number, e: Event) {
-  e.stopPropagation()
-  emit('open', g)
-}
-
-function onKeydown(e: KeyboardEvent) {
-  if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return
-  e.preventDefault()
-  onCardClick()
-}
 </script>
 
 <template>
   <div
     class="hongbao__item"
     :class="{ opened: empty, 'is-rps': showGestures }"
-    role="button"
-    tabindex="0"
-    @click="onCardClick"
-    @keydown="onKeydown"
   >
-    <div v-if="showGestures" class="hongbao__finger_guessing">
+    <button type="button" class="hongbao__open" :aria-label="typeLabel + '：打开红包'" @click="emit('open')" />
+    <div v-if="showGestures" class="hongbao__finger_guessing" role="group" aria-label="选择出拳，可能扣除积分">
       <button
         type="button"
         class="hongbao__finger_guessing_icon rock"
         title="石头"
         aria-label="石头"
-        @click="onGesture(0, $event)"
+        :disabled="gesturesDisabled"
+        @click="emit('open', 0)"
       />
       <button
         type="button"
         class="hongbao__finger_guessing_icon scissors"
         title="剪刀"
         aria-label="剪刀"
-        @click="onGesture(1, $event)"
+        :disabled="gesturesDisabled"
+        @click="emit('open', 1)"
       />
       <button
         type="button"
         class="hongbao__finger_guessing_icon paper"
         title="布"
         aria-label="布"
-        @click="onGesture(2, $event)"
+        :disabled="gesturesDisabled"
+        @click="emit('open', 2)"
       />
     </div>
 
@@ -122,7 +108,7 @@ function onKeydown(e: KeyboardEvent) {
       <div class="hongbao__type">{{ typeLabel }}</div>
     </div>
     <div class="hongbao__footer">
-      <span class="hongbao__desc">{{ desc || '摸鱼派红包' }}</span>
+      <span class="hongbao__desc">{{ desc || (showGestures ? '点手势出拳，输会扣积分' : '摸鱼派红包') }}</span>
       <span v-if="packet.money != null" class="hongbao__money">
         <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
           <circle cx="8" cy="8" r="7" fill="#f0c040" stroke="#d4a017" stroke-width="1" />
@@ -159,7 +145,18 @@ function onKeydown(e: KeyboardEvent) {
   border-color: color-mix(in srgb, #e59230 55%, var(--fp-border));
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
 }
-.hongbao__item:focus-visible {
+.hongbao__open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.hongbao__open:focus-visible,
+.hongbao__finger_guessing_icon:focus-visible {
   outline: 2px solid var(--fp-primary);
   outline-offset: 3px;
 }
@@ -249,8 +246,12 @@ function onKeydown(e: KeyboardEvent) {
   pointer-events: auto;
   transition: border-color 0.2s ease;
 }
-.hongbao__finger_guessing_icon:hover {
+.hongbao__finger_guessing_icon:hover:not(:disabled) {
   border-color: #5c1151;
+}
+.hongbao__finger_guessing_icon:disabled {
+  cursor: wait;
+  opacity: .55;
 }
 .hongbao__finger_guessing_icon.rock {
   top: 3px;

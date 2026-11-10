@@ -60,8 +60,56 @@ state.ssr=true;v=mount();before=state.calls.length;await v.store.create(input);a
 const main=await fs.readFile('src/views/ChatroomView.vue','utf8'),floating=await fs.readFile('src/components/chat/WhisperConversations.vue','utf8'),hidden=await fs.readFile('src/components/chat/HiddenChatConversations.vue','utf8'),facade=await fs.readFile('src/stores/chat.ts','utf8'),shell=await fs.readFile('src/layouts/AppShell.vue','utf8');assert.ok(main.includes('<ChatToolDialog '));assert.equal(main.split('<ChatRedPacketEditor ').length-1,0);assert.equal(main.split('<ChatRedPacketCard ').length-1,2);assert.ok(floating.includes('<ChatRedPacketCard ')&&hidden.includes('<ChatRedPacketCard '));assert.equal(shell.split('<ChatRedPacketDialog />').length-1,1);assert.equal(shell.split('<ChatRedPacketRecovery />').length-1,1);assert.ok(!facade.includes('sendLegacySpecial')&&!facade.includes('openRedPacket'))
 console.log('PASS packets 16 guest/SSR performs no packet work; both layouts/floating/hidden use details-first cards with one global dialog/recovery and no legacy writes')
 
-const Hongbao=await component('src/components/chat/HongbaoCard.vue');globalThis.__hongbao=Hongbao;hongbaoURL=url('export default globalThis.__hongbao');const Card=await component('src/components/chat/ChatRedPacketCard.vue'),cardPinia=createPinia(),cardRoot={children:[]},cardApp=renderer.createApp({setup(){return()=>h(Card,{packetId:'3',packet:{type:'rockPaperScissors',count:1,got:0,money:256,msg:'rps'}})}});cardApp.use(cardPinia);resetDetail({type:'rockPaperScissors',money:256,message:'rps',riskAccepted:true,gesture:0});cardApp.mount(cardRoot);assert.ok(!find(cardRoot,n=>n.tag==='button'));before=writes.length;find(cardRoot,n=>n.props?.role==='button').props.onClick();await tick();assert.equal(writes.length,before);const cardStore=useV3ChatRedPacketsStore(cardPinia);assert.equal(cardStore.detail.type,'rockPaperScissors');cardApp.unmount();cardStore.$dispose();useV3ChatTimelineStore(cardPinia).$dispose()
-console.log('PASS packets 17 actual wrapper disables legacy RPS gesture shortcuts and opens current detail using GET, never claim')
+const Hongbao=await component('src/components/chat/HongbaoCard.vue')
+globalThis.__hongbao=Hongbao
+hongbaoURL=url('export default globalThis.__hongbao')
+const Card=await component('src/components/chat/ChatRedPacketCard.vue')
+const duel={type:'rockPaperScissors',money:256,message:'rps',riskAccepted:true,gesture:0}
+function mountCard(senderId='2'){
+  const pinia=createPinia(),root={children:[]}
+  const app=renderer.createApp({setup(){return()=>h(Card,{packetId:'3',packet:{type:duel.type,count:1,got:0,money:256,msg:'rps',senderId}})}})
+  app.use(pinia)
+  app.mount(root)
+  const store=useV3ChatRedPacketsStore(pinia)
+  return {root,store,close(){app.unmount();store.$dispose();useV3ChatTimelineStore(pinia).$dispose()}}
+}
+const cardButton=(card,label)=>find(card.root,n=>n.tag==='button'&&n.props['aria-label']===label)
+resetDetail(duel)
+before=state.calls.length
+let card=mountCard()
+assert.ok(cardButton(card,'石头')&&cardButton(card,'剪刀')&&cardButton(card,'布'))
+assert.equal(state.calls.length,before)
+const openDetails=cardButton(card,'石头剪刀布红包：打开红包')
+openDetails.props.onClick()
+await tick()
+assert.equal(card.store.detail.type,duel.type)
+assert.deepEqual(state.calls.slice(before).map(c=>c.path),['/api/v3/chat/red-packets/3'])
+card.store.close()
+before=writes.length
+claimAmount=-217
+cardButton(card,'剪刀').props.onClick()
+await tick()
+assert.equal(writes.length,before+1)
+assert.deepEqual(JSON.parse(writes.at(-1).init.body),{gesture:1,riskAccepted:true})
+assert.equal(card.store.selectedId,'')
+assert.match(text(card.root),/惜败.*-217 积分/)
+assert.ok(!cardButton(card,'剪刀'))
+card.close()
+
+card=mountCard('1')
+assert.ok(!cardButton(card,'剪刀'))
+card.close()
+
+state.dispatch=async()=>env({legacy:true,id:'3',type:duel.type,message:'旧猜拳',money:256,count:1,got:0,sender:user('2'),claims:[],currentUserClaim:null})
+card=mountCard()
+before=writes.length
+cardButton(card,'石头').props.onClick()
+await tick()
+assert.equal(writes.length,before)
+assert.match(text(card.root),/此红包当前无法出拳/)
+card.close()
+state.dispatch=dispatch
+console.log('PASS packets 17 inline gestures require no mount reads, submit once without a dialog, keep details read-only, and block legacy or self claims')
 v=mount();resetDetail({type:'rockPaperScissors',money:256,message:'own',riskAccepted:true,gesture:2},'1');await v.store.open('3');await tick();assert.equal(v.store.detail.senderGesture,2);assert.ok(!find(v.root,n=>n.tag==='button'&&text(n).trim()==='确认风险后领取'));resetDetail({type:'specify',money:32,message:'private recipients',recipientIds:['2','3']},'1');await v.store.open('3');await tick();assert.deepEqual(v.store.detail.recipientIds,['2','3']);v.app.unmount();v.store.$dispose();v.timeline.$dispose()
 console.log('PASS packets 18 sender ID prevents self RPS claim and only owner detail exposes designated recipient list')
 v=mount();resetDetail();let resolveClosed;const closedDetail=copy(detailData);state.dispatch=path=>path.endsWith('/3')?new Promise(r=>resolveClosed=r):dispatch(path);before=writes.length;const closedRun=v.store.open('3',true);await tick();v.store.close();resolveClosed(env(closedDetail));await closedRun;assert.equal(writes.length,before);assert.equal(v.store.detail,null);v.app.unmount();v.store.$dispose();v.timeline.$dispose();state.dispatch=dispatch;state.confirm=async()=>true

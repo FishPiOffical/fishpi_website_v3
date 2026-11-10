@@ -24,9 +24,21 @@ export const useV3ChatRedPacketsStore=defineStore('v3-chat-red-packets',()=>{
  finally{if(valid())busy.value=false}}
  function create(input:PacketInput){if(pending.value||busy.value)return Promise.resolve(null);try{return execute({kind:'create',input:packetInput(input,account.value?.oId||''),key:profileOperationKey()},false)}catch(e){error.value=e instanceof Error?e.message:'红包参数不合法';return Promise.resolve(null)}}
  function claim(id:string,type:PacketType,input:ClaimInput){if(pending.value||busy.value||detail.value?.id===id&&detail.value.legacy)return Promise.resolve(null);try{return execute({kind:'claim',id:packetId(id),type,input:packetClaimInput(type,input),key:profileOperationKey()},false)}catch(e){error.value=e instanceof Error?e.message:'领取参数不合法';return Promise.resolve(null)}}
+ async function claimDuelFromCard(id:string,gesture:number,signal:AbortSignal){
+  const valid=proof()
+  if(!valid()||pending.value||busy.value)return
+  const ownerId=account.value!.oId
+  // 消息卡片不区分旧红包和新版红包。只在出拳时核对详情，避免逐条预读或尝试领取旧红包。
+  const current=await packetDetail(id,ownerId,signal)
+  if(!valid()||signal.aborted)return
+  const alreadySettled=receipt.value?.kind==='claim'&&receipt.value.data.id===id
+  if(alreadySettled||current.legacy||current.type!=='rockPaperScissors'||current.sender.id===ownerId||current.currentUserClaim||current.got>=current.count)return 'details'
+  if(pending.value||busy.value)return 'busy'
+  return claim(id,'rockPaperScissors',{gesture,riskAccepted:true})
+ }
  function retry(confirmed=false){return pending.value&&(!needsConfirmation.value||confirmed)?execute(pending.value,true):Promise.resolve(null)}
  function cancelConfirmation(){if(needsConfirmation.value&&!busy.value){pending.value=null;needsConfirmation.value=false;error.value=''}}
  function dismiss(){if(pending.value||busy.value)return;readRun++;readAbort?.abort();reading.value=false;receipt.value=null;error.value=readError.value=''}
  const stop=watch([accessToken,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),actor=account.value?.oId;if(!accessToken.value||next!==boundary||actor!==owner)reset();boundary=next;owner=actor},{flush:'sync'})
- onScopeDispose(()=>{stop();reset()});return{pending,completed,receipt,busy,error,needsConfirmation,selectedId,detail,loading,detailError,reading,readError,open,close,dismiss,readCurrent,create,claim,retry,cancelConfirmation}
+ onScopeDispose(()=>{stop();reset()});return{pending,completed,receipt,busy,error,needsConfirmation,selectedId,detail,loading,detailError,reading,readError,open,close,dismiss,readCurrent,create,claim,claimDuelFromCard,retry,cancelConfirmation}
 })
