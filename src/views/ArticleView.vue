@@ -545,7 +545,6 @@ function itemHandlers(c: ArticleComment) {
       @paragraph-reply="onParagraphReply"
     >
       <template #owner-actions><ReuseOwnerActions /></template>
-      <template #live-status><span v-if="heat!==null">本节点约 {{ heat }} 个连接</span><span v-if="heatError">{{ heatError }} <button type="button" @click="refreshHeat">重读热度</button></span></template>
       <template #reward><ReuseReward /></template>
       <template #comments><ReuseComments /></template>
       <template #composer><ReuseComposer /></template>

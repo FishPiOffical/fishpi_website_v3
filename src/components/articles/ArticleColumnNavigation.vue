@@ -29,8 +29,7 @@ onBeforeUnmount(()=>{mounted=false;generation++;pageRun++;abort?.abort();context
 </script>
 <template>
  <div class="article-column-navigation">
-  <p v-if="loading" role="status">正在读取章节导航…</p>
-  <p v-else-if="error" role="alert">{{ error }} <button type="button" @click="readContext">重试章节导航</button></p>
+  <p v-if="error" role="alert">章节导航暂时不可用。 <button type="button" @click="readContext">重试章节导航</button></p>
   <template v-else-if="context?.column">
    <p><RouterLink :to="`/column/${context.column.id}`">《{{ context.column.title }}》</RouterLink> · 第 {{ context.chapterNo }} 章 · {{ context.column.articleCount }} 个可见章节</p>
    <nav aria-label="当前可见章节导航">
@@ -39,8 +38,7 @@ onBeforeUnmount(()=>{mounted=false;generation++;pageRun++;abort?.abort();context
     <button type="button" :aria-expanded="opened" @click="toggle">章节目录</button>
    </nav>
    <section v-if="opened" aria-label="当前可见章节目录">
-    <p v-if="pageLoading" role="status">正在读取章节目录…</p>
-    <p v-else-if="pageError" role="alert">{{ pageError }} <button type="button" @click="readPage(pageNo)">重试当前目录页</button></p>
+    <p v-if="pageError" role="alert">章节目录暂时无法打开。 <button type="button" @click="readPage(pageNo)">重试当前目录页</button></p>
     <template v-else-if="page">
      <p>共 {{ page.total }} 个可见章节</p>
      <p v-if="!page.list.length">本页没有可见章节 <button type="button" @click="readPage(1)">返回目录首页</button></p>

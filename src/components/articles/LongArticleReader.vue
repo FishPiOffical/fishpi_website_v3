@@ -587,7 +587,6 @@ function chapterTitle(c: LongArticleChapter) {
         </div>
 
         <ArticleColumnNavigation :key="article.oId" :article-id="article.oId" />
-        <slot name="live-status" />
         <p v-if="statement" class="la-statement">创作声明：{{ statement }}</p>
 
         <audio v-if="article.articleAudioURL" class="la-audio" :src="article.articleAudioURL" controls preload="none" />

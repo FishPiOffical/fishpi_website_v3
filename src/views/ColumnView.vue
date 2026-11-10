@@ -9,7 +9,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { usePublicColumn } from '@/composables/usePublicColumn'
 import { usePageSeo } from '@/composables/usePageSeo'
 const route = useRoute(), columnId = computed(() => String(route.params.columnId || ''))
-const { meta, page, p, metaError, pageError, metaLoading, pageLoading, readMeta, readPage } = usePublicColumn(columnId)
+const { meta, page, p, metaError, pageError, readMeta, readPage } = usePublicColumn(columnId)
 const title = computed(() => meta.value?.column.title || `专栏 ${columnId.value}`), panel = ref<HTMLElement | null>(null), coverFailed = ref(false)
 watch(() => meta.value?.column.coverURL, () => { coverFailed.value = false })
 let lastPage = 1
@@ -23,8 +23,7 @@ usePageSeo(() => ({ title: title.value, path: `/column/${encodeURIComponent(colu
 <template>
   <main :data-public-content="meta ? 'ready' : undefined" class="column-page fp-page fp-page--wide fp-ui fp-special-page">
     <p class="crumb"><RouterLink to="/column">长篇专栏</RouterLink><span>/</span>{{ title }}</p>
-    <p v-if="metaLoading && !meta" class="column-meta-loading" role="status">正在读取专栏资料…</p>
-    <div v-if="metaError" role="alert"><p>{{ metaError }}</p><button class="fp-control" type="button" @click="readMeta">重试专栏资料</button></div>
+    <div v-if="metaError" role="alert"><p>专栏暂时无法打开。</p><button class="fp-control" type="button" @click="readMeta">重试专栏资料</button></div>
     <section v-if="meta" class="book-hero">
       <div class="cover-wrap"><img v-if="meta.column.coverURL && !coverFailed" :src="meta.column.coverURL" alt="" class="book-cover" @error="coverFailed = true" /><div v-else class="cover-placeholder" role="img" aria-label="未设置专栏封面">专栏</div><span class="cover-shine" /></div>
       <div class="book-info">
@@ -35,16 +34,14 @@ usePageSeo(() => ({ title: title.value, path: `/column/${encodeURIComponent(colu
       </div>
     </section>
     <section ref="panel" class="chapter-panel">
-      <header class="chapter-heading"><h2>章节目录</h2><button class="fp-control" type="button" :disabled="pageLoading" @click="readPage()">刷新章节目录</button></header>
-      <p v-if="pageLoading && !page" class="column-page-loading" role="status">正在读取章节目录…</p>
-      <div v-if="pageError" role="alert"><p>{{ pageError }}</p><button class="fp-control" type="button" @click="readPage()">重试章节目录</button><button class="fp-control" v-if="p > 1" type="button" @click="readPage(1)">返回目录首页</button></div>
+      <header class="chapter-heading"><h2>章节目录</h2></header>
+      <div v-if="pageError" role="alert"><p>章节目录暂时无法打开。</p><button class="fp-control" type="button" @click="readPage()">重试章节目录</button><button class="fp-control" v-if="p > 1" type="button" @click="readPage(1)">返回目录首页</button></div>
       <template v-if="page">
         <p class="hint">当前目录共 {{ page.total }} 条</p>
         <ol class="chapters"><li v-for="item in page.list" :key="item.id" :class="{'last-read':progress===item.id}"><span class="chapter-index">{{ item.chapterNo }}</span><RouterLink :to="`/article/${item.id}`">{{ item.title }}<small v-if="progress===item.id"> 上次读到</small></RouterLink><time class="chapter-time" :datetime="item.createdAt ? timeISO(item.createdAt) : undefined">{{ date(item.createdAt) }}</time><span class="chapter-arrow" aria-hidden="true">›</span></li></ol>
         <p v-if="!page.list.length" class="hint">本页没有可见章节。</p>
         <div class="column-pager fp-pagination"><button class="fp-control" type="button" :disabled="p <= 1" @click="readPage(p - 1)">上一页章节</button><span>第 {{ p }} 页 / 共 {{ page.pageCount }} 页</span><button class="fp-control" type="button" :disabled="p >= page.pageCount" @click="readPage(p + 1)">下一页章节</button><button class="fp-control" v-if="p > page.pageCount" type="button" @click="readPage(1)">返回目录首页</button></div>
       </template>
-      <p v-else-if="!pageLoading && !pageError" role="status">章节目录尚未读取。</p>
     </section>
   </main>
 </template>
@@ -90,5 +87,4 @@ usePageSeo(() => ({ title: title.value, path: `/column/${encodeURIComponent(colu
 .cover-placeholder { display: grid; place-items: center; width: 100%; height: 100%; min-height: 150px; color: #58452f; font-size: 28px; letter-spacing: 5px; background: linear-gradient(120deg, #d9c19a, #bba076); }
 .chapter-panel { margin-top: 24px; scroll-margin-top: 88px; } .column-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px; } button { border: 1px solid var(--fp-border); background: var(--fp-card); color: var(--fp-text); border-radius: 6px; padding: 7px 10px; cursor: pointer; &:disabled { opacity: .5; cursor: default; } } [role=alert] { padding: 16px; color: var(--fp-danger); }
 .chapters .last-read{background:var(--fp-primary-soft)}.chapters small{color:var(--fp-primary);font-size:10px}
-.column-meta-loading,.column-page-loading{display:grid;place-items:center;margin:0;color:var(--fp-muted);font-size:13px;background:var(--fp-hover);border-radius:12px}.column-meta-loading{min-height:285px;margin-bottom:18px}.column-page-loading{min-height:240px}
 </style>
