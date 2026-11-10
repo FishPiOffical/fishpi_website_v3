@@ -10,7 +10,7 @@ const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__publicRequests=[];globalThis.__publicResponses=[]
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}} export async function request(path,init){globalThis.__publicRequests.push({path,init});const result=globalThis.__publicResponses.shift();if(result instanceof Error)throw result;if(result===undefined)throw Error('Unexpected '+path);return result}`)
 const {ApiError}=await import(http)
-const api=await import(url(compile(await fs.readFile('src/api/v3-profession-public.ts','utf8')).replace("from './http'",`from '${http}'`)))
+const api=await import(url(compile((await fs.readFile('src/api/v3-profession-public.ts','utf8')).replace('import.meta.env.VITE_BROWSER_API_ORIGIN', JSON.stringify('https://rhythm.example'))).replace("from './http'",`from '${http}'`)))
 const definition={professionId:'10',professionCode:'writer',displayName:'创作者',shortName:'创作',description:'<b>仅作文本</b>'}
 const progress={...definition,state:'ACTIVE',levelCode:'L1',levelName:'初学者'}
 const contribution={professionId:'10',actionCode:'article.publish',eventCount:2,lastOccurredAt:1792800000000}
@@ -53,5 +53,11 @@ let releaseReader;__publicAPI.fetchV3PublicProfessions=async()=>auth.accessToken
 console.log('PASS public professions 6 actual target/credential changes replace reader-bound output and reject delayed old target/private summaries')
 __publicAPI.fetchV3PublicProfessions=async()=>{throw new ApiError('concealed',404)};view=mount();await tick();assert.match(view.text(),/当前没有可展示的职业资料/);assert.ok(!view.text().includes('concealed'));view.app.unmount()
 __publicAPI.fetchV3PublicProfessions=async()=>{throw new ApiError('temporary unavailable',503)};view=mount();await tick();assert.match(view.text(),/职业详情暂不可用/);assert.ok(!view.text().includes('temporary unavailable'));assert.ok(!view.text().includes('当前没有可展示的职业资料'));view.app.unmount()
-const member=await fs.readFile('src/components/member/MemberProfileBadges.vue','utf8');assert.match(member,/<PublicProfessions :user-name="userName"/);assert.ok(!source.includes('重新读取公开职业资料'))
-console.log('PASS public professions 7 concealed 404 and real failures remain distinct; member tab is no longer gated by visible primary profession or old profession API')
+const member=await fs.readFile('src/components/member/MemberProfileBadges.vue','utf8');assert.doesNotMatch(member,/<PublicProfessions/);assert.match(member,/<RouterLink v-if="summary" to="\/top\/profession"/);assert.ok(!source.includes('重新读取公开职业资料'))
+console.log('PASS public professions 7 concealed 404 and real failures remain distinct; member badge links to the ranking instead of mounting details')
+
+__publicResponses.push(envelope({primaryProfession:{...progress,iconUrl:'/images/profession/writer.svg'}}))
+const summary=await api.fetchV3ProfessionSummary('Alice',new AbortController().signal)
+assert.equal(summary.iconUrl,'https://rhythm.example/images/profession/writer.svg')
+assert.equal(__publicRequests.at(-1).path,'/api/v3/users/Alice/professions/summary')
+console.log('PASS public professions 8 relative icons resolve on the configured Rhythm origin')

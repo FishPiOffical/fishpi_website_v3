@@ -18,7 +18,7 @@ export function decodePublicUser(value: unknown, expectedName: string): PublicUs
     if (typeof row.cardBg !== 'string' || row.cardBg.length > 2048) throw new ApiError('用户背景响应格式不正确', 502)
     const background = row.cardBg
     const localImage = background.startsWith('/') && !background.startsWith('//') && !/[\\\u0000-\u0020\u007f]/u.test(background)
-    profile.cardBg = localImage ? background : safeWebsite(background)
+    profile.cardBg = localImage ? new URL(background, import.meta.env?.VITE_BROWSER_API_ORIGIN || 'https://fishpi.cn').href : safeWebsite(background)
   }
   for (const field of ['userPoint', 'onlineMinute'] as const) {
     if (row[field] === undefined) continue

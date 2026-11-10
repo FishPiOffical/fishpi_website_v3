@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { fetchV3ProfessionSummary } from '@/api/v3-profession-public'
 import { usePublicMedals } from '@/composables/usePublicMedals'
 import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/time'
 import V3MedalImage from '@/components/medal/V3MedalImage.vue'
-import PublicProfessions from '@/components/profession/PublicProfessions.vue'
 
 const props = defineProps<{ userName: string }>()
 const auth = useAuthStore(), route = useRoute()
@@ -15,10 +14,8 @@ const medals = usePublicMedals(name)
 const { value, p, loading, error, read } = medals
 const previewCount = 1
 const showMedals = ref(false)
-const showProfession = ref(false)
 const openMedal = ref<number | null>(null)
 const summary = ref<Awaited<ReturnType<typeof fetchV3ProfessionSummary>>>(null)
-const summaryFailed = ref(false)
 const shownMedals = computed(() => showMedals.value ? value.value?.list : value.value?.list.slice(0, previewCount))
 const remaining = computed(() => Math.max(0, (value.value?.total ?? 0) - previewCount))
 let mounted = false
@@ -27,7 +24,6 @@ let pending: AbortController | undefined
 async function loadProfession() {
   pending?.abort()
   summary.value = null
-  summaryFailed.value = false
   if (!mounted || !auth.initialized) return
   const controller = new AbortController()
   pending = controller
@@ -35,7 +31,7 @@ async function loadProfession() {
     const result = await fetchV3ProfessionSummary(props.userName, controller.signal)
     if (!controller.signal.aborted) summary.value = result
   } catch {
-    if (!controller.signal.aborted) summaryFailed.value = true
+    // 主页只展示可用的职业卡片。
   }
 }
 function toggleMedals() {
@@ -45,8 +41,7 @@ function toggleMedals() {
 }
 function openLinkedSection(hash: string) {
   if (hash === '#member-medals') showMedals.value = true
-  else if (hash === '#member-profession') showProfession.value = true
-  else return
+  else if (hash !== '#member-profession') return
   void nextTick(() => {
     if (mounted && route.hash === hash) globalThis.document?.getElementById(hash.slice(1))?.scrollIntoView({ block: 'nearest' })
   })
@@ -86,15 +81,11 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
     </section>
 
     <section id="member-profession" aria-label="职业">
-      <button v-if="summary" type="button" class="profession-badge" :aria-expanded="showProfession" @click="showProfession = !showProfession">
+      <RouterLink v-if="summary" to="/top/profession" class="profession-badge" aria-label="查看职业排行榜">
         <img v-if="summary.iconUrl" :src="summary.iconUrl" referrerpolicy="no-referrer" alt="" />
         <span><strong>{{ summary.job.displayName }}</strong><small v-if="summary.job.state !== 'SELECTED'">{{ summary.job.levelName }}</small></span>
-      </button>
-      <div v-if="summaryFailed && !showProfession" class="badge-error"><small role="alert">职业资料暂不可用</small><button type="button" @click="loadProfession">重试职业</button></div>
-      <template v-if="showProfession">
-        <button v-if="!summary" type="button" @click="showProfession = false">收起职业资料</button>
-        <PublicProfessions :user-name="userName" />
-      </template>
+        <span class="profession-arrow" aria-hidden="true">›</span>
+      </RouterLink>
     </section>
   </div>
 </template>
@@ -110,9 +101,9 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
 .medal-description { padding: 6px; font-size: 12px; }
 .medal-description p { margin: 4px 0; }
 small { color: var(--fp-muted); }
-.profile-badges .profession-badge { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 10px; text-align: left; }
+.profile-badges .profession-badge { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 10px; text-align: left; color: var(--fp-text); background: var(--fp-surface-subtle); border: 1px solid var(--fp-border); border-radius: 8px; }
+.profession-arrow { color: var(--fp-muted); }
 .profession-badge strong, .profession-badge small { display: block; }
 .profession-badge img { width: 32px; height: 32px; object-fit: contain; }
 nav { margin-top: 6px; }
-:deep(.public-professions) { text-align: left; margin-top: 8px; }
 </style>

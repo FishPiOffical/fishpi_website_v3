@@ -47,7 +47,7 @@ export function useMemberProfile(name: Ref<string>): MemberProfile {
       if (valid()) {
         const sameProfile = snapshotExpires > Date.now() && profile.value?.id === result.id
         profile.value = sameProfile && profile.value
-          ? { ...profile.value, userPoint: result.userPoint, onlineMinute: result.onlineMinute }
+          ? { ...profile.value, cardBg: result.cardBg, userPoint: result.userPoint, onlineMinute: result.onlineMinute }
           : result
         profileFromCache.value = false
         if (!sameProfile) { snapshotExpires = 0; savePublicSnapshot(key, publicCard(result)) }

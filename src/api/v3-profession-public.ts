@@ -50,7 +50,7 @@ export async function fetchV3ProfessionSummary(userName: string, signal: AbortSi
   if (!('primaryProfession' in source)) return null
   const primary = object(source.primaryProfession)
   const icon = typeof primary.iconUrl === 'string' ? primary.iconUrl : ''
-  const iconUrl = /^\/(?![\/\\])/.test(icon) ? new URL(icon, import.meta.env.VITE_SITE_ORIGIN || 'https://fishpi.cn').href
+  const iconUrl = /^\/(?![\/\\])/.test(icon) ? new URL(icon, import.meta.env.VITE_BROWSER_API_ORIGIN || 'https://fishpi.cn').href
     : /^https:\/\//i.test(icon) ? icon : ''
   return { job: job(primary, true), iconUrl }
 }
