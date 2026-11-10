@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { formatDisplayTime } from '@/utils/time'
 
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import CollectChatEmoji from '@/components/chat/CollectChatEmoji.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
-import { DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
+import { DEFAULT_AVATAR, avatarThumbnail, rhyPicThumbnail } from '@/utils/avatar'
 import { chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
 import { isSingleImageMessage } from '@/utils/chatMessage'
 
@@ -31,10 +31,36 @@ const props = withDefaults(
   { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
+const thumbnailWidth = 560
+const thumbnailHeight = 640
+const previewLimit = 1024
+
 const snapshot = computed(() => chatAppearanceSnapshot(props.appearance))
 const zoomed = ref('')
+const originalImage = ref('')
+const mounted = ref(false)
+onMounted(() => { mounted.value = true })
 const singleImage = computed(() => props.chatroom && isSingleImageMessage(props.html))
 const isStandalone = computed(() => props.chatroom && (props.standalone || singleImage.value))
+const displayHtml = computed(() => {
+  if (!props.chatroom || !/<img\b/i.test(props.html)) return props.html
+  if (!mounted.value) return ''
+  // 模板中的图片不会发起请求，先替换地址，再交给 Vue 插入页面。
+  const template = document.createElement('template')
+  template.innerHTML = props.html
+  for (const img of template.content.querySelectorAll('img:not(.emoji)')) {
+    const original = img.getAttribute('src')
+    if (!original) continue
+    const thumbnail = rhyPicThumbnail(original, thumbnailWidth, thumbnailHeight)
+    if (thumbnail === original) continue
+    img.setAttribute('src', thumbnail)
+    img.setAttribute('data-chat-original', original)
+    img.removeAttribute('srcset')
+    img.closest('picture')?.querySelectorAll('source').forEach(source => source.remove())
+  }
+  return template.innerHTML
+})
+
 
 function onAvatarError(e: Event) {
   const img = e.target as HTMLImageElement
@@ -45,7 +71,15 @@ function onBodyClick(e: MouseEvent) {
   const img = (e.target as HTMLElement | null)?.closest('img')
   if (!img || img.classList.contains('emoji') || !img.closest('.vditor-reset')) return
   e.preventDefault()
-  zoomed.value = img.currentSrc || img.src
+  const displayed = img.currentSrc || img.src
+  const original = img.getAttribute('data-chat-original')
+  if (props.chatroom && original && rhyPicThumbnail(original, thumbnailWidth, thumbnailHeight) === displayed && original !== displayed) {
+    originalImage.value = original
+    zoomed.value = rhyPicThumbnail(original, previewLimit, previewLimit)
+  } else {
+    originalImage.value = displayed
+    zoomed.value = displayed
+  }
 }
 </script>
 
@@ -75,7 +109,7 @@ function onBodyClick(e: MouseEvent) {
           <MedalList :items="medals" variant="chat" />
         </div>
         <slot>
-          <div class="vditor-reset body" v-html="html" />
+          <div class="vditor-reset body" v-html="displayHtml" />
         </slot>
         <template v-if="!chatroom">
           <slot name="reactions" />
@@ -92,7 +126,7 @@ function onBodyClick(e: MouseEvent) {
         <span v-if="$slots.actions" class="actions"><slot name="actions" /></span>
       </div>
     </div>
-    <ImageLightbox v-model="zoomed" />
+    <ImageLightbox v-model="zoomed" :original-src="originalImage" />
   </article>
 </template>
 

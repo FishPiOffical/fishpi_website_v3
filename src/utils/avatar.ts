@@ -35,10 +35,11 @@ export function coverStyle(url: string, width: number) {
 }
 
 /** 只缩放 RhyPic 公开原图；现网 GIF 缩图可能只返回首帧，保留原地址。 */
-export function rhyPicThumbnail(url: string, width: number): string {
+export function rhyPicThumbnail(url: string, width: number, height?: number): string {
   if (!Number.isInteger(width) || width < 1 || width > 1024) return url
   if (!/^https:\/\/file\.fishpi\.cn\/[^?#\s"<>\\]+\.(?:png|jpe?g|webp|bmp|avif|heic|tiff?)$/i.test(url)) return url
-  return `${url}?imageView2/2/w/${width}`
+  const heightLimit = height !== undefined && Number.isInteger(height) && height > 0 && height <= 1024 ? `/h/${height}` : ''
+  return `${url}?imageView2/2/w/${width}${heightLimit}`
 }
 
 export function avatarThumbnail(raw: string | undefined | null, width: number): string {

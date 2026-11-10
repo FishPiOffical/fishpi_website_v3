@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, reactive, ref, watch } from 'vue'
 
-defineProps<{ compact?: boolean }>()
+defineProps<{ compact?: boolean; originalSrc?: string }>()
 
 const src = defineModel<string>({ default: '' })
 
@@ -145,7 +145,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           {{ Math.round(scale * 100) }}%
         </button>
         <button type="button" class="tool" title="放大 (+)" :disabled="scale >= MAX" @click="zoomBy(STEP)">+</button>
-        <a :href="src" target="_blank" rel="noopener" class="tool link">原图</a>
+        <a :href="originalSrc || src" target="_blank" rel="noopener" class="tool link">原图</a>
         <button type="button" class="tool close" title="关闭 (Esc)" @click="src = ''">×</button>
       </div>
     </div>
