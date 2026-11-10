@@ -52,6 +52,9 @@ const scroller = ref<HTMLElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
 const isCompactPanel = ref(false)
 const PANEL_GEOMETRY_KEY = 'fp_whisper_panel_geometry_v1'
+const PANEL_GAP = 8
+const panelTop = ref(PANEL_GAP)
+const headerControls = 'button, a, input, textarea, select, [contenteditable="true"]'
 
 interface PanelGeometry {
   hasCustomPosition: boolean
@@ -74,15 +77,13 @@ function readPanelGeometry(): PanelGeometry | null {
       typeof saved.hasCustomSize !== 'boolean' ||
       !finite(saved.left) || !finite(saved.top) || !finite(saved.width) || !finite(saved.height)
     ) return null
-    const maxWidth = Math.max(1, window.innerWidth - 16)
-    const maxHeight = Math.max(1, window.innerHeight - 16)
     return {
       hasCustomPosition: saved.hasCustomPosition,
-      left: Math.max(8, Math.min(saved.left, window.innerWidth - Math.min(saved.width, maxWidth) - 8)),
-      top: Math.max(8, Math.min(saved.top, window.innerHeight - Math.min(saved.height, maxHeight) - 8)),
+      left: saved.left,
+      top: saved.top,
       hasCustomSize: saved.hasCustomSize,
-      width: Math.max(Math.min(320, maxWidth), Math.min(saved.width, maxWidth)),
-      height: Math.max(Math.min(360, maxHeight), Math.min(saved.height, maxHeight)),
+      width: Math.max(320, saved.width),
+      height: Math.max(360, saved.height),
     }
   } catch {
     return null
@@ -100,6 +101,7 @@ let resizingPointer: number | null = null
 let resizeDirection: 'nw' | 'se' = 'se'
 let resizeStart = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0 }
 let panelResizeObserver: ResizeObserver | null = null
+let navigationObserver: ResizeObserver | null = null
 
 function close() {
   emit('update:modelValue', false)
@@ -112,16 +114,15 @@ function onKeyDown(e: KeyboardEvent) {
 function clampPosition(left: number, top: number) {
   const element = panel.value
   if (!element) return { left, top }
-  const width = hasCustomSize.value ? size.value.width : element.offsetWidth
-  const height = hasCustomSize.value ? size.value.height : element.offsetHeight
+  const { width, height } = element.getBoundingClientRect()
   return {
     left: Math.max(8, Math.min(left, window.innerWidth - width - 8)),
-    top: Math.max(8, Math.min(top, window.innerHeight - height - 8)),
+    top: Math.max(panelTop.value, Math.min(top, window.innerHeight - height - PANEL_GAP)),
   }
 }
 
 function startDragging(e: PointerEvent) {
-  if (e.button !== 0 || (e.target as HTMLElement).closest('button, a, input, textarea, select, [contenteditable="true"]')) return
+  if (e.button !== 0 || (e.target as Element).closest(headerControls)) return
   const element = panel.value
   if (!element) return
   const bounds = element.getBoundingClientRect()
@@ -145,15 +146,33 @@ function stopDragging(e: PointerEvent) {
   if (header.hasPointerCapture(e.pointerId)) header.releasePointerCapture(e.pointerId)
 }
 
-function keepPanelInView() {
-  if (hasCustomSize.value) {
-    size.value = {
-      width: Math.min(size.value.width, window.innerWidth - 16),
-      height: Math.min(size.value.height, window.innerHeight - 16),
-    }
-  }
-  if (hasCustomPosition.value) position.value = clampPosition(position.value.left, position.value.top)
+function resetPanelPosition(e: MouseEvent) {
+  if ((e.target as Element).closest(headerControls)) return
+  hasCustomPosition.value = false
+  position.value = { left: 0, top: 0 }
   savePanelGeometry()
+}
+
+async function keepPanelInView() {
+  if (!panel.value) return
+  const navBottom = document.querySelector('[data-site-navigation]')?.getBoundingClientRect().bottom ?? 0
+  panelTop.value = Math.max(PANEL_GAP, Math.ceil(navBottom) + PANEL_GAP)
+  await nextTick()
+  if (!panel.value || !hasCustomPosition.value) return
+  const adjusted = clampPosition(position.value.left, position.value.top)
+  if (adjusted.left === position.value.left && adjusted.top === position.value.top) return
+  position.value = adjusted
+  savePanelGeometry()
+}
+
+function observeNavigation() {
+  navigationObserver?.disconnect()
+  const nav = document.querySelector('[data-site-navigation]')
+  if (nav && typeof ResizeObserver !== 'undefined') {
+    navigationObserver = new ResizeObserver(keepPanelInView)
+    navigationObserver.observe(nav)
+  }
+  void keepPanelInView()
 }
 
 function savePanelGeometry() {
@@ -197,7 +216,9 @@ function startResizing(e: PointerEvent, direction: 'nw' | 'se') {
 function resizePanel(e: PointerEvent) {
   if (resizingPointer !== e.pointerId) return
   const maxWidth = Math.max(1, window.innerWidth - 16)
-  const maxHeight = Math.max(1, window.innerHeight - 16)
+  const maxHeight = Math.max(1, resizeDirection === 'nw'
+    ? resizeStart.top + resizeStart.height - panelTop.value
+    : window.innerHeight - resizeStart.top - PANEL_GAP)
   const minWidth = Math.min(320, maxWidth)
   const minHeight = Math.min(360, maxHeight)
   const direction = resizeDirection === 'se' ? 1 : -1
@@ -209,7 +230,7 @@ function resizePanel(e: PointerEvent) {
       resizeDirection === 'nw' ? resizeStart.left + resizeStart.width - width : resizeStart.left,
       window.innerWidth - width - 8,
     )),
-    top: Math.max(8, Math.min(
+    top: Math.max(panelTop.value, Math.min(
       resizeDirection === 'nw' ? resizeStart.top + resizeStart.height - height : resizeStart.top,
       window.innerHeight - height - 8,
     )),
@@ -292,7 +313,8 @@ watch(
       chat.floatingChatroomOpen = isChatroomSelected.value
       window.addEventListener('keydown', onKeyDown)
       window.addEventListener('resize', keepPanelInView)
-      void nextTick(keepPanelInView)
+      window.addEventListener('scroll', keepPanelInView, { passive: true })
+      void nextTick(observeNavigation)
       void observePanelWidth()
       void refreshInbox()
     } else {
@@ -301,14 +323,21 @@ watch(
       chat.floatingChatroomOpen = false
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('resize', keepPanelInView)
+      window.removeEventListener('scroll', keepPanelInView)
+      navigationObserver?.disconnect()
       panelResizeObserver?.disconnect()
       panelResizeObserver = null
       isCompactPanel.value = false
       draggingPointer = null
+      resizingPointer = null
       if (wasChatroomSelected && route.path !== '/cr' && route.path !== '/') chat.disconnect()
     }
   },
 )
+
+watch(() => route.path, () => {
+  if (props.modelValue) observeNavigation()
+}, { flush: 'post' })
 
 watch(()=>account.value?.oId,()=>{draft.value='';privateFullId.value='';selectedPeer.value='__private__'})
 
@@ -317,6 +346,8 @@ onUnmounted(() => {
   if(isChatroomSelected.value&&route.path!=='/cr'&&route.path!=='/')chat.disconnect()
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('resize', keepPanelInView)
+  window.removeEventListener('scroll', keepPanelInView)
+  navigationObserver?.disconnect()
   panelResizeObserver?.disconnect()
 })
 </script>
@@ -328,6 +359,7 @@ onUnmounted(() => {
       class="whisper-panel"
       :class="{ positioned: hasCustomPosition }"
       :style="{
+        '--chat-panel-top': `${panelTop}px`,
         ...(hasCustomPosition ? { left: `${position.left}px`, top: `${position.top}px` } : {}),
         ...(hasCustomSize ? { width: `${size.width}px`, height: `${size.height}px` } : {}),
       }"
@@ -336,6 +368,8 @@ onUnmounted(() => {
     >
       <header
         class="head"
+        title="拖动移动窗口，双击恢复默认位置"
+        @dblclick="resetPanelPosition"
         @pointerdown="startDragging"
         @pointermove="dragPanel"
         @pointerup="stopDragging"
@@ -462,6 +496,9 @@ onUnmounted(() => {
   flex-direction: column;
   width: min(700px, calc(100vw - 36px));
   height: min(620px, calc(100vh - 36px));
+  max-width: max(1px, calc(100vw - 16px));
+  max-height: max(1px, calc(100dvh - var(--chat-panel-top) - var(--chat-panel-bottom)));
+  --chat-panel-bottom: 18px;
   overflow: hidden;
   border: 1px solid var(--fp-border);
   border-radius: 12px;
@@ -512,6 +549,7 @@ onUnmounted(() => {
 }
 .resize-handle:hover { color: var(--fp-primary); }
 .whisper-panel.positioned {
+  --chat-panel-bottom: 8px;
   right: auto;
   bottom: auto;
 }
@@ -629,6 +667,7 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .head {
+  flex-shrink: 0;
   cursor: move;
   user-select: none;
   touch-action: none;
@@ -913,6 +952,7 @@ onUnmounted(() => {
 }
 @media (max-width: 560px) {
   .whisper-panel {
+    --chat-panel-bottom: 10px;
     right: 10px;
     bottom: 10px;
     width: calc(100vw - 20px);

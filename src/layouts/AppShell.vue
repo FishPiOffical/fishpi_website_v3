@@ -321,7 +321,7 @@ onUnmounted(() => {
       </RouterLink>
       <button type="button" class="dismiss" aria-label="关闭" @click="apiOffline = false">×</button>
     </div>
-    <header v-if="!immersive" class="nav">
+    <header v-if="!immersive" class="nav" data-site-navigation>
       <RouterLink to="/" class="logo" :aria-label="branding.name || '摸鱼派'">
         <img v-if="branding.logo && !logoFailed" class="custom-logo" :src="branding.logo" alt="" @error="logoFailed = true" />
         <LogoMark v-else />
