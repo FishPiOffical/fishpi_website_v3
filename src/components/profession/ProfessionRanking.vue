@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -79,7 +80,7 @@ onBeforeUnmount(() => { mounted.value = false; reset() })
             <li v-for="user in ranking.list" :key="user.userName">
               <span class="rank" :aria-label="`第${user.rank}名`">{{ user.rank }}</span>
               <RouterLink :to="`/member/${encodeURIComponent(user.userName)}`" class="identity">
-                <img :src="displayAvatar(user.userAvatarURL) || '/images/user-thumbnail.png'" :alt="user.userNickname || user.userName" loading="lazy" />
+                <img :src="avatarThumbnail(displayAvatar(user.userAvatarURL), 40)" :alt="user.userNickname || user.userName" loading="lazy" @error="fallbackAvatar" />
                 <span>{{ user.userNickname || user.userName }}<small>@{{ user.userName }}</small></span>
               </RouterLink>
               <span class="level">{{ user.professionName }} · {{ user.levelName }}</span>

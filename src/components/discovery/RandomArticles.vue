@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { ArticleSummary } from '@/api/fishpi'
 import { useDiscoveryExtras } from '@/composables/useDiscoveryExtras'
-import { DEFAULT_AVATAR } from '@/utils/avatar'
+import { DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
 import { articleTitle } from '@/utils/text'
 
 const props = withDefaults(defineProps<{ size?: number; excludeId?: string }>(), { size: 8, excludeId: '' })
@@ -45,7 +45,7 @@ function fallback(event: Event) {
     <ul v-else-if="list?.length" class="discovery-grid">
       <li v-for="article in list" :key="article.oId" class="discovery-row">
         <RouterLink v-if="hasAuthor(article)" class="author-avatar" :to="`/member/${encodeURIComponent(article.articleAuthorName)}`" :data-user-card="article.articleAuthorName" tabindex="-1" aria-hidden="true">
-          <img :src="article.articleAuthorThumbnailURL48 || DEFAULT_AVATAR" alt="" loading="lazy" @error="fallback" />
+          <img :src="avatarThumbnail(article.articleAuthorThumbnailURL48, 26)" alt="" loading="lazy" @error="fallback" />
         </RouterLink>
         <span v-else class="author-avatar anonymous-avatar" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3" /><path d="M6 19v-1a6 6 0 0 1 12 0v1" /></svg>

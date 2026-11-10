@@ -6,8 +6,10 @@ const source=await fs.readFile('src/layouts/AppShell.vue','utf8')
 const start=source.indexOf('const avatarUrl ='),end=source.indexOf('const displayName =',start)
 assert.ok(start>=0&&end>start)
 const code=ts.transpileModule(source.slice(start,end),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+const avatarCode=ts.transpileModule(await fs.readFile('src/utils/avatar.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+const {avatarThumbnail}=await import('data:text/javascript;base64,'+Buffer.from(avatarCode).toString('base64'))
 const scope=effectScope(),account=ref({oId:'1',userAvatarURL:"https://example.test/a'b.png?sig=a%2Bb+c&x=1&x=2#literal"})
-const model=scope.run(()=>new Function('account','computed','ref','watch',`${code};return {avatarUrl,visibleAvatarUrl,onAvatarError}`)(account,computed,ref,watch))
+const model=scope.run(()=>new Function('account','computed','ref','watch','avatarThumbnail',`${code};return {avatarUrl,visibleAvatarUrl,onAvatarError}`)(account,computed,ref,watch,avatarThumbnail))
 const original=account.value.userAvatarURL
 assert.equal(model.visibleAvatarUrl.value,original)
 console.log('PASS shell avatar 1 actual AppShell setup preserves complete signed URL without encoding or trimming')
@@ -22,6 +24,15 @@ model.onAvatarError({currentTarget:null});assert.equal(model.visibleAvatarUrl.va
 console.log('PASS shell avatar 3 changed avatar retries once and late previous-URL error cannot hide current image')
 model.onAvatarError(error(account.value.userAvatarURL));assert.equal(model.visibleAvatarUrl.value,'')
 account.value={...account.value,oId:'2'};await nextTick();assert.equal(model.visibleAvatarUrl.value,account.value.userAvatarURL)
+const rhypic='https://file.fishpi.cn/f/2026/11/02/269153.png'
+account.value={...account.value,userAvatarURL:rhypic};await nextTick()
+assert.equal(avatarThumbnail(rhypic,20),rhypic+'?imageView2/2/w/20')
+assert.equal(avatarThumbnail(rhypic+'?sig=a%2Bb',20),rhypic+'?sig=a%2Bb')
+assert.equal(avatarThumbnail(rhypic+'?imageView2/1/w/48',20),rhypic+'?imageView2/1/w/48')
+const gif='https://file.fishpi.cn/2025/08/max-2cc87fe1.gif'
+assert.equal(avatarThumbnail(gif,20),gif)
+model.onAvatarError(error(avatarThumbnail(rhypic,34)))
+assert.equal(model.visibleAvatarUrl.value,'')
 account.value=null;await nextTick();assert.equal(model.visibleAvatarUrl.value,'')
 assert.equal((source.match(/<img v-if="visibleAvatarUrl"[^>]*@error="onAvatarError"/g)||[]).length,2)
 assert.ok(source.includes('<span v-else class="avatar fallback">'))

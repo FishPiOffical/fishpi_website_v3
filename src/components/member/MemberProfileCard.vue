@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { PublicUser } from '@/api/v3-public-user'
 import { useAuthStore } from '@/stores/auth'
-import { avatarStyle, avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
+import { avatarStyle, avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
 import MemberProfileBadges from './MemberProfileBadges.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
 import UserFollowButton from '@/components/user/UserFollowButton.vue'
@@ -38,9 +38,9 @@ function fallback(event: Event) {
     <p v-if="loading" role="status" class="profile-status">正在读取用户资料…</p>
     <div v-if="error" role="alert" class="profile-status"><p>{{ error }}</p><button type="button" @click="$emit('retry')">重试用户资料</button></div>
     <template v-if="profile">
-      <div class="profile-cover" :class="{ 'has-background': profile.cardBg }" :style="avatarStyle(profile.cardBg || avatarUrl(profile, 'large'))" aria-hidden="true" />
+      <div class="profile-cover" :class="{ 'has-background': profile.cardBg }" :style="profile.cardBg ? avatarStyle(profile.cardBg) : avatarStyle(avatarUrl(profile, 'large'), 256)" aria-hidden="true" />
       <div class="profile-body">
-        <img :key="profile.userAvatarURL" class="member-avatar" :src="avatarUrl(profile, 'large')" :data-user-card="profile.userName" alt="" @error="fallback" />
+        <img :key="profile.userAvatarURL" class="member-avatar" :src="avatarThumbnail(avatarUrl(profile, 'large'), 80)" :data-user-card="profile.userName" alt="" @error="fallback" />
         <h1><VipNickname :user-id="profile.id" :user-name="profile.userName" :text="profile.userNickname || profile.userName" /></h1>
         <p class="profile-handle">@{{ profile.userName }}</p>
         <MemberProfileBadges :key="profile.id" :user-name="profile.userName" />

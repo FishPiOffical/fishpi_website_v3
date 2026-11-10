@@ -69,7 +69,7 @@ function onBodyClick(e: MouseEvent) {
       <RouterLink v-if="comment.commentAuthorId" :to="`/member/${comment.commentAuthorName}`" class="avatar-link" :title="author">
         <span
           class="avatar"
-          :style="comment.commentAuthorThumbnailURL ? avatarStyle(comment.commentAuthorThumbnailURL) : undefined"
+          :style="comment.commentAuthorThumbnailURL ? avatarStyle(comment.commentAuthorThumbnailURL, reply ? 24 : 36) : undefined"
         />
       </RouterLink>
       <span v-else class="avatar-link" :aria-label="author"><span class="avatar" /></span>

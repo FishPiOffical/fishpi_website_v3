@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 import { memberSnapshotKey, removePublicSnapshot } from '@/utils/publicSnapshots'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -159,7 +160,7 @@ onBeforeUnmount(() => { mounted = false; reset() })
       </form>
     </template>
     <template v-else>
-      <img class="owner-avatar" :src="displayAvatar(avatar) || '/favicon.svg'" alt="当前头像" />
+      <img class="owner-avatar" :src="avatarThumbnail(displayAvatar(avatar), 80)" alt="当前头像" @error="fallbackAvatar" />
       <form @submit.prevent="saveAvatar">
         <fieldset :disabled="loading || busy || !loaded.avatar">
           <label class="settings-wide-field">头像图片地址<input class="fp-control" v-model="avatarDraft" maxlength="255" placeholder="https://" /></label>

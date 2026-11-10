@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { avatarThumbnail } from '@/utils/avatar'
 import { formatDisplayTime } from '@/utils/time'
 
 import {computed,nextTick,onBeforeUnmount,onMounted,ref,watch} from 'vue'
@@ -13,7 +14,7 @@ import {fpConfirm} from '@/composables/useDialog'
 
 const DEFAULT_AVATAR='/favicon.svg'
 
-const props=withDefaults(defineProps<{initialName?:string;initialId?:string;chatroomActive?:boolean;autoSelectFirst?:boolean}>(),{initialName:'',initialId:'',chatroomActive:false,autoSelectFirst:false})
+const props=withDefaults(defineProps<{initialName?:string;initialId?:string;chatroomActive?:boolean;autoSelectFirst?:boolean;compact?:boolean}>(),{initialName:'',initialId:'',chatroomActive:false,autoSelectFirst:false})
 const emit=defineEmits<{'peer-selected':[peer:{id:string;userName:string}]}>()
 const {accessToken,account}=storeToRefs(useAuthStore()),writes=useV3MessagesStore(),mounted=ref(false)
 const authenticated=computed(()=>mounted.value&&!!accessToken.value&&!!account.value?.oId)
@@ -110,7 +111,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
        @click="select(item.peer)"
       >
        <span class="conversation-avatar">
-        <img :src="item.peer.userAvatarURL||DEFAULT_AVATAR" alt="" @error="($event.target as HTMLImageElement).src=DEFAULT_AVATAR" />
+        <img :src="avatarThumbnail(item.peer.userAvatarURL, compact ? 28 : 36)" alt="" @error="($event.target as HTMLImageElement).src=DEFAULT_AVATAR" />
         <span v-if="item.unreadCount>0" class="conversation-unread-dot" aria-hidden="true" />
        </span>
        <span class="conversation-copy">
@@ -154,7 +155,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
       <li v-for="m in messages" :key="m.id" class="msg-row" :class="{'is-self':m.fromMe}">
        <img
         class="msg-avatar"
-        :src="(m.fromMe?account?.userAvatarURL:other?.userAvatarURL)||DEFAULT_AVATAR"
+        :src="avatarThumbnail(m.fromMe ? account?.userAvatarURL : other?.userAvatarURL, compact ? 24 : 32)"
         alt=""
         @error="($event.target as HTMLImageElement).src=DEFAULT_AVATAR"
        />

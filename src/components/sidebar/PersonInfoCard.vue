@@ -3,7 +3,9 @@ import { storeToRefs } from 'pinia'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import VipNickname from '@/components/user/VipNickname.vue'
-import { avatarUrl } from '@/utils/avatar'
+import { avatarUrl, avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
+
+withDefaults(defineProps<{ avatarSize?: number }>(), { avatarSize: 44 })
 
 const { account, isLoggedIn } = storeToRefs(useAuthStore())
 </script>
@@ -12,7 +14,7 @@ const { account, isLoggedIn } = storeToRefs(useAuthStore())
   <div v-if="isLoggedIn && account" class="person-card">
     <div class="person-head">
       <RouterLink :to="`/member/${account.userName}`" class="person-avatar-link">
-        <img class="person-avatar" :src="avatarUrl(account)" :alt="account.userName" />
+        <img class="person-avatar" :src="avatarThumbnail(avatarUrl(account), avatarSize)" :alt="account.userName" @error="fallbackAvatar" />
       </RouterLink>
       <div class="person-meta">
         <RouterLink :to="`/member/${account.userName}`" class="person-name">

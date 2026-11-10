@@ -6,7 +6,7 @@ defineProps<{ content: string; color: string; avatar?: string; author?: string }
 
 <template>
   <span class="barrage-bubble" :style="{ color }">
-    <span class="barrage-avatar" :style="avatarStyle(avatar)" aria-hidden="true"></span>
+    <span class="barrage-avatar" :style="avatarStyle(avatar, 22)" aria-hidden="true"></span>
     <span v-if="author" class="barrage-author">{{ author }}</span>
     <span class="barrage-text">{{ content }}</span>
   </span>

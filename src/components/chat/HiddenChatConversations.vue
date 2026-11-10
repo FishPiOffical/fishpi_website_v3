@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import ChatBubble from '@/components/ChatBubble.vue'
@@ -104,7 +105,7 @@ function preview(line: (typeof messages.value)[number]) {
               :class="{ selected: selectedKey === item.key }"
               @click="selectedKey = item.key"
             >
-              <img :src="item.avatar || '/favicon.svg'" alt="" />
+              <img :src="avatarThumbnail(item.avatar, 30)" alt="" @error="fallbackAvatar" />
               <span class="conversation-copy">
                 <b>{{ item.nickname }}</b>
                 <small>{{ preview(item.messages.at(-1)!) }}</small>

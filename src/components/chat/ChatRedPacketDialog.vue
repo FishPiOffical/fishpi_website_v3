@@ -4,7 +4,7 @@ import { formatDateTime } from '@/utils/time'
 
 import {computed,onBeforeUnmount,ref,watch} from 'vue'
 import { RouterLink } from 'vue-router'
-import { avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
+import { avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
 import FpDialog from '@/components/FpDialog.vue'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ChatRedPacketsStore} from '@/stores/v3ChatRedPackets'
@@ -44,8 +44,8 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
     <div v-else-if="detail" class="packet-detail" :class="{'is-duel':isDuel}">
       <section class="packet-hero" :class="{'has-claim':detail.currentUserClaim}">
         <div class="sender-line">
-          <RouterLink v-if="detail.sender.userName" :to="`/member/${encodeURIComponent(detail.sender.userName)}`" :data-user-card="detail.sender.userName" class="sender-avatar" @click="store.close" :aria-label="`查看 ${detail.sender.userNickname||detail.sender.userName} 的主页`"><img :src="avatarUrl(detail.sender)" alt="" @error="fallback" /></RouterLink>
-          <img v-else class="sender-avatar" :src="avatarUrl(detail.sender)" alt="" @error="fallback" />
+          <RouterLink v-if="detail.sender.userName" :to="`/member/${encodeURIComponent(detail.sender.userName)}`" :data-user-card="detail.sender.userName" class="sender-avatar" @click="store.close" :aria-label="`查看 ${detail.sender.userNickname||detail.sender.userName} 的主页`"><img :src="avatarThumbnail(avatarUrl(detail.sender), 28)" alt="" @error="fallback" /></RouterLink>
+          <img v-else class="sender-avatar" :src="avatarThumbnail(avatarUrl(detail.sender), 28)" alt="" @error="fallback" />
           <span>{{ detail.sender.userNickname||detail.sender.userName||detail.sender.id }}<small>的红包</small></span>
         </div>
         <h2>{{ detail.message||typeLabel }}</h2>
@@ -85,7 +85,7 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
       <section class="claim-records" aria-label="红包领取记录">
         <header><h3>领取记录 <span>{{ detail.got }}</span></h3><button type="button" class="refresh-button" :disabled="store.loading" @click="store.open()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5 M4 17v-5h5 M6 7a7 7 0 0 1 12-2l2 2 M4 17l2 2a7 7 0 0 0 12-2" /></svg>刷新详情</button></header>
         <ul v-if="detail.claims.length"><li v-for="row in detail.claims" :key="row.user.id">
-          <RouterLink v-if="row.user.userName" :to="`/member/${encodeURIComponent(row.user.userName)}`" :data-user-card="row.user.userName" class="record-avatar" @click="store.close" :aria-label="`查看 ${row.user.userNickname||row.user.userName} 的主页`"><img :src="avatarUrl(row.user)" alt="" @error="fallback" /></RouterLink><img v-else class="record-avatar" :src="avatarUrl(row.user)" alt="" @error="fallback" />
+          <RouterLink v-if="row.user.userName" :to="`/member/${encodeURIComponent(row.user.userName)}`" :data-user-card="row.user.userName" class="record-avatar" @click="store.close" :aria-label="`查看 ${row.user.userNickname||row.user.userName} 的主页`"><img :src="avatarThumbnail(avatarUrl(row.user), 28)" alt="" @error="fallback" /></RouterLink><img v-else class="record-avatar" :src="avatarThumbnail(avatarUrl(row.user), 28)" alt="" @error="fallback" />
           <div class="record-person"><strong>{{ row.user.userNickname||row.user.userName||row.user.id }}</strong><time v-if="row.claimedAt">{{ formatDateTime(row.claimedAt) }}</time><small v-if="row.gesture!==undefined" class="record-duel">{{ hand(row.gesture) }} · {{ resultLabel(row.outcome) }}<span v-if="row.senderRefundPoints!==undefined"> · 退回发送者 {{ row.senderRefundPoints }} 积分</span></small></div>
           <div class="record-amount" :class="{'is-debit':row.amount<0}"><strong>{{ signed(row.amount) }}</strong><small>{{ row.amount<0?'积分 · 扣款':'积分' }}</small></div>
         </li></ul>

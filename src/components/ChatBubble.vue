@@ -7,7 +7,7 @@ import CollectChatEmoji from '@/components/chat/CollectChatEmoji.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
-import { DEFAULT_AVATAR } from '@/utils/avatar'
+import { DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
 import { chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
 import { isSingleImageMessage } from '@/utils/chatMessage'
 
@@ -18,6 +18,7 @@ const props = withDefaults(
     userName: string
     nickname?: string
     avatar?: string
+    avatarSize?: number
     time?: string
     html?: string
     self?: boolean
@@ -27,7 +28,7 @@ const props = withDefaults(
     /** 红包由调用方明确标记，图片则根据完整消息内容判断。 */
     standalone?: boolean
   }>(),
-  { userId: '', nickname: '', avatar: '', time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
+  { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
 const snapshot = computed(() => chatAppearanceSnapshot(props.appearance))
@@ -51,7 +52,7 @@ function onBodyClick(e: MouseEvent) {
 <template>
   <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? snapshot.bubbleId : undefined" :data-frame="chatroom ? snapshot.frameId : undefined" class="fp-msg" :class="{ 'is-self': self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
     <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`">
-      <img class="fp-avatar" :src="avatar || DEFAULT_AVATAR" alt="" loading="lazy" @error="onAvatarError" />
+      <img class="fp-avatar" :src="avatarThumbnail(avatar, avatarSize)" alt="" loading="lazy" @error="onAvatarError" />
     </RouterLink>
     <div class="message-stack">
       <div v-if="chatroom" class="head">

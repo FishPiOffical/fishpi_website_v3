@@ -59,7 +59,7 @@ function avatarOf(a: ArticleSummary) {
         >
           <span
             class="avatar-small"
-            :style="avatarOf(item) ? avatarStyle(avatarOf(item)) : undefined"
+            :style="avatarOf(item) ? avatarStyle(avatarOf(item), 20) : undefined"
             :aria-label="item.articleAuthorNickname || item.articleAuthorName"
           />
         </RouterLink>
@@ -119,7 +119,7 @@ function avatarOf(a: ArticleSummary) {
           >
             <span
               class="avatar-img"
-              :style="avatarOf(item) ? avatarStyle(avatarOf(item)) : undefined"
+              :style="avatarOf(item) ? avatarStyle(avatarOf(item), 36) : undefined"
               :aria-label="item.articleAuthorNickname || item.articleAuthorName"
             />
           </RouterLink>

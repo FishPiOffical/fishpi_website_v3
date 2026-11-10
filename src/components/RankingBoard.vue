@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { rankingTitles, rankingSubTypes, type RankingType } from '@/api/v3-rankings'
@@ -49,7 +50,7 @@ function metricName(key: string) { if (key === 'points') return ['balance', 'con
         <li v-for="entry in value.list" :key="entry.rank" :value="entry.rank" :data-rank="entry.rank">
           <span class="ranking-number" :data-rank="entry.rank">{{ entry.rank }}</span>
           <RouterLink v-if="entry.user" :to="`/member/${encodeURIComponent(entry.user.userName)}`" class="ranking-user" :data-user-card="entry.user.userName">
-            <img :src="entry.user.userAvatarURL || '/images/user-thumbnail.png'" alt="" loading="lazy" referrerpolicy="no-referrer" />
+            <img :src="avatarThumbnail(entry.user.userAvatarURL, compact ? 20 : 40)" alt="" loading="lazy" referrerpolicy="no-referrer" @error="fallbackAvatar" />
             <span class="ranking-user-info">
               <VipNickname :user-id="entry.user.id" :text="entry.user.userNickname || entry.user.userName" />
               <small v-if="!compact && entry.user.userNickname && entry.user.userNickname !== entry.user.userName" class="ranking-handle">@{{ entry.user.userName }}</small>

@@ -405,6 +405,7 @@ onUnmounted(() => {
             :initial-name="inboxPeer"
             :initial-id="inboxPeerId"
             :chatroom-active="isChatroomSelected"
+            :compact="isCompactPanel"
             auto-select-first
             @peer-selected="peer => { privateFullId = peer.id; selectPrivate() }"
           >
@@ -438,7 +439,7 @@ onUnmounted(() => {
                   <button v-if="roomHasMore&&roomMessages.length" type="button" class="more" :disabled="roomLoadingMore" @click="loadOlder">{{ roomLoadingMore?'加载中…':'加载更早消息' }}</button>
                   <FpLoading v-if="roomLoading&&!roomMessages.length" />
                   <p v-else-if="!visibleRoomMessages.length" class="empty-content">聊天室暂时没有消息</p>
-                  <ChatBubble v-for="line in visibleRoomMessages" :key="line.oId" :appearance="line.appearance" :user-name="line.userName" :avatar="line.userAvatarURL" :time="line.time" chatroom :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :self="line.userOId===account?.oId"><ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" /><ChatCard v-else-if="line.card" :card="line.card" /><template #actions><ChatRepeatAction v-if="!line.redPacket&&!line.card" :id="line.oId" /><ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" /></template></ChatBubble>
+                  <ChatBubble v-for="line in visibleRoomMessages" :key="line.oId" :appearance="line.appearance" :user-name="line.userName" :avatar="line.userAvatarURL" :avatar-size="isCompactPanel ? 24 : 36" :time="line.time" chatroom :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :self="line.userOId===account?.oId"><ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" /><ChatCard v-else-if="line.card" :card="line.card" /><template #actions><ChatRepeatAction v-if="!line.redPacket&&!line.card" :id="line.oId" /><ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" /></template></ChatBubble>
                 </div>
                 <Transition name="composer-swap" mode="out-in">
                   <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit"><input v-model="draft" type="text" aria-label="聊天室消息" placeholder="说点什么吧…" :disabled="!!publication.pending" /><button type="submit" :disabled="!canSend">{{ roomSending?'发送中':'发送' }}</button></form>

@@ -7,7 +7,7 @@ import {onMounted,onUnmounted} from 'vue'
 import {RouterLink} from 'vue-router'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ChatMutesStore} from '@/stores/v3ChatMutes'
-import {DEFAULT_AVATAR} from '@/utils/avatar'
+import { DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
 const auth=useAuthStore(),mutes=useV3ChatMutesStore()
 onMounted(()=>{void mutes.connect()})
 onUnmounted(()=>mutes.disconnect())
@@ -21,7 +21,7 @@ function avatarError(event:Event){const img=event.target as HTMLImageElement;if(
   <p v-if="mutes.loading" role="status">正在读取思过崖…</p>
   <p v-if="mutes.error" role="alert">{{ mutes.error }} <button type="button" :disabled="mutes.loading" @click="mutes.retry">重试第{{ mutes.attempt }}页</button></p>
   <ul><li v-for="item in mutes.users" :key="item.id">
-   <RouterLink :to="`/member/${encodeURIComponent(item.userName)}`" :data-user-card="item.userName"><img :src="item.userAvatarURL||DEFAULT_AVATAR" alt="" loading="lazy" @error="avatarError"/><span>{{ item.userNickname||item.userName }}</span></RouterLink>
+   <RouterLink :to="`/member/${encodeURIComponent(item.userName)}`" :data-user-card="item.userName"><img :src="avatarThumbnail(item.userAvatarURL, 24)" alt="" loading="lazy" @error="avatarError"/><span>{{ item.userNickname||item.userName }}</span></RouterLink>
    <time :datetime="timeISO(item.expiresAt)">解除：{{ formatDateTime(item.expiresAt) }}</time>
   </li></ul>
   <p v-if="!mutes.loading&&!mutes.error&&mutes.total===0">当前没有被禁言的成员。</p>

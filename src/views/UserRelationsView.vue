@@ -6,7 +6,7 @@ import { ApiError, getAuthContextVersion } from '@/api/http'
 import { fetchV3UserRelations, type RelationKind, type RelationUser } from '@/api/v3-user-relations'
 import { useAuthStore } from '@/stores/auth'
 import { usePageSeo } from '@/composables/usePageSeo'
-import { avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
+import { avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
 import VipNickname from '@/components/user/VipNickname.vue'
 const route = useRoute(), { accessToken, account } = storeToRefs(useAuthStore())
 const mounted = ref(false), loading = ref(false), error = ref(''), list = ref<RelationUser[]>([]), page = ref(1), pageCount = ref(0), total = ref<number | null>(null)
@@ -44,7 +44,7 @@ usePageSeo(() => ({ title: title.value, path: route.path, robots: 'noindex' }))
         <p>共 {{ total }} 位用户</p>
         <p class="fp-state" v-if="!list.length">{{ total ? '本页没有用户，可返回第一页重新读取。' : '暂无用户' }}</p>
         <button class="fp-control" v-if="!list.length && page > 1" type="button" @click="home">返回第一页</button>
-        <ul><li v-for="user in list" :key="user.id"><RouterLink :to="`/member/${encodeURIComponent(user.userName)}`" :data-user-card="user.userName"><img :src="avatarUrl(user)" :data-user-card="user.userName" alt="" loading="lazy" @error="fallback" /><VipNickname :user-id="user.id" :user-name="user.userName" :text="user.userNickname || user.userName" /></RouterLink><span>@{{ user.userName }}</span></li></ul>
+        <ul><li v-for="user in list" :key="user.id"><RouterLink :to="`/member/${encodeURIComponent(user.userName)}`" :data-user-card="user.userName"><img :src="avatarThumbnail(avatarUrl(user), 40)" :data-user-card="user.userName" alt="" loading="lazy" @error="fallback" /><VipNickname :user-id="user.id" :user-name="user.userName" :text="user.userNickname || user.userName" /></RouterLink><span>@{{ user.userName }}</span></li></ul>
         <nav v-if="total || page > 1" aria-label="用户列表分页"><button class="fp-control" type="button" :disabled="page <= 1 || loading" @click="move(page - 1)">上一页</button><span>{{ page }} / {{ pageCount }}</span><button class="fp-control" type="button" :disabled="page >= Math.min(pageCount, 42949672) || loading" @click="move(page + 1)">下一页</button></nav>
       </template>
     </template>

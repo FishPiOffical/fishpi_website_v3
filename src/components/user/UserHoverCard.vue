@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 import VipNickname from '@/components/user/VipNickname.vue'
 import UserFollowButton from '@/components/user/UserFollowButton.vue'
 import { getAuthContextVersion } from '@/api/http'
@@ -278,7 +279,7 @@ onUnmounted(() => {
         <template v-else-if="profile">
           <div class="card-main">
             <RouterLink class="avatar-link" :to="`/member/${encodeURIComponent(profile.userName)}`">
-              <img v-if="profile.userAvatarURL" class="card-avatar" :src="profile.userAvatarURL" :alt="profile.userName" referrerpolicy="no-referrer" />
+              <img v-if="profile.userAvatarURL" class="card-avatar" :src="avatarThumbnail(profile.userAvatarURL, 72)" @error="fallbackAvatar" :alt="profile.userName" referrerpolicy="no-referrer" />
             </RouterLink>
 
             <div class="card-meta">

@@ -588,7 +588,7 @@ function itemHandlers(c: ArticleComment) {
           >
             <span
               class="avatar-small"
-              :style="article.articleAuthorThumbnailURL48 ? avatarStyle(article.articleAuthorThumbnailURL48) : undefined"
+              :style="article.articleAuthorThumbnailURL48 ? avatarStyle(article.articleAuthorThumbnailURL48, 22) : undefined"
             />
             <b><VipNickname :user-id="article.articleAuthorId" :user-name="article.articleAuthorName" :text="article.articleAuthorNickname || article.articleAuthorName" /></b>
           </RouterLink>
@@ -668,7 +668,7 @@ function itemHandlers(c: ArticleComment) {
           <RouterLink :to="`/member/${article.articleAuthorName}`" class="summary-avatar-link">
             <span
               class="summary-avatar"
-              :style="article.articleAuthorThumbnailURL48 ? avatarStyle(article.articleAuthorThumbnailURL48) : undefined"
+              :style="article.articleAuthorThumbnailURL48 ? avatarStyle(article.articleAuthorThumbnailURL48, 44) : undefined"
             />
           </RouterLink>
           <div class="summary-meta">

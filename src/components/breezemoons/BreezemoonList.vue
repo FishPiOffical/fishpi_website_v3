@@ -7,7 +7,7 @@ import { formatDateTime } from '@/utils/time'
 import { RouterLink } from 'vue-router'
 import type { FollowingMoon } from '@/api/v3-following-feed'
 import VipNickname from '@/components/user/VipNickname.vue'
-import { avatarUrl, DEFAULT_AVATAR } from '@/utils/avatar'
+import { avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
 defineProps<{items:FollowingMoon[];compact?:boolean;avatarOnly?:boolean;hideAuthor?:boolean}>()
 function fallback(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 const date = formatDateTime
@@ -25,7 +25,7 @@ function share(item: FollowingMoon, event: MouseEvent | DragEvent) {
 </script>
 <template>
   <ul class="breezemoon-list" :class="{compact,'avatar-only':avatarOnly,'author-hidden':hideAuthor}"><li v-for="item in items" :key="item.id" :class="{ 'can-quote': chatQuote?.enabled.value }">
-    <header><RouterLink v-if="!hideAuthor" :to="`/member/${encodeURIComponent(item.author.userName)}`" :data-user-card="item.author.userName" :aria-label="`查看 ${item.author.userNickname||item.author.userName} 的主页`"><img :src="avatarUrl(item.author)" :data-user-card="item.author.userName" alt="" loading="lazy" @error="fallback" /><VipNickname v-if="!avatarOnly" :user-id="item.author.id" :user-name="item.author.userName" :text="item.author.userNickname||item.author.userName" /></RouterLink><time v-if="!avatarOnly" :datetime="timeISO(item.createdAt)">{{ date(item.createdAt) }}</time><slot name="actions" :item="item" /></header>
+    <header><RouterLink v-if="!hideAuthor" :to="`/member/${encodeURIComponent(item.author.userName)}`" :data-user-card="item.author.userName" :aria-label="`查看 ${item.author.userNickname||item.author.userName} 的主页`"><img :src="avatarThumbnail(avatarUrl(item.author), avatarOnly || compact ? 20 : 28)" :data-user-card="item.author.userName" alt="" loading="lazy" @error="fallback" /><VipNickname v-if="!avatarOnly" :user-id="item.author.id" :user-name="item.author.userName" :text="item.author.userNickname||item.author.userName" /></RouterLink><time v-if="!avatarOnly" :datetime="timeISO(item.createdAt)">{{ date(item.createdAt) }}</time><slot name="actions" :item="item" /></header>
     <div class="moon-body" :draggable="chatQuote?.enabled.value" @dragstart="chatQuote?.enabled.value && share(item, $event)" v-html="item.contentHtml" />
     <button v-if="chatQuote?.enabled.value" type="button" class="moon-share" draggable="true"
       aria-label="引用到聊天室" title="引用到聊天室" @dragstart="share(item, $event)" @click="share(item, $event)">

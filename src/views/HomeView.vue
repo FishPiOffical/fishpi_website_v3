@@ -173,7 +173,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                   <RouterLink v-if="item.articleAnonymous !== 1 && item.articleAuthorId && item.articleAuthorName" :to="`/member/${encodeURIComponent(item.articleAuthorName)}`">
                     <span
                       class="avatar-small"
-                      :style="avatarStyle(item.articleAuthorThumbnailURL48)"
+                      :style="avatarStyle(item.articleAuthorThumbnailURL48, 20)"
                       :aria-label="item.articleAuthorName"
                     />
                   </RouterLink>
@@ -197,7 +197,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                   <RouterLink v-if="item.articleAnonymous !== 1 && item.articleAuthorId && item.articleAuthorName" :to="`/member/${encodeURIComponent(item.articleAuthorName)}`">
                     <span
                       class="avatar-small"
-                      :style="avatarStyle(item.articleAuthorThumbnailURL48)"
+                      :style="avatarStyle(item.articleAuthorThumbnailURL48, 20)"
                       :aria-label="item.articleAuthorName"
                     />
                   </RouterLink>
@@ -211,7 +211,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
             <aside v-else-if="mod.id === 'rank'" class="mod-body">
               <div v-if="!compactHome" class="download"><img src="https://file.fishpi.cn/logo_app.png" width="35" height="35" alt="" /><div><b>随时随地摸鱼？</b><p>下载摸鱼派客户端，想摸就摸！</p></div><RouterLink to="/download" class="green-link">下载</RouterLink></div>
-              <div v-if="compactHome && homeReady" class="home-person"><PersonInfoCard /></div>
+              <div v-if="compactHome && homeReady" class="home-person"><PersonInfoCard :avatar-size="34" /></div>
               <CheckinPanel />
               <div class="index-head">
                 <b>今日连签排行</b>
@@ -299,7 +299,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                   <RouterLink v-if="m.userName" class="fp-avatar-frame" :to="`/member/${m.userName}`">
                     <span
                       class="avatar-mid"
-                      :style="avatarStyle(avatarUrl(m))"
+                      :style="avatarStyle(avatarUrl(m), 28)"
                       :aria-label="m.userName"
                     />
                   </RouterLink>
@@ -329,7 +329,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <HomeReadStatus :label="hotMode === 'hot' ? '热议文章' : '专栏列表'" :loading="hotState.loading" :error="hotState.error" :ready="hotState.data !== null" :empty="!hotState.data?.length" :empty-text="hotMode === 'hot' ? '暂无可见热议文章。' : '暂无可见专栏。'" @retry="hotState.read" />
               <ol v-if="hotMode === 'hot'" class="module-list">
                 <li v-for="item in hot" :key="item.oId">
-                  <RouterLink v-if="item.articleAnonymous !== 1 && item.articleAuthorId && item.articleAuthorName" :to="`/member/${encodeURIComponent(item.articleAuthorName)}`"><span class="avatar-small" :style="avatarStyle(item.articleAuthorThumbnailURL48)" /></RouterLink>
+                  <RouterLink v-if="item.articleAnonymous !== 1 && item.articleAuthorId && item.articleAuthorName" :to="`/member/${encodeURIComponent(item.articleAuthorName)}`"><span class="avatar-small" :style="avatarStyle(item.articleAuthorThumbnailURL48, 20)" /></RouterLink>
                   <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{ articleTitle(item) }}</RouterLink><span class="count">{{ item.articleCommentCount }} 回帖</span>
                 </li>
               </ol>

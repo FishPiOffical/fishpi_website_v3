@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { avatarThumbnail } from '@/utils/avatar'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
@@ -167,7 +168,9 @@ function onAvatarError(event: Event) {
   const image = event.currentTarget as HTMLImageElement | null
   // Ignore an error from an old URL after the account or avatar has changed.
   const source = image?.getAttribute('src')
-  if (source && source === avatarUrl.value) failedAvatarUrl.value = source
+  if (source && (source === avatarThumbnail(avatarUrl.value, 34) || source === avatarThumbnail(avatarUrl.value, 40))) {
+    failedAvatarUrl.value = avatarUrl.value
+  }
 }
 const displayName = computed(() => account.value?.userNickname || account.value?.userName || '')
 const userCity = computed(() => (account.value?.userCity || '').trim())
@@ -373,13 +376,13 @@ onUnmounted(() => {
               :aria-expanded="menuOpen"
               @click="toggleMenu"
             >
-              <img v-if="visibleAvatarUrl" class="avatar" :src="visibleAvatarUrl" alt="" @error="onAvatarError" />
+              <img v-if="visibleAvatarUrl" class="avatar" :src="avatarThumbnail(visibleAvatarUrl, 34)" alt="" @error="onAvatarError" />
               <span v-else class="avatar fallback">{{ (account?.userName || '?').slice(0, 1) }}</span>
             </button>
             <div class="menu" role="menu">
               <div class="menu-head">
                 <RouterLink :to="memberPath" class="menu-user" @click="menuOpen = false">
-                  <img v-if="visibleAvatarUrl" :src="visibleAvatarUrl" alt="" @error="onAvatarError" />
+                  <img v-if="visibleAvatarUrl" :src="avatarThumbnail(visibleAvatarUrl, 40)" alt="" @error="onAvatarError" />
                   <div>
                     <b>{{ displayName }}</b>
                     <span>@{{ account?.userName }}</span>

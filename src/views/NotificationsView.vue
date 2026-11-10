@@ -14,7 +14,7 @@ import { fetchNotificationPage, markV3NotificationsRead, notificationReadKey } f
 import { useAuthStore } from '@/stores/auth'
 import { useNoticeStore } from '@/stores/notices'
 import FpLoading from '@/components/FpLoading.vue'
-import { DEFAULT_AVATAR } from '@/utils/avatar'
+import { DEFAULT_AVATAR, avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 import NoticeIcon from '@/components/notifications/NoticeIcon.vue'
 
 const tabs: { id: NoticeType; label: string; hint: string; unreadKey: keyof UnreadCount }[] = [
@@ -245,7 +245,7 @@ function readAll() { return mark('all') }
         <ol v-else class="notice-list">
           <li v-for="(n, i) in items" :key="n.oId || i" class="notice" :class="{ unread: n.hasRead === false }">
             <RouterLink v-if="noticeAuthor(n)" :to="`/member/${encodeURIComponent(noticeAuthor(n))}`" class="avatar" :data-user-card="noticeAuthor(n)" :aria-label="`查看 ${noticeAuthor(n)} 的主页`">
-              <img :src="noticeAvatar(n)" alt="" loading="lazy" @error="($event.target as HTMLImageElement).src = DEFAULT_AVATAR" />
+              <img :src="avatarThumbnail(noticeAvatar(n), 38)" alt="" loading="lazy" @error="fallbackAvatar" />
             </RouterLink>
             <span v-else class="notice-symbol"><NoticeIcon :name="type" /></span>
             <div class="notice-content">
