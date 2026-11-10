@@ -36,7 +36,7 @@ defineExpose({reveal:()=>props.writable&&editor.value?.reveal()})
   <div class="comment-composer">
     <p v-if="!ready">正在准备评论…</p>
     <template v-else>
-      <template v-if="operations.pending"><p>上次{{ operations.pending.operation==='delete'?'删除':operations.pending.operation==='update'?'编辑':'发布' }}评论结果待确认，所属文章 {{ operations.pending.articleId }}。请恢复同一次操作。</p><p v-if="operations.pending.input.content" class="pending-content">{{ operations.pending.input.content }}</p><button type="button" :disabled="operations.busy" @click="operations.retry()">{{ operations.busy?'正在确认…':'恢复本次评论操作' }}</button><p v-if="!applicable">恢复成功后请返回原文章核对，当前文章不会套用原结果。</p></template>
+      <template v-if="operations.pending && !operations.busy"><p>上次{{ operations.pending.operation==='delete'?'删除':operations.pending.operation==='update'?'编辑':'发布' }}评论结果待确认，所属文章 {{ operations.pending.articleId }}。请恢复同一次操作。</p><p v-if="operations.pending.input.content" class="pending-content">{{ operations.pending.input.content }}</p><button type="button" :disabled="operations.busy" @click="operations.retry()">{{ operations.busy?'正在确认…':'恢复本次评论操作' }}</button><p v-if="!applicable">恢复成功后请返回原文章核对，当前文章不会套用原结果。</p></template>
       <p v-else-if="!writable">当前不可发布或编辑评论，已有操作仍可恢复。</p>
       <template v-else-if="editId&&!sourceReady"><p v-if="sourceLoading">正在读取评论原文…</p><button v-else type="button" @click="source()">重读评论原文</button></template>
       <template v-else>
@@ -51,7 +51,6 @@ defineExpose({reveal:()=>props.writable&&editor.value?.reveal()})
       </template>
       <button v-if="editId" type="button" :disabled="operations.busy" @click="emit('cancel')">取消编辑</button>
       <p v-if="localError||operations.error" role="alert">{{ localError||operations.error }}</p><p v-if="operations.message" role="status">{{ operations.message }}</p>
-      <p v-if="operations.receipt" role="status">已确认评论编号 {{ operations.receipt.id }}（文章 {{ operations.receipt.articleId }}）。<span v-if="operations.receipt.operation==='create'">新回复可能位于其他页，请通过分页查看。</span></p>
       <p class="composer-policy-note">发布、匿名资格、编辑费用和五分钟规则由平台在提交时校验；整页刷新或退出会清除本地恢复信息，请先核对原操作。</p>
     </template>
   </div>

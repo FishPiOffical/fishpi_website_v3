@@ -40,9 +40,8 @@ onBeforeUnmount(()=>{mounted.value=false;close()})
 <template>
  <div v-if="authenticated&&(candidate||operations.pending||currentReceipt)" class="owner-actions">
   <button v-if="candidate" type="button" :disabled="operations.busy||operations.confirming" :aria-expanded="opened" @click="opened?close():check()">本人文章操作</button>
-  <p v-if="currentReceipt" role="status">{{ currentReceipt.kind==='delete'?'删除已确认':`本次置顶已确认，支付${currentReceipt.paidPoints}积分；当前状态以重新读取为准。` }}</p>
   <p v-if="operations.accountError&&(operations.pending?.id===articleId||currentReceipt)" role="status">{{ operations.accountError }}</p>
-  <div v-if="operations.pending" class="recovery">
+  <div v-if="operations.pending && !operations.busy" class="recovery">
    <p>文章 {{ operations.pending.id }} 的{{ operations.pending.kind==='stick'?'置顶':'删除' }}结果未确认，请先恢复本次操作。</p>
    <p v-if="operations.error" role="alert">{{ operations.error }}</p>
    <button type="button" :disabled="operations.busy||operations.confirming" @click="recover">恢复本次文章操作</button>

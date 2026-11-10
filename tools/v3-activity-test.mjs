@@ -24,6 +24,20 @@ console.log('PASS activity 3 reward state consistency, real zero/unavailable and
 let dismissNotice;const realSetTimeout=globalThis.setTimeout;globalThis.setTimeout=(callback,delay,...args)=>delay===5000?(dismissNotice=callback,0):realSetTimeout(callback,delay,...args);
 let v=mount();await tick();assert.ok(!v.text().includes('昨日活跃奖励已确认领取'));assert.ok(!find(v.root,n=>n.props?.class==='reward-section'));assert.match(v.text(),/65.25%/);assert.match(v.text(),/80%/);assert.match(v.text(),/连续\s*3\s*天/);assert.ok(find(v.root,n=>n.tag==='button'&&n.props?.['aria-label']==='领取昨日活跃奖励'));assert.ok(!v.text().includes('已自动签到'));state.confirmation=async()=>false;await click(v,'领取昨日活跃奖励');assert.equal(credits,0);state.confirmation=async()=>true;await click(v,'领取昨日活跃奖励');await tick();assert.equal(credits,1);assert.match(v.text(),/已确认领取\s*50/);assert.ok(!find(v.root,n=>n.tag==='button'&&n.props?.['aria-label']==='领取昨日活跃奖励'));assert.equal(typeof dismissNotice,'function');dismissNotice();await tick();assert.ok(!v.text().includes('已确认领取'));const samePinia=v.pinia;v.app.unmount();v=mount(samePinia);await tick();assert.ok(!v.text().includes('已确认领取'));v.app.unmount();v.store.$dispose();globalThis.setTimeout=realSetTimeout;reset()
 console.log('PASS activity 4 actual panel renders threshold/streak and requires confirmation, then reads current claimed status')
+v=mount();await tick()
+let finishClaim
+state.dispatch=(path,init)=>init?.method==='POST'
+  ? new Promise(resolve=>{finishClaim=()=>resolve(dispatch(path,init))})
+  : dispatch(path,init)
+const activeClaim=click(v,'领取昨日活跃奖励')
+await tick()
+assert.ok(v.store.pending && v.store.busy)
+assert.ok(!find(v.root,n=>n.props?.class==='activity-recovery'))
+finishClaim();await activeClaim;await tick()
+assert.ok(!find(v.root,n=>n.props?.class==='activity-recovery'))
+assert.match(v.text(),/已确认领取\s*50/)
+v.app.unmount();v.store.$dispose();reset()
+console.log('PASS activity claim in flight and success never display a page-top recovery banner')
 checkinFail=true;v=mount();await tick();assert.match(v.text(),/checkin503/);assert.ok(find(v.root,n=>n.tag==='button'&&n.props?.['aria-label']==='领取昨日活跃奖励'));assert.ok(!v.text().includes('活跃度 0'));checkinFail=false;await click(v,'重试签到状态');await tick();assert.match(v.text(),/65.25%/);rewardFail=true;await click(v,'刷新签到状态');await tick();assert.match(v.text(),/reward503/);assert.match(v.text(),/65.25%/);assert.ok(!find(v.root,n=>n.tag==='button'&&n.props?.['aria-label']==='领取昨日活跃奖励'));rewardFail=false;await click(v,'重试奖励状态');await tick();v.app.unmount();v.store.$dispose();reset()
 console.log('PASS activity 5 independent read failures clear stale values without fabricating zeros or claim eligibility')
 v=mount();await tick();loseAck=true;await click(v,'领取昨日活跃奖励');await tick();const original=v.store.pending,pinia=v.pinia;assert.equal(credits,1);v.app.unmount();v=mount(pinia,'recovery');await tick();loseAck=false;await click(v,'恢复本次奖励领取');await tick();assert.equal(credits,1);assert.equal(v.store.receipt.date,date);const posts=state.calls.filter(c=>c.init?.method==='POST').slice(-2);assert.equal(posts[0].init.headers['Idempotency-Key'],original.key);assert.equal(posts[1].init.headers['Idempotency-Key'],original.key);assert.equal(posts[0].init.body,posts[1].init.body);v.app.unmount();v.store.$dispose();reset()
