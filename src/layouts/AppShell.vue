@@ -32,7 +32,7 @@ const logoFailed = ref(false)
 watch(() => branding.logo, () => { logoFailed.value = false })
 
 const baseNav = [
-  { to: '/', label: '最新' },
+  { to: '/recent', label: '最新' },
   { to: '/column', label: '专栏' },
   { to: '/hot', label: '热门' },
   { to: '/cr', label: '聊天室' },
@@ -196,7 +196,7 @@ const navItems = computed(() => {
 function navCurrent(item: { to: string; key: string }) {
   const path = route.path
   if (item.key === 'city') return path.startsWith('/city/')
-  if (item.to === '/') return path === '/'
+  if (item.to === '/recent') return path === '/recent' || (path.startsWith('/recent/') && path !== '/recent/long')
   if (item.to === '/column') {
     return path === '/column' || path === '/recent/long' || path.startsWith('/column/')
   }
