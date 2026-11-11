@@ -10,6 +10,8 @@ html[data-bubble='paipai-orange'] .fp-msg:not([data-appearance-snapshot]).is-roo
 }
 html[data-bubble='paipai-orange'] .fp-msg:not([data-appearance-snapshot]).is-room.is-self:not(.is-standalone) .fp-bubble,
 .fp-msg[data-appearance-snapshot][data-bubble='paipai-orange'].is-room.is-self:not(.is-standalone) .fp-bubble {
+  padding-right: 14px;
+  padding-left: 34px;
   border-radius: 17px 5px 17px 17px;
   background: linear-gradient(145deg, color-mix(in srgb, #ef9829 19%, var(--fp-card)), color-mix(in srgb, #ef9829 30%, var(--fp-card)));
 }
@@ -25,4 +27,9 @@ html[data-bubble='paipai-orange'] .fp-msg:not([data-appearance-snapshot]).is-roo
   border-radius: 8px;
   background: #f4d963 url('/logo.png') center / contain no-repeat;
   pointer-events: none;
+}
+html[data-bubble='paipai-orange'] .fp-msg:not([data-appearance-snapshot]).is-room.is-self:not(.is-standalone) .fp-bubble::after,
+.fp-msg[data-appearance-snapshot][data-bubble='paipai-orange'].is-room.is-self:not(.is-standalone) .fp-bubble::after {
+  right: auto;
+  left: -5px;
 }

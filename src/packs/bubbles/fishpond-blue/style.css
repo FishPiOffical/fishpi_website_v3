@@ -10,8 +10,10 @@ html[data-bubble='fishpond-blue'] .fp-msg:not([data-appearance-snapshot]).is-roo
 }
 html[data-bubble='fishpond-blue'] .fp-msg:not([data-appearance-snapshot]).is-room.is-self:not(.is-standalone) .fp-bubble,
 .fp-msg[data-appearance-snapshot][data-bubble='fishpond-blue'].is-room.is-self:not(.is-standalone) .fp-bubble {
+  padding-right: 14px;
+  padding-left: 34px;
   border-radius: 17px 5px 17px 17px;
-  background: radial-gradient(ellipse at 100% 100%, color-mix(in srgb, #6ac6db 28%, transparent), transparent 70%), color-mix(in srgb, #69c0d8 18%, var(--fp-card));
+  background: radial-gradient(ellipse at 0% 100%, color-mix(in srgb, #6ac6db 28%, transparent), transparent 70%), color-mix(in srgb, #69c0d8 18%, var(--fp-card));
 }
 html[data-bubble='fishpond-blue'] .fp-msg:not([data-appearance-snapshot]).is-room:not(.is-standalone) .fp-bubble::after,
 .fp-msg[data-appearance-snapshot][data-bubble='fishpond-blue'].is-room:not(.is-standalone) .fp-bubble::after {
@@ -26,4 +28,9 @@ html[data-bubble='fishpond-blue'] .fp-msg:not([data-appearance-snapshot]).is-roo
   background: #f4d963 url('/logo.png') center / contain no-repeat;
   box-shadow: 0 0 0 3px color-mix(in srgb, #75c9df 12%, transparent);
   pointer-events: none;
+}
+html[data-bubble='fishpond-blue'] .fp-msg:not([data-appearance-snapshot]).is-room.is-self:not(.is-standalone) .fp-bubble::after,
+.fp-msg[data-appearance-snapshot][data-bubble='fishpond-blue'].is-room.is-self:not(.is-standalone) .fp-bubble::after {
+  right: auto;
+  left: -5px;
 }
