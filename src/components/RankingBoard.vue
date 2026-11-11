@@ -57,9 +57,7 @@ function metricName(key: string) { if (key === 'points') return ['balance', 'con
             </span>
           </RouterLink>
           <a v-else-if="entry.link?.url" :href="entry.link.url" target="_blank" rel="noopener noreferrer" class="ranking-link">{{ entry.link.title }}</a>
-          <span v-else-if="entry.link" class="ranking-link ranking-link--unavailable">
-            {{ entry.link.title }} <small>暂不可访问</small>
-          </span>
+          <span v-else-if="entry.link" class="ranking-link">{{ entry.link.title }}</span>
           <span v-if="compact" class="ranking-score">{{ entry.score.toLocaleString('zh-CN') }} {{ type === 'checkin' ? '天' : type === 'online' ? '分钟' : '' }}</span>
           <dl v-else class="ranking-metrics">
             <div v-for="(metric, key) in entry.metrics" :key="key" class="metric-pill">
@@ -281,11 +279,8 @@ select {
   font-weight: 600;
   color: var(--fp-title);
 
-  &--unavailable {
-    color: var(--fp-muted);
-    cursor: default;
-
-    small { font-size: 11px; font-weight: 400; }
+  &:hover {
+    color: var(--fp-accent);
   }
 }
 

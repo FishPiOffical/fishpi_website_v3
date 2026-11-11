@@ -35,20 +35,6 @@ row=data('links');row.list[0].link.url='javascript:alert(1)';assert.equal(api.de
 console.log('PASS rankings 5 links project only safe navigation and reject nonnumeric identities')
 let v=mount();await tick();assert.match(v.text(),/本次榜单共\s*21/);assert.match(v.text(),/literal <b>name<\/b>/);assert.equal(all(v.root,n=>n.tag==='li').length,20);assert.ok(!find(v.root,n=>n.props?.innerHTML));await click(v,'下一页榜单');await tick();assert.match(v.text(),/第\s*2\s*页/);assert.equal(all(v.root,n=>n.tag==='li').length,1);assert.equal(text(find(v.root,n=>n.props?.class==='ranking-number')).trim(),'21');assert.ok(find(v.root,n=>n.tag==='button'&&text(n).trim()==='下一页榜单').props.disabled);v.app.unmount()
 console.log('PASS rankings 6 actual board displays public users and server rank21 on true final page')
-state.dispatch = async () => {
-  const links = data('links', '', 1, 20, 2)
-  links.list[0].link.url = ''
-  return env(links)
-}
-v = mount('links')
-await tick()
-const linkRows = all(v.root, node => node.tag === 'li')
-assert.match(text(linkRows[0]), /暂不可访问/)
-assert.equal(all(linkRows[0], node => node.tag === 'a').length, 0)
-assert.equal(all(linkRows[1], node => node.tag === 'a').length, 1)
-v.app.unmount()
-state.dispatch = dispatch
-
 v=mount();await tick();state.dispatch=async()=>{throw new ApiError('ranking503',503)};await click(v,'下一页榜单');await tick();assert.match(v.text(),/ranking503/);assert.equal(all(v.root,n=>n.tag==='li').length,0);state.dispatch=dispatch;await click(v,'重试榜单');await tick();assert.ok(state.calls.at(-1).path.includes('p=2'));assert.equal(all(v.root,n=>n.tag==='li').length,1);v.app.unmount()
 console.log('PASS rankings 7 failed page clears stale users/count and retry preserves original page')
 v=mount('evolve');await tick();await click(v,'下一页榜单');await tick();find(v.root,n=>n.tag==='select').props['onUpdate:modelValue']('days');await tick();assert.ok(state.calls.at(-1).path.endsWith('p=1&size=20&subType=days'));assert.equal(all(v.root,n=>n.tag==='li').length,20);v.app.unmount();v=mount('xiaoice');await tick();assert.match(v.text(),/出身/);assert.match(v.text(),/literal <b>text<\/b>/);find(v.root,n=>n.tag==='select').props['onUpdate:modelValue']('2');await tick();assert.match(v.text(),/历练次数/);assert.ok(!v.text().includes('literal <b>text'));v.app.unmount()

@@ -57,9 +57,12 @@ const iconPaths:Record<string,string> = {
   <div class="top-page fp-page fp-page--wide fp-ui" :class="{'is-detail': kind || route.path === '/top/profession'}">
     <aside v-if="kind || route.path === '/top/profession'" class="ranking-sidebar" aria-label="排行榜分类">
       <RouterLink to="/top" class="back-catalog">← 全部榜单</RouterLink>
-      <nav v-for="section in sections" :key="section.key" :aria-label="section.title">
-        <h2>{{ section.title }}</h2>
-        <RouterLink v-for="item in section.items" :key="item.key" :to="`/top/${item.key}`" :aria-current="selected?.key===item.key?'page':undefined">{{ item.title }}</RouterLink>
+      <nav v-for="section in sections" :key="section.key" :aria-labelledby="`ranking-nav-${section.key}`">
+        <h2 :id="`ranking-nav-${section.key}`" class="ranking-category-title">{{ section.title }}</h2>
+        <div class="ranking-category-links">
+          <RouterLink v-for="item in section.items" :key="item.key" :to="`/top/${item.key}`"
+            :aria-current="selected?.key === item.key ? 'page' : undefined">{{ item.title }}</RouterLink>
+        </div>
       </nav>
     </aside>
     <section v-if="kind" class="top-board">
@@ -135,15 +138,23 @@ const iconPaths:Record<string,string> = {
 .catalog-item:focus-visible,.ranking-sidebar a:focus-visible{outline:2px solid var(--fp-primary);outline-offset:3px}
 .is-detail{display:grid;grid-template-columns:172px minmax(0,1fr);gap:20px;align-items:start}
 .ranking-sidebar{position:sticky;top:calc(var(--fp-nav-h) + 14px);padding:12px;background:var(--fp-card);border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius)}
-.ranking-sidebar a{display:block;padding:7px 10px;font-size:13px;line-height:1.5;color:var(--fp-muted);text-decoration:none;border-radius:6px}
+.ranking-sidebar a{display:block;padding:7px 10px;font-size:13px;line-height:1.5;color:var(--fp-text);text-decoration:none;border-radius:6px}
 .ranking-sidebar a:hover{background:var(--fp-hover);text-decoration:underline;text-underline-offset:3px}
 .ranking-sidebar .back-catalog{font-weight:600;color:var(--fp-text);padding-bottom:12px;border-bottom:1px solid var(--fp-border);border-radius:0;margin-bottom:12px}
-.ranking-sidebar h2{font-size:11px;font-weight:500;color:var(--fp-muted);margin:14px 10px 5px}
+.ranking-category-title {
+  margin: 14px 0 5px;
+  padding: 0 10px 5px;
+  border-bottom: 1px solid var(--fp-border);
+  color: var(--fp-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
 .ranking-sidebar a[aria-current='page']{background:var(--fp-primary-soft);color:var(--fp-primary);font-weight:600}
 .top-board{min-width:0;padding:22px;background:var(--fp-card);border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius)}
 .board-header{border-bottom:1px solid var(--fp-border);padding-bottom:16px;margin-bottom:16px;font-size:12px;color:var(--fp-muted)}
 .breadcrumb{color:inherit}.board-header .fp-page-title{margin:12px 0 6px}.board-header p{margin:0;line-height:1.6}
 @media(max-width:1000px){.catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-art{margin-right:0;width:160px}}
-@media(max-width:640px){.catalog-hero{padding:22px 20px;margin-bottom:22px;gap:0;position:relative}.hero-copy{position:relative;z-index:1}.catalog-hero h1{font-size:23px;letter-spacing:-.5px}.catalog-hero p{font-size:12px}.hero-meta{margin-top:16px;font-size:11px;gap:7px}.hero-art{position:absolute;right:-34px;top:12px;opacity:.25;width:155px;pointer-events:none}.catalog-grid{grid-template-columns:1fr;gap:8px}.catalog-item{padding:15px 16px}.catalog-section{margin-bottom:22px}.section-head h2{font-size:16px}.is-detail{display:block}.ranking-sidebar{position:static;display:flex;align-items:center;gap:12px;overflow-x:auto;margin-bottom:14px;scrollbar-width:thin}.ranking-sidebar nav{display:flex;gap:4px;flex:none}.ranking-sidebar h2{display:none}.ranking-sidebar a{white-space:nowrap;flex:none}.ranking-sidebar .back-catalog{margin:0;padding:7px 10px;border-bottom:0}.top-board{padding:16px}.item-desc{font-size:12px}}
+@media(max-width:640px){.catalog-hero{padding:22px 20px;margin-bottom:22px;gap:0;position:relative}.hero-copy{position:relative;z-index:1}.catalog-hero h1{font-size:23px;letter-spacing:-.5px}.catalog-hero p{font-size:12px}.hero-meta{margin-top:16px;font-size:11px;gap:7px}.hero-art{position:absolute;right:-34px;top:12px;opacity:.25;width:155px;pointer-events:none}.catalog-grid{grid-template-columns:1fr;gap:8px}.catalog-item{padding:15px 16px}.catalog-section{margin-bottom:22px}.section-head h2{font-size:16px}.is-detail{display:block}.ranking-sidebar{position:static;display:flex;align-items:center;gap:12px;overflow-x:auto;margin-bottom:14px;scrollbar-width:thin}.ranking-sidebar nav{flex:none}.ranking-category-title{margin:0 0 4px;padding:0 7px 4px}.ranking-category-links{display:flex;gap:4px}.ranking-sidebar a{white-space:nowrap;flex:none}.ranking-sidebar .back-catalog{margin:0;padding:7px 10px;border-bottom:0}.top-board{padding:16px}.item-desc{font-size:12px}}
 @media(prefers-reduced-motion:reduce){.catalog-item{transition:none}}
 </style>
