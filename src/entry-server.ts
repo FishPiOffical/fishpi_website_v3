@@ -99,7 +99,7 @@ async function prefetchPage(path: string): Promise<SsrPayload> {
 
   const memberMatch = path.match(/^\/member\/([^/]+)$/)
   if (memberMatch) {
-    const member = await fetchPublicUser(decodeURIComponent(memberMatch[1]))
+    const { userCity: _city, userOnlineFlag: _online, ...member } = await fetchPublicUser(decodeURIComponent(memberMatch[1]))
     return { member }
   }
 

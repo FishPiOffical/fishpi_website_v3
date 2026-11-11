@@ -319,10 +319,11 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div v-if="profile.userNo || profile.userPoint !== undefined || profile.onlineMinute !== undefined || profile.userURL" class="card-facts" aria-label="公开资料">
-            <div v-if="profile.userNo" class="fact member-number">
-              第 <strong>{{ profile.userNo }}</strong> 号成员
-            </div>
+          <div v-if="profile.userRole || profile.userNo || profile.userCity || profile.userOnlineFlag !== undefined || profile.userPoint !== undefined || profile.onlineMinute !== undefined || profile.userURL" class="card-facts" aria-label="公开资料">
+            <span v-if="profile.userRole" class="card-badge">{{ profile.userRole }}</span>
+            <span v-if="profile.userNo" class="card-badge member-number" :aria-label="`成员序号 ${profile.userNo}`"># {{ profile.userNo }}</span>
+            <span v-if="profile.userOnlineFlag !== undefined" class="card-status" :class="{ online: profile.userOnlineFlag }">{{ profile.userOnlineFlag ? '在线' : '离线' }}</span>
+            <div v-if="profile.userCity" class="fact"><span>城市</span><strong>{{ profile.userCity }}</strong></div>
             <div v-if="profile.userPoint !== undefined" class="fact">
               <span>积分</span><strong>{{ profile.userPoint.toLocaleString('zh-CN') }}</strong>
             </div>
@@ -461,8 +462,34 @@ onUnmounted(() => {
   color: var(--fp-text);
   font-weight: 600;
 }
+.card-badge {
+  max-width: 100%;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--fp-hover);
+  color: var(--fp-text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 .member-number {
-  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.card-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+.card-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.card-status.online::before {
+  background: var(--fp-primary);
 }
 .website {
   display: inline-flex;

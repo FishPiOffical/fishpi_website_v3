@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { shouldInvalidatePublicSnapshot, PUBLIC_LIST_TTL, memberSnapshotKey, readPublicSnapshot, removePublicSnapshot, savePublicSnapshot } from '@/utils/publicSnapshots'
 
 function publicCard(profile: PublicUser) {
-  const { userPoint: _points, onlineMinute: _minutes, ...card } = profile
+  const { userPoint: _points, onlineMinute: _minutes, userCity: _city, userOnlineFlag: _online, ...card } = profile
   return card
 }
 

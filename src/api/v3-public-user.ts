@@ -1,6 +1,16 @@
 import { ApiError, request } from './http'
 import { decodeV3RelationUser, type RelationUser } from './v3-user-relations'
-export type PublicUser = RelationUser & { userIntro: string; userURL: string; cardBg?: string; userNo?: string; userPoint?: number; onlineMinute?: number }
+export type PublicUser = RelationUser & {
+  userIntro: string
+  userURL: string
+  cardBg?: string
+  userNo?: string
+  userRole?: string
+  userCity?: string
+  userOnlineFlag?: boolean
+  userPoint?: number
+  onlineMinute?: number
+}
 export function publicUserName(value: string) {
   if (typeof value !== 'string' || value.length < 1 || value.length > 64 || /[^A-Za-z0-9_-]/.test(value)) throw new ApiError('用户名不合法', 422)
   return value
@@ -15,6 +25,11 @@ export function decodePublicUser(value: unknown, expectedName: string): PublicUs
   if (user.userName.toLowerCase() !== expectedName.toLowerCase() || typeof row.userIntro !== 'string' || row.userIntro.length > 65536 || typeof row.userURL !== 'string' || row.userURL.length > 4096) throw new ApiError('用户资料响应格式不正确', 502)
   const profile: PublicUser = { ...user, userIntro: row.userIntro, userURL: safeWebsite(row.userURL) }
   if (typeof row.userNo === 'string' && /^[1-9][0-9]{0,18}$/.test(row.userNo)) profile.userNo = row.userNo
+  for (const field of ['userRole', 'userCity'] as const) {
+    const value = row[field]
+    if (typeof value === 'string' && value.length <= 128 && value.trim()) profile[field] = value.trim()
+  }
+  if (typeof row.userOnlineFlag === 'boolean') profile.userOnlineFlag = row.userOnlineFlag
   if (row.cardBg !== undefined) {
     if (typeof row.cardBg !== 'string' || row.cardBg.length > 2048) throw new ApiError('用户背景响应格式不正确', 502)
     const background = row.cardBg
