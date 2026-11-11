@@ -8,6 +8,7 @@ import { usePageSidebarStore, type PageSidebarModuleId } from '@/stores/pageSide
 import { fish001 } from '@/emoji/fish001'
 import { emojiOrderOptions, useEmojiPreferencesStore } from '@/stores/emojiPreferences'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
+import { usesMacSendModifier } from '@/utils/chatSendShortcut'
 import { useChatSidebarStore } from '@/stores/chatSidebar'
 import { useChatFilterStore, type ChatBlockMatch, type ChatBlockMode } from '@/stores/chatFilter'
 import { useAuthStore } from '@/stores/auth'
@@ -28,6 +29,7 @@ const home = useHomeLayoutStore()
 const pageSidebar = usePageSidebarStore()
 const sidebar = useChatSidebarStore()
 const chatPreferences = useChatPreferencesStore()
+const defaultSendShortcutLabel = usesMacSendModifier() ? 'Command+Enter' : 'Ctrl+Enter'
 const emojiPreferences = useEmojiPreferencesStore()
 const chatFilter = useChatFilterStore()
 const auth = useAuthStore()
@@ -354,9 +356,9 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           <div v-else-if="section === 'chatInput'" class="content">
             <fieldset class="setting-options">
               <legend>发送快捷键</legend>
-              <label :class="{ selected: chatPreferences.sendShortcut === 'ctrl-enter' }">
-                <input type="radio" name="chat-send-shortcut" value="ctrl-enter" :checked="chatPreferences.sendShortcut === 'ctrl-enter'" @change="chatPreferences.setSendShortcut('ctrl-enter')" />
-                <span><b>Ctrl+Enter 发送（默认）</b><small>Enter 换行</small></span>
+              <label :class="{ selected: chatPreferences.sendShortcut === 'mod-enter' }">
+                <input type="radio" name="chat-send-shortcut" value="mod-enter" :checked="chatPreferences.sendShortcut === 'mod-enter'" @change="chatPreferences.setSendShortcut('mod-enter')" />
+                <span><b>{{ defaultSendShortcutLabel }} 发送（默认）</b><small>Enter 换行</small></span>
               </label>
               <label :class="{ selected: chatPreferences.sendShortcut === 'enter' }">
                 <input type="radio" name="chat-send-shortcut" value="enter" :checked="chatPreferences.sendShortcut === 'enter'" @change="chatPreferences.setSendShortcut('enter')" />

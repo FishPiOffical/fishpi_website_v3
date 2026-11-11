@@ -5,12 +5,13 @@ import type { ChatSendShortcut } from '@/utils/chatSendShortcut'
 const storageKey = 'fp.chat.sendShortcut'
 
 export const useChatPreferencesStore = defineStore('chatPreferences', () => {
-  const sendShortcut = ref<ChatSendShortcut>('ctrl-enter')
+  const sendShortcut = ref<ChatSendShortcut>('mod-enter')
 
   function restore() {
     try {
       const saved = localStorage.getItem(storageKey)
-      if (saved === 'ctrl-enter' || saved === 'enter') sendShortcut.value = saved
+      if (saved === 'ctrl-enter') sendShortcut.value = 'mod-enter'
+      else if (saved === 'mod-enter' || saved === 'enter') sendShortcut.value = saved
     } catch {
       // 存储不可用时继续使用本次页面中的设置。
     }
