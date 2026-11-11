@@ -103,7 +103,7 @@ const ecosystemLinks = [
     desc: '摸鱼派插件市场',
     color: '#47885d',
     bg: '#eaf7ed',
-    icon: 'https://ext.adventext.fun/favicon.ico',
+    icon: '/images/partners/plugin-market.png',
   },
 ]
 
