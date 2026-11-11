@@ -65,10 +65,10 @@ function place() {
   const navBottom = document.querySelector('header.nav')?.getBoundingClientRect().bottom ?? 0
   const topEdge = Math.max(margin, navBottom + margin)
   const bottomEdge = window.innerHeight - margin
-  const width = Math.min(264, window.innerWidth - margin * 2)
+  const width = Math.min(400, window.innerWidth - margin * 2)
   const above = Math.max(0, rect.top - gap - topEdge)
   const below = Math.max(0, bottomEdge - rect.bottom - gap)
-  const desiredHeight = Math.min(180, window.innerHeight * .55)
+  const desiredHeight = Math.min(272, window.innerHeight * .55)
   const preferAbove = preferred === 'above'
   const preferredSpace = preferAbove ? above : below
   const useAbove = preferredSpace >= desiredHeight ? preferAbove : above > below
@@ -226,7 +226,7 @@ defineExpose({ toggle })
         <h3>{{ selectedName }}</h3>
         <p v-if="error" class="hint" role="alert">{{ error }} <button v-if="retryItems" type="button" @click="retryItems()">重试</button></p>
         <FpLoading v-if="loading && !items.length" small />
-        <div v-else class="grid">
+        <div v-else class="grid" :class="{ 'grid--custom': groupId }">
           <button v-for="(item, index) in items" :key="item.oId || `${item.name}:${index}`"
             :disabled="Boolean(item.oId && !item.url)" type="button" :title="item.name" :aria-label="item.name" @pointerenter="showPreview(item, $event)" @pointerleave="clearPreview"
             @focus="showPreview(item, $event)" @blur="clearPreview" @click="pick(item)">
@@ -267,9 +267,9 @@ defineExpose({ toggle })
   left: 0;
   z-index: 8;
   display: grid;
-  grid-template-columns: clamp(54px, 25%, 66px) minmax(0, 1fr);
-  width: min(264px, calc(100vw - 16px));
-  height: min(180px, 55dvh);
+  grid-template-columns: clamp(60px, 25%, 84px) minmax(0, 1fr);
+  width: min(400px, calc(100vw - 16px));
+  height: min(272px, 55dvh);
   box-sizing: border-box;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
@@ -306,7 +306,18 @@ defineExpose({ toggle })
 }
 .selection { padding: 7px; }
 .selection h3 { margin: 0 0 5px; color: var(--fp-muted); font-size: 12px; font-weight: 600; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, 22px); gap: 2px; }
+.grid {
+  --emoji-size: 20px;
+  --emoji-cell-size: 22px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, var(--emoji-cell-size));
+  gap: 2px;
+}
+.grid--custom {
+  --emoji-size: 50px;
+  --emoji-cell-size: 54px;
+  gap: 4px;
+}
 .grid button {
   display: grid;
   place-items: center;
@@ -315,13 +326,13 @@ defineExpose({ toggle })
   color: var(--fp-text);
   border-radius: 5px;
   cursor: pointer;
-  width: 22px;
-  height: 22px;
+  width: var(--emoji-cell-size);
+  height: var(--emoji-cell-size);
   padding: 0;
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
 }
-.grid img { width: 20px; height: 20px; object-fit: contain; }
+.grid img { width: var(--emoji-size); height: var(--emoji-size); object-fit: contain; }
 .hover-preview {
   position: fixed;
   z-index: 1501;
