@@ -26,7 +26,7 @@ import HomeRepeaterStation from '@/components/home/HomeRepeaterStation.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
 import { chatAppearanceSnapshot } from '@/utils/chatAppearance'
-import { avatarStyle, avatarUrl } from '@/utils/avatar'
+import { avatarStyle, avatarUrl, rhyPicThumbnail } from '@/utils/avatar'
 
 const auth = useAuthStore(), chat = useChatStore(), publication = useV3ChatPublicationStore(), layout = useHomeLayoutStore()
 const { accessToken, isLoggedIn } = storeToRefs(auth)
@@ -258,7 +258,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <div id="long-active" class="long-shelf">
                 <article v-for="col in activeColumnsShelf" :key="activeLongShelf + '-' + col.id" class="long-card column">
                   <RouterLink class="long-cover" :to="`/column/${col.id}`" :aria-label="`阅读专栏：${decodeEntities(col.title)}`">
-                    <img v-if="col.coverURL && !failedCovers.has(col.id)" :src="col.coverURL" alt="" loading="lazy" @error="failedCovers.add(col.id)"><span v-else class="column-cover-placeholder" aria-hidden="true">卷</span>
+                    <img v-if="col.coverURL && !failedCovers.has(col.id)" :src="rhyPicThumbnail(col.coverURL, 136, 182)" alt="" loading="lazy" @error="failedCovers.add(col.id)"><span v-else class="column-cover-placeholder" aria-hidden="true">卷</span>
                   </RouterLink>
                   <div class="long-copy">
                     <RouterLink class="long-title" :to="`/column/${col.id}`">{{ decodeEntities(col.title) }}</RouterLink>

@@ -73,7 +73,8 @@ function onBodyClick(e: MouseEvent) {
   e.preventDefault()
   const displayed = img.currentSrc || img.src
   const original = img.getAttribute('data-chat-original')
-  if (props.chatroom && original && rhyPicThumbnail(original, thumbnailWidth, thumbnailHeight) === displayed && original !== displayed) {
+  const source = img.getAttribute('src')
+  if (props.chatroom && original && source !== original && source === rhyPicThumbnail(original, thumbnailWidth, thumbnailHeight)) {
     originalImage.value = original
     zoomed.value = rhyPicThumbnail(original, previewLimit, previewLimit)
   } else {

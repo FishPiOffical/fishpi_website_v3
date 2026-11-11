@@ -34,12 +34,15 @@ export function coverStyle(url: string, width: number) {
   return { backgroundImage: cssImage(rhyPicThumbnail(url, width)) }
 }
 
-/** 只缩放 RhyPic 公开原图；现网 GIF 缩图可能只返回首帧，保留原地址。 */
+/** 只缩放 RhyPic 公开原图，保留带签名或已有处理参数的地址。 */
 export function rhyPicThumbnail(url: string, width: number, height?: number): string {
   if (!Number.isInteger(width) || width < 1 || width > 1024) return url
-  if (!/^https:\/\/file\.fishpi\.cn\/[^?#\s"<>\\]+\.(?:png|jpe?g|webp|bmp|avif|heic|tiff?)$/i.test(url)) return url
-  const heightLimit = height !== undefined && Number.isInteger(height) && height > 0 && height <= 1024 ? `/h/${height}` : ''
-  return `${url}?imageView2/2/w/${width}${heightLimit}`
+  if (!/^https:\/\/file\.fishpi\.cn\/[^?#\s"<>\\]+\.(?:png|jpe?g|gif|webp|bmp|avif|heic|tiff?)$/i.test(url)) return url
+  if (height !== undefined && Number.isInteger(height) && height > 0 && height <= 1024) {
+    // RhyPic 的模式 1 同时限制宽高，模式 2 只限制宽度。
+    return `${url}?imageView2/1/w/${width}/h/${height}`
+  }
+  return `${url}?imageView2/2/w/${width}`
 }
 
 export function avatarThumbnail(raw: string | undefined | null, width: number): string {
