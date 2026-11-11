@@ -473,8 +473,15 @@ function scrollShelf(id: string, dir: -1 | 1) {
   position: relative;
   min-width: 0;
 }
-/* 模块按内容自然排布，避免相邻长列将整个首屏撑高。 */
-.board { align-items: start; }
+@media (width > 960px) {
+  .board { align-items: stretch; }
+  /* 只有列末的卡片吸收剩余高度，列内其他卡片和列表条目保持自然高度。 */
+  .board:not(.bare) .cell > .mod:last-child {
+    flex: 1 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .home-person { margin-bottom: 10px; }
 .home-person :deep(.person-head) { margin-bottom: 8px; gap: 8px; }
 .home-person :deep(.person-avatar) { width: 34px; height: 34px; }
