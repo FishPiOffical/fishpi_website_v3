@@ -9,6 +9,7 @@ import VipNickname from '@/components/user/VipNickname.vue'
 import UserFollowButton from '@/components/user/UserFollowButton.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import PointTransfer from '@/components/settings/PointTransfer.vue'
+import { formatOnlineMinutes } from '@/utils/time'
 
 const props = defineProps<{ profile: PublicUser | null; fromCache?: boolean; loading: boolean; error: string }>()
 defineEmits<{ retry: [] }>()
@@ -19,11 +20,7 @@ const points = computed(() => props.profile?.userPoint ?? null)
 const onlineTime = computed(() => {
   const minutes = props.profile?.onlineMinute
   if (minutes === undefined) return '—'
-  const days = Math.floor(minutes / 1440)
-  const hours = Math.floor(minutes % 1440 / 60)
-  if (days) return `${days}天 ${hours}小时`
-  if (hours) return `${hours}小时 ${minutes % 60}分`
-  return `${minutes}分钟`
+  return formatOnlineMinutes(minutes)
 })
 const websiteLabel = computed(() => props.profile?.userURL ? new URL(props.profile.userURL).hostname : '')
 watch([() => props.profile?.id, () => auth.account?.oId, () => auth.accessToken], () => { showTransfer.value = false })

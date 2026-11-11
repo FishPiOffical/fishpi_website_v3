@@ -14,7 +14,7 @@ const replacements=[['vue',import.meta.resolve('vue')],['vue-router',routerURL],
 for(const match of source.matchAll(/import \w+ from '(@\/components\/[^']+)'/g))replacements.push([match[1],stub])
 const Content=(await import(url(replace(compile(compileScript(d,{id:'member-page',inlineTemplate:true}).content),replacements)))).default
 const cardSource=await fs.readFile('src/components/member/MemberProfileCard.vue','utf8')
-const cardReplacements=[...replacements]
+const cardReplacements=[...replacements,['./MemberProfileBadges.vue',stub]]
 for(const match of cardSource.matchAll(/import \w+ from '(@\/components\/[^']+)'/g))cardReplacements.push([match[1],stub])
 const Card=(await import(url(replace(compile(compileScript(parse(cardSource).descriptor,{id:'member-profile',inlineTemplate:true}).content),cardReplacements)))).default
 globalThis.__memberProfileCard=Card

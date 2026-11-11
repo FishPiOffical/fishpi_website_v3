@@ -2,12 +2,15 @@
 import { coverStyle, avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 import VipNickname from '@/components/user/VipNickname.vue'
 import UserFollowButton from '@/components/user/UserFollowButton.vue'
+import V3MedalImage from '@/components/medal/V3MedalImage.vue'
 import { getAuthContextVersion } from '@/api/http'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { fetchPublicUser, type PublicUser } from '@/api/v3-public-user'
+import { fetchV3PublicMedals, type PublicMedal } from '@/api/v3-medals'
 import { useAuthStore } from '@/stores/auth'
+import { formatOnlineMinutes } from '@/utils/time'
 
 const CARD_WIDTH = 400
 const GAP = 10
@@ -44,6 +47,8 @@ const loading = ref(false)
 const failed = ref(false)
 const currentUserName = ref('')
 const profile = ref<PublicUser | null>(null)
+const medal = ref<PublicMedal | null>(null)
+const moreMedals = ref(0)
 const anchor = ref<HTMLElement | null>(null)
 const position = ref({ left: VIEWPORT_PADDING, top: VIEWPORT_PADDING, side: 'right' as 'left' | 'right' })
 
@@ -53,7 +58,8 @@ let requestId = 0
 let lastPointerType = ''
 
 const isSelf = computed(() => account.value?.oId === profile.value?.id)
-const memberDescription = computed(() => profile.value?.userIntro || '')
+const canAct = computed(() => isLoggedIn.value && !isSelf.value)
+const websiteLabel = computed(() => profile.value?.userURL ? new URL(profile.value.userURL).hostname : '')
 
 function usernameFrom(target: EventTarget | null): { userName: string; element: HTMLElement } | null {
   if (/^\/chat(?:\/|$)/.test(route.path)) return null
@@ -100,6 +106,8 @@ function hide() {
   active.value = false
   anchor.value = null
   profile.value = null
+  medal.value = null
+  moreMedals.value = 0
   loading.value = false
   failed.value = false
   currentUserName.value = ''
@@ -151,10 +159,23 @@ async function show(userName: string, element: HTMLElement) {
 async function loadProfile(id = ++requestId) {
   const name = currentUserName.value, element = anchor.value, token = accessToken.value, boundary = getAuthContextVersion(), owner = account.value?.oId
   const valid = () => mounted.value && id === requestId && active.value && name === currentUserName.value && element === anchor.value && token === accessToken.value && boundary === getAuthContextVersion() && owner === account.value?.oId
-  profile.value = null; failed.value = false; loading.value = true
+  profile.value = null; medal.value = null; moreMedals.value = 0; failed.value = false; loading.value = true
   try { const data = await fetchPublicUser(name); if (valid()) profile.value = data }
   catch { if (valid()) failed.value = true }
   finally { if (valid()) { loading.value = false; await nextTick(); if (valid()) positionCard() } }
+
+  const publicName = profile.value?.userName
+  if (!valid() || !publicName) return
+  try {
+    const result = await fetchV3PublicMedals(publicName)
+    if (!valid() || !result.list[0]) return
+    medal.value = result.list[0]
+    moreMedals.value = Math.max(0, result.total - 1)
+    await nextTick()
+    if (valid()) positionCard()
+  } catch {
+    // 勋章读取失败时保留已加载的公开资料。
+  }
 }
 
 function retry() { if (active.value && !loading.value) void loadProfile() }
@@ -280,7 +301,7 @@ onUnmounted(() => {
           <div v-if="profile.cardBg" class="card-cover" :style="coverStyle(profile.cardBg, 400)" aria-hidden="true" />
           <div class="card-main">
             <RouterLink class="avatar-link" :to="`/member/${encodeURIComponent(profile.userName)}`">
-              <img v-if="profile.userAvatarURL" class="card-avatar" :src="avatarThumbnail(profile.userAvatarURL, 72)" @error="fallbackAvatar" :alt="profile.userName" referrerpolicy="no-referrer" />
+              <img class="card-avatar" :src="avatarThumbnail(profile.userAvatarURL, 72)" @error="fallbackAvatar" :alt="profile.userName" referrerpolicy="no-referrer" />
             </RouterLink>
 
             <div class="card-meta">
@@ -290,19 +311,34 @@ onUnmounted(() => {
                 </RouterLink>
               </div>
               <RouterLink class="username" :to="`/member/${encodeURIComponent(profile.userName)}`">@{{ profile.userName }}</RouterLink>
-              <p class="intro">{{ memberDescription }}</p>
+              <p v-if="profile.userIntro" class="intro">{{ profile.userIntro }}</p>
+              <RouterLink v-if="medal" class="medal-link" :to="{ path: `/member/${encodeURIComponent(profile.userName)}`, hash: '#member-medals' }" :title="medal.name" aria-label="查看公开勋章">
+                <V3MedalImage :id="medal.id" :name="medal.name" :user-name="profile.userName" quiet />
+                <small v-if="moreMedals">+{{ moreMedals }}</small>
+              </RouterLink>
             </div>
           </div>
 
-          <div class="card-footer">
-            <div class="facts">
-              <a v-if="profile.userURL" class="fact fact-link external" aria-label="访问个人网址" :href="profile.userURL" target="_blank" rel="noopener noreferrer">
-                ↗
-              </a>
+          <div v-if="profile.userNo || profile.userPoint !== undefined || profile.onlineMinute !== undefined || profile.userURL" class="card-facts" aria-label="公开资料">
+            <div v-if="profile.userNo" class="fact member-number">
+              第 <strong>{{ profile.userNo }}</strong> 号成员
             </div>
+            <div v-if="profile.userPoint !== undefined" class="fact">
+              <span>积分</span><strong>{{ profile.userPoint.toLocaleString('zh-CN') }}</strong>
+            </div>
+            <div v-if="profile.onlineMinute !== undefined" class="fact" :title="`累计 ${profile.onlineMinute.toLocaleString('zh-CN')} 分钟`">
+              <span>在线时长</span><strong>{{ formatOnlineMinutes(profile.onlineMinute) }}</strong>
+            </div>
+            <a v-if="profile.userURL" class="website" aria-label="访问个人网址" :title="profile.userURL" :href="profile.userURL" target="_blank" rel="noopener noreferrer">
+              <span>{{ websiteLabel }}</span><span aria-hidden="true">↗</span>
+            </a>
+          </div>
+
+          <div v-if="canAct" class="card-footer">
+            <RouterLink class="transfer" :to="`/settings/point?to=${encodeURIComponent(profile.userName)}`">转账</RouterLink>
             <div class="actions">
-              <UserFollowButton v-if="isLoggedIn && !isSelf" :user-name="profile.userName" :user-id="profile.id" />
-              <RouterLink v-if="isLoggedIn && !isSelf" class="message" :to="`/chat?toUser=${encodeURIComponent(profile.userName)}`">
+              <UserFollowButton :user-name="profile.userName" :user-id="profile.id" />
+              <RouterLink class="message" :to="`/chat?toUser=${encodeURIComponent(profile.userName)}`">
                 私信
               </RouterLink>
             </div>
@@ -319,7 +355,8 @@ onUnmounted(() => {
   z-index: 1450;
   width: min(400px, calc(100vw - 24px));
   box-sizing: border-box;
-  overflow: hidden;
+  max-height: calc(100vh - 24px);
+  overflow: auto;
   border: 1px solid var(--fp-border);
   border-radius: 8px;
   background: var(--fp-card);
@@ -335,7 +372,7 @@ onUnmounted(() => {
   display: flex;
   gap: 12px;
   min-width: 0;
-  padding: 16px 16px 10px;
+  padding: 16px;
 }
 .avatar-link {
   align-self: flex-start;
@@ -394,42 +431,67 @@ onUnmounted(() => {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+.medal-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-height: 28px;
+  margin-top: 5px;
+  color: var(--fp-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 0 16px 14px;
+}
+.fact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--fp-muted);
+  font-variant-numeric: tabular-nums;
+}
+.fact strong {
+  color: var(--fp-text);
+  font-weight: 600;
+}
+.member-number {
+  gap: 3px;
+}
+.website {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+.website span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .card-footer {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   min-height: 38px;
   padding: 9px 12px;
   border-top: 1px solid var(--fp-border);
   background: color-mix(in srgb, var(--fp-hover) 55%, transparent);
 }
-.facts {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-}
-.fact {
-  flex: 0 0 auto;
-  max-width: 104px;
-  overflow: hidden;
-  padding: 2px 6px;
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--fp-border) 50%, transparent);
+.transfer {
+  padding: 4px;
   color: var(--fp-muted);
-  font-size: 11px;
-  line-height: 18px;
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.fact-link:hover {
-  text-decoration: underline;
-}
-.external {
-  font-size: 14px;
+  font-size: 12px;
 }
 .actions {
   display: flex;

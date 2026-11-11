@@ -42,3 +42,11 @@ export function formatDisplayTime(value: TimeValue, fallback='时间未知'): st
   return formatDateTime(value,fallback)
 }
 export function timeISO(value: TimeValue): string | undefined { return parseTime(value)?.toISOString() }
+
+export function formatOnlineMinutes(minutes: number): string {
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor(minutes % 1440 / 60)
+  if (days) return `${days}天 ${hours}小时`
+  if (hours) return `${hours}小时 ${minutes % 60}分`
+  return `${minutes}分钟`
+}
