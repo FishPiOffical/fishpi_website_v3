@@ -623,12 +623,6 @@ function clearScreen() {
 </template>
 
 <style scoped lang="scss">
-.cr-page {
-  width: 95%;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
 .timeline-controls {
   margin: 0;
 }
@@ -1208,10 +1202,6 @@ function clearScreen() {
 
 /* 响应式适配 */
 @media (max-width: 960px) {
-  .cr-page {
-    width: 96%;
-  }
-
   .cr-classic-layout {
     flex-direction: column;
   }

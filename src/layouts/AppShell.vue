@@ -161,7 +161,8 @@ const isLoggedIn = computed(() => mounted.value && authenticated.value)
 const { total: unreadTotal, error: noticeError } = storeToRefs(notices)
 const { unreadTotal: whisperUnread,error: whisperUnreadError } = storeToRefs(whispers)
 
-const isModernChat = computed(() => route.path === '/cr' && chat.chatStyle === 'modern')
+const isChatroom = computed(() => route.path === '/cr')
+const isModernChat = computed(() => isChatroom.value && chat.chatStyle === 'modern')
 
 const memberPath = computed(() => (account.value?.userName ? `/member/${account.value.userName}` : '/login'))
 const avatarUrl = computed(() => account.value?.userAvatarURL || '')
@@ -437,7 +438,11 @@ onUnmounted(() => {
     <SettingsDrawer />
     <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />
-    <main :key="pageRevision" ref="pageHost" :class="{ 'main--cr-modern': isModernChat, 'main--immersive': immersive }">
+    <main :key="pageRevision" ref="pageHost" :class="{
+      'main--chatroom': isChatroom,
+      'main--cr-modern': isModernChat,
+      'main--immersive': immersive,
+    }">
       <div v-if="ssrAuthShell" class="auth-shell">
         <template v-if="startup.error">
           <p role="alert">{{ startup.error }}</p>
@@ -905,9 +910,12 @@ main.main--immersive {
   max-width: none;
   padding: 0;
 }
-main.main--cr-modern {
-  padding: 8px 15px 0;
+main.main--chatroom {
   max-width: 1440px;
+  padding-inline: 20px;
+}
+main.main--cr-modern {
+  padding-block: 8px 0;
 }
 .foot {
   background: var(--fp-footer);
