@@ -24,6 +24,7 @@ import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
+import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useChatFilterStore } from '@/stores/chatFilter'
 import type { ChatNodeOption } from '@/api/fishpi'
 import FpLoading from '@/components/FpLoading.vue'
@@ -32,6 +33,7 @@ import FpDialog from '@/components/FpDialog.vue'
 const auth = useAuthStore()
 const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const chatFilter = useChatFilterStore()
+const chatPreferences = useChatPreferencesStore()
 const { account, isLoggedIn, accessToken } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 const composerReady = ref(false)
@@ -309,7 +311,7 @@ function clearScreen() {
               v-model="draft"
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"
               placeholder="说点什么吧！"
-              :sending="sending" enter-to-send
+              :sending="sending" :chat-send-shortcut="chatPreferences.sendShortcut"
               :disabled="!!publication.pending"
               :allow-empty="Boolean(quote)"
               @submit="submit"
@@ -535,7 +537,7 @@ function clearScreen() {
               v-model="draft"
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"
               placeholder="说点什么吧！"
-              :sending="sending" enter-to-send
+              :sending="sending" :chat-send-shortcut="chatPreferences.sendShortcut"
               :disabled="!!publication.pending"
               :allow-empty="Boolean(quote)"
               @submit="submit"

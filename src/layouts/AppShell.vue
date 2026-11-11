@@ -25,6 +25,7 @@ import ChatBarrageOverlay from '@/components/chat/ChatBarrageOverlay.vue'
 import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
 import MemberLayout from '@/components/member/MemberLayout.vue'
 import UserHoverCard from '@/components/user/UserHoverCard.vue'
+import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import { useLayoutStore } from '@/stores/layout'
 
@@ -151,6 +152,7 @@ const notices = useNoticeStore()
 const whispers = usePrivateInboxStore()
 const chat = useChatStore()
 const settingsDrawer = useSettingsDrawerStore()
+const chatPreferences = useChatPreferencesStore()
 const { immersive } = storeToRefs(useLayoutStore())
 const { isLoggedIn: authenticated, account, isVip } = storeToRefs(auth)
 const isLoggedIn = computed(() => mounted.value && authenticated.value)
@@ -297,6 +299,7 @@ onMounted(() => {
   branding.restore()
   appearance.restore()
   chat.restoreStyle()
+  chatPreferences.restore()
   document.addEventListener('click', onDocClick)
   window.addEventListener('fp:api-offline', onApiOffline)
 })

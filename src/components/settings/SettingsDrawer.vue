@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSettingsDrawerStore, type SettingsSection } from '@/stores/settingsDrawer'
 import { useHomeLayoutStore } from '@/stores/homeLayout'
 import { usePageSidebarStore, type PageSidebarModuleId } from '@/stores/pageSidebar'
+import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useChatSidebarStore } from '@/stores/chatSidebar'
 import { useChatFilterStore, type ChatBlockMatch, type ChatBlockMode } from '@/stores/chatFilter'
 import { useAuthStore } from '@/stores/auth'
@@ -24,6 +25,7 @@ const { open, section } = storeToRefs(drawer)
 const home = useHomeLayoutStore()
 const pageSidebar = usePageSidebarStore()
 const sidebar = useChatSidebarStore()
+const chatPreferences = useChatPreferencesStore()
 const chatFilter = useChatFilterStore()
 const auth = useAuthStore()
 const whispers = usePrivateInboxStore()
@@ -52,6 +54,7 @@ const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
   { id: 'branding', label: '站点外观', icon: '🎨' },
   { id: 'home', label: '首页模块', icon: '🏠' },
   { id: 'pageSidebar', label: '内页侧栏', icon: '📑' },
+  { id: 'chatInput', label: '聊天室输入', icon: '⌨️' },
   { id: 'chatSidebar', label: '聊天室侧栏', icon: '💬' },
   { id: 'chatBlock', label: '聊天室屏蔽', icon: '🚫' },
   { id: 'income', label: '上下班时间', icon: '🕒' },
@@ -278,7 +281,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
           <div v-else-if="section === 'branding'" class="content"><LocalBrandingSettings /></div>
           <div v-else-if="section === 'home'" class="content">
-            <fieldset class="home-variants"><legend>首页版本</legend><label :class="{ selected: home.mode === 'compact' }"><input type="radio" name="home-variant" value="compact" :checked="home.mode === 'compact'" @change="home.setMode('compact')" /><span><b>紧凑版</b><small>最新、长篇和聊天优先进入首屏</small></span></label><label :class="{ selected: home.mode === 'classic' }"><input type="radio" name="home-variant" value="classic" :checked="home.mode === 'classic'" @change="home.setMode('classic')" /><span><b>经典版</b><small>保留原来的双列最新与分行布局</small></span></label><p>两个版本分别保存模块位置与显隐，仅在此浏览器生效。</p></fieldset>
+            <fieldset class="setting-options"><legend>首页版本</legend><label :class="{ selected: home.mode === 'compact' }"><input type="radio" name="home-variant" value="compact" :checked="home.mode === 'compact'" @change="home.setMode('compact')" /><span><b>紧凑版</b><small>最新、长篇和聊天优先进入首屏</small></span></label><label :class="{ selected: home.mode === 'classic' }"><input type="radio" name="home-variant" value="classic" :checked="home.mode === 'classic'" @change="home.setMode('classic')" /><span><b>经典版</b><small>保留原来的双列最新与分行布局</small></span></label><p>两个版本分别保存模块位置与显隐，仅在此浏览器生效。</p></fieldset>
             <button type="button" class="drag-entry" @click="startHomeEdit">
               <b>⠿ 拖动调整布局</b>
               <span>在首页直接拖动模块，左中右、上下任意摆放</span>
@@ -342,6 +345,20 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
                 </span>
               </li>
             </ul>
+          </div>
+
+          <div v-else-if="section === 'chatInput'" class="content">
+            <fieldset class="setting-options">
+              <legend>发送快捷键</legend>
+              <label :class="{ selected: chatPreferences.sendShortcut === 'ctrl-enter' }">
+                <input type="radio" name="chat-send-shortcut" value="ctrl-enter" :checked="chatPreferences.sendShortcut === 'ctrl-enter'" @change="chatPreferences.setSendShortcut('ctrl-enter')" />
+                <span><b>Ctrl+Enter 发送（默认）</b><small>Enter 换行</small></span>
+              </label>
+              <label :class="{ selected: chatPreferences.sendShortcut === 'enter' }">
+                <input type="radio" name="chat-send-shortcut" value="enter" :checked="chatPreferences.sendShortcut === 'enter'" @change="chatPreferences.setSendShortcut('enter')" />
+                <span><b>Enter 发送</b><small>Shift+Enter 换行</small></span>
+              </label>
+            </fieldset>
           </div>
 
           <div v-else-if="section === 'chatSidebar'" class="content">
@@ -463,12 +480,12 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 </template>
 
 <style scoped>
-.home-variants { display:flex; flex-direction:column; gap:8px; margin:0 0 16px; padding:0; border:0; }
-.home-variants legend { margin-bottom:8px; font-size:13px; font-weight:600; color:var(--fp-title); }
-.home-variants label { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--fp-border); border-radius:8px; cursor:pointer; }
-.home-variants label.selected { border-color:var(--fp-primary); background:color-mix(in srgb,var(--fp-primary) 6%,var(--fp-card)); }
-.home-variants span { display:flex; flex-direction:column; gap:4px; }.home-variants b { font-size:13px; color:var(--fp-title); }.home-variants small,.home-variants p { margin:0; font-size:11px; color:var(--fp-muted); line-height:1.6; }
-.home-variants input { accent-color:var(--fp-primary); }
+.setting-options { display:flex; flex-direction:column; gap:8px; margin:0 0 16px; padding:0; border:0; }
+.setting-options legend { margin-bottom:8px; font-size:13px; font-weight:600; color:var(--fp-title); }
+.setting-options label { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--fp-border); border-radius:8px; cursor:pointer; }
+.setting-options label.selected { border-color:var(--fp-primary); background:color-mix(in srgb,var(--fp-primary) 6%,var(--fp-card)); }
+.setting-options span { display:flex; flex-direction:column; gap:4px; }.setting-options b { font-size:13px; color:var(--fp-title); }.setting-options small,.setting-options p { margin:0; font-size:11px; color:var(--fp-muted); line-height:1.6; }
+.setting-options input { accent-color:var(--fp-primary); }
 </style>
 
 <style scoped>

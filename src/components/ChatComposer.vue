@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
+import { matchesChatSendShortcut, type ChatSendShortcut } from '@/utils/chatSendShortcut'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 
 const props = withDefaults(
@@ -17,7 +18,7 @@ const props = withDefaults(
     collapsible?: boolean
     compact?: boolean
     adaptiveHeight?: boolean
-    enterToSend?: boolean
+    chatSendShortcut?: ChatSendShortcut
   }>(),
   {
     cacheId: '',
@@ -70,8 +71,7 @@ function submit() {
 }
 
 function onEditorKeydown(event: KeyboardEvent) {
-  if (!props.enterToSend || event.key !== 'Enter' || event.isComposing || event.keyCode === 229
-    || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return
+  if (!props.chatSendShortcut || !matchesChatSendShortcut(event, props.chatSendShortcut)) return
   const target = event.target
   if (!(target instanceof HTMLElement) || !target.matches('.vditor [contenteditable], .md-fallback')) return
   const hint = root.value?.querySelector<HTMLElement>('.vditor-content > .vditor-hint')
@@ -111,6 +111,7 @@ defineExpose({
       :cache-id="cacheId"
       :placeholder="placeholder"
       @update:model-value="(v: string) => emit('update:modelValue', v)"
+      :disable-submit-shortcut="Boolean(chatSendShortcut)"
       @submit="submit"
       @emoji-open="emojiOpen = $event"
     />

@@ -13,6 +13,7 @@ const props = withDefaults(
     modelValue: string
     height?: number
     adaptiveHeight?: boolean
+    disableSubmitShortcut?: boolean
     placeholder?: string
     outline?: boolean
     /** reply：聊天室 / 私信 / 回帖共用的短文工具栏，仅编辑区；post：发帖的长文工具栏，分屏预览 */
@@ -194,7 +195,7 @@ onMounted(async () => {
     counter: { enable: !inline },
     toolbar: resolvedToolbar,
     toolbarConfig: { pin: !inline },
-    ctrlEnter: () => emit('submit'),
+    ctrlEnter: props.disableSubmitShortcut ? undefined : () => emit('submit'),
     upload: {
       accept: 'image/*,.zip,.rar,.7z,.mp3,.mp4,.webm,.mov',
       handler: uploads.handler,

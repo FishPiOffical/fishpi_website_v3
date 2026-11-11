@@ -16,6 +16,8 @@ import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
 import V3PrivateMessages from '@/components/chat/V3PrivateMessages.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
+import { matchesChatSendShortcut } from '@/utils/chatSendShortcut'
+import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useChatFilterStore } from '@/stores/chatFilter'
 import { usePrivateInboxStore } from '@/stores/privateInbox'
 
@@ -25,6 +27,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 const auth = useAuthStore()
 const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const chatFilter = useChatFilterStore()
+const chatPreferences = useChatPreferencesStore()
 const whispers = usePrivateInboxStore()
 const route = useRoute()
 const { account } = storeToRefs(auth)
@@ -47,6 +50,11 @@ const draft = ref('')
 const isChatroomSelected = computed(() => selectedPeer.value === CHATROOM_PEER)
 const visibleRoomMessages = computed(() => roomMessages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
 const canSend = computed(()=>Boolean(draft.value.trim())&&!roomSending.value&&!publication.pending)
+function onCompactComposerKeydown(event: KeyboardEvent) {
+  if (!matchesChatSendShortcut(event, chatPreferences.sendShortcut)) return
+  event.preventDefault()
+  if (!event.repeat && canSend.value) void submit()
+}
 const roomConnectionLabel = computed(() => roomConnected.value ? '已连接' : roomConnecting.value ? '连接中' : '已断开')
 const scroller = ref<HTMLElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
@@ -442,8 +450,14 @@ onUnmounted(() => {
                   <ChatBubble v-for="line in visibleRoomMessages" :key="line.oId" :appearance="line.appearance" :user-name="line.userName" :avatar="line.userAvatarURL" :avatar-size="isCompactPanel ? 24 : 36" :time="line.time" chatroom :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :self="line.userOId===account?.oId"><ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" /><ChatCard v-else-if="line.card" :card="line.card" /><template #actions><ChatRepeatAction v-if="!line.redPacket&&!line.card" :id="line.oId" /><ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" /></template></ChatBubble>
                 </div>
                 <Transition name="composer-swap" mode="out-in">
-                  <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit"><input v-model="draft" type="text" aria-label="聊天室消息" placeholder="说点什么吧…" :disabled="!!publication.pending" /><button type="submit" :disabled="!canSend">{{ roomSending?'发送中':'发送' }}</button></form>
-                  <ChatComposer v-else v-model="draft" class="composer" :height="100" compact enter-to-send cache-id="chatroom-drawer" :sending="roomSending" :disabled="!!publication.pending" placeholder="说点什么吧，友善第一哦。" @submit="submit" />
+                  <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit">
+                    <textarea v-model="draft" rows="1" aria-label="聊天室消息" placeholder="说点什么吧…"
+                      :disabled="!!publication.pending" @keydown="onCompactComposerKeydown" />
+                    <button type="submit" :disabled="!canSend">{{ roomSending ? '发送中' : '发送' }}</button>
+                  </form>
+                  <ChatComposer v-else v-model="draft" class="composer" :height="100" compact cache-id="chatroom-drawer"
+                    :chat-send-shortcut="chatPreferences.sendShortcut" :sending="roomSending" :disabled="!!publication.pending"
+                    placeholder="说点什么吧，友善第一哦。" @submit="submit" />
                 </Transition>
               </section>
             </template>
@@ -892,12 +906,14 @@ onUnmounted(() => {
   padding: 7px 9px;
   background: var(--fp-card);
 }
-.compact-composer input {
+.compact-composer textarea {
+  resize: none;
   flex: 1;
   width: 0;
   min-width: 0;
+  box-sizing: border-box;
   height: 36px;
-  padding: 0 10px;
+  padding: 8px 10px;
   border: 1px solid var(--fp-border);
   border-radius: 8px;
   outline: none;
@@ -905,7 +921,7 @@ onUnmounted(() => {
   color: var(--fp-text);
   font-size: 13px;
 }
-.compact-composer input:focus { border-color: var(--fp-primary); }
+.compact-composer textarea:focus { border-color: var(--fp-primary); }
 .compact-composer button {
   flex: none;
   min-width: 54px;

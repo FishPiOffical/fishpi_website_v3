@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-export type SettingsSection = 'branding' | 'home' | 'pageSidebar' | 'chatSidebar' | 'chatBlock' | 'income' | 'feedback'
+export type SettingsSection = 'branding' | 'home' | 'pageSidebar' | 'chatInput' | 'chatSidebar' | 'chatBlock' | 'income' | 'feedback'
 
 export const useSettingsDrawerStore = defineStore('settingsDrawer', () => {
   const open = ref(false)
