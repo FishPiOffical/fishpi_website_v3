@@ -304,7 +304,6 @@ function clearScreen() {
             <ChatPublicationRecovery @confirmed="acceptConfirmed" />
             <ChatRevokeRecovery />
             <ChatComposer
-              collapsible
               :height="100"
               v-if="composerReady && isLoggedIn"
               ref="composerRef"
@@ -530,7 +529,6 @@ function clearScreen() {
             <ChatPublicationRecovery @confirmed="acceptConfirmed" />
             <ChatRevokeRecovery />
             <ChatComposer
-              collapsible
               adaptive-height
               :height="150"
               ref="composerRef"
@@ -990,6 +988,15 @@ function clearScreen() {
 .composer-return:hover { background: var(--fp-hover); }
 .composer-return svg { width: 18px; height: 18px; }
 .jump-latest { position: absolute; right: 16px; bottom: calc(100% + 8px); }
+/* 让工具栏菜单可以超出编辑器，同时避免内部背景盖住聚焦描边的圆角。 */
+.cr-classic-reply :deep(.vditor:not(.vditor--fullscreen)),
+.cr-composer-panel :deep(.vditor:not(.vditor--fullscreen)) {
+  overflow: visible;
+  > .vditor-toolbar { border-radius: 7px 7px 0 0; }
+  > .vditor-content :is(.vditor-sv, .vditor-ir > pre, .vditor-wysiwyg > pre, .vditor-preview) {
+    border-radius: 0 0 7px 7px;
+  }
+}
 .cr-composer-panel :deep(.vditor:not(.vditor--fullscreen) .vditor-toolbar__item > .vditor-panel--arrow) {
   top: auto;
   bottom: 100%;
