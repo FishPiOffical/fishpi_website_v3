@@ -9,9 +9,12 @@ import FpDialog from '@/components/FpDialog.vue'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ChatRedPacketsStore} from '@/stores/v3ChatRedPackets'
 import {getAuthContextVersion} from '@/api/http'
-import {packetRisk,type ClaimInput} from '@/api/v3-chat-red-packets'
+import {canClaimPacket,packetRisk,type ClaimInput} from '@/api/v3-chat-red-packets'
 const auth=useAuthStore(),store=useV3ChatRedPacketsStore(),gesture=ref<number|string>(''),confirming=ref(false),localError=ref('')
-const canClaim=computed(()=>{const d=store.detail;return!!d&&!d.legacy&&!d.currentUserClaim&&d.got<d.count&&!(d.type==='rockPaperScissors'&&d.sender.id===auth.account?.oId)})
+const canClaim=computed(()=>{
+  const d=store.detail
+  return !!d && canClaimPacket(d,auth.account?.oId) && !store.wasDeniedRecipient(d.id)
+})
 let abort:AbortController|null=null
 function cancel(){abort?.abort();abort=null;confirming.value=false}
 const identity=()=>JSON.stringify([getAuthContextVersion(),!!auth.accessToken,auth.account?.oId||''])
@@ -21,6 +24,14 @@ watch(()=>store.detail,()=>{cancel();gesture.value='';localError.value=''});watc
 const hands=[{value:0,label:'石头',image:'/images/redpacket/gesture/rock.png'},{value:1,label:'剪刀',image:'/images/redpacket/gesture/scissors.png'},{value:2,label:'布',image:'/images/redpacket/gesture/paper.png'}] as const
 const hand=(g:number)=>hands[g]?.label||'未知'
 const detail=computed(()=>store.detail)
+const recipientLabel=computed(()=>{
+  const packet=detail.value
+  if (packet?.type!=='specify') return ''
+  if (!packet.recipientIds?.length) return '仅指定用户可领取'
+  const names=new Map(packet.claims.map(({user})=>[user.id,user.userNickname||user.userName]))
+  const recipients=packet.recipientIds.map(id=>names.get(id)||`UID ${id}`)
+  return `仅 ${recipients.join('、')} 可领取`
+})
 const isDuel=computed(()=>detail.value?.type==='rockPaperScissors')
 const typeLabel=computed(()=>detail.value?({random:'拼手气红包',average:'普通红包',specify:'专属红包',heartbeat:'心跳红包',rockPaperScissors:'猜拳红包',dice:'骰子红包'})[detail.value.type]:'红包详情')
 const progress=computed(()=>detail.value?Math.min(100,detail.value.got/detail.value.count*100):0)
@@ -53,7 +64,8 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
           <strong>{{ signed(detail.currentUserClaim.amount) }}</strong><span>积分</span>
           <p>{{ detail.currentUserClaim.amount<0?'本次扣款':isDuel&&duelResult?duelResult:'已领取' }}</p>
         </div>
-        <p v-else class="hero-caption">{{ isDuel?'石头 · 剪刀 · 布，一局定胜负':detail.got===detail.count?'红包已领完':'祝你收获一份好手气' }}</p>
+        <p v-if="recipientLabel" class="hero-caption">{{ recipientLabel }}</p>
+        <p v-else-if="!detail.currentUserClaim && detail.got===detail.count" class="hero-caption">红包已领完</p>
       </section>
 
       <div class="packet-stats">
@@ -79,8 +91,7 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
       <p v-else-if="canClaim&&detail.type==='heartbeat'" class="risk-note">心跳红包可能领取负积分并扣款，领取前余额需至少 {{ detail.poolPoints }} 积分。</p>
 
       <div v-if="canClaim && !isDuel" class="claim-action"><button type="button" class="claim-button" :disabled="store.busy||!!store.pending||confirming" @click="claim">{{ store.busy?'正在领取…':confirming?'等待确认…':detail.type==='heartbeat'?'接受扣分风险并领取':'领取一份' }}</button></div>
-      <p v-if="store.pending" class="quiet-note" role="status">有红包操作结果待确认，请先通过红包操作提示恢复原操作。</p>
-      <p v-if="localError||store.error" class="inline-error" role="alert">{{ localError||store.error }}</p>
+      <p v-if="localError" class="inline-error" role="alert">{{ localError }}</p>
 
       <section class="claim-records" aria-label="红包领取记录">
         <header><h3>领取记录 <span>{{ detail.got }}</span></h3><button type="button" class="refresh-button" :disabled="store.loading" @click="store.open()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5 M4 17v-5h5 M6 7a7 7 0 0 1 12-2l2 2 M4 17l2 2a7 7 0 0 0 12-2" /></svg>刷新详情</button></header>
@@ -89,11 +100,8 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
           <div class="record-person"><strong>{{ row.user.userNickname||row.user.userName||row.user.id }}</strong><time v-if="row.claimedAt">{{ formatDateTime(row.claimedAt) }}</time><small v-if="row.gesture!==undefined" class="record-duel">{{ hand(row.gesture) }} · {{ resultLabel(row.outcome) }}<span v-if="row.senderRefundPoints!==undefined"> · 退回发送者 {{ row.senderRefundPoints }} 积分</span></small></div>
           <div class="record-amount" :class="{'is-debit':row.amount<0}"><strong>{{ signed(row.amount) }}</strong><small>{{ row.amount<0?'积分 · 扣款':'积分' }}</small></div>
         </li></ul>
-        <p v-else class="records-empty">{{ detail.got===detail.count?'红包已领完':'还没有人领取，等一份好手气。' }}</p>
+        <p v-else class="records-empty">暂无领取记录</p>
       </section>
-      <details v-if="detail.recipientIds?.length" class="recipients"><summary>指定接收人 · {{ detail.recipientIds.length }} 人</summary><p>{{ detail.recipientIds.join('、') }}</p></details>
-      <p v-if="detail.legacy" class="packet-footnote">经典红包 · 仅查看领取记录</p>
-      <p v-else class="packet-footnote">{{ detail.got===detail.count?'红包已领完 · ':'' }}查看详情不会领取，领取结果以实际结算为准。</p>
     </div>
     <div v-else class="packet-state"><p>红包详情尚未就绪。</p></div>
     <ChatRedPacketRecovery kind="claim" :packet-id="store.selectedId" />
@@ -125,9 +133,7 @@ button:disabled { opacity:.55; cursor:default; }
 .record-person { display:flex; min-width:0; flex:1; flex-direction:column; gap:3px; strong { color:var(--fp-title); font-size:12px; font-weight:500; } time,.record-duel { color:var(--fp-muted); font-size:10px; line-height:1.5; } }
 .record-amount { display:flex; flex:none; flex-direction:column; align-items:flex-end; gap:3px; color:#b78244; strong { font-size:17px; font-weight:600; font-variant-numeric:tabular-nums; } small { font-size:10px; color:var(--fp-muted); } &.is-debit { color:#c45c4c; } }
 .records-empty { margin:0; padding:21px 8px; text-align:center; color:var(--fp-muted); font-size:12px; }
-.recipients { margin-top:12px; color:var(--fp-muted); font-size:11px; summary { cursor:pointer; } p { margin:8px 0; } }
-.packet-footnote,.quiet-note { margin:12px 0 0; color:var(--fp-muted); font-size:11px; line-height:1.6; }
-.packet-footnote { text-align:center; }
+.quiet-note { margin:12px 0 0; color:var(--fp-muted); font-size:11px; line-height:1.6; }
 .inline-error { margin:10px 0 0; color:var(--fp-danger,#bc5142); font-size:12px; }
 .packet-state { min-height:180px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; text-align:center; p { margin:0; font-size:13px; color:var(--fp-muted); } h3 { margin:0; font-size:15px; color:var(--fp-title); } .state-symbol { display:grid; place-items:center; width:48px; height:48px; border-radius:50%; background:var(--fp-hover); font-size:28px; color:var(--fp-muted); } }
 @media(max-width:480px) { .packet-hero { padding:16px 12px 18px; h2 { font-size:19px; } }.packet-stats strong { font-size:15px; }.duel-arena { gap:8px; padding-right:2px; padding-left:2px; }.hand-picker { gap:6px; }.record-duel { max-width:190px; }.claim-records { margin-top:16px; } }

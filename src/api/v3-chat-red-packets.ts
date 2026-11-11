@@ -25,6 +25,13 @@ interface ClassicPacketDetail {
   taxPoints?:never
 }
 export type PacketDetail = SettledPacketDetail | ClassicPacketDetail
+
+export function canClaimPacket(detail: PacketDetail, viewerId: string | undefined): detail is SettledPacketDetail {
+  return Boolean(viewerId && !detail.legacy && !detail.currentUserClaim && detail.got < detail.count
+    && !(detail.sender.id === viewerId && (detail.type === 'specify' || detail.type === 'rockPaperScissors'))
+    && (!detail.recipientIds || detail.recipientIds.includes(viewerId)))
+}
+
 const invalid=()=>new ApiError('红包参数不合法',422),bad=()=>new ApiError('红包响应不正确',502)
 const unicode=(s:string)=>!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(s)
 export const packetRisk=(type:PacketType)=>type==='heartbeat'||type==='rockPaperScissors'
