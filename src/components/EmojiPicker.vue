@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fish001 } from '@/emoji/fish001'
 import { useEmojiPreferencesStore } from '@/stores/emojiPreferences'
 import { useScrollPagination } from '@/composables/useScrollPagination'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -91,7 +92,11 @@ const emojiPreferences = useEmojiPreferencesStore()
 const items = ref<EmojiItem[]>([]), groups = ref<EmojiGroup[]>([]), groupId = ref('')
 const groupPage = ref(0), groupPages = ref(0), itemPage = ref(0), itemPages = ref(0)
 const orderedGroups = computed(() => [...groups.value].sort((a, b) => Number(b.type === 1) - Number(a.type === 1)))
-const selectedName = computed(() => groupId.value ? groups.value.find(group => group.oId === groupId.value)?.name || '分组' : '常用表情')
+const isFish001 = computed(() => groupId.value === fish001.id)
+const selectedName = computed(() => {
+  if (isFish001.value) return fish001.name
+  return groupId.value ? groups.value.find(group => group.oId === groupId.value)?.name || '分组' : '常用表情'
+})
 const catalogLoading = ref(false), catalogError = ref('')
 let version = 0, catalogVersion = 0
 let retryItems: (() => Promise<void>) | undefined
@@ -134,6 +139,18 @@ function loadGroup(id: string) {
   groupId.value = id; items.value = []; itemPage.value = itemPages.value = 0
   return load(() => fetchV3GroupEmojis(id, 1, 50, emojiPreferences.order), page => { items.value = page.list; itemPage.value = page.p; itemPages.value = page.pageCount })
 }
+function loadFish001() {
+  clearPreview()
+  if (selection.value) selection.value.scrollTop = 0
+  version++
+  retryItems = undefined
+  loading.value = false
+  error.value = ''
+  groupId.value = fish001.id
+  items.value = [...fish001.items]
+  itemPage.value = itemPages.value = 0
+}
+
 function moreItems() {
   if (!groupId.value || loading.value || itemPage.value >= itemPages.value) return
   const id = groupId.value, p = itemPage.value + 1
@@ -188,7 +205,12 @@ onMounted(() => {
   window.addEventListener?.('scroll', place, true)
   window.addEventListener?.('resize', place)
 })
-watch(() => emojiPreferences.order, () => { if (open.value && groupId.value) void loadGroup(groupId.value) })
+watch(() => emojiPreferences.order, () => {
+  if (open.value && groupId.value && !isFish001.value) void loadGroup(groupId.value)
+})
+watch(() => emojiPreferences.fish001Enabled, enabled => {
+  if (!enabled && open.value && isFish001.value) void loadFrequent()
+})
 watch(identity, () => { close(); error.value = catalogError.value = ''; items.value = []; groups.value = []; groupId.value = '' }, { flush: 'sync' })
 onBeforeUnmount(() => {
   close()
@@ -213,6 +235,7 @@ defineExpose({ toggle })
       :class="{ 'panel--fixed': position, 'panel--below': !position && preferred === 'below' }">
       <nav ref="categories" class="categories" aria-label="表情分类">
         <button type="button" :aria-pressed="!groupId" @click="loadFrequent">常用</button>
+        <button v-if="emojiPreferences.fish001Enabled" type="button" :aria-pressed="isFish001" @click="loadFish001">{{ fish001.name }}</button>
         <button v-for="group in orderedGroups" :key="group.oId" type="button" :aria-pressed="groupId === group.oId"
           :title="group.name" @click="loadGroup(group.oId)">
           {{ group.name || '分组' }}

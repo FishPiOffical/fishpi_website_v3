@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSettingsDrawerStore, type SettingsSection } from '@/stores/settingsDrawer'
 import { useHomeLayoutStore } from '@/stores/homeLayout'
 import { usePageSidebarStore, type PageSidebarModuleId } from '@/stores/pageSidebar'
+import { fish001 } from '@/emoji/fish001'
 import { emojiOrderOptions, useEmojiPreferencesStore } from '@/stores/emojiPreferences'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useChatSidebarStore } from '@/stores/chatSidebar'
@@ -365,6 +366,14 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
 
           <div v-else-if="section === 'emoji'" class="content">
+            <fieldset class="setting-options">
+              <legend>可选表情包</legend>
+              <label :class="{ selected: emojiPreferences.fish001Enabled }">
+                <input type="checkbox" :checked="emojiPreferences.fish001Enabled"
+                  @change="emojiPreferences.setFish001Enabled(($event.target as HTMLInputElement).checked)" />
+                <span><b>{{ fish001.name }}</b><small>{{ fish001.items.length }} 张表情</small></span>
+              </label>
+            </fieldset>
             <fieldset class="setting-options">
               <legend>表情收藏排序</legend>
               <label v-for="(label, order) in emojiOrderOptions" :key="order" :class="{ selected: emojiPreferences.order === order }">
