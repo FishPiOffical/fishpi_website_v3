@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSettingsDrawerStore, type SettingsSection } from '@/stores/settingsDrawer'
 import { useHomeLayoutStore } from '@/stores/homeLayout'
 import { usePageSidebarStore, type PageSidebarModuleId } from '@/stores/pageSidebar'
+import { emojiOrderOptions, useEmojiPreferencesStore } from '@/stores/emojiPreferences'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useChatSidebarStore } from '@/stores/chatSidebar'
 import { useChatFilterStore, type ChatBlockMatch, type ChatBlockMode } from '@/stores/chatFilter'
@@ -26,6 +27,7 @@ const home = useHomeLayoutStore()
 const pageSidebar = usePageSidebarStore()
 const sidebar = useChatSidebarStore()
 const chatPreferences = useChatPreferencesStore()
+const emojiPreferences = useEmojiPreferencesStore()
 const chatFilter = useChatFilterStore()
 const auth = useAuthStore()
 const whispers = usePrivateInboxStore()
@@ -55,6 +57,7 @@ const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
   { id: 'home', label: '首页模块', icon: '🏠' },
   { id: 'pageSidebar', label: '内页侧栏', icon: '📑' },
   { id: 'chatInput', label: '聊天室输入', icon: '⌨️' },
+  { id: 'emoji', label: '表情包', icon: '😊' },
   { id: 'chatSidebar', label: '聊天室侧栏', icon: '💬' },
   { id: 'chatBlock', label: '聊天室屏蔽', icon: '🚫' },
   { id: 'income', label: '上下班时间', icon: '🕒' },
@@ -357,6 +360,17 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
               <label :class="{ selected: chatPreferences.sendShortcut === 'enter' }">
                 <input type="radio" name="chat-send-shortcut" value="enter" :checked="chatPreferences.sendShortcut === 'enter'" @change="chatPreferences.setSendShortcut('enter')" />
                 <span><b>Enter 发送</b><small>Shift+Enter 换行</small></span>
+              </label>
+            </fieldset>
+          </div>
+
+          <div v-else-if="section === 'emoji'" class="content">
+            <fieldset class="setting-options">
+              <legend>表情收藏排序</legend>
+              <label v-for="(label, order) in emojiOrderOptions" :key="order" :class="{ selected: emojiPreferences.order === order }">
+                <input type="radio" name="emoji-collection-order" :value="order" :checked="emojiPreferences.order === order"
+                  @change="emojiPreferences.setOrder(order)" />
+                <span><b>{{ label }}</b></span>
               </label>
             </fieldset>
           </div>

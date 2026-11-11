@@ -47,8 +47,9 @@ export async function fetchV3EmotionOptions(): Promise<{ groups: string[][]; def
 export async function fetchV3EmojiGroups(p = 1, size = 50): Promise<EmojiPage<EmojiGroup>> {
   return page(await data(`${base}/emoji-groups?${pageParams(p, size)}`), p, size, group)
 }
-export async function fetchV3GroupEmojis(groupId: string, p = 1, size = 50): Promise<EmojiPage<EmojiItem>> {
-  return page(await data(`${base}/emoji-groups/${pathId(groupId)}/emojis?${pageParams(p, size)}`), p, size, item)
+export type EmojiCollectionOrder = 'newest' | 'oldest' | 'manual'
+export async function fetchV3GroupEmojis(groupId: string, p = 1, size = 50, order: EmojiCollectionOrder = 'manual'): Promise<EmojiPage<EmojiItem>> {
+  return page(await data(`${base}/emoji-groups/${pathId(groupId)}/emojis?${pageParams(p, size)}${order === 'manual' ? '' : `&order=${order}`}`), p, size, item)
 }
 export function emojiOperationKey(): string {
   return `emojis:${Array.from(crypto.getRandomValues(new Uint8Array(16)), n => n.toString(16).padStart(2, '0')).join('')}`

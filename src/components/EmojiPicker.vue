@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useEmojiPreferencesStore } from '@/stores/emojiPreferences'
 import { useScrollPagination } from '@/composables/useScrollPagination'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -86,6 +87,7 @@ function previewImage(item: EmojiItem) {
   const asset = props.labels[item.name]?.match(/^\$\{emojiSite\}\/([a-z0-9_-]+\.(?:png|gif|webp))$/i)?.[1]
   return item.url || (asset ? CDN_EMOJIS + asset : item.name === 'trollface' ? CDN_EMOJIS + 'trollface.png' : '')
 }
+const emojiPreferences = useEmojiPreferencesStore()
 const items = ref<EmojiItem[]>([]), groups = ref<EmojiGroup[]>([]), groupId = ref('')
 const groupPage = ref(0), groupPages = ref(0), itemPage = ref(0), itemPages = ref(0)
 const orderedGroups = computed(() => [...groups.value].sort((a, b) => Number(b.type === 1) - Number(a.type === 1)))
@@ -130,18 +132,18 @@ function loadGroup(id: string) {
   clearPreview()
   if (selection.value) selection.value.scrollTop = 0
   groupId.value = id; items.value = []; itemPage.value = itemPages.value = 0
-  return load(() => fetchV3GroupEmojis(id), page => { items.value = page.list; itemPage.value = page.p; itemPages.value = page.pageCount })
+  return load(() => fetchV3GroupEmojis(id, 1, 50, emojiPreferences.order), page => { items.value = page.list; itemPage.value = page.p; itemPages.value = page.pageCount })
 }
 function moreItems() {
   if (!groupId.value || loading.value || itemPage.value >= itemPages.value) return
   const id = groupId.value, p = itemPage.value + 1
-  return load(() => fetchV3GroupEmojis(id, p), page => { items.value = [...items.value, ...page.list]; itemPage.value = page.p; itemPages.value = page.pageCount })
+  return load(() => fetchV3GroupEmojis(id, p, 50, emojiPreferences.order), page => { items.value = [...items.value, ...page.list]; itemPage.value = page.p; itemPages.value = page.pageCount })
 }
 const itemsEnd = ref<HTMLElement | null>(null)
 const groupsEnd = ref<HTMLElement | null>(null)
 const categories = ref<HTMLElement | null>(null)
 useScrollPagination(itemsEnd, () => open.value && !!groupId.value && !loading.value && !error.value && itemPage.value < itemPages.value,
-  moreItems, () => identity() + ':' + groupId.value, selection)
+  moreItems, () => identity() + ':' + groupId.value + ':' + emojiPreferences.order, selection)
 useScrollPagination(groupsEnd, () => open.value && !catalogLoading.value && !catalogError.value && groupPage.value < groupPages.value,
   () => loadCatalog(groupPage.value + 1), identity, categories)
 
@@ -186,6 +188,7 @@ onMounted(() => {
   window.addEventListener?.('scroll', place, true)
   window.addEventListener?.('resize', place)
 })
+watch(() => emojiPreferences.order, () => { if (open.value && groupId.value) void loadGroup(groupId.value) })
 watch(identity, () => { close(); error.value = catalogError.value = ''; items.value = []; groups.value = []; groupId.value = '' }, { flush: 'sync' })
 onBeforeUnmount(() => {
   close()
@@ -243,6 +246,7 @@ defineExpose({ toggle })
 </template>
 
 <style scoped lang="scss">
+
 .emoji {
   position: relative;
 }

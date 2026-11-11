@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useEmojiPreferencesStore } from '@/stores/emojiPreferences'
 import { useScrollPagination } from '@/composables/useScrollPagination'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -11,6 +12,7 @@ import { useAuthStore } from '@/stores/auth'
 import FpLoading from '@/components/FpLoading.vue'
 
 const { accessToken, account } = storeToRefs(useAuthStore())
+const emojiPreferences = useEmojiPreferencesStore()
 const groups = ref<EmojiGroup[]>([]), items = ref<EmojiItem[]>([]), groupId = ref('')
 const loading = ref(false), mutating = ref(false), error = ref(''), frequencyLoading = ref(false), catalogLoaded = ref(false)
 const newGroup = ref(''), newUrl = ref(''), newName = ref(''), frequency = ref('')
@@ -47,7 +49,7 @@ function loadItems(more = false) {
   const id = groupId.value
   if (!id) { items.value = []; itemTotal.value = itemPage.value = itemPages.value = 0; return Promise.resolve() }
   if (!more) { items.value = []; itemPage.value = itemPages.value = 0 }
-  return read(() => fetchV3GroupEmojis(id, more ? itemPage.value + 1 : 1), page => {
+  return read(() => fetchV3GroupEmojis(id, more ? itemPage.value + 1 : 1, 50, emojiPreferences.order), page => {
     items.value = more ? [...items.value, ...page.list] : page.list
     itemPage.value = page.p; itemPages.value = page.pageCount; itemTotal.value = page.total
   }, failure => {
@@ -96,8 +98,9 @@ useScrollPagination(
   itemsEnd,
   () => !!groupId.value && !busy.value && !loading.value && !error.value && itemPage.value < itemPages.value,
   () => loadItems(true),
-  () => identity() + ':' + groupId.value,
+  () => identity() + ':' + groupId.value + ':' + emojiPreferences.order,
 )
+watch(() => emojiPreferences.order, () => { if (mounted && !busy.value && groupId.value) void loadItems() })
 function selectGroup(id: string) { groupId.value = id; void loadItems() }
 async function loadFrequency() {
   const owner = identity(), currentEpoch = epoch, request = ++frequencySequence
@@ -341,6 +344,7 @@ function saveFrequency(resetDefaults = false) {
 </template>
 
 <style scoped lang="scss">
+
 h3 {
   margin: 0 0 8px;
   font-size: 18px;

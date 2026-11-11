@@ -23,6 +23,12 @@ assert.equal(item.oId,'20');assert.equal(item.emojiId,'99');assert.equal(item.ur
 __emojiResponses.push(envelope(page([{id:'21',emojiId:'98',name:'bad',sort:0,url:'javascript:bad()'}])));assert.equal((await api.fetchV3GroupEmojis('10')).list[0].url,'')
 __emojiResponses.push(envelope({list:[],pagination:{p:1,size:50,total:0,pageCount:0}}));assert.deepEqual((await api.fetchV3GroupEmojis('10')).list,[])
 await assert.rejects(api.fetchV3GroupEmojis('../user'))
+for (const order of ['newest', 'oldest']) {
+  __emojiResponses.push(envelope(page([{id:'21',emojiId:'98',name:'next',sort:0,url:signed}], 2, 51)))
+  await api.fetchV3GroupEmojis('10', 2, 50, order)
+  assert.match(__emojiRequests.at(-1).path, new RegExp(`[?&]order=${order}$`))
+}
+
 console.log('PASS emojis 2 actual pages, signed URL identity, member-id/global-id distinction and unsafe URL handling')
 __emojiResponses.push(envelope({...group,id:'12',name:'new',type:0,sort:2}));await api.createV3EmojiGroup('new',2,'same-key')
 assert.equal(__emojiRequests.at(-1).init.method,'POST');assert.deepEqual(JSON.parse(__emojiRequests.at(-1).init.body),{name:'new',sort:2})
