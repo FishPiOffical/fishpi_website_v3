@@ -1,27 +1,19 @@
 import { onMounted, onScopeDispose, reactive, ref, shallowRef, watch } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import { getAuthContextVersion } from '@/api/http'
 import { decodeHomeRead, fetchHomeRead, type HomeData, type HomeRead } from '@/api/v3-home-reads'
 import { shouldInvalidatePublicSnapshot, PUBLIC_DIRECTORY_TTL, PUBLIC_LIST_TTL, readPublicSnapshot, removePublicSnapshot, savePublicSnapshot } from '@/utils/publicSnapshots'
-// Browser memory only. Stable identity boundaries invalidate every entry, token rotation does not.
+// All five reads omit credentials and use the same public projection as SSR.
 const recentReads = new Map<HomeRead, { expires: number; value: unknown }>()
-let cacheBoundary = ''
 export function useHomeRead<K extends HomeRead>(key: K, initial: unknown, initialExpires = 0, enabled = () => true) {
-  const auth = useAuthStore(), data = shallowRef<HomeData[K] | null>(null), loading = ref(false), error = ref('')
+  const data = shallowRef<HomeData[K] | null>(null), loading = ref(false), error = ref('')
   try { data.value = decodeHomeRead(key, initial) } catch { /* A current read follows mount. */ }
   const snapshotKey = `home:${key}`
   let mounted = false, sequence = 0, fromSnapshot = false
-  const identity = () => `${getAuthContextVersion()}:${!!auth.accessToken}:${auth.account?.oId || ''}`
-  let boundary = identity()
-  function syncCache() {
-    if (cacheBoundary !== identity()) { recentReads.clear(); cacheBoundary = identity() }
-  }
   function clear() { fromSnapshot = false; sequence++; data.value = null; loading.value = false; error.value = '' }
   async function read() {
     if (!mounted || !enabled() || import.meta.env.SSR) return
-    syncCache(); sequence++; error.value = ''
-    const run = sequence, context = getAuthContextVersion(), token = auth.accessToken, actor = auth.account?.oId
-    const current = () => mounted && run === sequence && context === getAuthContextVersion() && token === auth.accessToken && actor === auth.account?.oId
+    sequence++; error.value = ''
+    const run = sequence
+    const current = () => mounted && run === sequence
     loading.value = data.value === null
     try { const result = await fetchHomeRead(key); if (current()) { data.value = result; fromSnapshot = false; savePublicSnapshot(snapshotKey, result); recentReads.set(key, { expires: Date.now() + 300_000, value: structuredClone(result) }) } }
     catch (e) {
@@ -45,18 +37,11 @@ export function useHomeRead<K extends HomeRead>(key: K, initial: unknown, initia
     }
     await read()
   }
-  const stop = watch([() => auth.accessToken, () => auth.account?.oId], () => {
-    const next = identity()
-    if (next !== boundary) clear()
-    boundary = next
-    syncCache(); void restoreAndRead()
-  }, { flush: 'sync' })
   function loadInitial() {
     if (!mounted || !enabled()) return
-    syncCache()
     const cached = recentReads.get(key)
     if (cached && cached.expires > Date.now() && cached.expires >= initialExpires) { data.value = decodeHomeRead(key, structuredClone(cached.value)); return }
-    if (data.value !== null && !auth.accessToken) {
+    if (data.value !== null) {
       if (initialExpires > Date.now()) {
         recentReads.set(key, { expires: initialExpires, value: structuredClone(data.value) })
       } else {
@@ -69,6 +54,6 @@ export function useHomeRead<K extends HomeRead>(key: K, initial: unknown, initia
   onMounted(() => { mounted = true; loadInitial() })
   const retryPublic=()=>{void read()}
   onMounted(()=>{if(typeof window!=='undefined')window.addEventListener('fp:retry-public',retryPublic)})
-  onScopeDispose(() => { if(typeof window!=='undefined')window.removeEventListener('fp:retry-public',retryPublic); mounted = false; stop(); clear() })
+  onScopeDispose(() => { if(typeof window!=='undefined')window.removeEventListener('fp:retry-public',retryPublic); mounted = false; clear() })
   return reactive({ data, loading, error, read })
 }

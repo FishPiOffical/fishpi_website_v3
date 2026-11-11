@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, onScopeDispose, ref } from 'vue'
-import { ApiError, getAccessToken, onAccessTokenChange, refreshAccessToken, wasRefreshRejected, request, setAccessToken } from '@/api/http'
+import { ApiError, getAccessToken, onAccessTokenChange, refreshAccessToken, wasRefreshRejected, request, setAccessToken, withHomeSessionPriority } from '@/api/http'
 import { clearCache } from '@/utils/swr'
 import { login as loginApi, type AccountInfo, type V3AccountInfo } from '@/api/fishpi'
 
@@ -8,18 +8,24 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null)
   const account = ref<AccountInfo | null>(null)
   const isVip = ref(false)
+  const membershipPending = ref(false)
+  const membershipChecked = ref(false)
   const loading = ref(false)
   const error = ref('')
   const initialized = ref(false)
   let version = 0
   let restoreFlight: Promise<void> | null = null
   let loginFlight: Promise<void> | null = null
+  let membershipRun = 0
 
   const isLoggedIn = computed(() => Boolean(accessToken.value && account.value))
   const unsubscribe = onAccessTokenChange((token) => {
     if (accessToken.value !== token) clearCache()
     accessToken.value = token
     if (!token) {
+      membershipRun++
+      membershipPending.value = false
+      membershipChecked.value = false
       account.value = null
       isVip.value = false
     }
@@ -39,8 +45,6 @@ export const useAuthStore = defineStore('auth', () => {
     assertCurrent(expected)
     if (res.code !== 0 || !res.data) throw new ApiError(res.msg || '登录状态已失效', 401)
     account.value = toAccount(res.data)
-    await refreshMembership()
-    assertCurrent(expected)
   }
 
   function restore(): Promise<void> {
@@ -49,15 +53,17 @@ export const useAuthStore = defineStore('auth', () => {
     if (restoreFlight) return restoreFlight
     if (initialized.value && (isLoggedIn.value || !accessToken.value)) return Promise.resolve()
     const expected = version
-    const operation = (async () => {
+    const operation = withHomeSessionPriority(async () => {
       try {
         if (!getAccessToken() && !await refreshAccessToken()) {
           // Definitive absence is cached; transient failures may be retried on a later navigation.
-          initialized.value = wasRefreshRejected()
+          if (expected === version) initialized.value = wasRefreshRejected()
           return
         }
         assertCurrent(expected)
         await loadAccount(expected)
+        assertCurrent(expected)
+        void refreshMembership()
         initialized.value = true
       } catch (e) {
         if (expected === version && e instanceof ApiError && e.status === 401) {
@@ -65,7 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
           initialized.value = true
         }
       }
-    })().finally(() => {
+    }).finally(() => {
       if (restoreFlight === operation) restoreFlight = null
     })
     restoreFlight = operation
@@ -79,12 +85,20 @@ export const useAuthStore = defineStore('auth', () => {
       isVip.value = false
       return
     }
+    const run = ++membershipRun
+    const current = () => run === membershipRun && expected === version && account.value?.oId === id
+    membershipPending.value = true
     try {
       const m = await request<{ code: number; data?: { active?: boolean } }>('/api/v3/me/membership')
       if (m.code !== 0 || typeof m.data?.active !== 'boolean') throw new ApiError('会员状态响应无效', 502)
-      if (expected === version && account.value?.oId === id) isVip.value = m.data.active
+      if (current()) {
+        isVip.value = m.data.active
+        membershipChecked.value = true
+      }
     } catch {
-      if (expected === version && account.value?.oId === id) isVip.value = false
+      // A failed background read doesn't determine entitlement.
+    } finally {
+      if (current()) membershipPending.value = false
     }
   }
 
@@ -101,6 +115,8 @@ export const useAuthStore = defineStore('auth', () => {
         // Publish synchronously before /me, rather than relying on Vue's deferred watch queue.
         setAccessToken(token)
         await loadAccount(expected)
+        assertCurrent(expected)
+        void refreshMembership()
         initialized.value = true
       } catch (e) {
         if (expected === version) {
@@ -131,8 +147,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function reloadAccount() {
     if (!accessToken.value) return
     await loadAccount(version)
+    void refreshMembership()
   }
 
-  return { accessToken, account, isVip, loading, error, initialized, isLoggedIn,
+  return { accessToken, account, isVip, membershipPending, membershipChecked, loading, error, initialized, isLoggedIn,
     restore, login, logout, refreshMembership, reloadAccount }
 })

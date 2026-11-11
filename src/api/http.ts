@@ -73,8 +73,9 @@ let homeReadsActive = false
 let homeReadGeneration = 0
 let homeReadQueue: Promise<unknown> = Promise.resolve()
 let nextHomeReadAt = 0
-let homeReadRunning = false
-let priorityHomeRefresh: Promise<unknown> | null = null
+let homeReadInFlight: Promise<unknown> | null = null
+let homePriorityRead: Promise<unknown> | null = null
+let homeSessionRestore: Promise<unknown> | null = null
 let homeReadPause: { until: number; message: string } | null = null
 const HOME_READ_PAUSE_KEY = 'fp.home-read-pause-until'
 
@@ -94,6 +95,17 @@ export function setHomeReadsActive(active: boolean) {
 
 export function getHomeReadPause() { return homeReadPause }
 
+/** Keep the homepage queue behind the cookie refresh and account read as one operation. */
+export function withHomeSessionPriority<T>(restore: () => Promise<T>): Promise<T> {
+  if (!homeReadsActive) return restore()
+  const flight = Promise.resolve().then(restore)
+  const barrier = flight.catch(() => {}).finally(() => {
+    if (homeSessionRestore === barrier) homeSessionRestore = null
+  })
+  homeSessionRestore = barrier
+  return flight
+}
+
 export function resumeHomeReads() {
   if (!homeReadPause || Date.now() < homeReadPause.until) return false
   homeReadPause = null
@@ -103,29 +115,33 @@ export function resumeHomeReads() {
   return true
 }
 
-function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promise<T>): Promise<T> {
+function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promise<T>, priority: boolean): Promise<T> {
   const generation = homeReadGeneration, version = authVersion
+  const sessionRead = priority || path === '/api/v3/me/membership'
   const check = () => {
-    if (generation !== homeReadGeneration || version !== authVersion || init.signal?.aborted) {
+    if ((!sessionRead && generation !== homeReadGeneration) || (init.credentials !== 'omit' && version !== authVersion) || init.signal?.aborted) {
       throw new ApiError('请求已取消', 0, 'aborted')
     }
     if (homeReadPause) throw new ApiError(homeReadPause.message, 0, 'home_reads_paused')
   }
-  const execute = async (priority = false) => {
+  const execute = async () => {
     while (true) {
       check()
-      if (!priority && priorityHomeRefresh) {
-        await priorityHomeRefresh
+      const blocker = (!priority && (homeSessionRestore || homePriorityRead)) || homeReadInFlight
+      if (blocker) {
+        await blocker
         continue
       }
       const wait = nextHomeReadAt - Date.now()
       if (wait <= 0) break
       await new Promise(resolve => setTimeout(resolve, wait))
     }
-    homeReadRunning = true
     nextHomeReadAt = Date.now() + 250
+    const request = Promise.resolve().then(run)
+    const inFlight = request.catch(() => {})
+    homeReadInFlight = inFlight
     try {
-      return await run()
+      return await request
     } catch (error) {
       // Rhythm uses structured unauthorized when a visitor has no refresh cookie.
       const guestRefresh = path === '/api/v3/auth/refresh' && !accessToken &&
@@ -146,14 +162,16 @@ function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promi
       }
       throw error
     } finally {
-      homeReadRunning = false
+      if (homeReadInFlight === inFlight) homeReadInFlight = null
     }
   }
-  // Startup queues public reads during mount. Give the refresh cookie probe the first turn.
-  if (path === '/api/v3/auth/refresh' && !homeReadRunning && !priorityHomeRefresh && Date.now() >= nextHomeReadAt) {
-    const refresh = execute(true).finally(() => { priorityHomeRefresh = null })
-    priorityHomeRefresh = refresh.catch(() => {})
-    return refresh
+  if (priority) {
+    const next = (homePriorityRead ?? Promise.resolve()).then(execute)
+    const barrier = next.catch(() => {}).finally(() => {
+      if (homePriorityRead === barrier) homePriorityRead = null
+    })
+    homePriorityRead = barrier
+    return next
   }
   const next = homeReadQueue.then(() => execute())
   homeReadQueue = next.catch(() => {})
@@ -428,7 +446,7 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
     const refresh = path === '/api/v3/auth/refresh'
     const ticket = /\/(?:realtime-ticket|realtime\/tickets)$/.test(path)
     if (method === 'GET' || refresh || ticket) {
-      return queueHomeRead(path, init, refresh ? () => queueCredentialRequest(run) : run)
+      return queueHomeRead(path, init, refresh ? () => queueCredentialRequest(run) : run, refresh || (method === 'GET' && path === '/api/v3/me'))
     }
   }
   try {

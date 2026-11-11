@@ -7,14 +7,14 @@ export type PublicLogMetadata = { id: string; time: string; category: typeof pub
 export type DiscoveryExtra = { kind: 'recent'; list: RelationUser[] } | { kind: 'random'; list: ArticleSummary[] } | { kind: 'logs'; list: PublicLogMetadata[]; p: number; size: number; total: number; pageCount: number }
 const invalid = () => new ApiError('发现接口响应格式不正确', 502)
 function row(value: unknown): Record<string, unknown> { if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid(); return value as Record<string, unknown> }
-async function data(path: string) { const result = row(await request(path, { cache: 'no-store' })); if (result.code !== 0) throw invalid(); return row(result.data) }
+async function data(path: string, credentials?: RequestCredentials) { const result = row(await request(path, { cache: 'no-store', ...(credentials ? { credentials } : {}) })); if (result.code !== 0) throw invalid(); return row(result.data) }
 export function decodeRecentMembers(value: unknown): RelationUser[] {
   if (!Array.isArray(value) || value.length > 20) throw invalid()
   const list = value.map(decodeV3RelationUser)
   if (list.some(u => /[^A-Za-z0-9_-]/.test(u.userName)) || new Set(list.map(u => u.id)).size !== list.length) throw invalid()
   return list
 }
-export async function fetchRecentMembers() { return decodeRecentMembers((await data('/api/v3/recent-members')).list) }
+export async function fetchRecentMembers() { return decodeRecentMembers((await data('/api/v3/recent-members', 'omit')).list) }
 export async function fetchRandomDiscovery(size = 8, excludeId = ''): Promise<ArticleSummary[]> {
   if (!Number.isSafeInteger(size) || size < 1 || size > 20 || typeof excludeId !== 'string' || excludeId && !/^[0-9]{1,32}$/.test(excludeId)) throw new ApiError('随机发现参数不合法', 422)
   const result = await data(`/api/v3/articles/random?size=${size}${excludeId ? `&excludeId=${encodeURIComponent(excludeId)}` : ''}`)

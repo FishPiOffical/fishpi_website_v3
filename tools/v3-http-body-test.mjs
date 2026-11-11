@@ -17,6 +17,9 @@ const server=http.createServer(async(req,res)=>{
   res.end(guestRefresh?'{"code":"unauthorized"}':'{"code":0,"data":{"accessToken":"synthetic-rotated"}}')
   return
  }
+ if(req.url==='/api/v3/me'){
+  res.writeHead(200,{'Content-Type':'application/json'});res.end('{"code":0}');return
+ }
  if(req.url==='/api/v3/fixture/guest-401'){
   res.writeHead(401,{'Content-Type':'text/html'});res.end('<p>Unauthorized</p>');return
  }
@@ -138,6 +141,15 @@ try{
   assert.equal(await read.then(value=>value.code),0)
   assert.deepEqual(received.slice(priorityStart).map(entry=>entry.path),['/api/v3/auth/refresh','/api/v3/fixture/json'])
   assert.equal(api.getHomeReadPause(),null)
+  guestRefresh=false
+  const sessionStart=received.length
+  const firstPublic=api.request('/api/v3/fixture/json',{credentials:'omit'})
+  const restore=api.withHomeSessionPriority(async()=>{
+   assert.equal(await api.refreshAccessToken(),true)
+   await api.request('/api/v3/me')
+  })
+  await Promise.all([firstPublic,restore])
+  assert.deepEqual(received.slice(sessionStart).map(entry=>entry.path),['/api/v3/auth/refresh','/api/v3/me','/api/v3/fixture/json'])
  } finally {
   Date.now=originalNow
   api.setHomeReadsActive(false)

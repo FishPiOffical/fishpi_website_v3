@@ -25,6 +25,7 @@ export interface SsrPayload {
   homeReadExpires?: Partial<Record<HomeRead, number>>
   articleListing?: unknown
   recentMembers?: RelationUser[] | null
+  recentMembersExpires?: number
   statistics?: CommunityStatistics | null
   milestonePage?: MilestonePage | null
   breezemoonPage?: BreezemoonPage | null
@@ -41,6 +42,7 @@ export interface SsrPayload {
   rankingPage?: RankingPage | null
   homeCheckinRanking?: RankingPage | null
   homeOnlineRanking?: RankingPage | null
+  homeRankingExpires?: Partial<Record<'checkin' | 'online', number>>
   repeater?: RepeaterItem[]
   chatFeed?: ChatHistoryItem[]
 }
@@ -171,9 +173,12 @@ export function consumeMilestonePayload(): MilestonePage | null { return takeFie
 export function consumeStatisticsPayload(): CommunityStatistics | null { return takeField('statistics') || null }
 
 export function consumeRankingPayload(): RankingPage | null { return takeField('rankingPage') || null }
-export function consumeHomeRankingPayload() { return { checkin: takeField('homeCheckinRanking') || null, online: takeField('homeOnlineRanking') || null } }
+export function consumeHomeRankingPayload() {
+  return { checkin: takeField('homeCheckinRanking') || null, online: takeField('homeOnlineRanking') || null, expires: takeField('homeRankingExpires') }
+}
 
 export function consumeRecentMembersPayload(): RelationUser[] | null { const value = takeField('recentMembers'); if (value == null) return null; try { return decodeRecentMembers(value) } catch { return null } }
+export function consumeRecentMembersExpiry() { return takeField('recentMembersExpires') ?? 0 }
 
 export function consumeArticleListingPayload(kind: ArticleFeedKind, extra: string, order: ColumnOrder) {
   const value = takeField('articleListing')

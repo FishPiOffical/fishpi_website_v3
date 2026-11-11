@@ -5,8 +5,8 @@ import { RouterLink } from 'vue-router'
 import { rankingTitles, rankingSubTypes, type RankingType } from '@/api/v3-rankings'
 import { useRankingBoard } from '@/composables/useRankingBoard'
 import VipNickname from '@/components/user/VipNickname.vue'
-const props = defineProps<{ type: RankingType; initial?: unknown; compact?: boolean }>()
-const { value, p, subType, loading, error, read } = useRankingBoard(props.type, props.initial, props.compact)
+const props = defineProps<{ type: RankingType; initial?: unknown; compact?: boolean; initialExpires?: number }>()
+const { value, p, subType, loading, error, read } = useRankingBoard(props.type, props.initial, props.compact, props.initialExpires)
 const panel = ref<HTMLElement | null>(null)
 let lastPage = 1, lastSubType = subType.value
 watch(value, data => {

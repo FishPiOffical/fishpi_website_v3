@@ -63,7 +63,7 @@ onMounted(() => {
   repeaterItems.value = undefined
   // A saved layout may mount a ranking after hydration; keep its SSR seed until it ages out.
   if (homeRanks.value.checkin || homeRanks.value.online) {
-    rankingSeedTimer = setTimeout(() => { homeRanks.value = { checkin: null, online: null } }, 300_000)
+    rankingSeedTimer = setTimeout(() => { homeRanks.value = { checkin: null, online: null, expires: undefined } }, 300_000)
   }
 })
 const chatDraft = ref(''), chatBusy = ref(false), chatMsg = ref('')
@@ -217,12 +217,12 @@ function scrollShelf(id: string, dir: -1 | 1) {
                 <b>今日连签排行</b>
                 <RouterLink to="/top/checkin">更多</RouterLink>
               </div>
-              <RankingBoard type="checkin" :initial="homeRanks.checkin" compact />
+              <RankingBoard type="checkin" :initial="homeRanks.checkin" :initial-expires="homeRanks.expires?.checkin ?? 0" compact />
               <div class="index-head spaced">
                 <b>在线时间排行</b>
                 <RouterLink to="/top/online">更多</RouterLink>
               </div>
-              <RankingBoard type="online" :initial="homeRanks.online" compact />
+              <RankingBoard type="online" :initial="homeRanks.online" :initial-expires="homeRanks.expires?.online ?? 0" compact />
             </aside>
 
             <section v-else-if="mod.id === 'long'" class="long-zone">

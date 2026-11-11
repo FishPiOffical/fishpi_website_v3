@@ -42,12 +42,14 @@ type WithinBudget = <T>(task: Promise<T>) => Promise<T>
 
 async function prefetchHome(withinBudget: WithinBudget): Promise<SsrPayload> {
   const expires: Partial<Record<HomeRead, number>> = {}
+  const rankingExpires: Partial<Record<'checkin' | 'online', number>> = {}
+  let recentMembersExpires: number | undefined
   // The gate admits requests in start order. Recent and hot must reach it before secondary modules.
   const settled = await Promise.allSettled([
     fetchHomeBootstrap(key => withinBudget(homeRead(key, () => fetchHomeRead(key), expiry => { expires[key] = expiry }))),
-    withinBudget(homeRead('ranking:checkin:8', () => fetchRanking('checkin', 1, undefined, 8))),
-    withinBudget(homeRead('ranking:online:8', () => fetchRanking('online', 1, undefined, 8))),
-    withinBudget(homeRead('recent-members', () => fetchRecentMembers())),
+    withinBudget(homeRead('ranking:checkin:8', () => fetchRanking('checkin', 1, undefined, 8, 'omit'), expiry => { rankingExpires.checkin = expiry })),
+    withinBudget(homeRead('ranking:online:8', () => fetchRanking('online', 1, undefined, 8, 'omit'), expiry => { rankingExpires.online = expiry })),
+    withinBudget(homeRead('recent-members', fetchRecentMembers, expiry => { recentMembersExpires = expiry })),
     withinBudget(homeRead('breezemoons:8', () => fetchV3Breezemoons(1, 8))),
     withinBudget(homeRead('repeater:joke', () => fetchRepeaterItems('joke'))),
   ])
@@ -58,7 +60,9 @@ async function prefetchHome(withinBudget: WithinBudget): Promise<SsrPayload> {
     homeReadExpires: { ...expires },
     homeCheckinRanking: val(1, null),
     homeOnlineRanking: val(2, null),
+    homeRankingExpires: { ...rankingExpires },
     recentMembers: val(3, null),
+    recentMembersExpires,
     homeBreezemoonPage: val(4, null),
     repeater: val(5, undefined),
   }

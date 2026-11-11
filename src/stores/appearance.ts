@@ -80,7 +80,7 @@ export const useAppearanceStore = defineStore('appearance', () => {
 
   function enforceVip() {
     const auth = useAuthStore()
-    if (auth.isVip) return
+    if (auth.isVip || auth.membershipPending || (auth.isLoggedIn && auth.membershipChecked === false)) return
     const bubble = findPack('bubble', state.value.bubble)
     const frame = findPack('frame', state.value.frame)
     if (bubble?.vip) state.value.bubble = DEFAULT_BUBBLE

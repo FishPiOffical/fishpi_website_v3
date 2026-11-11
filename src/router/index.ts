@@ -8,7 +8,6 @@ import {
 } from 'vue-router'
 import { useClientStartupStore } from '@/stores/clientStartup'
 import { useAuthStore } from '@/stores/auth'
-import { useAppearanceStore } from '@/stores/appearance'
 
 const routes = [
   ...['/feedback', '/feedback/new', '/feedback/:id'].map(path => ({ path, component: () => import('@/feedback/FeedbackView.vue'), meta: { robots: 'noindex' } })),
@@ -438,13 +437,14 @@ export function createAppRouter(history?: RouterHistory) {
     if (import.meta.env.SSR) return true
     // The first client tree must match credential-free SSR. AppShell gates private routes.
     if (from === START_LOCATION) return true
-    useClientStartupStore().navigationStarted()
+    const startup = useClientStartupStore()
+    startup.navigationStarted()
+    if (!to.meta.auth) return true
     const auth = useAuthStore()
     if (!auth.initialized || (auth.accessToken && !auth.account)) {
-      await auth.restore()
-      useAppearanceStore().enforceVip()
+      await startup.start(router, false)
     }
-    if (to.meta.auth && !auth.isLoggedIn) {
+    if (auth.initialized && !auth.isLoggedIn) {
       return { path: '/login', query: { redirect: to.fullPath } }
     }
     return true

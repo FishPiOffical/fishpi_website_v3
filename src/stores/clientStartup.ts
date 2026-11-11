@@ -16,13 +16,15 @@ export const useClientStartupStore = defineStore('client-startup', () => {
     navigation++
   }
 
-  function start(router: Router): Promise<void> {
-    if (import.meta.env.SSR || ready.value) return Promise.resolve()
+  function start(router: Router, redirect = true): Promise<void> {
+    if (import.meta.env.SSR) return Promise.resolve()
+    const auth = useAuthStore()
+    if (ready.value && auth.initialized && (!auth.accessToken || auth.account)) return Promise.resolve()
     if (flight) return flight
 
     const revision = navigation
     const route = router.currentRoute.value
-    const auth = useAuthStore()
+    ready.value = false
     pending.value = true
     error.value = ''
 
@@ -34,7 +36,7 @@ export const useClientStartupStore = defineStore('client-startup', () => {
         }
         useAppearanceStore().enforceVip()
         // A pending SPA navigation owns its guard; do not replace a newer navigation.
-        if (revision === navigation && router.currentRoute.value === route) {
+        if (redirect && revision === navigation && router.currentRoute.value === route) {
           if (route.meta.auth && !auth.isLoggedIn) {
             await router.replace({ path: '/login', query: { redirect: route.fullPath } })
           } else if (route.name === 'login' && auth.isLoggedIn) {

@@ -4,11 +4,11 @@ import { decodeInitialRanking, fetchRanking, rankingSubType, type RankingType, t
 import { useAuthStore } from '@/stores/auth'
 import { shouldInvalidatePublicSnapshot, PUBLIC_LIST_TTL, readPublicSnapshot, removePublicSnapshot, savePublicSnapshot } from '@/utils/publicSnapshots'
 
-export function useRankingBoard(type: RankingType, initial: unknown = null, compact = false) {
+export function useRankingBoard(type: RankingType, initial: unknown = null, compact = false, initialExpires = Infinity) {
   const auth = useAuthStore(), subType = ref(rankingSubType(type)), size = compact ? 8 : 20
   const value = ref<RankingPage | null>(null), p = ref(1), loading = ref(false), error = ref('')
   try { if (initial !== null) value.value = decodeInitialRanking(initial, type, subType.value, size) } catch { /* Requery malformed or differently bound SSR payloads. */ }
-  let mounted = false, sequence = 0, fromSnapshot = false
+  let mounted = false, sequence = 0, fromSnapshot = compact && value.value !== null
   function clear() { fromSnapshot = false; sequence++; value.value = null; loading.value = false; error.value = '' }
   const key = (sub: string, page: number) => compact ? `home:ranking:${type}:${sub}` : `ranking:${type}:${sub}:${page}`
   async function read(next = p.value, restore = false) {
@@ -17,7 +17,8 @@ export function useRankingBoard(type: RankingType, initial: unknown = null, comp
     else { sequence++; error.value = ''; loading.value = false }
     p.value = next
     const run = sequence, boundary = getAuthContextVersion(), token = auth.accessToken, owner = auth.account?.oId, sub = subType.value
-    const valid = () => mounted && run === sequence && boundary === getAuthContextVersion() && token === auth.accessToken && owner === auth.account?.oId && sub === subType.value
+    const valid = () => mounted && run === sequence && sub === subType.value
+      && (compact || boundary === getAuthContextVersion() && token === auth.accessToken && owner === auth.account?.oId)
     const cacheKey = key(sub, next), cacheable = !compact || next === 1
     if (cacheable && restore && !value.value) {
       const snapshot = await readPublicSnapshot(cacheKey, PUBLIC_LIST_TTL, raw => decodeInitialRanking(raw, type, sub, size, next))
@@ -38,13 +39,14 @@ export function useRankingBoard(type: RankingType, initial: unknown = null, comp
     }
     finally { if (valid()) loading.value = false }
   }
-  const stops = [watch(subType, () => { clear(); void read(1, true) }), watch([() => auth.accessToken, () => auth.account?.oId], (_, previous) => {
+  const stops = [watch(subType, () => { clear(); void read(1, true) })]
+  if (!compact) stops.push(watch([() => auth.accessToken, () => auth.account?.oId], (_, previous) => {
     const sameOwner = auth.account?.oId === previous[1] && !!auth.accessToken === !!previous[0]
-    if (!compact || !sameOwner && p.value !== 1) clear(); if (!sameOwner) p.value = 1; void read(p.value, true)
-  }, { flush: 'sync' })]
+    clear(); if (!sameOwner) p.value = 1; void read(p.value, true)
+  }, { flush: 'sync' }))
   onMounted(() => {
     mounted = true
-    if (!value.value || auth.accessToken) void read(1, true)
+    if (!value.value || (compact ? initialExpires <= Date.now() : auth.accessToken)) void read(1, true)
   })
   onScopeDispose(() => { mounted = false; stops.forEach(stop => stop()); clear() })
   return { value, p, subType, loading, error, read }
