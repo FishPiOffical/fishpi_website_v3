@@ -9,7 +9,7 @@ import FpDialog from '@/components/FpDialog.vue'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ChatRedPacketsStore} from '@/stores/v3ChatRedPackets'
 import {getAuthContextVersion} from '@/api/http'
-import {canClaimPacket,packetRisk,type ClaimInput} from '@/api/v3-chat-red-packets'
+import {canClaimPacket,packetRisk,type ClaimInput,type PacketUser} from '@/api/v3-chat-red-packets'
 const auth=useAuthStore(),store=useV3ChatRedPacketsStore(),gesture=ref<number|string>(''),confirming=ref(false),localError=ref('')
 const canClaim=computed(()=>{
   const d=store.detail
@@ -35,11 +35,14 @@ const recipientLabel=computed(()=>{
 const isDuel=computed(()=>detail.value?.type==='rockPaperScissors')
 const typeLabel=computed(()=>detail.value?({random:'拼手气红包',average:'普通红包',specify:'专属红包',heartbeat:'心跳红包',rockPaperScissors:'猜拳红包',dice:'骰子红包'})[detail.value.type]:'红包详情')
 const progress=computed(()=>detail.value?Math.min(100,detail.value.got/detail.value.count*100):0)
-const opponentHand=computed(()=>detail.value?.claims[0]?.gesture??(typeof gesture.value==='number'?gesture.value:undefined))
+const challenger=computed(()=>isDuel.value?detail.value?.claims[0]:undefined)
+const playerName=(user:PacketUser)=>user.userNickname||user.userName||`UID ${user.id}`
+const opponentHand=computed(()=>challenger.value?.gesture??(typeof gesture.value==='number'?gesture.value:undefined))
 const duelResult=computed(()=>{
- const d=detail.value,result=d?.currentUserClaim?.outcome||d?.claims[0]?.outcome
- if(!result)return''
- return d?.sender.id===auth.account?.oId?({win:'挑战方胜出',lose:'发起方胜出',tie:'双方平局'})[result]:({win:'你赢了',lose:'这次惜败',tie:'平局'})[result]
+  const result=challenger.value?.outcome
+  if(!result)return''
+  if(challenger.value?.user.id===auth.account?.oId) return ({win:'你赢了',lose:'这次惜败',tie:'平局'})[result]
+  return ({win:'挑战方胜出',lose:'发起方胜出',tie:'双方平局'})[result]
 })
 function selectHand(value:number){if(store.busy||store.pending||confirming.value)return;gesture.value=value;localError.value='';void claim()}
 const signed=(amount:number)=>amount>0?`+${amount}`:String(amount)
@@ -78,9 +81,21 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
 
       <section v-if="isDuel && !detail.legacy" class="duel-section" aria-label="猜拳对局">
         <div class="duel-arena">
-          <div class="duel-player"><span>发起方</span><img v-if="detail.senderGesture!==undefined" :src="hands[detail.senderGesture]?.image" :alt="hand(detail.senderGesture)" /><span v-else class="unknown-hand" aria-label="出拳尚未揭晓">?</span><small>{{ detail.senderGesture!==undefined?hand(detail.senderGesture):'待揭晓' }}</small></div>
+          <div class="duel-player">
+            <span>发起方</span>
+            <strong>{{ playerName(detail.sender) }}</strong>
+            <img v-if="detail.senderGesture!==undefined" :src="hands[detail.senderGesture]?.image" :alt="hand(detail.senderGesture)" />
+            <span v-else class="unknown-hand" aria-label="出拳尚未揭晓">?</span>
+            <small>{{ detail.senderGesture!==undefined?hand(detail.senderGesture):'待揭晓' }}</small>
+          </div>
           <div class="duel-center"><span>VS</span><small v-if="duelResult">{{ duelResult }}</small><small v-else>{{ detail.poolPoints }} 积分对局</small></div>
-          <div class="duel-player"><span>{{ detail.got?'挑战方':'你的出拳' }}</span><img v-if="opponentHand!==undefined" :src="hands[opponentHand]?.image" :alt="hand(opponentHand)" /><span v-else class="unknown-hand" aria-label="尚未选择出拳">?</span><small>{{ opponentHand!==undefined?hand(opponentHand):'等待出拳' }}</small></div>
+          <div class="duel-player">
+            <span>挑战方</span>
+            <strong>{{ challenger ? playerName(challenger.user) : '待挑战' }}</strong>
+            <img v-if="opponentHand!==undefined" :src="hands[opponentHand]?.image" :alt="hand(opponentHand)" />
+            <span v-else class="unknown-hand" aria-label="尚未选择出拳">?</span>
+            <small>{{ opponentHand!==undefined?hand(opponentHand):'等待出拳' }}</small>
+          </div>
         </div>
         <div v-if="canClaim" class="hand-picker" role="group" aria-label="选择出拳并领取">
           <button v-for="option in hands" :key="option.value" type="button" :aria-pressed="gesture===option.value" :disabled="store.busy||!!store.pending||confirming" @click="selectHand(option.value)"><img :src="option.image" alt="" /><span>{{ option.label }} · 领取</span><i v-if="gesture===option.value" aria-hidden="true">✓</i></button>
@@ -120,7 +135,7 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
 .claim-progress { height:3px; overflow:hidden; border-radius:3px; background:var(--fp-hover); i { display:block; height:100%; border-radius:inherit; background:#d1a36b; transition:width .2s ease; } }
 .duel-section { margin-top:16px; }
 .duel-arena { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:14px; align-items:center; padding:2px 12px 13px; }
-.duel-player { display:flex; min-width:0; flex-direction:column; align-items:center; gap:5px; >span:first-child { font-size:11px; color:var(--fp-muted); } img,.unknown-hand { width:42px; height:42px; object-fit:contain; } small { font-size:11px; color:var(--fp-text); } .unknown-hand { display:grid; place-items:center; font-size:27px; font-weight:500; color:var(--fp-muted); background:var(--fp-hover); border-radius:50%; } }
+.duel-player { display:flex; min-width:0; flex-direction:column; align-items:center; gap:5px; >strong { max-width:100%; font-size:13px; font-weight:600; text-align:center; } >span:first-child { font-size:11px; color:var(--fp-muted); } img,.unknown-hand { width:42px; height:42px; object-fit:contain; } small { font-size:11px; color:var(--fp-text); } .unknown-hand { display:grid; place-items:center; font-size:27px; font-weight:500; color:var(--fp-muted); background:var(--fp-hover); border-radius:50%; } }
 .duel-center { display:flex; flex-direction:column; gap:6px; text-align:center; >span { color:#c29867; font-size:19px; font-weight:600; font-style:italic; } small { font-size:11px; color:var(--fp-muted); } }
 .hand-picker { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; button { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px 8px; border:1px solid var(--fp-border); border-radius:10px; background:var(--fp-card); color:var(--fp-text); font-size:12px; cursor:pointer; transition:border-color .15s,background-color .15s; } img { width:38px; height:38px; object-fit:contain; } button:hover:not(:disabled) { background:var(--fp-hover); border-color:#d5ac77; } button[aria-pressed='true'] { border-color:#cb975c; background:color-mix(in srgb,#cfa468 10%,var(--fp-card)); box-shadow:inset 0 0 0 1px #cb975c; } i { position:absolute; top:5px; right:7px; font-size:11px; font-style:normal; color:#b78046; } }
 .risk-note { margin:12px 0 0; padding:9px 11px; border-radius:7px; border-left:2px solid #d7ad71; background:color-mix(in srgb,#d5a767 8%,var(--fp-card)); color:var(--fp-text); font-size:11px; line-height:1.65; }
