@@ -15,7 +15,7 @@
 .fp-settings .set-main textarea{resize:vertical;line-height:1.7}.fp-settings .set-main input[type=checkbox],.fp-settings .set-main input[type=radio]{width:16px;height:16px;flex:none;accent-color:var(--fp-primary)}
 .fp-settings .set-main input[type=file]{padding:12px;border:1px dashed var(--fp-border);border-radius:8px;background:var(--fp-surface-subtle)}
 .fp-settings .set-main :is(input,textarea,select):focus-visible{outline:2px solid var(--fp-primary);outline-offset:2px}
-.fp-settings .set-main button{box-sizing:border-box;max-width:100%;width:fit-content;font:inherit;font-size:12px;line-height:1.5;padding:8px 13px;border:1px solid var(--fp-border);border-radius:8px;background:var(--fp-card);color:var(--fp-text);cursor:pointer;margin:6px 6px 6px 0;vertical-align:middle;white-space:normal}
+.fp-settings .set-main button:not(.appearance-option){box-sizing:border-box;max-width:100%;width:fit-content;font:inherit;font-size:12px;line-height:1.5;padding:8px 13px;border:1px solid var(--fp-border);border-radius:8px;background:var(--fp-card);color:var(--fp-text);cursor:pointer;margin:6px 6px 6px 0;vertical-align:middle;white-space:normal}
 .fp-settings .set-main button:hover:not(:disabled){background:var(--fp-hover)}
 .fp-settings .set-main button:disabled{opacity:.5;cursor:default}
 .fp-settings .set-main button[data-tone=primary],.fp-settings .set-main button[type=submit]{background:var(--fp-primary);border-color:var(--fp-primary);color:#fff;font-weight:500;padding:9px 17px}

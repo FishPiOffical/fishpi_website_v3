@@ -4,7 +4,7 @@ import { computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ChatAppearanceStore } from '@/stores/v3ChatAppearance'
 import { storeToRefs } from 'pinia'
-import { packsOf, type PackKind } from '@/packs'
+import { DEFAULT_BUBBLE, DEFAULT_FRAME, packsOf, type PackKind } from '@/packs'
 import { useAppearanceStore } from '@/stores/appearance'
 
 defineProps<{ compact?: boolean }>()
@@ -17,11 +17,17 @@ const blocked = computed(() => !auth.accessToken || !chatAppearance.current || c
 function choose(kind:PackKind,id:string){ if(kind==='theme')appearance.apply(kind,id);else if(!blocked.value)void chatAppearance.choose(kind,id) }
 const { state, notice } = storeToRefs(appearance)
 
-const groups: { kind: PackKind; title: string }[] = [
+const groupDefinitions: { kind: PackKind; title: string; defaultId?: string }[] = [
   { kind: 'theme', title: '主题' },
-  { kind: 'bubble', title: '对话框' },
-  { kind: 'frame', title: '头像框' },
+  { kind: 'bubble', title: '对话框', defaultId: DEFAULT_BUBBLE },
+  { kind: 'frame', title: '头像框', defaultId: DEFAULT_FRAME },
 ]
+const groups = groupDefinitions.map(group => ({
+  ...group,
+  packs: packsOf(group.kind).sort((a, b) =>
+    Number(b.id === group.defaultId) - Number(a.id === group.defaultId) || Number(a.vip) - Number(b.vip),
+  ),
+}))
 
 function selected(kind: PackKind) {
   if (kind === 'theme') return state.value.theme
@@ -37,9 +43,10 @@ function selected(kind: PackKind) {
       <h4>{{ group.title }}</h4>
       <div class="grid">
         <button
-          v-for="pack in packsOf(group.kind)"
+          v-for="pack in group.packs"
           :key="pack.id"
           type="button"
+          class="appearance-option"
           :class="{ on: selected(group.kind) === pack.id }"
           :aria-pressed="selected(group.kind) === pack.id"
           :title="pack.name"
@@ -70,6 +77,9 @@ function selected(kind: PackKind) {
   flex-direction: column;
   gap: 12px;
 }
+.picker:not(.compact) {
+  container-type: inline-size;
+}
 h4 {
   margin: 0 0 6px;
   font-size: 12px;
@@ -78,11 +88,18 @@ h4 {
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 376px;
   gap: 8px;
 }
 .compact .grid {
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: none;
+}
+@container (width < 360px) {
+  .picker:not(.compact) .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 button {
   position: relative;
@@ -97,6 +114,35 @@ button {
 button.on {
   border-color: var(--fp-primary);
   box-shadow: 0 0 0 1px var(--fp-primary);
+}
+.picker:not(.compact) .appearance-option {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: 36px 18px;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px;
+  background: var(--fp-card);
+  font: inherit;
+  text-align: center;
+}
+.picker:not(.compact) .appearance-option:hover {
+  background: var(--fp-hover);
+}
+.picker:not(.compact) .appearance-option.on {
+  background: var(--fp-primary-soft);
+  color: var(--fp-primary);
+}
+.picker:not(.compact) .appearance-option i {
+  margin: 0;
+}
+.picker:not(.compact) .appearance-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 18px;
 }
 i {
   display: block;
