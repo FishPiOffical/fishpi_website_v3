@@ -68,6 +68,18 @@ const toc = ref<{ id: string; text: string; level: number }[]>([])
 const viewerIdentity=computed(()=>`${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}`)
 let stopArticle:(()=>void)|null=null,subscriptionKey='',heatRequest:AbortController|null=null,heatSequence=0
 let readVersion = 0, disposed = false
+const articleReads = new Map<string, Promise<ArticleDetail>>()
+
+function readArticle(target: string, page: number, viewer: string, fresh: boolean) {
+  const key = JSON.stringify([target, page, viewer])
+  const pending = articleReads.get(key)
+  if (pending && !fresh) return pending
+  const operation = fetchArticle(target, page, !!accessToken.value).finally(() => {
+    if (articleReads.get(key) === operation) articleReads.delete(key)
+  })
+  articleReads.set(key, operation)
+  return operation
+}
 
 const id = computed(() => String(route.params.id || ''))
 const tocReady = ref(false)
@@ -307,14 +319,14 @@ async function load(force=false,reason:'comments'|'owner'|'realtime'|'public'='c
     return
   }
   // A failed SSR preload must remain a shell; current-reader HTTP starts after hydration.
-  if (import.meta.env.SSR) { article.value = null; loading.value = true; return }
+  if (import.meta.env.SSR || !routeMounted.value) return
   const paging = article.value?.oId === reqId, refreshing = force && paging
   articleReading.value = true
   if (!paging) { article.value = null; loading.value = true }
   error.value = ''
   if(force){if(reason==='owner')ownerRefreshError.value='';else if(reason==='realtime'||reason==='public')realtimeReadError.value='';else commentRefreshError.value=''}
   try {
-    const data = await fetchArticle(reqId, requestedPage, !!accessToken.value)
+    const data = await readArticle(reqId, requestedPage, viewer, force)
     if (!current()) return
     article.value = data; heat.value = null; loading.value = false
     void buildToc()
@@ -357,7 +369,18 @@ watch(
   { immediate: true },
 )
 
-watch(accessToken,(token,old)=>{if(!import.meta.env.SSR){stopArticle?.();clearArticleRefresh();stopArticle=null;subscriptionKey='';if(token&&old)void load(true,'realtime');else{connectHeat();void refreshHeat()}}},{flush:'post'})
+watch(accessToken, (token, previousToken) => {
+  if (import.meta.env.SSR) return
+  stopArticle?.()
+  clearArticleRefresh()
+  stopArticle = null
+  subscriptionKey = ''
+  if (token && previousToken && article.value?.oId === id.value) {
+    void load(true, 'realtime')
+  } else {
+    connectHeat()
+  }
+}, { flush: 'post' })
 
 watch(viewerIdentity, () => {
   ownerRefreshError.value='';ownerDeletedId.value='';realtimeReadError.value=''
@@ -369,8 +392,14 @@ watch(viewerIdentity, () => {
 }, { flush: 'sync' })
 
 watch(
-  () => [id.value, viewerIdentity.value, commentPage.value],
-  () => {
+  [id, viewerIdentity, commentPage, routeMounted],
+  async ([target, viewer, page, mounted], previous) => {
+    if (!mounted) { void load(); return }
+    if (!previous?.[3] && article.value?.oId === id.value && !accessToken.value) return
+    if (!auth.initialized && !account.value) {
+      await auth.restore()
+      if (disposed || target !== id.value || page !== commentPage.value || viewer !== viewerIdentity.value) return
+    }
     void load()
   },
   { immediate: true },

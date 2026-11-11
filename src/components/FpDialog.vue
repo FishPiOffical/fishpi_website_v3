@@ -32,8 +32,18 @@ function close() {
   emit('close')
 }
 
+let pointerStartedOnMask = false
+function onPointerDown(event: PointerEvent) {
+  pointerStartedOnMask = event.target === event.currentTarget && event.isPrimary && event.button === 0
+}
+function onPointerUp(event: PointerEvent) {
+  if (event.target !== event.currentTarget) pointerStartedOnMask = false
+}
+
 function onMask() {
-  if (!props.persistent) close()
+  const shouldClose = pointerStartedOnMask
+  pointerStartedOnMask = false
+  if (shouldClose && !props.persistent) close()
 }
 
 function onKey(e: KeyboardEvent) {
@@ -43,6 +53,7 @@ function onKey(e: KeyboardEvent) {
 watch(
   () => props.open,
   (v) => {
+    pointerStartedOnMask = false
     if (typeof window === 'undefined') return
     if (v) window.addEventListener('keydown', onKey)
     else window.removeEventListener('keydown', onKey)
@@ -58,7 +69,7 @@ onBeforeUnmount(() => {
 <template>
   <Teleport v-if="mounted" to="body">
     <Transition name="fp-dialog">
-      <div v-if="open" class="fp-dialog-mask" :class="`layer-${layer}`" @click.self="onMask">
+      <div v-if="open" class="fp-dialog-mask" :class="`layer-${layer}`" @pointerdown="onPointerDown" @pointerup="onPointerUp" @pointercancel="pointerStartedOnMask = false" @click.self="onMask">
         <div
           class="fp-dialog"
           :class="`tone-${tone}`"

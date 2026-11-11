@@ -110,6 +110,7 @@ onUnmounted(() => {
 })
 
 const hasNewMessages = ref(false)
+const sentMessageId = ref('')
 let followingLatest = true
 const firstVisibleId = computed(() => visibleMessages.value[0]?.oId)
 const latestVisibleId = computed(() => visibleMessages.value.at(-1)?.oId)
@@ -134,13 +135,21 @@ watch(scroller, (el, _, onCleanup) => {
   scrollBottom()
   if (!el || typeof ResizeObserver === 'undefined') return
   // Images and editor expansion can change the scroll range after the message DOM is patched.
+  let frame = 0
   const observer = new ResizeObserver(() => {
-    if (el === scroller.value && followingLatest) scrollBottom()
+    if (frame || !followingLatest) return
+    frame = requestAnimationFrame(() => {
+      frame = 0
+      if (el === scroller.value && followingLatest) scrollBottom()
+    })
   })
   observer.observe(el)
   const content = el.querySelector('.messages-container')
   if (content) observer.observe(content)
-  onCleanup(() => observer.disconnect())
+  onCleanup(() => {
+    observer.disconnect()
+    cancelAnimationFrame(frame)
+  })
 }, { flush: 'post' })
 
 function scrollBottom() {
@@ -148,6 +157,17 @@ function scrollBottom() {
   if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
   hasNewMessages.value = false
 }
+
+watch(
+  () => visibleMessages.value.find(message => message.oId === sentMessageId.value)?.oId,
+  (id) => {
+    if (!id) return
+    sentMessageId.value = ''
+    if (chatStyle.value === 'modern') scrollBottom()
+    else document.getElementById(`chatroom${id}`)?.scrollIntoView({ block: 'nearest' })
+  },
+  { flush: 'post' },
+)
 
 function revealComposer() {
   composerRef.value?.reveal()
@@ -160,7 +180,12 @@ async function submit() {
   if(await chat.send(content)&&reader===JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']))acceptConfirmed(content.trim())
 }
 
-function acceptConfirmed(content:string){if(`${draft.value}${buildQuoteSuffix()}`.trim()===content){draft.value='';clearQuote()}}
+function acceptConfirmed(content: string) {
+  if (`${draft.value}${buildQuoteSuffix()}`.trim() !== content) return
+  draft.value = ''
+  clearQuote()
+  sentMessageId.value = publication.receipt?.id ?? ''
+}
 
 async function quoteMessage(msg:{oId:string}){
  await readQuote(msg.oId)
@@ -284,7 +309,7 @@ function clearScreen() {
               v-model="draft"
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"
               placeholder="说点什么吧！"
-              :sending="sending"
+              :sending="sending" enter-to-send
               :disabled="!!publication.pending"
               :allow-empty="Boolean(quote)"
               @submit="submit"
@@ -510,7 +535,7 @@ function clearScreen() {
               v-model="draft"
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"
               placeholder="说点什么吧！"
-              :sending="sending"
+              :sending="sending" enter-to-send
               :disabled="!!publication.pending"
               :allow-empty="Boolean(quote)"
               @submit="submit"
@@ -719,7 +744,7 @@ function clearScreen() {
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
 }
 
 /* =========================================================
@@ -802,6 +827,7 @@ function clearScreen() {
   padding-right: 2px;
   scrollbar-width: thin;
   scrollbar-color: var(--fp-border) transparent;
+  overflow-anchor: none;
 }
 
 .modern-sidebar::-webkit-scrollbar {
@@ -938,7 +964,7 @@ function clearScreen() {
 .messages-container {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
 }
 
 .guest-tip-bottom {

@@ -443,7 +443,7 @@ onUnmounted(() => {
                 </div>
                 <Transition name="composer-swap" mode="out-in">
                   <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit"><input v-model="draft" type="text" aria-label="聊天室消息" placeholder="说点什么吧…" :disabled="!!publication.pending" /><button type="submit" :disabled="!canSend">{{ roomSending?'发送中':'发送' }}</button></form>
-                  <ChatComposer v-else v-model="draft" class="composer" :height="100" compact cache-id="chatroom-drawer" :sending="roomSending" :disabled="!!publication.pending" placeholder="说点什么吧，友善第一哦。" @submit="submit" />
+                  <ChatComposer v-else v-model="draft" class="composer" :height="100" compact enter-to-send cache-id="chatroom-drawer" :sending="roomSending" :disabled="!!publication.pending" placeholder="说点什么吧，友善第一哦。" @submit="submit" />
                 </Transition>
               </section>
             </template>

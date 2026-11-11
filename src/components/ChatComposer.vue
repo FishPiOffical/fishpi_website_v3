@@ -17,6 +17,7 @@ const props = withDefaults(
     collapsible?: boolean
     compact?: boolean
     adaptiveHeight?: boolean
+    enterToSend?: boolean
   }>(),
   {
     cacheId: '',
@@ -68,6 +69,18 @@ function submit() {
   if (value !== null && (props.allowEmpty || value.trim())) emit('submit')
 }
 
+function onEditorKeydown(event: KeyboardEvent) {
+  if (!props.enterToSend || event.key !== 'Enter' || event.isComposing || event.keyCode === 229
+    || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return
+  const target = event.target
+  if (!(target instanceof HTMLElement) || !target.matches('.vditor [contenteditable], .md-fallback')) return
+  const hint = root.value?.querySelector<HTMLElement>('.vditor-content > .vditor-hint')
+  if (hint?.offsetWidth && hint.childElementCount) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (!event.repeat) submit()
+}
+
 function reveal() {
   editorExpanded.value = true
   void nextTick(() => {
@@ -85,7 +98,7 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="root" class="composer" :class="{'editor-collapsed':!editorOpen, 'editor-collapsible':collapsible}" @focusin="onEditorFocus">
+  <div ref="root" class="composer" :class="{'editor-collapsed':!editorOpen, 'editor-collapsible':collapsible}" @focusin="onEditorFocus" @keydown.capture="onEditorKeydown">
     <button v-if="collapsible && !modelValue" class="editor-toggle" type="button" :aria-expanded="editorOpen" @click="toggleEditor">{{ editorOpen ? '收起编辑器' : '展开编辑器' }}</button>
     <slot name="top" />
     <MarkdownEditor
