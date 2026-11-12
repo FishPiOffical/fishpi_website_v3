@@ -103,6 +103,9 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
 .medal-description p { margin: 4px 0; }
 small { color: var(--fp-muted); }
 .profile-badges .profession-badge { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 10px; text-align: left; color: var(--fp-text); background: var(--fp-surface-subtle); border: 1px solid var(--fp-border); border-radius: 8px; }
+.profile-badges a.profession-badge { text-decoration: none; transition: background 160ms ease, border-color 160ms ease; }
+.profile-badges a.profession-badge:hover { text-decoration: none; background: var(--fp-hover); border-color: var(--fp-primary); }
+.profile-badges a.profession-badge:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
 .profession-arrow { color: var(--fp-muted); }
 .profession-badge strong, .profession-badge small { display: block; }
 .profession-badge img { width: 32px; height: 32px; object-fit: contain; }

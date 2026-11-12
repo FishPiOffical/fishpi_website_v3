@@ -88,7 +88,7 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
   position: relative; flex: none; padding: 10px 0 13px; font-size: 14px; line-height: 20px;
   color: var(--fp-muted); text-decoration: none; white-space: nowrap;
 }
-.watch-tabs a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.watch-tabs a:hover { text-decoration: none; background: var(--fp-hover); }
 .watch-tabs a.current { color: var(--fp-text); font-weight: 600; }
 .watch-tabs a.current::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--fp-accent); }
 .watch-tabs a:focus-visible,

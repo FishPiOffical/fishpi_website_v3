@@ -70,7 +70,8 @@ const { account, isLoggedIn } = storeToRefs(useAuthStore())
 .stat-col { display: flex; min-width: 0; flex-direction: column; gap: 2px; text-decoration: none; }
 .stat-col strong { overflow: hidden; color: var(--fp-title); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .stat-col span { color: var(--fp-muted); font-size: 10px; }
-.stat-col:hover { text-decoration: underline; text-underline-offset: 3px; }
+.stat-col { padding: 4px 2px; border-radius: 6px; transition: background 160ms ease; }
+.stat-col:hover { text-decoration: none; background: var(--fp-hover); }
 .stat-col.action .post-strong { color: var(--fp-accent); }
 .guest-card { padding: 5px 0; text-align: center; }
 .guest-title { margin: 0 0 6px; color: var(--fp-title); font-size: 15px; font-weight: 600; }
@@ -78,5 +79,5 @@ const { account, isLoggedIn } = storeToRefs(useAuthStore())
 .guest-actions { display: flex; gap: 8px; }
 .guest-button { flex: 1; padding: 6px 8px; border: 1px solid var(--fp-border); border-radius: 5px; color: var(--fp-text); font-size: 11px; text-align: center; text-decoration: none; }
 .guest-button.primary { border-color: var(--fp-primary); background: var(--fp-primary); color: #fff; }
-.guest-button:hover { filter: brightness(.96); }
+.guest-button:hover { text-decoration: none; filter: brightness(.96); }
 </style>

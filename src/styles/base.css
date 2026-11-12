@@ -133,12 +133,16 @@ textarea {
   font: inherit;
 }
 
+/* 普通链接默认不划线；悬浮时提示可点击，卡片入口使用自身反馈。 */
 a {
   color: var(--fp-link);
+  text-decoration: none;
   transition: color 0.15s ease;
 }
 a:hover {
   text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
 }
 
 /* ==========================================================================

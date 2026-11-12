@@ -41,8 +41,8 @@ defineProps<{ quote: ChatQuote }>()
   text-align: start;
   text-decoration: none;
 }
-.chat-quote-card:hover { text-decoration: none; }
-.chat-quote-card:hover .chat-quote-excerpt { text-decoration: underline; text-underline-offset: 2px; }
+.chat-quote-card:hover { text-decoration: none; border-color: var(--fp-primary); background: var(--fp-hover); }
+.chat-quote-card:hover .chat-quote-excerpt { text-decoration: none; }
 .chat-quote-card:focus-visible { outline: 2px solid var(--fp-link); outline-offset: 2px; }
 .chat-quote-source {
   display: flex;
