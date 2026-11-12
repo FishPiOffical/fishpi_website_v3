@@ -1,10 +1,10 @@
-# yui.fishpi.cn 部署
+# new.fishpi.cn 部署（原 yui.fishpi.cn）
 
 使用服务器既有 Caddy 自动申请 HTTPS，独立 Node 24.12+ 运行时 `/opt/fishpi/runtime`，不替换服务器其他项目的 Node。将 Caddyfile 中的新域名块追加到服务器既有配置，验证通过后 reload，不能覆盖其他站点。
 
 网站和反馈服务使用各自 systemd 系统用户，仅监听 127.0.0.1:5173/5174。发布产物位于 `/opt/fishpi/releases/<版本>`，`/opt/fishpi/current` 指向当前发布；反馈数据库独立保存在 `/var/lib/fishpi-feedback`，不随发布替换。源码和构建包不得包含 `.host`、环境文件、node_modules、本地 SQLite 或测试账号数据。
 
-构建环境：`VITE_BROWSER_API_ORIGIN=https://fishpi.cn VITE_API_TARGET=https://fishpi.cn VITE_SITE_ORIGIN=https://yui.fishpi.cn VITE_FEEDBACK_ENABLED=true npm run build`。上传客户端/SSR构建、public、server.js、server/、package*.json、feedback-service/src及其package*.json；服务器两个目录分别 `npm ci`（网站运行时依赖vite的loadEnv，所以不能省devDependencies），使用独立运行时的PATH。
+构建环境：`VITE_BROWSER_API_ORIGIN=https://fishpi.cn VITE_API_TARGET=https://fishpi.cn VITE_SITE_ORIGIN=https://new.fishpi.cn VITE_FEEDBACK_ENABLED=true npm run build`。上传客户端/SSR构建、public、server.js、server/、package*.json、feedback-service/src及其package*.json；服务器两个目录分别 `npm ci`（网站运行时依赖vite的loadEnv，所以不能省devDependencies），使用独立运行时的PATH。
 
 安装两个 `.service` 至 `/etc/systemd/system/`，创建对应系统用户并授予反馈用户数据库目录独占写权限。`/etc/fishpi-feedback.env` 由 root 管理、权限600。反馈审核权限来自 Rhythm 的 `/api/v3/me`，先上线 Rhythm 的 `isAdmin` 字段。启动 `systemctl enable --now fishpi-feedback fishpi-website`。
 
@@ -28,7 +28,7 @@
 
 ## 浏览器直连 Rhythm
 
-生产构建设置 `VITE_BROWSER_API_ORIGIN=https://fishpi.cn`，浏览器HTTP和实时WebSocket直连fishpi.cn，不经过yui服务器v3代理；未设置时保留本地同源开发。SSR的读取仍使用VITE_API_TARGET，反馈浏览器API仍同源/feedback-api/v1，访客身份由反馈服务器本地执行。上传图床维持专用票据链路。需要fishpi.cn精确允许https://yui.fishpi.cn的CORS/OPTIONS、credentials及实际Authorization/Content-Type/Idempotency-Key等请求头，并允许WebSocket Origin；不使用no-cors、不伪造Origin、不将令牌放入URL。生产站点不再提供v3转发，旧缓存客户端访问本站/api/v3返回410提示刷新。
+生产构建设置 `VITE_BROWSER_API_ORIGIN=https://fishpi.cn`，浏览器HTTP和实时WebSocket直连fishpi.cn，不经过yui服务器v3代理；未设置时保留本地同源开发。SSR的读取仍使用VITE_API_TARGET，反馈浏览器API仍同源/feedback-api/v1，访客身份由反馈服务器本地执行。上传图床维持专用票据链路。需要fishpi.cn精确允许https://new.fishpi.cn的CORS/OPTIONS、credentials及实际Authorization/Content-Type/Idempotency-Key等请求头，并允许WebSocket Origin；不使用no-cors、不伪造Origin、不将令牌放入URL。生产站点不再提供v3转发，旧缓存客户端访问本站/api/v3返回410提示刷新。
 
 2026-11-06 直连版本 `03c8ddb` 已发布到 `/opt/fishpi/releases/20261106-03c8ddb`；前版fd9bb2c保留，反馈数据库在线备份pre-03c8ddb-20261106-152021.sqlite。Caddy原配置备份为/etc/caddy/Caddyfile.before-direct-03c8ddb，本站v3入口已验证410，反馈health 200。HTTP/刷新/重连/实时直连专项及既有离线身份、正文断流、通知、文章实时专项通过，完整构建通过。上线直连HTTP模块与本地字节一致。浏览器登录页/重连仍失败；现网captcha-options虽200 JSON但无Access-Control-Allow-Origin，登录OPTIONS 404，跨域尚未放行，登录及真实写未验收。反馈/me服务器核验仍受服务器到fishpi.cn网络可达性限制，未改变信任模型。
 
@@ -67,3 +67,14 @@
 只重启 fishpi-website；反馈服务从前版原样保留，进程PID未变，health正常，数据库与环境未修改；未部署Rhythm或执行其迁移。前版 `/opt/fishpi/releases/20261107-a85489f` 和旧assets保留可回滚。包内不包含.host或本地环境文件。
 
 公网首页、/games、/column、/chat、反馈health均200；入口/共享模块及GamesView、ArticleListView、HomeView和两项原游戏图标共7项资源与本地字节一致。原始首页HTML确认经典默认，浏览器加载后显示60条文章链接、无读取告警或控制台错误；游戏10个原图标全部加载且保持新标签页。未执行生产登录、私信已读/发送、领取、投票或需求写入。
+
+
+## 2026-11-12 发布 main 并迁移域名
+
+main 应用提交 `0a16bc3` 已按新域名生产变量构建并发布至 `/opt/fishpi/releases/20261112-0a16bc3-new`。前版 `/opt/fishpi/releases/20261112-693ff3e` 及旧 assets 保留。只重启网站，反馈目录从前版原样复制，反馈进程 PID 1209600 未变，数据库与环境文件未修改；未部署 pet 分支或 Rhythm。
+
+Caddy 主站改为 `new.fishpi.cn`，旧 `yui.fishpi.cn` 以 301 保留路径/查询跳转新域名。其他站点配置保持；Caddy validate 通过，Let's Encrypt 证书已签发。网站 systemd 的 VITE_SITE_ORIGIN 同步更新。备份分别为 `/etc/caddy/Caddyfile.before-new-20261112-0a16bc3` 和 `/etc/systemd/system/fishpi-website.service.before-new-20261112-0a16bc3`。
+
+公网首页、登录、聊天室和反馈 health 为 200；首页 canonical 为 https://new.fishpi.cn/，入口 JS、两项共享模块及 v3-realtime 模块与本地产物字节一致。桌面 Chrome 与 iPhone 13 尺寸模拟均显示 72 个文章链接，无 pageerror；浏览器带 credentials 的跨域 captcha-options 返回 200/code 0，刷新预检允许新 Origin。网站、反馈与 Caddy 均 active。未登录真实账号，未验证新域名上的认证 WebSocket/付费/写入操作，也未进行手机真机验收。
+
+完整生产构建通过。服务器 npm ci 的 jsdom/w3c-xmlserializer 测试依赖提示 Node 24.12 低于其 24.15 要求；网站运行检查正常，本次没有扩大范围升级共享服务器运行时。

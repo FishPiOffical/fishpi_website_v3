@@ -11,7 +11,7 @@ WorkingDirectory=/opt/fishpi/current
 Environment=NODE_ENV=production
 Environment=PORT=5173
 Environment=VITE_API_TARGET=https://fishpi.cn
-Environment=VITE_SITE_ORIGIN=https://yui.fishpi.cn
+Environment=VITE_SITE_ORIGIN=https://new.fishpi.cn
 Environment=VITE_FEEDBACK_ENABLED=true
 Environment=FEEDBACK_TARGET=http://127.0.0.1:5174
 ExecStart=/opt/fishpi/runtime/bin/node server.js
