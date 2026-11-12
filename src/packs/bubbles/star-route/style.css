@@ -1,0 +1,21 @@
+/* 积分外观 v1：历史样式保持稳定，资格由服务端写入快照时校验。 */
+.fp-msg[data-appearance-snapshot="v1"][data-bubble="star-route"].is-room:not(.is-standalone) .fp-bubble {
+  position: relative;
+  border: 1px solid color-mix(in srgb, #a4add8 75%, var(--fp-border));
+  background: linear-gradient(135deg, color-mix(in srgb, #a4add8 22%, var(--fp-card)), var(--fp-card));
+  color: var(--fp-text);
+  padding: 10px 16px;
+  border-radius: 5px 16px 16px 16px;
+  box-shadow: inset 0 -2px color-mix(in srgb, #a4add8 24%, transparent);
+}
+.fp-msg[data-appearance-snapshot="v1"][data-bubble="star-route"].is-room.is-self:not(.is-standalone) .fp-bubble { border-radius: 16px 5px 16px 16px; }
+.fp-msg[data-appearance-snapshot="v1"][data-bubble="star-route"].is-room:not(.is-standalone) .fp-bubble::after {
+  content: "✧";
+  position: absolute;
+  right: -5px;
+  bottom: -9px;
+  font-size: 22px;
+  color: #a4add8;
+  pointer-events: none;
+}
+.fp-msg[data-appearance-snapshot="v1"][data-bubble="star-route"].is-room.is-self:not(.is-standalone) .fp-bubble::after { right: auto; left: -5px; }

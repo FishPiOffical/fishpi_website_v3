@@ -1,0 +1,8 @@
+{
+  "id": "sunset-letter",
+  "kind": "bubble",
+  "name": "落日邮笺",
+  "vip": false,
+  "points": true,
+  "preview": "linear-gradient(135deg,#e9b684,#f5fafb)"
+}

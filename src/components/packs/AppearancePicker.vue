@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAppearanceShopStore } from '@/stores/appearanceShop'
 import ChatAppearanceRecovery from '@/components/chat/ChatAppearanceRecovery.vue'
 import { computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
@@ -9,6 +10,7 @@ import { useAppearanceStore } from '@/stores/appearance'
 
 defineProps<{ compact?: boolean }>()
 
+const shop = useAppearanceShopStore()
 const appearance = useAppearanceStore()
 const chatAppearance = useV3ChatAppearanceStore()
 const auth = useAuthStore()
@@ -24,7 +26,7 @@ const groupDefinitions: { kind: PackKind; title: string; defaultId?: string }[] 
 ]
 const groups = groupDefinitions.map(group => ({
   ...group,
-  packs: packsOf(group.kind).sort((a, b) =>
+  packs: packsOf(group.kind).filter(pack => !pack.points).sort((a, b) =>
     Number(b.id === group.defaultId) - Number(a.id === group.defaultId) || Number(a.vip) - Number(b.vip),
   ),
 }))
@@ -39,6 +41,7 @@ function selected(kind: PackKind) {
 <template>
   <div class="picker" :class="{ compact }">
     <ChatAppearanceRecovery />
+    <button type="button" class="shop-entry" @click="shop.show">外观商城 <span>座驾 · 气泡 · 头像框 ↗</span></button>
     <section v-for="group in groups" :key="group.kind">
       <h4>{{ group.title }}</h4>
       <div class="grid">
@@ -72,6 +75,8 @@ function selected(kind: PackKind) {
 </template>
 
 <style scoped>
+.shop-entry { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:10px 12px; border:1px solid var(--fp-border); border-radius:10px; background:var(--fp-card); color:var(--fp-text); cursor:pointer; }
+.shop-entry span { color:var(--fp-muted); font-size:11px; }
 .picker {
   display: flex;
   flex-direction: column;

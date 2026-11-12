@@ -5,6 +5,7 @@ export interface PackMeta {
   kind: PackKind
   name: string
   vip: boolean
+  points?: boolean
   preview: string
 }
 

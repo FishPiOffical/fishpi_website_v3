@@ -1,0 +1,8 @@
+{
+  "id": "sea-soda",
+  "kind": "bubble",
+  "name": "海盐汽水",
+  "vip": false,
+  "points": true,
+  "preview": "linear-gradient(135deg,#8fcfdf,#f5fafb)"
+}

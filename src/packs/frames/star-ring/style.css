@@ -1,0 +1,19 @@
+/* 积分外观 v1：历史样式保持稳定，资格由服务端写入快照时校验。 */
+.fp-msg[data-appearance-snapshot="v1"][data-frame="star-ring"].is-room .fp-avatar-frame {
+  position: relative;
+  border: 1px solid color-mix(in srgb, #b8a9db 75%, var(--fp-border));
+  background: linear-gradient(135deg, color-mix(in srgb, #b8a9db 22%, var(--fp-card)), var(--fp-card));
+  color: var(--fp-text);
+  padding: 3px;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #b8a9db 30%, transparent);
+}
+.fp-msg[data-appearance-snapshot="v1"][data-frame="star-ring"].is-room .fp-avatar-frame::after {
+  content: "✦";
+  position: absolute;
+  right: -5px;
+  bottom: -9px;
+  font-size: 22px;
+  color: #b8a9db;
+  pointer-events: none;
+}

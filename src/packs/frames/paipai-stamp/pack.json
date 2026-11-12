@@ -1,0 +1,8 @@
+{
+  "id": "paipai-stamp",
+  "kind": "frame",
+  "name": "派派邮票",
+  "vip": false,
+  "points": true,
+  "preview": "linear-gradient(135deg,#d9b47d,#f5fafb)"
+}

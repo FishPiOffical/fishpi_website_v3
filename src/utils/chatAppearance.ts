@@ -1,6 +1,6 @@
 export interface ChatAppearance { bubbleId: string; frameId: string; version: number }
-export const CHAT_BUBBLES = ['classic', 'candy', 'paipai-orange', 'fishpond-blue'] as const
-export const CHAT_FRAMES = ['none', 'gold', 'paipai-orange', 'fishpond-blue'] as const
+export const CHAT_BUBBLES = ['classic', 'candy', 'paipai-orange', 'fishpond-blue', 'sea-soda', 'sunset-letter', 'star-route'] as const
+export const CHAT_FRAMES = ['none', 'gold', 'paipai-orange', 'fishpond-blue', 'tide', 'paipai-stamp', 'star-ring'] as const
 export function defaultChatAppearance(): ChatAppearance { return { bubbleId: 'classic', frameId: 'none', version: 1 } }
 export function isChatAppearance(value: unknown): value is ChatAppearance {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false

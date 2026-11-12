@@ -1,0 +1,8 @@
+{
+  "id": "star-route",
+  "kind": "bubble",
+  "name": "星夜航线",
+  "vip": false,
+  "points": true,
+  "preview": "linear-gradient(135deg,#a4add8,#f5fafb)"
+}

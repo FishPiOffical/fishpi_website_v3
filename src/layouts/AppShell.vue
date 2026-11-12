@@ -21,6 +21,8 @@ import SystemAlertDialog from '@/components/SystemAlertDialog.vue'
 import WarnBroadcastDialog from '@/components/WarnBroadcastDialog.vue'
 import CountToast from '@/components/count/CountToast.vue'
 import ChatRedPacketDialog from '@/components/chat/ChatRedPacketDialog.vue'
+import AppearanceShop from '@/components/packs/AppearanceShop.vue'
+import ChatMountOverlay from '@/components/chat/ChatMountOverlay.vue'
 import ChatBarrageOverlay from '@/components/chat/ChatBarrageOverlay.vue'
 import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
 import MemberLayout from '@/components/member/MemberLayout.vue'
@@ -437,6 +439,8 @@ onUnmounted(() => {
     </header>
     <CountToast />
     <ChatBarrageOverlay />
+    <AppearanceShop />
+    <ChatMountOverlay />
     <ChatRedPacketDialog />
     <SettingsDrawer />
     <UserHoverCard />

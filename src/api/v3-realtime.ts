@@ -2,6 +2,14 @@ import { ApiError, getAccessToken, request } from './http'
 import * as chatMessages from './v3-chat-messages'
 import type { ChatMessage } from './v3-chat-messages'
 
+// 仅聊天页或悬浮聊天室参与进场；首页继续复用消息订阅。
+let chatPresenceWanted = false
+const presenceListeners = new Set<() => void>()
+export function setChatPresenceWanted(active: boolean) {
+  if (chatPresenceWanted === active) return
+  chatPresenceWanted = active
+  for (const notify of presenceListeners) notify()
+}
 /** A ticket goes only in the first socket frame, never in a URL or persistent storage. */
 export function subscribeNotificationChanges(changed: () => void, initialRead?: () => void): () => void {
   return subscribeChanges('notifications','/api/v3/realtime/tickets',changed,undefined,undefined,undefined,undefined,initialRead)
@@ -14,7 +22,7 @@ export function subscribeMessageChanges(changed:()=>void,initialRead?:()=>void):
 export interface ChatBarrageEvent{id:string;content:string;color:string;createdAt:number;author:{id:string;userName:string;userNickname:string;userAvatarURL:string}}
 interface ChatNoticeUser { id: string; userName: string; userNickname: string }
 export type ChatRoomNotice = { id: string; createdAt: number; actor: ChatNoticeUser } & (
-  | { kind: 'join' | 'leave'; text: string }
+  | { kind: 'join' | 'leave'; text: string; mount?: { id: string; version: number }; avatarURL?: string }
   | { kind: 'claim'; packetId: string; sender: ChatNoticeUser; got: number; count: number }
 )
 export type ChatRealtimeEvent =
@@ -45,7 +53,14 @@ function chatNotice(type: 'chat.red_packet.claimed' | 'chat.presence.changed', v
   if (type === 'chat.presence.changed') {
     if ((kind !== 'join' && kind !== 'leave') || typeof text !== 'string'
       || text.length > 1024 || Array.from(text).length > 512 || !text.trim() || /[\u0000-\u001f\u007f]/.test(text)) return null
-    return { id, createdAt, actor, kind, text }
+    let mount: { id: string; version: number } | undefined
+    const rawMount = data.mount as Record<string, unknown> | undefined
+    if (kind === 'join' && rawMount && typeof rawMount.id === 'string' && /^[a-z0-9-]{1,64}$/.test(rawMount.id) && rawMount.version === 1) mount = { id: rawMount.id, version: 1 }
+    let avatarURL = ''
+    if (typeof data.avatarURL === 'string' && data.avatarURL.length <= 2048) {
+      try { const url = new URL(data.avatarURL); if (['http:', 'https:'].includes(url.protocol) && !url.username && !url.password) avatarURL = url.href } catch { /* 无效头像使用统一默认图。 */ }
+    }
+    return { id, createdAt, actor, kind, text, ...(mount ? { mount, avatarURL } : {}) }
   }
   const sender = chatNoticeUser(data.sender)
   if (!sender || typeof packetId !== 'string' || !/^\d{1,32}$/.test(packetId)
@@ -76,6 +91,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
   if (!token) return () => {}
   let stopped = false, attempts = 0, sequence = 0
   let hasConnected = false, initialUnreadFallback = false
+  let presenceNotify: (() => void) | null = null
   let socket: WebSocket | null = null
   let retry: ReturnType<typeof setTimeout> | null = null
   let deadline: ReturnType<typeof setTimeout> | null = null
@@ -88,6 +104,8 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
   }
   function retire() {
     connectionState?.('closed')
+    if (presenceNotify) presenceListeners.delete(presenceNotify)
+    presenceNotify = null
     timers()
     const old = socket; socket = null
     if (old) { old.onopen = null; old.onmessage = null; old.onclose = null; old.onerror = null; old.close() }
@@ -131,11 +149,18 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
       transport.onmessage = (event) => {
         if (!valid()) return
         try {
-          const message = JSON.parse(event.data) as { type?: unknown; data?: { channel?: unknown; articleId?:unknown;messageId?:unknown;revision?:unknown;message?:unknown;reactions?:unknown;reactionsUnavailable?:unknown } }
+          const message = JSON.parse(event.data) as { type?: unknown; data?: { presenceControl?: boolean; channel?: unknown; articleId?:unknown;messageId?:unknown;revision?:unknown;message?:unknown;reactions?:unknown;reactionsUnavailable?:unknown } }
           if (message.type === 'authentication.required') { authenticate(); return }
           if (message.type === 'ready') {
             if (authenticated || !sent || message.data?.channel !== channel || (articleId!==undefined&&message.data?.articleId!==articleId)) { reconnect(); return }
             authenticated = true; attempts = 0
+            if (channel === 'chat' && message.data?.presenceControl === true) {
+              const notify = () => { if (valid() && transport.readyState === WebSocket.OPEN) transport.send(JSON.stringify({ type: 'chat.presence', active: chatPresenceWanted })) }
+              presenceNotify = notify
+              presenceListeners.add(notify)
+              transport.addEventListener('close', () => presenceListeners.delete(notify), { once: true })
+              notify()
+            }
             connectionState?.('ready')
             if (deadline) clearTimeout(deadline); deadline = null
             heartbeat = setInterval(() => { if (valid() && transport.readyState === WebSocket.OPEN) transport.send('{"type":"ping"}') }, 25_000)

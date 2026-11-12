@@ -1,0 +1,8 @@
+{
+  "id": "star-ring",
+  "kind": "frame",
+  "name": "星环",
+  "vip": false,
+  "points": true,
+  "preview": "linear-gradient(135deg,#b8a9db,#f5fafb)"
+}

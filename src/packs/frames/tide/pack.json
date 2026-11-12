@@ -1,0 +1,8 @@
+{
+  "id": "tide",
+  "kind": "frame",
+  "name": "潮汐",
+  "vip": false,
+  "points": true,
+  "preview": "linear-gradient(135deg,#75bace,#f5fafb)"
+}
