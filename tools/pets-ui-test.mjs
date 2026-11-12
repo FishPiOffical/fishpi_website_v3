@@ -9,7 +9,7 @@ import { parse, compileScript } from '@vue/compiler-sfc'
 
 // 使用真实 Vue 模板与 store，仅替换传输和浏览器几何；测试不会触碰真实账号或站点接口。
 const dom = new JSDOM('<!doctype html><html><body><header data-site-navigation></header><div id="app"></div></body></html>', { url: 'http://127.0.0.1:5173/pets', pretendToBeVisual: true })
-for (const key of ['window', 'document', 'navigator', 'localStorage', 'Element', 'HTMLElement', 'SVGElement', 'Node', 'Event', 'MouseEvent', 'KeyboardEvent', 'getComputedStyle']) {
+for (const key of ['window', 'document', 'navigator', 'localStorage', 'Element', 'HTMLElement', 'HTMLInputElement', 'SVGElement', 'Node', 'Event', 'MouseEvent', 'KeyboardEvent', 'MutationObserver', 'getComputedStyle']) {
   Object.defineProperty(globalThis, key, { configurable: true, value: key === 'getComputedStyle' ? dom.window.getComputedStyle.bind(dom.window) : dom.window[key] })
 }
 Object.defineProperty(document, 'hidden', { configurable: true, value: false })
@@ -104,6 +104,7 @@ const catalog = { version: 3, activityVersion: 4, species: [
     cost: { coins: 0, energy: 12, hunger: 4, water: 6 }, rewards: { coins: 12, proficiency: 10, experience: 15, food: 0, mood: 3, skills: [], items: [] },
     requirement: { skillId: Object.keys(skillNames)[index], experience: 10 }, requirements: [{ skillId: Object.keys(skillNames)[index], experience: 10 }] })),
   incomeRules: { dailyLimit: 60 },
+  growthRules: { experiencePerLevel: 100, maxLevel: 30, careExperience: 10, careFriendship: 2 },
   rules: { maxNameLength: 12, initialCoins: 100, initialFood: 6,
   dailyCoins: 20, dailyFood: 2, restDurationMs: 14400000, restEnergyPerHour: 20, growthDailyLimit: 10 } }
 const now = Date.UTC(2026, 10, 12, 10)
@@ -212,7 +213,7 @@ const success = async (url, options) => {
 }
 handler = success
 const writes = () => calls.filter(call => call.options?.method)
-const settle = async () => { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)); await nextTick() }
+const settle = async () => { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)); await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)); await nextTick() }
 const click = async element => { assert(element, '交互目标必须真实存在'); element.click(); await settle() }
 const input = async (element, value) => { assert(element); element.value = value; element.dispatchEvent(new Event('input', { bubbles: true })); await settle() }
 function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { resolve, reject, promise } }
@@ -274,25 +275,44 @@ try {
   serverState = adopted('pet-b', '小伙伴'); await pets.refresh(); await settle()
   display.hide(); await settle(); assert.equal(document.querySelector('.pet-desktop'), null)
   display.show(); await settle(); assert(document.querySelector('.pet-desktop'))
+  const desktopPosition = () => ({ x: Number.parseFloat(document.querySelector('.pet-desktop').style.left), y: Number.parseFloat(document.querySelector('.pet-desktop').style.top) })
   display.move(-9999, -9999); window.dispatchEvent(new Event('resize')); await settle()
-  assert(display.position.x >= 8); assert(display.position.y >= 88)
+  assert(desktopPosition().x >= 8); assert(desktopPosition().y >= 88)
+  assert.deepEqual(display.position, { x: -9999, y: -9999 })
   display.move(9999, 9999); window.dispatchEvent(new Event('resize')); await settle()
-  assert(display.position.x <= window.innerWidth - 144 - 8)
-  assert(display.position.y <= window.innerHeight - 184 - 12)
+  assert(desktopPosition().x <= window.innerWidth - 144 - 8)
+  assert(desktopPosition().y <= window.innerHeight - 184 - 12)
+  assert.deepEqual(display.position, { x: 9999, y: 9999 })
   await click(document.querySelector('[aria-label="收起桌宠"]'))
   assert(document.querySelector('.pet-desktop.collapsed'))
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 360 })
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 640 })
   window.dispatchEvent(new Event('resize')); await settle()
-  assert(display.position.x >= 8 && display.position.x <= 296)
-  assert(display.position.y >= 88 && display.position.y <= 544)
-  const handle = document.querySelector('.pet-drag-handle'), before = display.position.x
+  assert(desktopPosition().x >= 8 && desktopPosition().x <= 304)
+  assert(desktopPosition().y >= 88 && desktopPosition().y <= 580)
+  const handle = document.querySelector('.pet-drag-handle'), before = desktopPosition().x
   handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true })); await settle()
   assert.equal(display.position.x, Math.max(8, before - 12))
   handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); await settle()
-  assert(display.position && display.position.x >= 8 && display.position.y >= 88)
+  assert.equal(display.position, null, '归位清除用户偏好，临时视口位置不写回存储')
+  assert(desktopPosition().x >= 8 && desktopPosition().y >= 88)
   assert.equal(JSON.parse(localStorage.getItem('fishpi.pet.display.v1')).visible, true)
   console.log('PASS 桌宠隐藏恢复、收起展开、视口和导航边界、窄屏缩放、键盘移动及双击归位')
+
+  serverState.pet.level = 2; serverState.pet.experience = 140
+  await pets.refresh(); await settle()
+  assert.equal(document.querySelector('[aria-label="宠物升级进度"]').getAttribute('aria-valuenow'), '40')
+  assert(document.querySelector('.growth-summary').textContent.includes('再获得 60 经验，升到 Lv. 3'))
+  serverState.pet.level = 30; serverState.pet.experience = 3000
+  await pets.refresh(); await settle()
+  assert.equal(document.querySelector('[aria-label="宠物升级进度"]').getAttribute('aria-valuenow'), '100')
+  assert(document.querySelector('.growth-summary').textContent.includes('已达到当前最高等级'))
+  const originalGrowthRules = catalog.growthRules; delete catalog.growthRules
+  await pets.reloadCatalog(); await settle()
+  assert.equal(document.querySelector('[aria-label="宠物升级进度"]'), null)
+  assert(document.querySelector('.growth-summary').textContent.includes('累计经验 3000'))
+  catalog.growthRules = originalGrowthRules; await pets.reloadCatalog(); await settle()
+  console.log('PASS 成长进度使用真实目录规则，封顶明确展示，旧目录缺字段保留累计值且不伪造进度')
 
   const ownedState = adopted('pet-b', '小伙伴')
   ownedState.serverNow = now - 120000
@@ -458,6 +478,7 @@ try {
   assert.equal(pets.pet.jobs.find(job => job.id === 'library-assistant').experience, 10)
   assert.equal(pets.pet.jobs.find(job => job.id === 'library-assistant').completed, 1)
   assert.equal(pets.pet.skills.find(skill => skill.id === 'knowledge').experience, 10)
+  await new Promise(resolve => setTimeout(resolve, 1050)); await settle()
   assert(document.querySelector('.history-rewards.actual').textContent.includes('宠物币 +5'))
   assert(!document.querySelector('.history-rewards.actual').textContent.includes('宠物币 +12'))
   console.log('PASS 日志展开才读，工作领取后同步实际成果和履历，不以计划薪酬覆盖共享上限结算')

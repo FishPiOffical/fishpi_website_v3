@@ -8,16 +8,16 @@ function friendly(value: string, fallback: string) {
 </script>
 <template>
   <div v-if="pets.pending && !pets.busy" class="pet-feedback pending" role="status">
-    <span>{{ friendly(pets.pendingError, '上次操作的结果尚未确认，请先核对。') }}</span>
-    <button type="button" :disabled="pets.busy" aria-label="核对上次宠物操作" title="核对上次操作" @click="pets.retryPending()"><PetIcon name="refresh" /></button>
+    <span>{{ pets.offline ? '网络已断开。上次操作仍待确认，联网后请核对原操作。' : friendly(pets.pendingError, '上次操作的结果尚未确认，请先核对。') }}</span>
+    <button type="button" :disabled="pets.busy || pets.offline" aria-label="核对上次宠物操作" title="核对上次操作" @click="pets.retryPending()"><PetIcon name="refresh" /></button>
   </div>
   <div v-else-if="pets.refreshNeeded && !pets.busy && !pets.loading" class="pet-feedback pending" role="status">
     <span>{{ friendly(pets.error, '宠物状态暂未更新，请重新读取。') }}</span>
-    <button type="button" :disabled="pets.loading" aria-label="刷新宠物状态" title="刷新状态" @click="pets.refresh()"><PetIcon name="refresh" /></button>
+    <button type="button" :disabled="pets.loading || pets.offline" aria-label="刷新宠物状态" title="刷新状态" @click="pets.refresh()"><PetIcon name="refresh" /></button>
   </div>
   <div v-else-if="pets.error" class="pet-feedback" role="alert">
     <span>{{ friendly(pets.error, '暂时无法读取宠物状态，请稍后重试。') }}</span>
-    <button type="button" :disabled="pets.loading" aria-label="重新读取宠物状态" title="重新读取" @click="pets.refresh()"><PetIcon name="refresh" /></button>
+    <button type="button" :disabled="pets.loading || pets.offline" aria-label="重新读取宠物状态" title="重新读取" @click="pets.refresh()"><PetIcon name="refresh" /></button>
   </div>
 </template>
 <style scoped>

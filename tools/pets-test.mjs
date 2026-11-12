@@ -787,4 +787,192 @@ assert.equal(journeyStore.pending, null)
 assert.equal(journeyStore.catalog, null)
 journeyStore.$dispose()
 console.log('PASS 换账号清除待确认领养命令，迟到成功回执不污染新账号')
+
+// 第六批使用可控时钟验证真实超时与事件退避，不等待墙上时间，也不自动重发写操作。
+const realNow = Date.now, realSetTimeout = globalThis.setTimeout, realClearTimeout = globalThis.clearTimeout
+let recoveryNow = realNow(), timerId = 0
+const timers = new Map()
+Date.now = () => recoveryNow
+globalThis.setTimeout = (callback, delay = 0) => { const id = ++timerId; timers.set(id, { callback, at: recoveryNow + delay }); return id }
+globalThis.clearTimeout = id => timers.delete(id)
+const flushRecovery = () => new Promise(resolve => realSetTimeout(resolve, 0))
+async function advanceRecovery(ms) {
+  recoveryNow += ms
+  for (let round = 0; round < 20; round++) {
+    const due = [...timers.entries()].filter(([, timer]) => timer.at <= recoveryNow)
+    if (!due.length) { await flushRecovery(); if (![...timers.values()].some(timer => timer.at <= recoveryNow)) break; continue }
+    for (const [id, timer] of due) { if (timers.delete(id)) timer.callback() }
+    await flushRecovery()
+  }
+}
+const focusRecovery = () => { window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')) }
+const newRecoveryStore = () => { setActivePinia(createPinia()); context++; return { auth: useAuthStore(), pets: usePetsStore() } }
+
+const growthRules = { experiencePerLevel: 100, maxLevel: 30, careExperience: 10, careFriendship: 2 }
+assert.equal(api.decodePetCatalog(catalog).growthRules, undefined)
+assert.deepEqual(api.decodePetCatalog({ ...catalog, growthRules }).growthRules, growthRules)
+for (const invalidGrowth of [null, {}, { ...growthRules, experiencePerLevel: 0 }, { ...growthRules, maxLevel: 31 }, { ...growthRules, careFriendship: -1 }]) {
+  assert.throws(() => api.decodePetCatalog({ ...catalog, growthRules: invalidGrowth }))
+}
+console.log('PASS 可选成长规则保留旧目录兼容，缺失不编造，非法规则明确拒绝')
+
+{
+  const { pets } = newRecoveryStore()
+  handler = async () => { throw new ApiError('服务暂不可用', 503) }
+  let before = calls.length
+  await pets.ensureLoaded()
+  assert.equal(calls.length, before + 2)
+  assert(pets.error); assert(pets.catalogError)
+  for (let i = 0; i < 30; i++) focusRecovery()
+  await advanceRecovery(29_999)
+  assert.equal(calls.length, before + 2, '首次503不能被重复聚焦或隐藏切换刷请求')
+  await advanceRecovery(1)
+  focusRecovery(); await flushRecovery()
+  assert.equal(calls.length, before + 4, '冷却后一个前台事件合并为两种资源各一次探测')
+  await advanceRecovery(59_999); focusRecovery(); await flushRecovery()
+  assert.equal(calls.length, before + 4)
+  handler = success; serverState = adopted()
+  await advanceRecovery(1); focusRecovery(); await flushRecovery()
+  assert.equal(pets.pet.id, 'pet-a'); assert(pets.catalog)
+  assert.equal(calls.length, before + 6)
+  pets.$dispose()
+}
+console.log('PASS 初次503可聚焦恢复，状态/目录独立30秒起退避，重复事件不产生自动请求风暴')
+
+{
+  const { pets } = newRecoveryStore()
+  handler = success; serverState = adopted(); await pets.ensureLoaded()
+  const writeResult = deferred()
+  handler = (path, options) => options?.method ? writeResult.promise : success(path, options)
+  const writing = pets.buyFood(1)
+  const original = { ...pets.pending }, writeCount = writes().length
+  await advanceRecovery(15_000)
+  assert.equal(await writing, false)
+  assert.equal(pets.busy, false); assert.deepEqual(pets.pending, original)
+  writeResult.resolve(response({ operation: 'purchase', petId: 'pet-a', committedAt: now }))
+  await flushRecovery()
+  assert.deepEqual(pets.pending, original, '超时之后到达的旧回执不能自行清掉未知状态')
+  handler = success
+  window.dispatchEvent(new Event('offline'))
+  assert.equal(await pets.retryPending(), false)
+  window.dispatchEvent(new Event('online')); focusRecovery(); await flushRecovery()
+  assert.equal(writes().length, writeCount, '联网只读取，不能自动重发未知购买')
+  assert.deepEqual(pets.pending, original)
+  handler = (path, options) => {
+    if (options?.method) {
+      assert.equal(options.headers['Idempotency-Key'], original.key)
+      return Promise.resolve(response({ operation: 'purchase', petId: 'pet-a', committedAt: now }))
+    }
+    return Promise.reject(new Error('写后状态读取断流'))
+  }
+  assert.equal(await pets.retryPending(), true)
+  assert.equal(pets.pending, null); assert.equal(pets.refreshNeeded, true)
+  const confirmedWrites = writes().length
+  window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('online'))
+  handler = success
+  await advanceRecovery(1000); focusRecovery(); await flushRecovery()
+  await pets.refresh()
+  assert.equal(writes().length, confirmedWrites)
+  assert.equal(pets.pet.id, 'pet-a')
+  pets.$dispose()
+}
+console.log('PASS 写超时保留原键与命令、迟到回执不清未知，联网不重写，确认后GET失败只恢复读')
+
+{
+  const { auth, pets } = newRecoveryStore()
+  handler = success; serverState = adopted(); await pets.ensureLoaded()
+  const delayedRead = deferred(); handler = () => delayedRead.promise
+  const reading = pets.refresh()
+  await advanceRecovery(15_000)
+  await reading
+  assert.equal(pets.loading, false); assert.equal(pets.state, null); assert(pets.refreshNeeded)
+  delayedRead.resolve(response(adopted())); await flushRecovery()
+  assert.equal(pets.state, null)
+  handler = success
+  window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('online')); await flushRecovery()
+  assert.equal(pets.pet.id, 'pet-a')
+  const delayedWrite = deferred(); handler = () => delayedWrite.promise
+  const writing = pets.act('water'), oldSignal = calls.at(-1).options.signal
+  auth.accessToken = 'same-account-rotation'
+  assert.equal(oldSignal.aborted, false)
+  context++; auth.account = { oId: 'new-owner' }; auth.accessToken = 'new-token'
+  assert.equal(oldSignal.aborted, true)
+  assert.equal(await writing, false)
+  const count = calls.length
+  delayedWrite.resolve(response({ operation: 'water', petId: 'pet-a', committedAt: now })); await flushRecovery()
+  assert.equal(calls.length, count); assert.equal(pets.state, null); assert.equal(pets.pending, null)
+  pets.$dispose()
+}
+console.log('PASS 读取正文挂起可超时退出，迟到数据丢弃；正常令牌轮换保命令、换号立即取消旧请求')
+
+{
+  const { pets } = newRecoveryStore()
+  handler = success; serverState = adopted(); await pets.ensureLoaded()
+  const channel = Channel.all.at(-1), notices = () => channel.onmessage({ data: { type: 'changed', owner: 'A' } })
+  const old = deferred(), fresh = deferred()
+  let reads = 0
+  handler = () => (++reads === 1 ? old.promise : fresh.promise)
+  notices()
+  const originalSignal = calls.at(-1).options.signal
+  for (let i = 0; i < 40; i++) notices()
+  assert.equal(reads, 1); assert.equal(originalSignal.aborted, false, '广播不能反复中断并重启同一请求')
+  old.resolve(response({ ...adopted(), wallet: { coins: 999 } })); await flushRecovery()
+  assert.equal(pets.coins, 100, '已经失效的在途快照不能覆盖当前状态')
+  assert.equal(pets.refreshNeeded, true)
+  await advanceRecovery(1000)
+  assert.equal(reads, 2)
+  fresh.resolve(response({ ...adopted(), wallet: { coins: 80 } })); await flushRecovery()
+  assert.equal(pets.coins, 80)
+  handler = async () => { throw new ApiError('暂时失败', 503) }
+  await advanceRecovery(1000); notices(); await flushRecovery()
+  for (let i = 0; i < 40; i++) notices()
+  const failedReads = calls.length
+  await advanceRecovery(29_999)
+  assert.equal(calls.length, failedReads)
+  pets.$dispose()
+}
+console.log('PASS 双标签广播合并在途与后续读取，旧快照不回写，广播失败遵守退避')
+
+for (const status of [401, 429]) {
+  const { pets } = newRecoveryStore()
+  handler = async () => { throw new ApiError('请求受限', status) }
+  await pets.ensureLoaded()
+  const count = calls.length
+  await advanceRecovery(600_000); focusRecovery()
+  window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('online')); await flushRecovery()
+  assert.equal(calls.length, count, '认证或限流拒绝后不能以聚焦/联网探测绕过暂停')
+  handler = success; await pets.refresh(); await pets.reloadCatalog()
+  assert(pets.state); assert(pets.catalog)
+  pets.$dispose()
+}
+console.log('PASS 401和429暂停自动读取，恢复仅由用户明确请求，不借联网绕过')
+
+{
+  const { pets } = newRecoveryStore()
+  handler = success; serverState = adopted(); await pets.ensureLoaded()
+  const history = usePetActivityHistoryStore()
+  let journalReads = 0
+  handler = (path, options) => isHistory(path) ? (++journalReads, Promise.reject(new ApiError('日志暂不可用', 503))) : success(path, options)
+  await history.open()
+  for (let i = 0; i < 8; i++) { await pets.refresh(); focusRecovery() }
+  assert.equal(journalReads, 1, '聚合状态刷新不能反复请求失败的日志')
+  await advanceRecovery(30_000); focusRecovery(); await flushRecovery()
+  assert.equal(journalReads, 2)
+  window.dispatchEvent(new Event('offline'))
+  handler = (path, options) => isHistory(path) ? (++journalReads, Promise.resolve(response(historyPage([oldRecord])))) : success(path, options)
+  window.dispatchEvent(new Event('online')); await flushRecovery(); await advanceRecovery(1000)
+  assert.equal(journalReads, 3, '联网先恢复聚合后只读取一次当前日志')
+  assert.equal(history.history.list.length, 1)
+  history.close()
+  const count = journalReads
+  await advanceRecovery(60_001); focusRecovery(); await pets.refresh()
+  assert.equal(journalReads, count)
+  history.$dispose(); pets.$dispose()
+}
+console.log('PASS 履历失败不随聚合更新反复读取，联网合并恢复当前页，折叠始终零请求')
+
+Date.now = realNow
+globalThis.setTimeout = realSetTimeout
+globalThis.clearTimeout = realClearTimeout
+assert.equal(timers.size, 0, '销毁后不能遗留超时或自动恢复计时器')
 delete globalThis.__petTest

@@ -16,6 +16,7 @@ export const usePetsStore = defineStore('pets', () => {
   const error = ref(''), catalogError = ref(''), pendingError = ref('')
   const pending = ref<PetCommand | null>(null)
   const refreshNeeded = ref(false), receivedAt = ref(0)
+  const offline = ref(typeof navigator !== 'undefined' && navigator.onLine === false)
   const pet = computed(() => state.value?.pet ?? null)
   const coins = computed(() => state.value?.wallet.coins ?? null)
   const foodQuantity = computed(() => state.value?.inventory.find(item => item.itemId === 'food')?.quantity ?? 0)
@@ -23,8 +24,11 @@ export const usePetsStore = defineStore('pets', () => {
   let generation = 0, sequence = 0, catalogSequence = 0
   let boundary = getAuthContextVersion(), owner = account.value?.oId
   let readAbort: AbortController | null = null, catalogAbort: AbortController | null = null
+  let writeAbort: AbortController | null = null
   let stateFlight: Promise<void> | null = null, catalogFlight: Promise<void> | null = null
   let attempted = false, catalogAttempted = false, listening = false, invalidated = false
+  let stateFailures = 0, catalogFailures = 0, stateRetryAt = 0, catalogRetryAt = 0, lastAutoRead = 0
+  let autoTimer: ReturnType<typeof setTimeout> | null = null
   let channel: BroadcastChannel | null = null
 
   const active = () => !import.meta.env.SSR && !!accessToken.value && !!account.value?.oId
@@ -33,6 +37,10 @@ export const usePetsStore = defineStore('pets', () => {
     return () => active() && epoch === generation && actor === account.value?.oId && context === getAuthContextVersion()
   }
   const message = (reason: unknown, fallback: string) => reason instanceof ApiError ? reason.message : fallback
+  // 自动恢复仅由聚焦、联网或跨标签变化触发；拒绝/限流等待用户明确重读，不循环探测。
+  const retryAt = (reason: unknown, failures: number) => reason instanceof ApiError && reason.status >= 400 && reason.status < 500
+    ? Infinity : Date.now() + Math.min(300_000, 30_000 * 2 ** Math.min(failures - 1, 4))
+  function cancelAutoRead() { if (autoTimer !== null) clearTimeout(autoTimer); autoTimer = null }
 
   function cancelRead() {
     sequence++
@@ -43,6 +51,9 @@ export const usePetsStore = defineStore('pets', () => {
   }
   function clear() {
     generation++
+    cancelAutoRead()
+    writeAbort?.abort()
+    writeAbort = null
     cancelRead()
     catalogSequence++
     catalogAbort?.abort()
@@ -54,10 +65,11 @@ export const usePetsStore = defineStore('pets', () => {
     error.value = catalogError.value = pendingError.value = ''
     receivedAt.value = 0
     attempted = catalogAttempted = invalidated = false
+    stateFailures = catalogFailures = stateRetryAt = catalogRetryAt = lastAutoRead = 0
   }
 
   function loadState(): Promise<void> {
-    if (!active()) return Promise.resolve()
+    if (!active() || offline.value) return Promise.resolve()
     if (stateFlight) return stateFlight
     const valid = capture(), run = ++sequence, controller = new AbortController()
     readAbort = controller
@@ -69,28 +81,35 @@ export const usePetsStore = defineStore('pets', () => {
       try {
         const result = await readPetState(controller.signal)
         if (!valid() || run !== sequence || controller.signal.aborted) return
+        // 在途读取之后收到的失效信号不能被旧快照清掉，合并为一次后续读取。
+        if (invalidated) { refreshNeeded.value = true; return }
         state.value = result
         receivedAt.value = Date.now()
         refreshNeeded.value = false
+        stateFailures = stateRetryAt = 0
       } catch (reason) {
         if (!valid() || run !== sequence || controller.signal.aborted) return
         // 读取失败不能让过时的余额继续作为可操作状态；恢复只重读，不重写。
         state.value = null
         refreshNeeded.value = true
         error.value = message(reason, '宠物暂时没能回到画面，请稍后重试')
+        stateRetryAt = retryAt(reason, ++stateFailures)
       } finally {
         if (valid() && run === sequence) {
           loading.value = false
           readAbort = null
         }
       }
-    })().finally(() => { if (stateFlight === flight) stateFlight = null })
+    })().finally(() => {
+      if (stateFlight === flight) stateFlight = null
+      if (valid() && invalidated) scheduleStateRead()
+    })
     stateFlight = flight
     return flight
   }
 
   function reloadCatalog(): Promise<void> {
-    if (!active()) return Promise.resolve()
+    if (!active() || offline.value) return Promise.resolve()
     if (catalogFlight) return catalogFlight
     const valid = capture(), run = ++catalogSequence, controller = new AbortController()
     catalogAbort = controller
@@ -100,11 +119,15 @@ export const usePetsStore = defineStore('pets', () => {
     const flight = (async () => {
       try {
         const result = await readPetCatalog(controller.signal)
-        if (valid() && run === catalogSequence && !controller.signal.aborted) catalog.value = result
+        if (valid() && run === catalogSequence && !controller.signal.aborted) {
+          catalog.value = result
+          catalogFailures = catalogRetryAt = 0
+        }
       } catch (reason) {
         if (valid() && run === catalogSequence && !controller.signal.aborted) {
           catalog.value = null
           catalogError.value = message(reason, '宠物目录暂不可用')
+          catalogRetryAt = retryAt(reason, ++catalogFailures)
         }
       } finally {
         if (valid() && run === catalogSequence) {
@@ -119,28 +142,61 @@ export const usePetsStore = defineStore('pets', () => {
 
   function refresh(): Promise<void> {
     if (busy.value) return Promise.resolve()
+    cancelAutoRead()
     return loadState()
   }
 
+  function scheduleStateRead() {
+    if (!active() || offline.value || busy.value || document.hidden || stateFlight || autoTimer !== null || Date.now() < stateRetryAt) return
+    const delay = Math.max(0, lastAutoRead + 1000 - Date.now())
+    if (delay) {
+      autoTimer = setTimeout(() => { autoTimer = null; scheduleStateRead() }, delay)
+      return
+    }
+    lastAutoRead = Date.now()
+    void loadState()
+  }
   function onFocus() {
-    if (!active() || busy.value || !attempted || error.value || document.hidden) return
-    if (invalidated || Date.now() - receivedAt.value > 60_000) void loadState()
+    if (!active() || offline.value || busy.value || !attempted || document.hidden) return
+    if (invalidated || refreshNeeded.value || Date.now() - receivedAt.value > 60_000) scheduleStateRead()
+    if (catalogAttempted && !catalog.value && Date.now() >= catalogRetryAt) void reloadCatalog()
+  }
+  function onOffline() {
+    offline.value = true
+    cancelAutoRead()
+    cancelRead()
+    catalogSequence++
+    catalogAbort?.abort()
+    catalogAbort = null
+    catalogFlight = null
+    catalogLoading.value = false
+    writeAbort?.abort(new ApiError('网络已断开，操作结果尚未确认', 0, 'pet_offline'))
+    if (attempted) { invalidated = refreshNeeded.value = true; error.value = '网络已断开，联网后会核对宠物状态' }
+  }
+  function onOnline() {
+    if (!offline.value) return
+    offline.value = false
+    // 真实离线后允许一次联网探测，权限拒绝与限流仍不能自动重试。
+    if (Number.isFinite(stateRetryAt)) stateRetryAt = 0
+    if (Number.isFinite(catalogRetryAt)) catalogRetryAt = 0
+    onFocus()
   }
   function listen() {
     if (listening || typeof window === 'undefined') return
     listening = true
     window.addEventListener('focus', onFocus)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
     document.addEventListener('visibilitychange', onFocus)
     try {
       if (typeof BroadcastChannel !== 'undefined') {
         channel = new BroadcastChannel('fishpi.pet.changed')
         channel.onmessage = event => {
           if (!active() || !event.data || event.data.owner !== account.value?.oId || event.data.type !== 'changed') return
-          invalidated = true
+          invalidated = refreshNeeded.value = true
           // 标签页间只传失效信号，不传钱包、宠物资料或访问令牌。
           if (busy.value || document.hidden) return
-          cancelRead()
-          void loadState()
+          scheduleStateRead()
         }
       }
     } catch { /* 禁用跨页通道时，重新聚焦仍会读取当前状态。 */ }
@@ -148,6 +204,12 @@ export const usePetsStore = defineStore('pets', () => {
   async function ensureLoaded() {
     if (!active()) return
     listen()
+    if (offline.value) {
+      attempted = catalogAttempted = true
+      refreshNeeded.value = true
+      error.value = '网络已断开，联网后会读取宠物状态'
+      return
+    }
     await Promise.all([
       !attempted ? loadState() : stateFlight,
       !catalogAttempted ? reloadCatalog() : catalogFlight,
@@ -155,15 +217,18 @@ export const usePetsStore = defineStore('pets', () => {
   }
 
   async function execute(command: PetCommand, recovering = false): Promise<boolean> {
-    if (!active() || busy.value) return false
+    if (!active() || offline.value || busy.value) return false
     const valid = capture()
+    cancelAutoRead()
     cancelRead()
+    const controller = new AbortController()
+    writeAbort = controller
     pending.value = Object.freeze({ ...command })
     busy.value = true
     pendingError.value = error.value = ''
     let confirmed = false
     try {
-      await executePetCommand(command)
+      await executePetCommand(command, controller.signal)
       if (!valid()) return false
       confirmed = true
       pending.value = null
@@ -195,14 +260,15 @@ export const usePetsStore = defineStore('pets', () => {
     } finally {
       if (valid()) {
         busy.value = false
-        if (invalidated && !error.value && !pending.value && !document.hidden) void loadState()
+        if (writeAbort === controller) writeAbort = null
+        if (invalidated && !pending.value) scheduleStateRead()
       }
     }
     return confirmed
   }
 
   function canWrite() {
-    return active() && !!state.value && !busy.value && !pending.value && !loading.value && !refreshNeeded.value
+    return active() && !offline.value && !!state.value && !busy.value && !pending.value && !loading.value && !refreshNeeded.value
   }
   async function adopt(speciesId: PetSpeciesId, name: string) {
     if (!canWrite() || pet.value || !catalog.value?.species.some(species => species.id === speciesId)) return false
@@ -312,12 +378,14 @@ export const usePetsStore = defineStore('pets', () => {
     channel?.close()
     if (listening) {
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
       document.removeEventListener('visibilitychange', onFocus)
     }
   })
   return {
     state, catalog, pet, coins, foodQuantity, ready, receivedAt,
-    loading, catalogLoading, error, catalogError, busy, pending, pendingError, refreshNeeded,
+    loading, catalogLoading, error, catalogError, busy, pending, pendingError, refreshNeeded, offline,
     ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, craft, claimStory, readopt, startActivity, claimActivity, retryPending,
   }
 })

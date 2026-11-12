@@ -20,7 +20,7 @@ export const usePetDisplayStore = defineStore('petDisplay', () => {
   function restore() {
     if (restored || import.meta.env.SSR) return
     restored = true
-    collapsed.value = window.matchMedia('(max-width: 640px)').matches
+    // 窄屏收纳由摆放层临时处理，不能覆盖用户在宽屏选择的展开状态。
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (!raw) return

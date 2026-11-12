@@ -12,7 +12,7 @@
     "preview": "NODE_ENV=production node server.js",
     "sitemap": "node scripts/generate-sitemap.mjs",
     "test:v3": "node tools/test-v3.mjs",
-    "test:pets": "node tools/pets-test.mjs && node tools/pets-ui-test.mjs"
+    "test:pets": "node tools/pets-test.mjs && node tools/pets-ui-test.mjs && node tools/pet-desktop-test.mjs"
   },
   "dependencies": {
     "@knight-lab/timelinejs": "3.9.13",

@@ -11,12 +11,14 @@ import PetFeedback from './PetFeedback.vue'
 import PetIcon from './PetIcon.vue'
 import { usePetClock } from './usePetClock'
 import { petActivityStatus } from './petActivityStatus'
+import { usePetPlacement } from './layout/usePetPlacement'
+import type { FloatingPoint } from './layout/floatingPlacement'
 
 const auth = useAuthStore(), pets = usePetsStore(), display = usePetDisplayStore(), layout = useLayoutStore(), route = useRoute()
 const mounted = ref(false), panelOpen = ref(false), dragging = ref(false)
 const hadPet = ref(false)
 const element = ref<HTMLElement | null>(null), panel = ref<HTMLElement | null>(null)
-const viewport = ref({ width: 1000, height: 800 }), panelHeight = ref(240)
+const dragPosition = ref<FloatingPoint | null>(null)
 const { now } = usePetClock()
 const activityText = computed(() => petActivityStatus(pets.pet?.activity ?? null, now.value))
 const activityClaimable = computed(() => {
@@ -25,83 +27,65 @@ const activityClaimable = computed(() => {
 })
 const owner = computed(() => `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.accessToken}`)
 const recovering = computed(() => hadPet.value && !pets.pet && pets.refreshNeeded)
-const shown = computed(() => mounted.value && auth.isLoggedIn && (!!pets.pet || recovering.value) && display.visible && !layout.immersive)
-const panelWidth = computed(() => Math.min(296, viewport.value.width - 16))
-const panelStyle = computed(() => {
-  const pos = display.position ?? { x: 0, y: 0 }
-  const width = display.collapsed || recovering.value ? 56 : 144
-  const height = element.value?.offsetHeight ?? (display.collapsed ? 56 : 160)
-  const left = Math.max(8, Math.min(pos.x + width / 2 - panelWidth.value / 2, viewport.value.width - panelWidth.value - 8))
-  const minTop = headerBottom()
-  const top = pos.y - panelHeight.value - 10 >= minTop ? pos.y - panelHeight.value - 10 : Math.max(minTop, Math.min(pos.y + height + 10, viewport.value.height - panelHeight.value - 8))
-  return { left: `${left}px`, top: `${top}px`, width: `${panelWidth.value}px` }
-})
-let observer: ResizeObserver | undefined
-let drag: { pointer: number; x: number; y: number; left: number; top: number } | null = null
+const available = computed(() => mounted.value && auth.isLoggedIn && (!!pets.pet || recovering.value) && display.visible && !layout.immersive)
+const placement = usePetPlacement({ element, panel, preferred: () => display.position, collapsed: () => display.collapsed || recovering.value,
+  active: () => available.value, panelOpen: () => panelOpen.value })
+const shown = computed(() => available.value && !placement.suppressed.value)
+const compact = placement.compact, narrow = placement.narrow, panelStyle = placement.panelStyle
+const actualPosition = computed(() => dragPosition.value ?? placement.position.value)
+let drag: { pointer: number; x: number; y: number; left: number; top: number; moved: boolean } | null = null
+let ignoreClickUntil = 0
 const completedRests = new Set<string>()
 
-function headerBottom() {
-  if (!mounted.value) return 80
-  const bottom = document.querySelector('[data-site-navigation]')?.getBoundingClientRect().bottom ?? 0
-  return Math.max(8, bottom + 8)
-}
-function bounded(x: number, y: number) {
-  const width = element.value?.offsetWidth ?? (display.collapsed ? 56 : 144)
-  const height = element.value?.offsetHeight ?? (display.collapsed ? 56 : 160)
-  return {
-    x: Math.max(8, Math.min(x, viewport.value.width - width - 8)),
-    y: Math.max(headerBottom(), Math.min(y, viewport.value.height - height - 12)),
-  }
-}
-function clampPosition() {
-  if (!mounted.value) return
-  viewport.value = { width: window.innerWidth, height: window.innerHeight }
-  const original = display.position ?? { x: window.innerWidth - (display.collapsed ? 72 : 168), y: window.innerHeight - (display.collapsed ? 132 : 220) }
-  const next = bounded(original.x, original.y)
-  if (!display.position || next.x !== display.position.x || next.y !== display.position.y) display.move(next.x, next.y)
-  if (panel.value) panelHeight.value = panel.value.offsetHeight
-}
 function pointerDown(event: PointerEvent) {
-  if (event.button !== 0) return
-  clampPosition()
-  panelOpen.value = false
-  const pos = display.position!
-  drag = { pointer: event.pointerId, x: event.clientX, y: event.clientY, left: pos.x, top: pos.y }
-  dragging.value = true
+  if (event.button !== 0 || event.isPrimary === false) return
+  placement.refresh()
+  const pos = placement.position.value
+  drag = { pointer: event.pointerId, x: event.clientX, y: event.clientY, left: pos.x, top: pos.y, moved: false }
   ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
 }
 function pointerMove(event: PointerEvent) {
   if (!drag || drag.pointer !== event.pointerId) return
-  const pos = bounded(drag.left + event.clientX - drag.x, drag.top + event.clientY - drag.y)
-  display.move(pos.x, pos.y)
+  if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 4 && !drag.moved) return
+  if (!drag.moved) panelOpen.value = false
+  drag.moved = true; dragging.value = true
+  dragPosition.value = placement.clamp({ x: drag.left + event.clientX - drag.x, y: drag.top + event.clientY - drag.y })
 }
 function pointerUp(event: PointerEvent) {
   if (!drag || drag.pointer !== event.pointerId) return
-  drag = null
-  dragging.value = false
-  if (display.position) display.move(display.position.x, display.position.y, true)
+  if (drag.moved && dragPosition.value) {
+    display.move(dragPosition.value.x, dragPosition.value.y, true)
+    ignoreClickUntil = Date.now() + 350
+  }
+  drag = null; dragPosition.value = null; dragging.value = false
+  placement.refresh()
   const target = event.currentTarget as HTMLElement
   if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId)
 }
-function pointerLost() { drag = null; dragging.value = false }
+function pointerLost() { drag = null; dragPosition.value = null; dragging.value = false }
 function moveByKey(event: KeyboardEvent) {
   const step = event.shiftKey ? 32 : 12
   const delta: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
-  if (!delta[event.key] || !display.position) return
+  if (!delta[event.key]) return
   event.preventDefault()
   const [x, y] = delta[event.key]!
-  const pos = bounded(display.position.x + x, display.position.y + y)
+  const pos = placement.clamp({ x: actualPosition.value.x + x, y: actualPosition.value.y + y })
   display.move(pos.x, pos.y, true)
 }
+function activateCharacter() {
+  if (Date.now() < ignoreClickUntil) return
+  if (display.collapsed && !narrow.value) collapse(false)
+  else panelOpen.value = !panelOpen.value
+}
 function close() { panelOpen.value = false; display.hide() }
-function collapse(value: boolean) { panelOpen.value = false; display.setCollapsed(value); void nextTick(clampPosition) }
+function collapse(value: boolean) { panelOpen.value = false; display.setCollapsed(value); placement.schedule() }
 function closeOutside(event: PointerEvent) {
   const target = event.target as Node
   if (!element.value?.contains(target) && !panel.value?.contains(target)) panelOpen.value = false
 }
 function onKey(event: KeyboardEvent) { if (event.key === 'Escape') panelOpen.value = false }
 function load() { if (mounted.value && auth.isLoggedIn && !document.hidden) void pets.ensureLoaded() }
-function onVisible() { if (!document.hidden) { load(); clampPosition(); reconcileRest() } }
+function onVisible() { if (!document.hidden) { load(); placement.schedule(); reconcileRest() } }
 function reconcileRest() {
   const pet = pets.pet
   if (!mounted.value || document.hidden || !auth.isLoggedIn || pet?.activity?.kind !== 'rest' || pet.activity.endsAt > now.value || pets.loading || pets.busy || pets.pending) return
@@ -114,31 +98,20 @@ function reconcileRest() {
 }
 watch(owner, () => { hadPet.value = false; panelOpen.value = false; completedRests.clear(); load() }, { flush: 'sync' })
 watch(() => pets.pet, value => { if (value && auth.isLoggedIn) hadPet.value = true }, { immediate: true })
-watch(() => route.path, () => { panelOpen.value = false })
+watch(() => route.path, () => { panelOpen.value = false; placement.schedule() })
 watch(() => [now.value, pets.pet?.activity?.endsAt, pets.loading, pets.busy, pets.pending], reconcileRest)
-watch(() => [shown.value, display.collapsed, display.position === null], () => { void nextTick(clampPosition) })
-watch(panelOpen, () => { void nextTick(clampPosition) })
-function observeSize() {
-  observer?.disconnect()
-  if (element.value) observer?.observe(element.value)
-  if (panel.value) observer?.observe(panel.value)
-}
-watch([element, panel], observeSize)
+watch(placement.suppressed, value => { if (value) { panelOpen.value = false; pointerLost() } })
+watch(panelOpen, async value => { if (value) { await nextTick(); panel.value?.focus() } })
 onMounted(() => {
   mounted.value = true
   display.restore()
-  clampPosition()
-  observer = new ResizeObserver(clampPosition)
-  observeSize()
-  window.addEventListener('resize', clampPosition)
+  placement.schedule()
   document.addEventListener('visibilitychange', onVisible)
   document.addEventListener('pointerdown', closeOutside)
   document.addEventListener('keydown', onKey)
   load()
 })
 onBeforeUnmount(() => {
-  observer?.disconnect()
-  window.removeEventListener('resize', clampPosition)
   document.removeEventListener('visibilitychange', onVisible)
   document.removeEventListener('pointerdown', closeOutside)
   document.removeEventListener('keydown', onKey)
@@ -147,27 +120,28 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport v-if="mounted" to="body">
-    <aside v-if="shown" ref="element" class="pet-desktop" :class="{ collapsed: display.collapsed, dragging, recovering }" :style="{ left: `${display.position?.x ?? 0}px`, top: `${display.position?.y ?? 0}px` }" :aria-label="pets.pet ? `${pets.pet.name}桌宠` : '桌宠状态恢复'">
+    <aside v-if="shown" ref="element" class="pet-desktop" :class="{ collapsed: compact, narrow, dragging, recovering }" :style="{ left: `${actualPosition.x}px`, top: `${actualPosition.y}px` }" :aria-label="pets.pet ? `${pets.pet.name}桌宠` : '桌宠状态恢复'">
       <div class="desktop-tools">
-        <button type="button" class="pet-drag-handle" title="拖动桌宠；方向键移动，双击恢复位置" aria-label="移动桌宠，支持方向键" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerUp" @pointercancel="pointerUp" @lostpointercapture="pointerLost" @keydown="moveByKey" @dblclick="display.resetPosition()"><PetIcon name="move" /></button>
-        <button v-if="!display.collapsed && !recovering" type="button" title="收起桌宠" aria-label="收起桌宠" @click="collapse(true)"><PetIcon name="minus" /></button>
+        <button type="button" class="pet-drag-handle" title="拖动桌宠；方向键移动，双击恢复位置" aria-label="移动桌宠，支持方向键" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerUp" @pointercancel="pointerLost" @lostpointercapture="pointerLost" @keydown="moveByKey" @dblclick="display.resetPosition()"><PetIcon name="move" /></button>
+        <button v-if="!compact && !recovering" type="button" title="收起桌宠" aria-label="收起桌宠" @click="collapse(true)"><PetIcon name="minus" /></button>
         <button type="button" title="隐藏桌宠，可在宠物家园重新显示" aria-label="隐藏桌宠" @click="close"><PetIcon name="close" /></button>
       </div>
-      <button v-if="pets.pet" type="button" class="pet-character" :aria-label="display.collapsed ? `展开${pets.pet.name}` : `照顾${pets.pet.name}`" :aria-expanded="panelOpen" @click="display.collapsed ? collapse(false) : panelOpen = !panelOpen">
-        <img :src="`/images/pets/${pets.pet.speciesId}.webp`" :alt="pets.pet.name" :width="display.collapsed ? 48 : 128" :height="display.collapsed ? 48 : 128" draggable="false" />
-        <span v-if="!display.collapsed" class="desktop-name">{{ pets.pet.name }}<small>Lv. {{ pets.pet.level }}</small></span>
+      <button v-if="pets.pet" type="button" class="pet-character" :aria-label="display.collapsed && !narrow ? `展开${pets.pet.name}` : `照顾${pets.pet.name}`" :title="narrow ? '点击照顾，拖动调整位置' : undefined" :aria-expanded="panelOpen" @click="activateCharacter" @pointerdown="narrow && pointerDown($event)" @pointermove="narrow && pointerMove($event)" @pointerup="narrow && pointerUp($event)" @pointercancel="pointerLost" @lostpointercapture="pointerLost" @keydown="narrow && moveByKey($event)">
+        <img :src="`/images/pets/${pets.pet.speciesId}.webp`" :alt="pets.pet.name" :width="compact ? 48 : 128" :height="compact ? 48 : 128" draggable="false" />
+        <span v-if="!compact" class="desktop-name">{{ pets.pet.name }}<small>Lv. {{ pets.pet.level }}</small></span>
         <span v-if="pets.pet.activity?.kind === 'rest'" class="desktop-sleep" aria-label="休息中">z</span>
         <span v-else-if="pets.pet.activity" class="desktop-activity" :aria-label="activityClaimable ? '活动成果待领取' : pets.pet.activity.kind === 'outing' ? '外出中' : pets.pet.activity.kind === 'work' ? '工作中' : '上课中'"><PetIcon :name="activityClaimable ? 'gift' : pets.pet.activity.kind" /></span>
       </button>
       <button v-else type="button" class="pet-recovery" aria-label="宠物状态暂不可用，打开恢复面板" title="宠物状态暂不可用" :aria-expanded="panelOpen" @click="panelOpen = !panelOpen"><PetIcon name="refresh" /></button>
     </aside>
-    <section v-if="shown && panelOpen" ref="panel" class="pet-desktop-panel" :style="panelStyle" :aria-label="pets.pet ? `照顾${pets.pet.name}` : '恢复宠物状态'">
-      <header><div><strong>{{ pets.pet?.name ?? '宠物状态未更新' }}</strong><span v-if="pets.pet">Lv. {{ pets.pet.level }}</span></div><RouterLink to="/pets" title="打开宠物家园" aria-label="打开宠物家园" @click="panelOpen = false"><PetIcon name="home" /></RouterLink></header>
+    <section v-if="shown && panelOpen" ref="panel" class="pet-desktop-panel" :style="panelStyle" tabindex="-1" :aria-label="pets.pet ? `照顾${pets.pet.name}` : '恢复宠物状态'">
+      <header><div><strong>{{ pets.pet?.name ?? '宠物状态未更新' }}</strong><span v-if="pets.pet">Lv. {{ pets.pet.level }}</span></div><RouterLink to="/pets" title="打开宠物家园" aria-label="打开宠物家园" @click="panelOpen = false"><PetIcon name="home" /></RouterLink><button type="button" class="desktop-panel-close" aria-label="关闭桌宠面板" @click="panelOpen = false"><PetIcon name="close" /></button></header>
       <div v-if="pets.pet" class="desktop-stats"><span>饱食 <b>{{ pets.pet.hunger }}</b></span><span>水分 <b>{{ pets.pet.water }}</b></span><span>心情 <b>{{ pets.pet.mood }}</b></span><span>精力 <b>{{ pets.pet.energy }}</b></span></div>
       <PetActions v-if="pets.pet" compact />
       <PetFeedback />
       <p v-if="pets.pet?.activity" class="desktop-hint">{{ activityText }}</p>
       <RouterLink v-if="pets.pet?.activity && pets.pet.activity.kind !== 'rest'" class="desktop-activity-link" to="/pets#pet-activities" @click="panelOpen = false">{{ activityClaimable ? '回家领取成果' : '查看活动' }} <span aria-hidden="true">↗</span></RouterLink>
+      <footer class="desktop-panel-tools"><button v-if="!narrow" type="button" @click="collapse(!display.collapsed)">{{ display.collapsed ? '展开桌宠' : '收起桌宠' }}</button><button type="button" @click="display.resetPosition(); panelOpen = false">恢复位置</button><button type="button" @click="close">隐藏桌宠</button></footer>
     </section>
   </Teleport>
 </template>
@@ -175,6 +149,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .pet-desktop { position: fixed; z-index: 35; width: 144px; color: var(--fp-text); user-select: none; }
 .pet-desktop.collapsed, .pet-desktop.recovering { width: 56px; }
+.pet-desktop.narrow { width: 48px; }.narrow .desktop-tools { display: none; }.narrow .pet-character { width: 48px; height: 48px; touch-action: none; }.narrow .pet-character img { width: 44px; height: 44px; }.narrow .pet-character:hover img { transform: none; }.narrow .pet-recovery { margin: 0; }
 .desktop-tools { display: flex; align-items: center; justify-content: center; gap: 2px; opacity: 0; transition: opacity .16s; }
 .pet-desktop:hover .desktop-tools, .pet-desktop:focus-within .desktop-tools, .pet-desktop.dragging .desktop-tools { opacity: 1; }
 .desktop-tools button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--fp-border); border-radius: 7px; color: var(--fp-muted); background: var(--fp-card); cursor: pointer; }
@@ -187,15 +162,14 @@ onBeforeUnmount(() => {
 .desktop-sleep { position: absolute; top: 18px; right: 15px; font-weight: 700; font-size: 16px; color: var(--fp-muted); }
 .desktop-activity { position: absolute; right: 12px; top: 16px; display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-primary); background: var(--fp-card); }.desktop-activity svg { width: 15px; height: 15px; }.collapsed .desktop-activity { width: 20px; height: 20px; right: -4px; top: -5px; border-radius: 6px; }.collapsed .desktop-activity svg { width: 12px; height: 12px; }
 .collapsed .pet-character { border: 1px solid var(--fp-border); border-radius: 14px; background: var(--fp-card); box-shadow: 0 4px 16px rgb(0 0 0 / .06); }.collapsed .desktop-sleep { top: 2px; right: 5px; font-size: 12px; }.collapsed .desktop-tools { margin-bottom: 4px; }.collapsed .desktop-tools button { width: 24px; height: 24px; }
-.pet-desktop-panel { position: fixed; z-index: 36; padding: 14px; border: 1px solid var(--fp-border); border-radius: 14px; background: var(--fp-card); color: var(--fp-text); box-shadow: 0 10px 36px rgb(0 0 0 / .12); max-height: calc(100dvh - 100px); overflow: auto; }
+.pet-desktop-panel { position: fixed; z-index: 36; box-sizing: border-box; padding: 14px; border: 1px solid var(--fp-border); border-radius: 14px; background: var(--fp-card); color: var(--fp-text); box-shadow: 0 10px 36px rgb(0 0 0 / .12); overflow: auto; overscroll-behavior: contain; outline: none; }
 .pet-desktop-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; }.pet-desktop-panel header > div { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }.pet-desktop-panel strong { font-size: 14px; overflow-wrap: anywhere; }.pet-desktop-panel header span { color: var(--fp-muted); font-size: 11px; }.pet-desktop-panel header a { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--fp-muted); }.pet-desktop-panel header a:hover { color: var(--fp-primary); background: var(--fp-hover); }.pet-desktop-panel header svg { width: 17px; height: 17px; }
 .desktop-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 0 0 12px; border-bottom: 1px solid var(--fp-border); margin-bottom: 8px; }.desktop-stats span { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--fp-muted); }.desktop-stats b { color: var(--fp-text); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .desktop-hint { margin: 8px 0 0; color: var(--fp-muted); font-size: 11px; }.pet-desktop-panel :deep(.pet-feedback) { margin-top: 8px; font-size: 11px; }
 .desktop-activity-link { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 8px 10px; border-radius: 7px; background: var(--fp-primary-soft); color: var(--fp-primary); font-size: 12px; text-decoration: none; }.desktop-activity-link:hover { text-decoration: underline; }
+.desktop-panel-close { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; color: var(--fp-muted); background: transparent; cursor: pointer; }.pet-desktop-panel header > div { flex: 1; }.desktop-panel-close:hover { background: var(--fp-hover); color: var(--fp-text); }.desktop-panel-tools { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 8px; margin-top: 10px; border-top: 1px solid var(--fp-border); }.desktop-panel-tools button { flex: 1; min-height: 36px; padding: 7px 5px; font: inherit; font-size: 11px; color: var(--fp-muted); border: 0; border-radius: 7px; background: transparent; cursor: pointer; }.desktop-panel-tools button:hover { background: var(--fp-hover); }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
 @media (hover: none) { .desktop-tools { opacity: 1; }.desktop-tools button { width: 32px; height: 32px; } }
+@media (max-width: 640px) { .pet-desktop-panel { padding: 12px; }.pet-desktop-panel header { padding-bottom: 8px; gap: 6px; }.pet-desktop-panel header a, .desktop-panel-close { width: 44px; height: 44px; }.desktop-panel-tools button, .desktop-activity-link { min-height: 44px; }.pet-desktop-panel :deep(.pet-actions button) { min-height: 44px; }.pet-desktop-panel :deep(.pet-feedback button) { width: 44px; height: 44px; }.pet-desktop-panel .desktop-stats { gap: 4px; } }
 @media (prefers-reduced-motion: reduce) { .desktop-tools, .pet-character img { transition: none; } }
-</style>
-<style>
-body:has(.img-zoom, .vditor--fullscreen) :is(.pet-desktop, .pet-desktop-panel) { visibility: hidden; pointer-events: none; }
 </style>

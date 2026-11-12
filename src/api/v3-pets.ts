@@ -114,6 +114,7 @@ export interface PetCatalog {
   courses: PetActivityEntry[]
   jobs: PetJobEntry[]
   incomeRules: { dailyLimit: number }
+  growthRules?: { experiencePerLevel: number; maxLevel: number; careExperience: number; careFriendship: number }
   rules: {
     maxNameLength: number; initialCoins: number; initialFood: number
     dailyCoins: number; dailyFood: number; restDurationMs: number
@@ -343,6 +344,12 @@ export function decodePetCatalog(value: unknown): PetCatalog {
   }
   if (catalog.species.length !== 4 || catalog.skills.length !== 6 || catalog.jobs.length !== 6 || !catalog.items.some(item => item.id === 'food')) throw invalid()
   const itemIds = new Set(catalog.items.map(item => item.id)), collectionIds = new Set(catalog.collections.map(item => item.id))
+  // 旧目录缺失时保持未知，不在客户端补造成长规则。
+  if (row.growthRules !== undefined) {
+    const growth = object(row.growthRules)
+    catalog.growthRules = { experiencePerLevel: integer(growth.experiencePerLevel, 1), maxLevel: integer(growth.maxLevel, 1, 30),
+      careExperience: integer(growth.careExperience), careFriendship: integer(growth.careFriendship, 0, 100) }
+  }
   if (catalog.items.some(item => item.hunger !== item.effects.hunger)
       || catalog.recipes.some(recipe => !collectionIds.has(recipe.collectionId) || !recipe.ingredients.length
         || recipe.ingredients.some(item => !itemIds.has(item.itemId)))
@@ -467,8 +474,30 @@ export function decodePetJournal(value: unknown): PetJournal {
   return { serverNow, list: unique(records, item => `${item.recordType}:${item.id}`), pagination }
 }
 
+// 截止时间包含响应正文读取；写入超时只代表结果未知，不能据此重新生成命令。
+async function petRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const controller = new AbortController()
+  const cancel = () => controller.abort(init.signal?.reason)
+  const timer = setTimeout(() => controller.abort(new ApiError('等待响应超时，请稍后核对', 0, 'pet_timeout')), 15_000)
+  init.signal?.addEventListener('abort', cancel, { once: true })
+  if (init.signal?.aborted) cancel()
+  let rejectAbort: (() => void) | undefined
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      rejectAbort = () => reject(controller.signal.reason ?? new DOMException('已取消', 'AbortError'))
+      controller.signal.addEventListener('abort', rejectAbort, { once: true })
+      if (controller.signal.aborted) { rejectAbort(); return }
+      request<T>(path, { ...init, signal: controller.signal }).then(resolve, reject)
+    })
+  } finally {
+    clearTimeout(timer)
+    init.signal?.removeEventListener('abort', cancel)
+    if (rejectAbort) controller.signal.removeEventListener('abort', rejectAbort)
+  }
+}
+
 async function read<T>(path: string, decode: (value: unknown) => T, signal?: AbortSignal): Promise<T> {
-  const result = await request<{ code: number; data: unknown }>(path, { signal, cache: 'no-store' })
+  const result = await petRequest<{ code: number; data: unknown }>(path, { signal, cache: 'no-store' })
   if (result?.code !== 0) throw invalid()
   return decode(result.data)
 }
@@ -491,16 +520,16 @@ export async function readPetJournal(kind: PetHistoryKind, page: number, signal?
   return result
 }
 
-export async function executePetCommand(command: PetCommand): Promise<void> {
+export async function executePetCommand(command: PetCommand, signal?: AbortSignal): Promise<void> {
   if (!/^[A-Za-z0-9._:-]{1,128}$/.test(command.key)) throw new ApiError('操作标识不合法', 422)
   const { kind, key, ...input } = command
   // 命令的本地路由标识与服务端活动类型分开，原键恢复始终发送冻结的活动类型。
   const body = command.kind === 'activities'
     ? { petId: command.petId, kind: command.activityKind, entryId: command.entryId, activityVersion: command.activityVersion }
     : input
-  const response = await request<{ code: number; data: unknown }>(`/api/v3/me/pet/${kind}`, {
+  const response = await petRequest<{ code: number; data: unknown }>(`/api/v3/me/pet/${kind}`, {
     method: kind === 'name' ? 'PUT' : 'POST',
-    headers: { 'Idempotency-Key': key }, body: JSON.stringify(body),
+    headers: { 'Idempotency-Key': key }, body: JSON.stringify(body), signal,
   })
   if (response?.code !== 0) throw invalid()
   const receipt = object(response.data)
