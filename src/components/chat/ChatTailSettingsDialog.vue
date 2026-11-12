@@ -81,7 +81,7 @@ onBeforeUnmount(() => { sequence++; unlock() })
         <label class="tail-field" for="chat-tail-text">内容<span :class="{ 'over-limit': length !== null && length > CHAT_TAIL_MAX_LENGTH }">{{ length === null ? '最多 24 字' : `${length} / ${CHAT_TAIL_MAX_LENGTH}` }}</span></label>
         <input id="chat-tail-text" v-model="text" class="tail-input" type="text" :disabled="frozen" placeholder="写一句你的小尾巴" autocomplete="off" @input="markDirty" @compositionstart="composing = true" @compositionend="composing = false">
         <small class="tail-hint">仅单行文字和 Emoji，组合表情按一个计数。</small>
-        <div class="tail-preview" aria-label="小尾巴预览"><span>今天也要开心摸鱼</span><span v-if="enabled && text.trim()" class="tail-preview-text"><span class="tail-preview-label">小尾巴</span><span>{{ text }}</span></span></div>
+        <div class="tail-preview" aria-label="小尾巴预览"><span>今天也要开心摸鱼</span><span v-if="enabled && text.trim()" class="tail-preview-text"><svg class="tail-preview-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="小尾巴"><title>小尾巴</title><path d="M20.2 3.8a5.5 5.5 0 0 1 0 7.8L9 23H1v-8L12.2 3.8a5.5 5.5 0 0 1 8 0Z" transform="translate(1 -1) scale(.92)"/><path d="m5 19 10-10M9 15h5"/></svg><span>{{ text }}</span></span></div>
         <p class="tail-hint">特殊卡片、纯图片和纯引用不附加；精简模式会隐藏小尾巴。修改不影响历史消息。</p>
       </template>
       <p v-if="dirty && validation" class="tail-error" role="alert">{{ validation }}</p>
@@ -159,7 +159,7 @@ onBeforeUnmount(() => { sequence++; unlock() })
   color: var(--fp-muted);
   white-space: pre-wrap;
 }
-.tail-preview-label { flex: none; font-size: 10px; letter-spacing: .02em; }
+.tail-preview-label { flex: none; width: 13px; height: 13px; align-self: flex-start; margin-top: 2px; }
 .tail-error { margin: 0; font-size: 12px; line-height: 1.7; }
 .tail-actions {
   display: flex;

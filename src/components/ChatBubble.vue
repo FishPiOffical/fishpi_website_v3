@@ -144,7 +144,7 @@ function onBodyClick(e: MouseEvent) {
             <ChatQuoteCard v-for="(quote, index) in display.quotes" :key="index" :quote="quote" />
           </div>
         </slot>
-        <p v-if="chatroom && tail && !simpleMode && !isStandalone" class="fp-chat-tail" data-chat-tail><span class="tail-label">小尾巴</span><span class="tail-content">{{ tail.text }}</span></p>
+        <p v-if="chatroom && tail && !simpleMode && !isStandalone" class="fp-chat-tail" data-chat-tail><svg class="tail-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="小尾巴"><title>小尾巴</title><path d="M20.2 3.8a5.5 5.5 0 0 1 0 7.8L9 23H1v-8L12.2 3.8a5.5 5.5 0 0 1 8 0Z" transform="translate(1 -1) scale(.92)"/><path d="m5 19 10-10M9 15h5"/></svg><span class="tail-content">{{ tail.text }}</span></p>
         <template v-if="!chatroom">
           <slot name="reactions" />
           <div class="foot">
@@ -205,8 +205,10 @@ function onBodyClick(e: MouseEvent) {
 }
 .tail-label {
   flex: none;
-  font-size: 10px;
-  letter-spacing: .02em;
+  width: 13px;
+  height: 13px;
+  align-self: flex-start;
+  margin-top: 2px;
 }
 .tail-content { min-width: 0; }
 .is-self .fp-bubble {
