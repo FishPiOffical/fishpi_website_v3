@@ -7,6 +7,7 @@ import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
 import ChatQuotePreview from '@/components/chat/ChatQuotePreview.vue'
 import { breezemoonQuoteMarkdown, chatMessageQuotePreview, createBreezemoonQuote, type ChatQuote, type BreezemoonQuoteSource } from '@/utils/chatQuote'
 import ChatRoomNotice from '@/components/chat/ChatRoomNotice.vue'
+import ChatMessageEntry from '@/components/chat/ChatMessageEntry.vue'
 import { useV3ChatTimelineStore } from '@/stores/v3ChatTimeline'
 import ChatConnectionStatus from '@/components/chat/ChatConnectionStatus.vue'
 import { storeToRefs } from 'pinia'
@@ -143,6 +144,22 @@ const sentMessageId = ref('')
 let followingLatest = true
 const firstVisibleId = computed(() => visibleMessages.value[0]?.oId)
 const latestVisibleKey = computed(() => timelineEntries.value.at(-1)?.key)
+const animatedEntryKeys = ref(new Set<string>())
+watch(timelineEntries, (entries, previous) => {
+  animatedEntryKeys.value = new Set()
+  if (!previous?.length || loading.value || loadingMore.value || contextId.value) return
+  if (chatStyle.value === 'modern' && !followingLatest) return
+  // 翻阅经典模式的历史记录时不扩张布局，避免阅读位置受到动画干扰。
+  if (chatStyle.value === 'classic' && typeof document !== 'undefined') {
+    const list = document.querySelector('.cr-classic-list')
+    if (list && list.getBoundingClientRect().top < -100) return
+  }
+  const previousKeys = new Set(previous.map(entry => entry.key))
+  const newestTime = Math.max(...previous.map(entry => entry.time))
+  animatedEntryKeys.value = new Set(entries
+    .filter(entry => !previousKeys.has(entry.key) && entry.time >= newestTime)
+    .slice(-10).map(entry => entry.key))
+})
 
 function nearLatest(el: HTMLElement) {
   return el.scrollHeight - el.scrollTop - el.clientHeight < 100
@@ -405,7 +422,7 @@ function clearScreen() {
             <p v-else-if="messages.length && !timelineEntries.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
             <p v-else-if="!timelineEntries.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
 
-            <template v-for="entry in classicEntries" :key="entry.key">
+            <ChatMessageEntry v-for="entry in classicEntries" :key="entry.key" :animate="animatedEntryKeys.has(entry.key)">
               <ChatRoomNotice v-if="entry.notice" :notice="entry.notice" />
               <ChatBubble
                 v-else-if="entry.message"
@@ -439,7 +456,7 @@ function clearScreen() {
                   <ReportDialog v-if="entry.message.userOId !== auth.account?.oId && auth.accessToken" :data-id="entry.message.oId" :data-type="3" />
                 </template>
               </ChatBubble>
-            </template>
+            </ChatMessageEntry>
 
             <!-- 底部查看更早记录 -->
             <div class="classic-load-bottom">
@@ -515,7 +532,7 @@ function clearScreen() {
           <p v-else-if="!timelineEntries.length" class="empty-hint">暂无新消息，快来打破宁静吧！</p>
 
           <div class="messages-container">
-            <template v-for="entry in timelineEntries" :key="entry.key">
+            <ChatMessageEntry v-for="entry in timelineEntries" :key="entry.key" :animate="animatedEntryKeys.has(entry.key)">
               <ChatRoomNotice v-if="entry.notice" :notice="entry.notice" />
               <ChatBubble
                 v-else-if="entry.message"
@@ -549,7 +566,7 @@ function clearScreen() {
                   <ReportDialog v-if="entry.message.userOId !== auth.account?.oId && auth.accessToken" :data-id="entry.message.oId" :data-type="3" />
                 </template>
               </ChatBubble>
-            </template>
+            </ChatMessageEntry>
           </div>
 
           <p v-if="!isLoggedIn && visibleMessages.length" class="guest-tip-bottom">
