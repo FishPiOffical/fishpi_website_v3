@@ -795,7 +795,7 @@ function clearScreen() {
 /* 下方消息列表 */
 .cr-classic-list {
   border-top: 1px solid var(--fp-border);
-  padding: 16px 20px;
+  padding: 16px 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -956,7 +956,7 @@ function clearScreen() {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 16px 24px;
   display: flex;
   flex-direction: column;
 }
@@ -989,6 +989,22 @@ function clearScreen() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* 两种模式共用居中的阅读宽度，编辑器和消息滚动容器仍铺满主栏。 */
+.cr-classic-list > .chat-message-entry,
+.messages-container {
+  width: 100%;
+  max-width: 880px;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+@media (max-width: 600px) {
+  .cr-classic-list,
+  .chat-messages-scroll {
+    padding-inline: 12px;
+  }
 }
 
 .guest-tip-bottom {
