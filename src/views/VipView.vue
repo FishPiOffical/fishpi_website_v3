@@ -5,5 +5,9 @@ usePageSeo(() => ({ title: '摸鱼派 VIP', path: '/vips', robots: 'noindex' }))
 </script>
 
 <template>
-  <div class="fp-page fp-ui fp-surface"><OwnerMembership /></div>
+  <div class="fp-page fp-ui vip-page"><OwnerMembership /></div>
 </template>
+
+<style scoped>
+.vip-page { max-width: 1240px; margin-inline: auto; }
+</style>
