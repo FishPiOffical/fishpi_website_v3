@@ -9,12 +9,69 @@ export function useHomeDrag() {
   const dragging = ref<HomeModuleId | null>(null)
   const target = ref<HomeDropTarget | null>(null)
 
+  let scrollFrame = 0
+  let lastFrame = 0
+  let pointer: { x: number; y: number } | null = null
+
+  function stopScroll() {
+    if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
+    scrollFrame = 0
+    lastFrame = 0
+    pointer = null
+  }
+
+  function selectModule(id: HomeModuleId, element: HTMLElement, x: number, y: number) {
+    if (!dragging.value || id === dragging.value) { target.value = null; return }
+    const r = element.getBoundingClientRect()
+    const edge = Math.min(r.width * 0.25, 80)
+    const canSide = layout.canAddCell(id, dragging.value)
+    if (canSide && x - r.left < edge) target.value = { kind: 'side', anchor: id, after: false }
+    else if (canSide && r.right - x < edge) target.value = { kind: 'side', anchor: id, after: true }
+    else target.value = { kind: 'stack', anchor: id, after: y - r.top > r.height / 2 }
+  }
+
+  function scrollStep(time: number) {
+    scrollFrame = 0
+    if (!pointer || !dragging.value || !layout.editing) return
+    const { x, y } = pointer
+    const band = Math.min(120, window.innerHeight / 4)
+    const speed = y < band ? -(1 - y / band) : y > window.innerHeight - band ? (y - window.innerHeight + band) / band : 0
+    const elapsed = lastFrame ? Math.min(time - lastFrame, 32) : 16
+    lastFrame = time
+    if (speed) window.scrollBy({ top: Math.max(-1, Math.min(1, speed)) * 720 * elapsed / 1000, behavior: 'instant' })
+    // 滚动后重新命中落点，鼠标停住时也不能沿用滚动前的模块位置。
+    const hit = document.elementFromPoint(x, y)
+    const card = hit?.closest<HTMLElement>('.home.editing [data-home-module]')
+    const gap = hit?.closest<HTMLElement>('[data-home-row-gap]')
+    if (card) selectModule(card.dataset.homeModule as HomeModuleId, card, x, y)
+    else if (gap) target.value = { kind: 'row', anchor: (gap.dataset.homeRowGap || null) as HomeModuleId | null }
+    else target.value = null
+    scrollFrame = window.requestAnimationFrame(scrollStep)
+  }
+
+  function trackPointer(e: DragEvent) {
+    if (!dragging.value) return
+    if (e.clientX < 0 || e.clientX >= window.innerWidth || e.clientY < 0 || e.clientY >= window.innerHeight) { stopScroll(); return }
+    pointer = { x: e.clientX, y: e.clientY }
+    if (!scrollFrame) scrollFrame = window.requestAnimationFrame(scrollStep)
+  }
+
+  function leaveWindow(e: DragEvent) {
+    if (!e.relatedTarget) { stopScroll(); target.value = null }
+  }
+
   function onDragStart(e: DragEvent, id: HomeModuleId) {
     if (!layout.editing) {
       e.preventDefault()
       return
     }
+    onDragEnd()
     dragging.value = id
+    document.addEventListener('dragover', trackPointer, true)
+    document.addEventListener('dragleave', leaveWindow)
+    window.addEventListener('drop', onDragEnd)
+    window.addEventListener('dragend', onDragEnd)
+    window.addEventListener('blur', onDragEnd)
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move'
       e.dataTransfer.setData('text/plain', id)
@@ -24,6 +81,14 @@ export function useHomeDrag() {
   }
 
   function onDragEnd() {
+    if (typeof window !== 'undefined') {
+      stopScroll()
+      document.removeEventListener('dragover', trackPointer, true)
+      document.removeEventListener('dragleave', leaveWindow)
+      window.removeEventListener('drop', onDragEnd)
+      window.removeEventListener('dragend', onDragEnd)
+      window.removeEventListener('blur', onDragEnd)
+    }
     dragging.value = null
     target.value = null
   }
@@ -32,16 +97,7 @@ export function useHomeDrag() {
     if (!dragging.value) return
     e.preventDefault()
     e.stopPropagation()
-    if (id === dragging.value) {
-      target.value = null
-      return
-    }
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const edge = Math.min(r.width * 0.25, 80)
-    const canSide = layout.canAddCell(id, dragging.value)
-    if (canSide && e.clientX - r.left < edge) target.value = { kind: 'side', anchor: id, after: false }
-    else if (canSide && r.right - e.clientX < edge) target.value = { kind: 'side', anchor: id, after: true }
-    else target.value = { kind: 'stack', anchor: id, after: e.clientY - r.top > r.height / 2 }
+    selectModule(id, e.currentTarget as HTMLElement, e.clientX, e.clientY)
   }
 
   function onGapOver(e: DragEvent, anchor: HomeModuleId | null) {
@@ -78,7 +134,7 @@ export function useHomeDrag() {
     document.querySelector<HTMLElement>(`[data-home-module="${id}"] .mod-drag-bar`)?.focus()
   }
 
-  watch(() => layout.editing, value => { if (!value) onDragEnd() })
+  watch(() => layout.editing, value => { if (!value) onDragEnd() }, { flush: 'sync' })
   onScopeDispose(onDragEnd)
 
   function edgeOf(id: HomeModuleId): HomeDropEdge | null {

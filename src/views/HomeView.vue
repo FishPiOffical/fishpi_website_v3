@@ -152,7 +152,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
       <button type="button" class="green" @click="retryHomeReads">重试首页读取</button>
     </div>
     <div v-if="editing" class="edit-bar" role="toolbar" aria-label="首页布局编辑">
-      <div class="edit-bar-copy"><strong>调整首页布局</strong><span>拖住九点栏移动 · 上下排序，左右分栏 · 自动保存</span></div>
+      <div class="edit-bar-copy"><strong>调整首页布局</strong><span>紧凑编辑 · 拖至屏幕边缘自动滚动 · 自动保存</span></div>
       <button type="button" @click="layout.resetPositions()">恢复默认位置</button>
       <button type="button" class="green" @click="editing = false">完成</button>
     </div>
@@ -160,6 +160,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
       <div
         v-if="editing"
         class="row-gap"
+        :data-home-row-gap="row.cells[0].modules[0].id"
         :class="{ on: gapActive(row.cells[0].modules[0].id) }"
         @dragover="onGapOver($event, row.cells[0].modules[0].id)"
         @drop="onDrop"
@@ -395,7 +396,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
         </div>
       </div>
     </template>
-    <div v-if="editing" class="row-gap end" :class="{ on: gapActive(null) }" @dragover="onGapOver($event, null)" @drop="onDrop">
+    <div v-if="editing" class="row-gap end" data-home-row-gap="" :class="{ on: gapActive(null) }" @dragover="onGapOver($event, null)" @drop="onDrop">
       拖到这里新起一行
     </div>
   </div>
@@ -539,7 +540,15 @@ function scrollShelf(id: string, dir: -1 | 1) {
   background: var(--fp-card);
   align-content: start;
 }
+/* 只隐藏内容，保留组件挂载、草稿和折叠状态；结束编辑即恢复。 */
+.home.editing .board .cell > .mod {
+  flex: 0 0 auto;
+  display: block;
+  min-height: 0;
+}
+.home.editing .board { align-items: start; }
 .home.editing .mod > :not(.mod-drag-bar):not(.drop-caption) {
+  display: none !important;
   pointer-events: none;
   user-select: none;
 }
@@ -549,11 +558,10 @@ function scrollShelf(id: string, dir: -1 | 1) {
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 44px;
-  padding: 8px 12px;
+  min-height: 56px;
+  padding: 10px 12px;
   border: 0;
-  border-bottom: 1px solid var(--fp-border);
-  border-radius: var(--fp-panel-radius, 12px) var(--fp-panel-radius, 12px) 0 0;
+  border-radius: var(--fp-panel-radius, 12px);
   color: var(--fp-text);
   background: var(--fp-surface-subtle, var(--fp-bg));
   font: inherit;

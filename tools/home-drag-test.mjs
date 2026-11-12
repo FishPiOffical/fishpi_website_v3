@@ -66,5 +66,35 @@ const before = JSON.stringify(layout.state.rows)
 drag.onDrop(event())
 assert.equal(JSON.stringify(layout.state.rows), before)
 assert.ok(prevented > 0)
+// 用可控帧时钟验证持续滚动、边缘速度及结束后的资源清理。
+let frameId = 0
+const frames = new Map()
+window.requestAnimationFrame = callback => { frames.set(++frameId, callback); return frameId }
+window.cancelAnimationFrame = id => frames.delete(id)
+const scrolls = []
+window.scrollBy = options => scrolls.push(options.top)
+document.elementFromPoint = () => card
+function tick(time) { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback(time)) }
+function pointerAt(y) { document.dispatchEvent(new window.MouseEvent('dragover', { clientX: 150, clientY: y, bubbles: true })) }
+layout.editing = true
+drag.onDragStart(event(), 'chat')
+pointerAt(window.innerHeight - 60); tick(16)
+assert.ok(scrolls.at(-1) > 0, '底边向下滚动')
+const slower = scrolls.at(-1)
+pointerAt(window.innerHeight - 5); tick(32)
+assert.ok(scrolls.at(-1) > slower, '越靠近边缘越快')
+pointerAt(5); tick(48)
+assert.ok(scrolls.at(-1) < 0, '顶边向上滚动')
+pointerAt(window.innerHeight / 2); const count = scrolls.length; tick(64)
+assert.equal(scrolls.length, count, '回到中间停止滚动')
+window.dispatchEvent(new window.Event('blur'))
+assert.equal(frames.size, 0, '窗口失焦清理滚动帧')
+assert.equal(drag.dragging.value, null)
+drag.onDragStart(event(), 'chat'); pointerAt(5)
+layout.editing = false; await nextTick()
+assert.equal(frames.size, 0, '退出编辑立即取消滚动')
+layout.editing = true; drag.onDragStart(event(), 'chat'); pointerAt(5)
 scope.stop()
+assert.equal(frames.size, 0, '卸载不遗留滚动帧')
+console.log('边缘滚动：上下方向、渐进速度、中间停止、失焦、退出和卸载清理通过')
 console.log('首页拖动：编辑权限、整卡预览、上下排序、左右分栏、新建行、键盘焦点、取消与迟到 drop 均通过')
