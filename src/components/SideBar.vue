@@ -8,6 +8,7 @@ import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
 import PersonInfoCard from '@/components/sidebar/PersonInfoCard.vue'
 import BreezemoonFeed from '@/components/sidebar/BreezemoonFeed.vue'
+import SidebarModuleHeader from '@/components/sidebar/SidebarModuleHeader.vue'
 import IncomeModule from '@/chat/sidebar/modules/IncomeModule.vue'
 import AppearanceModule from '@/chat/sidebar/modules/AppearanceModule.vue'
 import AdModule from '@/chat/sidebar/modules/AdModule.vue'
@@ -22,15 +23,7 @@ const uid = useId()
 const ready = ref(false)
 onMounted(() => { ready.value = true })
 
-const ICONS: Record<PageSidebarModuleId, string> = {
-  profile: '👤',
-  checkin: '📅',
-  download: '📱',
-  breezemoons: '🌙',
-  income: '🕒',
-  appearance: '🎨',
-  ad: '✨',
-}
+const summaries = ref<Partial<Record<PageSidebarModuleId, string>>>({})
 
 function goDownload() {
   void router.push('/download')
@@ -70,17 +63,15 @@ function goDownload() {
           :class="{ 'is-collapsed': pageSidebar.isCollapsed(mod.id) }"
         >
           <header class="module-header side-module-head">
-            <button
-              type="button"
-              class="head-toggle"
-              :aria-expanded="!pageSidebar.isCollapsed(mod.id)"
-              :aria-controls="`${uid}-${mod.id}`"
-              @click="pageSidebar.toggleCollapsed(mod.id)"
-            >
-              <span class="mod-ico" aria-hidden="true">{{ ICONS[mod.id] }}</span>
-              <h2>{{ mod.title }}</h2>
-              <span class="chevron" aria-hidden="true">▾</span>
-            </button>
+            <SidebarModuleHeader
+              :module-id="mod.id"
+              :title="mod.title"
+              :expanded="!pageSidebar.isCollapsed(mod.id)"
+              :controls="`${uid}-${mod.id}`"
+              :summary="summaries[mod.id]"
+              heading="h2"
+              @toggle="pageSidebar.toggleCollapsed(mod.id)"
+            />
             <RouterLink v-if="mod.id === 'breezemoons'" to="/breezemoons" class="more-link">更多</RouterLink>
           </header>
 
@@ -90,7 +81,7 @@ function goDownload() {
             class="module-panel side-module-body"
           >
             <PersonInfoCard v-if="mod.id === 'profile'" />
-            <CheckinPanel v-else-if="mod.id === 'checkin'" class="embedded-checkin" />
+            <CheckinPanel v-else-if="mod.id === 'checkin'" class="embedded-checkin" @summary="summaries.checkin = $event" />
             <div v-else-if="mod.id === 'download'" class="app-download">
               <div class="app-left">
                 <img src="https://file.fishpi.cn/logo_app.png" width="36" height="36" alt="摸鱼派客户端" />
@@ -101,7 +92,7 @@ function goDownload() {
               </div>
               <button type="button" class="btn green small" @click="goDownload">下载</button>
             </div>
-            <BreezemoonFeed v-else-if="mod.id === 'breezemoons'" />
+            <BreezemoonFeed v-else-if="mod.id === 'breezemoons'" @summary="summaries.breezemoons = $event" />
             <IncomeModule v-else-if="mod.id === 'income'" />
             <AppearanceModule v-else-if="mod.id === 'appearance'" />
             <AdModule v-else-if="mod.id === 'ad'" />
@@ -172,57 +163,12 @@ function goDownload() {
 }
 
 .side-module-head {
-  padding: 0 12px 0 0;
-  gap: 8px;
-  background: color-mix(in srgb, var(--fp-card) 96%, var(--fp-text) 4%);
+  padding: 0;
+  gap: 0;
 }
 
 .side-module-card.is-collapsed .side-module-head {
   border-bottom-color: transparent;
-}
-
-.head-toggle {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 12px 11px 14px;
-  border: 0;
-  background: transparent;
-  color: var(--fp-head);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: color 0.16s ease, background-color 0.16s ease;
-}
-
-.head-toggle:hover {
-  color: var(--fp-title);
-  background: var(--fp-hover);
-}
-
-.head-toggle h2 {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--fp-title);
-  margin: 0;
-}
-
-.mod-ico {
-  font-size: 13px;
-  line-height: 1;
-}
-
-.chevron {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--fp-muted);
-  transition: transform 0.16s ease;
-}
-
-.head-toggle[aria-expanded='false'] .chevron {
-  transform: rotate(-90deg);
 }
 
 .more-link {
@@ -231,6 +177,7 @@ function goDownload() {
   color: var(--fp-muted);
   text-decoration: none;
   padding: 2px 4px;
+  margin-right: 10px;
   border-radius: 4px;
 }
 
