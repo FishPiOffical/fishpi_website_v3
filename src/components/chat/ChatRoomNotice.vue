@@ -9,14 +9,14 @@ const packets = useV3ChatRedPacketsStore()
 
 <template>
   <p class="chat-room-notice" :class="{ 'is-claim': notice.kind === 'claim' }">
-    <RouterLink :to="`/member/${notice.actor.userName}`">{{ notice.actor.userNickname || notice.actor.userName }}</RouterLink>
     <template v-if="notice.kind === 'claim'">
+      <RouterLink :to="`/member/${notice.actor.userName}`">{{ notice.actor.userNickname || notice.actor.userName }}</RouterLink>
       领取了
       <RouterLink :to="`/member/${notice.sender.userName}`">{{ notice.sender.userNickname || notice.sender.userName }}</RouterLink>
       的<button type="button" title="查看红包详情" @click="packets.open(notice.packetId)">红包</button>
       <span>{{ notice.got === notice.count ? '已领完 ' : '' }}{{ notice.got }}/{{ notice.count }}</span>
     </template>
-    <template v-else>{{ notice.kind === 'join' ? '进入了聊天室' : '离开了聊天室' }}</template>
+    <template v-else>{{ notice.text }}</template>
   </p>
 </template>
 

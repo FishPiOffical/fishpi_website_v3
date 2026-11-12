@@ -115,7 +115,8 @@ const timelineEntries = computed(() => {
   }))
   const noticeEntries = notices.value.flatMap(notice => {
     const participants = notice.kind === 'claim' ? [notice.actor, notice.sender] : [notice.actor]
-    if (participants.some(user => chatFilter.modeFor({ ...user, userOId: user.id }) !== 'show')) return []
+    const card = notice.kind === 'claim' ? undefined : { text: notice.text }
+    if (participants.some(user => chatFilter.modeFor({ ...user, userOId: user.id, card }) !== 'show')) return []
     return [{ key: `notice:${notice.id}`, time: notice.createdAt, message: null, notice }]
   })
   return noticeEntries.length ? [...messageEntries, ...noticeEntries].sort((a, b) => a.time - b.time) : messageEntries

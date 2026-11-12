@@ -14,7 +14,7 @@ export function subscribeMessageChanges(changed:()=>void,initialRead?:()=>void):
 export interface ChatBarrageEvent{id:string;content:string;color:string;createdAt:number;author:{id:string;userName:string;userNickname:string;userAvatarURL:string}}
 interface ChatNoticeUser { id: string; userName: string; userNickname: string }
 export type ChatRoomNotice = { id: string; createdAt: number; actor: ChatNoticeUser } & (
-  | { kind: 'join' | 'leave' }
+  | { kind: 'join' | 'leave'; text: string }
   | { kind: 'claim'; packetId: string; sender: ChatNoticeUser; got: number; count: number }
 )
 export type ChatRealtimeEvent =
@@ -38,12 +38,14 @@ function chatNoticeUser(value: unknown): ChatNoticeUser | null {
 function chatNotice(type: 'chat.red_packet.claimed' | 'chat.presence.changed', value: unknown): ChatRoomNotice | null {
   if (!value || typeof value !== 'object') return null
   const data = value as Record<string, unknown>
-  const { id, createdAt, kind, packetId, got, count } = data
+  const { id, createdAt, kind, packetId, got, count, text } = data
   const actor = chatNoticeUser(data.actor)
   if (!actor || typeof id !== 'string' || !/^[\w:-]{1,96}$/.test(id)
     || typeof createdAt !== 'number' || !Number.isSafeInteger(createdAt) || createdAt < 0 || createdAt > 8.64e15) return null
   if (type === 'chat.presence.changed') {
-    return kind === 'join' || kind === 'leave' ? { id, createdAt, actor, kind } : null
+    if ((kind !== 'join' && kind !== 'leave') || typeof text !== 'string'
+      || text.length > 1024 || Array.from(text).length > 512 || !text.trim() || /[\u0000-\u001f\u007f]/.test(text)) return null
+    return { id, createdAt, actor, kind, text }
   }
   const sender = chatNoticeUser(data.sender)
   if (!sender || typeof packetId !== 'string' || !/^\d{1,32}$/.test(packetId)
