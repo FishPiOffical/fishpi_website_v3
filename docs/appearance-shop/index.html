@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>积分外观 · 设计预览</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: light; --bg:#f4f6f7; --card:#fff; --ink:#26363b; --muted:#738087; --line:#e1e8e9; --accent:#368c7b; --soft:#edf5f1; }
+    html.dark { color-scheme:dark; --bg:#182024; --card:#232e33; --ink:#edf2f3; --muted:#9faeb5; --line:#39464c; --accent:#8acbbb; --soft:#293e38; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.6 system-ui,-apple-system,"PingFang SC",sans-serif; }
+    button { font:inherit; color:inherit; cursor:pointer; }
+    button:focus-visible { outline:2px solid var(--accent); outline-offset:4px; }
+    button:hover { filter:brightness(.97); }
+    button:active { transform:translateY(1px); }
+    .shell { max-width:1100px; margin:auto; padding:40px 32px 70px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:28px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand img { width:40px; height:40px; object-fit:contain; }
+    h1 { margin:0; font-size:23px; letter-spacing:-.5px; }
+    .sub { margin:2px 0 0; font-size:12px; color:var(--muted); }
+    .quiet { border:1px solid var(--line); border-radius:10px; padding:7px 12px; background:var(--card); }
+    .nav { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); margin-bottom:24px; gap:12px; }
+    .tabs { display:flex; gap:24px; }
+    .tabs button { padding:10px 2px 13px; background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); }
+    .tabs button[aria-selected=true] { color:var(--accent); border-bottom-color:var(--accent); font-weight:650; }
+    .duration { display:flex; padding:3px; gap:3px; background:var(--line); border-radius:9px; }
+    .duration button { padding:3px 12px; font-size:12px; border:0; border-radius:6px; background:transparent; }
+    .duration button[aria-pressed=true] { background:var(--card); }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+    .product { overflow:hidden; border:1px solid var(--line); border-radius:16px; background:var(--card); }
+    .art { height:210px; display:flex; align-items:center; justify-content:center; background:radial-gradient(ellipse at center,#e6f1f3 0%,transparent 72%); position:relative; }
+    html.dark .art { background:radial-gradient(ellipse at center,#344b50 0%,transparent 72%); }
+    .art img.mount { width:95%; height:100%; object-fit:contain; }
+    .art .brand-mark { position:absolute; width:22px; height:22px; object-fit:contain; left:48%; top:60%; }
+    .product-info { padding:18px; }
+    .product-info h2 { margin:0; font-size:17px; }
+    .product-info p { color:var(--muted); margin:5px 0 18px; font-size:12px; min-height:20px; }
+    .product-bottom { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .price { font-weight:700; font-variant-numeric:tabular-nums; }
+    .price small { font-weight:400; font-size:11px; color:var(--muted); }
+    .try { border:0; border-radius:8px; background:var(--soft); color:var(--accent); padding:6px 12px; font-size:12px; }
+    .stage { margin-top:28px; border:1px solid var(--line); border-radius:16px; background:var(--card); overflow:hidden; }
+    .stage-head { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--line); font-size:12px; color:var(--muted); }
+    .stage-body { position:relative; min-height:215px; padding:22px; }
+    .message { display:flex; align-items:flex-start; gap:12px; max-width:390px; }
+    .avatar { width:40px; height:40px; object-fit:contain; border-radius:8px; background:#f5f7f3; }
+    .message-name { font-size:12px; color:var(--muted); margin-bottom:6px; }
+    .bubble { position:relative; padding:11px 15px; border:1px solid var(--line); border-radius:4px 15px 15px 15px; font-size:14px; background:var(--bg); }
+    .bubble.sea-soda { background:linear-gradient(130deg,#f0fbff,#d9eff6); border-color:#abd3df; color:#315367; }
+    .bubble.sea-soda::after { content:'◦'; color:#84c2d5; position:absolute; right:7px; bottom:-7px; font-size:29px; }
+    .bubble.sunset-letter { background:#fff4e5; color:#72513d; border-color:#e9caa5; border-bottom:3px solid #e6b687; }
+    .bubble.star-route { background:linear-gradient(125deg,#e9eaf8,#edf3fc); color:#4a5074; border-color:#bfc8e3; }
+    .bubble.star-route::after { content:'✧'; position:absolute; color:#8796c6; right:-6px; bottom:-9px; font-size:24px; }
+    .frame { display:inline-flex; position:relative; padding:4px; border-radius:12px; }
+    .frame.tide { background:linear-gradient(140deg,#91d4e3,#4597c0,#b9ebdc); box-shadow:0 0 0 2px #d6eef3; }
+    .frame.paipai-stamp { background:#fff0d5; outline:2px dashed #d6ab73; outline-offset:1px; }
+    .frame.star-ring { background:linear-gradient(135deg,#8b96c9,#d0c9f0,#86abc9); box-shadow:0 0 0 2px #e7eaf8; }
+    .frame.star-ring::after { content:'✦'; position:absolute; bottom:-8px; right:-4px; color:#748dbb; font-size:19px; }
+    .frame.paipai-stamp::after { content:''; position:absolute; width:17px; height:17px; right:-5px; bottom:-5px; background:url('../../public/logo.png') center/contain no-repeat; }
+    .art .bubble { max-width:83%; }
+    .art .frame .avatar { width:64px; height:64px; }
+    .entrance { position:absolute; left:16px; bottom:15px; max-width:calc(100% - 32px); display:flex; align-items:center; gap:4px; padding:3px 22px 3px 0; background:linear-gradient(90deg,transparent,#e9f4f0 35%,#f0f5f1); color:#355f56; border-radius:0 35px 35px 0; pointer-events:none; animation:arrive 4.1s both; }
+    .entrance img { width:116px; height:77px; object-fit:contain; }
+    .entrance-text { font-size:12px; min-width:0; }
+    .entrance-text b { display:block; font-size:13px; }
+    .preview-note { color:var(--muted); font-size:12px; margin:18px 0 0; }
+    @keyframes arrive { 0% { transform:translateX(calc(-100% - 30px)); opacity:0; } 15%,88% { transform:translateX(0); opacity:1; } 100% { transform:translateX(24px); opacity:0; } }
+    @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none !important; transition:none !important; } }
+    @media(max-width:700px) { .shell { padding:24px 16px; } .grid { grid-template-columns:1fr; } .art { height:200px; } header { align-items:flex-start; } h1 { font-size:20px; } .tabs { gap:18px; } .stage-body { min-height:245px; padding:16px; } .stage-head { align-items:flex-start; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand"><img src="../../public/logo.png" alt="摸鱼派"><div><h1>积分外观</h1><p class="sub">首批设计 · 素材与动效预览</p></div></div>
+      <button class="quiet" id="theme" aria-pressed="false">切换暗色</button>
+    </header>
+    <div class="nav">
+      <div class="tabs" role="tablist" aria-label="外观分类">
+        <button role="tab" data-kind="mount" aria-selected="true">座驾</button>
+        <button role="tab" data-kind="bubble" aria-selected="false">气泡</button>
+        <button role="tab" data-kind="frame" aria-selected="false">头像框</button>
+      </div>
+      <div class="duration" aria-label="购买期限"><button data-days="7" aria-pressed="true">7 天</button><button data-days="30" aria-pressed="false">30 天</button></div>
+    </div>
+    <section class="grid" id="products" aria-label="外观设计"></section>
+    <section class="stage" aria-label="聊天室效果预览">
+      <div class="stage-head"><span>聊天室效果预览</span><span>点击商品「预览」播放 · 不扣积分</span></div>
+      <div class="stage-body" id="stage">
+        <div class="message"><span id="sample-frame" class="frame"><img class="avatar" src="../../public/logo.png" alt="演示头像"></span><div><div class="message-name">摸鱼派</div><div id="sample-bubble" class="bubble">今天也要开心摸鱼。</div></div></div>
+        <div id="live" aria-live="polite"></div>
+      </div>
+    </section>
+    <p class="preview-note">当前是独立设计预览，价格为方案建议。购买、权益和正式聊天室尚未接入。</p>
+  </main>
+  <script>
+    const products = [
+      { id:'paipai-scooter', kind:'mount', name:'派派小电驴', description:'浅蓝车身 · 轻巧登场', verb:'骑着', week:1024, month:3584 },
+      { id:'paper-plane', kind:'mount', name:'摸鱼纸飞机', description:'奶油折纸 · 顺风抵达', verb:'乘着', week:1024, month:3584 },
+      { id:'deepsea-submarine', kind:'mount', name:'深海潜艇', description:'薄荷舷窗 · 从深海浮现', verb:'开着', week:2048, month:7168 },
+      { id:'sea-soda', kind:'bubble', name:'海盐汽水', description:'清透浅蓝与细小气泡', week:256, month:896 },
+      { id:'sunset-letter', kind:'bubble', name:'落日邮笺', description:'奶油纸色与暖橘描边', week:256, month:896 },
+      { id:'star-route', kind:'bubble', name:'星夜航线', description:'低饱和蓝紫与星轨角饰', week:512, month:1792 },
+      { id:'tide', kind:'frame', name:'潮汐', description:'蓝青双色 · 轻薄边缘', week:256, month:896 },
+      { id:'paipai-stamp', kind:'frame', name:'派派邮票', description:'奶油邮票边 · 原版派派鱼角标', week:256, month:896 },
+      { id:'star-ring', kind:'frame', name:'星环', description:'淡紫星环 · 小星光角饰', week:512, month:1792 },
+    ];
+    let kind = 'mount';
+    let days = 7;
+    let cleanup;
+    function art(product) {
+      if (product.kind === 'mount') return `<img class="mount" src="assets/${product.id}-v1.png" alt="${product.name}">${product.id === 'paipai-scooter' ? '<img class="brand-mark" src="../../public/logo.png" alt="">' : ''}`;
+      if (product.kind === 'bubble') return `<div class="bubble ${product.id}">今天也要开心摸鱼。</div>`;
+      return `<span class="frame ${product.id}"><img class="avatar" src="../../public/logo.png" alt="${product.name}"></span>`;
+    }
+    function render() {
+      document.querySelector('#products').innerHTML = products.filter(product => product.kind === kind).map(product => `<article class="product"><div class="art">${art(product)}</div><div class="product-info"><h2>${product.name}</h2><p>${product.description}</p><div class="product-bottom"><span class="price">${(days === 7 ? product.week : product.month).toLocaleString('zh-CN')} <small>积分 / ${days} 天</small></span><button class="try" data-preview="${product.id}">预览</button></div></div></article>`).join('');
+    }
+    document.querySelectorAll('[data-kind]').forEach(button => button.addEventListener('click', () => {
+      kind = button.dataset.kind;
+      document.querySelectorAll('[data-kind]').forEach(tab => tab.setAttribute('aria-selected', String(tab === button)));
+      render();
+    }));
+    document.querySelectorAll('[data-days]').forEach(button => button.addEventListener('click', () => {
+      days = Number(button.dataset.days);
+      document.querySelectorAll('[data-days]').forEach(option => option.setAttribute('aria-pressed', String(option === button)));
+      render();
+    }));
+    document.querySelector('#products').addEventListener('click', event => {
+      const button = event.target.closest('[data-preview]');
+      if (!button) return;
+      const product = products.find(item => item.id === button.dataset.preview);
+      if (product.kind === 'bubble') document.querySelector('#sample-bubble').className = `bubble ${product.id}`;
+      else if (product.kind === 'frame') document.querySelector('#sample-frame').className = `frame ${product.id}`;
+      else {
+        clearTimeout(cleanup);
+        const old = document.querySelector('.entrance');
+        old?.remove();
+        const banner = document.createElement('div');
+        banner.className = 'entrance';
+        banner.innerHTML = `<img src="assets/${product.id}-v1.png" alt=""><div class="entrance-text"><b>摸鱼派</b>${product.verb}${product.name}进入了聊天室</div>`;
+        document.querySelector('#stage').append(banner);
+        document.querySelector('#live').textContent = `摸鱼派${product.verb}${product.name}进入了聊天室`;
+        document.querySelector('#live').style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';
+        cleanup = setTimeout(() => banner.remove(), 4200);
+      }
+      document.querySelector('#stage').scrollIntoView({ block:'nearest', behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    });
+    document.querySelector('#theme').addEventListener('click', event => {
+      const dark = document.documentElement.classList.toggle('dark');
+      event.currentTarget.textContent = dark ? '切换浅色' : '切换暗色';
+      event.currentTarget.setAttribute('aria-pressed', String(dark));
+    });
+    render();
+  </script>
+</body>
+</html>
