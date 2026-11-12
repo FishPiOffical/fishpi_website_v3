@@ -36,7 +36,7 @@ const chatCode=compile((await fs.readFile('src/stores/chat.ts','utf8')).replaceA
 console.log('PASS chat source 13 actual appearance/chat stores share SSR defaults and defer saved layout/theme reads until mounted shell restoration')
 
 const { JSDOM } = await import('jsdom')
-const { extractChatQuotes } = await import(url(compile(await fs.readFile('src/utils/chatQuote.ts','utf8'))))
+const { extractChatQuotes, hasChatQuoteBody } = await import(url(compile(await fs.readFile('src/utils/chatQuote.ts','utf8'))))
 const quoteDOM = new JSDOM()
 const quoteTemplate = quoteDOM.window.document.createElement('template')
 quoteTemplate.innerHTML = [
@@ -51,5 +51,14 @@ assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn
 ])
 assert.equal(quoteTemplate.content.querySelectorAll('blockquote').length, 1)
 assert.match(quoteTemplate.innerHTML, /我的回复.*外部链接保留原样/)
+const moon = '<blockquote><p><a href="/member/fish/breezemoons/7">清风明月 · ?????</a></p><p>快点放假吧</p></blockquote>'
+for (const body of ['', '<p>111</p>', '<p><img src="/logo.png"></p>']) {
+  // 浏览器会把服务端的段落包装拆成空段落和引用块。
+  quoteTemplate.innerHTML = body + '<p>' + moon + '</p><div><span>&nbsp;<br></span></div>'
+  const [quote] = extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn')
+  assert.equal(quote.author, '?????')
+  assert.equal(quote.excerpt, '快点放假吧')
+  assert.equal(hasChatQuoteBody(quoteTemplate.content), Boolean(body))
+}
 quoteDOM.window.close()
 console.log('PASS chat source 14 compact quote requires a trusted original-message link and preserves surrounding content')

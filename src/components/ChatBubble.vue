@@ -11,7 +11,7 @@ import VipNickname from '@/components/user/VipNickname.vue'
 import { DEFAULT_AVATAR, avatarThumbnail, rhyPicThumbnail } from '@/utils/avatar'
 import { chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
 import { isSingleImageMessage } from '@/utils/chatMessage'
-import { extractChatQuotes, type ChatQuote } from '@/utils/chatQuote'
+import { extractChatQuotes, hasChatQuoteBody, type ChatQuote } from '@/utils/chatQuote'
 
 const props = withDefaults(
   defineProps<{
@@ -54,6 +54,7 @@ const display = computed(() => {
   template.innerHTML = props.html
   const quotes = mayHaveQuotes ? extractChatQuotes(template.content, window.location.origin) : []
   if (!hasImages && !quotes.length) return plain
+  if (quotes.length && !hasChatQuoteBody(template.content)) return { html: '', quotes }
   for (const img of template.content.querySelectorAll('img:not(.emoji)')) {
     const picture = img.closest('picture')
     if (!singleImage.value) {

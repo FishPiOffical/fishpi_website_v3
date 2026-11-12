@@ -115,3 +115,13 @@ export function extractChatQuotes(fragment: DocumentFragment, origin: string): C
   }
   return quotes
 }
+
+/** Markdown 渲染器包装引用后可能留下空段落，不能把这些占位当成消息正文。 */
+export function hasChatQuoteBody(fragment: DocumentFragment): boolean {
+  const isPlaceholder = (node: Node): boolean => {
+    if (node.nodeType === 3) return !node.textContent?.trim()
+    if (node.nodeType === 8 || node.nodeName === 'BR') return true
+    return ['P', 'DIV', 'SPAN'].includes(node.nodeName) && Array.from(node.childNodes).every(isPlaceholder)
+  }
+  return !Array.from(fragment.childNodes).every(isPlaceholder)
+}
