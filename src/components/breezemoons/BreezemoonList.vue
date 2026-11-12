@@ -5,21 +5,29 @@ import { timeISO } from '@/utils/time'
 import { formatDateTime } from '@/utils/time'
 
 import { RouterLink } from 'vue-router'
+import type { BreezemoonQuoteSource } from '@/utils/breezemoonQuote'
 import type { FollowingMoon } from '@/api/v3-following-feed'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
 defineProps<{items:FollowingMoon[];compact?:boolean;avatarOnly?:boolean;hideAuthor?:boolean}>()
 function fallback(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 const date = formatDateTime
-const chatQuote = inject<{ enabled: Ref<boolean>; insert: (id: string, author: string, excerpt: string) => void } | null>('quoteBreezemoonInChat', null)
+const chatQuote = inject<{ enabled: Ref<boolean>; insert: (source: BreezemoonQuoteSource) => void } | null>('quoteBreezemoonInChat', null)
 function share(item: FollowingMoon, event: MouseEvent | DragEvent) {
   const target = event.currentTarget as HTMLElement
-  const excerpt = (target.closest('li')?.querySelector<HTMLElement>('.moon-body')?.innerText ?? '').trim()
+  const body = target.closest('li')?.querySelector<HTMLElement>('.moon-body')
+  const excerpt = body?.innerText.trim() || (body?.querySelector('img:not(.emoji)') ? '图片动态' : '')
+  const source: BreezemoonQuoteSource = {
+    id: item.id,
+    userName: item.author.userName,
+    nickname: item.author.userNickname,
+    excerpt,
+  }
   if ('dataTransfer' in event && event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'copy'
-    event.dataTransfer.setData('application/x-fishpi-breezemoon', JSON.stringify([item.id, item.author.userName, excerpt]))
+    event.dataTransfer.setData('application/x-fishpi-breezemoon', JSON.stringify(source))
   } else {
-    chatQuote?.insert(item.id, item.author.userName, excerpt)
+    chatQuote?.insert(source)
   }
 }
 </script>

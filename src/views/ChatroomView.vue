@@ -4,6 +4,8 @@ import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 
 import { RouterLink,useRoute,useRouter } from 'vue-router'
 import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
+import BreezemoonQuotePreview from '@/components/chat/BreezemoonQuotePreview.vue'
+import { breezemoonQuoteMarkdown, createBreezemoonQuote, type BreezemoonQuote, type BreezemoonQuoteSource } from '@/utils/breezemoonQuote'
 import ChatConnectionStatus from '@/components/chat/ChatConnectionStatus.vue'
 import { storeToRefs } from 'pinia'
 import {useChatMessageSource} from '@/composables/useChatMessageSource'
@@ -75,7 +77,11 @@ useScrollPagination(
 )
 
 const draft = ref('')
-watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{draft.value=''},{flush:'sync'})
+const breezemoonQuotes = ref<BreezemoonQuote[]>([])
+watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{
+  draft.value = ''
+  breezemoonQuotes.value = []
+},{flush:'sync'})
 const scroller = ref<HTMLElement | null>(null)
 const activeTool = ref<''|'packet'|'barrage'|'paint'>('')
 const chatTools = [
@@ -174,16 +180,22 @@ function revealComposer() {
   composerRef.value?.reveal()
 }
 
+function composedContent() {
+  const text = `${draft.value}${buildQuoteSuffix()}`
+  return [text, ...breezemoonQuotes.value.map(breezemoonQuoteMarkdown)].filter(Boolean).join('\n\n')
+}
+
 async function submit() {
-  const text = draft.value
-  if (!text.trim() && !quote.value) return
-  const content = `${text}${buildQuoteSuffix()}`,reader=JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])
+  const content = composedContent()
+  if (!content.trim()) return
+  const reader=JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])
   if(await chat.send(content)&&reader===JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']))acceptConfirmed(content.trim())
 }
 
 function acceptConfirmed(content: string) {
-  if (`${draft.value}${buildQuoteSuffix()}`.trim() !== content) return
+  if (composedContent().trim() !== content) return
   draft.value = ''
+  breezemoonQuotes.value = []
   clearQuote()
   sentMessageId.value = publication.receipt?.id ?? ''
 }
@@ -195,16 +207,18 @@ async function quoteMessage(msg:{oId:string}){
  if(quote.value?.messageId===msg.oId)composerRef.value?.reveal()
 }
 
-function quoteBreezemoon(id: string, author: string, excerpt: string) {
-  if (!/^[1-9][0-9]{0,18}$/.test(id) || !/^[A-Za-z0-9_-]{1,64}$/.test(author) || !composerRef.value || !isLoggedIn.value || !syncComposer()) return
-  const link = new URL(router.resolve(`/member/${author}/breezemoons/${id}`).href, window.location.origin).href
-  const plain = Array.from(excerpt).slice(0, 280).join('').replace(/\r\n?/g, '\n')
-    .replace(/[&<>]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[character]!)
-    .replace(/[\\`*_~[\]{}()!#|]/g, '\\$&')
-  const quoted = plain ? `\n${plain.split('\n').map(line => `> ${line}`).join('\n')}` : ''
-  draft.value += `${draft.value ? '\n\n' : ''}> [清风明月](${link})${quoted}\n`
+function quoteBreezemoon(source: BreezemoonQuoteSource) {
+  if (!composerRef.value || !isLoggedIn.value) return
+  const entry = createBreezemoonQuote(source, window.location.origin)
+  if (!entry) return
+  if (!breezemoonQuotes.value.some(quote => quote.href === entry.href)) breezemoonQuotes.value.push(entry)
   revealComposer()
 }
+
+function removeBreezemoonQuote(href: string) {
+  breezemoonQuotes.value = breezemoonQuotes.value.filter(quote => quote.href !== href)
+}
+
 provide('quoteBreezemoonInChat', { enabled: isLoggedIn, insert: quoteBreezemoon })
 
 function onBreezemoonDragOver(event: DragEvent) {
@@ -220,10 +234,11 @@ function onBreezemoonDrop(event: DragEvent) {
   event.preventDefault()
   event.stopPropagation()
   try {
-    const values: unknown = JSON.parse(payload)
-    if (!Array.isArray(values) || values.length !== 3) return
-    const [id, author, excerpt] = values
-    if (typeof id === 'string' && typeof author === 'string' && typeof excerpt === 'string') quoteBreezemoon(id, author, excerpt)
+    const source = JSON.parse(payload) as Partial<BreezemoonQuoteSource> | null
+    if (source && typeof source.id === 'string' && typeof source.userName === 'string'
+      && typeof source.nickname === 'string' && typeof source.excerpt === 'string') {
+      quoteBreezemoon({ id: source.id, userName: source.userName, nickname: source.nickname, excerpt: source.excerpt })
+    }
   } catch { /* Ignore malformed drag data. */ }
 }
 
@@ -311,10 +326,11 @@ function clearScreen() {
               placeholder="说点什么吧！"
               :sending="sending" :chat-send-shortcut="chatPreferences.sendShortcut"
               :disabled="!!publication.pending"
-              :allow-empty="Boolean(quote)"
+              :allow-empty="Boolean(quote) || breezemoonQuotes.length > 0"
               @submit="submit"
             >
               <template #top>
+                <BreezemoonQuotePreview :quotes="breezemoonQuotes" @remove="removeBreezemoonQuote" />
               <div v-if="quote" class="quote-preview-box">
                 <div class="quote-info">
                   <span class="quote-label">引用 @{{ quote.userName }}</span>
@@ -534,10 +550,11 @@ function clearScreen() {
               placeholder="说点什么吧！"
               :sending="sending" :chat-send-shortcut="chatPreferences.sendShortcut"
               :disabled="!!publication.pending"
-              :allow-empty="Boolean(quote)"
+              :allow-empty="Boolean(quote) || breezemoonQuotes.length > 0"
               @submit="submit"
             >
               <template #top>
+                <BreezemoonQuotePreview :quotes="breezemoonQuotes" @remove="removeBreezemoonQuote" />
               <div v-if="quote" class="quote-preview-box">
                 <div class="quote-info">
                   <span class="quote-label">引用 @{{ quote.userName }}</span>

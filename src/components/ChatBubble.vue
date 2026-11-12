@@ -4,12 +4,14 @@ import { formatDisplayTime } from '@/utils/time'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import CollectChatEmoji from '@/components/chat/CollectChatEmoji.vue'
+import BreezemoonQuoteCard from '@/components/chat/BreezemoonQuoteCard.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { DEFAULT_AVATAR, avatarThumbnail, rhyPicThumbnail } from '@/utils/avatar'
 import { chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
 import { isSingleImageMessage } from '@/utils/chatMessage'
+import { extractBreezemoonQuotes, type BreezemoonQuote } from '@/utils/breezemoonQuote'
 
 const props = withDefaults(
   defineProps<{
@@ -41,13 +43,17 @@ const originalImage = ref('')
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
 const singleImage = computed(() => props.chatroom && isSingleImageMessage(props.html))
-const isStandalone = computed(() => props.chatroom && (props.standalone || singleImage.value))
-const displayHtml = computed(() => {
-  if (!props.chatroom || !/<img\b/i.test(props.html)) return props.html
-  if (!mounted.value) return ''
-  // 模板中的图片不会发起请求，先替换地址，再交给 Vue 插入页面。
+const display = computed(() => {
+  const hasImages = /<img\b/i.test(props.html)
+  const mayHaveQuotes = /<blockquote\b/i.test(props.html) && props.html.includes('/breezemoons/')
+  const plain = { html: props.html, quotes: [] as BreezemoonQuote[] }
+  if (!props.chatroom || (!hasImages && !mayHaveQuotes)) return plain
+  if (!mounted.value) return hasImages ? { ...plain, html: '' } : plain
+  // 先在惰性模板里提取引用、替换图片地址，再交给 Vue 插入页面。
   const template = document.createElement('template')
   template.innerHTML = props.html
+  const quotes = mayHaveQuotes ? extractBreezemoonQuotes(template.content, window.location.origin) : []
+  if (!hasImages && !quotes.length) return plain
   for (const img of template.content.querySelectorAll('img:not(.emoji)')) {
     const picture = img.closest('picture')
     if (!singleImage.value) {
@@ -66,8 +72,11 @@ const displayHtml = computed(() => {
     img.removeAttribute('srcset')
     picture?.querySelectorAll('source').forEach(source => source.remove())
   }
-  return template.innerHTML
+  return { html: template.innerHTML.trim(), quotes }
 })
+const isStandalone = computed(() => props.chatroom && (
+  props.standalone || singleImage.value || (!display.value.html && display.value.quotes.length > 0)
+))
 
 
 function onAvatarError(e: Event) {
@@ -118,7 +127,10 @@ function onBodyClick(e: MouseEvent) {
           <MedalList :items="medals" variant="chat" />
         </div>
         <slot>
-          <div class="vditor-reset body" v-html="displayHtml" />
+          <div v-if="display.html" class="vditor-reset body" v-html="display.html" />
+          <div v-if="display.quotes.length" class="moon-quote-stack">
+            <BreezemoonQuoteCard v-for="(quote, index) in display.quotes" :key="index" :quote="quote" />
+          </div>
         </slot>
         <template v-if="!chatroom">
           <slot name="reactions" />
@@ -367,6 +379,13 @@ function onBodyClick(e: MouseEvent) {
 .is-room .body {
   font-size: 14px;
   line-height: 1.7;
+}
+.moon-quote-stack { display: grid; gap: 6px; }
+.body + .moon-quote-stack { margin-top: 7px; }
+.body + .moon-quote-stack :deep(.moon-quote-card) {
+  background: color-mix(in srgb, var(--fp-card) 46%, transparent);
+  border-color: color-mix(in srgb, var(--fp-muted) 20%, transparent);
+  border-inline-start-color: color-mix(in srgb, var(--fp-muted) 50%, transparent);
 }
 .is-room .body :deep(p + p) { margin-top: 6px; }
 .is-room .body :deep(.chat-image-frame) {
