@@ -165,7 +165,7 @@ async function loadProfile(id = ++requestId) {
   finally { if (valid()) { loading.value = false; await nextTick(); if (valid()) positionCard() } }
 
   const publicName = profile.value?.userName
-  if (!valid() || !publicName) return
+  if (!valid() || !publicName || !isLoggedIn.value) return
   try {
     const result = await fetchV3PublicMedals(publicName)
     if (!valid() || !result.list[0]) return
@@ -312,7 +312,7 @@ onUnmounted(() => {
               </div>
               <RouterLink class="username" :to="`/member/${encodeURIComponent(profile.userName)}`">@{{ profile.userName }}</RouterLink>
               <p v-if="profile.userIntro" class="intro">{{ profile.userIntro }}</p>
-              <RouterLink v-if="medal" class="medal-link" :to="{ path: `/member/${encodeURIComponent(profile.userName)}`, hash: '#member-medals' }" :title="medal.name" aria-label="查看公开勋章">
+              <RouterLink v-if="isLoggedIn && medal" class="medal-link" :to="{ path: `/member/${encodeURIComponent(profile.userName)}`, hash: '#member-medals' }" :title="medal.name" aria-label="查看公开勋章">
                 <V3MedalImage :id="medal.id" :name="medal.name" :user-name="profile.userName" quiet />
                 <small v-if="moreMedals">+{{ moreMedals }}</small>
               </RouterLink>

@@ -7,7 +7,7 @@ export function usePublicMedals(userName: Ref<string>) {
   let mounted = false, sequence = 0
   function clear() { sequence++; value.value = null; loading.value = false; error.value = '' }
   async function read(next = p.value) {
-    if (!mounted || import.meta.env.SSR) return
+    if (!mounted || import.meta.env.SSR || !auth.isLoggedIn) { clear(); return }
     clear(); p.value = next
     const run = sequence, name = userName.value, boundary = getAuthContextVersion(), token = auth.accessToken, actor = auth.account?.oId
     const valid = () => mounted && run === sequence && name === userName.value && boundary === getAuthContextVersion() && token === auth.accessToken && actor === auth.account?.oId

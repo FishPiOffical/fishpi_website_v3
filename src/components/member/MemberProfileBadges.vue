@@ -15,6 +15,7 @@ const medals = usePublicMedals(name)
 const { value, p, loading, error, read } = medals
 const previewCount = 1
 const showMedals = ref(false)
+const medalsMounted = ref(false)
 const openMedal = ref<number | null>(null)
 const medalHintId = useId()
 const summary = ref<Awaited<ReturnType<typeof fetchV3ProfessionSummary>>>(null)
@@ -51,13 +52,13 @@ function openLinkedSection(hash: string) {
 watch(() => route.hash, openLinkedSection)
 watch(value, () => { openMedal.value = null })
 watch([() => auth.initialized, () => auth.accessToken, () => auth.account?.oId, name], loadProfession, { flush: 'sync' })
-onMounted(() => { mounted = true; openLinkedSection(route.hash); void loadProfession() })
+onMounted(() => { mounted = true; medalsMounted.value = true; openLinkedSection(route.hash); void loadProfession() })
 onScopeDispose(() => { mounted = false; pending?.abort() })
 </script>
 
 <template>
   <div class="profile-badges">
-    <section id="member-medals" aria-label="公开勋章">
+    <section v-if="medalsMounted && auth.isLoggedIn" id="member-medals" aria-label="公开勋章">
       <div v-if="shownMedals?.length" class="medal-row">
         <div v-for="(medal, index) in shownMedals" :key="`${p}:${index}:${medal.id}`" class="medal-entry" :class="{ 'is-open': openMedal === index }" @mouseleave="openMedal=null">
           <div class="medal-preview" role="button" tabindex="0" :aria-expanded="openMedal === index" :aria-label="`${medal.name}，查看勋章说明`" :aria-describedby="`${medalHintId}-${index}`" @click="openMedal = openMedal === index ? null : index" @keydown.enter.prevent="openMedal = openMedal === index ? null : index" @keydown.space.prevent="openMedal = openMedal === index ? null : index">

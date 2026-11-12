@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+const auth = useAuthStore(), mounted = ref(false)
+onMounted(() => { mounted.value = true })
 import { normalizeMetals } from '@/api/fishpi'
 import MedalIcon from './MedalIcon.vue'
 
@@ -23,7 +26,7 @@ function isMini(name?: string) {
 </script>
 
 <template>
-  <span v-if="medals.length" class="medal-list">
+  <span v-if="mounted && auth.isLoggedIn && medals.length" class="medal-list">
     <MedalIcon v-for="(m, i) in medals" :key="(m.id || m.name || '') + i" :medal="m" :mini="isMini(m.name)" />
   </span>
 </template>
