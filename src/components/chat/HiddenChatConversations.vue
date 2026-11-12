@@ -143,7 +143,7 @@ function preview(line: (typeof messages.value)[number]) {
                   :self="line.userName === account?.userName"
                   vip-nickname
                   chatroom
-                  :standalone="Boolean(line.redPacket)"
+                  :standalone="Boolean(line.redPacket || line.card)"
                 >
                   <ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" />
                   <ChatCard v-else-if="line.card" :card="line.card" />

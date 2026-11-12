@@ -414,7 +414,7 @@ function clearScreen() {
                 :nickname="entry.message.userNickname"
                 vip-nickname
                 chatroom
-                :standalone="Boolean(entry.message.redPacket)"
+                :standalone="Boolean(entry.message.redPacket || entry.message.card)"
                 :avatar="entry.message.userAvatarURL"
                 :medals="entry.message.sysMetal"
                 :appearance="entry.message.appearance"
@@ -524,7 +524,7 @@ function clearScreen() {
                 :nickname="entry.message.userNickname"
                 vip-nickname
                 chatroom
-                :standalone="Boolean(entry.message.redPacket)"
+                :standalone="Boolean(entry.message.redPacket || entry.message.card)"
                 :avatar="entry.message.userAvatarURL"
                 :medals="entry.message.sysMetal"
                 :appearance="entry.message.appearance"

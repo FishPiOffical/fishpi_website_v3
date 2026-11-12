@@ -27,7 +27,7 @@ const props = withDefaults(
     medals?: unknown
     vipNickname?: boolean
     chatroom?: boolean
-    /** 红包由调用方明确标记，图片则根据完整消息内容判断。 */
+    /** 红包、音乐和天气卡片由调用方标记为独立展示。 */
     standalone?: boolean
   }>(),
   { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
