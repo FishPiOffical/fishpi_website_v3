@@ -2,63 +2,46 @@
 import { ref, useId } from 'vue'
 import { storeToRefs } from 'pinia'
 import { sidebarModule } from './registry'
-import SidebarIcon from './SidebarIcon.vue'
+import SidebarConfigureButton from '@/components/sidebar/SidebarConfigureButton.vue'
 import SidebarModuleHeader from '@/components/sidebar/SidebarModuleHeader.vue'
 import { useChatSidebarStore } from '@/stores/chatSidebar'
-import { useChatStore } from '@/stores/chat'
-import { useAuthStore } from '@/stores/auth'
-import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import type { ChatSidebarModuleId } from './meta'
 
 const sidebar = useChatSidebarStore()
 const { visibleModules, pref } = storeToRefs(sidebar)
-const { connected, connecting } = storeToRefs(useChatStore())
-const { isLoggedIn } = storeToRefs(useAuthStore())
 const summaries = ref<Partial<Record<ChatSidebarModuleId, string>>>({})
-const drawer = useSettingsDrawerStore()
 const id = useId()
 </script>
 
 <template>
   <aside class="chat-sidebar" aria-label="聊天室侧栏">
-    <header class="toolbar">
-      <span class="connection" :class="{ live: connected }" role="status">
-        <i aria-hidden="true" />
-        {{ connected ? '实时连接' : connecting ? '连接中' : isLoggedIn ? '未连接' : '游客模式' }}
-      </span>
-      <button class="configure" type="button" @click="drawer.show('chatSidebar')">
-        <SidebarIcon name="settings" />配置模块
-      </button>
-    </header>
-
-    <section v-for="mod in visibleModules" :key="mod.id" class="card">
-      <SidebarModuleHeader
-        :module-id="mod.id"
-        :title="mod.title"
-        :expanded="!pref.collapsed.includes(mod.id)"
-        :controls="`${id}-${mod.id}`"
-        :summary="summaries[mod.id]"
-        @toggle="sidebar.toggleCollapsed(mod.id)"
-      />
+    <section v-for="(mod, index) in visibleModules" :key="mod.id" class="card">
+      <header class="card-header">
+        <SidebarModuleHeader
+          :module-id="mod.id"
+          :title="mod.title"
+          :expanded="!pref.collapsed.includes(mod.id)"
+          :controls="`${id}-${mod.id}`"
+          :summary="summaries[mod.id]"
+          @toggle="sidebar.toggleCollapsed(mod.id)"
+        />
+        <SidebarConfigureButton v-if="index === 0" section="chatSidebar" />
+      </header>
       <div :id="`${id}-${mod.id}`" v-show="!pref.collapsed.includes(mod.id)" class="card-body">
         <component :is="sidebarModule(mod.id)?.component" @summary="summaries[mod.id] = $event" />
       </div>
     </section>
-    <p v-if="!visibleModules.length" class="empty">暂未开启模块，点击「配置模块」添加。</p>
+    <div v-if="!visibleModules.length" class="card-header empty">
+      <span>暂未开启模块</span>
+      <SidebarConfigureButton section="chatSidebar" />
+    </div>
   </aside>
 </template>
 
 <style scoped>
 .chat-sidebar { display: flex; flex-direction: column; gap: 10px; width: 100%; min-width: 0; }
-.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 28px; padding: 0 2px 2px; }
-.connection { display: inline-flex; align-items: center; gap: 6px; color: var(--fp-muted); font-size: 11px; }
-.connection i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.connection.live i { color: var(--fp-primary); }
-.configure { display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px; border: 0; border-radius: 5px; background: transparent; color: var(--fp-muted); font-size: 11px; cursor: pointer; }
-.configure svg { width: 14px; height: 14px; }
-.configure:hover { background: var(--fp-hover); color: var(--fp-text); }
+.card-header { display: flex; align-items: center; }
 .card { min-width: 0; border: 1px solid var(--fp-border); background: var(--fp-card); box-shadow: var(--fp-card-shadow); border-radius: 8px; }
 .card-body { padding: 0 14px 14px; font-size: 12px; line-height: 1.6; }
-.configure:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 2px; }
-.empty { margin: 0; padding: 16px; border: 1px dashed var(--fp-border); border-radius: 8px; color: var(--fp-muted); font-size: 12px; line-height: 1.6; }
+.empty { justify-content: space-between; min-height: 46px; padding-inline-start: 14px; border: 1px dashed var(--fp-border); border-radius: 8px; color: var(--fp-muted); font-size: 12px; }
 </style>

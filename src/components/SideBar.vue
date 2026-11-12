@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref, useId } from 'vue'
+import { computed, onMounted, ref, useId } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { usePageSidebarStore, type PageSidebarModuleId } from '@/stores/pageSidebar'
-import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
 import PersonInfoCard from '@/components/sidebar/PersonInfoCard.vue'
 import BreezemoonFeed from '@/components/sidebar/BreezemoonFeed.vue'
+import SidebarConfigureButton from '@/components/sidebar/SidebarConfigureButton.vue'
 import SidebarModuleHeader from '@/components/sidebar/SidebarModuleHeader.vue'
 import IncomeModule from '@/chat/sidebar/modules/IncomeModule.vue'
 import AppearanceModule from '@/chat/sidebar/modules/AppearanceModule.vue'
@@ -17,7 +17,9 @@ const router = useRouter()
 const { isLoggedIn } = storeToRefs(useAuthStore())
 const pageSidebar = usePageSidebarStore()
 const { visibleModules } = storeToRefs(pageSidebar)
-const drawer = useSettingsDrawerStore()
+const renderedModules = computed(() =>
+  visibleModules.value.filter((mod) => mod.id !== 'checkin' || isLoggedIn.value),
+)
 const uid = useId()
 // Identity and locally saved module layout are browser state, unavailable to public SSR.
 const ready = ref(false)
@@ -32,79 +34,56 @@ function goDownload() {
 
 <template>
   <aside class="sidebar-wrapper" aria-label="内页侧边栏">
-    <header class="sidebar-toolbar">
-      <span class="toolbar-title">社区侧栏</span>
-      <button type="button" class="configure-btn" @click="drawer.show('pageSidebar')">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-          />
-          <path
-            d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.03Z"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linejoin="round"
-          />
-        </svg>
-        配置模块
-      </button>
-    </header>
-
     <p v-if="!ready" class="empty-side" role="status">正在加载侧栏…</p>
     <template v-else>
-      <template v-for="mod in visibleModules" :key="mod.id">
-        <section
-          v-if="mod.id !== 'checkin' || isLoggedIn"
-          class="module side-module-card"
-          :class="{ 'is-collapsed': pageSidebar.isCollapsed(mod.id) }"
+      <section
+        v-for="(mod, index) in renderedModules"
+        :key="mod.id"
+        class="module side-module-card"
+        :class="{ 'is-collapsed': pageSidebar.isCollapsed(mod.id) }"
+      >
+        <header class="module-header side-module-head">
+          <SidebarModuleHeader
+            :module-id="mod.id"
+            :title="mod.title"
+            :expanded="!pageSidebar.isCollapsed(mod.id)"
+            :controls="`${uid}-${mod.id}`"
+            :summary="summaries[mod.id]"
+            heading="h2"
+            @toggle="pageSidebar.toggleCollapsed(mod.id)"
+          />
+          <RouterLink v-if="mod.id === 'breezemoons'" to="/breezemoons" class="more-link">更多</RouterLink>
+          <SidebarConfigureButton v-if="index === 0" section="pageSidebar" />
+        </header>
+
+        <div
+          :id="`${uid}-${mod.id}`"
+          v-show="!pageSidebar.isCollapsed(mod.id)"
+          class="module-panel side-module-body"
         >
-          <header class="module-header side-module-head">
-            <SidebarModuleHeader
-              :module-id="mod.id"
-              :title="mod.title"
-              :expanded="!pageSidebar.isCollapsed(mod.id)"
-              :controls="`${uid}-${mod.id}`"
-              :summary="summaries[mod.id]"
-              heading="h2"
-              @toggle="pageSidebar.toggleCollapsed(mod.id)"
-            />
-            <RouterLink v-if="mod.id === 'breezemoons'" to="/breezemoons" class="more-link">更多</RouterLink>
-          </header>
-
-          <div
-            :id="`${uid}-${mod.id}`"
-            v-show="!pageSidebar.isCollapsed(mod.id)"
-            class="module-panel side-module-body"
-          >
-            <PersonInfoCard v-if="mod.id === 'profile'" />
-            <CheckinPanel v-else-if="mod.id === 'checkin'" class="embedded-checkin" @summary="summaries.checkin = $event" />
-            <div v-else-if="mod.id === 'download'" class="app-download">
-              <div class="app-left">
-                <img src="https://file.fishpi.cn/logo_app.png" width="36" height="36" alt="摸鱼派客户端" />
-                <div class="app-text">
-                  <b>随时随地摸鱼？</b>
-                  <p>下载摸鱼派客户端，想摸就摸！</p>
-                </div>
+          <PersonInfoCard v-if="mod.id === 'profile'" />
+          <CheckinPanel v-else-if="mod.id === 'checkin'" class="embedded-checkin" @summary="summaries.checkin = $event" />
+          <div v-else-if="mod.id === 'download'" class="app-download">
+            <div class="app-left">
+              <img src="https://file.fishpi.cn/logo_app.png" width="36" height="36" alt="摸鱼派客户端" />
+              <div class="app-text">
+                <b>随时随地摸鱼？</b>
+                <p>下载摸鱼派客户端，想摸就摸！</p>
               </div>
-              <button type="button" class="btn green small" @click="goDownload">下载</button>
             </div>
-            <BreezemoonFeed v-else-if="mod.id === 'breezemoons'" @summary="summaries.breezemoons = $event" />
-            <IncomeModule v-else-if="mod.id === 'income'" />
-            <AppearanceModule v-else-if="mod.id === 'appearance'" />
-            <AdModule v-else-if="mod.id === 'ad'" />
+            <button type="button" class="btn green small" @click="goDownload">下载</button>
           </div>
-        </section>
-      </template>
+          <BreezemoonFeed v-else-if="mod.id === 'breezemoons'" @summary="summaries.breezemoons = $event" />
+          <IncomeModule v-else-if="mod.id === 'income'" />
+          <AppearanceModule v-else-if="mod.id === 'appearance'" />
+          <AdModule v-else-if="mod.id === 'ad'" />
+        </div>
+      </section>
 
-      <p v-if="!visibleModules.length" class="empty-side">
-        暂未开启内页侧栏模块，点击上方
-        <button type="button" class="link-btn" @click="drawer.show('pageSidebar')">配置模块</button>
-        开启。
-      </p>
+      <div v-if="!renderedModules.length" class="empty-side empty-configure">
+        <span>暂未开启内页侧栏模块</span>
+        <SidebarConfigureButton section="pageSidebar" />
+      </div>
     </template>
   </aside>
 </template>
@@ -114,45 +93,6 @@ function goDownload() {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.sidebar-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 2px;
-  min-height: 24px;
-}
-
-.toolbar-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--fp-muted);
-}
-
-.configure-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 8px;
-  border: 1px solid transparent;
-  border-radius: var(--fp-radius-sm, 6px);
-  background: transparent;
-  color: var(--fp-muted);
-  font-size: 12px;
-  cursor: pointer;
-  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
-}
-
-.configure-btn svg {
-  width: 13px;
-  height: 13px;
-}
-
-.configure-btn:hover {
-  background: var(--fp-hover);
-  border-color: var(--fp-border);
-  color: var(--fp-title);
 }
 
 .side-module-card {
@@ -249,16 +189,11 @@ function goDownload() {
   text-align: center;
 }
 
-.link-btn {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--fp-link);
-  font: inherit;
-  cursor: pointer;
-}
-
-.link-btn:hover {
-  text-decoration: underline;
+.empty-configure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  padding: 0 0 0 14px;
 }
 </style>

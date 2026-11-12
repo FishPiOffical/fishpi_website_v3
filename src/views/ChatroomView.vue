@@ -4,6 +4,7 @@ import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 
 import { RouterLink,useRoute,useRouter } from 'vue-router'
 import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
+import ChatConnectionStatus from '@/components/chat/ChatConnectionStatus.vue'
 import { storeToRefs } from 'pinia'
 import {useChatMessageSource} from '@/composables/useChatMessageSource'
 import {getAuthContextVersion} from '@/api/http'
@@ -56,8 +57,6 @@ const {
   loadingMore,
   hasMore,
   error,
-  connected,
-  connecting,
   discuss,
   onlineTotal,
   nodeName,
@@ -329,6 +328,7 @@ function clearScreen() {
                 <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-expanded="toolOpen(tool.id)" aria-haspopup="dialog" @click="togglePanel(tool.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="tool.path" /></svg><span>{{ tool.label }}</span>
                 </button>
+                <ChatConnectionStatus />
               </template>
               <template #context>
                 <div class="classic-topic-pill" :title="discuss">
@@ -351,6 +351,7 @@ function clearScreen() {
             <div v-else-if="composerReady" class="comment-login-hint">
               <RouterLink to="/login" class="login-link">登录</RouterLink>后参与讨论与收发消息
               <button type="button" class="classic-btn style-toggle" @click="toggleChatStyle">简约模式</button>
+              <ChatConnectionStatus />
             </div>
 
             <!-- 话题编辑展开表单 -->
@@ -442,10 +443,6 @@ function clearScreen() {
             >
               🌐 {{ nodeName ? `大区: ${nodeName}` : '选择大区' }}
             </button>
-            <span class="cr-status-tag" :class="{ on: connected }">
-              <span class="status-dot" />
-              {{ connected?'已连接':connecting?'连接中':'未连接' }}
-            </span>
           </div>
 
           <div class="cr-header-right">
@@ -554,6 +551,7 @@ function clearScreen() {
                 <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-expanded="toolOpen(tool.id)" aria-haspopup="dialog" @click="togglePanel(tool.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="tool.path" /></svg><span>{{ tool.label }}</span>
                 </button>
+                <ChatConnectionStatus />
               </template>
               <template #context>
                 <div class="classic-topic-pill" :title="discuss">
@@ -574,6 +572,7 @@ function clearScreen() {
           <div v-else-if="composerReady" class="guest-bottom-bar">
             <span>登录后即可参与发言、抢红包与互动。</span>
             <RouterLink to="/login" class="login-link">立即登录</RouterLink>
+            <ChatConnectionStatus />
           </div>
         </div>
       </section>
@@ -873,30 +872,6 @@ function clearScreen() {
   border-color: var(--fp-accent);
   color: var(--fp-accent);
   font-weight: 600;
-}
-
-.cr-status-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #bdc3c7;
-}
-
-.cr-status-tag.on {
-  color: #27ae60;
-}
-
-.cr-status-tag.on .status-dot {
-  background: #27ae60;
-  box-shadow: 0 0 6px rgba(39, 174, 96, 0.5);
 }
 
 .online-indicator {
