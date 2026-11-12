@@ -12,6 +12,11 @@ export function subscribeArticleChanges(articleId:string,changed:()=>void,unavai
 }
 export function subscribeMessageChanges(changed:()=>void,initialRead?:()=>void):()=>void {return subscribeChanges('messages','/api/v3/me/messages/realtime-ticket',changed,undefined,undefined,undefined,undefined,initialRead)}
 export interface ChatBarrageEvent{id:string;content:string;color:string;createdAt:number;author:{id:string;userName:string;userNickname:string;userAvatarURL:string}}
+interface ChatNoticeUser { id: string; userName: string; userNickname: string }
+export type ChatRoomNotice = { id: string; createdAt: number; actor: ChatNoticeUser } & (
+  | { kind: 'join' | 'leave' }
+  | { kind: 'claim'; packetId: string; sender: ChatNoticeUser; got: number; count: number }
+)
 export type ChatRealtimeEvent =
   | { type: 'sync' }
   | { type: 'topic'; revision: string }
@@ -19,6 +24,33 @@ export type ChatRealtimeEvent =
   | { type: 'deleted'; id: string; revision: string }
   | { type: 'reactions'; id: string; revision: string; snapshot?: import('./v3-reactions').ReactionState; reactionsUnavailable?: boolean }
   | { type: 'barrage'; barrage: ChatBarrageEvent }
+  | { type: 'notice'; notice: ChatRoomNotice }
+
+function chatNoticeUser(value: unknown): ChatNoticeUser | null {
+  if (!value || typeof value !== 'object') return null
+  const { id, userName, userNickname } = value as Partial<ChatNoticeUser>
+  if (typeof id !== 'string' || !/^\d{1,32}$/.test(id)
+    || typeof userName !== 'string' || !/^[\w-]{1,64}$/.test(userName)
+    || typeof userNickname !== 'string' || userNickname.length > 128 || /[\u0000-\u001f\u007f]/.test(userNickname)) return null
+  return { id, userName, userNickname }
+}
+
+function chatNotice(type: 'chat.red_packet.claimed' | 'chat.presence.changed', value: unknown): ChatRoomNotice | null {
+  if (!value || typeof value !== 'object') return null
+  const data = value as Record<string, unknown>
+  const { id, createdAt, kind, packetId, got, count } = data
+  const actor = chatNoticeUser(data.actor)
+  if (!actor || typeof id !== 'string' || !/^[\w:-]{1,96}$/.test(id)
+    || typeof createdAt !== 'number' || !Number.isSafeInteger(createdAt) || createdAt < 0 || createdAt > 8.64e15) return null
+  if (type === 'chat.presence.changed') {
+    return kind === 'join' || kind === 'leave' ? { id, createdAt, actor, kind } : null
+  }
+  const sender = chatNoticeUser(data.sender)
+  if (!sender || typeof packetId !== 'string' || !/^\d{1,32}$/.test(packetId)
+    || typeof got !== 'number' || typeof count !== 'number'
+    || !Number.isSafeInteger(got) || !Number.isSafeInteger(count) || got < 1 || got > count) return null
+  return { id, createdAt, actor, kind: 'claim', packetId, sender, got, count }
+}
 function barrageEvent(value:unknown):ChatBarrageEvent|null{
  if(!value||typeof value!=='object'||Array.isArray(value))return null
  const d=value as Record<string,unknown>,a=d.author as Record<string,unknown>|null
@@ -111,6 +143,11 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
             if (unreadChannel && !reconnecting && !initialUnreadFallback && initialRead) initialRead()
             else if (channel !== 'article' || reconnecting) changed()
           } else if(authenticated&&channel==='chat'){
+            if (message.type === 'chat.red_packet.claimed' || message.type === 'chat.presence.changed') {
+              const notice = chatNotice(message.type, message.data)
+              if (notice) chatEvent?.({ type: 'notice', notice })
+              return
+            }
             if(message.type==='chat.barrager'){const barrage=barrageEvent(message.data);if(barrage)chatEvent?.({type:'barrage',barrage});return}
             if(message.type==='chat.sync_required'){chatEvent?.({type:'sync'});return}
             const revision=message.data?.revision

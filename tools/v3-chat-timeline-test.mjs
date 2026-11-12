@@ -127,3 +127,36 @@ assert.equal(state.calls.length,readsBeforeFault)
 assert.equal(state.reactions.length,invalidationsBeforeFault)
 view.store.$dispose()
 console.log('PASS 表态故障推送保留正文并跳过逐条补查')
+
+state.dispatch=async()=>env({ticket:'fixture-ticket',path:'/api/v3/realtime',channel:'chat'})
+const notices=[]
+const stopNotices=realtime.subscribeChatChanges(event=>notices.push(event),()=>{})
+await tick()
+const actor={id:'8',userName:'fish',userNickname:'鱼'}
+const sender={id:'9',userName:'sender',userNickname:'发包人'}
+const claim={id:'claim-12-1',createdAt:100,actor,sender,packetId:'12',got:1,count:2}
+frame('chat.red_packet.claimed',claim)
+assert.equal(notices.length,0)
+socket.onopen()
+frame('ready',{channel:'chat'})
+frame('chat.red_packet.claimed',{...claim,got:3})
+frame('chat.presence.changed',{...claim,kind:'unknown'})
+assert.equal(notices.length,0)
+frame('chat.red_packet.claimed',claim)
+frame('chat.presence.changed',{id:'join-8',createdAt:101,actor,kind:'join'})
+frame('chat.presence.changed',{id:'leave-8',createdAt:102,actor,kind:'leave'})
+assert.deepEqual(notices.map(event=>event.notice.kind),['claim','join','leave'])
+stopNotices()
+
+state.dispatch=dispatch
+view=setup()
+await view.store.connect()
+const readsBeforeNotices=state.calls.length
+const subscription=state.subscriptions.at(-1)
+for(const event of [...notices,notices[0]])subscription.event(event)
+assert.deepEqual(view.store.notices.map(notice=>notice.id),['claim-12-1','join-8','leave-8'])
+assert.equal(state.calls.length,readsBeforeNotices)
+view.store.clearVisible()
+assert.deepEqual(view.store.notices,[])
+view.store.$dispose()
+console.log('PASS 红包和进出场事件仅在实时授权后接收，重复事件去重且无额外读取')

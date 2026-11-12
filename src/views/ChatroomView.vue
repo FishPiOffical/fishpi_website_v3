@@ -6,6 +6,8 @@ import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
 import ChatQuotePreview from '@/components/chat/ChatQuotePreview.vue'
 import { breezemoonQuoteMarkdown, chatMessageQuotePreview, createBreezemoonQuote, type ChatQuote, type BreezemoonQuoteSource } from '@/utils/chatQuote'
+import ChatRoomNotice from '@/components/chat/ChatRoomNotice.vue'
+import { useV3ChatTimelineStore } from '@/stores/v3ChatTimeline'
 import ChatConnectionStatus from '@/components/chat/ChatConnectionStatus.vue'
 import { storeToRefs } from 'pinia'
 import {useChatMessageSource} from '@/composables/useChatMessageSource'
@@ -36,6 +38,7 @@ import FpDialog from '@/components/FpDialog.vue'
 const auth = useAuthStore()
 const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const chatFilter = useChatFilterStore()
+const { notices } = storeToRefs(useV3ChatTimelineStore())
 const chatPreferences = useChatPreferencesStore()
 const { account, isLoggedIn, accessToken } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
@@ -103,8 +106,22 @@ const editingTopic = ref(false)
 
 const me = computed(() => account.value?.userName)
 
-// 经典版：最新消息排在最上面！
-const classicMessages = computed(() => [...visibleMessages.value].reverse())
+const timelineEntries = computed(() => {
+  const messageEntries = visibleMessages.value.map(message => ({
+    key: `message:${message.oId}`,
+    time: Date.parse(message.time || '') || 0,
+    message,
+    notice: null,
+  }))
+  const noticeEntries = notices.value.flatMap(notice => {
+    const participants = notice.kind === 'claim' ? [notice.actor, notice.sender] : [notice.actor]
+    if (participants.some(user => chatFilter.modeFor({ ...user, userOId: user.id }) !== 'show')) return []
+    return [{ key: `notice:${notice.id}`, time: notice.createdAt, message: null, notice }]
+  })
+  return noticeEntries.length ? [...messageEntries, ...noticeEntries].sort((a, b) => a.time - b.time) : messageEntries
+})
+// 经典版最新消息在上，简约版最新消息在下。
+const classicEntries = computed(() => [...timelineEntries.value].reverse())
 
 function syncContextHash(){const match=/^#chatroom(\d{1,32})$/.exec(route.hash);contextId.value=accessToken.value&&account.value?.oId&&match?match[1]!:''}
 watch(()=>JSON.stringify([route.hash,!!accessToken.value,account.value?.oId||'']),syncContextHash,{immediate:true})
@@ -124,22 +141,22 @@ const hasNewMessages = ref(false)
 const sentMessageId = ref('')
 let followingLatest = true
 const firstVisibleId = computed(() => visibleMessages.value[0]?.oId)
-const latestVisibleId = computed(() => visibleMessages.value.at(-1)?.oId)
+const latestVisibleKey = computed(() => timelineEntries.value.at(-1)?.key)
 
 function nearLatest(el: HTMLElement) {
   return el.scrollHeight - el.scrollTop - el.clientHeight < 100
 }
 
-watch(latestVisibleId, async (id, previous) => {
+watch(latestVisibleKey, async (key, previous) => {
   const el = scroller.value
   if (!el) return
-  if (!id) { hasNewMessages.value = false; return }
+  if (!key) { hasNewMessages.value = false; return }
   // Measure against the previous layout before Vue inserts the new message.
   const follow = !previous || followingLatest
   await nextTick()
-  if (el !== scroller.value || id !== latestVisibleId.value) return
+  if (el !== scroller.value || key !== latestVisibleKey.value) return
   if (follow) scrollBottom()
-  else if (visibleMessages.value.some(message => message.oId === previous)) hasNewMessages.value = true
+  else if (timelineEntries.value.some(entry => entry.key === previous)) hasNewMessages.value = true
 })
 
 watch(scroller, (el, _, onCleanup) => {
@@ -384,42 +401,44 @@ function clearScreen() {
           <!-- 2. 下方消息列表：与输入区在同一个卡片中，自上而下阅读，最新在最上方 -->
           <section class="cr-classic-list">
             <FpLoading v-if="(loading || chat.connecting) && !messages.length" />
-            <p v-else-if="messages.length && !visibleMessages.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
-            <p v-else-if="!messages.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
+            <p v-else-if="messages.length && !timelineEntries.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
+            <p v-else-if="!timelineEntries.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
 
-            <ChatBubble
-              v-for="msg in classicMessages"
-              :id="`chatroom${msg.oId}`"
-              :key="msg.oId"
-              :user-id="msg.userOId"
-              :user-name="msg.userName"
-              :nickname="msg.userNickname"
-              vip-nickname
-              chatroom
-              :standalone="Boolean(msg.redPacket)"
-              :avatar="msg.userAvatarURL"
-              :medals="msg.sysMetal"
-              :appearance="msg.appearance"
-              :time="msg.time"
-              :html="msg.html || ''"
-              :self="msg.userName === me"
-            >
-              <ChatRedPacketCard v-if="msg.redPacket" :packet="msg.redPacket" :packet-id="msg.oId" />
-              <ChatCard v-else-if="msg.card" :card="msg.card" />
-              <template #reactions>
-                <V3ReactionBar kind="chat" :target-id="msg.oId" :initial-state="msg.reactions" :reactions-unavailable="msg.reactionsUnavailable" :initial-read-started="msg.reactionReadStarted" />
-              </template>
-              <template #actions>
-                <ChatRepeatAction v-if="!msg.redPacket && !msg.card" :id="msg.oId" />
-                <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
-                <template v-if="!msg.redPacket && accessToken">
-                  <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
-                    {{ quoteBusy === msg.oId ? '…' : '引用' }}
-                  </button>
+            <template v-for="entry in classicEntries" :key="entry.key">
+              <ChatRoomNotice v-if="entry.notice" :notice="entry.notice" />
+              <ChatBubble
+                v-else-if="entry.message"
+                :id="`chatroom${entry.message.oId}`"
+                :user-id="entry.message.userOId"
+                :user-name="entry.message.userName"
+                :nickname="entry.message.userNickname"
+                vip-nickname
+                chatroom
+                :standalone="Boolean(entry.message.redPacket)"
+                :avatar="entry.message.userAvatarURL"
+                :medals="entry.message.sysMetal"
+                :appearance="entry.message.appearance"
+                :time="entry.message.time"
+                :html="entry.message.html || ''"
+                :self="entry.message.userName === me"
+              >
+                <ChatRedPacketCard v-if="entry.message.redPacket" :packet="entry.message.redPacket" :packet-id="entry.message.oId" />
+                <ChatCard v-else-if="entry.message.card" :card="entry.message.card" />
+                <template #reactions>
+                  <V3ReactionBar kind="chat" :target-id="entry.message.oId" :initial-state="entry.message.reactions" :reactions-unavailable="entry.message.reactionsUnavailable" :initial-read-started="entry.message.reactionReadStarted" />
                 </template>
-                <ReportDialog v-if="msg.userOId !== auth.account?.oId && auth.accessToken" :data-id="msg.oId" :data-type="3" />
-              </template>
-            </ChatBubble>
+                <template #actions>
+                  <ChatRepeatAction v-if="!entry.message.redPacket && !entry.message.card" :id="entry.message.oId" />
+                  <ChatRevokeAction :id="entry.message.oId" :author-id="entry.message.userOId" :red-packet="!!entry.message.redPacket" />
+                  <template v-if="!entry.message.redPacket && accessToken">
+                    <button type="button" title="引用消息" :disabled="quoteBusy === entry.message.oId" @click="quoteMessage(entry.message!)">
+                      {{ quoteBusy === entry.message.oId ? '…' : '引用' }}
+                    </button>
+                  </template>
+                  <ReportDialog v-if="entry.message.userOId !== auth.account?.oId && auth.accessToken" :data-id="entry.message.oId" :data-type="3" />
+                </template>
+              </ChatBubble>
+            </template>
 
             <!-- 底部查看更早记录 -->
             <div class="classic-load-bottom">
@@ -491,43 +510,45 @@ function clearScreen() {
           </button>
 
           <FpLoading v-if="(loading || chat.connecting) && !messages.length" />
-          <p v-else-if="messages.length && !visibleMessages.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
-          <p v-else-if="!messages.length" class="empty-hint">暂无新消息，快来打破宁静吧！</p>
+          <p v-else-if="messages.length && !timelineEntries.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
+          <p v-else-if="!timelineEntries.length" class="empty-hint">暂无新消息，快来打破宁静吧！</p>
 
           <div class="messages-container">
-            <ChatBubble
-              v-for="msg in visibleMessages"
-              :id="`chatroom${msg.oId}`"
-              :key="msg.oId"
-              :user-id="msg.userOId"
-              :user-name="msg.userName"
-              :nickname="msg.userNickname"
-              vip-nickname
-              chatroom
-              :standalone="Boolean(msg.redPacket)"
-              :avatar="msg.userAvatarURL"
-              :medals="msg.sysMetal"
-              :appearance="msg.appearance"
-              :time="msg.time"
-              :html="msg.html || ''"
-              :self="msg.userName === me"
-            >
-              <ChatRedPacketCard v-if="msg.redPacket" :packet="msg.redPacket" :packet-id="msg.oId" />
-              <ChatCard v-else-if="msg.card" :card="msg.card" />
-              <template #reactions>
-                <V3ReactionBar kind="chat" :target-id="msg.oId" :initial-state="msg.reactions" :reactions-unavailable="msg.reactionsUnavailable" :initial-read-started="msg.reactionReadStarted" />
-              </template>
-              <template #actions>
-                <ChatRepeatAction v-if="!msg.redPacket && !msg.card" :id="msg.oId" />
-                <ChatRevokeAction :id="msg.oId" :author-id="msg.userOId" :red-packet="!!msg.redPacket" />
-                <template v-if="!msg.redPacket && accessToken">
-                  <button type="button" title="引用消息" :disabled="quoteBusy === msg.oId" @click="quoteMessage(msg)">
-                    {{ quoteBusy === msg.oId ? '…' : '引用' }}
-                  </button>
+            <template v-for="entry in timelineEntries" :key="entry.key">
+              <ChatRoomNotice v-if="entry.notice" :notice="entry.notice" />
+              <ChatBubble
+                v-else-if="entry.message"
+                :id="`chatroom${entry.message.oId}`"
+                :user-id="entry.message.userOId"
+                :user-name="entry.message.userName"
+                :nickname="entry.message.userNickname"
+                vip-nickname
+                chatroom
+                :standalone="Boolean(entry.message.redPacket)"
+                :avatar="entry.message.userAvatarURL"
+                :medals="entry.message.sysMetal"
+                :appearance="entry.message.appearance"
+                :time="entry.message.time"
+                :html="entry.message.html || ''"
+                :self="entry.message.userName === me"
+              >
+                <ChatRedPacketCard v-if="entry.message.redPacket" :packet="entry.message.redPacket" :packet-id="entry.message.oId" />
+                <ChatCard v-else-if="entry.message.card" :card="entry.message.card" />
+                <template #reactions>
+                  <V3ReactionBar kind="chat" :target-id="entry.message.oId" :initial-state="entry.message.reactions" :reactions-unavailable="entry.message.reactionsUnavailable" :initial-read-started="entry.message.reactionReadStarted" />
                 </template>
-                <ReportDialog v-if="msg.userOId !== auth.account?.oId && auth.accessToken" :data-id="msg.oId" :data-type="3" />
-              </template>
-            </ChatBubble>
+                <template #actions>
+                  <ChatRepeatAction v-if="!entry.message.redPacket && !entry.message.card" :id="entry.message.oId" />
+                  <ChatRevokeAction :id="entry.message.oId" :author-id="entry.message.userOId" :red-packet="!!entry.message.redPacket" />
+                  <template v-if="!entry.message.redPacket && accessToken">
+                    <button type="button" title="引用消息" :disabled="quoteBusy === entry.message.oId" @click="quoteMessage(entry.message!)">
+                      {{ quoteBusy === entry.message.oId ? '…' : '引用' }}
+                    </button>
+                  </template>
+                  <ReportDialog v-if="entry.message.userOId !== auth.account?.oId && auth.accessToken" :data-id="entry.message.oId" :data-type="3" />
+                </template>
+              </ChatBubble>
+            </template>
           </div>
 
           <p v-if="!isLoggedIn && visibleMessages.length" class="guest-tip-bottom">

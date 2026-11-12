@@ -2,12 +2,13 @@ import {defineStore,storeToRefs} from 'pinia'
 import {onScopeDispose,ref,watch} from 'vue'
 import {ApiError,getAuthContextVersion} from '@/api/http'
 import {chatMessagePage,chatTopic,type ChatMessage} from '@/api/v3-chat-messages'
-import {subscribeChatChanges,type ChatBarrageEvent,type ChatRealtimeEvent} from '@/api/v3-realtime'
+import {subscribeChatChanges,type ChatBarrageEvent,type ChatRealtimeEvent,type ChatRoomNotice} from '@/api/v3-realtime'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ReactionsStore} from '@/stores/v3Reactions'
 export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
  const {accessToken,account}=storeToRefs(useAuthStore()),reactions=useV3ReactionsStore()
  const barrage=ref<ChatBarrageEvent|null>(null)
+ const notices=ref<ChatRoomNotice[]>([])
  const changeHint=ref<{id:string;version:number}|null>(null)
  const messages=ref<ChatMessage[]>([]),loading=ref(false),loadingMore=ref(false),hasMore=ref(false),error=ref(''),connected=ref(false),connecting=ref(false),topic=ref(''),topicError=ref('')
  let wanted=false,blocked=false,generation=0,latestRun=0,before='',oldestRun=0,version=0,boundary=getAuthContextVersion(),owner=account.value?.oId,stop:(()=>void)|null=null,latestAbort:AbortController|null=null,olderAbort:AbortController|null=null,topicAbort:AbortController|null=null,topicRun=0,topicBusy=false,topicDirty=false
@@ -17,7 +18,7 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
  const localChanges=new Map<string,{version:number;message:ChatMessage|null}>()
  const active=()=>!blocked&&!import.meta.env.SSR&&!!accessToken.value&&!!account.value?.oId
  function proof(requireConsumer=true){const run=generation,context=getAuthContextVersion(),actor=account.value?.oId;return()=>(!requireConsumer||wanted)&&active()&&run===generation&&context===getAuthContextVersion()&&actor===account.value?.oId}
- function clear(){cancelStartup?.();barrage.value=null;changeHint.value={id:'',version:++version};blocked=false;generation++;latestRun++;oldestRun++;topicRun++;latestAbort?.abort();olderAbort?.abort();topicAbort?.abort();latestAbort=olderAbort=topicAbort=null;cancelSnapshotRecovery();stop?.();stop=null;messages.value=[];before='';hasMore.value=false;loading.value=false;loadingMore.value=false;connected.value=false;connecting.value=false;topic.value='';topicError.value='';error.value='';localChanges.clear();removed.clear();version=0;topicBusy=false;topicDirty=false}
+ function clear(){cancelStartup?.();barrage.value=null;notices.value=[];changeHint.value={id:'',version:++version};blocked=false;generation++;latestRun++;oldestRun++;topicRun++;latestAbort?.abort();olderAbort?.abort();topicAbort?.abort();latestAbort=olderAbort=topicAbort=null;cancelSnapshotRecovery();stop?.();stop=null;messages.value=[];before='';hasMore.value=false;loading.value=false;loadingMore.value=false;connected.value=false;connecting.value=false;topic.value='';topicError.value='';error.value='';localChanges.clear();removed.clear();version=0;topicBusy=false;topicDirty=false}
  function deny(){clear();blocked=true;error.value='聊天室授权不可用，请重新登录或授权'}
  function merge(message:ChatMessage){const list=messages.value.filter(m=>m.id!==message.id);list.push(message);list.sort((a,b)=>BigInt(a.id)<BigInt(b.id)?-1:1);messages.value=list}
  function upsertConfirmed(message:ChatMessage){if(!active()||removed.has(message.id))return;const seq=++version;changeHint.value={id:message.id,version:seq};localChanges.set(message.id,{version:seq,message});merge(message)}
@@ -42,6 +43,13 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
  function sync(keepVisible = false){if(!wanted||!active())return;changeHint.value={id:'',version:++version};localChanges.clear();cancelSnapshotRecovery();if(!keepVisible){messages.value=[];before='';hasMore.value=false}void readLatest();void readTopic()}
  function event(value:ChatRealtimeEvent){
    if(!wanted||!active())return
+   if (value.type === 'notice') {
+     const notice = value.notice
+     if (!notices.value.some(item => item.id === notice.id)) {
+       notices.value = [...notices.value, notice].slice(-40)
+     }
+     return
+   }
    if(value.type==='barrage'){barrage.value=value.barrage;return}
    if(value.type==='sync'){sync();return}
    if(value.type==='topic'){void readTopic();return}
@@ -66,7 +74,7 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
      reconcileMissingSnapshot()
    }
  }
- function clearVisible(){latestRun++;oldestRun++;latestAbort?.abort();olderAbort?.abort();cancelSnapshotRecovery();localChanges.clear();messages.value=[];before='';hasMore.value=false;loading.value=false;loadingMore.value=false;error.value=''}
+ function clearVisible(){notices.value=[];latestRun++;oldestRun++;latestAbort?.abort();olderAbort?.abort();cancelSnapshotRecovery();localChanges.clear();messages.value=[];before='';hasMore.value=false;loading.value=false;loadingMore.value=false;error.value=''}
  function bind() {
    stop?.()
    const valid = proof()
@@ -113,5 +121,5 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
  function disconnect(){wanted=false;clear()}
  const stopAuth=watch([accessToken,()=>account.value?.oId],()=>{blocked=false;const next=getAuthContextVersion(),actor=account.value?.oId,changed=next!==boundary||actor!==owner||!accessToken.value;if(changed)clear();else{cancelStartup?.();generation++;latestRun++;oldestRun++;topicRun++;latestAbort?.abort();olderAbort?.abort();topicAbort?.abort();cancelSnapshotRecovery();stop?.();stop=null;loading.value=false;loadingMore.value=false;topicBusy=false;topicDirty=false}boundary=next;owner=actor;if(wanted&&active())void bind()},{flush:'sync'})
  onScopeDispose(()=>{stopAuth();disconnect()})
- return{barrage,changeHint,messages,loading,loadingMore,hasMore,error,connected,connecting,topic,topicError,connect,disconnect,loadMore,readLatest,readTopic,sync,clearVisible,upsertConfirmed,removeConfirmed}
+ return{barrage,notices,changeHint,messages,loading,loadingMore,hasMore,error,connected,connecting,topic,topicError,connect,disconnect,loadMore,readLatest,readTopic,sync,clearVisible,upsertConfirmed,removeConfirmed}
 })
