@@ -16,6 +16,14 @@ const route = useRoute(), chat = useChatStore(), timeline = useV3ChatTimelineSto
 const preferences = useChatPreferencesStore(), filter = useChatFilterStore(), auth = useAuthStore()
 const visible = computed(() => route.path === '/cr' || chat.floatingChatroomOpen)
 const row = ref<Arrival | null>(null)
+const arrivalText = computed(() => {
+  const notice = row.value
+  if (!notice) return ''
+  const name = notice.actor.userNickname || notice.actor.userName
+  // 上方已显示昵称，只移除文案开头的同名，保留座驾自己的动作词。
+  const text = name && notice.text.startsWith(name) ? notice.text.slice(name.length) : notice.text
+  return text.replace(/进入了聊天室$/, '来了')
+})
 const queue: { notice: Arrival; receivedAt: number }[] = []
 const seen = new Set<string>()
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -57,7 +65,7 @@ onBeforeUnmount(() => { clear(); setChatPresenceWanted(false) })
     <img class="vehicle" :src="mountAssets[row.mount.id]" alt="">
     <div class="arrival-copy">
       <div class="arrival-user"><img :src="avatarThumbnail(row.avatarURL, 20)" alt="" @error="avatarError"><strong>{{ row.actor.userNickname || row.actor.userName }}</strong></div>
-      <span>{{ row.text.replace(/进入了聊天室$/, '来了') }}</span>
+      <span>{{ arrivalText }}</span>
     </div>
   </div>
 </template>
