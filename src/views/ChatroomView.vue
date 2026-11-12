@@ -1211,6 +1211,7 @@ function clearScreen() {
 @media (max-width: 960px) {
   .cr-classic-layout {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .classic-sidebar {

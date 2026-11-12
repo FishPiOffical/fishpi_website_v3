@@ -159,7 +159,7 @@
 /* Primary list panes share the same surface as their sidebar modules. */
 .fp-list-page {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
   gap: var(--fp-page-gap);
   align-items: start;
 }
