@@ -29,22 +29,36 @@ onBeforeUnmount(() => { mounted = false; reset() })
     <h3>{{ name }}成长提示</h3>
     <p v-if="loading" role="status">正在读取成长提示…</p>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
-    <template v-if="guide">
+    <div v-if="guide" class="guide-content">
+      <div class="guide-column">
       <h4>成长来源</h4>
       <ul v-if="guide.triggers.length"><li v-for="(trigger, index) in guide.triggers" :key="index">{{ professionTriggers[trigger.triggerType] }}</li></ul>
       <p v-else>暂无已发布的成长来源。</p>
+      </div><div class="guide-column">
       <h4>等级奖励概要</h4>
       <ul v-if="guide.rewards.length"><li v-for="(reward, index) in guide.rewards" :key="index">{{ reward.rewardType === 'POINT' ? `${reward.amount} 积分` : '勋章奖励' }}</li></ul>
       <p v-else>暂无等级奖励概要。</p>
+      </div>
       <p class="hint">这里只说明成长来源与奖励类型，不保证每次操作都会增加经验或发放奖励。</p>
-    </template>
-    <button type="button" class="refresh-guide-btn fp-control" :class="{ 'is-hidden': guide && !error }" :disabled="loading || !accessToken" @click="load">重新读取成长提示</button>
+    </div>
+    <button type="button" class="refresh-guide-btn fp-control" :class="{ 'is-hidden': guide && !error }" :disabled="loading || !accessToken" @click="load" title="刷新成长指南" aria-label="重新读取成长提示"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg></button>
   </section>
 </template>
 
 <style scoped lang="scss">
-.profession-guide { scroll-margin-top: 88px; margin: 20px 0; border-top: 1px solid var(--fp-border); padding-top: 12px; .refresh-guide-btn.is-hidden { display: none !important; } }
-h3 { font-size: 17px; } h4 { font-size: 15px; margin: 14px 0 8px; } li { margin: 8px 0; }
-button { border: 1px solid var(--fp-border); color: var(--fp-text); background: transparent; border-radius: 8px; padding: 7px 12px; cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
-.hint { color: var(--fp-muted); font-size: 13px; } .error { color: #c34a36; }
+.profession-guide { scroll-margin-top: 88px; margin: 20px 0 0; padding: 20px; border: 1px solid var(--fp-border); background: var(--fp-surface-subtle); border-radius: 10px; }
+.profession-guide:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
+.profession-guide h3 { margin: 0 0 18px; font-size: 15px; color: var(--fp-title); }
+.guide-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 28px; }
+.guide-column { min-width: 0; }
+.profession-guide h4 { margin: 0 0 10px; font-size: 12px; color: var(--fp-muted); font-weight: 500; }
+.profession-guide ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.profession-guide li { margin: 0; padding: 5px 9px; border: 1px solid var(--fp-border); border-radius: 6px; font-size: 12px; background: var(--fp-card); }
+.profession-guide .hint { grid-column: 1 / -1; color: var(--fp-muted); font-size: 12px; line-height: 1.8; margin: 0; }
+.profession-guide button.refresh-guide-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 8px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: var(--fp-card); cursor: pointer; }
+.refresh-guide-btn svg { width: 18px; height: 18px; }
+.profession-guide button.refresh-guide-btn.is-hidden { display: none; }
+button:disabled { opacity: .5; cursor: default; }
+.error { color: var(--fp-danger); }
+@media (max-width: 640px) { .guide-content { grid-template-columns: minmax(0, 1fr); } }
 </style>

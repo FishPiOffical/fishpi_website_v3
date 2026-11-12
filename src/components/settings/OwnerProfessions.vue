@@ -7,7 +7,7 @@ import ProfessionGuide from '@/components/profession/ProfessionGuide.vue'
 import { ApiError, getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { profileOperationKey } from '@/api/v3-profile'
-import { professionModules, professionPresets, professionScopes, fetchV3OwnerProfessions, fetchV3Professions, fetchV3ProfessionDetail, fetchV3ProfessionRecords, writeV3Profession,
+import { professionTriggers, professionModules, professionPresets, professionScopes, fetchV3OwnerProfessions, fetchV3Professions, fetchV3ProfessionDetail, fetchV3ProfessionRecords, writeV3Profession,
   type Mine, type Page, type Profession, type Detail, type ExperienceRecord, type Preset, type Visibility, type ProfessionCommand } from '@/api/v3-professions'
 const { accessToken, account } = storeToRefs(useAuthStore())
 const guideId = ref(''), guideName = ref('')
@@ -28,6 +28,7 @@ const primaryLabel = computed(() => {
   const name = mine.value.list.find(v => v.professionId === id)?.displayName || catalog.value?.list.find(v => v.professionId === id)?.displayName || `已选职业（编号 ${id}）`
   return `${name}${state.primaryProfessionState === 'RETIRED' ? '（已停用）' : state.primaryProfessionState === 'DELETED' ? '（已删除）' : ''}`
 })
+const primaryProgress = computed(() => mine.value?.list.find(job => job.professionId === mine.value?.state.primaryProfessionId))
 const disabled = computed(() => busy.value || !!pending.value || mineLoading.value || !mine.value)
 function reset() {
   generation++; mineSequence++; catalogSequence++; detailSequence++; recordsSequence++
@@ -102,6 +103,7 @@ async function execute(intent: { command: ProfessionCommand; key: string }) {
 function start(command: ProfessionCommand) { if (!disabled.value) void execute({ command, key: profileOperationKey() }) }
 function savePrivacy() { if (preset.value && modules.value) start({ kind: 'privacy', preset: preset.value, ...(preset.value === 'CUSTOM' ? { moduleVisibility: { ...modules.value } } : {}) }) }
 function retry() { if (pending.value) void execute(pending.value) }
+function actionLabel(code: string) { return professionTriggers[code as keyof typeof professionTriggers] || code }
 const date = formatDateTime
 onMounted(() => { mounted = true; void loadMine(1); void loadCatalog(1) })
 watch([accessToken, () => account.value?.oId], () => {
@@ -115,69 +117,66 @@ onBeforeUnmount(() => { mounted = false; reset() })
 
 <template>
   <div class="owner-professions">
+    <header class="profession-overview">
+      <div class="overview-copy"><span class="eyebrow">职业档案</span><h2>{{ mine ? primaryLabel : '我的职业' }}</h2><p>选择你的主职业，在主页与用户名片中展示。</p></div>
+      <div v-if="primaryProgress" class="overview-level"><strong>{{ primaryProgress.levelName }}</strong><span>{{ primaryProgress.totalExperience.toLocaleString() }} 经验</span></div>
+      <button class="fp-control icon-button" type="button" :disabled="mineLoading || busy || !!pending" @click="loadMine()" title="刷新职业资料" aria-label="刷新职业资料"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg></button>
+    </header>
     <p v-if="mineLoading" role="status">正在读取本人职业…</p>
     <p v-if="mineError" role="alert" class="error">{{ mineError }}</p>
-    <template v-if="mine">
-      <p>当前主职业：{{ primaryLabel }}</p>
-      <p class="hint">选择主职业免费，不会自动创建经验或等级。</p>
-      <h2>本人职业进度</h2>
-      <p v-if="mine.pagination.total === 0">尚未产生职业进度。</p>
-      <ul class="items">
-        <li v-for="job in mine.list" :key="job.professionId">
-          <strong>{{ job.displayName }} <small v-if="job.state === 'RETIRED'">已停用</small></strong>
-          <span>{{ job.levelName }} · 经验 {{ job.totalExperience }} · 本级门槛 {{ job.requiredExperience }}</span>
-          <span v-if="job.professionId === mine.state.primaryProfessionId">主职业</span>
-          <button class="fp-control" type="button" @click="openDetail(job.professionId)">查看{{ job.displayName }}详情</button>
-        </li>
-      </ul>
-      <nav v-if="mine.pagination.pageCount > 1" aria-label="本人职业分页">
-        <button class="fp-control" :disabled="disabled || mine.pagination.p <= 1" @click="loadMine(mine.pagination.p - 1, false)">上一页本人职业</button>
-        <span>第 {{ mine.pagination.p }} / {{ mine.pagination.pageCount }} 页，共 {{ mine.pagination.total }} 项</span>
-        <button class="fp-control" :disabled="disabled || mine.pagination.p >= mine.pagination.pageCount" @click="loadMine(mine.pagination.p + 1, false)">下一页本人职业</button>
-      </nav>
-      <h2>职业隐私</h2>
-      <form @submit.prevent="savePrivacy">
-        <fieldset :disabled="disabled">
-          <label>职业隐私预设<select class="fp-control" v-model="preset" aria-label="职业隐私预设"><option v-for="(label, value) in professionPresets" :key="value" :value="value">{{ label }}</option></select></label>
-          <div v-if="preset === 'CUSTOM' && modules" class="module-fields">
-            <label v-for="[name, label] in professionModules" :key="name">{{ label }}<select class="fp-control" v-model="modules[name]" :aria-label="`${label}可见范围`"><option v-for="(scopeLabel, scope) in professionScopes" :key="scope" :value="scope">{{ scopeLabel }}</option></select></label>
-          </div>
-          <p class="hint">“仅主职业”的两种预设均只公开主职业，其他模块隐藏；自定义会替换全部十个模块。</p>
-          <button data-tone="primary" class="fp-control" type="submit">保存职业隐私</button>
-        </fieldset>
-      </form>
-      <p class="hint">跳过引导会清除当前主职业，已有经验与隐私保持；之后可重新选择。</p>
-      <button class="fp-control" type="button" :disabled="disabled" @click="start({ kind: 'skip' })">跳过引导并清除主职业</button>
-    </template>
-    <button class="fp-control settings-refresh" type="button" :disabled="mineLoading || busy || !!pending" @click="loadMine()" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取本人职业</span></button>
-    <p v-if="error" role="alert" class="error">{{ error }}</p>
-    <p v-if="message" role="status">{{ message }}</p>
-    <p v-if="pending && !busy" class="hint">操作结果尚未确认，重试会恢复同一次设置。</p>
-    <button class="fp-control" v-if="pending" type="button" :disabled="busy" @click="retry">重试未确认的职业设置</button>
-    <h2>可选择的职业</h2>
-    <p v-if="catalogLoading" role="status">正在读取职业目录…</p>
-    <p v-if="catalogError" role="alert" class="error">{{ catalogError }}</p>
-    <template v-if="catalog">
-      <p v-if="catalog.pagination.total === 0">暂无可选择的职业。</p>
-      <ul class="items"><li v-for="job in catalog.list" :key="job.professionId"><strong>{{ job.displayName }}</strong><span>{{ job.description }}</span><button class="fp-control" type="button" :disabled="disabled" @click="start({ kind: 'primary', professionId: job.professionId })">选择{{ job.displayName }}为主职业</button><button class="fp-control" type="button" @click="guideId = job.professionId; guideName = job.displayName">查看{{ job.displayName }}成长提示</button></li></ul>
-      <nav v-if="catalog.pagination.pageCount > 1" aria-label="职业目录分页">
-        <button class="fp-control" :disabled="catalogLoading || catalog.pagination.p <= 1" @click="loadCatalog(catalog.pagination.p - 1)">上一页职业目录</button><span>第 {{ catalog.pagination.p }} / {{ catalog.pagination.pageCount }} 页，共 {{ catalog.pagination.total }} 项</span><button class="fp-control" :disabled="catalogLoading || catalog.pagination.p >= catalog.pagination.pageCount" @click="loadCatalog(catalog.pagination.p + 1)">下一页职业目录</button>
-      </nav>
-    </template>
-    <button class="fp-control settings-refresh" type="button" :disabled="catalogLoading" @click="loadCatalog()" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取职业目录</span></button>
-    <ProfessionGuide v-if="guideId" :profession-id="guideId" :name="guideName" />
-    <section v-if="selected" ref="detailPanel" tabindex="-1" class="details" aria-label="本人职业详情">
-      <h2>职业详情与经验</h2>
+    <div v-if="error || message || pending" class="operation-status" aria-live="polite">
+      <p v-if="error" role="alert" class="error">{{ error }}</p>
+      <p v-if="message" role="status">{{ message }}</p>
+      <p v-if="pending && !busy" class="hint">设置结果尚未确认，可重试本次操作。</p>
+      <button v-if="pending" class="fp-control icon-button" type="button" :disabled="busy" @click="retry" title="重试本次设置" aria-label="重试未确认的职业设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg></button>
+    </div>
+
+    <section class="profession-section" aria-labelledby="profession-choices-title">
+      <header class="section-heading"><div><h2 id="profession-choices-title">选择主职业</h2><p>切换免费，已有的职业经验仍会保留。</p></div><button class="fp-control icon-button" type="button" :disabled="catalogLoading" @click="loadCatalog()" title="刷新职业目录" aria-label="刷新职业目录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg></button></header>
+      <p v-if="catalogLoading" role="status">正在读取职业目录…</p>
+      <p v-if="catalogError" role="alert" class="error">{{ catalogError }}</p>
+      <template v-if="catalog">
+        <p v-if="catalog.pagination.total === 0" class="empty-state">暂无可选择的职业。</p>
+        <ul class="profession-choices">
+          <li v-for="job in catalog.list" :key="job.professionId" class="profession-choice" :class="{ 'is-selected': job.professionId === mine?.state.primaryProfessionId }">
+            <div class="choice-heading"><span class="profession-mark" aria-hidden="true">{{ (job.shortName || job.displayName).slice(0, 1) }}</span><div><h3>{{ job.displayName }}</h3><span class="hint">{{ job.shortName }}</span></div><span v-if="job.professionId === mine?.state.primaryProfessionId" class="selection-badge">当前主职业</span></div>
+            <p class="choice-description">{{ job.description }}</p>
+            <div class="choice-actions"><button class="fp-control" type="button" :disabled="disabled" :aria-pressed="job.professionId === mine?.state.primaryProfessionId" :aria-label="`选择${job.displayName}为主职业`" @click="start({ kind: 'primary', professionId: job.professionId })">{{ job.professionId === mine?.state.primaryProfessionId ? '已选择' : '设为主职业' }}</button><button class="fp-control text-button" type="button" :aria-label="`查看${job.displayName}成长提示`" @click="guideId = job.professionId; guideName = job.displayName">成长指南 <span aria-hidden="true">↗</span></button></div>
+          </li>
+        </ul>
+        <nav v-if="catalog.pagination.pageCount > 1" aria-label="职业目录分页"><button class="fp-control" :disabled="catalogLoading || catalog.pagination.p <= 1" @click="loadCatalog(catalog.pagination.p - 1)">上一页</button><span>{{ catalog.pagination.p }} / {{ catalog.pagination.pageCount }} · {{ catalog.pagination.total }} 项</span><button class="fp-control" :disabled="catalogLoading || catalog.pagination.p >= catalog.pagination.pageCount" @click="loadCatalog(catalog.pagination.p + 1)">下一页</button></nav>
+      </template>
+      <ProfessionGuide v-if="guideId" :profession-id="guideId" :name="guideName" />
+    </section>
+
+    <section v-if="mine" class="profession-section" aria-labelledby="profession-progress-title">
+      <header class="section-heading"><div><h2 id="profession-progress-title">职业进度</h2><p>查看已积累的经验与等级记录。</p></div></header>
+      <p v-if="mine.pagination.total === 0" class="empty-state">尚未产生职业进度，选择主职业不会自动增加经验。</p>
+      <ul class="progress-list"><li v-for="job in mine.list" :key="job.professionId" :class="{ 'is-active': selected === job.professionId }"><div class="progress-identity"><strong>{{ job.displayName }}</strong><span>{{ job.levelName }}<small v-if="job.state === 'RETIRED'"> · 已停用</small><small v-if="job.professionId === mine.state.primaryProfessionId"> · 主职业</small></span></div><div class="progress-experience"><strong>{{ job.totalExperience.toLocaleString() }} <small>经验</small></strong><span>本级门槛 {{ job.requiredExperience.toLocaleString() }}</span></div><button class="fp-control" type="button" :aria-label="`查看${job.displayName}详情`" @click="openDetail(job.professionId)">查看详情 <span aria-hidden="true">→</span></button></li></ul>
+      <nav v-if="mine.pagination.pageCount > 1" aria-label="本人职业分页"><button class="fp-control" :disabled="disabled || mine.pagination.p <= 1" @click="loadMine(mine.pagination.p - 1, false)">上一页</button><span>{{ mine.pagination.p }} / {{ mine.pagination.pageCount }} · {{ mine.pagination.total }} 项</span><button class="fp-control" :disabled="disabled || mine.pagination.p >= mine.pagination.pageCount" @click="loadMine(mine.pagination.p + 1, false)">下一页</button></nav>
+    </section>
+
+    <section v-if="selected" ref="detailPanel" tabindex="-1" class="profession-section details" aria-label="本人职业详情">
+      <header class="section-heading"><div><h2>{{ detail ? detail.profession.displayName : '职业详情' }}</h2><p v-if="detail">{{ detail.profession.levelName }} · {{ detail.profession.description }}</p></div><button class="fp-control icon-button" type="button" :disabled="detailLoading" @click="openDetail(selected)" title="刷新职业详情" aria-label="刷新职业详情"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg></button></header>
       <p v-if="detailLoading" role="status">正在读取详情…</p><p v-if="detailError" role="alert" class="error">{{ detailError }}</p>
       <template v-if="detail">
-        <h3>{{ detail.profession.displayName }} · {{ detail.profession.levelName }}</h3><p>{{ detail.profession.description }}</p>
-        <h3>等级路线</h3><ol><li v-for="level in detail.levels" :key="level.levelCode"><strong>{{ level.displayName }}{{ level.topLevel ? '（最高等级）' : '' }}</strong> · 累计门槛 {{ level.requiredExperience }}<span>{{ level.description }} {{ level.achievementDescription }}</span></li></ol>
-        <h3>贡献汇总</h3><p v-if="!detail.contributions.length">暂无贡献记录。</p><ul><li v-for="item in detail.contributions" :key="item.actionCode">{{ item.actionCode }} · {{ item.experienceSum }} 经验 · {{ item.eventCount }} 次 · 最近 {{ date(item.lastOccurredAt) }}</li></ul>
+        <h3 class="subheading">等级路线</h3>
+        <ol class="level-roadmap"><li v-for="level in detail.levels" :key="level.levelCode" :class="{ 'is-current': level.levelCode === detail.profession.levelCode }"><span class="level-node" aria-hidden="true"></span><div class="level-body"><div class="level-heading"><strong>{{ level.displayName }}</strong><span v-if="level.levelCode === detail.profession.levelCode" class="selection-badge">当前等级</span><span v-else-if="level.topLevel" class="hint">最高等级</span><span class="level-threshold">{{ level.requiredExperience.toLocaleString() }} 经验</span></div><p v-if="level.description || level.achievementDescription">{{ level.description }} {{ level.achievementDescription }}</p></div></li></ol>
+        <h3 class="subheading">贡献汇总</h3><p v-if="!detail.contributions.length" class="empty-state">暂无贡献记录。</p><ul v-else class="contribution-list"><li v-for="item in detail.contributions" :key="item.actionCode"><div><strong>{{ actionLabel(item.actionCode) }}</strong><span>{{ item.eventCount }} 次 · 最近 {{ date(item.lastOccurredAt) }}</span></div><strong>{{ item.experienceSum.toLocaleString() }} <small>经验</small></strong></li></ul>
       </template>
-      <button class="fp-control settings-refresh" type="button" :disabled="detailLoading" @click="openDetail(selected)" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取职业详情</span></button>
-      <h3>最近90天经验记录</h3><p v-if="recordsLoading" role="status">正在读取经验记录…</p><p v-if="recordsError" role="alert" class="error">{{ recordsError }}</p>
-      <template v-if="records"><p v-if="records.pagination.total === 0">最近90天没有经验变化记录。</p><ul><li v-for="(item, index) in records.list" :key="index">{{ date(item.occurredAt) }} · {{ item.actionCode }} · {{ item.experienceDelta > 0 ? '+' : '' }}{{ item.experienceDelta }} 经验<span>{{ item.beforeExperience }} → {{ item.afterExperience }} · {{ item.beforeLevelCode }} → {{ item.afterLevelCode }}</span></li></ul><nav v-if="records.pagination.pageCount > 1" aria-label="职业经验分页"><button class="fp-control" :disabled="recordsLoading || records.pagination.p <= 1" @click="loadRecords(records.pagination.p - 1)">上一页经验记录</button><span>第 {{ records.pagination.p }} / {{ records.pagination.pageCount }} 页</span><button class="fp-control" :disabled="recordsLoading || records.pagination.p >= records.pagination.pageCount" @click="loadRecords(records.pagination.p + 1)">下一页经验记录</button></nav></template>
-      <button class="fp-control settings-refresh" type="button" :disabled="recordsLoading" @click="loadRecords()" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取经验记录</span></button>
+      <header class="section-heading records-heading"><h3>近 90 天经验记录</h3><button class="fp-control icon-button" type="button" :disabled="recordsLoading" @click="loadRecords()" title="刷新经验记录" aria-label="刷新经验记录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg></button></header>
+      <p v-if="recordsLoading" role="status">正在读取经验记录…</p><p v-if="recordsError" role="alert" class="error">{{ recordsError }}</p>
+      <template v-if="records"><p v-if="records.pagination.total === 0" class="empty-state">最近 90 天没有经验变化记录。</p><ul v-else class="experience-list"><li v-for="(item, index) in records.list" :key="index"><div><strong>{{ actionLabel(item.actionCode) }}</strong><time>{{ date(item.occurredAt) }}</time><span>{{ item.beforeExperience }} → {{ item.afterExperience }} · {{ item.beforeLevelCode }} → {{ item.afterLevelCode }}</span></div><strong class="experience-delta" :class="{ 'is-positive': item.experienceDelta > 0, 'is-negative': item.experienceDelta < 0 }">{{ item.experienceDelta > 0 ? '+' : '' }}{{ item.experienceDelta.toLocaleString() }} <small>经验</small></strong></li></ul><nav v-if="records.pagination.pageCount > 1" aria-label="职业经验分页"><button class="fp-control" :disabled="recordsLoading || records.pagination.p <= 1" @click="loadRecords(records.pagination.p - 1)">上一页</button><span>{{ records.pagination.p }} / {{ records.pagination.pageCount }}</span><button class="fp-control" :disabled="recordsLoading || records.pagination.p >= records.pagination.pageCount" @click="loadRecords(records.pagination.p + 1)">下一页</button></nav></template>
+    </section>
+
+    <section v-if="mine" class="profession-section" aria-labelledby="profession-privacy-title">
+      <header class="section-heading"><div><h2 id="profession-privacy-title">展示范围</h2><p>决定他人能看到哪些职业资料。</p></div></header>
+      <form @submit.prevent="savePrivacy"><fieldset :disabled="disabled">
+        <label class="preset-field">可见范围<select class="fp-control" v-model="preset" aria-label="职业隐私预设"><option v-for="(label, value) in professionPresets" :key="value" :value="value">{{ label }}</option></select></label>
+        <div v-if="preset === 'CUSTOM' && modules" class="module-fields"><label v-for="[name, label] in professionModules" :key="name">{{ label }}<select class="fp-control" v-model="modules[name]" :aria-label="`${label}可见范围`"><option v-for="(scopeLabel, scope) in professionScopes" :key="scope" :value="scope">{{ scopeLabel }}</option></select></label></div>
+        <p class="hint">两种“仅主职业”预设均隐藏其他模块；自定义设置会保存全部十项范围。</p><button data-tone="primary" class="fp-control" type="submit">保存展示范围</button>
+      </fieldset></form>
+      <div class="clear-profession"><div><strong>暂不展示主职业</strong><p>清除当前选择，保留已有经验和隐私设置，之后可重新选择。</p></div><button class="fp-control" type="button" :disabled="disabled" @click="start({ kind: 'skip' })">清除主职业</button></div>
     </section>
   </div>
 </template>
