@@ -3,7 +3,7 @@ import { ApiError, request } from './http'
 export type PetSpeciesId = 'momota' | 'hexiaotun' | 'yubingmiao' | 'paixiaoyu'
 export type PetAction = 'feed' | 'water' | 'pet' | 'play' | 'rest' | 'wake'
 export type PetActivityKind = 'outing' | 'course' | 'work'
-export type PetHistoryKind = PetActivityKind | 'care' | 'craft' | 'purchase' | 'all'
+export type PetHistoryKind = PetActivityKind | 'care' | 'craft' | 'purchase' | 'story' | 'readoption' | 'all'
 export interface PetRequirement { skillId: PetSkillId; experience: number }
 export interface PetItemAmount { itemId: string; quantity: number }
 export interface PetItem {
@@ -23,6 +23,20 @@ export interface PetRecipe {
   ingredients: PetItemAmount[]
   coins: number
   collectionId: string
+}
+export interface PetStory {
+  id: string
+  name: string
+  description: string
+  steps: { id: string; description: string }[]
+  rewards: { items: PetItemAmount[] }
+}
+export interface PetStoryProgress {
+  id: string
+  completedSteps: number
+  status: 'active' | 'claimable' | 'claimed'
+  completedAt: number | null
+  claimedAt: number | null
 }
 export type PetJobId = 'delivery-assistant' | 'trail-assistant' | 'library-assistant' | 'broadcast-assistant' | 'craft-assistant' | 'care-assistant'
 export type PetSkillId = 'vitality' | 'exploration' | 'knowledge' | 'expression' | 'crafting' | 'kindness'
@@ -64,7 +78,7 @@ export interface PetJournalEvent {
   recordType: 'event'
   id: string
   petId: string
-  kind: 'care' | 'craft' | 'purchase'
+  kind: 'care' | 'craft' | 'purchase' | 'story' | 'readoption'
   action: string
   name: string
   occurredAt: number
@@ -93,6 +107,8 @@ export interface PetCatalog {
   items: PetItem[]
   recipes: PetRecipe[]
   collections: { id: string; name: string; description: string }[]
+  stories: PetStory[]
+  readoptionRules: { coins: number }
   skills: { id: PetSkillId; name: string; description: string }[]
   places: PetActivityEntry[]
   courses: PetActivityEntry[]
@@ -130,6 +146,7 @@ export interface PetState {
   income: { date: string; earned: number; limit: number; remaining: number }
   inventory: { itemId: string; quantity: number }[]
   collections: { id: string; unlockedAt: number }[]
+  stories: PetStoryProgress[]
   dailySupply: { claimed: boolean; coins: number; food: number }
   pet: Pet | null
 }
@@ -142,6 +159,8 @@ export type PetCommand = (
   | { kind: 'activities'; petId: string; activityKind: PetActivityKind; entryId: string; activityVersion: number }
   | { kind: 'activities/claim'; petId: string; activityId: string }
   | { kind: 'crafts'; petId: string; recipeId: string; catalogVersion: number }
+  | { kind: 'stories/claim'; petId: string; storyId: string; catalogVersion: number }
+  | { kind: 'readoption'; petId: string; speciesId: PetSpeciesId; name: string; catalogVersion: number; resetAccepted: true }
 ) & { key: string }
 
 const speciesIds = new Set(['momota', 'hexiaotun', 'yubingmiao', 'paixiaoyu'])
@@ -304,6 +323,17 @@ export function decodePetCatalog(value: unknown): PetCatalog {
       const entry = object(value)
       return { id: text(entry.id, 64), name: text(entry.name, 80), description: text(entry.description, 500) }
     }), entry => entry.id),
+    stories: unique(list(row.stories, 20).map(value => {
+      const entry = object(value)
+      const steps = unique(list(entry.steps, 20).map(value => {
+        const step = object(value)
+        return { id: text(step.id, 64), description: text(step.description, 500) }
+      }), step => step.id)
+      if (!steps.length) throw invalid()
+      return { id: text(entry.id, 64), name: text(entry.name, 80), description: text(entry.description, 500),
+        steps, rewards: { items: itemAmounts(object(entry.rewards).items) } }
+    }), entry => entry.id),
+    readoptionRules: { coins: integer(object(row.readoptionRules).coins, 1) },
     rules: {
       maxNameLength: integer(rules.maxNameLength, 1, 12), initialCoins: integer(rules.initialCoins),
       initialFood: integer(rules.initialFood), dailyCoins: integer(rules.dailyCoins),
@@ -316,7 +346,8 @@ export function decodePetCatalog(value: unknown): PetCatalog {
   if (catalog.items.some(item => item.hunger !== item.effects.hunger)
       || catalog.recipes.some(recipe => !collectionIds.has(recipe.collectionId) || !recipe.ingredients.length
         || recipe.ingredients.some(item => !itemIds.has(item.itemId)))
-      || [...catalog.places, ...catalog.courses, ...catalog.jobs].some(entry => entry.rewards.items.some(item => !itemIds.has(item.itemId)))) throw invalid()
+      || [...catalog.places, ...catalog.courses, ...catalog.jobs].some(entry => entry.rewards.items.some(item => !itemIds.has(item.itemId)))
+      || catalog.stories.some(story => story.rewards.items.some(item => !itemIds.has(item.itemId)))) throw invalid()
   return catalog
 }
 
@@ -371,6 +402,18 @@ export function decodePetState(value: unknown): PetState {
       const item = object(value)
       return { id: text(item.id, 64), unlockedAt: integer(item.unlockedAt) }
     }), item => item.id),
+    stories: unique(list(row.stories, 20).map(value => {
+      const item = object(value)
+      if (item.status !== 'active' && item.status !== 'claimable' && item.status !== 'claimed') throw invalid()
+      const completedSteps = integer(item.completedSteps, 0, 20)
+      const completedAt = item.completedAt === null ? null : integer(item.completedAt)
+      const claimedAt = item.claimedAt === null ? null : integer(item.claimedAt)
+      if ((item.status === 'active') !== (completedAt === null)
+          || (item.status === 'claimed') !== (claimedAt !== null)
+          || (completedAt !== null && (completedSteps === 0 || completedAt > integer(row.serverNow)))
+          || (claimedAt !== null && (completedAt === null || claimedAt < completedAt || claimedAt > integer(row.serverNow)))) throw invalid()
+      return { id: text(item.id, 64), completedSteps, status: item.status, completedAt, claimedAt }
+    }), item => item.id),
     dailySupply: { claimed: flag(daily.claimed), coins: integer(daily.coins), food: integer(daily.food) }, pet,
   }
 }
@@ -409,9 +452,10 @@ export function decodePetJournal(value: unknown): PetJournal {
   const records = values.map((value): PetJournalRecord => {
     const item = object(value)
     if (item.recordType === 'activity') return { ...activityRecord(value, serverNow), recordType: 'activity' }
-    if (item.recordType !== 'event' || !['care', 'craft', 'purchase'].includes(String(item.kind))) throw invalid()
+    if (item.recordType !== 'event' || !['care', 'craft', 'purchase', 'story', 'readoption'].includes(String(item.kind))) throw invalid()
     const kind = item.kind as PetJournalEvent['kind'], action = text(item.action, 40)
-    if (kind === 'care' ? !['feed', 'water', 'pet', 'play', 'rest', 'wake'].includes(action) : action !== kind) throw invalid()
+    if (kind === 'care' ? !['feed', 'water', 'pet', 'play', 'rest', 'wake'].includes(action)
+      : action !== (kind === 'story' ? 'story-claim' : kind)) throw invalid()
     const gains = object(item.effects), occurredAt = integer(item.occurredAt)
     const collectionId = item.collectionId === null ? null : text(item.collectionId, 64)
     if ((kind === 'craft') !== (collectionId !== null)) throw invalid()
@@ -439,7 +483,7 @@ export async function readPetActivityHistory(kind: PetActivityKind | 'all', page
   return result
 }
 export async function readPetJournal(kind: PetHistoryKind, page: number, signal?: AbortSignal): Promise<PetJournal> {
-  if (!['all', 'outing', 'course', 'work', 'care', 'craft', 'purchase'].includes(kind)) throw invalid()
+  if (!['all', 'outing', 'course', 'work', 'care', 'craft', 'purchase', 'story', 'readoption'].includes(kind)) throw invalid()
   integer(page, 1, 10000)
   const result = await read(`/api/v3/me/pet/journal?kind=${kind}&p=${page}&size=10`, decodePetJournal, signal)
   if (result.pagination.page !== page || result.pagination.pageSize !== 10
@@ -462,11 +506,15 @@ export async function executePetCommand(command: PetCommand): Promise<void> {
   const receipt = object(response.data)
   const expectedOperation = command.kind === 'actions' ? command.action : command.kind === 'purchases' ? 'purchase'
     : command.kind === 'activities' ? 'activity-start' : command.kind === 'activities/claim' ? 'activity-claim'
-      : command.kind === 'crafts' ? 'craft' : command.kind
+      : command.kind === 'crafts' ? 'craft' : command.kind === 'stories/claim' ? 'story-claim' : command.kind
   if (text(receipt.operation, 80) !== expectedOperation) throw invalid()
   text(receipt.petId, 64)
   integer(receipt.committedAt)
-  if ('petId' in command && receipt.petId !== command.petId) throw invalid()
+  // 更换宠物回执必须同时证明旧目标与新身份，不能把历史回执当成当前宠物状态。
+  if (command.kind === 'readoption') {
+    if (text(receipt.previousPetId, 64) !== command.petId || receipt.petId === command.petId) throw invalid()
+  } else if ('petId' in command && receipt.petId !== command.petId) throw invalid()
+  if (command.kind === 'stories/claim' && text(receipt.storyId, 64) !== command.storyId) throw invalid()
   if (command.kind === 'activities' || command.kind === 'activities/claim') {
     text(receipt.activityId, 64)
     if (command.kind === 'activities/claim' && receipt.activityId !== command.activityId) throw invalid()

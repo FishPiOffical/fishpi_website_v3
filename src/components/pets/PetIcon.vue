@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: 'feed' | 'water' | 'pet' | 'play' | 'rest' | 'wake' | 'coin' | 'gift' | 'bag' | 'edit' | 'close' | 'minus' | 'move' | 'refresh' | 'home' | 'check' | 'outing' | 'course' | 'work' | 'clock' | 'growth' | 'history' | 'chevron' | 'shop' | 'craft' | 'collection' | 'material' | 'care' | 'purchase' | 'lock' }>()
+defineProps<{ name: 'feed' | 'water' | 'pet' | 'play' | 'rest' | 'wake' | 'coin' | 'gift' | 'bag' | 'edit' | 'close' | 'minus' | 'move' | 'refresh' | 'home' | 'check' | 'outing' | 'course' | 'work' | 'clock' | 'growth' | 'history' | 'chevron' | 'shop' | 'craft' | 'collection' | 'material' | 'care' | 'purchase' | 'lock' | 'journey' }>()
 const paths = {
   feed: 'M4 12h16c0 5-3 8-8 8s-8-3-8-8Zm2-4h.01M12 5h.01M17 8h.01',
   water: 'M12 3S5 11 5 15a7 7 0 0 0 14 0c0-4-7-12-7-12ZM8 15a4 4 0 0 0 4 4',
@@ -30,6 +30,7 @@ const paths = {
   material: 'M20 3C10 2 3 6 4 13a7 7 0 0 0 7 7c7 1 11-7 9-17ZM3 21 15 9',
   care: 'M12 20s-9-5-9-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6-9 11-9 11Z',
   purchase: 'M6 6h12l2 15H4L6 6Zm3 0V5a3 3 0 0 1 6 0v1m-6 6h6',
+  journey: 'M5 4h14v17H5V4Zm4-2v4m6-4v4M9 10h6m-6 4h4',
   lock: 'M5 10h14v11H5V10Zm3 0V7a4 4 0 0 1 8 0v3m-4 4v3',
 }
 </script>

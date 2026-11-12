@@ -10,7 +10,7 @@ import { usePetClock } from './usePetClock'
 
 const history = usePetActivityHistoryStore(), pets = usePetsStore()
 const { now } = usePetClock()
-const filters = [{ id: 'all', name: '全部' }, { id: 'outing', name: '外出' }, { id: 'course', name: '学校' }, { id: 'work', name: '工作履历' }, { id: 'care', name: '日常互动' }, { id: 'craft', name: '制作' }, { id: 'purchase', name: '购买' }] as const
+const filters = [{ id: 'all', name: '全部' }, { id: 'outing', name: '外出' }, { id: 'course', name: '学校' }, { id: 'work', name: '工作履历' }, { id: 'care', name: '日常互动' }, { id: 'craft', name: '制作' }, { id: 'purchase', name: '购买' }, { id: 'story', name: '成长旅程' }, { id: 'readoption', name: '重新领养' }] as const
 const errorText = computed(() => /JSON|HTTP|SQL|fetch|network|token|stack|接口|数据格式/i.test(history.error) ? '活动记录暂时无法读取，请稍后重试。' : history.error)
 const pagination = computed(() => history.history?.pagination)
 onBeforeUnmount(() => history.close())
@@ -27,7 +27,7 @@ function rewards(value: PetActivityRewards, showWorkIncome = false) {
   return result.length ? result.join(' · ') : '本次没有额外收益'
 }
 function itemName(id: string) { return pets.catalog?.items.find(item => item.id === id)?.name || id }
-function eventIcon(item: PetJournalEvent) { return item.kind === 'purchase' ? 'shop' : item.kind === 'craft' ? 'craft' : item.action === 'feed' ? 'feed' : item.action === 'water' ? 'water' : item.action === 'rest' ? 'rest' : item.action === 'wake' ? 'wake' : item.action === 'play' ? 'play' : 'pet' }
+function eventIcon(item: PetJournalEvent) { return item.kind === 'story' ? 'journey' : item.kind === 'readoption' ? 'home' : item.kind === 'purchase' ? 'shop' : item.kind === 'craft' ? 'craft' : item.action === 'feed' ? 'feed' : item.action === 'water' ? 'water' : item.action === 'rest' ? 'rest' : item.action === 'wake' ? 'wake' : item.action === 'play' ? 'play' : 'pet' }
 function signed(value: number) { return `${value > 0 ? '+' : ''}${Number(value.toFixed(2))}` }
 function eventChanges(item: PetJournalEvent) {
   const result: string[] = []

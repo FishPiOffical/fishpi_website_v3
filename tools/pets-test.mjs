@@ -39,8 +39,8 @@ for (const [name, url] of [
 const { usePetsStore } = await import(compile(source.replaceAll('import.meta.env.SSR', 'false')))
 
 const catalog = {
-  version: 2,
-  activityVersion: 3,
+  version: 3,
+  activityVersion: 4,
   skills: ['vitality', 'exploration', 'knowledge', 'expression', 'crafting', 'kindness'].map(id => ({ id, name: id, description: '入门技能' })),
   places: [{ id: 'plaza', name: '广场散步', description: '和伙伴走一走', durationMs: 300000,
     cost: { coins: 0, energy: 5, hunger: 2, water: 3 },
@@ -60,6 +60,10 @@ const catalog = {
   ],
   recipes: [{ id: 'reed-boat', name: '芦苇小舟', description: '留下荷塘的回忆', requirements: [{ skillId: 'exploration', experience: 10 }], ingredients: [{ itemId: 'reed', quantity: 2 }], coins: 2, collectionId: 'reed-boat' }],
   collections: [{ id: 'reed-boat', name: '芦苇小舟', description: '荷塘的回忆' }],
+  stories: [{ id: 'care-companion', name: '照顾小伙伴', description: '一起熟悉家园',
+    steps: [{ id: 'feed', description: '喂食一次' }, { id: 'water', description: '饮水一次' }, { id: 'play', description: '玩耍一次' }],
+    rewards: { items: [{ itemId: 'food', quantity: 2 }] } }],
+  readoptionRules: { coins: 512 },
   rules: { maxNameLength: 12, initialCoins: 100, initialFood: 6, dailyCoins: 20, dailyFood: 2,
     restDurationMs: 14400000, restEnergyPerHour: 20, growthDailyLimit: 10 },
 }
@@ -71,9 +75,9 @@ catalog.places.push({ ...structuredClone(catalog.places[0]), id: 'lotus-pond', n
   requirements: [{ skillId: 'exploration', experience: 10 }],
   rewards: { ...structuredClone(catalog.places[0].rewards), items: [{ itemId: 'reed', quantity: 2 }] } })
 const now = Date.UTC(2026, 10, 12, 10)
-const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 2, wallet: { coins: 0 },
+const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 3, wallet: { coins: 0 },
   income: { date: '2026-11-12', earned: 0, limit: 60, remaining: 60 },
-  inventory: [], collections: [], dailySupply: { claimed: false, coins: 20, food: 2 }, pet: null })
+  inventory: [], collections: [], stories: [{ id: 'care-companion', completedSteps: 0, status: 'active', completedAt: null, claimedAt: null }], dailySupply: { claimed: false, coins: 20, food: 2 }, pet: null })
 const adopted = () => ({ ...empty(), wallet: { coins: 100 }, inventory: [{ itemId: 'food', quantity: 6 }], pet: {
   id: 'pet-a', speciesId: 'hexiaotun', name: '荷小豚', hunger: 90, water: 90, mood: 90, energy: 80,
   experience: 0, level: 1, friendship: 0, adoptedAt: now - 3600000, activity: null,
@@ -164,7 +168,7 @@ await store.buyFood(1)
 assert.equal(writes().length, rejectedPurchases)
 handler = success
 await store.reloadCatalog()
-assert.equal(store.catalog.version, 2)
+assert.equal(store.catalog.version, 3)
 assert.equal(store.catalogError, '')
 console.log('PASS 目录版本变化阻止旧价继续下单，显式刷新目录后恢复购买')
 
@@ -228,7 +232,7 @@ assert.throws(() => api.decodePetState(oldState), '缺少技能字段不能伪�
 const tripStart = deferred(), beforeStart = calls.length
 handler = (path, options) => options?.method ? tripStart.promise : success(path, options)
 const starting = store.startActivity('outing', 'plaza')
-assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', kind: 'outing', entryId: 'plaza', activityVersion: 3 })
+assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', kind: 'outing', entryId: 'plaza', activityVersion: 4 })
 assert.equal(await store.startActivity('course', 'reading-basics'), false)
 assert.equal(await store.act('rest'), false)
 serverState = { ...adopted(), pet: { ...adopted().pet, activity: activeTrip, energy: 75 } }
@@ -422,7 +426,7 @@ const working = { ...activeTrip, id: 'work-a', kind: 'work', entryId: 'library-a
   status: 'running', endsAt: now + 1200000, cost: catalog.jobs[2].cost, rewards: catalog.jobs[2].rewards }
 handler = async (path, options) => {
   if (options?.method) {
-    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', kind: 'work', entryId: 'library-assistant', activityVersion: 3 })
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', kind: 'work', entryId: 'library-assistant', activityVersion: 4 })
     serverState.pet.activity = working
     return response({ operation: 'activity-start', petId: 'pet-a', activityId: 'work-a', committedAt: now })
   }
@@ -573,7 +577,7 @@ let launched = false
 handler = async (path, options) => {
   if (options?.method) {
     const body = JSON.parse(options.body)
-    assert.equal(body.entryId, 'lotus-pond'); assert.equal(body.activityVersion, 3)
+    assert.equal(body.entryId, 'lotus-pond'); assert.equal(body.activityVersion, 4)
     launched = true
     return response({ operation: 'activity-start', petId: 'pet-a', activityId: 'advanced-1', committedAt: now })
   }
@@ -586,7 +590,7 @@ console.log('PASS 进阶探索与制作门槛在本地阻止无效请求，出�
 
 handler = async (path, options) => {
   if (options?.method) {
-    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', itemId: 'fruit', quantity: 2, catalogVersion: 2 })
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', itemId: 'fruit', quantity: 2, catalogVersion: 3 })
     serverState.inventory.push({ itemId: 'fruit', quantity: 2 }, { itemId: 'spring-water', quantity: 1 })
     serverState.wallet.coins -= 12
     return response({ operation: 'purchase', petId: 'pet-a', committedAt: now })
@@ -626,7 +630,7 @@ assert.equal(calls.length, beforeOtherCraft)
 handler = async (path, options) => {
   if (options?.method) {
     assert.equal(options.headers['Idempotency-Key'], frozenCraft.key)
-    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', recipeId: 'reed-boat', catalogVersion: 2 })
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', recipeId: 'reed-boat', catalogVersion: 3 })
     serverState.inventory.find(item => item.itemId === 'reed').quantity = 0
     serverState.wallet.coins -= 2
     serverState.collections.push({ id: 'reed-boat', unlockedAt: now })
@@ -664,4 +668,123 @@ staleCare.resolve(response(historyPage([careRecord]))); await staleCareRead
 assert.equal(exploreHistory.history, null)
 exploreHistory.$dispose(); exploreStore.$dispose()
 console.log('PASS 日常日志过滤走新接口，错误分类明确失败，关闭后迟到响应不再回写')
+
+const claimableStory = { id: 'care-companion', completedSteps: 3, status: 'claimable', completedAt: now, claimedAt: null }
+for (const patch of [
+  { stories: undefined }, { stories: [claimableStory, claimableStory] },
+  { stories: [{ ...claimableStory, completedSteps: -1 }] },
+  { stories: [{ ...claimableStory, status: 'active' }] },
+  { stories: [{ ...claimableStory, completedSteps: 0 }] },
+  { stories: [{ ...claimableStory, status: 'claimed', claimedAt: now - 1 }] },
+  { stories: [{ ...claimableStory, completedAt: now + 1 }] },
+]) assert.throws(() => api.decodePetState({ ...adopted(), ...patch }))
+for (const patch of [
+  { stories: undefined }, { readoptionRules: { coins: 0 } },
+  { stories: [{ ...catalog.stories[0], steps: [] }] },
+  { stories: [{ ...catalog.stories[0], rewards: { items: [{ itemId: 'unknown', quantity: 1 }] } }] },
+]) assert.throws(() => api.decodePetCatalog({ ...catalog, ...patch }))
+const storyLog = { ...careRecord, id: 'story-1', kind: 'story', action: 'story-claim', name: '照顾小伙伴奖励', itemChanges: [{ itemId: 'food', quantity: 2 }] }
+const readoptionLog = { ...careRecord, id: 'readoption-1', petId: 'pet-new', kind: 'readoption', action: 'readoption', name: '重新领养派小鱼', coinsDelta: -512 }
+assert.equal(api.decodePetJournal(historyPage([storyLog, readoptionLog])).list.length, 2)
+assert.throws(() => api.decodePetJournal(historyPage([{ ...storyLog, action: 'readoption' }])))
+console.log('PASS 事件链进度、领奖时间与奖励目录严格校验，重新领养及旅程日志可独立解码')
+
+setActivePinia(createPinia())
+context++
+const journeyAuth = useAuthStore(), journeyStore = usePetsStore()
+serverState = { ...adopted(), wallet: { coins: 600 } }
+handler = success
+await journeyStore.ensureLoaded()
+let beforeJourneyWrites = writes().length
+assert.equal(await journeyStore.claimStory('care-companion'), false)
+assert.equal(await journeyStore.readopt('paixiaoyu', '派派', false), false)
+assert.equal(writes().length, beforeJourneyWrites)
+serverState.stories = [claimableStory]
+await journeyStore.refresh()
+handler = async () => { throw new Error('领奖响应中断') }
+assert.equal(await journeyStore.claimStory('care-companion'), false)
+const storyCommand = { ...journeyStore.pending }
+assert.equal(storyCommand.kind, 'stories/claim')
+journeyAuth.accessToken = 'journey-token-rotated'
+assert.deepEqual(journeyStore.pending, storyCommand)
+assert.equal(await journeyStore.readopt('paixiaoyu', '派派', true), false)
+handler = async (path, options) => {
+  if (!options?.method) return success(path, options)
+  assert(path.endsWith('/stories/claim'))
+  assert.equal(options.headers['Idempotency-Key'], storyCommand.key)
+  assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', storyId: 'care-companion', catalogVersion: 3 })
+  serverState.stories = [{ ...claimableStory, status: 'claimed', claimedAt: now }]
+  return response({ operation: 'story-claim', petId: 'pet-a', storyId: 'care-companion', committedAt: now })
+}
+assert.equal(await journeyStore.retryPending(), true)
+assert.equal(journeyStore.state.stories[0].status, 'claimed')
+beforeJourneyWrites = writes().length
+assert.equal(await journeyStore.claimStory('care-companion'), false)
+assert.equal(writes().length, beforeJourneyWrites)
+console.log('PASS 事件链仅完成后可领，未知结果固定原键，令牌轮换保留，成功重读且不可再领')
+
+handler = async () => { throw new Error('换宠响应中断') }
+assert.equal(await journeyStore.readopt('paixiaoyu', ' 新派派 ', true), false)
+const readoptionCommand = { ...journeyStore.pending }
+assert.equal(readoptionCommand.petId, 'pet-a')
+assert.equal(readoptionCommand.name, '新派派')
+assert.equal(readoptionCommand.resetAccepted, true)
+journeyAuth.accessToken = 'readoption-token-rotated'
+assert.deepEqual(journeyStore.pending, readoptionCommand)
+handler = async (path, options) => {
+  if (!options?.method) throw new Error('换宠后聚合读取失败')
+  assert(path.endsWith('/readoption'))
+  assert.equal(options.headers['Idempotency-Key'], readoptionCommand.key)
+  assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', speciesId: 'paixiaoyu', name: '新派派', catalogVersion: 3, resetAccepted: true })
+  serverState = { ...serverState, wallet: { coins: 88 }, pet: { ...adopted().pet, id: 'pet-new', speciesId: 'paixiaoyu', name: '新派派' } }
+  return response({ operation: 'readoption', petId: 'pet-new', previousPetId: 'pet-a', committedAt: now })
+}
+assert.equal(await journeyStore.retryPending(), true)
+assert.equal(journeyStore.pending, null)
+assert.equal(journeyStore.state, null)
+const afterReadoption = writes().length
+assert.equal(await journeyStore.retryPending(), false)
+assert.equal(writes().length, afterReadoption)
+handler = success
+await journeyStore.refresh()
+assert.equal(journeyStore.pet.id, 'pet-new')
+assert.equal(journeyStore.coins, 88)
+assert.equal(journeyStore.state.stories[0].status, 'claimed')
+assert.equal(await journeyStore.readopt('hexiaotun', '再换一次', true), false)
+console.log('PASS 重新领养明确确认、512费用门槛和新旧petId回执，换宠后读取失败不重复收费')
+
+for (const receipt of [
+  { operation: 'readoption', petId: 'pet-a', previousPetId: 'pet-a', committedAt: now },
+  { operation: 'readoption', petId: 'pet-new', previousPetId: 'someone-else', committedAt: now },
+  { operation: 'adoption', petId: 'pet-new', previousPetId: 'pet-a', committedAt: now },
+]) {
+  handler = async () => response(receipt)
+  await assert.rejects(() => api.executePetCommand(readoptionCommand))
+}
+handler = async () => response({ operation: 'story-claim', petId: 'pet-a', storyId: 'another-story', committedAt: now })
+await assert.rejects(() => api.executePetCommand(storyCommand))
+handler = success
+serverState = { ...adopted(), wallet: { coins: 600 }, pet: { ...adopted().pet, activity: activeTrip }, stories: [claimableStory] }
+await journeyStore.refresh()
+beforeJourneyWrites = writes().length
+assert.equal(await journeyStore.readopt('paixiaoyu', '活动中', true), false)
+assert.equal(await journeyStore.claimStory('care-companion'), false)
+assert.equal(writes().length, beforeJourneyWrites)
+console.log('PASS 错配回执保持未知，不接受同petId假换宠，活动中不能领奖或重新领养')
+
+serverState.pet.activity = null
+await journeyStore.refresh()
+const staleReadoption = deferred()
+handler = () => staleReadoption.promise
+const staleSwitch = journeyStore.readopt('paixiaoyu', '旧账号命令', true)
+context++
+journeyAuth.account = { oId: 'B' }
+journeyAuth.accessToken = 'token-b'
+staleReadoption.resolve(response({ operation: 'readoption', petId: 'pet-other', previousPetId: 'pet-a', committedAt: now }))
+assert.equal(await staleSwitch, false)
+assert.equal(journeyStore.state, null)
+assert.equal(journeyStore.pending, null)
+assert.equal(journeyStore.catalog, null)
+journeyStore.$dispose()
+console.log('PASS 换账号清除待确认领养命令，迟到成功回执不污染新账号')
 delete globalThis.__petTest

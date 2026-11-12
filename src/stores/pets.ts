@@ -253,6 +253,22 @@ export const usePetsStore = defineStore('pets', () => {
         || recipe.ingredients.some(required => (state.value?.inventory.find(item => item.itemId === required.itemId)?.quantity ?? 0) < required.quantity)) return Promise.resolve(false)
     return execute({ kind: 'crafts', petId: pet.value.id, recipeId, catalogVersion: catalog.value.version, key: profileOperationKey() })
   }
+  function claimStory(storyId: string): Promise<boolean> {
+    if (!canWrite() || !pet.value || !catalog.value || pet.value.activity
+        || !catalog.value.stories.some(story => story.id === storyId)
+        || state.value?.stories.find(story => story.id === storyId)?.status !== 'claimable') return Promise.resolve(false)
+    return execute({ kind: 'stories/claim', petId: pet.value.id, storyId,
+      catalogVersion: catalog.value.version, key: profileOperationKey() })
+  }
+  async function readopt(speciesId: PetSpeciesId, name: string, resetAccepted: boolean): Promise<boolean> {
+    if (!canWrite() || !pet.value || !catalog.value || pet.value.activity || resetAccepted !== true
+        || !catalog.value.species.some(species => species.id === speciesId)
+        || (coins.value ?? 0) < catalog.value.readoptionRules.coins) return false
+    try {
+      return await execute({ kind: 'readoption', petId: pet.value.id, speciesId, name: normalizePetName(name),
+        catalogVersion: catalog.value.version, resetAccepted: true, key: profileOperationKey() })
+    } catch (reason) { error.value = message(reason, '请检查宠物名字'); return false }
+  }
   function startActivity(kind: PetActivityKind, entryId: string): Promise<boolean> {
     if (!canWrite() || !pet.value || !catalog.value || pet.value.activity) return Promise.resolve(false)
     const entries = kind === 'outing' ? catalog.value.places : kind === 'course' ? catalog.value.courses : catalog.value.jobs
@@ -302,6 +318,6 @@ export const usePetsStore = defineStore('pets', () => {
   return {
     state, catalog, pet, coins, foodQuantity, ready, receivedAt,
     loading, catalogLoading, error, catalogError, busy, pending, pendingError, refreshNeeded,
-    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, craft, startActivity, claimActivity, retryPending,
+    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, craft, claimStory, readopt, startActivity, claimActivity, retryPending,
   }
 })

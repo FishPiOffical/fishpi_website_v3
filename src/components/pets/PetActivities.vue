@@ -25,10 +25,10 @@ const progress = computed(() => {
   return value ? Math.max(0, Math.min(100, (now.value - value.startedAt) / Math.max(1, value.endsAt - value.startedAt) * 100)) : 0
 })
 const entries = computed(() => tab.value === 'outing' ? pets.catalog?.places ?? [] : tab.value === 'course' ? pets.catalog?.courses ?? [] : pets.catalog?.jobs ?? [])
-const entryGroups = computed(() => tab.value === 'outing' ? [
-  { name: '日常外出', entries: entries.value.filter(entry => !entry.requirements.length) },
-  { name: '进阶探索', entries: entries.value.filter(entry => entry.requirements.length) },
-].filter(group => group.entries.length) : [{ name: '', entries: entries.value }])
+const entryGroups = computed(() => tab.value === 'work' ? [{ name: '', entries: entries.value }] : [
+  { name: tab.value === 'outing' ? '日常外出' : '入门课程', entries: entries.value.filter(entry => !entry.requirements.length) },
+  { name: tab.value === 'outing' ? '进阶探索' : '进阶课程', entries: entries.value.filter(entry => entry.requirements.length) },
+].filter(group => group.entries.length))
 const skills = computed(() => pets.catalog
   ? pets.catalog.skills.map(skill => ({ ...skill, progress: pets.pet?.skills.find(value => value.id === skill.id) }))
   : pets.pet?.skills.map(progress => ({ id: progress.id, name: petSkillNames[progress.id], description: '', progress })) ?? [])
@@ -117,7 +117,7 @@ watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () =>
     <div v-if="tab === 'work' && pets.state" class="work-income"><div><PetIcon name="coin" /><span>今日工作收入</span><strong>{{ pets.state.income.earned }}<small> / {{ pets.state.income.limit }} 币</small></strong></div><p>所有兼职共享每日额度，按领取当天结算。</p></div>
     <div v-if="pets.catalog" id="pet-activity-options" class="activity-options" role="tabpanel" :aria-labelledby="`pet-${tab}-tab`">
       <template v-for="group in entryGroups" :key="group.name">
-      <h3 v-if="group.name" class="activity-group-heading">{{ group.name }}<span v-if="group.name === '进阶探索'">带回材料，制作你的第一份收藏</span></h3>
+      <h3 v-if="group.name" class="activity-group-heading">{{ group.name }}<span v-if="group.name === '进阶探索'">带回材料，制作你的第一份收藏</span><span v-else-if="group.name === '进阶课程'">在已有本领上，再前进一步</span></h3>
       <article v-for="entry in group.entries" :key="`${tab}:${entry.id}`" class="activity-option">
         <header><h3>{{ entry.name }}</h3><span><PetIcon name="clock" />{{ petDuration(entry.durationMs) }}</span></header>
         <p class="activity-description">{{ entry.description }}</p>

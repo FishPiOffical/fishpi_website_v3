@@ -16,6 +16,8 @@ Object.defineProperty(document, 'hidden', { configurable: true, value: false })
 window.matchMedia = query => ({ matches: /max-width: 640px/.test(query) && window.innerWidth <= 640, addEventListener() {}, removeEventListener() {} })
 globalThis.ResizeObserver = class { observe() {} disconnect() {} unobserve() {} }
 globalThis.BroadcastChannel = class { postMessage() {} close() {} }
+globalThis.requestAnimationFrame = callback => setTimeout(callback, 0)
+globalThis.cancelAnimationFrame = clearTimeout
 document.querySelector('header').getBoundingClientRect = () => ({ top: 0, bottom: 80, left: 0, right: window.innerWidth, width: window.innerWidth, height: 80 })
 Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get() { return this.classList.contains('pet-desktop') ? this.classList.contains('collapsed') ? 56 : 144 : this.classList.contains('pet-desktop-panel') ? 296 : 0 } })
 Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get() { return this.classList.contains('pet-desktop') ? this.classList.contains('collapsed') ? 84 : 184 : this.classList.contains('pet-desktop-panel') ? 240 : 0 } })
@@ -65,7 +67,7 @@ const skillNames = { vitality: '体能', exploration: '探索', knowledge: '知�
 const jobNames = { 'delivery-assistant': '配送见习', 'trail-assistant': '巡游向导', 'library-assistant': '图书助理', 'broadcast-assistant': '播报学徒', 'craft-assistant': '手作学徒', 'care-assistant': '照护见习' }
 const entry = (id, name, durationMs, coins, skill) => ({ id, name, description: '本地测试活动', durationMs,
   requirements: [], cost: { coins, energy: 8, hunger: 4, water: 4 }, rewards: { coins: 0, proficiency: 0, experience: 5, food: 1, mood: 3, items: [], skills: [{ id: skill, experience: 7 }] } })
-const catalog = { version: 2, activityVersion: 3, species: [
+const catalog = { version: 3, activityVersion: 4, species: [
   { id: 'momota', name: '摸摸獭', description: '水边的小伙伴' }, { id: 'hexiaotun', name: '荷小豚', description: '戴荷叶帽的小伙伴' },
   { id: 'yubingmiao', name: '鱼饼喵', description: '好奇的小伙伴' }, { id: 'paixiaoyu', name: '派小鱼', description: '熟悉的小伙伴' },
 ], items: [
@@ -82,13 +84,22 @@ const catalog = { version: 2, activityVersion: 3, species: [
   { id: 'forest-chime', name: '森林风铃', description: '风吹过森林的声音' },
   { id: 'shell-frame', name: '贝壳相框', description: '来自海边的纪念' },
 ],
+  stories: [
+    { id: 'care-companion', name: '陪伴的日常', description: '从一顿饭、一杯水和一次玩耍，认识彼此。',
+      steps: [{ id: 'feed', description: '给宠物喂一次食物' }, { id: 'water', description: '给宠物饮水一次' }, { id: 'play', description: '陪宠物玩耍一次' }], rewards: { items: [{ itemId: 'food', quantity: 2 }] } },
+    { id: 'pond-keepsake', name: '荷塘见闻', description: '从观察课堂走向荷塘，再把发现带回课堂。',
+      steps: [{ id: 'nature-class', description: '完成并领取自然观察课' }, { id: 'lotus-trip', description: '完成并领取荷塘采集' }, { id: 'nature-research', description: '完成并领取自然研究课' }], rewards: { items: [{ itemId: 'fruit', quantity: 2 }, { itemId: 'reed', quantity: 2 }] } },
+    { id: 'first-career', name: '第一次小小工作', description: '学一点本领，试一次工作，再继续进修。',
+      steps: [{ id: 'first-class', description: '完成并领取任意一门课程' }, { id: 'first-work', description: '完成并领取任意见习工作' }, { id: 'advanced-class', description: '完成并领取任意一门进阶课程' }], rewards: { items: [{ itemId: 'spring-water', quantity: 2 }, { itemId: 'sea-shell', quantity: 2 }] } },
+  ], readoptionRules: { coins: 512 },
   skills: Object.entries(skillNames).map(([id, name]) => ({ id, name, description: '本地测试技能' })),
   places: [entry('plaza', '广场散步', 300000, 0, 'vitality'), entry('river', '河岸探索', 900000, 3, 'exploration'), entry('forest', '林间远足', 1800000, 5, 'exploration'),
     ...[['lotus-pond', '荷塘采集', 'exploration', 'reed'], ['deep-forest', '森林寻种', 'vitality', 'forest-seed'], ['tidal-flat', '潮汐拾贝', 'knowledge', 'sea-shell']].map(([id, name, skill, itemId]) => ({
       ...entry(id, name, 1200000, 5, skill), requirements: [{ skillId: skill, experience: 10 }], rewards: { coins: 0, proficiency: 0, experience: 25, food: 0, mood: 6, skills: [{ id: skill, experience: 8 }], items: [{ itemId, quantity: 2 }] },
     })),
   ],
-  courses: Object.entries(skillNames).map(([id, name]) => entry(`basic-${id}`, `${name}入门`, 600000, 5, id)),
+  courses: [...Object.entries(skillNames).map(([id, name]) => entry(`basic-${id}`, `${name}入门`, 600000, 5, id)),
+    ...[['fitness-advanced', '体能训练课', 'vitality'], ['nature-advanced', '自然研究课', 'exploration'], ['reading-advanced', '阅读研习课', 'knowledge'], ['expression-advanced', '表达进阶课', 'expression'], ['craft-advanced', '创作进阶课', 'crafting'], ['manners-advanced', '伙伴协作课', 'kindness']].map(([id, name, skill]) => ({ ...entry(id, name, 1800000, 10, skill), requirements: [{ skillId: skill, experience: 20 }] }))],
   jobs: Object.entries(jobNames).map(([id, name], index) => ({ ...entry(id, name, 1200000, 0, Object.keys(skillNames)[index]),
     cost: { coins: 0, energy: 12, hunger: 4, water: 6 }, rewards: { coins: 12, proficiency: 10, experience: 15, food: 0, mood: 3, skills: [], items: [] },
     requirement: { skillId: Object.keys(skillNames)[index], experience: 10 }, requirements: [{ skillId: Object.keys(skillNames)[index], experience: 10 }] })),
@@ -96,7 +107,8 @@ const catalog = { version: 2, activityVersion: 3, species: [
   rules: { maxNameLength: 12, initialCoins: 100, initialFood: 6,
   dailyCoins: 20, dailyFood: 2, restDurationMs: 14400000, restEnergyPerHour: 20, growthDailyLimit: 10 } }
 const now = Date.UTC(2026, 10, 12, 10)
-const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 2, wallet: { coins: 0 }, inventory: [], collections: [],
+const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 3, wallet: { coins: 0 }, inventory: [], collections: [],
+  stories: catalog.stories.map(story => ({ id: story.id, completedSteps: 0, status: 'active', completedAt: null, claimedAt: null })),
   income: { date: '2026-11-12', earned: 0, limit: 60, remaining: 60 },
   dailySupply: { claimed: false, coins: 20, food: 2 }, pet: null })
 const adopted = (id = 'pet-a', name = '我的小鱼', speciesId = 'momota') => ({ ...empty(), wallet: { coins: 100 }, inventory: [{ itemId: 'food', quantity: 6 }], pet: {
@@ -120,6 +132,23 @@ const success = async (url, options) => {
   if (options?.method) {
     const body = JSON.parse(options.body), kind = url.split('/').at(-1)
     if (kind === 'adoption') serverState = adopted('pet-a', body.name, body.speciesId)
+    if (url.endsWith('/stories/claim')) {
+      const story = catalog.stories.find(story => story.id === body.storyId), progress = serverState.stories.find(story => story.id === body.storyId)
+      assert.equal(progress.status, 'claimable')
+      progress.status = 'claimed'; progress.claimedAt = now
+      for (const item of story.rewards.items) changeInventory(item.itemId, item.quantity)
+      journalEvent('story', 'story-claim', `完成${story.name}`, { itemChanges: structuredClone(story.rewards.items) })
+      return response({ operation: 'story-claim', storyId: story.id, petId: serverState.pet.id, committedAt: now })
+    }
+    if (kind === 'readoption') {
+      assert.equal(body.resetAccepted, true)
+      const previous = serverState.pet
+      serverState.pet = adopted(`pet-replaced-${serial}`, body.name, body.speciesId).pet
+      serverState.pet.cooldowns = previous.cooldowns; serverState.pet.growthToday = previous.growthToday
+      serverState.wallet.coins -= catalog.readoptionRules.coins
+      journalEvent('readoption', 'readoption', `重新领养${body.name}`, { coinsDelta: -catalog.readoptionRules.coins })
+      return response({ operation: 'readoption', petId: serverState.pet.id, previousPetId: previous.id, committedAt: now })
+    }
     if (kind === 'activities') {
       const choice = catalog[body.kind === 'outing' ? 'places' : body.kind === 'work' ? 'jobs' : 'courses'].find(item => item.id === body.entryId)
       serverState.pet.activity = { id: `activity-${serial}`, kind: body.kind, entryId: choice.id, name: choice.name, startedAt: now, endsAt: now + choice.durationMs, status: 'running', cost: choice.cost, rewards: choice.rewards }
@@ -281,11 +310,12 @@ try {
   assert.equal(document.querySelectorAll('.activity-group-heading').length, 2)
   assert.equal(document.querySelectorAll('.pet-skill').length, 6)
   await click(document.querySelector('#pet-course-tab'))
-  assert.equal(document.querySelectorAll('.activity-option').length, 6)
+  assert.equal(document.querySelectorAll('.activity-option').length, 12)
+  assert.equal(document.querySelectorAll('.activity-group-heading').length, 2)
   document.querySelector('#pet-course-tab').dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true })); await settle()
   assert.equal(document.activeElement.id, 'pet-outing-tab')
   assert.equal(calls.length, beforeTabs, '活动目录切换应使用已读目录，不额外请求')
-  console.log('PASS 三个日常地点、三个进阶地点、六门课程与六项真实技能，标签支持键盘切换且不新增读取')
+  console.log('PASS 日常与进阶地点、十二门课程按门槛分组，标签支持键盘切换且不新增读取')
 
   const startWait = deferred(), beforeStart = writes().length
   let startedRequest
@@ -552,7 +582,7 @@ try {
   console.log('PASS 扩展商店分类与批量购买，食品饮品真实使用，纯材料无使用入口，满状态不浪费消耗品')
 
   await click(document.querySelector('.history-toggle'))
-  assert.equal(document.querySelectorAll('.history-filters button').length, 7)
+  assert.equal(document.querySelectorAll('.history-filters button').length, 9)
   await click(historyFilter('日常互动'))
   assert.equal(document.querySelectorAll('.history-item').length, 2)
   assert.equal(document.querySelectorAll('.history-status').length, 0, '日常互动不是计时活动，不显示待领取或预计奖励')
@@ -570,7 +600,163 @@ try {
   assert([...document.querySelectorAll('.history-cost')].some(item => item.textContent.includes('宠物币 -30') && item.textContent.includes('芦苇 +5')))
   assert.equal(document.querySelectorAll('.history-rewards').length, 0, '纯购买不显示伪造的成长奖励')
   console.log('PASS 统一日志展示照顾、制作和购买的实际变动，保留正负方向，不把即时操作渲染成待领奖活动')
+
+  await click(document.querySelector('.history-toggle'))
+  serverState = adopted('phase-five-pet', '老伙伴'); serverState.wallet.coins = 1000
+  for (const skill of serverState.pet.skills) skill.experience = 20
+  serverState.pet.skills.find(skill => skill.id === 'knowledge').experience = 19
+  await pets.refresh(); await settle(); await click(document.querySelector('#pet-course-tab'))
+  assert.equal(document.querySelectorAll('.activity-option').length, 12)
+  assert.deepEqual([...document.querySelectorAll('.activity-group-heading')].map(node => node.firstChild.textContent.trim()), ['入门课程', '进阶课程'])
+  assert(document.querySelector('[aria-label="开始阅读研习课"]').disabled)
+  assert(document.querySelector('[aria-label="开始阅读研习课"]').title.includes('知识经验 20'))
+  serverState.pet.skills.find(skill => skill.id === 'knowledge').experience = 20
+  await pets.refresh(); await settle()
+  await click(document.querySelector('[aria-label="开始阅读研习课"]'))
+  assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'phase-five-pet', kind: 'course', entryId: 'reading-advanced', activityVersion: 4 })
+  assert(document.querySelector('.current-copy').textContent.includes('阅读研习课'))
+  serverState.serverNow = serverState.pet.activity.endsAt; serverState.pet.activity.status = 'claimable'
+  await pets.refresh(); await settle(); await click(document.querySelector('.activity-primary'))
+  assert.equal(pets.pet.skills.find(skill => skill.id === 'knowledge').experience, 27)
+  console.log('PASS 六门进阶课程复用计时活动和真实门槛，选择与领取使用当前目录版本')
+
+  const story = serverState.stories.find(item => item.id === 'care-companion')
+  story.completedSteps = 1
+  await pets.refresh(); await settle()
+  const firstStory = () => document.querySelector('.story-card')
+  assert.equal(firstStory().querySelectorAll('.story-steps .complete').length, 1)
+  assert(firstStory().querySelector('.story-steps .current').textContent.includes('饮水'))
+  assert.equal(firstStory().querySelector('button'), null)
+  const beforeStoryReady = writes().length
+  story.completedSteps = 3; story.status = 'claimable'; story.completedAt = now
+  await pets.refresh(); await settle()
+  assert.equal(writes().length, beforeStoryReady, '整链完成不能自动发奖')
+  assert(document.querySelector('[aria-label="领取陪伴的日常奖励"]'))
+  handler = (url, options) => options?.method && url.endsWith('/stories/claim') ? Promise.reject(new Error('模拟旅程领取断流')) : success(url, options)
+  await click(document.querySelector('[aria-label="领取陪伴的日常奖励"]'))
+  const storyKey = pets.pending.key, originalStory = JSON.parse(writes().at(-1).options.body), oldFood = serverState.inventory.find(item => item.itemId === 'food').quantity
+  assert.equal(pets.pending.kind, 'stories/claim')
+  assert(document.querySelector('[aria-label="领取陪伴的日常奖励"]').disabled)
+  auth.accessToken = 'phase-five-rotation'; await settle(); handler = success
+  await click(document.querySelector('[aria-label="核对上次宠物操作"]'))
+  assert.equal(writes().at(-1).options.headers['Idempotency-Key'], storyKey)
+  assert.deepEqual(JSON.parse(writes().at(-1).options.body), originalStory)
+  assert.equal(pets.state.inventory.find(item => item.itemId === 'food').quantity, oldFood + 2)
+  assert(firstStory().textContent.includes('奖励已领取'))
+  assert.equal(firstStory().querySelector('button'), null)
+  assert.equal(document.querySelectorAll('.story-card.claimed').length, 1)
+  console.log('PASS 成长旅程只展示服务端顺序进度，完成后显式领奖，未知结果同键恢复且其他旅程独立')
+
+  serverState.wallet.coins = 100; await pets.refresh(); await settle()
+  const readoptionWrites = writes().length
+  assert(document.querySelector('.pet-readoption').textContent.includes('512 宠物币'))
+  await click(document.querySelector('.readoption-open'))
+  assert(document.querySelector('[role="dialog"]'))
+  assert(document.querySelector('.readoption-form').textContent.includes('宠物币不足'))
+  assert(document.querySelector('.readoption-submit').disabled)
+  assert(document.querySelector('.readoption-rules').textContent.includes('剩余宠物币、背包、收藏、成长旅程进度'))
+  await click([...document.querySelectorAll('.readoption-actions button')].find(button => button.textContent === '取消'))
+  await settle(); await settle()
+  assert.equal(document.querySelector('.readoption-form'), null)
+  assert.equal(writes().length, readoptionWrites)
+  assert.equal(document.activeElement, document.querySelector('.readoption-open'))
+  console.log('PASS 余额不足也可查看重新领养规则和费用，取消不写入并把焦点归还入口')
+
+  serverState.wallet.coins = 1000; serverState.pet.level = 3; serverState.pet.experience = 220; serverState.pet.friendship = 19
+  serverState.pet.growthToday.used = 4; serverState.pet.cooldowns.pet = now + 4000
+  serverState.dailySupply.claimed = true; serverState.income.earned = 20; serverState.income.remaining = 40
+  serverState.collections = [{ id: 'reed-boat', unlockedAt: now }]
+  await pets.refresh(); await settle(); await click(document.querySelector('.readoption-open'))
+  const readoptionForm = () => document.querySelector('.readoption-form')
+  const choosePet = document.querySelector('.readoption-species input[value="paixiaoyu"]')
+  await click(choosePet); await input(document.querySelector('#readoption-name'), '新的派派')
+  const beforeConfirmation = writes().length
+  readoptionForm().dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await settle()
+  assert.equal(writes().length, beforeConfirmation)
+  assert(document.querySelector('.readoption-submit').disabled)
+  await click(document.querySelector('.readoption-accept input'))
+  auth.accessToken = 'readoption-rotation'; await settle()
+  assert.equal(document.querySelector('#readoption-name').value, '新的派派')
+  assert(document.querySelector('.readoption-accept input').checked)
+  assert(!document.querySelector('.readoption-submit').disabled)
+  const readoptionWait = deferred()
+  handler = (url, options) => options?.method && url.endsWith('/readoption') ? readoptionWait.promise : success(url, options)
+  readoptionForm().dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await settle()
+  readoptionForm().dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await settle()
+  assert.equal(writes().length, beforeConfirmation + 1)
+  assert(document.querySelector('#readoption-name').disabled)
+  assert(document.querySelector('.readoption-actions button').disabled)
+  assert.equal(document.querySelector('.fp-dialog-x'), null)
+  readoptionWait.reject(new Error('模拟重新领养响应断流')); await settle()
+  const readoptionKey = pets.pending.key, readoptionBody = JSON.parse(writes().at(-1).options.body)
+  assert.equal(readoptionBody.resetAccepted, true)
+  assert.equal(readoptionBody.name, '新的派派')
+  assert.equal(readoptionBody.speciesId, 'paixiaoyu')
+  assert.equal(readoptionBody.catalogVersion, 3)
+  assert(document.querySelector('.readoption-feedback'))
+  assert(document.querySelector('#readoption-name').disabled, '未知结果冻结原命令，不能编辑成另一次领养')
+  assert(!document.querySelector('.readoption-feedback').textContent.includes('JSON'))
+  const retained = structuredClone({ inventory: serverState.inventory, collections: serverState.collections, stories: serverState.stories, dailySupply: serverState.dailySupply, income: serverState.income, cooldowns: serverState.pet.cooldowns, growthToday: serverState.pet.growthToday })
+  handler = success
+  await click(document.querySelector('[aria-label="核对重新领养操作"]')); await settle(); await settle()
+  assert.equal(writes().at(-1).options.headers['Idempotency-Key'], readoptionKey)
+  assert.deepEqual(JSON.parse(writes().at(-1).options.body), readoptionBody)
+  assert.equal(document.querySelector('.readoption-form'), null, '新宠物ID生效即关闭并废弃旧确认')
+  assert.notEqual(pets.pet.id, 'phase-five-pet'); assert.equal(pets.pet.name, '新的派派'); assert.equal(pets.pet.speciesId, 'paixiaoyu')
+  assert.equal(pets.coins, 488); assert.equal(pets.pet.level, 1); assert.equal(pets.pet.experience, 0); assert.equal(pets.pet.friendship, 0)
+  assert(pets.pet.skills.every(skill => skill.experience === 0)); assert(pets.pet.jobs.every(job => job.experience === 0))
+  for (const key of ['inventory', 'collections', 'stories', 'dailySupply', 'income']) assert.deepEqual(structuredClone(vue.toRaw(pets.state[key])), retained[key])
+  assert.deepEqual(structuredClone(vue.toRaw(pets.pet.cooldowns)), retained.cooldowns); assert.deepEqual(structuredClone(vue.toRaw(pets.pet.growthToday)), retained.growthToday)
+  await click(document.querySelector('.readoption-open'))
+  assert.equal(document.querySelector('#readoption-name').value, '')
+  assert.equal(document.querySelector('.readoption-accept input').checked, false)
+  await click(document.querySelector('.fp-dialog-x')); await settle(); await settle()
+  console.log('PASS 重新领养必须明确确认，轮换保草稿，重复提交拦截，未知同键恢复，新ID关闭旧确认并显示服务端资产与成长')
+
+  await click(document.querySelector('.history-toggle'))
+  await click(historyFilter('成长旅程'))
+  assert.equal(document.querySelectorAll('.history-item').length, 1)
+  assert(document.querySelector('.history-cost').textContent.includes('基础口粮 +2'))
+  assert.equal(document.querySelector('.history-status'), null)
+  await click(historyFilter('重新领养'))
+  assert.equal(document.querySelectorAll('.history-item').length, 1)
+  assert(document.querySelector('.history-cost').textContent.includes('宠物币 -512'))
+  assert(document.querySelector('.history-record h3').textContent.includes('新的派派'))
+  assert.equal(document.querySelector('.history-status'), null)
+  console.log('PASS 旅程领奖和重新领养归入独立日志分类，展示实际物品及扣费，不出现计时或待领奖状态')
+
+  serverState.wallet.coins = 1600; await pets.refresh(); await settle(); await click(document.querySelector('.readoption-open'))
+  await input(document.querySelector('#readoption-name'), '只需更新状态'); await click(document.querySelector('.readoption-accept input'))
+  handler = (url, options) => options?.method && url.endsWith('/readoption') ? Promise.reject(new Error('模拟领养断流')) : success(url, options)
+  await click(document.querySelector('.readoption-submit'))
+  let replacementCommitted = false
+  handler = async (url, options) => {
+    if (options?.method && url.endsWith('/readoption')) { const receipt = await success(url, options); replacementCommitted = true; return receipt }
+    if (replacementCommitted && url === '/api/v3/me/pet') throw new Error('模拟后置读取失败')
+    return success(url, options)
+  }
+  await click(document.querySelector('[aria-label="核对重新领养操作"]')); await settle(); await settle()
+  assert.equal(document.querySelector('.readoption-form'), null, '写入确认后不应让后置读取失败留住旧确认弹窗')
+  assert.equal(pets.pending, null); assert.equal(pets.refreshNeeded, true)
+  const confirmedWriteCount = writes().length
+  handler = success
+  await click(document.querySelector('[aria-label="刷新宠物状态"]'))
+  assert.equal(writes().length, confirmedWriteCount)
+  assert.equal(pets.pet.name, '只需更新状态'); assert.equal(pets.coins, 1088)
+  console.log('PASS 重新领养恢复确认后读取失败，只开放状态重读，不保留旧确认或再次扣费')
+
+  serverState.wallet.coins = 800; await pets.refresh(); await settle(); await click(document.querySelector('.readoption-open'))
+  await input(document.querySelector('#readoption-name'), '跨设备旧草稿'); await click(document.querySelector('.readoption-accept input'))
+  serverState.pet = adopted('other-device-new-pet', '跨设备新伙伴', 'yubingmiao').pet
+  await pets.refresh(); await settle(); await settle()
+  assert.equal(document.querySelector('.readoption-form'), null)
+  await click(document.querySelector('.readoption-open'))
+  assert.equal(document.querySelector('#readoption-name').value, '')
+  assert.equal(document.querySelector('.readoption-accept input').checked, false)
+  console.log('PASS 其他设备更换宠物后废弃旧确认，重新打开必须再次选择和确认')
   serverState = empty(); context++; auth.account = { oId: 'C' }; auth.accessToken = 'token-c'; await settle()
+  await settle(); await settle()
+  assert.equal(document.querySelector('.readoption-form'), null)
   assert.equal(document.querySelector('.pet-history'), null)
   assert(!document.body.textContent.includes('工作记录'))
   console.log('PASS 日志失败与空结果分离，技术错误友好展示，快速筛选和换号不回写旧记录')

@@ -12,6 +12,8 @@ import PetActivities from '@/components/pets/PetActivities.vue'
 import PetActivityHistory from '@/components/pets/PetActivityHistory.vue'
 import PetShop from '@/components/pets/PetShop.vue'
 import PetWorkshop from '@/components/pets/PetWorkshop.vue'
+import PetStories from '@/components/pets/PetStories.vue'
+import PetReadoption from '@/components/pets/PetReadoption.vue'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetIcon from '@/components/pets/PetIcon.vue'
 import { usePetClock } from '@/components/pets/usePetClock'
@@ -130,6 +132,7 @@ onMounted(() => { mounted.value = true; display.restore(); load() })
         </section>
 
         <PetActivities />
+        <PetStories />
 
         <div class="daily-supplies">
           <section class="supply-panel pet-panel" aria-labelledby="supply-title"><div class="supply-icon"><PetIcon name="gift" /></div><div class="supply-copy"><h2 id="supply-title">每日补给</h2><p>{{ pets.state.dailySupply.coins }} 宠物币 <span>＋</span> {{ pets.state.dailySupply.food }} 份口粮</p></div><button type="button" :class="pets.state.dailySupply.claimed ? 'pet-secondary' : 'pet-primary'" :disabled="locked || pets.state.dailySupply.claimed" @click="pets.claimSupply()">{{ pets.state.dailySupply.claimed ? '今日已领取' : '领取补给' }}</button></section>
@@ -138,6 +141,7 @@ onMounted(() => { mounted.value = true; display.restore(); load() })
         <PetWorkshop />
         <PetActivityHistory />
         <section class="desktop-settings" aria-label="桌宠显示设置"><div><h2>让它陪你逛社区</h2><p>拖动桌宠可调整位置，收起后仍能随时找到它。</p></div><div class="desktop-buttons"><button type="button" class="pet-secondary" @click="display.visible ? display.hide() : display.show()">{{ display.visible ? '隐藏桌宠' : '显示桌宠' }}</button><button type="button" class="text-button" @click="display.resetPosition()">恢复默认位置</button></div></section>
+        <PetReadoption />
       </template>
     </template>
   </div>

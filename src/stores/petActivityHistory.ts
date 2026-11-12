@@ -64,7 +64,7 @@ export const usePetActivityHistoryStore = defineStore('pet-activity-history', ()
   }
   function close() { opened.value = false; cancel() }
   function setFilter(kind: PetHistoryKind) {
-    if (!['all', 'outing', 'course', 'work', 'care', 'craft', 'purchase'].includes(kind) || kind === filter.value) return Promise.resolve()
+    if (!['all', 'outing', 'course', 'work', 'care', 'craft', 'purchase', 'story', 'readoption'].includes(kind) || kind === filter.value) return Promise.resolve()
     cancel()
     filter.value = kind
     page.value = 1

@@ -74,6 +74,7 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 第二批继续加入三个外出地点、六门课程、技能成长与到期成果领取；活动与休息互斥，使用服务器快照与原键恢复，不轮询或自动发奖。需先更新 Rhythm 的活动表和接口，详见 [外出与学校](docs/pets-phase-two.md)。
 第三批加入六类见习兼职、独立职业熟练度和可筛选的活动记录；工作收益按领取日共享每日 60 宠物币额度。履历仅展开时读取，详见 [兼职与活动记录](docs/pets-phase-three.md)。
 第四批加入进阶探索、材料配方与永久收藏、扩展食品饮料商店，以及包含日常互动的统一日志，详见 [探索、手作与日常记录](docs/pets-phase-four.md)。
+第五批加入六门进阶课程、三条成长旅程，以及 512 宠物币重新领养；更换宠物保留账号资产与已领取奖励，详见 [进阶课程、旅程与重新领养](docs/pets-phase-five.md)。
 用户列表/内容读取失败明确显示错误和重试，合法空结果单独展示，不用 mock 冒充。
 SSR 另 prefetch：`/domains`、`/tags`、`/breezemoons`、`/top`、`/repeater`。
 补齐页面：`/download`、`/agreement`、`/privacy`、`/activity`、`/following`、`/settings/point`、`/member/:name/medals`、`/city/:city`、`/charge/point`、`/column/:id`。
