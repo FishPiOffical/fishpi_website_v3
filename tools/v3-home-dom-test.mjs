@@ -143,3 +143,25 @@ console.log('PASS home DOM 5 switching routes/offline/back preserves connected c
 const entry = await fs.readFile('src/entry-client.ts', 'utf8')
 assert.ok(entry.indexOf("app.mount('#app', true)") < entry.indexOf('useHomeLayoutStore(pinia).restore()'))
 console.log('PASS home DOM 6 actual entry restores optional local layout only after hydration')
+
+// 混合模块、全侧栏及列内堆叠的三列行必须共享列宽，编辑模式不能改变比例。
+setActivePinia(createPinia())
+const aligned = useHomeLayoutStore()
+for (const mode of ['classic', 'compact']) {
+  aligned.setMode(mode)
+  aligned.state.hidden = {}
+  aligned.state.rows = [[['recentA'], ['recentB'], ['rank']], [['side:income'], ['side:appearance'], ['side:ad']], [['chat'], ['hotQna'], ['community']], [['long']]]
+  const snapshot = JSON.stringify(aligned.state.rows)
+  for (const editing of [false, true]) {
+    aligned.editing = editing
+    assert.deepEqual(aligned.visibleRows.slice(0, 3).map(row => row.columns), Array(3).fill('repeat(3, minmax(0, 1fr))'))
+    assert.equal(aligned.visibleRows[3].columns, 'minmax(0, 1fr)')
+  }
+  assert.equal(JSON.stringify(aligned.state.rows), snapshot)
+  aligned.state.rows = [[['recentA', 'recentB'], ['chat'], ['rank']]]
+  assert.equal(aligned.visibleRows[0].columns, 'repeat(3, minmax(0, 1fr))')
+  aligned.state.hidden.rank = true
+  assert.equal(aligned.visibleRows[0].cells.length, 2)
+  assert.equal(aligned.visibleRows[0].columns, mode === 'compact' ? 'minmax(0, 1.5fr) minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(0, 1fr)')
+}
+console.log('PASS 首页三列跨行对齐：经典/紧凑、编辑/正常、堆叠/隐藏均通过')

@@ -7,7 +7,7 @@ export type HomeSideModuleId = `side:${ChatSidebarModuleId}`
 
 export type HomeModuleId = HomeCoreModuleId | HomeSideModuleId
 
-/** narrow：侧栏类模块，所在列略窄 */
+/** narrow：侧栏类模块，两列布局时所在列略窄；三列统一等宽。 */
 export type HomeModuleWidth = 'wide' | 'narrow'
 
 export interface HomeModuleMeta {

@@ -149,7 +149,8 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
         return {
           key: row.flat().join('|'),
           cells,
-          columns: cells.map((c) => mode.value === 'classic' ? (c.narrow && cells.length > 1 ? 'minmax(0, 0.95fr)' : 'minmax(0, 1fr)') : (cells.length > 1 && c.modules.some(m => m.id === 'recentA') && c.modules.some(m => m.id === 'recentB') ? 'minmax(0, 1.5fr)' : c.narrow && cells.length > 1 ? 'minmax(0, 0.85fr)' : 'minmax(0, 1fr)')).join(' '),
+          // 三列共用等宽网格，不因模块类型或列内堆叠改变跨行对齐；两列保留原比例。
+          columns: cells.length === 3 ? 'repeat(3, minmax(0, 1fr))' : cells.map((c) => mode.value === 'classic' ? (c.narrow && cells.length > 1 ? 'minmax(0, 0.95fr)' : 'minmax(0, 1fr)') : (cells.length > 1 && c.modules.some(m => m.id === 'recentA') && c.modules.some(m => m.id === 'recentB') ? 'minmax(0, 1.5fr)' : c.narrow && cells.length > 1 ? 'minmax(0, 0.85fr)' : 'minmax(0, 1fr)')).join(' '),
         }
       })
       .filter((r) => r.cells.length),
