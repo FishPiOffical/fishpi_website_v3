@@ -62,14 +62,14 @@ onBeforeUnmount(() => { clear(); setChatPresenceWanted(false) })
   </div>
 </template>
 <style scoped>
-.mount-arrival { position:fixed; left:16px; bottom:26px; z-index:1050; display:flex; align-items:center; gap:4px; width:max-content; max-width:min(320px,calc(100vw - 32px)); padding:4px 14px 4px 0; border-radius:0 30px 30px 0; background:linear-gradient(90deg,transparent,color-mix(in srgb,#a3d7c8 24%,var(--fp-card)) 38%,var(--fp-card)); color:var(--fp-text); pointer-events:none; animation:mount-arrive 4.1s both; }
-.vehicle { width:76px; height:52px; flex:none; object-fit:contain; }
+.mount-arrival { position:fixed; left:16px; bottom:26px; z-index:1050; display:flex; align-items:center; gap:4px; width:max-content; max-width:min(280px,calc(100vw - 32px)); padding:3px 10px 3px 0; border-radius:0 24px 24px 0; background:linear-gradient(90deg,transparent,color-mix(in srgb,#a3d7c8 24%,var(--fp-card)) 38%,var(--fp-card)); color:var(--fp-text); pointer-events:none; animation:mount-arrive 4.1s both; }
+.vehicle { width:56px; height:40px; flex:none; object-fit:contain; }
 .arrival-copy { min-width:0; font-size:12px; line-height:1.4; }
 .arrival-copy>span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.arrival-user { display:flex; align-items:center; gap:5px; margin-bottom:2px; }
-.arrival-user img { width:20px; height:20px; border-radius:4px; object-fit:cover; }
+.arrival-user { display:flex; align-items:center; gap:4px; margin-bottom:1px; }
+.arrival-user img { width:16px; height:16px; border-radius:3px; object-fit:cover; }
 .arrival-user strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 @keyframes mount-arrive { 0% { transform:translateX(calc(-100% - 20px)); opacity:0; } 15%,88% { transform:translateX(0); opacity:1; } 100% { transform:translateX(20px); opacity:0; } }
-@media(max-width:600px) { .mount-arrival { bottom:calc(100px + env(safe-area-inset-bottom)); left:8px; max-width:calc(100vw - 16px); } .vehicle { width:64px; height:44px; } }
-@media(prefers-reduced-motion:reduce) { .mount-arrival { animation:none; } .vehicle { display:none; } .mount-arrival { padding:12px 18px; border-radius:12px; } }
+@media(max-width:600px) { .mount-arrival { bottom:calc(100px + env(safe-area-inset-bottom)); left:8px; max-width:calc(100vw - 16px); } .vehicle { width:48px; height:36px; } }
+@media(prefers-reduced-motion:reduce) { .mount-arrival { animation:none; } .vehicle { display:none; } .mount-arrival { padding:6px 10px; border-radius:10px; } }
 </style>
