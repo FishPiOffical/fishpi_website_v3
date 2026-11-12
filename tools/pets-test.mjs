@@ -39,8 +39,8 @@ for (const [name, url] of [
 const { usePetsStore } = await import(compile(source.replaceAll('import.meta.env.SSR', 'false')))
 
 const catalog = {
-  version: 1,
-  activityVersion: 2,
+  version: 2,
+  activityVersion: 3,
   skills: ['vitality', 'exploration', 'knowledge', 'expression', 'crafting', 'kindness'].map(id => ({ id, name: id, description: '入门技能' })),
   places: [{ id: 'plaza', name: '广场散步', description: '和伙伴走一走', durationMs: 300000,
     cost: { coins: 0, energy: 5, hunger: 2, water: 3 },
@@ -51,14 +51,29 @@ const catalog = {
   incomeRules: { dailyLimit: 60 },
   jobs: ['delivery-assistant','trail-assistant','library-assistant','broadcast-assistant','craft-assistant','care-assistant'].map((id, index) => ({ id, name: id, description: '见习工作', durationMs: 1200000, cost: { coins: 0, energy: 12, hunger: 4, water: 6 }, rewards: { coins: 12, proficiency: 10, experience: 15, food: 0, mood: 3, skills: [] }, requirement: { skillId: ['vitality','exploration','knowledge','expression','crafting','kindness'][index], experience: 10 } })),
   species: ['momota', 'hexiaotun', 'yubingmiao', 'paixiaoyu'].map(id => ({ id, name: id, description: '社区伙伴' })),
-  items: [{ id: 'food', name: '基础口粮', price: 5, hunger: 35 }],
+  items: [
+    { id: 'food', name: '基础口粮', description: '日常口粮', category: 'food', price: 5, hunger: 35, effects: { hunger: 35, water: 0, mood: 0, energy: 0 } },
+    { id: 'fruit', name: '鲜果', description: '香甜鲜果', category: 'food', price: 6, hunger: 20, effects: { hunger: 20, water: 0, mood: 8, energy: 0 } },
+    { id: 'spring-water', name: '清泉饮', description: '补充水分', category: 'drink', price: 5, hunger: 0, effects: { hunger: 0, water: 35, mood: 0, energy: 5 } },
+    { id: 'reed', name: '芦苇', description: '手作材料', category: 'material', price: 6, hunger: 0, effects: { hunger: 0, water: 0, mood: 0, energy: 0 } },
+    { id: 'sea-shell', name: '海贝', description: '海边拾取', category: 'material', price: null, hunger: 0, effects: { hunger: 0, water: 0, mood: 0, energy: 0 } },
+  ],
+  recipes: [{ id: 'reed-boat', name: '芦苇小舟', description: '留下荷塘的回忆', requirements: [{ skillId: 'exploration', experience: 10 }], ingredients: [{ itemId: 'reed', quantity: 2 }], coins: 2, collectionId: 'reed-boat' }],
+  collections: [{ id: 'reed-boat', name: '芦苇小舟', description: '荷塘的回忆' }],
   rules: { maxNameLength: 12, initialCoins: 100, initialFood: 6, dailyCoins: 20, dailyFood: 2,
     restDurationMs: 14400000, restEnergyPerHour: 20, growthDailyLimit: 10 },
 }
+for (const entry of [...catalog.places, ...catalog.courses, ...catalog.jobs]) {
+  entry.requirements = entry.requirement ? [entry.requirement] : []
+  entry.rewards.items = []
+}
+catalog.places.push({ ...structuredClone(catalog.places[0]), id: 'lotus-pond', name: '荷塘采集',
+  requirements: [{ skillId: 'exploration', experience: 10 }],
+  rewards: { ...structuredClone(catalog.places[0].rewards), items: [{ itemId: 'reed', quantity: 2 }] } })
 const now = Date.UTC(2026, 10, 12, 10)
-const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 1, wallet: { coins: 0 },
+const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 2, wallet: { coins: 0 },
   income: { date: '2026-11-12', earned: 0, limit: 60, remaining: 60 },
-  inventory: [], dailySupply: { claimed: false, coins: 20, food: 2 }, pet: null })
+  inventory: [], collections: [], dailySupply: { claimed: false, coins: 20, food: 2 }, pet: null })
 const adopted = () => ({ ...empty(), wallet: { coins: 100 }, inventory: [{ itemId: 'food', quantity: 6 }], pet: {
   id: 'pet-a', speciesId: 'hexiaotun', name: '荷小豚', hunger: 90, water: 90, mood: 90, energy: 80,
   experience: 0, level: 1, friendship: 0, adoptedAt: now - 3600000, activity: null,
@@ -149,7 +164,7 @@ await store.buyFood(1)
 assert.equal(writes().length, rejectedPurchases)
 handler = success
 await store.reloadCatalog()
-assert.equal(store.catalog.version, 1)
+assert.equal(store.catalog.version, 2)
 assert.equal(store.catalogError, '')
 console.log('PASS 目录版本变化阻止旧价继续下单，显式刷新目录后恢复购买')
 
@@ -213,7 +228,7 @@ assert.throws(() => api.decodePetState(oldState), '缺少技能字段不能伪�
 const tripStart = deferred(), beforeStart = calls.length
 handler = (path, options) => options?.method ? tripStart.promise : success(path, options)
 const starting = store.startActivity('outing', 'plaza')
-assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', kind: 'outing', entryId: 'plaza', activityVersion: 2 })
+assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', kind: 'outing', entryId: 'plaza', activityVersion: 3 })
 assert.equal(await store.startActivity('course', 'reading-basics'), false)
 assert.equal(await store.act('rest'), false)
 serverState = { ...adopted(), pet: { ...adopted().pet, activity: activeTrip, energy: 75 } }
@@ -407,7 +422,7 @@ const working = { ...activeTrip, id: 'work-a', kind: 'work', entryId: 'library-a
   status: 'running', endsAt: now + 1200000, cost: catalog.jobs[2].cost, rewards: catalog.jobs[2].rewards }
 handler = async (path, options) => {
   if (options?.method) {
-    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', kind: 'work', entryId: 'library-assistant', activityVersion: 2 })
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', kind: 'work', entryId: 'library-assistant', activityVersion: 3 })
     serverState.pet.activity = working
     return response({ operation: 'activity-start', petId: 'pet-a', activityId: 'work-a', committedAt: now })
   }
@@ -423,7 +438,7 @@ assert.equal(workStore.pet.jobs[2].experience, 0, '未领取不能预先增加�
 assert.equal(await workStore.startActivity('outing', 'plaza'), false)
 console.log('PASS 工作只按对应技能门槛与服务端收入额度解锁，单槽互斥，报酬和熟练度不在本地预发')
 
-const historyPage = (records = [], page = 1, total = records.length) => ({ serverNow: now + 1200001, list: records,
+const historyPage = (records = [], page = 1, total = records.length) => ({ serverNow: now + 1200001, list: records.map(record => ({ ...record, recordType: record.recordType ?? 'activity' })),
   pagination: { page, pageSize: 10, total, pageCount: Math.max(1, Math.ceil(total / 10)) } })
 const oldRecord = { ...activeTrip, petId: 'pet-a', status: 'claimed', claimedAt: activeTrip.endsAt, actualRewards: null }
 const workRecord = { ...working, petId: 'pet-a', status: 'claimed', claimedAt: working.endsAt,
@@ -449,7 +464,7 @@ for (const [name, url] of [
 ]) historySource = historySource.replaceAll(`from '${name}'`, `from '${url}'`)
 const { usePetActivityHistoryStore } = await import(compile(historySource.replaceAll('import.meta.env.SSR', 'false')))
 const historyStore = usePetActivityHistoryStore()
-const isHistory = path => path.includes('/pet/activities?')
+const isHistory = path => path.includes('/pet/journal?')
 let historyRequests = () => calls.filter(call => isHistory(call.path))
 handler = (path, options) => isHistory(path) ? Promise.resolve(response(historyPage([oldRecord, workRecord]))) : success(path, options)
 await workStore.refresh()
@@ -506,4 +521,147 @@ const beforeGuestHistory = calls.length; await historyStore.open(); await histor
 assert.equal(calls.length, beforeGuestHistory)
 historyStore.$dispose(); workStore.$dispose()
 console.log('PASS 日志普通轮换保留，换号清除/关闭且拒迟到响应，游客零请求')
+// 第四批测试在同一真实 API/store 上继续运行。
+
+const careRecord = { recordType: 'event', id: 'care-1', petId: 'pet-a', kind: 'care', action: 'feed', name: '喂食鲜果',
+  occurredAt: now, itemChanges: [{ itemId: 'fruit', quantity: -1 }], coinsDelta: 0,
+  effects: { hunger: 10.25, water: 0, mood: 8, energy: 0, experience: 2, friendship: 1 }, collectionId: null }
+const craftRecord = { ...careRecord, id: 'craft-1', kind: 'craft', action: 'craft', name: '制作芦苇小舟',
+  coinsDelta: -2, itemChanges: [{ itemId: 'reed', quantity: -2 }],
+  effects: { hunger: 0, water: 0, mood: 0, energy: 0, experience: 0, friendship: 0 }, collectionId: 'reed-boat' }
+const mixedJournal = api.decodePetJournal(historyPage([careRecord, craftRecord, oldRecord, workRecord]))
+assert.equal(mixedJournal.list[0].effects.hunger, 10.25)
+assert.equal(mixedJournal.list[0].itemChanges[0].quantity, -1)
+assert.equal(mixedJournal.list[1].collectionId, 'reed-boat')
+assert.equal(mixedJournal.list[2].actualRewards, null)
+for (const patch of [{ recordType: 'fake' }, { kind: 'care', action: 'purchase' }, { effects: { ...careRecord.effects, hunger: Infinity } },
+  { itemChanges: [{ itemId: 'fruit', quantity: 0 }] }, { collectionId: 'reed-boat' }, { coinsDelta: '2' },
+  { itemChanges: [{ itemId: 'fruit', quantity: -1 }, { itemId: 'fruit', quantity: -2 }] }]) {
+  assert.throws(() => api.decodePetJournal(historyPage([{ ...careRecord, ...patch }])))
+}
+assert.throws(() => api.decodePetJournal(historyPage([{ ...craftRecord, collectionId: null }])))
+assert.throws(() => api.decodePetJournal({ ...historyPage([]), list: [workRecord], pagination: { page: 1, pageSize: 10, total: 1, pageCount: 1 } }))
+console.log('PASS 统一日志按记录类型解码，保留实际小数效果、消费负数及旧成果未知，拒绝伪造类型与非法变化')
+
+for (const patch of [{ recipes: undefined }, { collections: [{ id: 'other', name: '其他', description: '无对应收藏' }] },
+  { recipes: [{ ...catalog.recipes[0], ingredients: [{ itemId: 'absent', quantity: 1 }] }] },
+  { items: [{ ...catalog.items[0], effects: { ...catalog.items[0].effects, hunger: 20 } }, ...catalog.items.slice(1)] },
+  { places: [{ ...catalog.places[0], rewards: { ...catalog.places[0].rewards, items: [{ itemId: 'absent', quantity: 1 }] } }] }]) {
+  assert.throws(() => api.decodePetCatalog({ ...catalog, ...patch }))
+}
+assert.throws(() => api.decodePetState({ ...adopted(), collections: undefined }))
+assert.throws(() => api.decodePetState({ ...adopted(), collections: [{ id: 'reed-boat', unlockedAt: now }, { id: 'reed-boat', unlockedAt: now }] }))
+assert.equal(api.decodePetCatalog(catalog).items.find(item => item.id === 'sea-shell').price, null)
+console.log('PASS 商品用途/不可购买材料与配方引用严格验证，缺失收藏数据不伪装为空')
+
+setActivePinia(createPinia())
+const exploreAuth = useAuthStore(), exploreStore = usePetsStore()
+serverState = adopted(); handler = success; await exploreStore.ensureLoaded()
+const beforeUntrained = calls.length
+assert.equal(await exploreStore.startActivity('outing', 'lotus-pond'), false)
+assert.equal(await exploreStore.craft('reed-boat'), false)
+assert.equal(await exploreStore.buyItem('sea-shell', 1), false)
+assert.equal(await exploreStore.buyItem('fruit', 21), false)
+assert.equal(calls.length, beforeUntrained)
+serverState.pet.skills[1].experience = 10
+serverState.inventory.push({ itemId: 'reed', quantity: 1 })
+await exploreStore.refresh()
+const beforeInsufficient = calls.length
+assert.equal(await exploreStore.craft('reed-boat'), false)
+assert.equal(calls.length, beforeInsufficient)
+let launched = false
+handler = async (path, options) => {
+  if (options?.method) {
+    const body = JSON.parse(options.body)
+    assert.equal(body.entryId, 'lotus-pond'); assert.equal(body.activityVersion, 3)
+    launched = true
+    return response({ operation: 'activity-start', petId: 'pet-a', activityId: 'advanced-1', committedAt: now })
+  }
+  return success(path, options)
+}
+assert.equal(await exploreStore.startActivity('outing', 'lotus-pond'), true)
+assert(launched)
+assert.equal(exploreStore.state.inventory.find(item => item.itemId === 'reed').quantity, 1, '出发回执不能预发材料')
+console.log('PASS 进阶探索与制作门槛在本地阻止无效请求，出发不预发材料，不可购买资源无写请求')
+
+handler = async (path, options) => {
+  if (options?.method) {
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', itemId: 'fruit', quantity: 2, catalogVersion: 2 })
+    serverState.inventory.push({ itemId: 'fruit', quantity: 2 }, { itemId: 'spring-water', quantity: 1 })
+    serverState.wallet.coins -= 12
+    return response({ operation: 'purchase', petId: 'pet-a', committedAt: now })
+  }
+  return success(path, options)
+}
+const beforeShop = calls.length
+assert.equal(await exploreStore.buyItem('fruit', 2), true)
+assert.equal(calls.length, beforeShop + 2, '购买仅一写一次聚合读取')
+assert.equal(exploreStore.coins, 88)
+const beforeWrongUse = calls.length
+assert.equal(await exploreStore.act('feed', 'reed'), false)
+assert.equal(await exploreStore.act('feed', 'spring-water'), false)
+assert.equal(await exploreStore.act('water', 'fruit'), false)
+assert.equal(calls.length, beforeWrongUse)
+handler = success
+assert.equal(await exploreStore.act('feed', 'fruit'), true)
+assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', action: 'feed', itemId: 'fruit' })
+assert.equal(await exploreStore.act('water', 'spring-water'), true)
+assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', action: 'water', itemId: 'spring-water' })
+assert.equal(await exploreStore.act('water'), true)
+assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', action: 'water' })
+console.log('PASS 商店冻结商品与价格版本，物品按用途使用，原免费饮水保留')
+
+serverState.inventory.find(item => item.itemId === 'reed').quantity = 2
+await exploreStore.refresh()
+handler = async () => { throw new Error('制作回包中断') }
+assert.equal(await exploreStore.craft('reed-boat'), false)
+const frozenCraft = structuredClone({ ...exploreStore.pending })
+assert.equal(frozenCraft.kind, 'crafts'); assert.equal(frozenCraft.recipeId, 'reed-boat')
+assert.equal(exploreStore.state.collections.length, 0, '未知制作不能本地解锁收藏')
+exploreAuth.accessToken = 'token-craft-rotated'
+assert.deepEqual({ ...exploreStore.pending }, frozenCraft)
+const beforeOtherCraft = calls.length
+assert.equal(await exploreStore.craft('reed-boat'), false)
+assert.equal(calls.length, beforeOtherCraft)
+handler = async (path, options) => {
+  if (options?.method) {
+    assert.equal(options.headers['Idempotency-Key'], frozenCraft.key)
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', recipeId: 'reed-boat', catalogVersion: 2 })
+    serverState.inventory.find(item => item.itemId === 'reed').quantity = 0
+    serverState.wallet.coins -= 2
+    serverState.collections.push({ id: 'reed-boat', unlockedAt: now })
+    return response({ operation: 'craft', petId: 'pet-a', committedAt: now })
+  }
+  throw new Error('制作成功后状态读取断流')
+}
+assert.equal(await exploreStore.retryPending(), true)
+assert.equal(exploreStore.pending, null)
+assert.equal(exploreStore.state, null)
+const confirmedCrafts = writes().length
+assert.equal(await exploreStore.retryPending(), false)
+assert.equal(writes().length, confirmedCrafts)
+handler = success; await exploreStore.refresh()
+assert.equal(exploreStore.state.collections[0].id, 'reed-boat')
+const beforeDuplicate = calls.length
+assert.equal(await exploreStore.craft('reed-boat'), false)
+assert.equal(calls.length, beforeDuplicate)
+console.log('PASS 制作未知结果保留原材料命令/键，令牌轮换不丢失，成功后读取失败不再消费，收藏不可重复制作')
+
+const exploreHistory = usePetActivityHistoryStore()
+handler = (path, options) => isHistory(path) ? Promise.resolve(response(historyPage([careRecord]))) : success(path, options)
+await exploreHistory.open()
+await exploreHistory.setFilter('care')
+assert(calls.at(-1).path.includes('/journal?kind=care'))
+assert.equal(exploreHistory.history.list[0].action, 'feed')
+handler = (path, options) => isHistory(path) ? Promise.resolve(response(historyPage([workRecord]))) : success(path, options)
+await exploreHistory.refresh()
+assert.equal(exploreHistory.history, null, '分类错配不能让其他记录冒充日常')
+assert(exploreHistory.error)
+const staleCare = deferred(); handler = () => staleCare.promise
+const staleCareRead = exploreHistory.refresh()
+exploreHistory.close()
+staleCare.resolve(response(historyPage([careRecord]))); await staleCareRead
+assert.equal(exploreHistory.history, null)
+exploreHistory.$dispose(); exploreStore.$dispose()
+console.log('PASS 日常日志过滤走新接口，错误分类明确失败，关闭后迟到响应不再回写')
 delete globalThis.__petTest

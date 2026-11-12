@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: 'feed' | 'water' | 'pet' | 'play' | 'rest' | 'wake' | 'coin' | 'gift' | 'bag' | 'edit' | 'close' | 'minus' | 'move' | 'refresh' | 'home' | 'check' | 'outing' | 'course' | 'work' | 'clock' | 'growth' | 'history' | 'chevron' }>()
+defineProps<{ name: 'feed' | 'water' | 'pet' | 'play' | 'rest' | 'wake' | 'coin' | 'gift' | 'bag' | 'edit' | 'close' | 'minus' | 'move' | 'refresh' | 'home' | 'check' | 'outing' | 'course' | 'work' | 'clock' | 'growth' | 'history' | 'chevron' | 'shop' | 'craft' | 'collection' | 'material' | 'care' | 'purchase' | 'lock' }>()
 const paths = {
   feed: 'M4 12h16c0 5-3 8-8 8s-8-3-8-8Zm2-4h.01M12 5h.01M17 8h.01',
   water: 'M12 3S5 11 5 15a7 7 0 0 0 14 0c0-4-7-12-7-12ZM8 15a4 4 0 0 0 4 4',
@@ -24,6 +24,13 @@ const paths = {
   growth: 'M12 21V11m0 5C5 16 3 12 3 7c6 0 9 3 9 9Zm0-5c0-5 3-8 9-8 0 5-3 8-9 8Z',
   history: 'M3 11a9 9 0 1 1 2.6 7.3M3 5v6h6m3-4v5l3 2',
   chevron: 'm9 5 7 7-7 7',
+  shop: 'M4 9v12h16V9M3 9l2-6h14l2 6M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M9 21v-7h6v7',
+  craft: 'm14 5 5 5M4 20l5-1L21 7a2 2 0 0 0-5-4L4 15v5ZM4 4l4 4m-4-4v4m0-4h4',
+  collection: 'M7 3h10v7a5 5 0 0 1-10 0V3Zm0 2H3v3a4 4 0 0 0 4 4m10-7h4v3a4 4 0 0 1-4 4M12 15v6m-4 0h8',
+  material: 'M20 3C10 2 3 6 4 13a7 7 0 0 0 7 7c7 1 11-7 9-17ZM3 21 15 9',
+  care: 'M12 20s-9-5-9-11a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6-9 11-9 11Z',
+  purchase: 'M6 6h12l2 15H4L6 6Zm3 0V5a3 3 0 0 1 6 0v1m-6 6h6',
+  lock: 'M5 10h14v11H5V10Zm3 0V7a4 4 0 0 1 8 0v3m-4 4v3',
 }
 </script>
 <template><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="paths[name]" /></svg></template>

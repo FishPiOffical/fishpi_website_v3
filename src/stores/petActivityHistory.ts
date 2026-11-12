@@ -1,7 +1,7 @@
 import { onScopeDispose, ref, watch } from 'vue'
 import { defineStore, storeToRefs } from 'pinia'
 import { ApiError, getAuthContextVersion } from '@/api/http'
-import { readPetActivityHistory, type PetActivityHistory, type PetHistoryKind } from '@/api/v3-pets'
+import { readPetJournal, type PetJournal, type PetHistoryKind } from '@/api/v3-pets'
 import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
 
@@ -10,7 +10,7 @@ export const usePetActivityHistoryStore = defineStore('pet-activity-history', ()
   const { accessToken, account } = storeToRefs(useAuthStore())
   const pets = usePetsStore()
   const opened = ref(false), loading = ref(false), error = ref('')
-  const history = ref<PetActivityHistory | null>(null)
+  const history = ref<PetJournal | null>(null)
   const filter = ref<PetHistoryKind>('all'), page = ref(1)
   let sequence = 0, boundary = getAuthContextVersion(), owner = account.value?.oId
   let controller: AbortController | null = null, flight: Promise<void> | null = null
@@ -43,7 +43,7 @@ export const usePetActivityHistoryStore = defineStore('pet-activity-history', ()
     error.value = ''
     const task = (async () => {
       try {
-        const result = await readPetActivityHistory(requestFilter, requestPage, abort.signal)
+        const result = await readPetJournal(requestFilter, requestPage, abort.signal)
         if (valid()) history.value = result
       } catch (reason) {
         if (valid()) {
@@ -64,7 +64,7 @@ export const usePetActivityHistoryStore = defineStore('pet-activity-history', ()
   }
   function close() { opened.value = false; cancel() }
   function setFilter(kind: PetHistoryKind) {
-    if (!['all', 'outing', 'course', 'work'].includes(kind) || kind === filter.value) return Promise.resolve()
+    if (!['all', 'outing', 'course', 'work', 'care', 'craft', 'purchase'].includes(kind) || kind === filter.value) return Promise.resolve()
     cancel()
     filter.value = kind
     page.value = 1

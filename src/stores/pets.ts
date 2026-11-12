@@ -220,6 +220,11 @@ export const usePetsStore = defineStore('pets', () => {
     if (!canWrite() || !pet.value) return Promise.resolve(false)
     const activity = pet.value.activity
     if (activity && (activity.kind !== 'rest' || action !== 'wake')) return Promise.resolve(false)
+    if (itemId) {
+      const item = catalog.value?.items.find(item => item.id === itemId)
+      const category = action === 'feed' ? 'food' : action === 'water' ? 'drink' : null
+      if (!item || item.category !== category || !state.value?.inventory.some(item => item.itemId === itemId && item.quantity > 0)) return Promise.resolve(false)
+    }
     return execute({ kind: 'actions', petId: pet.value.id, action, ...(itemId ? { itemId } : {}), key: profileOperationKey() })
   }
   function claimSupply(): Promise<boolean> {
@@ -227,18 +232,33 @@ export const usePetsStore = defineStore('pets', () => {
     return execute({ kind: 'supplies', expectedDate: state.value.today, key: profileOperationKey() })
   }
   function buyFood(quantity: number): Promise<boolean> {
+    return buyItem('food', quantity)
+  }
+  function buyItem(itemId: string, quantity: number): Promise<boolean> {
     if (!canWrite() || !pet.value || !catalog.value) return Promise.resolve(false)
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 20) {
-      error.value = '每次可购买 1～20 份口粮'
+      error.value = '每次可购买 1～20 件物品'
       return Promise.resolve(false)
     }
-    return execute({ kind: 'purchases', petId: pet.value.id, itemId: 'food', quantity, catalogVersion: catalog.value.version, key: profileOperationKey() })
+    const item = catalog.value.items.find(item => item.id === itemId)
+    if (!item || item.price === null || item.price * quantity > (coins.value ?? 0)) return Promise.resolve(false)
+    return execute({ kind: 'purchases', petId: pet.value.id, itemId, quantity, catalogVersion: catalog.value.version, key: profileOperationKey() })
+  }
+  function craft(recipeId: string): Promise<boolean> {
+    if (!canWrite() || !pet.value || !catalog.value || !state.value || pet.value.activity) return Promise.resolve(false)
+    const recipe = catalog.value.recipes.find(recipe => recipe.id === recipeId)
+    if (!recipe || state.value.collections.some(item => item.id === recipe.collectionId)
+        || recipe.coins > (coins.value ?? 0)
+        || recipe.requirements.some(requirement => (pet.value?.skills.find(skill => skill.id === requirement.skillId)?.experience ?? 0) < requirement.experience)
+        || recipe.ingredients.some(required => (state.value?.inventory.find(item => item.itemId === required.itemId)?.quantity ?? 0) < required.quantity)) return Promise.resolve(false)
+    return execute({ kind: 'crafts', petId: pet.value.id, recipeId, catalogVersion: catalog.value.version, key: profileOperationKey() })
   }
   function startActivity(kind: PetActivityKind, entryId: string): Promise<boolean> {
     if (!canWrite() || !pet.value || !catalog.value || pet.value.activity) return Promise.resolve(false)
     const entries = kind === 'outing' ? catalog.value.places : kind === 'course' ? catalog.value.courses : catalog.value.jobs
     const entry = entries.find(entry => entry.id === entryId)
     if (!entry) return Promise.resolve(false)
+    if (entry.requirements.some(requirement => (pet.value?.skills.find(skill => skill.id === requirement.skillId)?.experience ?? 0) < requirement.experience)) return Promise.resolve(false)
     if (kind === 'work') {
       const job = catalog.value.jobs.find(item => item.id === entryId)
       const progress = pet.value.skills.find(item => item.id === job?.requirement.skillId)
@@ -282,6 +302,6 @@ export const usePetsStore = defineStore('pets', () => {
   return {
     state, catalog, pet, coins, foodQuantity, ready, receivedAt,
     loading, catalogLoading, error, catalogError, busy, pending, pendingError, refreshNeeded,
-    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, startActivity, claimActivity, retryPending,
+    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, craft, startActivity, claimActivity, retryPending,
   }
 })

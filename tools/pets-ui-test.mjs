@@ -64,22 +64,39 @@ async function compileFile(file) {
 const skillNames = { vitality: '体能', exploration: '探索', knowledge: '知识', expression: '表达', crafting: '手作', kindness: '亲和' }
 const jobNames = { 'delivery-assistant': '配送见习', 'trail-assistant': '巡游向导', 'library-assistant': '图书助理', 'broadcast-assistant': '播报学徒', 'craft-assistant': '手作学徒', 'care-assistant': '照护见习' }
 const entry = (id, name, durationMs, coins, skill) => ({ id, name, description: '本地测试活动', durationMs,
-  cost: { coins, energy: 8, hunger: 4, water: 4 }, rewards: { coins: 0, proficiency: 0, experience: 5, food: 1, mood: 3, skills: [{ id: skill, experience: 7 }] } })
-const catalog = { version: 1, activityVersion: 1, species: [
+  requirements: [], cost: { coins, energy: 8, hunger: 4, water: 4 }, rewards: { coins: 0, proficiency: 0, experience: 5, food: 1, mood: 3, items: [], skills: [{ id: skill, experience: 7 }] } })
+const catalog = { version: 2, activityVersion: 3, species: [
   { id: 'momota', name: '摸摸獭', description: '水边的小伙伴' }, { id: 'hexiaotun', name: '荷小豚', description: '戴荷叶帽的小伙伴' },
   { id: 'yubingmiao', name: '鱼饼喵', description: '好奇的小伙伴' }, { id: 'paixiaoyu', name: '派小鱼', description: '熟悉的小伙伴' },
-], items: [{ id: 'food', name: '基础口粮', price: 5, hunger: 35 }],
+], items: [
+  { id: 'food', name: '基础口粮', description: '日常口粮', category: 'food', price: 5, hunger: 35, effects: { hunger: 35, water: 0, mood: 0, energy: 0 } },
+  { id: 'fruit', name: '鲜果', description: '香甜的鲜果', category: 'food', price: 6, hunger: 20, effects: { hunger: 20, water: 0, mood: 8, energy: 0 } },
+  { id: 'spring-water', name: '清泉饮', description: '清凉补水', category: 'drink', price: 5, hunger: 0, effects: { hunger: 0, water: 35, mood: 0, energy: 5 } },
+  ...[['reed', '芦苇', 6], ['forest-seed', '森林种子', null], ['sea-shell', '海贝', null]].map(([id, name, price]) => ({ id, name, description: '制作收藏的材料', category: 'material', price, hunger: 0, effects: { hunger: 0, water: 0, mood: 0, energy: 0 } })),
+], recipes: [
+  { id: 'reed-boat', name: '芦苇小舟', description: '把旅行的收获带回家', requirements: [{ skillId: 'exploration', experience: 10 }], ingredients: [{ itemId: 'reed', quantity: 2 }], coins: 2, collectionId: 'reed-boat' },
+  { id: 'forest-chime', name: '森林风铃', description: '风吹过森林的声音', requirements: [{ skillId: 'vitality', experience: 10 }], ingredients: [{ itemId: 'forest-seed', quantity: 2 }], coins: 2, collectionId: 'forest-chime' },
+  { id: 'shell-frame', name: '贝壳相框', description: '来自海边的纪念', requirements: [{ skillId: 'knowledge', experience: 10 }], ingredients: [{ itemId: 'sea-shell', quantity: 2 }], coins: 2, collectionId: 'shell-frame' },
+], collections: [
+  { id: 'reed-boat', name: '芦苇小舟', description: '把旅行的收获带回家' },
+  { id: 'forest-chime', name: '森林风铃', description: '风吹过森林的声音' },
+  { id: 'shell-frame', name: '贝壳相框', description: '来自海边的纪念' },
+],
   skills: Object.entries(skillNames).map(([id, name]) => ({ id, name, description: '本地测试技能' })),
-  places: [entry('plaza', '广场散步', 300000, 0, 'vitality'), entry('river', '河岸探索', 900000, 3, 'exploration'), entry('forest', '林间远足', 1800000, 5, 'exploration')],
+  places: [entry('plaza', '广场散步', 300000, 0, 'vitality'), entry('river', '河岸探索', 900000, 3, 'exploration'), entry('forest', '林间远足', 1800000, 5, 'exploration'),
+    ...[['lotus-pond', '荷塘采集', 'exploration', 'reed'], ['deep-forest', '森林寻种', 'vitality', 'forest-seed'], ['tidal-flat', '潮汐拾贝', 'knowledge', 'sea-shell']].map(([id, name, skill, itemId]) => ({
+      ...entry(id, name, 1200000, 5, skill), requirements: [{ skillId: skill, experience: 10 }], rewards: { coins: 0, proficiency: 0, experience: 25, food: 0, mood: 6, skills: [{ id: skill, experience: 8 }], items: [{ itemId, quantity: 2 }] },
+    })),
+  ],
   courses: Object.entries(skillNames).map(([id, name]) => entry(`basic-${id}`, `${name}入门`, 600000, 5, id)),
   jobs: Object.entries(jobNames).map(([id, name], index) => ({ ...entry(id, name, 1200000, 0, Object.keys(skillNames)[index]),
-    cost: { coins: 0, energy: 12, hunger: 4, water: 6 }, rewards: { coins: 12, proficiency: 10, experience: 15, food: 0, mood: 3, skills: [] },
-    requirement: { skillId: Object.keys(skillNames)[index], experience: 10 } })),
+    cost: { coins: 0, energy: 12, hunger: 4, water: 6 }, rewards: { coins: 12, proficiency: 10, experience: 15, food: 0, mood: 3, skills: [], items: [] },
+    requirement: { skillId: Object.keys(skillNames)[index], experience: 10 }, requirements: [{ skillId: Object.keys(skillNames)[index], experience: 10 }] })),
   incomeRules: { dailyLimit: 60 },
   rules: { maxNameLength: 12, initialCoins: 100, initialFood: 6,
   dailyCoins: 20, dailyFood: 2, restDurationMs: 14400000, restEnergyPerHour: 20, growthDailyLimit: 10 } }
 const now = Date.UTC(2026, 10, 12, 10)
-const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 1, wallet: { coins: 0 }, inventory: [],
+const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 2, wallet: { coins: 0 }, inventory: [], collections: [],
   income: { date: '2026-11-12', earned: 0, limit: 60, remaining: 60 },
   dailySupply: { claimed: false, coins: 20, food: 2 }, pet: null })
 const adopted = (id = 'pet-a', name = '我的小鱼', speciesId = 'momota') => ({ ...empty(), wallet: { coins: 100 }, inventory: [{ itemId: 'food', quantity: 6 }], pet: {
@@ -88,7 +105,16 @@ const adopted = (id = 'pet-a', name = '我的小鱼', speciesId = 'momota') => (
   jobs: Object.keys(jobNames).map(id => ({ id, level: 1, experience: 0, completed: 0 })), cooldowns: { pet: 0, play: 0 }, growthToday: { used: 0, limit: 10 },
 } })
 let serverState = empty()
-let historyRows = []
+let historyRows = [], journalSerial = 0
+function changeInventory(itemId, quantity) {
+  const item = serverState.inventory.find(item => item.itemId === itemId)
+  if (item) item.quantity += quantity
+  else serverState.inventory.push({ itemId, quantity })
+}
+function journalEvent(kind, action, name, changes = {}) {
+  historyRows.unshift({ recordType: 'event', id: `event-${++journalSerial}`, petId: serverState.pet.id, kind, action, name, occurredAt: now,
+    itemChanges: [], coinsDelta: 0, effects: { hunger: 0, water: 0, mood: 0, energy: 0, experience: 0, friendship: 0 }, collectionId: null, ...changes })
+}
 const response = data => ({ code: 0, data: structuredClone(data) })
 const success = async (url, options) => {
   if (options?.method) {
@@ -99,7 +125,7 @@ const success = async (url, options) => {
       serverState.pet.activity = { id: `activity-${serial}`, kind: body.kind, entryId: choice.id, name: choice.name, startedAt: now, endsAt: now + choice.durationMs, status: 'running', cost: choice.cost, rewards: choice.rewards }
       serverState.wallet.coins -= choice.cost.coins
       for (const key of ['energy', 'hunger', 'water']) serverState.pet[key] -= choice.cost[key]
-      historyRows.unshift({ ...structuredClone(serverState.pet.activity), petId: serverState.pet.id, claimedAt: null, actualRewards: null })
+      historyRows.unshift({ recordType: 'activity', ...structuredClone(serverState.pet.activity), petId: serverState.pet.id, claimedAt: null, actualRewards: null })
       return response({ operation: 'activity-start', petId: serverState.pet.id, activityId: serverState.pet.activity.id, committedAt: now })
     }
     if (kind === 'claim') {
@@ -107,6 +133,7 @@ const success = async (url, options) => {
       serverState.pet.experience += activity.rewards.experience
       serverState.inventory[0].quantity += activity.rewards.food
       for (const skill of activity.rewards.skills) serverState.pet.skills.find(value => value.id === skill.id).experience += skill.experience
+      for (const reward of activity.rewards.items) changeInventory(reward.itemId, reward.quantity)
       const actual = structuredClone(activity.rewards)
       actual.coins = Math.min(actual.coins, serverState.income.remaining)
       serverState.wallet.coins += actual.coins
@@ -120,13 +147,35 @@ const success = async (url, options) => {
       serverState.pet.activity = null
       return response({ operation: 'activity-claim', petId: serverState.pet.id, activityId: activity.id, committedAt: now })
     }
-    if (kind === 'actions' && body.action === 'wake') serverState.pet.activity = null
-    return response({ operation: kind === 'actions' ? body.action : kind === 'purchases' ? 'purchase' : kind, petId: serverState.pet?.id, committedAt: now })
+    if (kind === 'purchases') {
+      const item = catalog.items.find(item => item.id === body.itemId)
+      const coinsDelta = -item.price * body.quantity
+      serverState.wallet.coins += coinsDelta; changeInventory(item.id, body.quantity)
+      journalEvent('purchase', 'purchase', `购买${item.name}`, { coinsDelta, itemChanges: [{ itemId: item.id, quantity: body.quantity }] })
+    }
+    if (kind === 'crafts') {
+      const recipe = catalog.recipes.find(item => item.id === body.recipeId)
+      serverState.wallet.coins -= recipe.coins
+      for (const item of recipe.ingredients) changeInventory(item.itemId, -item.quantity)
+      serverState.collections.push({ id: recipe.collectionId, unlockedAt: now })
+      journalEvent('craft', 'craft', `制作${recipe.name}`, { coinsDelta: -recipe.coins, itemChanges: recipe.ingredients.map(item => ({ ...item, quantity: -item.quantity })), collectionId: recipe.collectionId })
+    }
+    if (kind === 'actions') {
+      const effects = { hunger: 0, water: 0, mood: 0, energy: 0, experience: 0, friendship: 0 }
+      const item = catalog.items.find(item => item.id === body.itemId)
+      if (item) {
+        changeInventory(item.id, -1)
+        for (const [key, value] of Object.entries(item.effects)) { const before = serverState.pet[key]; serverState.pet[key] = Math.min(100, before + value); effects[key] = serverState.pet[key] - before }
+      }
+      if (body.action === 'wake') serverState.pet.activity = null
+      journalEvent('care', body.action, ({ feed: '喂食', water: '饮水', pet: '抚摸', play: '玩耍', rest: '休息', wake: '唤醒' })[body.action], { effects, itemChanges: item ? [{ itemId: item.id, quantity: -1 }] : [] })
+    }
+    return response({ operation: kind === 'actions' ? body.action : kind === 'purchases' ? 'purchase' : kind === 'crafts' ? 'craft' : kind, petId: serverState.pet?.id, committedAt: now })
   }
-  if (url.startsWith('/api/v3/me/pet/activities?')) {
+  if (url.startsWith('/api/v3/me/pet/journal?')) {
     const params = new URL(url, 'http://localhost').searchParams, kind = params.get('kind'), page = Number(params.get('p') || 1), size = Number(params.get('size') || 10)
-    const historyNow = Math.max(now, ...historyRows.map(item => item.claimedAt ?? item.startedAt))
-    const list = historyRows.filter(item => kind === 'all' || item.kind === kind).map(item => ({ ...item,
+    const historyNow = Math.max(now, ...historyRows.map(item => item.recordType === 'event' ? item.occurredAt : item.claimedAt ?? item.startedAt))
+    const list = historyRows.filter(item => kind === 'all' || item.kind === kind).map(item => item.recordType === 'event' ? item : ({ ...item,
       status: item.status === 'claimed' ? 'claimed' : item.endsAt <= historyNow ? 'claimable' : 'running' }))
     return response({ serverNow: historyNow, list: list.slice((page - 1) * size, page * size), pagination: { page, pageSize: size, total: list.length, pageCount: Math.max(1, Math.ceil(list.length / size)) } })
   }
@@ -228,14 +277,15 @@ try {
 
   serverState = adopted('pet-b', '小伙伴'); await pets.refresh(); await settle()
   const beforeTabs = calls.length
-  assert.equal(document.querySelectorAll('.activity-option').length, 3)
+  assert.equal(document.querySelectorAll('.activity-option').length, 6)
+  assert.equal(document.querySelectorAll('.activity-group-heading').length, 2)
   assert.equal(document.querySelectorAll('.pet-skill').length, 6)
   await click(document.querySelector('#pet-course-tab'))
   assert.equal(document.querySelectorAll('.activity-option').length, 6)
   document.querySelector('#pet-course-tab').dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true })); await settle()
   assert.equal(document.activeElement.id, 'pet-outing-tab')
   assert.equal(calls.length, beforeTabs, '活动目录切换应使用已读目录，不额外请求')
-  console.log('PASS 三个地点、六门课程与六项真实技能，标签支持键盘切换且不新增读取')
+  console.log('PASS 三个日常地点、三个进阶地点、六门课程与六项真实技能，标签支持键盘切换且不新增读取')
 
   const startWait = deferred(), beforeStart = writes().length
   let startedRequest
@@ -335,7 +385,7 @@ try {
   handler = success
   console.log('PASS 跨日只核对一次服务端额度，不本地重置收入或连续补查')
 
-  assert(!calls.some(call => call.url.startsWith('/api/v3/me/pet/activities?')), '日志默认收起，不随初始化或照顾动作请求')
+  assert(!calls.some(call => call.url.startsWith('/api/v3/me/pet/journal?')), '日志默认收起，不随初始化或照顾动作请求')
   handler = success; await pets.reloadCatalog()
   serverState = adopted('pet-b', '小伙伴'); serverState.pet.skills.find(skill => skill.id === 'knowledge').experience = 10
   await pets.refresh(); await settle()
@@ -361,7 +411,7 @@ try {
   assert.equal(pets.pet.jobs.find(job => job.id === 'library-assistant').experience, 0)
   console.log('PASS 六类兼职读取门槛和共享收入上限，职业熟练度独立，工作中不误显示睡眠')
 
-  const historyCount = () => calls.filter(call => call.url.startsWith('/api/v3/me/pet/activities?')).length
+  const historyCount = () => calls.filter(call => call.url.startsWith('/api/v3/me/pet/journal?')).length
   const beforeHistoryOpen = historyCount()
   await click(document.querySelector('.history-toggle'))
   assert.equal(historyCount(), beforeHistoryOpen + 1)
@@ -401,7 +451,7 @@ try {
   assert(document.querySelector('.history-record h3').textContent.includes('工作记录10'))
   console.log('PASS 工作筛选就是履历，使用真实分页，早期缺成果记录不伪造收益，实际心情保留小数')
 
-  handler = (url, options) => url.startsWith('/api/v3/me/pet/activities?') ? Promise.reject(new ApiError('HTTP JSON 解码失败', 502)) : success(url, options)
+  handler = (url, options) => url.startsWith('/api/v3/me/pet/journal?') ? Promise.reject(new ApiError('HTTP JSON 解码失败', 502)) : success(url, options)
   await click(historyFilter('全部'))
   assert(document.querySelector('.history-error').textContent.includes('活动记录暂时无法读取'))
   assert(!document.querySelector('.history-empty'))
@@ -415,7 +465,7 @@ try {
   await click(historyFilter('学校'))
   lateHistory.resolve(response({ serverNow: now, list: [], pagination: { page: 1, pageSize: 10, total: 0, pageCount: 1 } })); await settle()
   assert.equal(historyFilter('学校').getAttribute('aria-pressed'), 'true')
-  assert(document.querySelector('.history-empty').textContent.includes('课程记录'))
+  assert(document.querySelector('.history-empty').textContent.includes('学校记录'))
   handler = success
   showHome.value = false; await settle()
   const afterLeavingHome = historyCount()
@@ -427,6 +477,99 @@ try {
   await click(document.querySelector('.history-toggle'))
   assert.equal(historyCount(), afterLeavingHome + 1)
   console.log('PASS 离开家园关闭日志读取，返回后保持折叠，重新展开才读取')
+  await click(document.querySelector('.history-toggle'))
+  serverState = adopted('pet-b', '小伙伴'); historyRows = []
+  await pets.refresh(); await settle()
+  await click(document.querySelector('#pet-outing-tab'))
+  assert.equal(document.querySelectorAll('.activity-group-heading').length, 2)
+  assert(document.querySelector('[aria-label="开始荷塘采集"]').disabled)
+  assert(document.querySelector('[aria-label="开始荷塘采集"]').title.includes('探索经验 10'))
+  for (const skill of serverState.pet.skills) skill.experience = 10
+  await pets.refresh(); await settle()
+  assert(!document.querySelector('[aria-label="开始荷塘采集"]').disabled)
+  assert(document.querySelector('[aria-label="开始荷塘采集"]').closest('article').textContent.includes('芦苇 +2'))
+  const journalBeforeExplore = historyCount()
+  await click(document.querySelector('[aria-label="开始荷塘采集"]'))
+  assert(document.querySelector('.current-rewards').textContent.includes('芦苇 +2'))
+  assert(document.querySelector('[aria-label="制作芦苇小舟"]').disabled)
+  serverState.serverNow = serverState.pet.activity.endsAt; serverState.pet.activity.status = 'claimable'
+  await pets.refresh(); await settle(); await click(document.querySelector('.activity-primary'))
+  assert(document.querySelector('.material-chip.available').textContent.includes('芦苇2'))
+  assert(!document.querySelector('[aria-label="制作芦苇小舟"]').disabled)
+  assert.equal(historyCount(), journalBeforeExplore, '关闭日志时进阶探索和领取不能额外读取日志')
+  console.log('PASS 进阶探索按真实技能解锁，材料随显式领取入背包，占用活动时不能制作')
+
+  handler = (url, options) => options?.method && url.endsWith('/crafts') ? Promise.reject(new Error('模拟制作响应断流')) : success(url, options)
+  await click(document.querySelector('[aria-label="制作芦苇小舟"]'))
+  const craftKey = pets.pending.key, craftInput = JSON.parse(writes().at(-1).options.body)
+  assert.equal(pets.pending.kind, 'crafts')
+  assert(document.querySelector('[aria-label="购买芦苇"]').disabled)
+  await click([...document.querySelectorAll('.workshop-tabs button')].find(button => button.textContent === '我的收藏'))
+  auth.accessToken = 'token-b-workshop'; await settle()
+  assert.equal(pets.pending.key, craftKey)
+  assert(document.querySelector('.collection-grid'), '普通令牌轮换应保留当前收藏页')
+  handler = success
+  await click(document.querySelector('[aria-label="核对上次宠物操作"]'))
+  assert.equal(writes().at(-1).options.headers['Idempotency-Key'], craftKey)
+  assert.deepEqual(JSON.parse(writes().at(-1).options.body), craftInput)
+  assert.equal(document.querySelectorAll('.collection-card.collected').length, 1)
+  assert(document.querySelector('.collection-card.collected').textContent.includes('芦苇小舟'))
+  assert(document.querySelector('.collection-card.collected time'))
+  assert.equal(pets.state.collections.length, 1)
+  await click([...document.querySelectorAll('.workshop-tabs button')].find(button => button.textContent === '制作配方'))
+  assert(document.querySelector('[aria-label="制作芦苇小舟"]').disabled)
+  assert.equal(document.querySelector('[aria-label="制作芦苇小舟"]').textContent, '已收入收藏')
+  assert(document.querySelector('[aria-label="制作森林风铃"]').title.includes('材料尚未集齐'))
+  console.log('PASS 制作未知结果保留原键与内容，恢复后收藏和材料同步，已收藏配方不能重复消费')
+
+  assert.equal(document.querySelectorAll('.shop-item').length, 4, '探索专属材料不应显示成可购买商品')
+  const shopFilter = label => [...document.querySelectorAll('.shop-filters button')].find(button => button.textContent === label)
+  await click(shopFilter('材料'))
+  assert.equal(document.querySelectorAll('.shop-item').length, 1)
+  assert.equal(document.querySelector('[aria-label="使用芦苇"]'), null)
+  const quantityInput = document.querySelector('#pet-item-quantity-reed')
+  quantityInput.value = '5'; quantityInput.dispatchEvent(new Event('change', { bubbles: true })); await settle()
+  const beforePurchaseCoins = pets.coins
+  await click(document.querySelector('[aria-label="购买芦苇"]'))
+  assert.equal(pets.coins, beforePurchaseCoins - 30)
+  assert(document.querySelector('.material-chip.available').textContent.includes('芦苇5'))
+  await click(shopFilter('食品'))
+  await click(document.querySelector('[aria-label="购买鲜果"]'))
+  const beforeFruitHunger = pets.pet.hunger
+  await click(document.querySelector('[aria-label="使用鲜果"]'))
+  assert.equal(pets.pet.hunger, Math.min(100, beforeFruitHunger + 20))
+  assert.equal(pets.state.inventory.find(item => item.itemId === 'fruit').quantity, 0)
+  assert(document.querySelector('[aria-label="使用鲜果"]').disabled)
+  await click(shopFilter('饮品'))
+  await click(document.querySelector('[aria-label="购买清泉饮"]'))
+  serverState.pet.water = 96; serverState.pet.energy = 99
+  await pets.refresh(); await settle()
+  await click(document.querySelector('[aria-label="使用清泉饮"]'))
+  assert.equal(pets.pet.water, 100); assert.equal(pets.pet.energy, 100)
+  await click(document.querySelector('[aria-label="购买清泉饮"]'))
+  assert(document.querySelector('[aria-label="使用清泉饮"]').disabled)
+  assert(document.querySelector('[aria-label="使用清泉饮"]').title.includes('当前状态充足'))
+  console.log('PASS 扩展商店分类与批量购买，食品饮品真实使用，纯材料无使用入口，满状态不浪费消耗品')
+
+  await click(document.querySelector('.history-toggle'))
+  assert.equal(document.querySelectorAll('.history-filters button').length, 7)
+  await click(historyFilter('日常互动'))
+  assert.equal(document.querySelectorAll('.history-item').length, 2)
+  assert.equal(document.querySelectorAll('.history-status').length, 0, '日常互动不是计时活动，不显示待领取或预计奖励')
+  assert(document.querySelector('.history-rewards.actual').textContent.includes('水分 +4'))
+  assert(document.querySelector('.history-rewards.actual').textContent.includes('精力 +1'))
+  assert(!document.querySelector('.history-rewards.actual').textContent.includes('水分 +35'))
+  assert(document.querySelector('.history-cost').textContent.includes('清泉饮 -1'))
+  await click(historyFilter('制作'))
+  assert.equal(document.querySelectorAll('.history-item').length, 1)
+  assert(document.querySelector('.history-cost').textContent.includes('芦苇 -2'))
+  assert(document.querySelector('.history-cost').textContent.includes('宠物币 -2'))
+  assert(document.querySelector('.history-rewards.actual').textContent.includes('已收藏「芦苇小舟」'))
+  await click(historyFilter('购买'))
+  assert.equal(document.querySelectorAll('.history-item').length, 4)
+  assert([...document.querySelectorAll('.history-cost')].some(item => item.textContent.includes('宠物币 -30') && item.textContent.includes('芦苇 +5')))
+  assert.equal(document.querySelectorAll('.history-rewards').length, 0, '纯购买不显示伪造的成长奖励')
+  console.log('PASS 统一日志展示照顾、制作和购买的实际变动，保留正负方向，不把即时操作渲染成待领奖活动')
   serverState = empty(); context++; auth.account = { oId: 'C' }; auth.accessToken = 'token-c'; await settle()
   assert.equal(document.querySelector('.pet-history'), null)
   assert(!document.body.textContent.includes('工作记录'))

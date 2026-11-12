@@ -25,6 +25,10 @@ const progress = computed(() => {
   return value ? Math.max(0, Math.min(100, (now.value - value.startedAt) / Math.max(1, value.endsAt - value.startedAt) * 100)) : 0
 })
 const entries = computed(() => tab.value === 'outing' ? pets.catalog?.places ?? [] : tab.value === 'course' ? pets.catalog?.courses ?? [] : pets.catalog?.jobs ?? [])
+const entryGroups = computed(() => tab.value === 'outing' ? [
+  { name: '日常外出', entries: entries.value.filter(entry => !entry.requirements.length) },
+  { name: '进阶探索', entries: entries.value.filter(entry => entry.requirements.length) },
+].filter(group => group.entries.length) : [{ name: '', entries: entries.value }])
 const skills = computed(() => pets.catalog
   ? pets.catalog.skills.map(skill => ({ ...skill, progress: pets.pet?.skills.find(value => value.id === skill.id) }))
   : pets.pet?.skills.map(progress => ({ id: progress.id, name: petSkillNames[progress.id], description: '', progress })) ?? [])
@@ -44,24 +48,21 @@ function rewards(value: PetActivityRewards) {
     const name = pets.catalog?.skills.find(item => item.id === skill.id)?.name || petSkillNames[skill.id]
     if (name && skill.experience) lines.push(`${name} +${skill.experience}`)
   }
+  for (const item of value.items) lines.push(`${pets.catalog?.items.find(value => value.id === item.itemId)?.name || item.itemId} +${item.quantity}`)
   return lines
 }
 function requirement(entry: PetActivityEntry | PetJobEntry) {
-  if (!('requirement' in entry)) return ''
-  const name = pets.catalog?.skills.find(skill => skill.id === entry.requirement.skillId)?.name || petSkillNames[entry.requirement.skillId]
-  return `${name}经验 ${entry.requirement.experience}`
+  return entry.requirements.map(value => `${pets.catalog?.skills.find(skill => skill.id === value.skillId)?.name || petSkillNames[value.skillId]}经验 ${value.experience}`).join('、')
 }
 function reason(entry: PetActivityEntry | PetJobEntry) {
   if (pets.pet?.activity) return occupiedText.value
   const pet = pets.pet
   if (!pet || !pets.state) return '请先读取当前宠物状态'
-  if (tab.value === 'work') {
-    if (pets.state.income.remaining <= 0) return '今日工作收入已达上限'
-    if ('requirement' in entry) {
-      const experience = pet.skills.find(skill => skill.id === entry.requirement.skillId)?.experience
-      if (experience === undefined) return '技能状态暂不可用'
-      if (experience < entry.requirement.experience) return `需要${requirement(entry)}`
-    }
+  if (tab.value === 'work' && pets.state.income.remaining <= 0) return '今日工作收入已达上限'
+  for (const needed of entry.requirements) {
+    const experience = pet.skills.find(skill => skill.id === needed.skillId)?.experience
+    if (experience === undefined) return '技能状态暂不可用'
+    if (experience < needed.experience) return `需要${requirement(entry)}`
   }
   if (pets.state.wallet.coins < entry.cost.coins) return '宠物币不足'
   if (pet.energy < entry.cost.energy) return '精力不足，先休息一下'
@@ -115,7 +116,9 @@ watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () =>
     </div>
     <div v-if="tab === 'work' && pets.state" class="work-income"><div><PetIcon name="coin" /><span>今日工作收入</span><strong>{{ pets.state.income.earned }}<small> / {{ pets.state.income.limit }} 币</small></strong></div><p>所有兼职共享每日额度，按领取当天结算。</p></div>
     <div v-if="pets.catalog" id="pet-activity-options" class="activity-options" role="tabpanel" :aria-labelledby="`pet-${tab}-tab`">
-      <article v-for="entry in entries" :key="`${tab}:${entry.id}`" class="activity-option">
+      <template v-for="group in entryGroups" :key="group.name">
+      <h3 v-if="group.name" class="activity-group-heading">{{ group.name }}<span v-if="group.name === '进阶探索'">带回材料，制作你的第一份收藏</span></h3>
+      <article v-for="entry in group.entries" :key="`${tab}:${entry.id}`" class="activity-option">
         <header><h3>{{ entry.name }}</h3><span><PetIcon name="clock" />{{ petDuration(entry.durationMs) }}</span></header>
         <p class="activity-description">{{ entry.description }}</p>
         <p v-if="requirement(entry)" class="activity-requirement">需要{{ requirement(entry) }}</p>
@@ -124,6 +127,7 @@ watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () =>
         <footer><span class="activity-price"><PetIcon name="coin" /><b>{{ entry.cost.coins }}</b>宠物币</span><button type="button" :aria-label="`开始${entry.name}`" :disabled="locked || !!reason(entry)" :title="reason(entry) || `${entry.cost.coins ? `花费 ${entry.cost.coins} 宠物币，` : ''}开始${entry.name}`" @click="start(entry)">{{ tab === 'outing' ? '出发' : tab === 'work' ? '去工作' : '去上课' }}<span aria-hidden="true">↗</span></button></footer>
         <p v-if="!pets.pet.activity && reason(entry)" class="shortage">{{ reason(entry) }}</p>
       </article>
+      </template>
     </div>
 
     <section v-if="tab === 'work'" class="job-progress" aria-labelledby="pet-jobs-title"><header><h3 id="pet-jobs-title"><PetIcon name="work" />职业熟练度</h3><span>工作经历单独积累，不消耗已有技能</span></header><div class="jobs-grid"><div v-for="job in jobs" :key="job.id" class="pet-job"><header><span>{{ job.name }}</span><strong>{{ job.progress ? `Lv. ${job.progress.level}` : '—' }}</strong></header><p v-if="job.progress"><b>{{ job.progress.experience }}</b> 熟练度<span>完成 {{ job.progress.completed }} 次</span></p><p v-else>暂不可用</p></div></div></section>
@@ -138,6 +142,7 @@ watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () =>
 .current-activity { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 20px; margin-bottom: 12px; border: 1px solid var(--fp-border); border-radius: 12px; background: var(--fp-bg); }.current-activity.claimable { background: var(--fp-primary-soft); border-color: color-mix(in srgb, var(--fp-primary) 25%, var(--fp-border)); }.current-icon { display: grid; place-items: center; width: 48px; height: 48px; flex: none; border-radius: 12px; color: var(--fp-primary); background: var(--fp-card); }.current-icon svg { width: 24px; height: 24px; }.current-copy { flex: 1; min-width: 120px; }.current-copy > span { color: var(--fp-muted); font-size: 11px; }.current-copy h3 { margin: 5px 0; color: var(--fp-title); font-size: 17px; }.current-copy p { margin: 0; font-size: 12px; color: var(--fp-muted); }.current-duration { display: flex; align-items: center; gap: 6px; color: var(--fp-muted); font-size: 12px; }.current-duration svg { width: 15px; height: 15px; }.activity-primary { min-height: 42px; padding: 10px 18px; border: 0; border-radius: 9px; background: var(--fp-primary); color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .activity-progress { width: 100%; height: 5px; border-radius: 5px; background: var(--fp-border); overflow: hidden; }.activity-progress > span { display: block; height: 100%; background: var(--fp-primary); border-radius: inherit; transition: width 1s linear; }.current-rewards { flex-basis: 100%; margin: -4px 0 0; font-size: 12px; color: var(--fp-text); line-height: 1.8; }.current-rewards > span { color: var(--fp-muted); margin-right: 12px; }.occupied-note { display: flex; align-items: center; gap: 7px; margin: 12px 0 20px; color: var(--fp-muted); font-size: 12px; line-height: 1.6; }.occupied-note svg { width: 15px; height: 15px; }
 .activity-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; width: min(100%, 350px); padding: 4px; border-radius: 10px; background: var(--fp-bg); margin-bottom: 16px; }.activity-tabs button { display: flex; align-items: center; justify-content: center; gap: 7px; min-width: 0; min-height: 38px; padding: 8px 12px; border: 1px solid transparent; border-radius: 7px; color: var(--fp-muted); background: transparent; font: inherit; font-size: 13px; cursor: pointer; }.activity-tabs button[aria-selected=true] { color: var(--fp-primary); background: var(--fp-card); border-color: var(--fp-border); }.activity-tabs svg { width: 17px; height: 17px; }.activity-tabs button > span { font-size: 11px; opacity: .75; }
+.activity-group-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; grid-column: 1 / -1; margin: 8px 0 0; color: var(--fp-title); font-size: 13px; }.activity-group-heading:not(:first-child) { margin-top: 16px; }.activity-group-heading > span { color: var(--fp-muted); font-size: 11px; font-weight: 400; }
 .activity-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }.activity-option { display: flex; flex-direction: column; padding: 18px; border: 1px solid var(--fp-border); border-radius: 11px; background: var(--fp-card); min-width: 0; }.activity-option > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }.activity-option h3 { color: var(--fp-title); margin: 0; font-size: 15px; }.activity-option > header > span { display: flex; align-items: center; gap: 4px; color: var(--fp-muted); font-size: 11px; white-space: nowrap; }.activity-option > header svg { width: 13px; height: 13px; }.activity-description { min-height: 40px; margin: 10px 0 16px; color: var(--fp-muted); font-size: 12px; line-height: 1.7; }
 .detail-label { color: var(--fp-muted); font-size: 11px; }.activity-rewards, .activity-costs { display: flex; gap: 12px; align-items: flex-start; }.activity-rewards > span, .activity-costs > span { flex: none; line-height: 1.8; }.activity-rewards p, .activity-costs p { display: flex; flex-wrap: wrap; gap: 3px 10px; margin: 0; font-size: 11px; line-height: 1.8; }.activity-rewards { min-height: 40px; margin-bottom: 7px; }.activity-rewards p { color: var(--fp-primary); }.activity-costs p { color: var(--fp-muted); }.activity-option footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 16px; margin-top: auto; }.activity-price { display: flex; align-items: center; gap: 4px; color: var(--fp-muted); font-size: 11px; }.activity-price svg { color: var(--fp-accent); width: 15px; height: 15px; }.activity-price b { color: var(--fp-text); font-size: 14px; margin-right: 2px; }.activity-option footer button { display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-primary); background: var(--fp-primary-soft); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: border-color .16s, transform .16s; }.activity-option footer button:not(:disabled):hover { border-color: var(--fp-primary); transform: translateY(-1px); }.shortage { color: var(--fp-muted); font-size: 11px; margin: 8px 0 0; }
 .pet-skills { border-top: 1px solid var(--fp-border); padding-top: 20px; margin-top: 24px; }.pet-skills > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }.pet-skills h3 { display: flex; align-items: center; gap: 7px; color: var(--fp-title); font-size: 14px; margin: 0; }.pet-skills h3 svg { color: var(--fp-primary); width: 17px; height: 17px; }.pet-skills > header > span { color: var(--fp-muted); font-size: 11px; }.skills-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }.pet-skill > div { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; margin-bottom: 6px; }.pet-skill strong { color: var(--fp-primary); font-size: 11px; font-weight: 500; white-space: nowrap; }.pet-skill > span { color: var(--fp-muted); font-size: 11px; }

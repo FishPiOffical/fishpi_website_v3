@@ -6,7 +6,7 @@
 
 ## 项目范围
 
-- `pet` 分支养成、外出、学校及见习兼职由 `v3-pets.ts`、`pets` store 和 `PetsView/PetDesktop` 共用，服务端权威状态、独立宠物币；写回执后只重读聚合状态，未知保留原键，换号清私有数据。桌宠仅持久化位置/显示偏好，不轮询；工作熟练度独立于课程技能，共享产币额度由服务端结算。活动记录由 `petActivityHistory` 按展开状态惰性读取，不进 SSR 或持久缓存。规则及人工验收见 `docs/pets-phase-one.md`、`docs/pets-phase-two.md`、`docs/pets-phase-three.md`；动画另批实施。
+- `pet` 分支养成、外出、学校及见习兼职由 `v3-pets.ts`、`pets` store 和 `PetsView/PetDesktop` 共用，服务端权威状态、独立宠物币；写回执后只重读聚合状态，未知保留原键，换号清私有数据。桌宠仅持久化位置/显示偏好，不轮询；工作熟练度独立于课程技能，共享产币额度由服务端结算。活动记录由 `petActivityHistory` 按展开状态惰性读取，不进 SSR 或持久缓存。规则及人工验收见 `docs/pets-phase-one.md`、`docs/pets-phase-two.md`、`docs/pets-phase-three.md`、`docs/pets-phase-four.md`；进阶探索材料、制作收藏、食品饮料及日常事件共用事务和统一日志，旧活动接口保留，日志只记真实净变化；动画另批实施。
 
 - 项目为摸鱼派用户站，采用 Vue 3、TypeScript、Pinia、Vite 与 SSR。
 - 后端继续使用 Rhythm，功能行为与接口参考 https://fishpi.cn。
