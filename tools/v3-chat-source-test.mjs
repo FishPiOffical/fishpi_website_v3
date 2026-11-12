@@ -12,6 +12,8 @@ const card={...base,type:'music',content:'SECRET_SOURCE',contentHtml:'SECRET_SOU
 console.log('PASS chat source 3 cards expose selected public fields only; unavailable messages cannot become raw text or author proof')
 state.dispatch=async()=>env(base);let view=setup();await view.model.quoteMessage('2');assert.equal(view.model.quote.value.html,base.contentHtml);assert.equal(view.model.quote.value.content,base.content);assert.match(view.model.buildQuoteSuffix(),/\n> second line/);assert.match(view.model.buildQuoteSuffix(),/\/cr#chatroom2/);await view.model.showRaw('2');assert.equal(view.model.rawText.value,base.content);assert.equal(view.model.rawOpen.value,true);view.scope.stop()
 console.log('PASS chat source 4 actual lifecycle uses current HTTP raw/clean preview and quotes every source line')
+state.dispatch=async()=>env({...base,tail:{text:'不进入引用的小尾巴'}});view=setup();await view.model.quoteMessage('2');assert.ok(!view.model.buildQuoteSuffix().includes('不进入引用的小尾巴'));await view.model.showRaw('2');assert.equal(view.model.rawText.value,base.content);view.scope.stop()
+console.log('PASS 小尾巴独立于引用与原文，不重复带入下一条消息')
 state.dispatch=async()=>env({...base,author:{...base.author,userName:'[x](bad)'}});view=setup();await view.model.quoteMessage('2');assert.match(view.model.buildQuoteSuffix(),/@\\\[x\\\]/);view.scope.stop()
 console.log('PASS chat source 5 author display text escaped before Markdown quote header interpolation')
 let finish;state.dispatch=()=>new Promise(r=>finish=r);view=setup();const quoting=view.model.quoteMessage('2');await tick();const signal=state.calls.at(-1).init.signal;view.model.clearQuote();assert.equal(signal.aborted,true);finish(env(base));await quoting;assert.equal(view.model.quote.value,null);view.scope.stop()

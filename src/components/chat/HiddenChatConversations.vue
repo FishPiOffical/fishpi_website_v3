@@ -134,6 +134,7 @@ function preview(line: (typeof messages.value)[number]) {
                   :key="line.oId"
                   :user-id="line.userOId"
                   :appearance="line.appearance"
+                  :tail="line.tail"
                   :user-name="line.userName"
                   :nickname="line.userNickname"
                   :avatar="line.userAvatarURL"

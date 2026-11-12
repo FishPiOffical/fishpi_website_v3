@@ -74,7 +74,7 @@ const delivered=[]
 const unsubscribe=realtime.subscribeChatChanges(value=>delivered.push(value),()=>{})
 await tick()
 const frame=(type,data)=>socket.onmessage({data:JSON.stringify({type,data})})
-const payload={messageId:'12',revision:'1',message:{...msg('12'),appearance:{bubbleId:'candy',frameId:'gold',version:1}}}
+const payload={messageId:'12',revision:'1',message:{...msg('12'),tail:{text:'今天也要开心🐟'},appearance:{bubbleId:'candy',frameId:'gold',version:1}}}
 frame('chat.message.created',payload)
 assert.equal(delivered.length,0)
 socket.onopen()
@@ -88,6 +88,7 @@ assert.deepEqual(delivered,[
   {type:'deleted',id:'12',revision:'3'},
 ])
 assert.deepEqual(delivered[0].message.appearance,payload.message.appearance)
+assert.deepEqual(delivered[0].message.tail,payload.message.tail)
 console.log('PASS timeline 19 authenticated transport decodes HTTP-equivalent snapshot, rejects mismatched IDs, ignores deletion bodies')
 
 const summary = {targetId:'12',targetType:'chat',groupType:'emoji',currentUserReaction:'heart',

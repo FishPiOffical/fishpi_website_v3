@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ChatTail } from '@/api/v3-chat-messages'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { formatDisplayTime } from '@/utils/time'
@@ -18,6 +19,7 @@ import { extractChatQuotes, hasChatQuoteBody, type ChatQuote } from '@/utils/cha
 
 const props = withDefaults(
   defineProps<{
+    tail?: ChatTail
     appearance?: ChatAppearance
     userId?: string
     userName: string
@@ -142,6 +144,7 @@ function onBodyClick(e: MouseEvent) {
             <ChatQuoteCard v-for="(quote, index) in display.quotes" :key="index" :quote="quote" />
           </div>
         </slot>
+        <p v-if="chatroom && tail && !simpleMode && !isStandalone" class="fp-chat-tail" data-chat-tail>{{ tail.text }}</p>
         <template v-if="!chatroom">
           <slot name="reactions" />
           <div class="foot">
@@ -186,6 +189,13 @@ function onBodyClick(e: MouseEvent) {
   border-radius: 6px;
   background: var(--fp-hover);
   overflow: visible;
+  overflow-wrap: anywhere;
+}
+.fp-chat-tail {
+  margin: 6px 0 0;
+  color: var(--fp-muted);
+  font-size: 12px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .is-self .fp-bubble {

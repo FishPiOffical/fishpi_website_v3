@@ -22,6 +22,7 @@ import LocalBrandingSettings from './LocalBrandingSettings.vue'
 import IncomeCard from '@/components/count/IncomeCard.vue'
 import HiddenChatConversations from '@/components/chat/HiddenChatConversations.vue'
 import WhisperConversations from '@/components/chat/WhisperConversations.vue'
+import ChatTailSettingsDialog from '@/components/chat/ChatTailSettingsDialog.vue'
 
 const drawer = useSettingsDrawerStore()
 const feedbackPanel = useFeedbackPanelStore()
@@ -41,6 +42,12 @@ const router = useRouter()
 
 const mounted = ref(false)
 const hiddenChatsOpen = ref(false)
+const chatTailOpen = ref(false)
+function openChatTail() {
+  if (!auth.isLoggedIn) return
+  drawer.hide()
+  chatTailOpen.value = true
+}
 const { isLoggedIn } = storeToRefs(auth)
 const { unreadTotal: whisperUnread,error: whisperUnreadError, inboxOpen: whisperInboxOpen } = storeToRefs(whispers)
 const draggedSidebarId = ref('')
@@ -355,8 +362,9 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
 
           <div v-else-if="section === 'chatInput'" class="content">
-            <label class="setting-options"><input type="checkbox" :checked="chatPreferences.simpleMode" @change="chatPreferences.setSimpleMode(($event.target as HTMLInputElement).checked)"> 精简模式（隐藏头像框、气泡和进出场效果）</label>
+            <label class="setting-options"><input type="checkbox" :checked="chatPreferences.simpleMode" @change="chatPreferences.setSimpleMode(($event.target as HTMLInputElement).checked)"> 精简模式（隐藏头像框、气泡、小尾巴和进出场效果）</label>
             <label class="setting-options"><input type="checkbox" :disabled="chatPreferences.simpleMode" :checked="chatPreferences.mountEffects" @change="chatPreferences.setMountEffects(($event.target as HTMLInputElement).checked)"> 显示座驾进场特效</label>
+            <div class="setting-options"><button type="button" class="fp-btn" :disabled="!isLoggedIn" @click="openChatTail">小尾巴设置</button><small v-if="!isLoggedIn">登录后可设置</small></div>
             <fieldset class="setting-options">
               <legend>发送快捷键</legend>
               <label :class="{ selected: chatPreferences.sendShortcut === 'mod-enter' }">
@@ -504,6 +512,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
       </aside>
     </Transition>
     <FeedbackDialog v-if="feedbackEnabled && feedbackPanel.open" />
+    <ChatTailSettingsDialog :open="chatTailOpen" @close="chatTailOpen = false" />
   </Teleport>
 </template>
 
