@@ -33,8 +33,8 @@ const props = withDefaults(
   { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
-const thumbnailWidth = 560
-const thumbnailHeight = 640
+const thumbnailWidth = 400
+const thumbnailHeight = 360
 const previewLimit = 1024
 
 const snapshot = computed(() => chatAppearanceSnapshot(props.appearance))
@@ -397,14 +397,14 @@ function onBodyClick(e: MouseEvent) {
 }
 .is-room .body :deep(.chat-image-frame > picture) { display: contents; }
 .is-room .body :deep(img:not(.emoji)) {
-  max-width: min(220px, 100%);
-  max-height: 260px;
+  max-width: min(180px, 100%);
+  max-height: 160px;
   border-radius: 8px;
 }
 /* 固定上限参与气泡的固有宽度计算，窄容器再由外层 flex 缩小图片。 */
 .is-room .body :deep(:where(.chat-image-frame) img:not(.emoji)) {
   min-width: 0;
-  max-width: 220px;
+  max-width: 180px;
 }
 .is-room .body :deep(video), .is-room .body :deep(iframe) {
   max-width: 100%;
@@ -436,12 +436,12 @@ function onBodyClick(e: MouseEvent) {
   background: transparent;
   box-shadow: none;
 }
-.is-room.is-image .body { line-height: 0; max-width: 280px; }
+.is-room.is-image .body { line-height: 0; max-width: 200px; }
 .is-room.is-self.is-image .body { margin-left: auto; }
 .is-room.is-image .body :deep(img:not(.emoji)) {
   display: block;
-  max-width: min(280px, 100%);
-  max-height: 320px;
+  max-width: min(200px, 100%);
+  max-height: 180px;
   border-radius: 12px;
 }
 .is-room .foot {
