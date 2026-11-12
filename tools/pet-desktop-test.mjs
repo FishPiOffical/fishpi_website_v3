@@ -72,7 +72,8 @@ async function compileFile(file) {
 const { placeFloating, overlapsFloatingRect } = await import(await compileFile('src/components/pets/layout/floatingPlacement.ts'))
 const { default: Desktop } = await import(await compileFile('src/components/pets/PetDesktop.vue'))
 const { usePetDisplayStore } = await import(await compileFile('src/stores/petDisplay.ts'))
-const app = createApp(Desktop).use(createPinia())
+const pinia = createPinia(), app = createApp(Desktop).use(pinia)
+let activeApp = app
 const settle = async () => { await nextTick(); for (let i = 0; i < 4; i++) { await new Promise(resolve => setTimeout(resolve, 0)); await nextTick() } }
 const pet = () => document.querySelector('.pet-desktop')
 const panel = () => document.querySelector('.pet-desktop-panel')
@@ -104,6 +105,13 @@ try {
     const overlay = box(selector, rect(0, 80, 1200, 720)); await settle(); assert.equal(pet(), null)
     overlay.remove(); await settle(); assert(pet()); assert.deepEqual(pos(), { x: 1000, y: 550 })
   }
+  const retainedModal = box('aria-modal', rect(40, 120, 500, 400)); await settle(); assert.equal(pet(), null)
+  retainedModal.style.display = 'none'; await settle(); assert(pet())
+  retainedModal.style.display = 'block'; await settle(); assert.equal(pet(), null)
+  retainedModal.setAttribute('aria-hidden', 'true'); await settle(); assert(pet())
+  retainedModal.remove(); await settle()
+  assert.equal(localStorage.getItem('fishpi.pet.display.v1'), preference)
+  console.log('PASS 模态保留DOM并切换显示或aria-hidden时，同步让位恢复且不改偏好')
   const editor = document.createElement('textarea'); externalRects.set(editor, rect(950, 500, 242, 280)); document.body.append(editor); editor.focus(); await settle()
   assert(!overlapsFloatingRect(pet().getBoundingClientRect(), editor.getBoundingClientRect(), 8))
   editor.blur(); editor.remove(); await settle()
@@ -130,6 +138,23 @@ try {
   assert.deepEqual(pos(), { x: 1000, y: 550 }); assert.equal(display.collapsed, false)
   console.log('PASS 320/390窄屏自动48像素收纳、点击收起、键盘与visualViewport偏移边界及宽屏恢复')
 
+  await viewportSize(390, 200)
+  await tap(document.querySelector('.pet-character')); assert(panel())
+  const shortPanel = panel().getBoundingClientRect()
+  assert(shortPanel.top >= 88 && shortPanel.bottom <= 188)
+  assert.equal(Number.parseFloat(panel().style.maxHeight), 100, '短视口面板限制高度，正文交给内部滚动')
+  await tap(document.querySelector('.pet-character')); assert.equal(panel(), null)
+  await viewportSize(780, 390)
+  assert(!pet().classList.contains('narrow'))
+  assert(pos().y >= 88 && pet().getBoundingClientRect().bottom <= 378)
+  await viewportSize(320, 700)
+  const editable = document.createElement('div'); editable.setAttribute('contenteditable', 'true'); editable.tabIndex = 0; document.body.append(editable)
+  editable.focus(); await settle(); assert.equal(pet(), null)
+  editable.blur(); editable.remove(); await settle(); assert(pet())
+  assert.equal(localStorage.getItem('fishpi.pet.display.v1'), preference)
+  assert.equal(reads, networkBefore)
+  console.log('PASS 短视口和横竖屏切换保持面板边界，contenteditable输入让位且不新增读取')
+
   await viewportSize(320, 700)
   const character = document.querySelector('.pet-character')
   const before = { ...display.position }, actual = pos()
@@ -153,12 +178,38 @@ try {
   for (let i = 0; i < 30; i++) messages.append(document.createElement('p'))
   await settle(); assert.equal(frames, idleFrames, '普通消息增删不触发布局测量')
   console.log('PASS 没有空间时暂时隐藏，高频事件合并，普通消息更新不触发观察循环')
-  app.unmount(); await settle()
+  const layout = useLayoutStore(pinia), auth = useAuthStore(pinia), pets = usePetsStore(pinia)
+  const savedPosition = { ...display.position }, lifecycleReads = reads
+  layout.immersive = true; await settle(); assert.equal(pet(), null)
+  layout.immersive = false; await settle(); assert(pet())
+  assert.equal(reads, lifecycleReads, '沉浸切换只处理显示状态')
+  auth.isLoggedIn = false; auth.accessToken = ''; auth.account = null; await settle()
+  assert.equal(pet(), null); assert.equal(panel(), null)
+  assert(!document.body.textContent.includes('小伙伴'), '退出后不残留旧宠物姓名')
+  pets.pet = { ...pets.pet, id: 'pet-two', name: '新的伙伴' }
+  auth.account = { oId: 'another-fixture' }; auth.isLoggedIn = true; auth.accessToken = 'new-test'; await settle()
+  assert.equal(pet().getAttribute('aria-label'), '新的伙伴桌宠')
+  assert.deepEqual(display.position, savedPosition, '身份变化不清除纯本机摆放偏好')
+  console.log('PASS 沉浸场景暂时隐藏，退出清可见身份内容，换号只显示当前宠物且保留本机位置')
+  app.unmount(); activeApp = null; await settle()
   assert.equal(document.querySelector('.pet-placement-probe'), null)
   assert([...resizeObservers].every(observer => observer.nodes.size === 0)); assert.equal(scheduled.size, 0)
   const disposedFrames = frames; viewport.dispatchEvent(new Event('resize')); window.dispatchEvent(new Event('scroll')); await settle(); assert.equal(frames, disposedFrames)
   console.log('PASS 卸载清理观察器、视口监听、辅助节点与待执行帧')
+  for (let cycle = 0; cycle < 3; cycle++) {
+    activeApp = createApp(Desktop).use(pinia); activeApp.mount('#app'); await settle()
+    assert.equal(document.querySelectorAll('.pet-desktop').length, 1)
+    assert.equal(document.querySelectorAll('.pet-placement-probe').length, 1)
+    const mountedFrames = frames
+    viewport.dispatchEvent(new Event('resize')); await settle(); assert(frames - mountedFrames <= 2)
+    activeApp.unmount(); activeApp = null; await settle()
+    assert.equal(document.querySelectorAll('.pet-desktop, .pet-placement-probe').length, 0)
+    assert([...resizeObservers].every(observer => observer.nodes.size === 0)); assert.equal(scheduled.size, 0)
+    const afterUnmount = frames
+    viewport.dispatchEvent(new Event('resize')); await settle(); assert.equal(frames, afterUnmount)
+  }
+  console.log('PASS 连续挂载卸载不累积桌宠节点、辅助节点、活跃观察目标或视口回调')
 } finally {
-  if (document.querySelector('.pet-placement-probe')) app.unmount()
+  activeApp?.unmount()
   dom.window.close(); await fs.rm(temporary, { recursive: true, force: true }); delete globalThis.__desktopTest
 }

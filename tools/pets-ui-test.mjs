@@ -7,6 +7,25 @@ import { JSDOM } from 'jsdom'
 import ts from 'typescript'
 import { parse, compileScript } from '@vue/compiler-sfc'
 
+// 与数据专项使用相同的可复现种子接口，每轮只替换夹具数值，不改真实组件。
+const options = new Map(process.argv.slice(2).map(argument => {
+  const match = /^--(seed|cases)=(\d+)$/.exec(argument)
+  if (!match) throw new Error(`不支持的测试参数：${argument}；使用 --seed=整数 --cases=整数`)
+  return [match[1], match[2]]
+}))
+const seed = Number(options.get('seed') ?? process.env.PET_TEST_SEED ?? 20261113)
+const randomCases = Number(options.get('cases') ?? process.env.PET_TEST_CASES ?? 32)
+assert(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff, 'seed 必须为 uint32')
+assert(Number.isInteger(randomCases) && randomCases >= 1 && randomCases <= 2000, 'cases 必须为 1～2000')
+let randomState = seed
+const random = maximum => {
+  randomState = (randomState + 0x6d2b79f5) >>> 0
+  let value = Math.imul(randomState ^ randomState >>> 15, 1 | randomState)
+  value ^= value + Math.imul(value ^ value >>> 7, 61 | value)
+  return Math.floor(((value ^ value >>> 14) >>> 0) / 0x100000000 * maximum)
+}
+console.log(`SEED pets-ui seed=${seed} cases=${randomCases}`)
+
 // 使用真实 Vue 模板与 store，仅替换传输和浏览器几何；测试不会触碰真实账号或站点接口。
 const dom = new JSDOM('<!doctype html><html><body><header data-site-navigation></header><div id="app"></div></body></html>', { url: 'http://127.0.0.1:5173/pets', pretendToBeVisual: true })
 for (const key of ['window', 'document', 'navigator', 'localStorage', 'Element', 'HTMLElement', 'HTMLInputElement', 'SVGElement', 'Node', 'Event', 'MouseEvent', 'KeyboardEvent', 'MutationObserver', 'getComputedStyle']) {
@@ -313,6 +332,40 @@ try {
   assert(document.querySelector('.growth-summary').textContent.includes('累计经验 3000'))
   catalog.growthRules = originalGrowthRules; await pets.reloadCatalog(); await settle()
   console.log('PASS 成长进度使用真实目录规则，封顶明确展示，旧目录缺字段保留累计值且不伪造进度')
+
+  const growthWriteCount = writes().length
+  for (let index = 0; index < randomCases; index++) {
+    try {
+      const unit = [1, 7, 100, 256][random(4)], maximum = [1, 2, 10, 30][random(4)]
+      const experience = [0, unit - 1, unit, (maximum - 1) * unit, maximum * unit + random(1000), random(maximum * unit + 1)][index % 6]
+      catalog.growthRules = { ...originalGrowthRules, experiencePerLevel: unit, maxLevel: maximum }
+      serverState.pet.experience = experience
+      serverState.pet.level = Math.min(maximum, 1 + Math.floor(experience / unit))
+      serverState.pet.friendship = random(101)
+      await pets.reloadCatalog(); await pets.refresh(); await settle()
+      const complete = serverState.pet.level === maximum
+      const remaining = unit - experience % unit
+      const bar = document.querySelector('[aria-label="宠物升级进度"]')
+      assert(bar)
+      assert.equal(Number(bar.getAttribute('aria-valuenow')), complete ? 100 : Math.round((unit - remaining) / unit * 100))
+      const summary = document.querySelector('.growth-summary').textContent
+      assert(summary.includes(`累计经验 ${experience}`))
+      assert(summary.includes(`亲密度 ${serverState.pet.friendship}`))
+      assert(summary.includes(complete ? '已达到当前最高等级' : `再获得 ${remaining} 经验，升到 Lv. ${serverState.pet.level + 1}`))
+      if (index % 4 === 0) {
+        delete catalog.growthRules; await pets.reloadCatalog(); await settle()
+        assert.equal(document.querySelector('[aria-label="宠物升级进度"]'), null)
+        assert(!document.querySelector('.growth-summary').textContent.includes('再获得'))
+        assert(document.querySelector('.growth-summary').textContent.includes(`累计经验 ${experience}`))
+      }
+      assert.equal(writes().length, growthWriteCount, '成长展示和规则切换不能发写请求')
+    } catch (error) {
+      error.message = `seed=${seed} growth-case=${index}: ${error.message}`
+      throw error
+    }
+  }
+  catalog.growthRules = originalGrowthRules; await pets.reloadCatalog(); await settle()
+  console.log(`PASS 随机真实Vue成长边界：不同等级步长、零值、整级、封顶、亲密度和缺失规则（${randomCases}例，seed=${seed}）`)
 
   const ownedState = adopted('pet-b', '小伙伴')
   ownedState.serverNow = now - 120000

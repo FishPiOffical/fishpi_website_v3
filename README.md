@@ -76,6 +76,7 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 第四批加入进阶探索、材料配方与永久收藏、扩展食品饮料商店，以及包含日常互动的统一日志，详见 [探索、手作与日常记录](docs/pets-phase-four.md)。
 第五批加入六门进阶课程、三条成长旅程，以及 512 宠物币重新领养；更换宠物保留账号资产与已领取奖励，详见 [进阶课程、旅程与重新领养](docs/pets-phase-five.md)。
 第六批调整散步与进阶课成长效率，补齐成长进度、移动端桌宠避让及弱网恢复，详见 [成长节奏与恢复](docs/pets-phase-six.md)。
+本地八小时持续检查使用 `node tools/pets-soak.mjs start --hours 8`，以专用账号、隔离事务专项和前端交互专项分别记录结果；状态、停止方式及覆盖边界见 [持续检查说明](docs/pets-soak-test.md)。
 用户列表/内容读取失败明确显示错误和重试，合法空结果单独展示，不用 mock 冒充。
 SSR 另 prefetch：`/domains`、`/tags`、`/breezemoons`、`/top`、`/repeater`。
 补齐页面：`/download`、`/agreement`、`/privacy`、`/activity`、`/following`、`/settings/point`、`/member/:name/medals`、`/city/:city`、`/charge/point`、`/column/:id`。

@@ -4,6 +4,30 @@ import ts from 'typescript'
 import { createPinia, defineStore, setActivePinia } from 'pinia'
 import { ref } from 'vue'
 
+// 固定种子可复现长时测试中的同一轮，默认场景数保持日常专项足够轻量。
+const options = new Map(process.argv.slice(2).map(argument => {
+  const match = /^--(seed|cases)=(\d+)$/.exec(argument)
+  if (!match) throw new Error(`不支持的测试参数：${argument}；使用 --seed=整数 --cases=整数`)
+  return [match[1], match[2]]
+}))
+const seed = Number(options.get('seed') ?? process.env.PET_TEST_SEED ?? 20261113)
+const randomCases = Number(options.get('cases') ?? process.env.PET_TEST_CASES ?? 32)
+assert(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff, 'seed 必须为 uint32')
+assert(Number.isInteger(randomCases) && randomCases >= 1 && randomCases <= 2000, 'cases 必须为 1～2000')
+let randomState = seed
+const random = maximum => {
+  randomState = (randomState + 0x6d2b79f5) >>> 0
+  let value = Math.imul(randomState ^ randomState >>> 15, 1 | randomState)
+  value ^= value + Math.imul(value ^ value >>> 7, 61 | value)
+  return Math.floor(((value ^ value >>> 14) >>> 0) / 0x100000000 * maximum)
+}
+const shuffled = values => {
+  const result = [...values]
+  for (let index = result.length - 1; index > 0; index--) { const other = random(index + 1); [result[index], result[other]] = [result[other], result[index]] }
+  return result
+}
+console.log(`SEED pets-store seed=${seed} cases=${randomCases}`)
+
 const moduleUrl = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 const compile = source => moduleUrl(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
 class ApiError extends Error { constructor(message, status, code) { super(message); this.status = status; this.code = code } }
@@ -970,6 +994,131 @@ console.log('PASS 401和429暂停自动读取，恢复仅由用户明确请求�
   history.$dispose(); pets.$dispose()
 }
 console.log('PASS 履历失败不随聚合更新反复读取，联网合并恢复当前页，折叠始终零请求')
+
+const recoveryKinds = shuffled(['purchase', 'readoption', 'craft', 'story', 'water'])
+for (let index = 0; index < randomCases; index++) {
+  const { auth, pets } = newRecoveryStore()
+  const kind = recoveryKinds[index % recoveryKinds.length]
+  try {
+    serverState = adopted()
+    serverState.wallet.coins = 2000 + random(500)
+    serverState.inventory.push({ itemId: 'reed', quantity: 2 })
+    serverState.pet.skills.find(skill => skill.id === 'exploration').experience = 20
+    serverState.stories = [structuredClone(claimableStory)]
+    handler = success; await pets.ensureLoaded()
+    const quantity = random(20) + 1, originalId = pets.pet.id, initialCoins = pets.coins
+    const failuresAfterCommit = random(2) === 1
+    let commandKey, commandBody, committedReceipt, commits = 0, requests = 0, readingFails = false
+    // 此传输夹具只验证客户端发出的原命令与回执边界，不代替后端幂等事务测试。
+    handler = async (path, request) => {
+      if (!request?.method) {
+        if (readingFails && !path.endsWith('/catalog')) throw new ApiError('模拟读取断流', 503)
+        return success(path, request)
+      }
+      requests++
+      if (committedReceipt) {
+        assert.equal(request.headers['Idempotency-Key'], commandKey)
+        assert.equal(request.body, commandBody, '恢复不得用换宠后的 petId 或新版本重建命令')
+        readingFails = failuresAfterCommit
+        return response(committedReceipt)
+      }
+      commandKey = request.headers['Idempotency-Key']; commandBody = request.body
+      const body = JSON.parse(commandBody)
+      assert.equal(body.petId, originalId)
+      commits++
+      committedReceipt = { operation: kind === 'story' ? 'story-claim' : kind, petId: originalId, committedAt: now }
+      if (kind === 'purchase') {
+        serverState.wallet.coins -= 5 * quantity
+        serverState.inventory.find(item => item.itemId === 'food').quantity += quantity
+      } else if (kind === 'readoption') {
+        serverState.wallet.coins -= 512
+        serverState.pet = { ...adopted().pet, id: `new-pet-${seed}-${index}`, speciesId: body.speciesId, name: body.name }
+        committedReceipt.previousPetId = originalId; committedReceipt.petId = serverState.pet.id
+      } else if (kind === 'craft') {
+        serverState.wallet.coins -= 2
+        serverState.inventory.find(item => item.itemId === 'reed').quantity = 0
+        serverState.collections = [{ id: 'reed-boat', unlockedAt: now }]
+      } else if (kind === 'story') {
+        serverState.stories = [{ ...claimableStory, status: 'claimed', claimedAt: now }]
+        serverState.inventory.find(item => item.itemId === 'food').quantity += 2
+        committedReceipt.storyId = 'care-companion'
+      } else serverState.pet.water = 100
+      throw new ApiError('模拟已提交但回执丢失', 503)
+    }
+    const write = kind === 'purchase' ? pets.buyFood(quantity)
+      : kind === 'readoption' ? pets.readopt(catalog.species[random(4)].id, `新伙伴${index}`, true)
+        : kind === 'craft' ? pets.craft('reed-boat')
+          : kind === 'story' ? pets.claimStory('care-companion') : pets.act('water')
+    assert.equal(await write, false)
+    const frozen = { ...pets.pending }, channel = Channel.all.at(-1)
+    assert(frozen.key)
+    for (const event of shuffled(['rotation', 'focus', 'offline', 'broadcast', 'foreign-broadcast'])) {
+      if (event === 'rotation') auth.accessToken = `rotated-${index}-${random(1000)}`
+      if (event === 'focus') for (let count = random(20) + 1; count > 0; count--) focusRecovery()
+      if (event === 'offline') {
+        window.dispatchEvent(new Event('offline'))
+        assert.equal(await pets.retryPending(), false)
+        window.dispatchEvent(new Event('online'))
+      }
+      if (event.includes('broadcast')) channel.onmessage({ data: { type: 'changed', owner: event === 'broadcast' ? 'A' : 'unrelated-account' } })
+      await flushRecovery(); await advanceRecovery(random(1200))
+      assert.deepEqual(pets.pending, frozen)
+      assert.equal(requests, 1, '恢复网络、换令牌或广播都不能自动重发未知写入')
+    }
+    const outcomes = await Promise.all([pets.retryPending(), pets.retryPending(), pets.retryPending()])
+    assert.deepEqual(outcomes, [true, false, false], '并发核对仍只能发送同一个原命令一次')
+    assert.equal(commits, 1); assert.equal(requests, 2); assert.equal(pets.pending, null)
+    readingFails = false
+    await pets.refresh(); await advanceRecovery(1100)
+    assert.equal(pets.coins, initialCoins - (kind === 'purchase' ? quantity * 5 : kind === 'readoption' ? 512 : kind === 'craft' ? 2 : 0))
+    assert.equal(pets.pet.id, serverState.pet.id)
+    assert.equal(await pets.retryPending(), false)
+    assert.equal(requests, 2)
+    assert.deepEqual(channel.messages, [{ type: 'changed', owner: 'A' }], '跨标签通知不包含资产、宠物或访问令牌')
+  } catch (error) {
+    error.message = `seed=${seed} case=${index} kind=${kind}: ${error.message}`
+    throw error
+  } finally { pets.$dispose() }
+}
+console.log(`PASS 随机原键恢复：五类命令、失回执、事件顺序、并发核对与后置读失败（${randomCases}例，seed=${seed}）`)
+
+for (let index = 0; index < randomCases; index++) {
+  const { auth, pets } = newRecoveryStore()
+  const oldState = deferred(), oldCatalog = deferred()
+  try {
+    const oldReads = []
+    handler = (path, request) => { oldReads.push(request.signal); return path.endsWith('/catalog') ? oldCatalog.promise : oldState.promise }
+    const initial = pets.ensureLoaded()
+    assert.equal(oldReads.length, 2)
+    const boundaryKind = index % 3
+    auth.accessToken = `old-rotated-${random(10000)}`
+    assert(oldReads.every(signal => !signal.aborted), '同账号令牌轮换不得取消当前读取')
+    context++
+    if (boundaryKind === 0) auth.account = { oId: `next-owner-${index}` }
+    else if (boundaryKind === 1) auth.accessToken = null
+    auth.accessToken = `next-session-${index}`
+    assert(oldReads.every(signal => signal.aborted), '换号、退出和同账号重新认证都要隔离旧读取')
+    serverState = adopted()
+    serverState.pet.id = `current-${index}`; serverState.wallet.coins = random(10000)
+    handler = success
+    await pets.ensureLoaded()
+    const currentId = pets.pet.id, currentCoins = pets.coins
+    for (const responseKind of shuffled(['state', 'catalog'])) {
+      if (responseKind === 'state') oldState.resolve(response({ ...adopted(), wallet: { coins: 999999 } }))
+      else oldCatalog.resolve(response({ ...catalog, version: 999 }))
+      if (random(2)) auth.accessToken = `current-rotated-${index}-${responseKind}`
+      await flushRecovery()
+      assert.equal(pets.pet.id, currentId); assert.equal(pets.coins, currentCoins)
+      assert.equal(pets.catalog.version, 3)
+    }
+    await initial
+    assert.equal(pets.pending, null)
+  } catch (error) {
+    error.message = `seed=${seed} identity-case=${index}: ${error.message}`
+    throw error
+  } finally { pets.$dispose() }
+}
+console.log(`PASS 随机身份时序：换号/退出/重新认证、目录和状态乱序回包、普通令牌轮换（${randomCases}例，seed=${seed}）`)
 
 Date.now = realNow
 globalThis.setTimeout = realSetTimeout
