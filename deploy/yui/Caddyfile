@@ -31,8 +31,3 @@ new.fishpi.cn {
         reverse_proxy 127.0.0.1:5173
     }
 }
-
-# Keep old bookmarks working during the domain migration.
-yui.fishpi.cn {
-    redir https://new.fishpi.cn{uri} permanent
-}

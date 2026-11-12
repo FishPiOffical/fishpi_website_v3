@@ -78,3 +78,8 @@ Caddy 主站改为 `new.fishpi.cn`，旧 `yui.fishpi.cn` 以 301 保留路径/�
 公网首页、登录、聊天室和反馈 health 为 200；首页 canonical 为 https://new.fishpi.cn/，入口 JS、两项共享模块及 v3-realtime 模块与本地产物字节一致。桌面 Chrome 与 iPhone 13 尺寸模拟均显示 72 个文章链接，无 pageerror；浏览器带 credentials 的跨域 captcha-options 返回 200/code 0，刷新预检允许新 Origin。网站、反馈与 Caddy 均 active。未登录真实账号，未验证新域名上的认证 WebSocket/付费/写入操作，也未进行手机真机验收。
 
 完整生产构建通过。服务器 npm ci 的 jsdom/w3c-xmlserializer 测试依赖提示 Node 24.12 低于其 24.15 要求；网站运行检查正常，本次没有扩大范围升级共享服务器运行时。
+
+
+### 旧域名退役
+
+2026-11-12 用户确认旧域名 DNS 已删除，随后从服务器和部署模板移除 `yui.fishpi.cn` 站点/301跳转块，仅保留 `new.fishpi.cn`。Caddy 配置验证及 reload 成功，新域名首页 200；未修改 DNS 平台记录。更改前配置备份为 `/etc/caddy/Caddyfile.before-remove-yui-20261112`。
