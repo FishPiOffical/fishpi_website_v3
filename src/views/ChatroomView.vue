@@ -647,18 +647,21 @@ function clearScreen() {
   font-size: 12px;
 }
 
+:is(.cr-classic-layout, .cr-modern-layout) {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+  gap: var(--fp-page-gap);
+}
+
 /* =========================================================
    版本 A：经典版本（Classic，对齐现网 chat-room.ftl）
    ========================================================= */
 .cr-classic-layout {
-  display: flex;
-  gap: var(--fp-page-gap);
-  align-items: flex-start;
+  align-items: start;
   padding: 10px 0 30px;
 }
 
 .cr-classic-main {
-  flex: 1;
   min-width: 0;
 }
 
@@ -784,24 +787,20 @@ function clearScreen() {
   overflow-y: auto;
   scrollbar-width: thin;
   overflow-anchor: none;
-  flex: 0 0 280px;
-  width: 280px;
 }
 
 /* =========================================================
    版本 B：现代气泡版本 (Modern，对齐现网 chat-room-2.ftl)
    ========================================================= */
 .cr-modern-layout {
-  display: flex;
-  gap: 16px;
   height: calc(100dvh - var(--fp-nav-h) - 24px);
   min-height: 0;
   padding-bottom: 8px;
 }
 
 .cr-modern-main {
-  flex: 1;
   min-width: 0;
+  min-height: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -813,8 +812,6 @@ function clearScreen() {
 }
 
 .modern-sidebar {
-  flex: 0 0 280px;
-  width: 280px;
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1209,27 +1206,21 @@ function clearScreen() {
 
 /* 响应式适配 */
 @media (max-width: 960px) {
-  .cr-classic-layout {
-    flex-direction: column;
-    align-items: stretch;
+  :is(.cr-classic-layout, .cr-modern-layout) {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .classic-sidebar {
     position: static;
     max-height: none;
     overflow: visible;
-    width: 100%;
-    flex: auto;
   }
 
   .cr-modern-layout {
-    flex-direction: column;
     height: auto;
   }
 
   .cr-modern-main {
-    flex: none;
-    min-height: 0;
     height: calc(100dvh - var(--fp-nav-h) - 20px);
   }
 
@@ -1238,8 +1229,6 @@ function clearScreen() {
   }
 
   .modern-sidebar {
-    width: 100%;
-    flex: auto;
     height: auto;
   }
 }
