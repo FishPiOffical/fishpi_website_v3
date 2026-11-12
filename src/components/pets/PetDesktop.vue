@@ -10,6 +10,7 @@ import PetActions from './PetActions.vue'
 import PetFeedback from './PetFeedback.vue'
 import PetIcon from './PetIcon.vue'
 import { usePetClock } from './usePetClock'
+import { petActivityStatus } from './petActivityStatus'
 
 const auth = useAuthStore(), pets = usePetsStore(), display = usePetDisplayStore(), layout = useLayoutStore(), route = useRoute()
 const mounted = ref(false), panelOpen = ref(false), dragging = ref(false)
@@ -17,6 +18,11 @@ const hadPet = ref(false)
 const element = ref<HTMLElement | null>(null), panel = ref<HTMLElement | null>(null)
 const viewport = ref({ width: 1000, height: 800 }), panelHeight = ref(240)
 const { now } = usePetClock()
+const activityText = computed(() => petActivityStatus(pets.pet?.activity ?? null, now.value))
+const activityClaimable = computed(() => {
+  const activity = pets.pet?.activity
+  return !!activity && activity.kind !== 'rest' && (activity.status === 'claimable' || activity.endsAt <= now.value)
+})
 const owner = computed(() => `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.accessToken}`)
 const recovering = computed(() => hadPet.value && !pets.pet && pets.refreshNeeded)
 const shown = computed(() => mounted.value && auth.isLoggedIn && (!!pets.pet || recovering.value) && display.visible && !layout.immersive)
@@ -98,7 +104,7 @@ function load() { if (mounted.value && auth.isLoggedIn && !document.hidden) void
 function onVisible() { if (!document.hidden) { load(); clampPosition(); reconcileRest() } }
 function reconcileRest() {
   const pet = pets.pet
-  if (!mounted.value || document.hidden || !auth.isLoggedIn || !pet?.activity || pet.activity.endsAt > now.value || pets.loading || pets.busy || pets.pending) return
+  if (!mounted.value || document.hidden || !auth.isLoggedIn || pet?.activity?.kind !== 'rest' || pet.activity.endsAt > now.value || pets.loading || pets.busy || pets.pending) return
   const key = `${owner.value}:${pet.id}:${pet.activity.endsAt}`
   if (completedRests.has(key)) return
   // 到期只核对一次当前状态；读取失败由用户重试，不产生后台轮询。
@@ -150,7 +156,8 @@ onBeforeUnmount(() => {
       <button v-if="pets.pet" type="button" class="pet-character" :aria-label="display.collapsed ? `展开${pets.pet.name}` : `照顾${pets.pet.name}`" :aria-expanded="panelOpen" @click="display.collapsed ? collapse(false) : panelOpen = !panelOpen">
         <img :src="`/images/pets/${pets.pet.speciesId}.webp`" :alt="pets.pet.name" :width="display.collapsed ? 48 : 128" :height="display.collapsed ? 48 : 128" draggable="false" />
         <span v-if="!display.collapsed" class="desktop-name">{{ pets.pet.name }}<small>Lv. {{ pets.pet.level }}</small></span>
-        <span v-if="pets.pet.activity" class="desktop-sleep" aria-label="休息中">z</span>
+        <span v-if="pets.pet.activity?.kind === 'rest'" class="desktop-sleep" aria-label="休息中">z</span>
+        <span v-else-if="pets.pet.activity" class="desktop-activity" :aria-label="activityClaimable ? '活动成果待领取' : pets.pet.activity.kind === 'outing' ? '外出中' : '上课中'"><PetIcon :name="activityClaimable ? 'gift' : pets.pet.activity.kind" /></span>
       </button>
       <button v-else type="button" class="pet-recovery" aria-label="宠物状态暂不可用，打开恢复面板" title="宠物状态暂不可用" :aria-expanded="panelOpen" @click="panelOpen = !panelOpen"><PetIcon name="refresh" /></button>
     </aside>
@@ -159,7 +166,8 @@ onBeforeUnmount(() => {
       <div v-if="pets.pet" class="desktop-stats"><span>饱食 <b>{{ pets.pet.hunger }}</b></span><span>水分 <b>{{ pets.pet.water }}</b></span><span>心情 <b>{{ pets.pet.mood }}</b></span><span>精力 <b>{{ pets.pet.energy }}</b></span></div>
       <PetActions v-if="pets.pet" compact />
       <PetFeedback />
-      <p v-if="pets.pet?.activity" class="desktop-hint">{{ pets.pet.activity.endsAt > now ? '正在休息，可以提前唤醒。' : '休息已结束，正在核对状态。' }}</p>
+      <p v-if="pets.pet?.activity" class="desktop-hint">{{ activityText }}</p>
+      <RouterLink v-if="pets.pet?.activity && pets.pet.activity.kind !== 'rest'" class="desktop-activity-link" to="/pets#pet-activities" @click="panelOpen = false">{{ activityClaimable ? '回家领取成果' : '查看活动' }} <span aria-hidden="true">↗</span></RouterLink>
     </section>
   </Teleport>
 </template>
@@ -177,11 +185,13 @@ onBeforeUnmount(() => {
 .desktop-name { display: flex; align-items: center; justify-content: center; gap: 5px; width: max-content; max-width: 100%; padding: 4px 8px; border: 1px solid var(--fp-border); border-radius: 7px; background: var(--fp-card); font-size: 11px; overflow-wrap: anywhere; }.desktop-name small { font-size: 10px; color: var(--fp-muted); white-space: nowrap; }
 .pet-recovery { display: grid; place-items: center; width: 48px; height: 48px; margin: 4px auto 0; border: 1px solid var(--fp-border); border-radius: 12px; color: var(--fp-muted); background: var(--fp-card); cursor: pointer; }
 .desktop-sleep { position: absolute; top: 18px; right: 15px; font-weight: 700; font-size: 16px; color: var(--fp-muted); }
+.desktop-activity { position: absolute; right: 12px; top: 16px; display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-primary); background: var(--fp-card); }.desktop-activity svg { width: 15px; height: 15px; }.collapsed .desktop-activity { width: 20px; height: 20px; right: -4px; top: -5px; border-radius: 6px; }.collapsed .desktop-activity svg { width: 12px; height: 12px; }
 .collapsed .pet-character { border: 1px solid var(--fp-border); border-radius: 14px; background: var(--fp-card); box-shadow: 0 4px 16px rgb(0 0 0 / .06); }.collapsed .desktop-sleep { top: 2px; right: 5px; font-size: 12px; }.collapsed .desktop-tools { margin-bottom: 4px; }.collapsed .desktop-tools button { width: 24px; height: 24px; }
 .pet-desktop-panel { position: fixed; z-index: 36; padding: 14px; border: 1px solid var(--fp-border); border-radius: 14px; background: var(--fp-card); color: var(--fp-text); box-shadow: 0 10px 36px rgb(0 0 0 / .12); max-height: calc(100dvh - 100px); overflow: auto; }
 .pet-desktop-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; }.pet-desktop-panel header > div { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }.pet-desktop-panel strong { font-size: 14px; overflow-wrap: anywhere; }.pet-desktop-panel header span { color: var(--fp-muted); font-size: 11px; }.pet-desktop-panel header a { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--fp-muted); }.pet-desktop-panel header a:hover { color: var(--fp-primary); background: var(--fp-hover); }.pet-desktop-panel header svg { width: 17px; height: 17px; }
 .desktop-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 0 0 12px; border-bottom: 1px solid var(--fp-border); margin-bottom: 8px; }.desktop-stats span { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--fp-muted); }.desktop-stats b { color: var(--fp-text); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .desktop-hint { margin: 8px 0 0; color: var(--fp-muted); font-size: 11px; }.pet-desktop-panel :deep(.pet-feedback) { margin-top: 8px; font-size: 11px; }
+.desktop-activity-link { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 8px 10px; border-radius: 7px; background: var(--fp-primary-soft); color: var(--fp-primary); font-size: 12px; text-decoration: none; }.desktop-activity-link:hover { text-decoration: underline; }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
 @media (hover: none) { .desktop-tools { opacity: 1; }.desktop-tools button { width: 32px; height: 32px; } }
 @media (prefers-reduced-motion: reduce) { .desktop-tools, .pet-character img { transition: none; } }

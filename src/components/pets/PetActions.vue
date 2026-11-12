@@ -8,17 +8,19 @@ import { petDuration, usePetClock } from './usePetClock'
 defineProps<{ compact?: boolean }>()
 const pets = usePetsStore()
 const { now } = usePetClock()
-const resting = computed(() => !!pets.pet?.activity)
+const occupied = computed(() => !!pets.pet?.activity)
+const resting = computed(() => pets.pet?.activity?.kind === 'rest')
+const occupiedHint = computed(() => resting.value ? '休息时暂不能进行其他互动' : '当前活动结束并领取成果后，才能继续照顾')
 const actions = computed<{ id: PetAction; label: string; hint: string; blocked: boolean }[]>(() => {
   const pet = pets.pet
   if (!pet) return []
   const until = pet.activity?.endsAt ?? 0
   return [
-    { id: 'feed', label: '喂食', hint: pets.foodQuantity ? `余 ${pets.foodQuantity} 份口粮` : '背包里没有口粮了', blocked: resting.value || !pets.foodQuantity || pet.hunger >= 100 },
-    { id: 'water', label: '饮水', hint: pet.water >= 100 ? '水分充足' : '补充水分', blocked: resting.value || pet.water >= 100 },
-    { id: 'pet', label: '抚摸', hint: pet.cooldowns.pet > now.value ? `${petDuration(pet.cooldowns.pet - now.value)}后` : '陪伴一下', blocked: resting.value || pet.cooldowns.pet > now.value },
-    { id: 'play', label: '玩耍', hint: pet.cooldowns.play > now.value ? `${petDuration(pet.cooldowns.play - now.value)}后` : pet.energy < 10 ? '需要先休息' : '消耗 10 精力', blocked: resting.value || pet.cooldowns.play > now.value || pet.energy < 10 },
-    { id: resting.value ? 'wake' : 'rest', label: resting.value ? '唤醒' : '休息', hint: resting.value ? until > now.value ? `${petDuration(until - now.value)}后结束` : '休息已结束' : '恢复精力', blocked: resting.value ? until <= now.value : pet.energy >= 100 },
+    { id: 'feed', label: '喂食', hint: pets.foodQuantity ? `余 ${pets.foodQuantity} 份口粮` : '背包里没有口粮了', blocked: occupied.value || !pets.foodQuantity || pet.hunger >= 100 },
+    { id: 'water', label: '饮水', hint: pet.water >= 100 ? '水分充足' : '补充水分', blocked: occupied.value || pet.water >= 100 },
+    { id: 'pet', label: '抚摸', hint: pet.cooldowns.pet > now.value ? `${petDuration(pet.cooldowns.pet - now.value)}后` : '陪伴一下', blocked: occupied.value || pet.cooldowns.pet > now.value },
+    { id: 'play', label: '玩耍', hint: pet.cooldowns.play > now.value ? `${petDuration(pet.cooldowns.play - now.value)}后` : pet.energy < 10 ? '需要先休息' : '消耗 10 精力', blocked: occupied.value || pet.cooldowns.play > now.value || pet.energy < 10 },
+    { id: resting.value ? 'wake' : 'rest', label: resting.value ? '唤醒' : '休息', hint: resting.value ? until > now.value ? `${petDuration(until - now.value)}后结束` : '结束休息' : '恢复精力', blocked: !resting.value && (occupied.value || pet.energy >= 100) },
   ]
 })
 function run(action: PetAction, blocked: boolean) {
@@ -28,7 +30,7 @@ function run(action: PetAction, blocked: boolean) {
 </script>
 <template>
   <div class="pet-actions" :class="{ compact }" aria-label="照顾宠物">
-    <button v-for="action in actions" :key="action.id" type="button" :disabled="action.blocked || pets.loading || pets.busy || !!pets.pending || pets.refreshNeeded" :title="resting && action.id !== 'wake' ? '休息时暂不能进行其他互动' : action.hint" @click="run(action.id, action.blocked)">
+    <button v-for="action in actions" :key="action.id" type="button" :disabled="action.blocked || pets.loading || pets.busy || !!pets.pending || pets.refreshNeeded" :title="occupied && action.id !== 'wake' ? occupiedHint : action.hint" @click="run(action.id, action.blocked)">
       <PetIcon :name="action.id" /><span>{{ action.label }}</span><small v-if="!compact">{{ action.hint }}</small>
     </button>
   </div>

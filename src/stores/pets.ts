@@ -4,7 +4,7 @@ import { ApiError, getAuthContextVersion } from '@/api/http'
 import { profileOperationKey } from '@/api/v3-profile'
 import {
   executePetCommand, normalizePetName, readPetCatalog, readPetState,
-  type PetAction, type PetCatalog, type PetCommand, type PetSpeciesId, type PetState,
+  type PetAction, type PetActivityKind, type PetCatalog, type PetCommand, type PetSpeciesId, type PetState,
 } from '@/api/v3-pets'
 import { useAuthStore } from '@/stores/auth'
 
@@ -182,6 +182,10 @@ export const usePetsStore = defineStore('pets', () => {
           // 价格版本被明确拒绝后，先让用户更新目录，不能继续按旧价格创建新命令。
           catalog.value = null
           catalogError.value = description
+        } else if (command.kind === 'activities/claim' && reason.status === 409 && reason.code === 'activity_claimed') {
+          // 其他设备已领取时只核对一次当前状态；读错保留读取恢复入口，不重新领取。
+          refreshNeeded.value = true
+          await loadState()
         } else {
           error.value = description
         }
@@ -214,6 +218,8 @@ export const usePetsStore = defineStore('pets', () => {
   }
   function act(action: PetAction, itemId?: string): Promise<boolean> {
     if (!canWrite() || !pet.value) return Promise.resolve(false)
+    const activity = pet.value.activity
+    if (activity && (activity.kind !== 'rest' || action !== 'wake')) return Promise.resolve(false)
     return execute({ kind: 'actions', petId: pet.value.id, action, ...(itemId ? { itemId } : {}), key: profileOperationKey() })
   }
   function claimSupply(): Promise<boolean> {
@@ -227,6 +233,26 @@ export const usePetsStore = defineStore('pets', () => {
       return Promise.resolve(false)
     }
     return execute({ kind: 'purchases', petId: pet.value.id, itemId: 'food', quantity, catalogVersion: catalog.value.version, key: profileOperationKey() })
+  }
+  function startActivity(kind: PetActivityKind, entryId: string): Promise<boolean> {
+    if (!canWrite() || !pet.value || !catalog.value || pet.value.activity) return Promise.resolve(false)
+    const entries = kind === 'outing' ? catalog.value.places : kind === 'course' ? catalog.value.courses : []
+    const entry = entries.find(entry => entry.id === entryId)
+    if (!entry) return Promise.resolve(false)
+    const cost = entry.cost
+    if ((coins.value ?? 0) < cost.coins || pet.value.energy < cost.energy
+        || pet.value.hunger < cost.hunger || pet.value.water < cost.water) return Promise.resolve(false)
+    return execute({ kind: 'activities', petId: pet.value.id, activityKind: kind, entryId,
+      activityVersion: catalog.value.activityVersion, key: profileOperationKey() })
+  }
+  function claimActivity(): Promise<boolean> {
+    if (!canWrite() || !pet.value || !state.value) return Promise.resolve(false)
+    const activity = pet.value.activity
+    if (!activity || activity.kind === 'rest') return Promise.resolve(false)
+    // 本地计时仅决定按钮是否可用，成果与结束时间仍由服务器在领取事务中核验。
+    const now = state.value.serverNow + Math.max(0, Date.now() - receivedAt.value)
+    if (activity.status !== 'claimable' && now < activity.endsAt) return Promise.resolve(false)
+    return execute({ kind: 'activities/claim', petId: pet.value.id, activityId: activity.id, key: profileOperationKey() })
   }
   function retryPending(): Promise<boolean> {
     return pending.value ? execute(pending.value, true) : Promise.resolve(false)
@@ -250,6 +276,6 @@ export const usePetsStore = defineStore('pets', () => {
   return {
     state, catalog, pet, coins, foodQuantity, ready, receivedAt,
     loading, catalogLoading, error, catalogError, busy, pending, pendingError, refreshNeeded,
-    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, retryPending,
+    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, startActivity, claimActivity, retryPending,
   }
 })

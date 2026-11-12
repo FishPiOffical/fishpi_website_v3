@@ -8,9 +8,11 @@ import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
 import { usePetDisplayStore } from '@/stores/petDisplay'
 import PetActions from '@/components/pets/PetActions.vue'
+import PetActivities from '@/components/pets/PetActivities.vue'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetIcon from '@/components/pets/PetIcon.vue'
-import { petDuration, usePetClock } from '@/components/pets/usePetClock'
+import { usePetClock } from '@/components/pets/usePetClock'
+import { petActivityStatus } from '@/components/pets/petActivityStatus'
 
 usePageSeo(() => ({ title: '宠物家园', path: '/pets', description: '领养你的摸鱼伙伴，照顾它，一起慢慢长大。', robots: 'noindex,follow' }))
 const auth = useAuthStore(), pets = usePetsStore(), display = usePetDisplayStore()
@@ -28,10 +30,8 @@ const speciesName = computed(() => pets.catalog?.species.find(species => species
 const food = computed(() => pets.catalog?.items.find(item => item.id === 'food'))
 const locked = computed(() => pets.busy || !!pets.pending || pets.refreshNeeded || pets.loading)
 const catalogErrorText = computed(() => /JSON|HTTP|SQL|fetch|network|token|stack|接口|数据格式/i.test(pets.catalogError) ? '宠物目录暂时不可用，请稍后重试。' : pets.catalogError)
-const restText = computed(() => {
-  const end = pets.pet?.activity?.endsAt
-  return end ? end > now.value ? `休息中 · 还剩 ${petDuration(end - now.value)}` : '休息已结束' : '在家等你'
-})
+const activityText = computed(() => petActivityStatus(pets.pet?.activity ?? null, now.value))
+const resting = computed(() => pets.pet?.activity?.kind === 'rest')
 const stats = computed(() => pets.pet ? [
   { key: 'hunger', label: '饱食', icon: 'feed' as const, value: pets.pet.hunger },
   { key: 'water', label: '水分', icon: 'water' as const, value: pets.pet.water },
@@ -110,22 +110,24 @@ onMounted(() => { mounted.value = true; display.restore(); load() })
         <section class="pet-home pet-panel" aria-label="我的宠物">
           <div class="companion">
             <header class="companion-heading"><span class="species-label">{{ speciesName }}</span><span class="level-label">Lv. {{ pets.pet.level }}</span></header>
-            <div class="pet-scene" :class="{ resting: !!pets.pet.activity }"><div class="scene-halo" aria-hidden="true" /><img :src="`/images/pets/${pets.pet.speciesId}.webp`" :alt="pets.pet.name" width="256" height="256" /><span v-if="pets.pet.activity" class="sleep-mark" aria-hidden="true">Z z</span></div>
+            <div class="pet-scene" :class="{ resting }"><div class="scene-halo" aria-hidden="true" /><img :src="`/images/pets/${pets.pet.speciesId}.webp`" :alt="pets.pet.name" width="256" height="256" /><span v-if="resting" class="sleep-mark" aria-hidden="true">Z z</span><span v-else-if="pets.pet.activity" class="activity-mark" aria-hidden="true"><PetIcon :name="pets.pet.activity.kind" /></span></div>
             <div v-if="!editingName" class="pet-name"><h2>{{ pets.pet.name }}</h2><button type="button" class="icon-button" :disabled="locked" aria-label="修改宠物名字" title="修改名字" @click="startRename"><PetIcon name="edit" /></button></div>
             <form v-else class="rename-form" @submit.prevent="rename"><label class="sr-only" for="pet-name">宠物名字</label><input id="pet-name" v-model="renameDraft" :disabled="locked" autocomplete="off" autofocus /><button type="submit" class="icon-button" :disabled="locked" aria-label="保存宠物名字" title="保存名字"><PetIcon name="check" /></button><button type="button" class="icon-button" :disabled="pets.busy" aria-label="取消修改名字" title="取消" @click="editingName = false"><PetIcon name="close" /></button></form>
             <p v-if="editingName" class="rename-count">{{ petNameLength(renameDraft) }} / {{ pets.catalog?.rules.maxNameLength ?? 12 }}</p>
             <p v-if="nameError" class="form-error" role="alert">{{ nameError }}</p>
-            <p class="pet-status"><span :class="{ sleeping: !!pets.pet.activity }" />{{ restText }}</p>
+            <p class="pet-status"><span :class="{ sleeping: resting }" />{{ activityText }}</p>
             <div class="growth-info"><span>累计经验 <strong>{{ pets.pet.experience }}</strong></span><span>亲密度 <strong>{{ pets.pet.friendship }}</strong></span></div>
           </div>
           <div class="care-panel">
             <header class="care-heading"><h2>今天也要好好照顾它</h2><button type="button" class="icon-button" :disabled="pets.loading || pets.busy" aria-label="刷新宠物状态" title="刷新状态" @click="pets.refresh()"><PetIcon name="refresh" /></button></header>
             <div class="pet-stats"><div v-for="stat in stats" :key="stat.key" class="pet-stat" :class="[stat.key, { low: stat.value < 25 }]"><div><span><PetIcon :name="stat.icon" />{{ stat.label }}</span><strong>{{ stat.value }}<small> / 100</small></strong></div><div class="stat-track" role="progressbar" :aria-label="stat.label" :aria-valuenow="stat.value" :aria-valuemin="0" :aria-valuemax="100"><span :style="{ width: `${stat.value}%` }" /></div></div></div>
             <PetActions />
-            <p class="care-note">{{ pets.pet.activity ? '休息时暂停其他互动，想提前见面也可以唤醒它。' : '不在身边时也会慢慢消耗状态，休息可以恢复精力。' }}</p>
+            <p class="care-note">{{ resting ? '休息时暂停其他互动，想提前见面也可以唤醒它。' : pets.pet.activity ? '这次活动结束并领取成果后，就可以继续照顾它了。' : '不在身边时也会慢慢消耗状态，休息可以恢复精力。' }}</p>
             <div class="daily-growth"><span>今日成长</span><strong>{{ pets.pet.growthToday.used }} / {{ pets.pet.growthToday.limit }}</strong></div>
           </div>
         </section>
+
+        <PetActivities />
 
         <div class="supplies-grid">
           <section class="supply-panel pet-panel" aria-labelledby="supply-title"><div class="supply-icon"><PetIcon name="gift" /></div><div class="supply-copy"><h2 id="supply-title">每日补给</h2><p>{{ pets.state.dailySupply.coins }} 宠物币 <span>＋</span> {{ pets.state.dailySupply.food }} 份口粮</p></div><button type="button" :class="pets.state.dailySupply.claimed ? 'pet-secondary' : 'pet-primary'" :disabled="locked || pets.state.dailySupply.claimed" @click="pets.claimSupply()">{{ pets.state.dailySupply.claimed ? '今日已领取' : '领取补给' }}</button></section>
@@ -166,6 +168,7 @@ button:disabled { opacity: .5; cursor: default; }button:focus-visible, a:focus-v
 .name-input:focus-within { border-color: var(--fp-primary); box-shadow: var(--fp-focus-ring); }
 .name-input #pet-adoption-name { min-height: 42px; padding: 10px 12px; border: 0; background: transparent; box-shadow: none; outline: none; }
 .pet-stat > .stat-track > span { display: block; height: 100%; }
+.activity-mark { position: absolute; top: 15%; right: 9%; display: grid; place-items: center; width: 36px; height: 36px; z-index: 2; border: 1px solid var(--fp-border); border-radius: 10px; color: var(--fp-primary); background: var(--fp-card); }
 @media (max-width: 1000px) { .supplies-grid { grid-template-columns: 1fr; }.pet-home { grid-template-columns: minmax(240px, .8fr) minmax(0, 1fr); }.care-panel { padding: 24px 20px; }.pet-stats { gap: 20px 16px; } }
 @media (max-width: 720px) { .page-heading { margin-bottom: 16px; }.page-heading h1 { font-size: 24px; }.pet-home { grid-template-columns: 1fr; }.companion { padding: 20px; }.pet-scene { margin-top: -18px; margin-bottom: 0; }.pet-scene img { width: 220px; }.care-panel { border-left: 0; border-top: 1px solid var(--fp-border); padding: 20px; }.species-options { grid-template-columns: 1fr 1fr; gap: 10px; }.species-option img { max-width: 140px; }.adoption { padding: 20px; }.adoption-form { flex-direction: column; align-items: stretch; }.name-input { max-width: none; }.desktop-settings { flex-direction: column; align-items: flex-start; gap: 12px; }.desktop-buttons { width: 100%; justify-content: space-between; }.section-heading h2 { font-size: 20px; }.pet-wallet { gap: 6px; padding: 10px 12px; }.pet-wallet strong { font-size: 18px; } }
 @media (max-width: 390px) { .care-panel, .adoption { padding: 16px; }.pet-stats { gap: 20px 12px; }.pet-wallet > span { display: none; }.food-panel .buy-food { width: 100%; justify-content: flex-end; }.supply-panel, .food-panel { padding: 16px; }.supply-panel .pet-primary, .supply-panel .pet-secondary { padding-inline: 10px; font-size: 12px; }.species-description { font-size: 11px; } }

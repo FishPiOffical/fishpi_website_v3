@@ -61,17 +61,24 @@ async function compileFile(file) {
   await fs.writeFile(target, ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
   return url
 }
-const catalog = { version: 1, species: [
+const skillNames = { vitality: '体能', exploration: '探索', knowledge: '知识', expression: '表达', crafting: '手作', kindness: '亲和' }
+const entry = (id, name, durationMs, coins, skill) => ({ id, name, description: '本地测试活动', durationMs,
+  cost: { coins, energy: 8, hunger: 4, water: 4 }, rewards: { experience: 5, food: 1, mood: 3, skills: [{ id: skill, experience: 7 }] } })
+const catalog = { version: 1, activityVersion: 1, species: [
   { id: 'momota', name: '摸摸獭', description: '水边的小伙伴' }, { id: 'hexiaotun', name: '荷小豚', description: '戴荷叶帽的小伙伴' },
   { id: 'yubingmiao', name: '鱼饼喵', description: '好奇的小伙伴' }, { id: 'paixiaoyu', name: '派小鱼', description: '熟悉的小伙伴' },
-], items: [{ id: 'food', name: '基础口粮', price: 5, hunger: 35 }], rules: { maxNameLength: 12, initialCoins: 100, initialFood: 6,
+], items: [{ id: 'food', name: '基础口粮', price: 5, hunger: 35 }],
+  skills: Object.entries(skillNames).map(([id, name]) => ({ id, name, description: '本地测试技能' })),
+  places: [entry('plaza', '广场散步', 300000, 0, 'vitality'), entry('river', '河岸探索', 900000, 3, 'exploration'), entry('forest', '林间远足', 1800000, 5, 'exploration')],
+  courses: Object.entries(skillNames).map(([id, name]) => entry(`basic-${id}`, `${name}入门`, 600000, 5, id)),
+  rules: { maxNameLength: 12, initialCoins: 100, initialFood: 6,
   dailyCoins: 20, dailyFood: 2, restDurationMs: 14400000, restEnergyPerHour: 20, growthDailyLimit: 10 } }
 const now = Date.now()
 const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 1, wallet: { coins: 0 }, inventory: [],
   dailySupply: { claimed: false, coins: 20, food: 2 }, pet: null })
 const adopted = (id = 'pet-a', name = '我的小鱼', speciesId = 'momota') => ({ ...empty(), wallet: { coins: 100 }, inventory: [{ itemId: 'food', quantity: 6 }], pet: {
   id, name, speciesId, hunger: 90, water: 90, mood: 90, energy: 80, experience: 0, level: 1, friendship: 0, adoptedAt: now,
-  activity: null, cooldowns: { pet: 0, play: 0 }, growthToday: { used: 0, limit: 10 },
+  activity: null, skills: Object.keys(skillNames).map(id => ({ id, level: 1, experience: 0 })), cooldowns: { pet: 0, play: 0 }, growthToday: { used: 0, limit: 10 },
 } })
 let serverState = empty()
 const response = data => ({ code: 0, data: structuredClone(data) })
@@ -79,6 +86,22 @@ const success = async (url, options) => {
   if (options?.method) {
     const body = JSON.parse(options.body), kind = url.split('/').at(-1)
     if (kind === 'adoption') serverState = adopted('pet-a', body.name, body.speciesId)
+    if (kind === 'activities') {
+      const choice = catalog[body.kind === 'outing' ? 'places' : 'courses'].find(item => item.id === body.entryId)
+      serverState.pet.activity = { id: `activity-${serial}`, kind: body.kind, entryId: choice.id, name: choice.name, startedAt: now, endsAt: now + choice.durationMs, status: 'running', cost: choice.cost, rewards: choice.rewards }
+      serverState.wallet.coins -= choice.cost.coins
+      for (const key of ['energy', 'hunger', 'water']) serverState.pet[key] -= choice.cost[key]
+      return response({ operation: 'activity-start', petId: serverState.pet.id, activityId: serverState.pet.activity.id, committedAt: now })
+    }
+    if (kind === 'claim') {
+      const activity = serverState.pet.activity
+      serverState.pet.experience += activity.rewards.experience
+      serverState.inventory[0].quantity += activity.rewards.food
+      for (const skill of activity.rewards.skills) serverState.pet.skills.find(value => value.id === skill.id).experience += skill.experience
+      serverState.pet.activity = null
+      return response({ operation: 'activity-claim', petId: serverState.pet.id, activityId: activity.id, committedAt: now })
+    }
+    if (kind === 'actions' && body.action === 'wake') serverState.pet.activity = null
     return response({ operation: kind === 'actions' ? body.action : kind === 'purchases' ? 'purchase' : kind, petId: serverState.pet?.id, committedAt: now })
   }
   return response(url.endsWith('/catalog') ? catalog : serverState)
@@ -175,6 +198,96 @@ try {
   const petAction = [...document.querySelectorAll('.pet-actions button')].find(button => button.textContent.includes('抚摸'))
   assert(/\d+ 秒后/.test(petAction.textContent), '倒计时必须基于共享状态接收时间，不从组件新挂载重新计时')
   console.log('PASS 缓存状态的冷却倒计时使用共享接收时间')
+
+  serverState = adopted('pet-b', '小伙伴'); await pets.refresh(); await settle()
+  const beforeTabs = calls.length
+  assert.equal(document.querySelectorAll('.activity-option').length, 3)
+  assert.equal(document.querySelectorAll('.pet-skill').length, 6)
+  await click(document.querySelector('#pet-course-tab'))
+  assert.equal(document.querySelectorAll('.activity-option').length, 6)
+  document.querySelector('#pet-course-tab').dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true })); await settle()
+  assert.equal(document.activeElement.id, 'pet-outing-tab')
+  assert.equal(calls.length, beforeTabs, '活动目录切换应使用已读目录，不额外请求')
+  console.log('PASS 三个地点、六门课程与六项真实技能，标签支持键盘切换且不新增读取')
+
+  const startWait = deferred(), beforeStart = writes().length
+  let startedRequest
+  handler = (url, options) => { if (options?.method) { startedRequest = { url, options }; return startWait.promise } return success(url, options) }
+  const startButton = document.querySelector('[aria-label="开始河岸探索"]')
+  await click(startButton); await click(startButton)
+  assert.equal(writes().length, beforeStart + 1)
+  assert.equal(document.querySelector('.pet-feedback.pending'), null)
+  startWait.resolve(await success(startedRequest.url, startedRequest.options)); await settle()
+  handler = success
+  assert.equal(pets.pet.activity.kind, 'outing')
+  assert.equal(pets.coins, 97)
+  assert.equal(pets.pet.energy, 72)
+  assert.equal(document.querySelector('.desktop-sleep'), null, '外出不能被渲染为睡觉')
+  assert(document.querySelector('.desktop-activity'))
+  assert([...document.querySelectorAll('.care-panel .pet-actions button')].every(button => button.disabled))
+  assert([...document.querySelectorAll('.activity-option button')].every(button => button.disabled))
+  assert(!document.querySelector('.care-panel .pet-actions').textContent.includes('唤醒'))
+  assert.equal(document.querySelector('.current-activity.claimable'), null)
+  console.log('PASS 外出双击仅一写，消费由当前读取更新，活动占用时照顾与再次出发禁用')
+
+  const beforeExpiry = calls.length, coinsBeforeExpiry = pets.coins, experienceBeforeExpiry = pets.pet.experience
+  pets.receivedAt = Date.now() - 901000; await settle()
+  assert(document.querySelector('.current-activity.claimable'))
+  assert.equal(calls.length, beforeExpiry, '活动到期只更新倒计时，不触发逐秒读取或自动领奖')
+  assert.equal(pets.coins, coinsBeforeExpiry)
+  assert.equal(pets.pet.experience, experienceBeforeExpiry)
+  assert([...document.querySelectorAll('.care-panel .pet-actions button')].every(button => button.disabled), '待领取也必须占用活动位置')
+  const claimWait = deferred(), beforeClaim = writes().length
+  let claimRequest
+  handler = (url, options) => { if (options?.method) { claimRequest = { url, options }; return claimWait.promise } return success(url, options) }
+  const claimButton = document.querySelector('.activity-primary')
+  await click(claimButton); await click(claimButton)
+  assert.equal(writes().length, beforeClaim + 1)
+  claimWait.resolve(await success(claimRequest.url, claimRequest.options)); await settle(); handler = success
+  assert.equal(pets.pet.activity, null)
+  assert.equal(pets.pet.experience, 5)
+  assert.equal(pets.pet.skills.find(skill => skill.id === 'exploration').experience, 7)
+  assert.equal(document.querySelector('.current-activity'), null)
+  assert(!document.querySelector('[aria-label="开始广场散步"]').disabled)
+  console.log('PASS 到期不自动发奖或读取，显式领取去重并通过当前状态更新技能和成长')
+
+  serverState.wallet.coins = 0; serverState.pet.energy = 0; await pets.refresh(); await settle()
+  assert(document.querySelector('[aria-label="开始广场散步"]').disabled)
+  assert(document.querySelector('[aria-label="开始广场散步"]').title.includes('精力不足'))
+  await click(document.querySelector('#pet-course-tab'))
+  assert([...document.querySelectorAll('.activity-option button')].every(button => button.disabled))
+  assert(document.querySelector('.shortage').textContent.includes('宠物币不足'))
+  serverState = adopted('pet-b', '小伙伴'); await pets.refresh(); await settle()
+  handler = (url, options) => options?.method ? Promise.reject(new Error('模拟课程响应断流')) : success(url, options)
+  await click(document.querySelector('[aria-label="开始知识入门"]'))
+  assert.equal(pets.pending.kind, 'activities')
+  const courseKey = pets.pending.key, originalCourse = JSON.parse(writes().at(-1).options.body)
+  await click(document.querySelector('#pet-outing-tab'))
+  auth.accessToken = 'token-b-next'; await settle()
+  assert.equal(pets.pending.key, courseKey)
+  handler = success
+  await click(document.querySelector('[aria-label="核对上次宠物操作"]'))
+  assert.equal(writes().at(-1).options.headers['Idempotency-Key'], courseKey)
+  assert.deepEqual(JSON.parse(writes().at(-1).options.body), originalCourse)
+  assert.equal(pets.pet.activity.kind, 'course')
+  assert.equal(document.querySelector('.desktop-sleep'), null)
+  assert(document.querySelector('.current-copy').textContent.includes('本次课程'))
+  console.log('PASS 资源不足禁用开始，课程未知结果在切换标签和令牌轮换后仍恢复原命令')
+
+  serverState.pet.activity.status = 'claimable'
+  serverState.pet.activity.startedAt = now - 601000; serverState.pet.activity.endsAt = now - 1000
+  await pets.refresh(); await settle()
+  handler = (url, options) => url.endsWith('/catalog') ? Promise.reject(new ApiError('宠物目录暂不可用', 503)) : success(url, options)
+  await pets.reloadCatalog(); await settle()
+  assert.equal(pets.catalog, null)
+  assert(document.querySelector('.current-activity.claimable'))
+  assert(document.querySelector('.current-rewards').textContent.includes('知识 +7'))
+  assert.equal(document.querySelectorAll('.pet-skill').length, 6)
+  assert(!document.querySelector('.activity-primary').disabled)
+  await click(document.querySelector('.activity-primary'))
+  assert.equal(pets.pet.activity, null)
+  assert.equal(pets.pet.skills.find(skill => skill.id === 'knowledge').experience, 7)
+  console.log('PASS 目录读取失败保留当前活动快照、技能与领取入口，不依赖目录重读才领奖')
 } finally {
   app?.unmount()
   await fs.rm(temporary, { recursive: true, force: true })
