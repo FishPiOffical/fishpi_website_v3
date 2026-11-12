@@ -96,6 +96,15 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
   let retry: ReturnType<typeof setTimeout> | null = null
   let deadline: ReturnType<typeof setTimeout> | null = null
   let heartbeat: ReturnType<typeof setInterval> | null = null
+  let checkConnection: (() => void) | null = null
+  const resume = () => {
+    if (typeof document === 'undefined' || document.visibilityState === 'visible') checkConnection?.()
+  }
+  const online = () => { if (current() && socket) reconnect() }
+  window.addEventListener?.('focus', resume)
+  window.addEventListener?.('pageshow', resume)
+  window.addEventListener?.('online', online)
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', resume)
   const current = () => !stopped && getAccessToken() === token
   function timers() {
     if (deadline) clearTimeout(deadline)
@@ -103,6 +112,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
     deadline = null; heartbeat = null
   }
   function retire() {
+    checkConnection = null
     connectionState?.('closed')
     if (presenceNotify) presenceListeners.delete(presenceNotify)
     presenceNotify = null
@@ -121,6 +131,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
     retry = setTimeout(() => { retry = null; void connect() }, Math.min(1000 * 2 ** Math.min(attempts++, 5), 30_000))
   }
   async function connect() {
+    if (!current()) return
     const turn = ++sequence
     connectionState?.('connecting')
     try {
@@ -137,7 +148,25 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
       const transport = new WebSocket(endpoint.href)
       socket = transport
       let authenticated = false, sent = false
+      let lastPing = 0, lastPong = 0
+      const openedAt = Date.now()
       const valid = () => current() && turn === sequence && socket === transport
+      // Reuse the one heartbeat interval. Wall time detects suspended timers and
+      // half-open sockets; business pushes/presence never count as heartbeats.
+      const healthy = () => {
+        if (!valid()) return false
+        const now = Date.now()
+        if (transport.readyState !== WebSocket.OPEN ||
+          (authenticated ? now - lastPing >= 60_000 || now - lastPong >= 60_000 : now - openedAt >= 5000)) {
+          reconnect()
+          return false
+        }
+        return true
+      }
+      checkConnection = () => {
+        if (transport.readyState !== WebSocket.CONNECTING) healthy()
+        else if (Date.now() - openedAt >= 5000 && valid()) reconnect()
+      }
       const authenticate = () => {
         if (!valid() || sent) return
         sent = true
@@ -150,10 +179,12 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
         if (!valid()) return
         try {
           const message = JSON.parse(event.data) as { type?: unknown; data?: { presenceControl?: boolean; channel?: unknown; articleId?:unknown;messageId?:unknown;revision?:unknown;message?:unknown;reactions?:unknown;reactionsUnavailable?:unknown } }
+          if (message.type === 'pong') { if (authenticated) lastPong = Date.now(); return }
           if (message.type === 'authentication.required') { authenticate(); return }
           if (message.type === 'ready') {
             if (authenticated || !sent || message.data?.channel !== channel || (articleId!==undefined&&message.data?.articleId!==articleId)) { reconnect(); return }
             authenticated = true; attempts = 0
+            lastPing = lastPong = Date.now()
             if (channel === 'chat' && message.data?.presenceControl === true) {
               const notify = () => { if (valid() && transport.readyState === WebSocket.OPEN) transport.send(JSON.stringify({ type: 'chat.presence', active: chatPresenceWanted })) }
               presenceNotify = notify
@@ -162,8 +193,13 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
               notify()
             }
             connectionState?.('ready')
+            if (!valid()) return
             if (deadline) clearTimeout(deadline); deadline = null
-            heartbeat = setInterval(() => { if (valid() && transport.readyState === WebSocket.OPEN) transport.send('{"type":"ping"}') }, 25_000)
+            heartbeat = setInterval(() => {
+              if (!healthy()) return
+              try { transport.send('{"type":"ping"}'); lastPing = Date.now() }
+              catch { if (valid()) reconnect() }
+            }, 25_000)
             const reconnecting = hasConnected
             hasConnected = true
             // 未读数在首次订阅就绪后读取，重连就绪后补读断线期间的变更。
@@ -201,7 +237,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
               chatEvent?.({type:'message',id,revision,...(snapshot ? {message:snapshot} : {})})
             }
           } else if (authenticated && (channel==='article'?message.type==='article.changed'&&message.data?.articleId===articleId:message.type===`${channel}.changed`)) changed()
-        } catch { reconnect() }
+        } catch { if (valid()) reconnect() }
       }
       transport.onerror = () => { if (valid()) reconnect() }
       transport.onclose = () => { if (valid()) reconnect() }
@@ -222,5 +258,13 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
     }
   }
   void connect()
-  return () => { stopped = true; sequence++; if (retry) clearTimeout(retry); retry = null; retire() }
+  return () => {
+    stopped = true; sequence++
+    window.removeEventListener?.('focus', resume)
+    window.removeEventListener?.('pageshow', resume)
+    window.removeEventListener?.('online', online)
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', resume)
+    if (retry) clearTimeout(retry)
+    retry = null; retire()
+  }
 }
