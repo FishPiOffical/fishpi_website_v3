@@ -10,9 +10,13 @@ import { consumeBreezemoonPagePayload } from '@/seo/payload'
 import BreezemoonComposer from './BreezemoonComposer.vue'
 import BreezemoonList from './BreezemoonList.vue'
 const props=withDefaults(defineProps<{size?:number;previewLimit?:number;compact?:boolean;avatarOnly?:boolean;manage?:boolean;ssrScope?:'global'|'home'}>(),{size:20,compact:false,avatarOnly:false,manage:false})
+const emit = defineEmits<{ summary: [text: string] }>()
 const{accessToken,account}=storeToRefs(useAuthStore()),operations=useV3BreezemoonStore(),editor=ref<{id:string;content:string}|null>(null),editLoading=ref(false),editError=ref('')
 const bootstrap=props.ssrScope?consumeBreezemoonPagePayload(props.ssrScope):null
 const{mounted,result,loading,error,page,load,move,home}=useBreezemoonFeed(props.size,bootstrap)
+watch([result, loading, error], ([data, pending, failure]) => {
+  emit('summary', pending ? '读取中' : failure ? '暂不可用' : data?.total ? `${data.total} 条动态` : '暂无动态')
+}, { immediate: true })
 const canManage=computed(()=>props.manage&&mounted.value&&!!accessToken.value&&!!account.value)
 async function edit(id:string){
   if(editLoading.value||operations.pending||operations.busy||operations.confirming)return

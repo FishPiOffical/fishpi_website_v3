@@ -6,9 +6,13 @@ import { useV3ActivityStore } from '@/stores/v3Activity'
 import { getAuthContextVersion } from '@/api/http'
 import { useActivityStatus } from '@/composables/useActivityStatus'
 import { fpConfirm } from '@/composables/useDialog'
+const emit = defineEmits<{ summary: [text: string] }>()
 const auth = useAuthStore(), writes = useV3ActivityStore(), { checkin, reward } = useActivityStatus(), mounted = ref(false), confirming = ref(false)
 const loggedIn = computed(() => mounted.value && !!auth.accessToken && !!auth.account?.oId)
 const today = computed(() => checkin.value.value)
+watch([today, checkin.error], ([state, failure]) => {
+  emit('summary', failure ? '暂不可用' : state ? `${state.liveness}% · ${state.checkedIn ? '已签到' : '待签到'}` : '读取中')
+}, { immediate: true })
 const goalProgress = computed(() => {
   const state = today.value
   if (!state) return 0

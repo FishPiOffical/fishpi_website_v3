@@ -4,11 +4,12 @@ import CheckinPanel from '@/components/home/CheckinPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const { isLoggedIn } = storeToRefs(useAuthStore())
+const emit = defineEmits<{ summary: [text: string] }>()
 </script>
 
 <template>
   <div class="activity">
-    <CheckinPanel v-if="isLoggedIn" class="embedded-checkin" />
+    <CheckinPanel v-if="isLoggedIn" class="embedded-checkin" @summary="emit('summary', $event)" />
     <p v-else class="guest-hint">登录后查看今日活跃情况</p>
   </div>
 </template>

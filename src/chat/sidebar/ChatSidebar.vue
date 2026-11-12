@@ -1,22 +1,45 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed, ref, useId } from 'vue'
 import { storeToRefs } from 'pinia'
 import { sidebarModule } from './registry'
 import SidebarIcon from './SidebarIcon.vue'
 import { useChatSidebarStore } from '@/stores/chatSidebar'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
+import { useAppearanceStore } from '@/stores/appearance'
 import { useCountStore } from '@/stores/count'
 import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import { useV3ChatOnlineStore } from '@/stores/v3ChatOnline'
-import { avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
+import { useV3ChatMutesStore } from '@/stores/v3ChatMutes'
+import { findPack } from '@/packs'
+import { avatarThumbnail, avatarUrl, fallbackAvatar } from '@/utils/avatar'
+import type { ChatSidebarModuleId } from './meta'
 
 const sidebar = useChatSidebarStore()
 const { visibleModules, pref } = storeToRefs(sidebar)
 const { connected, connecting, discuss, topicError } = storeToRefs(useChatStore())
-const { isLoggedIn } = storeToRefs(useAuthStore())
+const { isLoggedIn, account } = storeToRefs(useAuthStore())
 const { view: schedule } = storeToRefs(useCountStore())
 const online = useV3ChatOnlineStore()
+const mutes = useV3ChatMutesStore()
+const appearance = useAppearanceStore()
+const theme = computed(() => findPack('theme', appearance.state.theme))
+const profile = computed(() => isLoggedIn.value ? account.value : null)
+const summaries = ref<Partial<Record<ChatSidebarModuleId, string>>>({})
+function updateSummary(module: ChatSidebarModuleId, text: string) {
+  summaries.value[module] = text
+}
+
+const summaryText = computed<Partial<Record<ChatSidebarModuleId, string>>>(() => ({
+  activity: isLoggedIn.value ? summaries.value.activity ?? '读取中' : '登录后可见',
+  ad: '暂无广告',
+  appearance: theme.value?.name,
+  breezemoons: summaries.value.breezemoons ?? '读取中',
+  income: '计算中',
+  mutes: !isLoggedIn.value ? '登录后可见' : mutes.loading ? '读取中' :
+    mutes.total === null ? '暂不可用' : mutes.total === 0 ? '暂无禁言' : `${mutes.total} 人禁言中`,
+  profile: profile.value ? profile.value.userNickname || profile.value.userName : '登录后可见',
+}))
 const onlinePreview = computed(() => online.users.slice(0, 3))
 const topicSummary = computed(() => topicError.value ? '暂不可用' : discuss.value || '暂无话题')
 const incomeAmount = computed(() => {
@@ -77,12 +100,17 @@ const id = useId()
               </span>
               <span v-else class="summary-text summary-muted">{{ !isLoggedIn ? '登录后可见' : online.loading ? '读取中' : '暂不可用' }}</span>
             </span>
+            <span v-else-if="summaryText[mod.id]" class="summary" :class="{ 'summary-accent': mod.id === 'activity' && isLoggedIn }" :title="summaryText[mod.id]">
+              <img v-if="mod.id === 'profile' && profile" class="summary-avatar" :src="avatarThumbnail(avatarUrl(profile), 20)" alt="" @error="fallbackAvatar" />
+              <span v-if="mod.id === 'appearance' && theme" class="theme-swatch" :style="{ background: theme.preview }" aria-hidden="true" />
+              <span class="summary-text">{{ summaryText[mod.id] }}</span>
+            </span>
           </template>
           <SidebarIcon class="chevron" name="chevron" />
         </button>
       </h3>
       <div :id="`${id}-${mod.id}`" v-show="!pref.collapsed.includes(mod.id)" class="card-body">
-        <component :is="sidebarModule(mod.id)?.component" />
+        <component :is="sidebarModule(mod.id)?.component" @summary="updateSummary(mod.id, $event)" />
       </div>
     </section>
     <p v-if="!visibleModules.length" class="empty">暂未开启模块，点击「配置模块」添加。</p>
@@ -139,7 +167,7 @@ h3 { margin: 0; font-size: 12px; }
 .summary-muted { color: var(--fp-muted); font-weight: 500; }
 .summary-online, .avatar-stack { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .avatar-stack { gap: 0; overflow: hidden; }
-.avatar-stack img {
+.avatar-stack img, .summary-avatar {
   flex: none;
   width: 20px;
   height: 20px;
@@ -149,6 +177,7 @@ h3 { margin: 0; font-size: 12px; }
 }
 .avatar-stack img + img { margin-left: -4px; }
 .avatar-stack + .summary-value { padding-left: 5px; border-left: 1px solid var(--fp-border); }
+.theme-swatch { flex: none; width: 13px; height: 13px; border: 1px solid var(--fp-border); border-radius: 4px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .card-body { padding: 0 14px 14px; font-size: 12px; line-height: 1.6; }
 .configure:focus-visible, .card-toggle:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 2px; }
