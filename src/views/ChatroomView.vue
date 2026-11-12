@@ -4,8 +4,8 @@ import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 
 import { RouterLink,useRoute,useRouter } from 'vue-router'
 import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
-import BreezemoonQuotePreview from '@/components/chat/BreezemoonQuotePreview.vue'
-import { breezemoonQuoteMarkdown, createBreezemoonQuote, type BreezemoonQuote, type BreezemoonQuoteSource } from '@/utils/breezemoonQuote'
+import ChatQuotePreview from '@/components/chat/ChatQuotePreview.vue'
+import { breezemoonQuoteMarkdown, chatMessageQuotePreview, createBreezemoonQuote, type ChatQuote, type BreezemoonQuoteSource } from '@/utils/chatQuote'
 import ChatConnectionStatus from '@/components/chat/ChatConnectionStatus.vue'
 import { storeToRefs } from 'pinia'
 import {useChatMessageSource} from '@/composables/useChatMessageSource'
@@ -77,7 +77,7 @@ useScrollPagination(
 )
 
 const draft = ref('')
-const breezemoonQuotes = ref<BreezemoonQuote[]>([])
+const breezemoonQuotes = ref<ChatQuote[]>([])
 watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{
   draft.value = ''
   breezemoonQuotes.value = []
@@ -95,6 +95,10 @@ watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.va
 
 const showNodes = ref(false)
 const {quote,quoteBusy,quoteErr,quoteMessage:readQuote,clearQuote,buildQuoteSuffix}=useChatMessageSource()
+const composerQuotes = computed(() => quote.value
+  ? [chatMessageQuotePreview(quote.value), ...breezemoonQuotes.value]
+  : breezemoonQuotes.value)
+
 const editingTopic = ref(false)
 
 const me = computed(() => account.value?.userName)
@@ -215,7 +219,11 @@ function quoteBreezemoon(source: BreezemoonQuoteSource) {
   revealComposer()
 }
 
-function removeBreezemoonQuote(href: string) {
+function removeComposerQuote(href: string) {
+  if (composerQuotes.value[0]?.kind === 'message' && composerQuotes.value[0].href === href) {
+    clearQuote()
+    return
+  }
   breezemoonQuotes.value = breezemoonQuotes.value.filter(quote => quote.href !== href)
 }
 
@@ -330,15 +338,7 @@ function clearScreen() {
               @submit="submit"
             >
               <template #top>
-                <BreezemoonQuotePreview :quotes="breezemoonQuotes" @remove="removeBreezemoonQuote" />
-              <div v-if="quote" class="quote-preview-box">
-                <div class="quote-info">
-                  <span class="quote-label">引用 @{{ quote.userName }}</span>
-                  <div v-if="quote.html" class="vditor-reset quote-html" v-html="quote.html" />
-                  <div v-else class="quote-html">{{ quote.label }}</div>
-                </div>
-                <button type="button" class="quote-cancel" title="取消引用" @click="clearQuote">✕</button>
-              </div>
+                <ChatQuotePreview :quotes="composerQuotes" @remove="removeComposerQuote" />
               </template>
               <template #tools>
                 <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-expanded="toolOpen(tool.id)" aria-haspopup="dialog" @click="togglePanel(tool.id)">
@@ -554,15 +554,7 @@ function clearScreen() {
               @submit="submit"
             >
               <template #top>
-                <BreezemoonQuotePreview :quotes="breezemoonQuotes" @remove="removeBreezemoonQuote" />
-              <div v-if="quote" class="quote-preview-box">
-                <div class="quote-info">
-                  <span class="quote-label">引用 @{{ quote.userName }}</span>
-                  <div v-if="quote.html" class="vditor-reset quote-html" v-html="quote.html" />
-                  <div v-else class="quote-html">{{ quote.label }}</div>
-                </div>
-                <button type="button" class="quote-cancel" title="取消引用" @click="clearQuote">✕</button>
-              </div>
+                <ChatQuotePreview :quotes="composerQuotes" @remove="removeComposerQuote" />
               </template>
               <template #tools>
                 <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-expanded="toolOpen(tool.id)" aria-haspopup="dialog" @click="togglePanel(tool.id)">
@@ -1012,72 +1004,6 @@ function clearScreen() {
   padding: 12px 0;
   font-size: 13px;
   color: var(--fp-muted);
-}
-
-/* 引用预览 */
-.quote-preview-box {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--fp-hover);
-  border-left: 3px solid var(--fp-accent);
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-
-.quote-label {
-  font-weight: 600;
-  color: var(--fp-accent);
-}
-
-.quote-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.quote-html {
-  margin-top: 2px;
-  max-height: 64px;
-  overflow: hidden;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--fp-muted);
-  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent);
-  mask-image: linear-gradient(180deg, #000 70%, transparent);
-}
-
-.quote-html :deep(p) {
-  margin: 0;
-}
-
-.quote-html :deep(img:not(.emoji)) {
-  max-height: 48px;
-  max-width: 120px;
-  vertical-align: middle;
-}
-
-.quote-html :deep(img.emoji) {
-  width: 18px;
-  height: 18px;
-}
-
-.quote-html :deep(blockquote),
-.quote-html :deep(h5) {
-  display: none;
-}
-
-.quote-cancel {
-  border: 0;
-  background: transparent;
-  color: var(--fp-muted);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.quote-cancel:hover {
-  color: #e74c3c;
 }
 
 /* 辅助表单与画板 */

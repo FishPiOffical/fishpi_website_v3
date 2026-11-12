@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import ts from 'typescript';import{effectScope,ref,nextTick}from'vue';import{createPinia,defineStore,setActivePinia}from'pinia'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`);return s}
-const state=globalThis.__chatSource={context:1,calls:[],dispatch:null};const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAuthContextVersion(){return globalThis.__chatSource.context}export async function request(path,init){globalThis.__chatSource.calls.push({path,init});return globalThis.__chatSource.dispatch(path,init)}`),{ApiError}=await import(http),apiURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'").replace("from './http'",`from '${http}'`)),api=await import(apiURL)
+const state=globalThis.__chatSource={context:1,calls:[],dispatch:null};const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAuthContextVersion(){return globalThis.__chatSource.context}export async function request(path,init){globalThis.__chatSource.calls.push({path,init});return globalThis.__chatSource.dispatch(path,init)}`),{ApiError}=await import(http),apiURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replace("from '@/utils/chatAppearance'",`from '${url(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')))}'`).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'").replace("from './http'",`from '${http}'`)),api=await import(apiURL)
 const auth=defineStore('source-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__chatSourceAuth=auth;const authURL=url('export const useAuthStore=globalThis.__chatSourceAuth'),source=await fs.readFile('src/composables/useChatMessageSource.ts','utf8'),hookURL=ssr=>url(replace(compile(source.replaceAll('import.meta.env.SSR',String(ssr))),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-chat-messages',apiURL],['@/stores/auth',authURL]])),{useChatMessageSource}=await import(hookURL(false)),env=data=>({code:0,data}),tick=async()=>{for(let i=0;i<10;i++)await Promise.resolve();await nextTick()}
 const base={id:'2',createdAt:2,type:'text',content:'raw **Markdown**\nsecond line',contentHtml:'<p>current clean HTML</p>',author:{id:'8',userName:'other',userNickname:'public',userAvatarURL:''},client:'Web/Website',card:{}}
 function setup(){const pinia=createPinia();setActivePinia(pinia);const scope=effectScope();let model;scope.run(()=>model=useChatMessageSource());return{scope,model,user:auth(pinia)}}
@@ -34,3 +34,22 @@ const {useAppearanceStore}=await import(url(replace(appearanceCode,[['vue',impor
 const fishpiStub=url('export async function fetchChatHistory(){return[]}export async function fetchChatNodeBundle(){}export async function fetchChatOnlineUsers(){return{}}export async function fetchMutes(){return[]}export async function openRedPacket(){}export async function revokeChat(){}export async function sendChat(){}'),cardStub=url('export function parseChatCard(){}'),reactionStub=url('export function useV3ReactionsStore(){return{invalidate(){}}}')
 const chatCode=compile((await fs.readFile('src/stores/chat.ts','utf8')).replaceAll('import.meta.env.SSR','false')),chatModule=await import(url(replace(chatCode,[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/fishpi',fishpiStub],['@/utils/chatCard',cardStub],['./auth',authURL],['./v3ChatOnline',url('export function useV3ChatOnlineStore(){return{users:[],total:null,connect:async()=>{},disconnect(){},refresh:async()=>{}}}')],['./v3ChatTimeline',url('export function useV3ChatTimelineStore(){return{messages:[],topic:"",connected:false,connecting:false,loading:false,loadingMore:false,hasMore:false,error:""}}')],['./v3Reactions',reactionStub],['./v3ChatPublication',url(`import{ref}from'${import.meta.resolve('vue')}';export function useV3ChatPublicationStore(){return{busy:false,currentMessage:ref(null),completed:ref(null)}}`)]])));setActivePinia(createPinia());const readsBefore=storageReads,chat=chatModule.useChatStore();assert.equal(chat.chatStyle,'classic');assert.equal(storageReads,readsBefore);chat.restoreStyle();assert.equal(chat.chatStyle,'modern');chat.$dispose();const shell=await fs.readFile('src/layouts/AppShell.vue','utf8');assert.ok(shell.includes('mounted.value = true\n  branding.restore()\n  appearance.restore()\n  chat.restoreStyle()'))
 console.log('PASS chat source 13 actual appearance/chat stores share SSR defaults and defer saved layout/theme reads until mounted shell restoration')
+
+const { JSDOM } = await import('jsdom')
+const { extractChatQuotes } = await import(url(compile(await fs.readFile('src/utils/chatQuote.ts','utf8'))))
+const quoteDOM = new JSDOM()
+const quoteTemplate = quoteDOM.window.document.createElement('template')
+quoteTemplate.innerHTML = [
+  '<p>我的回复</p>',
+  '<h5>引用 @<a href="/member/fish">fish</a> <a href="/cr#chatroom2">↩</a></h5>',
+  '<blockquote><p>第一行<br>第二行</p></blockquote>',
+  '<h5>引用 <a href="https://example.com/cr#chatroom2">↩</a></h5>',
+  '<blockquote><p>外部链接保留原样</p></blockquote>',
+].join('')
+assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn'), [
+  { kind: 'message', href: '/cr#chatroom2', author: 'fish', excerpt: '第一行 第二行' },
+])
+assert.equal(quoteTemplate.content.querySelectorAll('blockquote').length, 1)
+assert.match(quoteTemplate.innerHTML, /我的回复.*外部链接保留原样/)
+quoteDOM.window.close()
+console.log('PASS chat source 14 compact quote requires a trusted original-message link and preserves surrounding content')

@@ -4,14 +4,14 @@ import { formatDisplayTime } from '@/utils/time'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import CollectChatEmoji from '@/components/chat/CollectChatEmoji.vue'
-import BreezemoonQuoteCard from '@/components/chat/BreezemoonQuoteCard.vue'
+import ChatQuoteCard from '@/components/chat/ChatQuoteCard.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { DEFAULT_AVATAR, avatarThumbnail, rhyPicThumbnail } from '@/utils/avatar'
 import { chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
 import { isSingleImageMessage } from '@/utils/chatMessage'
-import { extractBreezemoonQuotes, type BreezemoonQuote } from '@/utils/breezemoonQuote'
+import { extractChatQuotes, type ChatQuote } from '@/utils/chatQuote'
 
 const props = withDefaults(
   defineProps<{
@@ -45,14 +45,14 @@ onMounted(() => { mounted.value = true })
 const singleImage = computed(() => props.chatroom && isSingleImageMessage(props.html))
 const display = computed(() => {
   const hasImages = /<img\b/i.test(props.html)
-  const mayHaveQuotes = /<blockquote\b/i.test(props.html) && props.html.includes('/breezemoons/')
-  const plain = { html: props.html, quotes: [] as BreezemoonQuote[] }
+  const mayHaveQuotes = /<blockquote\b/i.test(props.html) && (props.html.includes('/breezemoons/') || props.html.includes('#chatroom'))
+  const plain = { html: props.html, quotes: [] as ChatQuote[] }
   if (!props.chatroom || (!hasImages && !mayHaveQuotes)) return plain
   if (!mounted.value) return hasImages ? { ...plain, html: '' } : plain
   // 先在惰性模板里提取引用、替换图片地址，再交给 Vue 插入页面。
   const template = document.createElement('template')
   template.innerHTML = props.html
-  const quotes = mayHaveQuotes ? extractBreezemoonQuotes(template.content, window.location.origin) : []
+  const quotes = mayHaveQuotes ? extractChatQuotes(template.content, window.location.origin) : []
   if (!hasImages && !quotes.length) return plain
   for (const img of template.content.querySelectorAll('img:not(.emoji)')) {
     const picture = img.closest('picture')
@@ -128,8 +128,8 @@ function onBodyClick(e: MouseEvent) {
         </div>
         <slot>
           <div v-if="display.html" class="vditor-reset body" v-html="display.html" />
-          <div v-if="display.quotes.length" class="moon-quote-stack">
-            <BreezemoonQuoteCard v-for="(quote, index) in display.quotes" :key="index" :quote="quote" />
+          <div v-if="display.quotes.length" class="chat-quote-stack">
+            <ChatQuoteCard v-for="(quote, index) in display.quotes" :key="index" :quote="quote" />
           </div>
         </slot>
         <template v-if="!chatroom">
@@ -380,9 +380,9 @@ function onBodyClick(e: MouseEvent) {
   font-size: 14px;
   line-height: 1.7;
 }
-.moon-quote-stack { display: grid; gap: 6px; }
-.body + .moon-quote-stack { margin-top: 7px; }
-.body + .moon-quote-stack :deep(.moon-quote-card) {
+.chat-quote-stack { display: grid; gap: 6px; }
+.body + .chat-quote-stack { margin-top: 7px; }
+.body + .chat-quote-stack :deep(.chat-quote-card) {
   background: color-mix(in srgb, var(--fp-card) 46%, transparent);
   border-color: color-mix(in srgb, var(--fp-muted) 20%, transparent);
   border-inline-start-color: color-mix(in srgb, var(--fp-muted) 50%, transparent);

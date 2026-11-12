@@ -5,7 +5,7 @@ import { timeISO } from '@/utils/time'
 import { formatDateTime } from '@/utils/time'
 
 import { RouterLink } from 'vue-router'
-import type { BreezemoonQuoteSource } from '@/utils/breezemoonQuote'
+import type { BreezemoonQuoteSource } from '@/utils/chatQuote'
 import type { FollowingMoon } from '@/api/v3-following-feed'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
