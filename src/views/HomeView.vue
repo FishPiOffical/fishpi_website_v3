@@ -8,7 +8,6 @@ import HomeReadStatus from '@/components/home/HomeReadStatus.vue'
 import { consumeHomeRankingPayload, consumeHomeReadsPayload, consumeRepeaterPayload } from '@/seo/payload'
 import { getAuthContextVersion, getHomeReadPause, resumeHomeReads } from '@/api/http'
 import { useHomeRead } from '@/composables/useHomeRead'
-import VipNickname from '@/components/user/VipNickname.vue'
 import ChatPublicationRecovery from '@/components/chat/ChatPublicationRecovery.vue'
 import { useV3ChatPublicationStore } from '@/stores/v3ChatPublication'
 import BreezemoonPanel from '@/components/breezemoons/BreezemoonPanel.vue'
@@ -29,19 +28,13 @@ import HomeModuleDisclosure from '@/components/home/HomeModuleDisclosure.vue'
 import HomeRepeaterStation from '@/components/home/HomeRepeaterStation.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
-import { chatAppearanceSnapshot } from '@/utils/chatAppearance'
-import { avatarStyle, avatarUrl, rhyPicThumbnail } from '@/utils/avatar'
+import HomeChatPreview from '@/components/home/HomeChatPreview.vue'
+import { avatarStyle, rhyPicThumbnail } from '@/utils/avatar'
 
 const functionPreferences = useFunctionPreferencesStore()
 const chatImagePreview = ref('')
 const imagePreferencesMounted = ref(false)
 onMounted(() => { imagePreferencesMounted.value = true })
-function openChatImage(event: MouseEvent) {
-  const image = (event.target as HTMLElement).closest('img:not(.emoji)') as HTMLImageElement | null
-  if (!image) return
-  event.preventDefault()
-  chatImagePreview.value = image.currentSrc || image.src
-}
 
 const auth = useAuthStore(), chat = useChatStore(), publication = useV3ChatPublicationStore(), layout = useHomeLayoutStore()
 const { accessToken, isLoggedIn } = storeToRefs(auth)
@@ -325,23 +318,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <p v-if="chat.error" role="alert">{{ chat.error }} <button type="button" :disabled="chat.loading" @click="chat.refreshMessages">重读聊天室消息</button></p>
               <p v-if="chatMsg" class="hint">{{ chatMsg }}</p>
               <ol class="module-list chat-list">
-                <li v-for="m in chatLines" :key="m.oId" class="chat-item fp-msg is-room" data-appearance-snapshot="v1" :data-frame="chatAppearanceSnapshot(m.appearance).frameId">
-                  <RouterLink v-if="m.userName" class="fp-avatar-frame" :to="`/member/${m.userName}`">
-                    <span
-                      class="avatar-mid"
-                      :style="avatarStyle(avatarUrl(m), 28)"
-                      :aria-label="m.userName"
-                    />
-                  </RouterLink>
-                  <div class="chat-body">
-                    <RouterLink v-if="m.userName" class="chat-who" :to="`/member/${m.userName}`">
-                      <VipNickname :user-id="m.userOId" :user-name="m.userName">{{ m.userNickname || m.userName }}</VipNickname>
-                      <span v-if="m.userNickname && m.userName" class="chat-uname">({{ m.userName }})</span>
-                    </RouterLink>
-                    <div v-if="m.html" class="chat-text" :class="{ 'blur-chat-images': imagePreferencesMounted && functionPreferences.blurChatImages }" @click="openChatImage" v-html="m.html"></div>
-                    <div v-else-if="m.redPacket" class="chat-text">[红包]</div>
-                    <div v-else-if="m.card" class="chat-text">{{ m.card.msgType === 'music' ? m.card.title || '音乐分享' : '天气信息' }}</div>
-                  </div>
+                <li v-for="m in chatLines" :key="m.oId" class="chat-item">
+                  <HomeChatPreview :message="m" :blur-images="imagePreferencesMounted && functionPreferences.blurChatImages" @preview="chatImagePreview = $event" />
                 </li>
                 <li v-if="!chatLines.length&&!chat.loading&&!chat.error" class="hint-li">{{ isLoggedIn?'暂无消息，去聊天室看看':'登录后可读取聊天室消息' }}</li>
               </ol>
@@ -1063,49 +1041,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   font-size: 12.5px;
   white-space: nowrap;
 }
-.chat-list .chat-item {
-  align-items: flex-start;
-  padding: 4px 5px;
-}
-.avatar-mid {
-  display: inline-block;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--fp-avatar-radius);
-  background: var(--fp-border) center/cover no-repeat;
-  flex-shrink: 0;
-}
-.chat-body {
-  min-width: 0;
-  flex: 1;
-}
-.chat-who {
-  font-size: 12px;
-  color: var(--fp-muted);
-  text-decoration: none;
-}
-.chat-uname {
-  opacity: 0.75;
-}
-.chat-text {
-  margin-top: 2px;
-  font-size: 13px;
-  color: var(--fp-title);
-  line-height: 1.4;
-  word-break: break-word;
-}
-
-.chat-text :deep(p) { margin: 0 0 4px; }
-.chat-text :deep(p:last-child) { margin-bottom: 0; }
-.chat-text :deep(img) {
-  max-width: 100%;
-  max-height: 120px;
-  object-fit: contain;
-  vertical-align: middle;
-}
-.chat-text.blur-chat-images :deep(img:not(.emoji)) { filter: blur(8px); cursor: zoom-in; }
-.chat-text :deep(img.emoji) { max-height: 1.4em; }
-.chat-text :deep(pre) { overflow-x: auto; }
+.chat-list .chat-item { padding: 3px 0; min-width: 0; }
 
 .community-body { display:flex; flex-direction:column; }
 .is-classic {
