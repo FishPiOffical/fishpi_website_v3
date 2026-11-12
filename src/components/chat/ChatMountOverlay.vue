@@ -15,7 +15,7 @@ type Arrival = Extract<ChatRoomNotice, { kind: 'join' | 'leave' }>
 const route = useRoute(), chat = useChatStore(), timeline = useV3ChatTimelineStore()
 const preferences = useChatPreferencesStore(), filter = useChatFilterStore(), auth = useAuthStore()
 const visible = computed(() => route.path === '/cr' || chat.floatingChatroomOpen)
-const arrivals = ref<{ notice: Arrival; lane: number }[]>([])
+const arrivals = ref<{ notice: Arrival }[]>([])
 function arrivalText(notice: Arrival) {
   const name = notice.actor.userNickname || notice.actor.userName
   // 上方已显示昵称，只移除文案开头的同名，保留座驾自己的动作词。
@@ -40,9 +40,8 @@ function next() {
   while (queue.length && arrivals.value.length < 3) {
     const item = queue.shift()!
     if (Date.now() - item.receivedAt > 15000) continue
-    // 固定三条轨道，其他动画结束时，仍在播放的提示不上下跳动。
-    const lane = [0, 1, 2].find(value => !arrivals.value.some(active => active.lane === value))!
-    arrivals.value.push({ notice: item.notice, lane })
+    // 新提示追加到最底部，现有提示仅更新位置，不重建节点或重播进场动画。
+    arrivals.value.push({ notice: item.notice })
     timers.set(item.notice.id, setTimeout(() => {
       timers.delete(item.notice.id)
       arrivals.value = arrivals.value.filter(active => active.notice.id !== item.notice.id)
@@ -69,7 +68,7 @@ watch(visible, value => { if (!import.meta.env.SSR) setChatPresenceWanted(value)
 onBeforeUnmount(() => { clear(); setChatPresenceWanted(false) })
 </script>
 <template>
-  <div v-for="{ notice: row, lane } in arrivals" :key="row.id" class="mount-arrival" :style="{ '--arrival-offset': `${lane * 72}px` }" role="status">
+  <div v-for="({ notice: row }, index) in arrivals" :key="row.id" class="mount-arrival" :style="{ '--arrival-offset': `${(arrivals.length - 1 - index) * 64}px` }" role="status">
     <img class="vehicle" :src="mountAssets[row.mount!.id]" alt="">
     <div class="arrival-copy">
       <div class="arrival-user"><img :src="avatarThumbnail(row.avatarURL, 20)" alt="" @error="avatarError"><strong>{{ row.actor.userNickname || row.actor.userName }}</strong></div>
@@ -78,7 +77,7 @@ onBeforeUnmount(() => { clear(); setChatPresenceWanted(false) })
   </div>
 </template>
 <style scoped>
-.mount-arrival { position:fixed; left:16px; bottom:calc(26px + var(--arrival-offset)); z-index:1050; display:flex; align-items:center; gap:4px; width:max-content; max-width:min(280px,calc(100vw - 32px)); padding:3px 10px 3px 0; border-radius:0 24px 24px 0; background:linear-gradient(90deg,transparent,color-mix(in srgb,#a3d7c8 24%,var(--fp-card)) 38%,var(--fp-card)); color:var(--fp-text); pointer-events:none; animation:mount-arrive 4.1s both; }
+.mount-arrival { position:fixed; left:16px; bottom:calc(26px + var(--arrival-offset)); z-index:1050; display:flex; align-items:center; gap:4px; width:max-content; max-width:min(280px,calc(100vw - 32px)); padding:3px 10px 3px 0; border-radius:0 24px 24px 0; background:linear-gradient(90deg,transparent,color-mix(in srgb,#a3d7c8 24%,var(--fp-card)) 38%,var(--fp-card)); color:var(--fp-text); pointer-events:none; animation:mount-arrive 4.1s both; transition:bottom 280ms cubic-bezier(.22,1,.36,1); }
 .vehicle { width:56px; height:40px; flex:none; object-fit:contain; }
 .arrival-copy { min-width:0; font-size:12px; line-height:1.4; }
 .arrival-copy>span { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
@@ -87,5 +86,5 @@ onBeforeUnmount(() => { clear(); setChatPresenceWanted(false) })
 .arrival-user strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 @keyframes mount-arrive { 0% { transform:translateX(calc(-100% - 20px)); opacity:0; } 15%,88% { transform:translateX(0); opacity:1; } 100% { transform:translateX(20px); opacity:0; } }
 @media(max-width:600px) { .mount-arrival { bottom:calc(100px + env(safe-area-inset-bottom) + var(--arrival-offset)); left:8px; max-width:calc(100vw - 16px); } .vehicle { width:48px; height:36px; } }
-@media(prefers-reduced-motion:reduce) { .mount-arrival { animation:none; } .vehicle { display:none; } .mount-arrival { padding:6px 10px; border-radius:10px; } }
+@media(prefers-reduced-motion:reduce) { .mount-arrival { animation:none; transition:none; } .vehicle { display:none; } .mount-arrival { padding:6px 10px; border-radius:10px; } }
 </style>
