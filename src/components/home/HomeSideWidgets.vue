@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { sidebarModule } from '@/chat/sidebar/registry'
 import type { HomeModuleMeta } from '@/home/modules'
+import HomeModuleDisclosure from './HomeModuleDisclosure.vue'
 
 defineProps<{ modules: HomeModuleMeta[] }>()
 </script>
@@ -13,16 +14,16 @@ defineProps<{ modules: HomeModuleMeta[] }>()
     :data-home-module="m.id"
     :data-home-title="m.title"
   >
-    <div class="head">
-      <b>{{ m.title }}</b>
-    </div>
-    <component :is="m.sidebarId ? sidebarModule(m.sidebarId)?.component : undefined" />
+    <HomeModuleDisclosure v-if="m.sidebarId" :module-key="m.id" :module-id="m.sidebarId" :title="m.title">
+      <template #default="{ reportSummary }">
+        <component :is="sidebarModule(m.sidebarId)?.component" @summary="reportSummary" />
+      </template>
+    </HomeModuleDisclosure>
   </div>
 </template>
 
 <style scoped>
 .home-side-widget {
-  padding: 10px 12px;
   border: 1px solid var(--fp-border);
   border-radius: 8px;
   background: var(--fp-card);
@@ -31,14 +32,5 @@ defineProps<{ modules: HomeModuleMeta[] }>()
 .home-side-widget + .home-side-widget {
   margin-top: 10px;
 }
-.head {
-  margin-bottom: 6px;
-  font-size: 13px;
-  color: var(--fp-head);
-}
-.head b {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--fp-title);
-}
+.home-side-widget :deep(.disclosure-body) { padding: 0 12px 10px; }
 </style>

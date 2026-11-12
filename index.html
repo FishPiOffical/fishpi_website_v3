@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="classic-dark" data-bubble="classic" data-frame="none">
+<html lang="zh-CN" data-theme="classic-light" data-bubble="classic" data-frame="none">
   <head>
     <meta charset="UTF-8" />
     <link id="site-favicon" rel="icon" href="/logo.png" />
@@ -16,11 +16,11 @@
         try {
           var raw = localStorage.getItem('fp.appearance')
           var s = raw ? JSON.parse(raw) : {}
-          document.documentElement.dataset.theme = s.theme || 'classic-dark'
+          if (s.theme) document.documentElement.dataset.theme = s.theme
           document.documentElement.dataset.bubble = s.bubble || 'classic'
           document.documentElement.dataset.frame = s.frame || 'none'
         } catch (e) {
-          document.documentElement.dataset.theme = 'classic-dark'
+          // 保留 HTML 声明的默认外观。
         }
       })()
     </script>

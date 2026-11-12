@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<{
   controls: string
   summary?: string
   heading?: 'h2' | 'h3'
+  disabled?: boolean
 }>(), { heading: 'h3' })
 const emit = defineEmits<{ toggle: [] }>()
 const { isLoggedIn, account } = storeToRefs(useAuthStore())
@@ -62,6 +63,7 @@ const summaryText = computed(() => {
       type="button"
       :aria-expanded="expanded"
       :aria-controls="controls"
+      :disabled="disabled"
       @click="emit('toggle')"
     >
       <SidebarIcon class="module-icon" :name="moduleId" />

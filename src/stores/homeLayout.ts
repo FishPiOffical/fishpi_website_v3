@@ -38,6 +38,8 @@ export interface HomeRowView {
   columns: string
 }
 
+const HOME_COLLAPSED_STORAGE = 'fishpi.home.collapsed.v1'
+
 function read(): HomeLayoutState {
   const base = defaultHomeLayout()
   if (import.meta.env.SSR) return base
@@ -78,6 +80,7 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
   const state = ref<HomeLayoutState>(defaultHomeLayout())
   const mode = ref<HomeVariant>('classic')
   const editing = ref(false)
+  const collapsed = ref<string[]>([])
   const layouts: Partial<Record<HomeVariant, HomeLayoutState>> = {}
   const copy = (value: HomeLayoutState): HomeLayoutState => JSON.parse(JSON.stringify(value))
   let restored = false
@@ -86,6 +89,10 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
     if (import.meta.env.SSR || restored) return
     restored = true
     state.value = read()
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem(HOME_COLLAPSED_STORAGE) || '[]')
+      if (Array.isArray(saved)) collapsed.value = saved.filter((id): id is string => typeof id === 'string')
+    } catch { /* Local preferences are optional. */ }
     try {
       const raw = localStorage.getItem(HOME_VARIANTS_STORAGE)
       if (raw) {
@@ -99,6 +106,19 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
       }
     } catch { /* Local preferences are optional. */ }
     layouts[mode.value] = copy(state.value)
+  }
+
+  function toggleCollapsed(id: string) {
+    if (editing.value) return
+    const next = new Set(collapsed.value)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    saveCollapsed([...next])
+  }
+
+  function saveCollapsed(value: string[]) {
+    collapsed.value = value
+    try { localStorage.setItem(HOME_COLLAPSED_STORAGE, JSON.stringify(value)) } catch { /* Storage is optional. */ }
   }
 
   watch(
@@ -184,6 +204,7 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
 
   function reset() {
     state.value = defaultHomeLayout(mode.value)
+    saveCollapsed([])
   }
 
   function resetPositions() {
@@ -208,6 +229,8 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
     setMode,
     restore,
     editing,
+    collapsed,
+    toggleCollapsed,
     orderedModules,
     visibleRows,
     moveTo,

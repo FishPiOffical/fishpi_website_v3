@@ -22,6 +22,7 @@ import { useHomeDrag } from '@/home/useHomeDrag'
 import PersonInfoCard from '@/components/sidebar/PersonInfoCard.vue'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
 import HomeSideWidgets from '@/components/home/HomeSideWidgets.vue'
+import HomeModuleDisclosure from '@/components/home/HomeModuleDisclosure.vue'
 import HomeRepeaterStation from '@/components/home/HomeRepeaterStation.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
@@ -211,8 +212,14 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
             <aside v-else-if="mod.id === 'rank'" class="mod-body">
               <div v-if="!compactHome" class="download"><img src="https://file.fishpi.cn/logo_app.png" width="35" height="35" alt="" /><div><b>随时随地摸鱼？</b><p>下载摸鱼派客户端，想摸就摸！</p></div><RouterLink to="/download" class="green-link">下载</RouterLink></div>
-              <div v-if="compactHome && homeReady" class="home-person"><PersonInfoCard :avatar-size="34" /></div>
-              <CheckinPanel />
+              <HomeModuleDisclosure v-if="compactHome && homeReady" class="home-person" module-key="rank:profile" module-id="profile" title="我的资料">
+                <PersonInfoCard :avatar-size="34" />
+              </HomeModuleDisclosure>
+              <HomeModuleDisclosure v-if="homeReady && isLoggedIn" class="home-checkin" module-key="rank:checkin" module-id="checkin" title="今日活跃与签到">
+                <template #default="{ reportSummary }">
+                  <CheckinPanel @summary="reportSummary" />
+                </template>
+              </HomeModuleDisclosure>
               <div class="index-head">
                 <b>今日连签排行</b>
                 <RouterLink to="/top/checkin">更多</RouterLink>
@@ -338,11 +345,14 @@ function scrollShelf(id: string, dir: -1 | 1) {
             </section>
 
             <aside v-else-if="mod.id === 'community'" class="mod-body community-body">
-            <div class="home-moons"><div class="index-head spaced">
-              <b>清风明月</b>
-              <RouterLink to="/breezemoons" title="清风明月是什么？">更多</RouterLink>
-            </div>
-            <BreezemoonPanel :size="8" :preview-limit="compactHome ? 3 : undefined" compact avatar-only ssr-scope="home" /></div>
+              <HomeModuleDisclosure class="home-moons" module-key="community:breezemoons" module-id="breezemoons" title="清风明月">
+                <template #action>
+                  <RouterLink to="/breezemoons" title="清风明月是什么？" class="home-moons-more">更多</RouterLink>
+                </template>
+                <template #default="{ reportSummary }">
+                  <BreezemoonPanel :size="8" :preview-limit="compactHome ? 3 : undefined" compact avatar-only ssr-scope="home" @summary="reportSummary" />
+                </template>
+              </HomeModuleDisclosure>
               <HomeRepeaterStation :initial="repeaterItems" />
 
               <RecentMembers />
@@ -491,6 +501,10 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home-person :deep(.person-sub) { font-size: 10px; }
 .home-person :deep(.guest-slogan) { margin-bottom: 8px; }
 .home-person :deep(.role-tag) { display: none; }
+.home-checkin :deep(.checkin-head h3) { display: none; }
+.home-checkin :deep(.checkin-head) { justify-content: flex-end; }
+.home-moons-more { flex: none; color: var(--fp-muted); font-size: 12px; text-decoration: none; }
+.home-moons-more:hover { text-decoration: underline; }
 .home :deep(.checkin-panel) { margin: 10px 0 12px; }
 .home :deep(.checkin-section) { padding: 7px 8px; }
 .home :deep(.breezemoon-list .moon-body) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

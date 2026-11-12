@@ -26,6 +26,6 @@ export function findPack(kind: PackKind, id: string) {
   return packsOf(kind).find((p) => p.id === id)
 }
 
-export const DEFAULT_THEME = 'classic-dark'
+export const DEFAULT_THEME = 'classic-light'
 export const DEFAULT_BUBBLE = 'classic'
 export const DEFAULT_FRAME = 'none'
