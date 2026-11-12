@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: 'feed' | 'water' | 'pet' | 'play' | 'rest' | 'wake' | 'coin' | 'gift' | 'bag' | 'edit' | 'close' | 'minus' | 'move' | 'refresh' | 'home' | 'check' | 'outing' | 'course' | 'clock' | 'growth' }>()
+defineProps<{ name: 'feed' | 'water' | 'pet' | 'play' | 'rest' | 'wake' | 'coin' | 'gift' | 'bag' | 'edit' | 'close' | 'minus' | 'move' | 'refresh' | 'home' | 'check' | 'outing' | 'course' | 'work' | 'clock' | 'growth' | 'history' | 'chevron' }>()
 const paths = {
   feed: 'M4 12h16c0 5-3 8-8 8s-8-3-8-8Zm2-4h.01M12 5h.01M17 8h.01',
   water: 'M12 3S5 11 5 15a7 7 0 0 0 14 0c0-4-7-12-7-12ZM8 15a4 4 0 0 0 4 4',
@@ -19,8 +19,11 @@ const paths = {
   check: 'm5 12 4 4L19 6',
   outing: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-6-3-2 4-4 2 2-4 4-2Z',
   course: 'M12 5v16M3 4h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5v15h-5a4 4 0 0 0-4 2 4 4 0 0 0-4-2H3V4Z',
+  work: 'M8 7V4h8v3M3 7h18v13H3V7Zm0 5a22 22 0 0 0 18 0M10 12h4v3h-4v-3Z',
   clock: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM12 7v5l3 2',
   growth: 'M12 21V11m0 5C5 16 3 12 3 7c6 0 9 3 9 9Zm0-5c0-5 3-8 9-8 0 5-3 8-9 8Z',
+  history: 'M3 11a9 9 0 1 1 2.6 7.3M3 5v6h6m3-4v5l3 2',
+  chevron: 'm9 5 7 7-7 7',
 }
 </script>
 <template><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="paths[name]" /></svg></template>

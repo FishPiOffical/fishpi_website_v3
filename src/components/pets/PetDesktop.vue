@@ -157,7 +157,7 @@ onBeforeUnmount(() => {
         <img :src="`/images/pets/${pets.pet.speciesId}.webp`" :alt="pets.pet.name" :width="display.collapsed ? 48 : 128" :height="display.collapsed ? 48 : 128" draggable="false" />
         <span v-if="!display.collapsed" class="desktop-name">{{ pets.pet.name }}<small>Lv. {{ pets.pet.level }}</small></span>
         <span v-if="pets.pet.activity?.kind === 'rest'" class="desktop-sleep" aria-label="休息中">z</span>
-        <span v-else-if="pets.pet.activity" class="desktop-activity" :aria-label="activityClaimable ? '活动成果待领取' : pets.pet.activity.kind === 'outing' ? '外出中' : '上课中'"><PetIcon :name="activityClaimable ? 'gift' : pets.pet.activity.kind" /></span>
+        <span v-else-if="pets.pet.activity" class="desktop-activity" :aria-label="activityClaimable ? '活动成果待领取' : pets.pet.activity.kind === 'outing' ? '外出中' : pets.pet.activity.kind === 'work' ? '工作中' : '上课中'"><PetIcon :name="activityClaimable ? 'gift' : pets.pet.activity.kind" /></span>
       </button>
       <button v-else type="button" class="pet-recovery" aria-label="宠物状态暂不可用，打开恢复面板" title="宠物状态暂不可用" :aria-expanded="panelOpen" @click="panelOpen = !panelOpen"><PetIcon name="refresh" /></button>
     </aside>

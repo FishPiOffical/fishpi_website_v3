@@ -2,10 +2,14 @@ import { ApiError, request } from './http'
 
 export type PetSpeciesId = 'momota' | 'hexiaotun' | 'yubingmiao' | 'paixiaoyu'
 export type PetAction = 'feed' | 'water' | 'pet' | 'play' | 'rest' | 'wake'
-export type PetActivityKind = 'outing' | 'course'
+export type PetActivityKind = 'outing' | 'course' | 'work'
+export type PetHistoryKind = PetActivityKind | 'all'
+export type PetJobId = 'delivery-assistant' | 'trail-assistant' | 'library-assistant' | 'broadcast-assistant' | 'craft-assistant' | 'care-assistant'
 export type PetSkillId = 'vitality' | 'exploration' | 'knowledge' | 'expression' | 'crafting' | 'kindness'
 export interface PetActivityCost { coins: number; energy: number; hunger: number; water: number }
 export interface PetActivityRewards {
+  coins: number
+  proficiency: number
   experience: number
   food: number
   mood: number
@@ -18,6 +22,21 @@ export interface PetActivityEntry {
   durationMs: number
   cost: PetActivityCost
   rewards: PetActivityRewards
+}
+export interface PetJobEntry extends PetActivityEntry {
+  id: PetJobId
+  requirement: { skillId: PetSkillId; experience: number }
+}
+export interface PetActivityRecord extends Omit<PetTimedActivity, 'status'> {
+  petId: string
+  status: 'running' | 'claimable' | 'claimed'
+  claimedAt: number | null
+  actualRewards: PetActivityRewards | null
+}
+export interface PetActivityHistory {
+  serverNow: number
+  list: PetActivityRecord[]
+  pagination: { page: number; pageSize: number; total: number; pageCount: number }
 }
 export interface PetTimedActivity {
   id: string
@@ -38,6 +57,8 @@ export interface PetCatalog {
   skills: { id: PetSkillId; name: string; description: string }[]
   places: PetActivityEntry[]
   courses: PetActivityEntry[]
+  jobs: PetJobEntry[]
+  incomeRules: { dailyLimit: number }
   rules: {
     maxNameLength: number; initialCoins: number; initialFood: number
     dailyCoins: number; dailyFood: number; restDurationMs: number
@@ -58,6 +79,7 @@ export interface Pet {
   adoptedAt: number
   activity: null | { kind: 'rest'; startedAt: number; endsAt: number } | PetTimedActivity
   skills: { id: PetSkillId; experience: number; level: number }[]
+  jobs: { id: PetJobId; experience: number; level: number; completed: number }[]
   cooldowns: { pet: number; play: number }
   growthToday: { used: number; limit: number }
 }
@@ -66,6 +88,7 @@ export interface PetState {
   today: string
   catalogVersion: number
   wallet: { coins: number }
+  income: { date: string; earned: number; limit: number; remaining: number }
   inventory: { itemId: string; quantity: number }[]
   dailySupply: { claimed: boolean; coins: number; food: number }
   pet: Pet | null
@@ -82,6 +105,7 @@ export type PetCommand = (
 
 const speciesIds = new Set(['momota', 'hexiaotun', 'yubingmiao', 'paixiaoyu'])
 const skillIds = new Set(['vitality', 'exploration', 'knowledge', 'expression', 'crafting', 'kindness'])
+const jobIds = new Set(['delivery-assistant', 'trail-assistant', 'library-assistant', 'broadcast-assistant', 'craft-assistant', 'care-assistant'])
 const invalid = () => new ApiError('宠物数据格式不正确', 502)
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid()
@@ -107,6 +131,14 @@ function skill(value: unknown): PetSkillId {
   if (typeof value !== 'string' || !skillIds.has(value)) throw invalid()
   return value as PetSkillId
 }
+function job(value: unknown): PetJobId {
+  if (typeof value !== 'string' || !jobIds.has(value)) throw invalid()
+  return value as PetJobId
+}
+function activityKind(value: unknown): PetActivityKind {
+  if (value !== 'outing' && value !== 'course' && value !== 'work') throw invalid()
+  return value
+}
 function date(value: unknown): string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw invalid()
   const parsed = new Date(`${value}T00:00:00Z`)
@@ -127,22 +159,26 @@ function activityCost(value: unknown): PetActivityCost {
   return { coins: integer(row.coins), energy: integer(row.energy, 0, 100),
     hunger: integer(row.hunger, 0, 100), water: integer(row.water, 0, 100) }
 }
-function activityRewards(value: unknown): PetActivityRewards {
+function activityRewards(value: unknown, actual = false): PetActivityRewards {
   const row = object(value)
+  // 心情按服务端原始状态封顶，实际增量可能是小数，不能取整后冒充真实结算。
+  if (typeof row.mood !== 'number' || !Number.isFinite(row.mood) || row.mood < 0 || row.mood > 100) throw invalid()
   return {
-    experience: integer(row.experience), food: integer(row.food), mood: integer(row.mood, 0, 100),
+    coins: integer(row.coins), proficiency: integer(row.proficiency),
+    experience: integer(row.experience), food: integer(row.food), mood: actual ? row.mood : integer(row.mood, 0, 100),
     skills: unique(list(row.skills, 6).map(value => {
       const entry = object(value)
       return { id: skill(entry.id), experience: integer(entry.experience, 1) }
     }), entry => entry.id),
   }
 }
+function activityEntry(value: unknown): PetActivityEntry {
+  const row = object(value)
+  return { id: text(row.id, 64), name: text(row.name, 80), description: text(row.description, 500),
+    durationMs: integer(row.durationMs, 1), cost: activityCost(row.cost), rewards: activityRewards(row.rewards) }
+}
 function activityEntries(value: unknown): PetActivityEntry[] {
-  return unique(list(value, 50).map(value => {
-    const row = object(value)
-    return { id: text(row.id, 64), name: text(row.name, 80), description: text(row.description, 500),
-      durationMs: integer(row.durationMs, 1), cost: activityCost(row.cost), rewards: activityRewards(row.rewards) }
-  }), entry => entry.id)
+  return unique(list(value, 50).map(activityEntry), entry => entry.id)
 }
 
 export function petNameLength(value: string): number {
@@ -175,6 +211,12 @@ export function decodePetCatalog(value: unknown): PetCatalog {
     }), entry => entry.id),
     places: activityEntries(row.places),
     courses: activityEntries(row.courses),
+    jobs: unique(list(row.jobs, 6).map(value => {
+      const entry = object(value), requirement = object(entry.requirement)
+      return { ...activityEntry(value), id: job(entry.id),
+        requirement: { skillId: skill(requirement.skillId), experience: integer(requirement.experience, 1) } }
+    }), entry => entry.id),
+    incomeRules: { dailyLimit: integer(object(row.incomeRules).dailyLimit, 1) },
     species: unique(list(row.species, 4).map(value => {
       const entry = object(value)
       return { id: species(entry.id), name: text(entry.name, 40), description: text(entry.description, 500) }
@@ -190,7 +232,7 @@ export function decodePetCatalog(value: unknown): PetCatalog {
       restEnergyPerHour: integer(rules.restEnergyPerHour, 1, 100), growthDailyLimit: integer(rules.growthDailyLimit, 1),
     },
   }
-  if (catalog.species.length !== 4 || catalog.skills.length !== 6 || !catalog.items.some(item => item.id === 'food')) throw invalid()
+  if (catalog.species.length !== 4 || catalog.skills.length !== 6 || catalog.jobs.length !== 6 || !catalog.items.some(item => item.id === 'food')) throw invalid()
   return catalog
 }
 
@@ -204,8 +246,8 @@ export function decodePetState(value: unknown): PetState {
       const item = object(data.activity)
       const times = { startedAt: integer(item.startedAt), endsAt: integer(item.endsAt) }
       if (item.kind === 'rest') activity = { kind: 'rest', ...times }
-      else if ((item.kind === 'outing' || item.kind === 'course') && (item.status === 'running' || item.status === 'claimable')) {
-        activity = { id: text(item.id, 64), kind: item.kind, entryId: text(item.entryId, 64), name: text(item.name, 80),
+      else if (item.status === 'running' || item.status === 'claimable') {
+        activity = { id: text(item.id, 64), kind: activityKind(item.kind), entryId: text(item.entryId, 64), name: text(item.name, 80),
           ...times, status: item.status, cost: activityCost(item.cost), rewards: activityRewards(item.rewards) }
         if ((activity.status === 'claimable') !== (integer(row.serverNow) >= activity.endsAt)) throw invalid()
       } else throw invalid()
@@ -221,20 +263,53 @@ export function decodePetState(value: unknown): PetState {
         const entry = object(value)
         return { id: skill(entry.id), experience: integer(entry.experience), level: integer(entry.level, 1, 30) }
       }), entry => entry.id),
+      jobs: unique(list(data.jobs, 6).map(value => {
+        const entry = object(value)
+        return { id: job(entry.id), experience: integer(entry.experience), level: integer(entry.level, 1, 30), completed: integer(entry.completed) }
+      }), entry => entry.id),
       cooldowns: { pet: integer(cooldowns.pet), play: integer(cooldowns.play) },
       growthToday: { used: integer(growth.used), limit: integer(growth.limit, 1) },
     }
-    if (pet.growthToday.used > pet.growthToday.limit || pet.skills.length !== 6) throw invalid()
+    if (pet.growthToday.used > pet.growthToday.limit || pet.skills.length !== 6 || pet.jobs.length !== 6) throw invalid()
   }
+  const income = object(row.income)
+  const earned = integer(income.earned), limit = integer(income.limit, 1), remaining = integer(income.remaining)
+  if (remaining !== Math.max(0, limit - earned)) throw invalid()
   return {
     serverNow: integer(row.serverNow), today: date(row.today), catalogVersion: integer(row.catalogVersion, 1),
     wallet: { coins: integer(wallet.coins) },
+    income: { date: date(income.date), earned, limit, remaining },
     inventory: unique(list(row.inventory, 100).map(value => {
       const item = object(value)
       return { itemId: text(item.itemId, 64), quantity: integer(item.quantity) }
     }), item => item.itemId),
     dailySupply: { claimed: flag(daily.claimed), coins: integer(daily.coins), food: integer(daily.food) }, pet,
   }
+}
+
+export function decodePetActivityHistory(value: unknown): PetActivityHistory {
+  const row = object(value), pagination = object(row.pagination)
+  const serverNow = integer(row.serverNow)
+  const page = integer(pagination.page, 1, 10000), pageSize = integer(pagination.pageSize, 1, 50)
+  const total = integer(pagination.total), pageCount = integer(pagination.pageCount, 1)
+  if (pageCount !== Math.max(1, Math.ceil(total / pageSize))) throw invalid()
+  const records = unique(list(row.list, pageSize).map(value => {
+    const item = object(value)
+    if (item.status !== 'running' && item.status !== 'claimable' && item.status !== 'claimed') throw invalid()
+    const startedAt = integer(item.startedAt), endsAt = integer(item.endsAt)
+    const claimedAt = item.claimedAt === null ? null : integer(item.claimedAt)
+    if (endsAt <= startedAt || (item.status === 'claimed') !== (claimedAt !== null)
+        || (claimedAt !== null && claimedAt < endsAt)) throw invalid()
+    if (item.status !== 'claimed' && (item.status === 'claimable') !== (serverNow >= endsAt)) throw invalid()
+    // 早期已领取活动没有结算快照，保留未知，不能拿目录奖励冒充实际到账。
+    const actualRewards = item.actualRewards === null ? null : activityRewards(item.actualRewards, true)
+    if (item.status !== 'claimed' && actualRewards !== null) throw invalid()
+    return { id: text(item.id, 64), petId: text(item.petId, 64), kind: activityKind(item.kind),
+      entryId: text(item.entryId, 64), name: text(item.name, 80), startedAt, endsAt,
+      status: item.status, claimedAt, actualRewards, cost: activityCost(item.cost), rewards: activityRewards(item.rewards) } as PetActivityRecord
+  }), item => item.id)
+  if (records.length > total) throw invalid()
+  return { serverNow, list: records, pagination: { page, pageSize, total, pageCount } }
 }
 
 async function read<T>(path: string, decode: (value: unknown) => T, signal?: AbortSignal): Promise<T> {
@@ -244,6 +319,14 @@ async function read<T>(path: string, decode: (value: unknown) => T, signal?: Abo
 }
 export const readPetCatalog = (signal?: AbortSignal) => read('/api/v3/pets/catalog', decodePetCatalog, signal)
 export const readPetState = (signal?: AbortSignal) => read('/api/v3/me/pet', decodePetState, signal)
+export async function readPetActivityHistory(kind: PetHistoryKind, page: number, signal?: AbortSignal): Promise<PetActivityHistory> {
+  if (!['all', 'outing', 'course', 'work'].includes(kind)) throw invalid()
+  integer(page, 1, 10000)
+  const result = await read(`/api/v3/me/pet/activities?kind=${kind}&p=${page}&size=10`, decodePetActivityHistory, signal)
+  if (result.pagination.page !== page || result.pagination.pageSize !== 10
+      || (kind !== 'all' && result.list.some(item => item.kind !== kind))) throw invalid()
+  return result
+}
 
 export async function executePetCommand(command: PetCommand): Promise<void> {
   if (!/^[A-Za-z0-9._:-]{1,128}$/.test(command.key)) throw new ApiError('操作标识不合法', 422)

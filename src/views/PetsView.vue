@@ -9,6 +9,7 @@ import { usePetsStore } from '@/stores/pets'
 import { usePetDisplayStore } from '@/stores/petDisplay'
 import PetActions from '@/components/pets/PetActions.vue'
 import PetActivities from '@/components/pets/PetActivities.vue'
+import PetActivityHistory from '@/components/pets/PetActivityHistory.vue'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetIcon from '@/components/pets/PetIcon.vue'
 import { usePetClock } from '@/components/pets/usePetClock'
@@ -133,6 +134,7 @@ onMounted(() => { mounted.value = true; display.restore(); load() })
           <section class="supply-panel pet-panel" aria-labelledby="supply-title"><div class="supply-icon"><PetIcon name="gift" /></div><div class="supply-copy"><h2 id="supply-title">每日补给</h2><p>{{ pets.state.dailySupply.coins }} 宠物币 <span>＋</span> {{ pets.state.dailySupply.food }} 份口粮</p></div><button type="button" :class="pets.state.dailySupply.claimed ? 'pet-secondary' : 'pet-primary'" :disabled="locked || pets.state.dailySupply.claimed" @click="pets.claimSupply()">{{ pets.state.dailySupply.claimed ? '今日已领取' : '领取补给' }}</button></section>
           <section class="food-panel pet-panel" aria-labelledby="food-title"><div class="supply-icon"><PetIcon name="bag" /></div><div class="supply-copy"><h2 id="food-title">口粮背包 <span>{{ pets.foodQuantity }} 份</span></h2><p v-if="food">每份 {{ food.price }} 宠物币 · 饱食 +{{ food.hunger }}</p></div><form v-if="food" class="buy-food" @submit.prevent="pets.buyFood(quantity)"><label class="sr-only" for="pet-food-quantity">购买口粮数量</label><select id="pet-food-quantity" v-model.number="quantity" :disabled="locked"><option :value="1">1 份</option><option :value="5">5 份</option><option :value="10">10 份</option></select><button type="submit" class="pet-secondary" :disabled="locked || (pets.coins ?? 0) < food.price * quantity">补充 · {{ food.price * quantity }} 币</button></form></section>
         </div>
+        <PetActivityHistory />
         <section class="desktop-settings" aria-label="桌宠显示设置"><div><h2>让它陪你逛社区</h2><p>拖动桌宠可调整位置，收起后仍能随时找到它。</p></div><div class="desktop-buttons"><button type="button" class="pet-secondary" @click="display.visible ? display.hide() : display.show()">{{ display.visible ? '隐藏桌宠' : '显示桌宠' }}</button><button type="button" class="text-button" @click="display.resetPosition()">恢复默认位置</button></div></section>
       </template>
     </template>

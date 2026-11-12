@@ -236,9 +236,15 @@ export const usePetsStore = defineStore('pets', () => {
   }
   function startActivity(kind: PetActivityKind, entryId: string): Promise<boolean> {
     if (!canWrite() || !pet.value || !catalog.value || pet.value.activity) return Promise.resolve(false)
-    const entries = kind === 'outing' ? catalog.value.places : kind === 'course' ? catalog.value.courses : []
+    const entries = kind === 'outing' ? catalog.value.places : kind === 'course' ? catalog.value.courses : catalog.value.jobs
     const entry = entries.find(entry => entry.id === entryId)
     if (!entry) return Promise.resolve(false)
+    if (kind === 'work') {
+      const job = catalog.value.jobs.find(item => item.id === entryId)
+      const progress = pet.value.skills.find(item => item.id === job?.requirement.skillId)
+      if (!job || !progress || progress.experience < job.requirement.experience
+          || !state.value || state.value.income.remaining <= 0) return Promise.resolve(false)
+    }
     const cost = entry.cost
     if ((coins.value ?? 0) < cost.coins || pet.value.energy < cost.energy
         || pet.value.hunger < cost.hunger || pet.value.water < cost.water) return Promise.resolve(false)

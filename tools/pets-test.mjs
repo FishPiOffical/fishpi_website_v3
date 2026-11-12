@@ -40,14 +40,16 @@ const { usePetsStore } = await import(compile(source.replaceAll('import.meta.env
 
 const catalog = {
   version: 1,
-  activityVersion: 1,
+  activityVersion: 2,
   skills: ['vitality', 'exploration', 'knowledge', 'expression', 'crafting', 'kindness'].map(id => ({ id, name: id, description: '入门技能' })),
   places: [{ id: 'plaza', name: '广场散步', description: '和伙伴走一走', durationMs: 300000,
     cost: { coins: 0, energy: 5, hunger: 2, water: 3 },
-    rewards: { experience: 10, food: 0, mood: 8, skills: [{ id: 'exploration', experience: 3 }] } }],
+    rewards: { coins: 0, proficiency: 0, experience: 10, food: 0, mood: 8, skills: [{ id: 'exploration', experience: 3 }] } }],
   courses: [{ id: 'reading-basics', name: '阅读入门', description: '认识新的知识', durationMs: 600000,
     cost: { coins: 5, energy: 8, hunger: 3, water: 4 },
-    rewards: { experience: 15, food: 0, mood: 3, skills: [{ id: 'knowledge', experience: 10 }] } }],
+    rewards: { coins: 0, proficiency: 0, experience: 15, food: 0, mood: 3, skills: [{ id: 'knowledge', experience: 10 }] } }],
+  incomeRules: { dailyLimit: 60 },
+  jobs: ['delivery-assistant','trail-assistant','library-assistant','broadcast-assistant','craft-assistant','care-assistant'].map((id, index) => ({ id, name: id, description: '见习工作', durationMs: 1200000, cost: { coins: 0, energy: 12, hunger: 4, water: 6 }, rewards: { coins: 12, proficiency: 10, experience: 15, food: 0, mood: 3, skills: [] }, requirement: { skillId: ['vitality','exploration','knowledge','expression','crafting','kindness'][index], experience: 10 } })),
   species: ['momota', 'hexiaotun', 'yubingmiao', 'paixiaoyu'].map(id => ({ id, name: id, description: '社区伙伴' })),
   items: [{ id: 'food', name: '基础口粮', price: 5, hunger: 35 }],
   rules: { maxNameLength: 12, initialCoins: 100, initialFood: 6, dailyCoins: 20, dailyFood: 2,
@@ -55,11 +57,13 @@ const catalog = {
 }
 const now = Date.UTC(2026, 10, 12, 10)
 const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 1, wallet: { coins: 0 },
+  income: { date: '2026-11-12', earned: 0, limit: 60, remaining: 60 },
   inventory: [], dailySupply: { claimed: false, coins: 20, food: 2 }, pet: null })
 const adopted = () => ({ ...empty(), wallet: { coins: 100 }, inventory: [{ itemId: 'food', quantity: 6 }], pet: {
   id: 'pet-a', speciesId: 'hexiaotun', name: '荷小豚', hunger: 90, water: 90, mood: 90, energy: 80,
   experience: 0, level: 1, friendship: 0, adoptedAt: now - 3600000, activity: null,
   skills: catalog.skills.map(skill => ({ id: skill.id, experience: 0, level: 1 })),
+  jobs: catalog.jobs.map(job => ({ id: job.id, experience: 0, level: 1, completed: 0 })),
   cooldowns: { pet: 0, play: 0 }, growthToday: { used: 0, limit: 10 },
 } })
 const response = data => ({ code: 0, data: structuredClone(data) })
@@ -209,7 +213,7 @@ assert.throws(() => api.decodePetState(oldState), '缺少技能字段不能伪�
 const tripStart = deferred(), beforeStart = calls.length
 handler = (path, options) => options?.method ? tripStart.promise : success(path, options)
 const starting = store.startActivity('outing', 'plaza')
-assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', kind: 'outing', entryId: 'plaza', activityVersion: 1 })
+assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', kind: 'outing', entryId: 'plaza', activityVersion: 2 })
 assert.equal(await store.startActivity('course', 'reading-basics'), false)
 assert.equal(await store.act('rest'), false)
 serverState = { ...adopted(), pet: { ...adopted().pet, activity: activeTrip, energy: 75 } }
@@ -384,4 +388,122 @@ await ssr.refresh()
 assert.equal(calls.length, beforeSsr)
 ssr.$dispose()
 console.log('PASS SSR不读取宠物私有数据')
+// 第三批沿用真实 API 与 Pinia 状态，隔离传输，验证开工门槛和日志竞态。
+setActivePinia(createPinia())
+const workAuth = useAuthStore(), workStore = usePetsStore()
+serverState = adopted(); handler = success; await workStore.ensureLoaded()
+const beforeLocked = calls.length
+assert.equal(await workStore.startActivity('work', 'library-assistant'), false)
+assert.equal(calls.length, beforeLocked)
+serverState.pet.skills[2].experience = 9; await workStore.refresh()
+assert.equal(await workStore.startActivity('work', 'library-assistant'), false)
+serverState.pet.skills[2].experience = 10
+serverState.income = { date: '2026-11-12', earned: 60, limit: 60, remaining: 0 }
+await workStore.refresh()
+assert.equal(await workStore.startActivity('work', 'library-assistant'), false)
+serverState.income = { date: '2026-11-12', earned: 55, limit: 60, remaining: 5 }
+await workStore.refresh()
+const working = { ...activeTrip, id: 'work-a', kind: 'work', entryId: 'library-assistant', name: '图书助理',
+  status: 'running', endsAt: now + 1200000, cost: catalog.jobs[2].cost, rewards: catalog.jobs[2].rewards }
+handler = async (path, options) => {
+  if (options?.method) {
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', kind: 'work', entryId: 'library-assistant', activityVersion: 2 })
+    serverState.pet.activity = working
+    return response({ operation: 'activity-start', petId: 'pet-a', activityId: 'work-a', committedAt: now })
+  }
+  return success(path, options)
+}
+const beforeWork = calls.length
+assert.equal(await workStore.startActivity('work', 'library-assistant'), true)
+assert.equal(calls.length, beforeWork + 2)
+api.decodePetState(serverState)
+assert.equal(workStore.pet.activity.kind, 'work')
+assert.equal(workStore.coins, 100, '启动工作不能预先把工资加入钱包')
+assert.equal(workStore.pet.jobs[2].experience, 0, '未领取不能预先增加职业熟练度')
+assert.equal(await workStore.startActivity('outing', 'plaza'), false)
+console.log('PASS 工作只按对应技能门槛与服务端收入额度解锁，单槽互斥，报酬和熟练度不在本地预发')
+
+const historyPage = (records = [], page = 1, total = records.length) => ({ serverNow: now + 1200001, list: records,
+  pagination: { page, pageSize: 10, total, pageCount: Math.max(1, Math.ceil(total / 10)) } })
+const oldRecord = { ...activeTrip, petId: 'pet-a', status: 'claimed', claimedAt: activeTrip.endsAt, actualRewards: null }
+const workRecord = { ...working, petId: 'pet-a', status: 'claimed', claimedAt: working.endsAt,
+  actualRewards: { ...working.rewards, coins: 5, mood: 2.3 } }
+assert.equal(api.decodePetActivityHistory(historyPage([oldRecord])).list[0].actualRewards, null)
+assert.equal(api.decodePetActivityHistory(historyPage([workRecord])).list[0].actualRewards.coins, 5)
+assert.equal(api.decodePetActivityHistory(historyPage([workRecord])).list[0].actualRewards.mood, 2.3)
+for (const record of [{ ...workRecord, actualRewards: undefined }, { ...workRecord, claimedAt: null },
+  { ...workRecord, actualRewards: { ...workRecord.actualRewards, coins: -1 } },
+  { ...workRecord, actualRewards: { ...workRecord.actualRewards, mood: NaN } },
+  { ...workRecord, status: 'running', claimedAt: null }]) {
+  assert.throws(() => api.decodePetActivityHistory(historyPage([record])))
+}
+assert.throws(() => api.decodePetActivityHistory({ ...historyPage(), pagination: { page: 1, pageSize: 10, total: 11, pageCount: 1 } }))
+console.log('PASS 工作履历实际发币、封顶小数心情与旧记录未知成果分别保留，非法奖励/分页拒绝')
+
+globalThis.__petTest.usePetsStore = usePetsStore
+let historySource = await fs.readFile('src/stores/petActivityHistory.ts', 'utf8')
+for (const [name, url] of [
+  ['vue', import.meta.resolve('vue')], ['pinia', import.meta.resolve('pinia')], ['@/api/http', transport],
+  ['@/api/v3-pets', apiUrl], ['@/stores/auth', moduleUrl('export const {useAuthStore}=globalThis.__petTest')],
+  ['@/stores/pets', moduleUrl('export const {usePetsStore}=globalThis.__petTest')],
+]) historySource = historySource.replaceAll(`from '${name}'`, `from '${url}'`)
+const { usePetActivityHistoryStore } = await import(compile(historySource.replaceAll('import.meta.env.SSR', 'false')))
+const historyStore = usePetActivityHistoryStore()
+const isHistory = path => path.includes('/pet/activities?')
+let historyRequests = () => calls.filter(call => isHistory(call.path))
+handler = (path, options) => isHistory(path) ? Promise.resolve(response(historyPage([oldRecord, workRecord]))) : success(path, options)
+await workStore.refresh()
+assert.equal(historyRequests().length, 0, '折叠状态没有日志请求')
+await Promise.all([historyStore.open(), historyStore.open(), historyStore.refresh()])
+assert.equal(historyRequests().length, 1, '展开双击与刷新合并')
+assert.equal(historyStore.history.list.length, 2)
+const oldPage = deferred(), latestPage = deferred()
+handler = path => path.includes('kind=work') ? latestPage.promise : oldPage.promise
+const staleHistory = historyStore.refresh()
+const switchFilter = historyStore.setFilter('work')
+latestPage.resolve(response(historyPage([workRecord], 1, 11))); await switchFilter
+oldPage.resolve(response(historyPage([oldRecord]))); await staleHistory
+assert.equal(historyStore.history.list[0].id, 'work-a')
+assert.equal(historyStore.filter, 'work')
+const pageTwo = deferred()
+handler = () => pageTwo.promise
+const nextPage = historyStore.setPage(2)
+assert.equal(historyStore.history, null, '换页期间不能把旧页当作新页')
+pageTwo.resolve(response(historyPage([], 2, 11))); await nextPage
+assert.equal(historyStore.history.pagination.page, 2)
+console.log('PASS 日志按需展开与并发合并，分类/页码切换废弃旧响应，真实分页')
+
+const staleBeforeClaim = deferred(), currentAfterClaim = deferred()
+let historyCounter = 0
+handler = (path, options) => isHistory(path) ? (++historyCounter === 1 ? staleBeforeClaim.promise : currentAfterClaim.promise) : success(path, options)
+const staleClaimRead = historyStore.refresh()
+await workStore.refresh()
+assert.equal(historyCounter, 2, '状态重读必须废弃领取前在途履历再读取一次')
+currentAfterClaim.resolve(response(historyPage([], 2, 11))); await tick()
+staleBeforeClaim.resolve(response(historyPage([workRecord], 2, 11))); await staleClaimRead
+assert.equal(historyStore.history.list.length, 0)
+historyStore.close()
+const beforeClosed = historyRequests().length
+handler = success; await workStore.refresh()
+assert.equal(historyRequests().length, beforeClosed)
+console.log('PASS 状态更新废弃旧在途履历后刷新一次，关闭后桌宠更新不再读日志')
+
+const rotateHistory = deferred(); handler = () => rotateHistory.promise
+const rotatedRead = historyStore.open()
+workAuth.accessToken = 'token-a-rotated-for-history'
+rotateHistory.resolve(response(historyPage([], 2, 11))); await rotatedRead
+assert.equal(historyStore.history.pagination.page, 2, '同账号令牌轮换保留在途读取')
+const oldIdentity = deferred(); handler = () => oldIdentity.promise
+const identityRead = historyStore.refresh()
+context++; workAuth.account = { oId: 'another-owner' }; workAuth.accessToken = 'other-token'
+oldIdentity.resolve(response(historyPage([workRecord], 2, 11))); await identityRead
+assert.equal(historyStore.history, null)
+assert.equal(historyStore.opened, false)
+assert.equal(historyStore.filter, 'all')
+assert.equal(historyStore.page, 1)
+workAuth.accessToken = null
+const beforeGuestHistory = calls.length; await historyStore.open(); await historyStore.refresh()
+assert.equal(calls.length, beforeGuestHistory)
+historyStore.$dispose(); workStore.$dispose()
+console.log('PASS 日志普通轮换保留，换号清除/关闭且拒迟到响应，游客零请求')
 delete globalThis.__petTest
