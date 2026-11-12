@@ -49,6 +49,14 @@ const displayHtml = computed(() => {
   const template = document.createElement('template')
   template.innerHTML = props.html
   for (const img of template.content.querySelectorAll('img:not(.emoji)')) {
+    const picture = img.closest('picture')
+    if (!singleImage.value) {
+      const media = picture ?? img
+      const frame = document.createElement('span')
+      frame.className = 'chat-image-frame'
+      media.before(frame)
+      frame.append(media)
+    }
     const original = img.getAttribute('src')
     if (!original) continue
     const thumbnail = rhyPicThumbnail(original, thumbnailWidth, thumbnailHeight)
@@ -56,7 +64,7 @@ const displayHtml = computed(() => {
     img.setAttribute('src', thumbnail)
     img.setAttribute('data-chat-original', original)
     img.removeAttribute('srcset')
-    img.closest('picture')?.querySelectorAll('source').forEach(source => source.remove())
+    picture?.querySelectorAll('source').forEach(source => source.remove())
   }
   return template.innerHTML
 })
@@ -361,10 +369,22 @@ function onBodyClick(e: MouseEvent) {
   line-height: 1.7;
 }
 .is-room .body :deep(p + p) { margin-top: 6px; }
+.is-room .body :deep(.chat-image-frame) {
+  display: inline-flex;
+  align-items: flex-start;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.is-room .body :deep(.chat-image-frame > picture) { display: contents; }
 .is-room .body :deep(img:not(.emoji)) {
   max-width: min(220px, 100%);
   max-height: 260px;
   border-radius: 8px;
+}
+/* 固定上限参与气泡的固有宽度计算，窄容器再由外层 flex 缩小图片。 */
+.is-room .body :deep(:where(.chat-image-frame) img:not(.emoji)) {
+  min-width: 0;
+  max-width: 220px;
 }
 .is-room .body :deep(video), .is-room .body :deep(iframe) {
   max-width: 100%;
