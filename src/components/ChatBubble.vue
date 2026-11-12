@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { formatDisplayTime } from '@/utils/time'
 
@@ -34,6 +35,8 @@ const props = withDefaults(
   { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
+const chatPreferences = useChatPreferencesStore()
+const simpleMode = computed(() => mounted.value && props.chatroom && chatPreferences.simpleMode)
 const functionPreferences = useFunctionPreferencesStore()
 const thumbnailWidth = 400
 const thumbnailHeight = 360
@@ -105,7 +108,7 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? snapshot.bubbleId : undefined" :data-frame="chatroom ? snapshot.frameId : undefined" class="fp-msg" :class="{ 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
+  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
     <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`">
       <img class="fp-avatar" :src="avatarThumbnail(avatar, avatarSize)" alt="" loading="lazy" @error="onAvatarError" />
     </RouterLink>
@@ -510,4 +513,14 @@ function onBodyClick(e: MouseEvent) {
 @media (prefers-reduced-motion: reduce) {
   .is-room .actions, .is-room .message-reactions :deep(.rx.empty:not(.open)) { transition: none; }
 }
+/* 精简模式仅改变本机显示，保留消息携带的原始外观快照。 */
+.fp-msg.is-room.is-simple .fp-bubble {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  padding-inline: 0;
+}
+.fp-msg.is-room.is-simple .fp-bubble::before,
+.fp-msg.is-room.is-simple .fp-bubble::after { display: none; }
 </style>

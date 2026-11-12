@@ -36,7 +36,7 @@ function clear() {
   arrivals.value = []
 }
 function next() {
-  if (!visible.value || !preferences.mountEffects || !timeline.connected) { clear(); return }
+  if (!visible.value || !preferences.showMountEffects || !timeline.connected) { clear(); return }
   while (queue.length && arrivals.value.length < 3) {
     const item = queue.shift()!
     if (Date.now() - item.receivedAt > 15000) continue
@@ -54,7 +54,7 @@ watch(() => timeline.notices, notices => {
     if (seen.has(notice.id)) continue
     seen.add(notice.id)
     if (seen.size > 200) seen.delete(seen.values().next().value!)
-    if (!visible.value || !preferences.mountEffects || notice.kind !== 'join' || !notice.mount || !mountAssets[notice.mount.id]) continue
+    if (!visible.value || !preferences.showMountEffects || notice.kind !== 'join' || !notice.mount || !mountAssets[notice.mount.id]) continue
     if (filter.modeFor({ ...notice.actor, userOId: notice.actor.id, card: { text: notice.text } }) !== 'show') continue
     if (queue.length >= 3) queue.shift()
     queue.push({ notice, receivedAt: Date.now() })
@@ -62,7 +62,7 @@ watch(() => timeline.notices, notices => {
   }
   next()
 }, { flush: 'sync' })
-watch([visible, () => preferences.mountEffects, () => timeline.connected], () => { if (!visible.value || !preferences.mountEffects || !timeline.connected) clear() })
+watch([visible, () => preferences.showMountEffects, () => timeline.connected], () => { if (!visible.value || !preferences.showMountEffects || !timeline.connected) clear() })
 watch(() => `${getAuthContextVersion()}:${auth.account?.oId}:${!!auth.accessToken}`, () => { clear(); seen.clear() })
 watch(visible, value => { if (!import.meta.env.SSR) setChatPresenceWanted(value) }, { immediate: true })
 onBeforeUnmount(() => { clear(); setChatPresenceWanted(false) })

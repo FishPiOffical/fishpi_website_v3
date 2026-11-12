@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { RouterLink } from 'vue-router'
 import type { ChatRoomNotice } from '@/api/v3-realtime'
 import { useV3ChatRedPacketsStore } from '@/stores/v3ChatRedPackets'
 
+const preferences = useChatPreferencesStore()
 defineProps<{ notice: ChatRoomNotice }>()
 const packets = useV3ChatRedPacketsStore()
 </script>
 
 <template>
-  <p class="chat-room-notice" :class="{ 'is-claim': notice.kind === 'claim' }">
+  <p v-if="!preferences.simpleMode || notice.kind === 'claim'" class="chat-room-notice" :class="{ 'is-claim': notice.kind === 'claim' }">
     <template v-if="notice.kind === 'claim'">
       <RouterLink :to="`/member/${notice.actor.userName}`">{{ notice.actor.userNickname || notice.actor.userName }}</RouterLink>
       领取了

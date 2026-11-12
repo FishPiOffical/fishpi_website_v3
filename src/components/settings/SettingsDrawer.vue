@@ -354,7 +354,8 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
 
           <div v-else-if="section === 'chatInput'" class="content">
-            <label class="setting-options"><input type="checkbox" :checked="chatPreferences.mountEffects" @change="chatPreferences.setMountEffects(($event.target as HTMLInputElement).checked)"> 显示座驾进场特效</label>
+            <label class="setting-options"><input type="checkbox" :checked="chatPreferences.simpleMode" @change="chatPreferences.setSimpleMode(($event.target as HTMLInputElement).checked)"> 精简模式（隐藏头像框、气泡和进出场效果）</label>
+            <label class="setting-options"><input type="checkbox" :disabled="chatPreferences.simpleMode" :checked="chatPreferences.mountEffects" @change="chatPreferences.setMountEffects(($event.target as HTMLInputElement).checked)"> 显示座驾进场特效</label>
             <fieldset class="setting-options">
               <legend>发送快捷键</legend>
               <label :class="{ selected: chatPreferences.sendShortcut === 'mod-enter' }">

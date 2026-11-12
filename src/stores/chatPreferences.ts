@@ -1,15 +1,18 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { ChatSendShortcut } from '@/utils/chatSendShortcut'
 
 const storageKey = 'fp.chat.sendShortcut'
 
 export const useChatPreferencesStore = defineStore('chatPreferences', () => {
+  const simpleMode = ref(false)
   const mountEffects = ref(true)
+  const showMountEffects = computed(() => mountEffects.value && !simpleMode.value)
   const sendShortcut = ref<ChatSendShortcut>('mod-enter')
 
   function restore() {
     try {
+      simpleMode.value = localStorage.getItem('fp.chat.simpleMode') === 'true'
       mountEffects.value = localStorage.getItem('fp.chat.mountEffects') !== 'false'
       const saved = localStorage.getItem(storageKey)
       if (saved === 'ctrl-enter') sendShortcut.value = 'mod-enter'
@@ -28,9 +31,14 @@ export const useChatPreferencesStore = defineStore('chatPreferences', () => {
     }
   }
 
+  function setSimpleMode(enabled: boolean) {
+    simpleMode.value = enabled
+    try { localStorage.setItem('fp.chat.simpleMode', String(enabled)) } catch { /* 存储不可用时仍立即生效。 */ }
+  }
+
   function setMountEffects(enabled: boolean) {
     mountEffects.value = enabled
     try { localStorage.setItem('fp.chat.mountEffects', String(enabled)) } catch { /* 本机存储不可用时保留当前选择。 */ }
   }
-  return { sendShortcut, mountEffects, restore, setSendShortcut, setMountEffects }
+  return { simpleMode, showMountEffects, setSimpleMode, sendShortcut, mountEffects, restore, setSendShortcut, setMountEffects }
 })
