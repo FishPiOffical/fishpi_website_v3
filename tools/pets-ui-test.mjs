@@ -1,0 +1,182 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import os from 'node:os'
+import { pathToFileURL } from 'node:url'
+import { JSDOM } from 'jsdom'
+import ts from 'typescript'
+import { parse, compileScript } from '@vue/compiler-sfc'
+
+// 使用真实 Vue 模板与 store，仅替换传输和浏览器几何；测试不会触碰真实账号或站点接口。
+const dom = new JSDOM('<!doctype html><html><body><header data-site-navigation></header><div id="app"></div></body></html>', { url: 'http://127.0.0.1:5173/pets', pretendToBeVisual: true })
+for (const key of ['window', 'document', 'navigator', 'localStorage', 'Element', 'HTMLElement', 'SVGElement', 'Node', 'Event', 'MouseEvent', 'KeyboardEvent', 'getComputedStyle']) {
+  Object.defineProperty(globalThis, key, { configurable: true, value: key === 'getComputedStyle' ? dom.window.getComputedStyle.bind(dom.window) : dom.window[key] })
+}
+Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+window.matchMedia = query => ({ matches: /max-width: 640px/.test(query) && window.innerWidth <= 640, addEventListener() {}, removeEventListener() {} })
+globalThis.ResizeObserver = class { observe() {} disconnect() {} unobserve() {} }
+globalThis.BroadcastChannel = class { postMessage() {} close() {} }
+document.querySelector('header').getBoundingClientRect = () => ({ top: 0, bottom: 80, left: 0, right: window.innerWidth, width: window.innerWidth, height: 80 })
+Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get() { return this.classList.contains('pet-desktop') ? this.classList.contains('collapsed') ? 56 : 144 : this.classList.contains('pet-desktop-panel') ? 296 : 0 } })
+Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get() { return this.classList.contains('pet-desktop') ? this.classList.contains('collapsed') ? 84 : 184 : this.classList.contains('pet-desktop-panel') ? 240 : 0 } })
+HTMLElement.prototype.setPointerCapture = function () {}
+HTMLElement.prototype.releasePointerCapture = function () {}
+HTMLElement.prototype.hasPointerCapture = function () { return false }
+const vue = await import('vue')
+const { createApp, h, nextTick, ref, reactive } = vue
+const { createPinia, defineStore, setActivePinia } = await import('pinia')
+const useAuthStore = defineStore('pet-ui-auth', () => ({ accessToken: ref('token-a'), account: ref({ oId: 'A' }), isLoggedIn: vue.computed(() => !!useAuthStore().accessToken) }))
+const useLayoutStore = defineStore('pet-ui-layout', () => ({ immersive: ref(false) }))
+class ApiError extends Error { constructor(message, status, code) { super(message); this.status = status; this.code = code } }
+let context = 1, serial = 0, handler
+const calls = [], route = reactive({ path: '/pets' })
+const RouterLink = { props: ['to'], setup(props, { slots }) { return () => h('a', { href: typeof props.to === 'string' ? props.to : props.to.path }, slots.default?.()) } }
+globalThis.__petUITest = { ApiError, getAuthContextVersion: () => context, useAuthStore, useLayoutStore, RouterLink, useRoute: () => route,
+  profileOperationKey: () => `pet-ui:${++serial}`, usePageSeo: () => {},
+  request: (url, options) => { calls.push({ url, options }); return handler(url, options) } }
+const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'fishpi-pets-ui-'))
+const compiled = new Map()
+const stub = pathToFileURL(path.join(temporary, 'stubs.mjs')).href
+await fs.writeFile(path.join(temporary, 'stubs.mjs'), 'export const { ApiError,getAuthContextVersion,useAuthStore,useLayoutStore,RouterLink,useRoute,profileOperationKey,usePageSeo,request }=globalThis.__petUITest')
+const stubs = new Set(['@/api/http', '@/stores/auth', '@/stores/layout', '@/api/v3-profile', '@/composables/usePageSeo', 'vue-router'])
+async function compileFile(file) {
+  file = path.resolve(file)
+  if (compiled.has(file)) return compiled.get(file)
+  const target = path.join(temporary, `${compiled.size}.mjs`), url = pathToFileURL(target).href
+  compiled.set(file, url)
+  let source = await fs.readFile(file, 'utf8')
+  if (file.endsWith('.vue')) source = compileScript(parse(source, { filename: file }).descriptor, { id: `pet-ui-${compiled.size}`, inlineTemplate: true }).content
+  source = source.replaceAll('import.meta.env.SSR', 'false')
+  for (const match of [...source.matchAll(/from\s*(['"])([^'"]+)\1/g)]) {
+    const specifier = match[2]
+    let replacement
+    if (stubs.has(specifier) || (path.basename(file) === 'v3-pets.ts' && specifier === './http')) replacement = stub
+    else if (specifier.startsWith('@/') || specifier.startsWith('.')) {
+      let dependency = specifier.startsWith('@/') ? path.resolve('src', specifier.slice(2)) : path.resolve(path.dirname(file), specifier)
+      if (!path.extname(dependency)) dependency += '.ts'
+      replacement = await compileFile(dependency)
+    } else replacement = import.meta.resolve(specifier)
+    source = source.replaceAll(match[0], `from '${replacement}'`)
+  }
+  await fs.writeFile(target, ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
+  return url
+}
+const catalog = { version: 1, species: [
+  { id: 'momota', name: '摸摸獭', description: '水边的小伙伴' }, { id: 'hexiaotun', name: '荷小豚', description: '戴荷叶帽的小伙伴' },
+  { id: 'yubingmiao', name: '鱼饼喵', description: '好奇的小伙伴' }, { id: 'paixiaoyu', name: '派小鱼', description: '熟悉的小伙伴' },
+], items: [{ id: 'food', name: '基础口粮', price: 5, hunger: 35 }], rules: { maxNameLength: 12, initialCoins: 100, initialFood: 6,
+  dailyCoins: 20, dailyFood: 2, restDurationMs: 14400000, restEnergyPerHour: 20, growthDailyLimit: 10 } }
+const now = Date.now()
+const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 1, wallet: { coins: 0 }, inventory: [],
+  dailySupply: { claimed: false, coins: 20, food: 2 }, pet: null })
+const adopted = (id = 'pet-a', name = '我的小鱼', speciesId = 'momota') => ({ ...empty(), wallet: { coins: 100 }, inventory: [{ itemId: 'food', quantity: 6 }], pet: {
+  id, name, speciesId, hunger: 90, water: 90, mood: 90, energy: 80, experience: 0, level: 1, friendship: 0, adoptedAt: now,
+  activity: null, cooldowns: { pet: 0, play: 0 }, growthToday: { used: 0, limit: 10 },
+} })
+let serverState = empty()
+const response = data => ({ code: 0, data: structuredClone(data) })
+const success = async (url, options) => {
+  if (options?.method) {
+    const body = JSON.parse(options.body), kind = url.split('/').at(-1)
+    if (kind === 'adoption') serverState = adopted('pet-a', body.name, body.speciesId)
+    return response({ operation: kind === 'actions' ? body.action : kind === 'purchases' ? 'purchase' : kind, petId: serverState.pet?.id, committedAt: now })
+  }
+  return response(url.endsWith('/catalog') ? catalog : serverState)
+}
+handler = success
+const writes = () => calls.filter(call => call.options?.method)
+const settle = async () => { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)); await nextTick() }
+const click = async element => { assert(element, '交互目标必须真实存在'); element.click(); await settle() }
+const input = async (element, value) => { assert(element); element.value = value; element.dispatchEvent(new Event('input', { bubbles: true })); await settle() }
+function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { resolve, reject, promise } }
+let app
+try {
+  const viewModule = await import(await compileFile('src/views/PetsView.vue'))
+  const desktopModule = await import(await compileFile('src/components/pets/PetDesktop.vue'))
+  const petModule = await import(await compileFile('src/stores/pets.ts'))
+  const displayModule = await import(await compileFile('src/stores/petDisplay.ts'))
+  const pinia = createPinia(); setActivePinia(pinia)
+  const auth = useAuthStore(), pets = petModule.usePetsStore(), display = displayModule.usePetDisplayStore()
+  app = createApp({ render: () => h('div', [h(viewModule.default), h(desktopModule.default)]) })
+  app.use(pinia).mount('#app'); await settle()
+  assert.equal(document.querySelectorAll('.species-options input').length, 4)
+  assert.equal(calls.length, 2, '家园和桌宠应合并初始化请求')
+  const radios = document.querySelectorAll('.species-options input')
+  await click(radios[0])
+  assert.equal(document.querySelectorAll('.species-option.selected').length, 1)
+  assert.equal(document.querySelector('.species-option.selected input').value, 'momota')
+  await input(document.querySelector('#pet-adoption-name'), '我的小鱼')
+  auth.accessToken = 'token-a-rotated'; await settle()
+  assert.equal(document.querySelector('#pet-adoption-name').value, '我的小鱼')
+  console.log('PASS 四选一真实表单，页面与桌宠合并初始化，普通令牌轮换保留草稿')
+
+  const pendingWrite = deferred()
+  handler = (url, options) => options?.method ? pendingWrite.promise : success(url, options)
+  const form = document.querySelector('.adoption-form')
+  form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await settle()
+  assert.equal(pets.busy, true)
+  assert.equal(document.querySelector('.pet-feedback.pending'), null, '进行中的正常请求不得显示未确认提示')
+  assert.equal(document.querySelector('#pet-adoption-name').disabled, true)
+  form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await settle()
+  assert.equal(writes().length, 1)
+  pendingWrite.reject(new Error('模拟断流')); await settle()
+  assert.equal(document.querySelector('#pet-adoption-name').value, '我的小鱼')
+  assert(document.querySelector('[aria-label="核对上次宠物操作"]'))
+  const originalKey = pets.pending.key
+  handler = success
+  await click(document.querySelector('[aria-label="核对上次宠物操作"]'))
+  assert.equal(writes().at(-1).options.headers['Idempotency-Key'], originalKey)
+  assert.equal(pets.pet.name, '我的小鱼')
+  assert.equal(document.querySelector('.species-options'), null)
+  assert(document.querySelector('.pet-desktop'))
+  console.log('PASS 领养双击仅一写，未知结果保留输入与原键，成功后家园和桌宠同步')
+
+  await click(document.querySelector('[aria-label="修改宠物名字"]'))
+  await input(document.querySelector('#pet-name'), '旧账号未存草稿')
+  auth.accessToken = 'token-a-new'; await settle()
+  assert.equal(document.querySelector('#pet-name').value, '旧账号未存草稿')
+  serverState = empty(); context++; auth.account = { oId: 'B' }; auth.accessToken = 'token-b'; await settle()
+  assert.equal(pets.pet, null)
+  assert.equal(document.querySelector('#pet-name'), null)
+  assert.equal(document.querySelector('#pet-adoption-name').value, '')
+  assert.equal(document.querySelector('.pet-desktop'), null)
+  assert.equal(document.body.textContent.includes('旧账号未存草稿'), false)
+  console.log('PASS 改名草稿在轮换时保留，换号后清空旧名字、旧宠物和未确认操作')
+
+  serverState = adopted('pet-b', '小伙伴'); await pets.refresh(); await settle()
+  display.hide(); await settle(); assert.equal(document.querySelector('.pet-desktop'), null)
+  display.show(); await settle(); assert(document.querySelector('.pet-desktop'))
+  display.move(-9999, -9999); window.dispatchEvent(new Event('resize')); await settle()
+  assert(display.position.x >= 8); assert(display.position.y >= 88)
+  display.move(9999, 9999); window.dispatchEvent(new Event('resize')); await settle()
+  assert(display.position.x <= window.innerWidth - 144 - 8)
+  assert(display.position.y <= window.innerHeight - 184 - 12)
+  await click(document.querySelector('[aria-label="收起桌宠"]'))
+  assert(document.querySelector('.pet-desktop.collapsed'))
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 360 })
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 640 })
+  window.dispatchEvent(new Event('resize')); await settle()
+  assert(display.position.x >= 8 && display.position.x <= 296)
+  assert(display.position.y >= 88 && display.position.y <= 544)
+  const handle = document.querySelector('.pet-drag-handle'), before = display.position.x
+  handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true })); await settle()
+  assert.equal(display.position.x, Math.max(8, before - 12))
+  handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); await settle()
+  assert(display.position && display.position.x >= 8 && display.position.y >= 88)
+  assert.equal(JSON.parse(localStorage.getItem('fishpi.pet.display.v1')).visible, true)
+  console.log('PASS 桌宠隐藏恢复、收起展开、视口和导航边界、窄屏缩放、键盘移动及双击归位')
+
+  const ownedState = adopted('pet-b', '小伙伴')
+  ownedState.serverNow = now - 120000
+  ownedState.pet.cooldowns.pet = now + 40000
+  serverState = ownedState; await pets.refresh(); pets.receivedAt = Date.now() - 120000; await settle()
+  const care = document.querySelector('.pet-actions button[title]')
+  assert(care)
+  const petAction = [...document.querySelectorAll('.pet-actions button')].find(button => button.textContent.includes('抚摸'))
+  assert(/\d+ 秒后/.test(petAction.textContent), '倒计时必须基于共享状态接收时间，不从组件新挂载重新计时')
+  console.log('PASS 缓存状态的冷却倒计时使用共享接收时间')
+} finally {
+  app?.unmount()
+  await fs.rm(temporary, { recursive: true, force: true })
+  dom.window.close()
+}

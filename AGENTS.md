@@ -6,6 +6,8 @@
 
 ## 项目范围
 
+- `pet` 分支基础养成由 `v3-pets.ts`、`pets` store 和 `PetsView/PetDesktop` 共用，服务端权威状态、独立宠物币；写回执后只重读聚合状态，未知保留原键，换号清私有数据。桌宠仅持久化位置/显示偏好，不轮询；规则及人工验收见 `docs/pets-phase-one.md`，动画和学校/外出/工作另批实施。
+
 - 项目为摸鱼派用户站，采用 Vue 3、TypeScript、Pinia、Vite 与 SSR。
 - 后端继续使用 Rhythm，功能行为与接口参考 https://fishpi.cn。
 - 管理后台不在重构范围，继续使用 Rhythm 的 /admin。

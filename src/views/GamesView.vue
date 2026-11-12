@@ -50,6 +50,7 @@ watch(selected,id=>{if(id)void nextTick(()=>{if(selected.value===id)detailPanel.
       <svg class="hero-art" viewBox="0 0 200 160" fill="none" aria-hidden="true"><circle cx="104" cy="80" r="66" fill="currentColor" opacity=".06"/><g transform="translate(27 15) scale(6)"><path :d="gamepad" stroke="currentColor" stroke-width=".45" stroke-linecap="round" stroke-linejoin="round"/></g><path d="M38 29v12m-6-6h12m120 79v12m-6-6h12" stroke="currentColor" stroke-width="2" opacity=".5"/></svg>
     </header>
     <nav class="section-nav" aria-label="游戏分区"><a href="#official">官方游戏 <span>{{ official.length }}</span></a><a href="#activities">活动小游戏 <span>{{ activities.length }}</span></a><a href="#community">社区鱼游 <span v-if="games">{{ games.total }}</span></a><a href="#submission" class="submit-shortcut" @click="submissionOpen=true">分享游戏 <span aria-hidden="true">＋</span></a></nav>
+    <RouterLink to="/pets" class="pet-game-entry"><span class="pet-game-art"><img src="/images/pets/hexiaotun.webp" alt="" width="72" height="72" /></span><span><strong>宠物家园</strong><span>领养一位摸鱼伙伴，喂食、陪伴，一起慢慢长大。</span></span><span class="pet-game-arrow" aria-hidden="true">↗</span></RouterLink>
     <section v-for="section in sections" :id="section.id" :key="section.id" class="catalog-section" :aria-labelledby="section.id+'-title'">
       <header class="section-head"><span class="section-number" aria-hidden="true">{{ section.number }}</span><div><h2 :id="section.id+'-title'">{{ section.title }}</h2><p>{{ section.description }}</p></div><RouterLink v-if="section.id==='activities'" to="/activity" class="section-more">签到与昨日活跃 ↗</RouterLink><span v-else class="section-more">在经典站点打开</span></header>
       <ul class="official-grid"><li v-for="g in section.items" :key="g.href"><a class="official-game" :href="'https://fishpi.cn'+g.href" target="_blank" rel="noopener noreferrer"><span class="catalog-icon"><img :src="g.icon" alt="" width="34" height="34" referrerpolicy="no-referrer" /></span><span class="catalog-copy"><strong>{{ g.title }}</strong><span>{{ g.tip }}</span></span><span class="card-arrow" aria-hidden="true">↗</span></a></li></ul>
@@ -77,6 +78,12 @@ watch(selected,id=>{if(id)void nextTick(()=>{if(selected.value===id)detailPanel.
   </div>
 </template>
 <style scoped>
+.pet-game-entry { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; padding: 12px 24px; border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius, 14px); background: var(--fp-card); color: var(--fp-text); text-decoration: none; transition: border-color .18s, transform .18s; }
+.pet-game-entry:hover { border-color: color-mix(in srgb, var(--fp-primary) 45%, var(--fp-border)); transform: translateY(-2px); text-decoration: none; }
+.pet-game-art { flex: none; width: 72px; height: 72px; }.pet-game-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.pet-game-entry > span:nth-child(2) { display: grid; gap: 7px; min-width: 0; }.pet-game-entry strong { color: var(--fp-title); font-size: 18px; }.pet-game-entry > span:nth-child(2) > span { color: var(--fp-muted); font-size: 13px; line-height: 1.6; }.pet-game-arrow { margin-left: auto; color: var(--fp-primary); font-size: 22px; }
+@media(max-width:600px) { .pet-game-entry { gap: 12px; padding: 12px 16px; }.pet-game-art { width: 56px; height: 56px; }.pet-game-entry strong { font-size: 16px; } }
+@media(prefers-reduced-motion:reduce) { .pet-game-entry { transition: none; } }
 .games-page{padding-bottom:20px;color:var(--fp-text)}
 .games-hero{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:30px 32px;border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius);background:linear-gradient(115deg,var(--fp-card) 35%,var(--fp-primary-soft));overflow:hidden}
 .eyebrow{font-size:12px;color:var(--fp-primary);font-weight:600;letter-spacing:2px}.games-hero h1{font-size:30px;line-height:1.45;letter-spacing:-.8px;margin:10px 0 8px;color:var(--fp-title);font-weight:650}.games-hero h1>span{color:var(--fp-primary)}.games-hero p{font-size:14px;line-height:1.7;color:var(--fp-muted);margin:0}.hero-art{width:200px;height:160px;flex:none;color:var(--fp-primary)}

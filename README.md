@@ -70,6 +70,7 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 
 闲聊室 `/idle-talk` 现网 404，**明确不做**。管理后台不在本站范围（继续用 Rhythm FTL `/admin`）。
 游戏入口：`/games`（官方小游戏跳转 Rhythm + 鱼游投稿）；VIP：`/vips`（v3 本人会员及原子积分开通）。
+`pet` 分支新增 `/pets` 宠物家园第一批：免费领养、日常照顾、宠物币/口粮及静态桌宠。依赖配套 Rhythm 迁移和接口；规则、验证与后续批次见 [宠物家园工作记录](docs/pets-phase-one.md)。
 用户列表/内容读取失败明确显示错误和重试，合法空结果单独展示，不用 mock 冒充。
 SSR 另 prefetch：`/domains`、`/tags`、`/breezemoons`、`/top`、`/repeater`。
 补齐页面：`/download`、`/agreement`、`/privacy`、`/activity`、`/following`、`/settings/point`、`/member/:name/medals`、`/city/:city`、`/charge/point`、`/column/:id`。

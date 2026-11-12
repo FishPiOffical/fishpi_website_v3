@@ -380,6 +380,12 @@ const routes = [
     component: () => import('@/views/GamesView.vue'),
   },
   {
+    path: '/pets',
+    name: 'pets',
+    component: () => import('@/views/PetsView.vue'),
+    meta: { robots: 'noindex' },
+  },
+  {
     path: '/vips',
     name: 'vips',
     component: () => import('@/views/VipView.vue'),
