@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CommentVisibilityNotice from '@/components/comments/CommentVisibilityNotice.vue'
 import { formatDisplayTime } from '@/utils/time'
 
 import { computed, nextTick, ref, watch } from 'vue'
@@ -53,7 +54,7 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
                 <time :datetime="item.comment.commentCreateTimeStr">{{ formatDisplayTime(item.comment.commentCreateTimeStr) }}</time>
               </div>
               <div v-if="item.comment.commentContentVisible" class="comment-body" v-html="item.comment.commentContent" />
-              <p v-else class="comment-private">私密评论正文不可见。</p>
+              <CommentVisibilityNotice v-else />
             </li>
           </ul>
           <p v-if="!content.total && activeTab !== 'home' && activeTab !== 'long'" class="member-status">没有可见记录。</p>

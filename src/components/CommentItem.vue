@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CommentVisibilityNotice from '@/components/comments/CommentVisibilityNotice.vue'
 import { formatDisplayTime } from '@/utils/time'
 
 import { computed, ref } from 'vue'
@@ -85,7 +86,7 @@ function onBodyClick(e: MouseEvent) {
         </header>
 
         <slot v-if="editing" name="editor" />
-        <p v-else-if="comment.commentContentVisible===false" class="cmt-body">此评论正文当前不可见</p>
+        <CommentVisibilityNotice v-else-if="comment.commentContentVisible===false" />
         <div v-else class="cmt-body" @click="onBodyClick" v-html="comment.commentContent || ''" />
 
         <footer class="cmt-ops">

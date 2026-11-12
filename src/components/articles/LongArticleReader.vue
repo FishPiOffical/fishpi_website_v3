@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CommentVisibilityNotice from '@/components/comments/CommentVisibilityNotice.vue'
 import { rememberChapter } from '@/utils/readingProgress'
 import { formatDisplayTime } from '@/utils/time'
 
@@ -698,7 +699,7 @@ function chapterTitle(c: LongArticleChapter) {
                 <time>{{ formatDisplayTime(comment.commentCreateTimeStr) }}</time>
               </div>
               <p v-if="comment.commentOriginalCommentId">回复评论 {{ comment.commentOriginalCommentId }}</p>
-              <p v-if="comment.commentContentVisible===false">此评论正文当前不可见</p>
+              <CommentVisibilityNotice v-if="comment.commentContentVisible===false" />
               <div v-else class="la-paragraph-comment-body" v-html="comment.commentContent || ''" />
               <div class="la-paragraph-ops">
               <V3ReactionBar kind="comment" :target-id="comment.oId" :initial-read-started="comment.interactionReadStarted" :initial-state="comment.interactions === null ? null : comment.interactions?.reactions" />
@@ -714,7 +715,8 @@ function chapterTitle(c: LongArticleChapter) {
               <div v-for="reply in comment.commentThreadReplies || []" :key="reply.oId" class="la-paragraph-reply-item">
                 <RouterLink v-if="reply.commentAuthorId" :to="`/member/${reply.commentAuthorName}`"><VipNickname :user-id="reply.commentAuthorId" :user-name="reply.commentAuthorName" :text="reply.commentAuthorNickname || reply.commentAuthorName" /></RouterLink>
                 <span v-else>匿名用户</span><span class="reply-colon">：</span>
-                <span class="reply-content" v-html="reply.commentContent || ''" />
+                <CommentVisibilityNotice v-if="reply.commentContentVisible===false" />
+                <span v-else class="reply-content" v-html="reply.commentContent || ''" />
                 <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
               <template v-if="ownParagraphComment(comment)">
                 <button v-if="commentingEnabled" type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="commentingEnabled && (paragraphEditingId=comment.oId)">编辑</button>
