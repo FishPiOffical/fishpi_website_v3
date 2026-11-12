@@ -307,7 +307,13 @@ function onApiOffline() {
     .catch(() => {}).finally(() => { offlineNavigation = false })
 }
 
+function syncWebsiteSession() {
+  if (document.visibilityState === 'visible') void auth.syncWebsiteSession()
+}
+
 onMounted(() => {
+  window.addEventListener('focus', syncWebsiteSession)
+  document.addEventListener('visibilitychange', syncWebsiteSession)
   mounted.value = true
   branding.restore()
   appearance.restore()
@@ -318,6 +324,8 @@ onMounted(() => {
   window.addEventListener('fp:api-offline', onApiOffline)
 })
 onUnmounted(() => {
+  window.removeEventListener('focus', syncWebsiteSession)
+  document.removeEventListener('visibilitychange', syncWebsiteSession)
   document.removeEventListener('click', onDocClick)
   window.removeEventListener('fp:api-offline', onApiOffline)
 })
@@ -325,6 +333,10 @@ onUnmounted(() => {
 
 <template>
   <div class="shell">
+    <div v-if="auth.logoutPending && auth.error" class="offline-banner" role="alert">
+      <span>{{ auth.error }}</span>
+      <button type="button" aria-label="重试退出登录" @click="auth.logout()">↻</button>
+    </div>
     <div v-if="apiOffline && route.name !== 'offline'" class="offline-banner">
       <span>网络暂不可用，已显示内容可继续浏览。</span>
       <button type="button" @click="retryPublicContent">重试读取</button>

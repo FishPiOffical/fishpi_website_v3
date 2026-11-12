@@ -13,6 +13,11 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error = ref('')
   const initialized = ref(false)
+  const logoutPending = ref(false)
+  let sessionFlight: Promise<void> | null = null
+  let sessionRevision: string | null = null
+  let lastSessionCheck = 0
+  let sessionTimer: ReturnType<typeof setTimeout> | null = null
   let version = 0
   let restoreFlight: Promise<void> | null = null
   let loginFlight: Promise<void> | null = null
@@ -30,7 +35,10 @@ export const useAuthStore = defineStore('auth', () => {
       isVip.value = false
     }
   })
-  onScopeDispose(unsubscribe)
+  onScopeDispose(() => {
+    unsubscribe()
+    if (sessionTimer !== null) clearTimeout(sessionTimer)
+  })
 
   function toAccount(data: V3AccountInfo): AccountInfo {
     return { ...data, oId: data.id }
@@ -49,6 +57,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function restore(): Promise<void> {
     if (import.meta.env.SSR) return Promise.resolve()
+    if (logoutPending.value) return Promise.resolve()
     if (loginFlight) return loginFlight
     if (restoreFlight) return restoreFlight
     if (initialized.value && (isLoggedIn.value || !accessToken.value)) return Promise.resolve()
@@ -104,6 +113,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   function login(username: string, passwd: string, mfaCode = ''): Promise<void> {
     const expected = ++version
+    logoutPending.value = false
+    sessionRevision = null
     setAccessToken(null)
     initialized.value = false
     loading.value = true
@@ -135,13 +146,60 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    ++version
+    const expected = ++version
+    logoutPending.value = true
+    sessionRevision = null
     setAccessToken(null)
     initialized.value = true
     loading.value = false
     error.value = ''
-    // The transport serializes this cookie mutation after any pending rotation/login.
-    await request('/api/v3/auth/logout', { method: 'POST' }).catch(() => {})
+    // 本地立即清身份，但服务端撤销失败必须保留重试入口，不能静默宣称退出成功。
+    try {
+      await request('/api/v3/auth/logout', { method: 'POST' })
+      if (expected === version) logoutPending.value = false
+    } catch (e) {
+      if (expected === version) error.value = '退出暂未完成，请重试'
+    }
+  }
+
+  function syncWebsiteSession(): Promise<void> {
+    if (import.meta.env.SSR || !initialized.value || logoutPending.value || loginFlight || restoreFlight) return Promise.resolve()
+    if (sessionFlight) return sessionFlight
+    const remaining = 5000 - (Date.now() - lastSessionCheck)
+    if (remaining > 0) {
+      // 节流保留最后一次触发，避免用户快速切页退出后丢失同步。
+      if (sessionTimer === null) sessionTimer = setTimeout(() => {
+        sessionTimer = null
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') void syncWebsiteSession()
+      }, remaining)
+      return Promise.resolve()
+    }
+    if (sessionTimer !== null) { clearTimeout(sessionTimer); sessionTimer = null }
+    lastSessionCheck = Date.now()
+    const expected = version
+    const operation = (async () => {
+      try {
+        const res = await request<{ code: number; data?: { userId: string | null; revision: string | null; linked?: boolean } }>(
+          '/api/v3/auth/session', { method: 'POST' })
+        if (expected !== version || logoutPending.value || res.code !== 0 || !res.data) return
+        if (res.data.linked === false) return
+        const { userId, revision } = res.data
+        if (userId !== null && typeof userId !== 'string' || revision !== null && typeof revision !== 'string') return
+        const changed = userId !== (account.value?.oId ?? null)
+          || sessionRevision !== null && revision !== sessionRevision
+        sessionRevision = revision
+        if (!changed) return
+        ++version
+        setAccessToken(null)
+        initialized.value = !userId
+        // 只恢复服务器刚确认的绑定会话；不会凭旧版 Cookie 自动签发新令牌。
+        if (userId) await restore()
+      } catch {
+        // 网络故障不等于退出；下一次切回页面再核对，不循环请求。
+      }
+    })().finally(() => { if (sessionFlight === operation) sessionFlight = null })
+    sessionFlight = operation
+    return operation
   }
 
   async function reloadAccount() {
@@ -151,5 +209,5 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return { accessToken, account, isVip, membershipPending, membershipChecked, loading, error, initialized, isLoggedIn,
-    restore, login, logout, refreshMembership, reloadAccount }
+    restore, login, logout, logoutPending, syncWebsiteSession, refreshMembership, reloadAccount }
 })

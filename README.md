@@ -29,6 +29,12 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 
 本站优先请求 Rhythm JSON，不抓取现网 HTML。文章列表、搜索、领域、标签、文章/评论读取与通知HTTP/实时订阅已改用 v3，合法空结果保留为空，错误不会回退到假帖子。其他尚未迁移模块仍需逐项清理旧接口与历史占位数据；[缺口清单](docs/MISSING_APIS.md)包含历史记录，以[v3迁移记录](docs/V3_MIGRATION.md)为当前状态。广告位仅保留入口，不拉素材。
 
+### 新旧站网页登录互通
+
+需要配套 Rhythm 的绑定会话版本：两端常规密码登录同时建立旧 Cookie 与 V3 刷新 Cookie，前端 Bearer 仍只在内存。任一端退出会撤销当前浏览器绑定会话，其他浏览器不受影响。已打开页面在重新聚焦时合并核对状态，不轮询；退出失败保留重试图标，并暂停自动恢复。
+
+更新前的未绑定 Cookie 需要重新登录一次；注册、重置密码和第三方专用登录入口本次不改。开发联调请在两端统一使用 `localhost` 或统一 `127.0.0.1`，不同主机名不共享 Cookie。生产仍浏览器直连 fishpi.cn，不设置 `.fishpi.cn` 域 Cookie，不恢复旧 apiKey 桥接。专项：`node tools/v3-website-session-test.mjs`。
+
 ### SEO / SSR
 
 - 客户端：`@unhead/vue` 设置 title / description / og / canonical；帖子页输出 Article JSON-LD

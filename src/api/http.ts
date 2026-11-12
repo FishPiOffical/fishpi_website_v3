@@ -179,7 +179,7 @@ function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promi
 }
 
 function isCredentialPath(path: string) {
-  return /^\/api\/v3\/auth\/(?:login|refresh|logout)(?:\?|$)/.test(path)
+  return /^\/api\/v3\/auth\/(?:login|refresh|logout|session)(?:\?|$)/.test(path)
 }
 
 // Cookie rotations must complete in order, including logout followed immediately by login.

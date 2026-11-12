@@ -321,3 +321,5 @@
 - 首页默认classic，SSR/首帧一致，已保存compact/classic选择与各自布局不覆盖。网络故障时AppShell仅对当前已有data-public-content=ready的公开内容保留页内提示；首次无内容仍offline，401/403/身份边界继续清授权。fp:retry-public只触发当前挂载公开读取，禁止重发写操作。http仅合并同凭据参数的并发公共列表GET，不缓存完成结果或合并私有/可取消请求。
 
 - 个人主页职业与勋章由 MemberProfileBadges 放在资料卡，旧子路由定位到对应区域。主职业摘要单独读取，展开才加载职业详情；公开勋章图片走 v3 SVG，可供游客读取，私有勋章图片仍需登录。
+
+- 新旧网页密码登录互通由 Rhythm 绑定 sym-ce 与 V3 网页令牌家族，前端仍仅内存 Bearer。auth.syncWebsiteSession 在聚焦时合并检查，不轮询；退出失败保留 logoutPending，阻止自动恢复，明确重试。不能自动兑换存量未绑定旧 Cookie；普通刷新保持身份版本，跨站换号建立新身份边界。两端 Cookie 均 host-only，不恢复旧 apiKey 桥接。
