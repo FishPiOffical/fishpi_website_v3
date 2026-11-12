@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useHead, useSeoMeta } from '@unhead/vue'
 import { useLocalBrandingStore } from '@/stores/localBranding'
@@ -11,7 +12,15 @@ const branding = useLocalBrandingStore()
 useHead({
   htmlAttrs: { lang: 'zh-CN' },
   titleTemplate: title => branding.name || title || '摸鱼派',
-  link: () => [{ rel: 'icon', href: branding.logo || '/logo.png' }],
+})
+
+onMounted(() => {
+  const icon = document.querySelector<HTMLLinkElement>('#site-favicon')
+  if (!icon) return
+  const defaultLogo = icon.getAttribute('href') || '/logo.png'
+  watch(() => branding.logo, logo => {
+    icon.setAttribute('href', logo || defaultLogo)
+  }, { immediate: true })
 })
 
 useSeoMeta({
