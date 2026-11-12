@@ -19,6 +19,7 @@ import {articleHeat} from '@/api/v3-article-heat'
 import {subscribeArticleChanges} from '@/api/v3-realtime'
 import ArticleOwnerActions from '@/components/articles/ArticleOwnerActions.vue'
 import { ApiError,getAuthContextVersion } from '@/api/http'
+import QuickReplyPanel from '@/components/articles/QuickReplyPanel.vue'
 import CommentComposer from '@/components/articles/CommentComposer.vue'
 import ArticleCommentLocation from '@/components/articles/ArticleCommentLocation.vue'
 import type {CommentLocation} from '@/api/v3-comment-location'
@@ -161,6 +162,20 @@ const typeBadge = computed(() => TYPE_BADGES[Number(article.value?.articleType)]
 const commentingEnabled = computed(() => article.value?.articleCommentable === true)
 const statementLabel = computed(() => article.value?.articleStatement == null ? '状态暂不可用' : STATEMENT_LABELS[article.value.articleStatement] || '')
 
+const quickReplyOpen = ref(false)
+const commentsInView = ref(false)
+function updateReplyShortcut() {
+  const comments = document.querySelector('.comments-list')
+  commentsInView.value = !!comments && comments.getBoundingClientRect().top < window.innerHeight
+}
+function openQuickReply() {
+  if (!commentingEnabled.value) return
+  if (!isLoggedIn.value) { void router.push({ path: '/login', query: { redirect: loginRedirect.value } }); return }
+  quickReplyOpen.value = true
+}
+onMounted(() => window.addEventListener('scroll', updateReplyShortcut, { passive: true }))
+onUnmounted(() => window.removeEventListener('scroll', updateReplyShortcut))
+watch([id, viewerIdentity], () => { quickReplyOpen.value = false; commentsInView.value = false })
 const composerRef = ref<InstanceType<typeof CommentComposer> | null>(null)
 const readerRef = ref<InstanceType<typeof LongArticleReader> | null>(null)
 const [DefineOwnerActions, ReuseOwnerActions] = createReusableTemplate()
@@ -450,8 +465,7 @@ function startReply(c: ArticleComment) {
     void nextTick(() => composerRef.value?.reveal())
     return
   }
-  if (composerRef.value) composerRef.value.reveal()
-  else document.querySelector('.composer-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  openQuickReply()
 }
 
 function onContentClick(e: MouseEvent) {
@@ -498,6 +512,7 @@ function itemHandlers(c: ArticleComment) {
   <template v-else-if="article">
     <span v-if="!accessToken" data-public-content="ready" hidden />
     <p v-if="realtimeReadError" role="alert">{{ realtimeReadError }}</p>
+    <button v-if="routeMounted && !isLong && commentingEnabled && commentsInView && !quickReplyOpen" class="quick-reply-floating" type="button" title="写回复" aria-label="写回复" @click="openQuickReply()"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/></svg></button>
     <DefineOwnerActions>
       <ArticleOwnerActions :article-id="article.oId" :author-id="article.articleAuthorId||''" :anonymous="Number(article.articleAnonymous)===1" :permanent="article.stick?.permanent||false" @changed="ownerChanged" @deleted="ownerDeleted" />
       <p v-if="ownerRefreshError" role="alert">{{ ownerRefreshError }} <button type="button" @click="load(true,'owner')">重读文章状态</button></p>
@@ -546,17 +561,20 @@ function itemHandlers(c: ArticleComment) {
       </footer>
     </DefineComments>
     <DefineComposer>
+      <QuickReplyPanel :open="quickReplyOpen" @close="quickReplyOpen=false">
       <div class="composer-inner">
         <p v-if="article.articleCommentable === false" class="hint-login">作者已关闭回帖。</p>
         <p v-else-if="!commentingEnabled" class="hint-login">评论状态暂不可用。</p>
         <template v-if="isLoggedIn">
-          <CommentComposer :writable="commentingEnabled" ref="composerRef" :article-id="article.oId" :parent-id="replyId" :paragraph-id="paragraphIdForReply" :reply-label="replyAuthor" @clear-reply="cancelReply" />
+          <blockquote v-if="replyComment" class="quick-reply-quote"><strong>回复 {{ who(replyComment) }}</strong><p>{{ replyComment.commentContentVisible === false ? '评论正文当前不可见' : stripHtml(replyComment.commentContent || '') }}</p></blockquote>
+          <CommentComposer @saved="quickReplyOpen=false" :writable="commentingEnabled" ref="composerRef" :article-id="article.oId" :parent-id="replyId" :paragraph-id="paragraphIdForReply" :reply-label="replyAuthor" @clear-reply="cancelReply" />
         </template>
         <p v-else-if="commentingEnabled" class="hint-login">
           <RouterLink :to="{ path: '/login', query: { redirect: loginRedirect } }" class="login-link">登录</RouterLink>
           后即可参与讨论。
         </p>
       </div>
+      </QuickReplyPanel>
     </DefineComposer>
     <LongArticleReader
       v-if="isLong"
@@ -661,6 +679,7 @@ function itemHandlers(c: ArticleComment) {
         </nav>
 
         <!-- 文章底部互动操作栏 -->
+        <button v-if="commentingEnabled" type="button" class="btn quick-reply-entry" @click="clearReplyTarget();openQuickReply()">写回复</button>
         <div class="article-tail-bar">
           <div class="tail-main-row">
             <div class="actions">
@@ -1407,4 +1426,11 @@ h1 {
 #articleCommentsPanel {
   scroll-margin-top: calc(var(--fp-nav-h) + 12px);
 }
+</style>
+
+<style scoped>
+.quick-reply-entry { margin-top: 20px; }
+.quick-reply-floating { position: fixed; right: 24px; bottom: 88px; z-index: 100; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--fp-border); border-radius: 12px; background: var(--fp-card); color: var(--fp-text); box-shadow: 0 3px 12px rgb(0 0 0 / 8%); cursor: pointer; }
+.quick-reply-quote { margin: 0 0 12px; padding: 10px 12px; border-left: 3px solid var(--fp-border); background: color-mix(in srgb, var(--fp-muted) 6%, transparent); font-size: 13px; color: var(--fp-muted); }
+.quick-reply-quote p { margin: 5px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 </style>
