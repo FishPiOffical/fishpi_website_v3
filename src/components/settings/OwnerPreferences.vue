@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { getAuthContextVersion } from '@/api/http'
+import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { useAuthStore } from '@/stores/auth'
 import { profileOperationKey } from '@/api/v3-profile'
 import { preferenceFields, fetchV3Preferences, saveV3Preferences, fetchV3LocaleOptions, fetchV3SkinOptions,
@@ -9,6 +10,7 @@ import { preferenceFields, fetchV3Preferences, saveV3Preferences, fetchV3LocaleO
 
 const props = defineProps<{ resource: PreferenceResource; title: string; fields?: string[] }>()
 const auth = useAuthStore(), { accessToken, account } = storeToRefs(auth)
+const functionPreferences = useFunctionPreferencesStore()
 const schema = computed(() => preferenceFields[props.resource].filter(field => !props.fields || props.fields.includes(field.key)))
 const values = ref<Record<string, PreferenceValue>>({}), original = ref<Record<string, PreferenceValue>>({})
 const options = ref<Record<string, PreferenceOption[]>>({})
@@ -24,7 +26,7 @@ async function load() {
   ready.value = false; loading.value = true; error.value = message.value = ''
   try {
     const [data, choices] = await Promise.all([
-      fetchV3Preferences(props.resource),
+      props.resource === 'functions' ? functionPreferences.load(true) : fetchV3Preferences(props.resource),
       props.resource === 'locale' ? fetchV3LocaleOptions() : props.resource === 'display' && schema.value.some(field => field.key === 'skin' || field.key === 'mobileSkin') ? fetchV3SkinOptions() : Promise.resolve({}),
     ])
     if (valid()) { values.value = { ...data }; original.value = { ...data }; options.value = choices; ready.value = true }
@@ -45,7 +47,7 @@ async function save() {
   try {
     if (!intent || intent.fingerprint !== fingerprint) intent = { fingerprint, key: profileOperationKey(), fields: Object.keys(changes) }
     const saved = await saveV3Preferences(props.resource, changes, intent.key)
-    if (valid()) { intent = null; values.value = { ...saved }; original.value = { ...saved }; message.value = '已保存'; void auth.reloadAccount().catch(() => {}) }
+    if (valid()) { if (props.resource === 'functions') functionPreferences.accept(saved); intent = null; values.value = { ...saved }; original.value = { ...saved }; message.value = '已保存'; void auth.reloadAccount().catch(() => {}) }
   } catch (failure) { if (valid()) error.value = failure instanceof Error ? failure.message : '设置保存失败' }
   finally { if (valid()) busy.value = false }
 }

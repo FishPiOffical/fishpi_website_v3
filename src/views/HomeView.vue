@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 import HomePreferenceRedirect from '@/components/home/HomePreferenceRedirect.vue'
 import RecentMembers from '@/components/discovery/RecentMembers.vue'
 import RankingBoard from '@/components/RankingBoard.vue'
@@ -29,8 +31,22 @@ import { SITE_DEFAULT_DESC, SITE_NAME } from '@/seo/site'
 import { chatAppearanceSnapshot } from '@/utils/chatAppearance'
 import { avatarStyle, avatarUrl, rhyPicThumbnail } from '@/utils/avatar'
 
+const functionPreferences = useFunctionPreferencesStore()
+const chatImagePreview = ref('')
+const imagePreferencesMounted = ref(false)
+onMounted(() => { imagePreferencesMounted.value = true })
+function openChatImage(event: MouseEvent) {
+  const image = (event.target as HTMLElement).closest('img:not(.emoji)') as HTMLImageElement | null
+  if (!image) return
+  event.preventDefault()
+  chatImagePreview.value = image.currentSrc || image.src
+}
+
 const auth = useAuthStore(), chat = useChatStore(), publication = useV3ChatPublicationStore(), layout = useHomeLayoutStore()
 const { accessToken, isLoggedIn } = storeToRefs(auth)
+watch(() => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || '']), () => {
+  chatImagePreview.value = ''
+}, { flush: 'sync' })
 const boot = consumeHomeReadsPayload()
 const activeLongShelf = ref<'recent' | 'hot'>('recent')
 const recentRead = useHomeRead('recent', boot.recent, boot.expires.recent), hotRead = useHomeRead('hot', boot.hot, boot.expires.hot), tagsRead = useHomeRead('tags', boot.tags, boot.expires.tags)
@@ -126,6 +142,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 </script>
 
 <template>
+  <ImageLightbox v-model="chatImagePreview" />
   <div class="home" :data-public-content="recentRead.data ? 'ready' : undefined" :class="{ editing, 'is-classic': !compactHome }">
     <h1 class="home-a11y-title">摸鱼派社区动态</h1>
     <HomePreferenceRedirect />
@@ -316,7 +333,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                       <VipNickname :user-id="m.userOId" :user-name="m.userName">{{ m.userNickname || m.userName }}</VipNickname>
                       <span v-if="m.userNickname && m.userName" class="chat-uname">({{ m.userName }})</span>
                     </RouterLink>
-                    <div v-if="m.html" class="chat-text" v-html="m.html"></div>
+                    <div v-if="m.html" class="chat-text" :class="{ 'blur-chat-images': imagePreferencesMounted && functionPreferences.blurChatImages }" @click="openChatImage" v-html="m.html"></div>
                     <div v-else-if="m.redPacket" class="chat-text">[红包]</div>
                     <div v-else-if="m.card" class="chat-text">{{ m.card.msgType === 'music' ? m.card.title || '音乐分享' : '天气信息' }}</div>
                   </div>
@@ -1059,6 +1076,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   object-fit: contain;
   vertical-align: middle;
 }
+.chat-text.blur-chat-images :deep(img:not(.emoji)) { filter: blur(8px); cursor: zoom-in; }
 .chat-text :deep(img.emoji) { max-height: 1.4em; }
 .chat-text :deep(pre) { overflow-x: auto; }
 

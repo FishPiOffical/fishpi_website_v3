@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { formatDisplayTime } from '@/utils/time'
 
 import { computed, onMounted, ref } from 'vue'
@@ -33,6 +34,7 @@ const props = withDefaults(
   { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
+const functionPreferences = useFunctionPreferencesStore()
 const thumbnailWidth = 400
 const thumbnailHeight = 360
 const previewLimit = 1024
@@ -103,7 +105,7 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? snapshot.bubbleId : undefined" :data-frame="chatroom ? snapshot.frameId : undefined" class="fp-msg" :class="{ 'is-self': self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
+  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? snapshot.bubbleId : undefined" :data-frame="chatroom ? snapshot.frameId : undefined" class="fp-msg" :class="{ 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
     <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`">
       <img class="fp-avatar" :src="avatarThumbnail(avatar, avatarSize)" alt="" loading="lazy" @error="onAvatarError" />
     </RouterLink>
@@ -396,6 +398,7 @@ function onBodyClick(e: MouseEvent) {
   vertical-align: middle;
 }
 .is-room .body :deep(.chat-image-frame > picture) { display: contents; }
+.blur-chat-images .body :deep(img:not(.emoji)) { filter: blur(8px); }
 .is-room .body :deep(img:not(.emoji)) {
   max-width: min(180px, 100%);
   max-height: 160px;

@@ -28,6 +28,7 @@ import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
 import MemberLayout from '@/components/member/MemberLayout.vue'
 import UserHoverCard from '@/components/user/UserHoverCard.vue'
 import { useEmojiPreferencesStore } from '@/stores/emojiPreferences'
+import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useSettingsDrawerStore } from '@/stores/settingsDrawer'
 import { useLayoutStore } from '@/stores/layout'
@@ -156,6 +157,10 @@ const whispers = usePrivateInboxStore()
 const chat = useChatStore()
 const settingsDrawer = useSettingsDrawerStore()
 const chatPreferences = useChatPreferencesStore()
+const functionPreferences = useFunctionPreferencesStore()
+watch(() => JSON.stringify([mounted.value, getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || '']), () => {
+  if (mounted.value && auth.accessToken && auth.account?.oId) void functionPreferences.load().catch(() => {})
+}, { flush: 'post' })
 const emojiPreferences = useEmojiPreferencesStore()
 const { immersive } = storeToRefs(useLayoutStore())
 const { isLoggedIn: authenticated, account, isVip } = storeToRefs(auth)

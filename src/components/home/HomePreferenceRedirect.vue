@@ -3,11 +3,12 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getAuthContextVersion } from '@/api/http'
-import { fetchV3Preferences } from '@/api/v3-preferences'
+import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { SITE_ORIGIN } from '@/seo/site'
 import { homeRedirectBases, homeRedirectDestination } from '@/utils/homeRedirect'
 
 const auth = useAuthStore(), route = useRoute(), router = useRouter()
+const functions = useFunctionPreferencesStore()
 const pending = ref(false), message = ref('')
 let mounted = false, generation = 0
 const identity = () => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || ''])
@@ -20,7 +21,7 @@ async function check() {
   pending.value = true
   let navigating = false
   try {
-    const settings = await fetchV3Preferences('functions')
+    const settings = await functions.load()
     if (!current()) return
     const target = homeRedirectDestination(String(settings.indexRedirectURL), router,
       homeRedirectBases(SITE_ORIGIN, import.meta.env.VITE_API_TARGET, window.location.origin))

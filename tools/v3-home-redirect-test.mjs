@@ -13,10 +13,14 @@ const apiURL=url(compile(await fs.readFile('src/api/v3-preferences.ts','utf8')).
 const helperURL=url(compile(await fs.readFile('src/utils/homeRedirect.ts','utf8'))),{homeRedirectBases,homeRedirectDestination}=await import(helperURL)
 const auth=defineStore('home-redirect-auth',()=>{const accessToken=ref(null),account=ref(null),initialized=ref(false);return{accessToken,account,initialized,isLoggedIn:computed(()=>!!accessToken.value&&!!account.value)}});globalThis.__homeRedirectAuth=auth
 const authURL=url('export const useAuthStore=globalThis.__homeRedirectAuth')
+// 将共享偏好接入真实 store，沿用已有接口和身份夹具。
+let functionSource=compile(await fs.readFile('src/stores/functionPreferences.ts','utf8'))
+for(const [name,target] of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['./auth',authURL],['@/api/http',http],['@/api/v3-preferences',apiURL]]) functionSource=functionSource.replaceAll(`from '${name}'`,`from '${target}'`)
+const functionURL=url(functionSource)
 globalThis.window={location:{origin:'http://127.0.0.1:5173'}}
 const descriptor=parse(await fs.readFile('src/components/home/HomePreferenceRedirect.vue','utf8')).descriptor
 let code=compile(compileScript(descriptor,{id:'home-redirect',inlineTemplate:true}).content.replaceAll('import.meta.env.VITE_API_TARGET',"'http://[::1]:8081'"))
-for(const[a,b]of [['vue',import.meta.resolve('vue')],['vue-router',import.meta.resolve('vue-router')],['@/stores/auth',authURL],['@/api/http',http],['@/api/v3-preferences',apiURL],['@/utils/homeRedirect',helperURL],['@/seo/site',url("export const SITE_ORIGIN='https://fishpi.cn'")]])code=code.replaceAll(`from '${a}'`,`from '${b}'`).replaceAll(`from "${a}"`,`from '${b}'`)
+for(const[a,b]of [['vue',import.meta.resolve('vue')],['vue-router',import.meta.resolve('vue-router')],['@/stores/functionPreferences',functionURL],['@/stores/auth',authURL],['@/api/http',http],['@/api/v3-preferences',apiURL],['@/utils/homeRedirect',helperURL],['@/seo/site',url("export const SITE_ORIGIN='https://fishpi.cn'")]])code=code.replaceAll(`from '${a}'`,`from '${b}'`).replaceAll(`from "${a}"`,`from '${b}'`)
 const Component=(await import(url(code))).default
 const routes=[{path:'/',name:'home',component:{}},{path:'/recent',component:{}},{path:'/cr',component:{}},{path:'/watch',component:{}},{path:'/notifications',component:{}},{path:'/settings/function',component:{}},{path:'/following',redirect:'/watch'},{path:'/old/:tag',redirect:to=>'/recent?tag='+to.params.tag},{path:'/root-alias',redirect:'/'},{path:'/cycle-a',redirect:'/cycle-b'},{path:'/cycle-b',redirect:'/cycle-a'},{path:'/:pathMatch(.*)*',name:'not-found',component:{}}]
 const router=()=>createRouter({history:createMemoryHistory(),routes})

@@ -37,11 +37,15 @@ let keyId=0;globalThis.__prefKey=()=>`pref:${++keyId}`
 const keyURL=url('export const profileOperationKey=globalThis.__prefKey')
 globalThis.__prefAPI={...api}
 const apiURL=url('export const preferenceFields=globalThis.__prefAPI.preferenceFields;'+['fetchV3Preferences','saveV3Preferences','fetchV3LocaleOptions','fetchV3SkinOptions'].map(name=>`export const ${name}=(...args)=>globalThis.__prefAPI.${name}(...args);`).join('\n'))
+// 将共享偏好接入真实 store，沿用已有接口和身份夹具。
+let functionSource=transpile(await fs.readFile('src/stores/functionPreferences.ts','utf8'))
+for(const [name,target] of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['./auth',authURL],['@/api/http',shim],['@/api/v3-preferences',apiURL]]) functionSource=functionSource.replaceAll(`from '${name}'`,`from '${target}'`)
+const functionURL=url(functionSource)
 const tick=async()=>{for(let i=0;i<20;i++)await Promise.resolve();await nextTick()}
 async function component(resource,fields){
  globalThis.__prefProps={resource,title:resource,fields}
  let source=(await fs.readFile('src/components/settings/OwnerPreferences.vue','utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
- let js=transpile(source).replace("from '@/api/v3-preferences'",`from '${apiURL}'`).replace("from '@/api/v3-profile'",`from '${keyURL}'`).replace("from '@/api/http'",`from '${shim}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`).replace('const props = defineProps();','const props = globalThis.__prefProps;')
+ let js=transpile(source).replace("from '@/stores/functionPreferences'",`from '${functionURL}'`).replace("from '@/api/v3-preferences'",`from '${apiURL}'`).replace("from '@/api/v3-profile'",`from '${keyURL}'`).replace("from '@/api/http'",`from '${shim}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from 'vue'",`from '${import.meta.resolve('vue')}'`).replace("from 'pinia'",`from '${import.meta.resolve('pinia')}'`).replace('const props = defineProps();','const props = globalThis.__prefProps;')
  const imports=[...js.matchAll(/^import .+;$/gm)].map(m=>m[0]).join('\n');js=js.replace(/^import .+;$/gm,'')
  const module=await import(url(`${imports}\nexport default{setup(){${js}\nreturn{values,original,options,ready,error,message,busy,save,load}},render(){return null}}`))
  const app=renderer.createApp(module.default);app.use(createPinia());return{app,vm:app.mount({})}
