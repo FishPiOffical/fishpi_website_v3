@@ -118,12 +118,12 @@ function onBodyClick(e: MouseEvent) {
     <div class="message-stack">
       <div v-if="chatroom" class="head">
         <component :is="canMention ? 'button' : RouterLink" v-bind="canMention ? { type: 'button' } : { to: `/member/${userName}` }" class="name" :class="{ 'name--mention': canMention }" :data-user-card="canMention ? undefined : userName" :aria-label="canMention ? `点击 @${nickname || userName}` : undefined" @click="canMention && mention?.insert(userName)">
+          <span v-if="canMention" class="mention-prefix" aria-hidden="true">@</span>
           <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">
             {{ nickname || userName }}
           </VipNickname>
           <template v-else>{{ nickname || userName }}</template>
           <small v-if="nickname && nickname !== userName">({{ userName }})</small>
-          <span v-if="canMention" class="mention-tip" aria-hidden="true">点击 @{{ nickname || userName }}</span>
         </component>
         <MedalList :items="medals" variant="chat" />
       </div>
@@ -212,31 +212,22 @@ function onBodyClick(e: MouseEvent) {
   color: var(--fp-muted);
   text-decoration: none;
 }
-/* 昵称负责提及、头像负责资料卡，避免原生 title 与资料浮层竞争。 */
-.name--mention { position: relative; }
-.mention-tip {
+/* 提及符号不占布局空间，悬浮时不会挤动昵称和勋章。 */
+.name.name--mention { position: relative; }
+.name.name--mention:hover,
+.name.name--mention:focus-visible {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
+}
+.mention-prefix {
   position: absolute;
-  bottom: calc(100% + 5px);
-  left: 0;
-  z-index: 8;
-  width: max-content;
-  max-width: min(240px, 60vw);
-  padding: 4px 8px;
-  border: 1px solid var(--fp-border);
-  border-radius: 6px;
-  background: var(--fp-card);
-  color: var(--fp-text);
-  box-shadow: var(--fp-card-shadow);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 18px;
-  text-align: left;
-  white-space: normal;
-  pointer-events: none;
+  right: calc(100% + 2px);
   visibility: hidden;
 }
-.name--mention:hover .mention-tip,
-.name--mention:focus-visible .mention-tip { visibility: visible; }
+.name--mention:hover .mention-prefix,
+.name--mention:focus-visible .mention-prefix { visibility: visible; }
 .name:hover { text-decoration: underline; text-underline-offset: 3px; }
 .name:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
 .is-self .name {
