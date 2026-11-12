@@ -164,11 +164,17 @@ onBeforeUnmount(() => { mounted = false; reset() })
       <form @submit.prevent="saveAvatar">
         <fieldset :disabled="loading || busy || !loaded.avatar">
           <label class="settings-wide-field">头像图片地址<input class="fp-control" v-model="avatarDraft" maxlength="255" placeholder="https://" /></label>
-          <label>上传头像<input type="file" accept="image/jpeg,image/png,image/gif" @change="onUpload" /></label>
+          <div class="settings-wide-field avatar-upload-field">
+            <label class="avatar-upload">
+              <input class="settings-visually-hidden" type="file" accept="image/jpeg,image/png,image/gif" aria-describedby="avatar-upload-hint" @change="onUpload" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3" /></svg>
+              上传头像
+            </label>
+            <small id="avatar-upload-hint">JPEG、PNG、GIF，最大 1 MB</small>
+          </div>
           <button data-tone="primary" class="fp-control" type="submit">保存头像地址</button>
         </fieldset>
       </form>
-      <p>支持 JPEG、PNG、GIF，也可填写 HTTPS 图片地址。</p>
       <p v-if="busy" role="status">正在处理，请稍候…</p>
       <p v-if="errors.avatar" role="alert" class="error">{{ errors.avatar }}</p>
       <p v-if="messages.avatar" role="status">{{ messages.avatar }}</p>
@@ -185,4 +191,23 @@ button { width: fit-content; border: 1px solid var(--fp-border); border-radius: 
 button:disabled { opacity: .5; cursor: default; }
 .error { color: var(--fp-danger); }
 .owner-avatar { display: block; width: 80px; height: 80px; object-fit: cover; border-radius: var(--fp-avatar-radius); margin: 16px 0; }
+.avatar-upload-field { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.avatar-upload-field small { color: var(--fp-muted); }
+.avatar-upload {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  background: var(--fp-bg);
+  color: var(--fp-text);
+  cursor: pointer;
+}
+.avatar-upload svg { width: 16px; height: 16px; }
+.avatar-upload:has(input:enabled):hover { border-color: var(--fp-primary); }
+.avatar-upload:focus-within { outline: 2px solid var(--fp-primary); outline-offset: 2px; }
+.avatar-upload:has(input:disabled) { opacity: .5; cursor: default; }
 </style>

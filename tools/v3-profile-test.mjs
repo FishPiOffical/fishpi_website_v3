@@ -33,6 +33,15 @@ assert.equal(uploads[0].path,'/rhypic-upload/api/v1/files');assert.equal(uploads
 assert.equal(uploads[0].init.body.get('file').name,'avatar.png');assert.equal(uploads[0].init.body.get('file[]'),null)
 assert.equal(uploads[0].init.body.get('file').type,'image/png')
 assert.equal(__profileRequests.at(-1).path,'/api/v3/uploads/tickets');assert.deepEqual(JSON.parse(__profileRequests.at(-1).init.body),{})
+const limit = 1024 * 1024
+const avatarBytes = new Uint8Array(limit)
+avatarBytes.set(new Uint8Array(await png.arrayBuffer()))
+__profileResponses.push(envelope(ticket))
+assert.equal(await api.uploadV3Avatar(new File([avatarBytes], 'avatar.png'), new AbortController().signal), signed)
+assert.deepEqual(new Uint8Array(await uploads.at(-1).init.body.get('file').arrayBuffer()), avatarBytes)
+const requestCount = __profileRequests.length
+await assert.rejects(api.uploadV3Avatar(new File([avatarBytes, 'x'], 'avatar.png'), new AbortController().signal), /1 MB/)
+assert.equal(__profileRequests.length, requestCount, 'oversized avatar must not request a ticket')
 await assert.rejects(api.uploadV3Avatar(new File(['RIFFwebp'],'fake.png'),new AbortController().signal),/WebP/)
 const before=uploads.length
 __profileResponses.push(envelope({...ticket,uploadURL:'http://remote.example/api/v1/files'}));await assert.rejects(api.uploadV3Avatar(png,new AbortController().signal));assert.equal(uploads.length,before)

@@ -2,6 +2,7 @@ import { ApiError, request } from './http'
 
 type Row = Record<string, unknown>
 const root = '/api/v3/me/settings'
+const MAX_AVATAR_UPLOAD_BYTES = 1024 * 1024
 const invalid = () => new ApiError('设置接口响应格式不正确', 502, 'invalid_response')
 function row(value: unknown): Row { if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid(); return value as Row }
 function text(value: unknown): string { if (typeof value !== 'string') throw invalid(); return value }
@@ -55,6 +56,7 @@ export async function saveV3Avatar(avatarURL: string, key: string): Promise<stri
 }
 
 export async function uploadV3Avatar(file: File, signal: AbortSignal): Promise<string> {
+  if (file.size > MAX_AVATAR_UPLOAD_BYTES) throw new ApiError('头像文件不能超过 1 MB', 422)
   const header = new Uint8Array(await file.slice(0, 8).arrayBuffer())
   const png = [137,80,78,71,13,10,26,10].every((b, i) => header[i] === b)
   const jpeg = header[0] === 255 && header[1] === 216 && header[2] === 255
