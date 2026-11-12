@@ -86,7 +86,13 @@
   --fp-radius-xl: 14px;
   --fp-nav-h: 58px;
   --fp-wrap: 1300px;
+  --fp-page-gutter: clamp(12px, 1.5vw, 20px);
+  --fp-divider: var(--fp-border);
+  --fp-surface-subtle: var(--fp-elevated);
+  --fp-danger-ink: #b42318;
 }
+
+html[data-theme='classic-dark'] { --fp-danger-ink: #ef887b; }
 
 @media (max-width: 960px) {
   :root {

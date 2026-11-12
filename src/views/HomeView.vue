@@ -281,6 +281,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                 <input
                   v-model="chatDraft"
                   type="text"
+                  aria-label="聊天室消息"
                   maxlength="512"
                   :placeholder="isLoggedIn ? '说点什么...' : '登录后发言'"
                   :disabled="!isLoggedIn || chatBusy || !!publication.pending"
@@ -436,17 +437,17 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .board {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   background: transparent;
   box-shadow: none;
   border: 0;
   padding: 0;
 }
 .mod-body {
-  padding: 10px;
+  padding: clamp(12px, 1.1vw, 16px);
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 8px;
+  border-radius: var(--fp-panel-radius);
   box-shadow: var(--fp-card-shadow);
 }
 .board.bare {
@@ -459,7 +460,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .cell {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
   padding: 0;
 }
@@ -1083,9 +1084,6 @@ function scrollShelf(id: string, dir: -1 | 1) {
   }
   .long-zone {
     --long-gutter: 14px;
-  }
-  .long-card {
-    flex-basis: calc((100% - 10px) / 2);
   }
   .long-card {
     flex-basis: calc((100% - 10px) / 2);

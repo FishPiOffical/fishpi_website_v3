@@ -8,17 +8,18 @@
 .fp-settings .set-main p:empty{display:none}
 .fp-settings .set-main fieldset{border:0;padding:0;margin:0;min-width:0;display:grid;gap:16px}
 .fp-settings .set-main fieldset>button{justify-self:start}
-.fp-settings .set-main label{display:flex;flex-direction:column;align-items:stretch;gap:8px;font-size:13px;line-height:1.6;color:var(--fp-text);min-width:0;margin:0}
+.fp-settings .set-main label:not(.avatar-upload){display:flex;flex-direction:column;align-items:stretch;gap:8px;font-size:13px;line-height:1.6;color:var(--fp-text);min-width:0;margin:0}
 .fp-settings .set-main label.check,.fp-settings .set-main label:has(>input[type=checkbox]),.fp-settings .set-main label:has(>input[type=radio]){flex-direction:row;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--fp-border);border-radius:9px;background:var(--fp-surface-subtle);cursor:pointer}
 .fp-settings .set-main :is(input,textarea,select){box-sizing:border-box;font:inherit;font-size:13px;max-width:100%;color:var(--fp-text)}
 .fp-settings .set-main input:not([type=checkbox]):not([type=radio]):not([type=file]),.fp-settings .set-main textarea,.fp-settings .set-main select{width:100%;padding:10px 12px;border:1px solid var(--fp-border);border-radius:8px;background:var(--fp-surface-subtle);min-width:0}
 .fp-settings .set-main textarea{resize:vertical;line-height:1.7}.fp-settings .set-main input[type=checkbox],.fp-settings .set-main input[type=radio]{width:16px;height:16px;flex:none;accent-color:var(--fp-primary)}
-.fp-settings .set-main input[type=file]{padding:12px;border:1px dashed var(--fp-border);border-radius:8px;background:var(--fp-surface-subtle)}
+.fp-settings .set-main input[type=file]:not(.settings-visually-hidden){padding:12px;border:1px dashed var(--fp-border);border-radius:8px;background:var(--fp-surface-subtle)}
 .fp-settings .set-main :is(input,textarea,select):focus-visible{outline:2px solid var(--fp-primary);outline-offset:2px}
 .fp-settings .set-main button:not(.appearance-option){box-sizing:border-box;max-width:100%;width:fit-content;font:inherit;font-size:12px;line-height:1.5;padding:8px 13px;border:1px solid var(--fp-border);border-radius:8px;background:var(--fp-card);color:var(--fp-text);cursor:pointer;margin:6px 6px 6px 0;vertical-align:middle;white-space:normal}
 .fp-settings .set-main button:hover:not(:disabled){background:var(--fp-hover)}
 .fp-settings .set-main button:disabled{opacity:.5;cursor:default}
-.fp-settings .set-main button[data-tone=primary],.fp-settings .set-main button[type=submit]{background:var(--fp-primary);border-color:var(--fp-primary);color:#fff;font-weight:500;padding:9px 17px}
+.fp-settings .set-main button[data-tone=primary],.fp-settings .set-main button[type=submit]{background:var(--fp-primary-fill);border-color:var(--fp-primary-fill);color:#fff;font-weight:500;padding:9px 17px}
+.fp-settings .set-main :is(button[data-tone=primary],button[type=submit]):hover:not(:disabled){background:var(--fp-primary-fill-hover);border-color:var(--fp-primary-fill-hover)}
 .fp-settings .set-main button[aria-pressed=true]{color:var(--fp-primary);border-color:var(--fp-primary);background:var(--fp-primary-soft)}
 .fp-settings .set-main :is(button,a):focus-visible{outline:2px solid var(--fp-primary);outline-offset:3px}
 .fp-settings .set-main [role=alert]{color:var(--fp-danger);font-size:12px;line-height:1.8;padding:10px 13px;background:color-mix(in srgb,var(--fp-danger) 5%,var(--fp-card));border:1px solid color-mix(in srgb,var(--fp-danger) 20%,var(--fp-border));border-radius:8px}
@@ -91,11 +92,11 @@
   font-weight: 400;
 }
 
-.fp-settings .set-main form :is(input:not([type=checkbox], [type=radio]), select) {
+.fp-settings .set-main form :is(input:not([type=checkbox], [type=radio], .settings-visually-hidden), select) {
   min-height: 40px;
 }
 
-.fp-settings .set-main form input[type=file] {
+.fp-settings .set-main form input[type=file]:not(.settings-visually-hidden) {
   width: 100%;
   font-size: 12px;
 }

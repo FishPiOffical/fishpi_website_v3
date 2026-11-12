@@ -31,7 +31,8 @@ watch(()=>route.path,reveal)
 nav{display:flex;flex-wrap:wrap;gap:4px}
 nav a{flex:none;padding:7px 11px;border-radius:6px;color:var(--fp-muted);font-size:13px;line-height:1.5;text-decoration:none;white-space:nowrap}
 nav a:hover{background:var(--fp-hover);text-decoration:underline;text-underline-offset:3px}
-nav a.selected{color:var(--fp-primary);background:var(--fp-primary-soft);font-weight:600}
-nav a:focus-visible{outline:2px solid var(--fp-primary);outline-offset:2px}
+nav a.selected{color:var(--fp-primary-ink);background:var(--fp-primary-soft);font-weight:600}
+nav a:focus-visible{outline:2px solid var(--fp-primary);outline-offset:-2px}
 @media(max-width:640px){.member-navigation{padding:12px;margin-bottom:14px}nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px}}
+@media(pointer:coarse){nav a{display:inline-flex;align-items:center;min-height:44px}}
 </style>

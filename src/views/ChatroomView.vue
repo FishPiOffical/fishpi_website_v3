@@ -631,7 +631,7 @@ function clearScreen() {
 
 :deep(video),
 :deep(iframe) {
-  max-width: 320px !important;
+  max-width: min(320px, 100%) !important;
   max-height: 200px !important;
   border-radius: 6px;
 }
@@ -652,7 +652,7 @@ function clearScreen() {
    ========================================================= */
 .cr-classic-layout {
   display: flex;
-  gap: 20px;
+  gap: var(--fp-page-gap);
   align-items: flex-start;
   padding: 10px 0 30px;
 }
@@ -666,13 +666,13 @@ function clearScreen() {
 .cr-classic-card {
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 8px;
+  border-radius: var(--fp-panel-radius);
   box-shadow: var(--fp-card-shadow);
 }
 
 /* 输入区域 */
 .cr-classic-reply {
-  padding: 16px 20px 12px;
+  padding: 16px var(--fp-panel-padding) 12px;
 }
 
 .classic-btn {
@@ -807,7 +807,7 @@ function clearScreen() {
   flex-direction: column;
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
-  border-radius: 8px;
+  border-radius: var(--fp-panel-radius);
   box-shadow: var(--fp-card-shadow);
   position: relative;
 }

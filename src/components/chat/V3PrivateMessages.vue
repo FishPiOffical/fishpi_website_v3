@@ -606,7 +606,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
 
 .msg-bubble {
   position: relative;
-  min-width: 96px;
+  min-width: min(96px, 100%);
   max-width: 100%;
   padding: 8px 12px 6px;
   border-radius: 10px;
@@ -670,6 +670,7 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
 }
@@ -789,8 +790,40 @@ onBeforeUnmount(()=>{mounted.value=false;listRun++;closeTarget()})
 }
 
 @media (max-width: 640px) {
-  .conversation-layout {
-    grid-template-columns: 170px minmax(0, 1fr);
+  .whisper-page .conversation-layout {
+    grid-template-columns: clamp(108px, 32vw, 160px) minmax(0, 1fr);
   }
+  .whisper-page .start {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .whisper-page .start-input {
+    flex: auto;
+    width: 100%;
+  }
+  .whisper-page .head-main {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+  .whisper-page .head-main h2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .whisper-page .connection-label {
+    font-size: 11px;
+    white-space: normal;
+  }
+  .whisper-page .msg-row {
+    gap: 6px;
+    max-width: 100%;
+  }
+  .whisper-page .msg-avatar {
+    width: 24px;
+    height: 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .conversation-layout, .conversation-list, .start, .withdraw-btn { transition: none; }
 }
 </style>

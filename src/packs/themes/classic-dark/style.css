@@ -1,5 +1,5 @@
 html[data-theme='classic-dark'] {
-  --fp-bg: #282a2a;
+  --fp-bg: #242626;
   --fp-nav: #242525;
   --fp-card: #282a2a;
   --fp-elevated: #2f3232;
@@ -11,6 +11,9 @@ html[data-theme='classic-dark'] {
   --fp-primary: #69aa69;
   --fp-primary-hover: #5b9a5b;
   --fp-primary-soft: rgba(105, 170, 105, 0.15);
+  --fp-primary-ink: #8fc88f;
+  --fp-primary-fill: #36773b;
+  --fp-primary-fill-hover: #2c6630;
   --fp-link: #5c9fdf;
   --fp-accent: #e59230;
   --fp-accent-hover: #cf8024;
@@ -27,7 +30,7 @@ html[data-theme='classic-dark'] {
   --fp-green: #69aa69;
   --fp-income: #69aa69;
   --fp-nav-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
-  --fp-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  --fp-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   --fp-dialog-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
   --fp-mask-bg: rgba(0, 0, 0, 0.55);
   --fp-search-bg: #343636;

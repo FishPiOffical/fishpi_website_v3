@@ -362,7 +362,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   .category-panel { position: static; padding: 7px; border-radius: var(--fp-panel-radius); }
   .category-heading { display: none; }
   .categories { flex-direction: row; overflow-x: auto; scrollbar-width: thin; }
-  .category { flex: none; width: auto; min-height: 36px; padding: 8px 11px; gap: 6px; white-space: nowrap; }
+  .category { flex: none; width: auto; min-height: 40px; padding: 8px 11px; gap: 6px; white-space: nowrap; }
   .category svg { display: none; }
   .count { height: 17px; min-width: 17px; font-size: 9px; }
   .list-heading { padding: 18px; gap: 8px; }
@@ -375,6 +375,9 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   .notice-meta time { width: 100%; margin-left: 0; font-size: 10px; }
   .notice-title { font-size: 14px; }
   .pager { padding: 16px 18px; }
+}
+@media (pointer: coarse) {
+  .category, .pager button { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .category { transition: none; }

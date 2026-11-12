@@ -5,12 +5,12 @@
   --fp-page-wide: 1200px;
   --fp-page-reading: 760px;
   --fp-page-auth: 440px;
-  --fp-page-gap: 20px;
-  --fp-panel-padding: 20px;
-  --fp-panel-radius: 10px;
+  --fp-page-gap: clamp(14px, 1.5vw, 20px);
+  --fp-panel-padding: clamp(16px, 2vw, 22px);
+  --fp-panel-radius: var(--fp-radius-lg);
   --fp-control-height: 36px;
-  --fp-control-radius: 8px;
-  --fp-page-title-size: 24px;
+  --fp-control-radius: var(--fp-radius-md);
+  --fp-page-title-size: clamp(21px, 2vw, 25px);
 }
 
 .fp-page {
@@ -80,15 +80,16 @@
 }
 .fp-ui textarea.fp-control { resize: vertical; }
 .fp-ui button.fp-control { cursor: pointer; font-weight: 500; }
+.fp-ui button.fp-control:hover:not(:disabled, [aria-disabled='true']) { border-color: var(--fp-border-strong); }
 .fp-ui button.fp-control:disabled { opacity: .5; cursor: default; box-shadow: none; }
 .fp-ui button.fp-control:focus-visible, .fp-ui a:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
 .fp-ui button.fp-control[aria-busy='true'] { cursor: progress; }
 .fp-ui button.fp-control[data-tone='primary'] {
   color: #fff;
-  background: var(--fp-primary);
-  border: 1px solid var(--fp-primary);
+  background: var(--fp-primary-fill);
+  border: 1px solid var(--fp-primary-fill);
 }
-.fp-ui button.fp-control[data-tone='primary']:hover:not(:disabled) { background: var(--fp-primary-hover); border-color: var(--fp-primary-hover); }
+.fp-ui button.fp-control[data-tone='primary']:hover:not(:disabled) { background: var(--fp-primary-fill-hover); border-color: var(--fp-primary-fill-hover); }
 .fp-ui .fp-pagination {
   display: flex;
   flex-wrap: wrap;
@@ -133,7 +134,7 @@
 .fp-ui :is(nav, div).fp-tabs :is(a, button.fp-control):hover { background: var(--fp-hover); text-decoration: none; }
 .fp-ui :is(nav, div).fp-tabs a:is(.router-link-exact-active, .current),
 .fp-ui :is(nav, div).fp-tabs button.fp-control:is([aria-selected='true'], [aria-pressed='true']) {
-  color: var(--fp-primary);
+  color: var(--fp-primary-ink);
   background: var(--fp-primary-soft);
   font-weight: 600;
 }
@@ -153,7 +154,7 @@
   overflow-wrap: anywhere;
 }
 .fp-ui .fp-state p { margin: 0; }
-.fp-ui .fp-state[role='alert'] { color: var(--fp-danger); }
+.fp-ui .fp-state[role='alert'] { color: var(--fp-danger-ink); }
 .fp-ui .fp-state-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
 /* Primary list panes share the same surface as their sidebar modules. */
 .fp-list-page {
@@ -210,8 +211,7 @@
   background: var(--fp-elevated, var(--fp-bg));
 }
 .fp-list-page .list-page-head {
-  padding: 14px 18px;
-  background: color-mix(in srgb, var(--fp-card) 96%, var(--fp-text) 4%);
+  padding: 14px var(--fp-panel-padding);
   border-bottom: 1px solid var(--fp-border);
 }
 .fp-list-page .list-page-head :is(h1, h2) { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.4; color: var(--fp-title); }
@@ -233,7 +233,6 @@
   }
 }
 @media (max-width: 640px) {
-  :root { --fp-page-gap: 14px; --fp-panel-padding: 16px; --fp-page-title-size: 21px; }
   .fp-page--auth { margin: 12px auto; }
   .fp-ui .fp-page-heading { margin-bottom: 16px; }
   .fp-list-page .list-page-head { padding: 16px; }
@@ -241,6 +240,12 @@
   .fp-ui :is(nav, div).fp-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
   .fp-ui :is(nav, div).fp-tabs :is(a, button) { flex: none; white-space: nowrap; }
   .fp-ui .fp-state { min-height: 144px; padding: 24px 16px; }
+}
+@media (pointer: coarse) {
+  .fp-ui .fp-pagination button.fp-control,
+  .fp-ui .fp-tabs :is(a, button.fp-control),
+  .fp-page--auth .fp-control { min-height: 44px; }
+  .fp-ui :is(input, textarea, select).fp-control { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .fp-ui .fp-control { transition: none; }
@@ -250,7 +255,7 @@
 .fp-page.fp-ui:is(.activity-page, .milestones-page, .member-page) { gap: var(--fp-page-gap); }
 .fp-ui .fp-card > :first-child { margin-top: 0; }
 .fp-ui .fp-card > :last-child { margin-bottom: 0; }
-.fp-ui :is(nav, div).fp-tabs button.fp-control.on { color: var(--fp-primary); background: var(--fp-primary-soft); }
+.fp-ui :is(nav, div).fp-tabs button.fp-control.on { color: var(--fp-primary-ink); background: var(--fp-primary-soft); }
 .fp-ui .fp-state-actions .fp-control { margin: 0; }
 
 .fp-ui a.fp-link-action { display: inline-flex; align-items: center; justify-content: center; min-height: var(--fp-control-height); padding: 7px 12px; font-size: 13px; border-radius: var(--fp-control-radius); text-decoration: none; }

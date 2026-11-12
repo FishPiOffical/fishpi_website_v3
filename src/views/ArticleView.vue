@@ -811,7 +811,7 @@ function itemHandlers(c: ArticleComment) {
   overflow: hidden;
 }
 .card.post {
-  padding: 24px 28px;
+  padding: clamp(16px, 2.4vw, 28px);
 }
 
 @media (max-width: 1099px) {
@@ -863,11 +863,12 @@ function itemHandlers(c: ArticleComment) {
 }
 h1 {
   margin: 0;
-  font-size: 22px;
-  line-height: 1.4;
+  font-size: clamp(21px, 2vw, 27px);
+  line-height: 1.35;
   color: var(--fp-title);
   font-weight: 600;
   letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
 }
 
 .meta {
@@ -937,7 +938,7 @@ h1 {
 .body {
   margin-top: 20px;
   margin-bottom: 24px;
-  line-height: 1.8;
+  line-height: 1.85;
   font-size: 15px;
   color: var(--fp-text);
   word-break: break-word;
@@ -1210,6 +1211,7 @@ h1 {
 
 .pager {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 12px;

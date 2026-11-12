@@ -345,7 +345,7 @@ select {
   border-radius: 10px;
   background: rgba(195, 74, 54, 0.08);
   border: 1px solid rgba(195, 74, 54, 0.25);
-  color: var(--fp-danger, #c34a36);
+  color: var(--fp-danger-ink);
 
   p {
     margin: 0 0 10px;
