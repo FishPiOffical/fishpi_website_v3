@@ -2,6 +2,7 @@
 import { useScrollPagination } from '@/composables/useScrollPagination'
 import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink,useRoute,useRouter } from 'vue-router'
+import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
 import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
 import ChatQuotePreview from '@/components/chat/ChatQuotePreview.vue'
@@ -43,6 +44,15 @@ const { notices } = storeToRefs(useV3ChatTimelineStore())
 const chatPreferences = useChatPreferencesStore()
 const { account, isLoggedIn, accessToken } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
+provide(CHAT_MENTION, {
+  enabled: () => isLoggedIn.value && !publication.pending,
+  insert: userName => {
+    const text = chatMentionText(userName)
+    if (!isLoggedIn.value || publication.pending || !text) return
+    composerRef.value?.insert(text)
+    composerRef.value?.reveal()
+  },
+})
 const composerReady = ref(false)
 const classicComposerArea = ref<HTMLElement | null>(null)
 const classicComposerAboveView = ref(false)

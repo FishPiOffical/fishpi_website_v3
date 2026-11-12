@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import {getAuthContextVersion} from '@/api/http'
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
 import ChatRepeatAction from '@/components/chat/ChatRepeatAction.vue'
 import ChatBubble from '@/components/ChatBubble.vue'
 import ChatRedPacketCard from '@/components/chat/ChatRedPacketCard.vue'
@@ -47,6 +48,25 @@ const CHATROOM_PEER = '__fishpi_chatroom__'
 const CHATROOM_LABEL = '聊天室'
 const selectedPeer = ref('__private__')
 const draft = ref('')
+const roomComposer = ref<InstanceType<typeof ChatComposer> | null>(null)
+const roomInput = ref<HTMLTextAreaElement | null>(null)
+provide(CHAT_MENTION, {
+  enabled: () => !!auth.accessToken && !publication.pending,
+  insert: userName => {
+    const text = chatMentionText(userName)
+    if (!auth.accessToken || publication.pending || !text) return
+    if (roomComposer.value) {
+      roomComposer.value.insert(text)
+      roomComposer.value.focus()
+    } else if (roomInput.value) {
+      const input = roomInput.value
+      const start = input.selectionStart
+      const end = input.selectionEnd
+      draft.value = draft.value.slice(0, start) + text + draft.value.slice(end)
+      void nextTick(() => { input.focus(); input.setSelectionRange(start + text.length, start + text.length) })
+    }
+  },
+})
 const isChatroomSelected = computed(() => selectedPeer.value === CHATROOM_PEER)
 const visibleRoomMessages = computed(() => roomMessages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
 const canSend = computed(()=>Boolean(draft.value.trim())&&!roomSending.value&&!publication.pending)
@@ -451,11 +471,11 @@ onUnmounted(() => {
                 </div>
                 <Transition name="composer-swap" mode="out-in">
                   <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit">
-                    <textarea v-model="draft" rows="1" aria-label="聊天室消息" placeholder="说点什么吧…"
+                    <textarea ref="roomInput" v-model="draft" rows="1" aria-label="聊天室消息" placeholder="说点什么吧…"
                       :disabled="!!publication.pending" @keydown="onCompactComposerKeydown" />
                     <button type="submit" :disabled="!canSend">{{ roomSending ? '发送中' : '发送' }}</button>
                   </form>
-                  <ChatComposer v-else v-model="draft" class="composer" :height="100" compact cache-id="chatroom-drawer"
+                  <ChatComposer v-else ref="roomComposer" v-model="draft" class="composer" :height="100" compact cache-id="chatroom-drawer"
                     :chat-send-shortcut="chatPreferences.sendShortcut" :sending="roomSending" :disabled="!!publication.pending"
                     placeholder="说点什么吧，友善第一哦。" @submit="submit" />
                 </Transition>

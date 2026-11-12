@@ -3,7 +3,8 @@ import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { formatDisplayTime } from '@/utils/time'
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
+import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
 import { RouterLink } from 'vue-router'
 import CollectChatEmoji from '@/components/chat/CollectChatEmoji.vue'
 import ChatQuoteCard from '@/components/chat/ChatQuoteCard.vue'
@@ -35,6 +36,8 @@ const props = withDefaults(
   { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
+const mention = inject(CHAT_MENTION, null)
+const canMention = computed(() => props.chatroom && !props.self && !!chatMentionText(props.userName) && !!mention?.enabled())
 const chatPreferences = useChatPreferencesStore()
 const simpleMode = computed(() => mounted.value && props.chatroom && chatPreferences.simpleMode)
 const functionPreferences = useFunctionPreferencesStore()
@@ -114,13 +117,13 @@ function onBodyClick(e: MouseEvent) {
     </RouterLink>
     <div class="message-stack">
       <div v-if="chatroom" class="head">
-        <RouterLink :to="`/member/${userName}`" class="name">
+        <component :is="canMention ? 'button' : RouterLink" v-bind="canMention ? { type: 'button' } : { to: `/member/${userName}` }" class="name" :data-user-card="userName" :title="canMention ? `点击 @${nickname || userName}` : undefined" @click="canMention && mention?.insert(userName)">
           <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">
             {{ nickname || userName }}
           </VipNickname>
           <template v-else>{{ nickname || userName }}</template>
           <small v-if="nickname && nickname !== userName">({{ userName }})</small>
-        </RouterLink>
+        </component>
         <MedalList :items="medals" variant="chat" />
       </div>
       <div class="fp-bubble" @click="onBodyClick">
@@ -197,12 +200,19 @@ function onBodyClick(e: MouseEvent) {
   flex-direction: row-reverse;
 }
 .name {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
   display: block;
   font-size: 12px;
   line-height: 18px;
   color: var(--fp-muted);
   text-decoration: none;
 }
+.name:hover { text-decoration: underline; text-underline-offset: 3px; }
+.name:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
 .is-self .name {
   text-align: right;
 }
