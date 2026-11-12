@@ -21,6 +21,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useHomeLayoutStore, type HomeRowView } from '@/stores/homeLayout'
 import { useHomeDrag } from '@/home/useHomeDrag'
+import DragGrip from '@/components/home/DragGrip.vue'
 import PersonInfoCard from '@/components/sidebar/PersonInfoCard.vue'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
 import HomeSideWidgets from '@/components/home/HomeSideWidgets.vue'
@@ -92,7 +93,7 @@ const activeColumnsShelf = computed(() => activeColumnsRead.value.data || [])
 const failedCovers = ref(new Set<string>())
 watch(() => [columnsRecentRead.data, columnsHotRead.data], () => { failedCovers.value = new Set() })
 const { editing } = storeToRefs(layout)
-const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive } = useHomeDrag()
+const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive, dropLabel, onHandleKeydown } = useHomeDrag()
 const { messages: liveChatMessages } = storeToRefs(chat)
 let homeMounted = false, longShelfTimer: ReturnType<typeof setInterval> | undefined
 const chatLines = computed(() => liveChatMessages.value.slice(-10).reverse())
@@ -151,7 +152,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
       <button type="button" class="green" @click="retryHomeReads">重试首页读取</button>
     </div>
     <div v-if="editing" class="edit-bar" role="toolbar" aria-label="首页布局编辑">
-      <span>拖动模块到任意位置：模块上下半部插入同一列，左右边缘新开一列，行间空隙新起一行</span>
+      <div class="edit-bar-copy"><strong>调整首页布局</strong><span>拖住九点栏移动 · 上下排序，左右分栏 · 自动保存</span></div>
       <button type="button" @click="layout.resetPositions()">恢复默认位置</button>
       <button type="button" class="green" @click="editing = false">完成</button>
     </div>
@@ -162,7 +163,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
         :class="{ on: gapActive(row.cells[0].modules[0].id) }"
         @dragover="onGapOver($event, row.cells[0].modules[0].id)"
         @drop="onDrop"
-      />
+      ><span>＋ 放在这里，新建一行</span></div>
       <div class="board" :class="{ bare: isBareRow(row) }" :style="{ gridTemplateColumns: row.columns }">
         <div v-for="cell in row.cells" :key="cell.key" class="cell" :class="{ 'cell--narrow': cell.narrow, 'cell--feed': cell.modules.some(m => m.id === 'recentA') }">
           <div
@@ -170,15 +171,18 @@ function scrollShelf(id: string, dir: -1 | 1) {
             :key="mod.id"
             class="mod"
             :class="[edgeOf(mod.id) ? `drop-${edgeOf(mod.id)}` : '', { dragging: dragging === mod.id }]"
-            :draggable="editing"
             :data-home-module="mod.id"
             :data-home-title="mod.title"
-            @dragstart="onDragStart($event, mod.id)"
-            @dragend="onDragEnd"
             @dragover="onModuleOver($event, mod.id)"
             @drop="onDrop"
           >
-            <span v-if="editing" class="mod-badge">⠿ {{ mod.title }}</span>
+            <button v-if="editing" type="button" class="mod-drag-bar" draggable="true"
+              :aria-label="`移动${mod.title}，方向键调整位置，Escape 取消拖动`"
+              title="拖动调整布局，或用方向键移动" @dragstart="onDragStart($event, mod.id)"
+              @dragend="onDragEnd" @keydown="onHandleKeydown($event, mod.id)">
+              <DragGrip /><span>{{ mod.title }}</span><small>移动</small>
+            </button>
+            <span v-if="edgeOf(mod.id)" class="drop-caption" aria-hidden="true">{{ dropLabel(mod.id) }}</span>
             <section v-if="mod.id === 'recentA'" class="mod-body">
               <div class="index-head">
                 <b>最新</b>
@@ -436,14 +440,17 @@ function scrollShelf(id: string, dir: -1 | 1) {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border: 1px solid var(--fp-link);
-  border-radius: var(--fp-panel-radius);
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-panel-radius, 12px);
   background: color-mix(in srgb, var(--fp-card) 92%, transparent);
   backdrop-filter: blur(10px);
   box-shadow: var(--fp-card-shadow);
   font-size: 13px;
   color: var(--fp-text);
 }
+.edit-bar-copy { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.edit-bar-copy strong { font-size: 14px; }
+.edit-bar-copy span { color: var(--fp-muted); font-size: 12px; }
 .edit-bar span {
   flex: 1;
   min-width: 0;
@@ -527,30 +534,44 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home :deep(.breezemoon-list .moon-body) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 
 .home.editing .mod {
-  cursor: grab;
-  border-radius: 8px;
-  outline: 1px dashed color-mix(in srgb, var(--fp-link) 55%, transparent);
-  outline-offset: 4px;
+  border-radius: var(--fp-panel-radius, 12px);
+  outline: 1px solid var(--fp-border);
+  background: var(--fp-card);
+  align-content: start;
 }
-.home.editing .mod > :not(.mod-badge) {
+.home.editing .mod > :not(.mod-drag-bar):not(.drop-caption) {
   pointer-events: none;
   user-select: none;
 }
-.home.editing .mod.dragging {
-  opacity: 0.35;
+.home.editing .mod.dragging { opacity: 0.4; outline: 2px dashed var(--fp-primary); }
+.mod-drag-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--fp-border);
+  border-radius: var(--fp-panel-radius, 12px) var(--fp-panel-radius, 12px) 0 0;
+  color: var(--fp-text);
+  background: var(--fp-surface-subtle, var(--fp-bg));
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: grab;
+  transition: background 150ms, color 150ms;
 }
-.mod-badge {
-  position: absolute;
-  top: -12px;
-  left: 6px;
-  z-index: 2;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--fp-link);
-  color: #fff;
-  font-size: 11px;
-  line-height: 18px;
-  pointer-events: none;
+.mod-drag-bar:hover, .mod-drag-bar:focus-visible { background: var(--fp-primary-soft); color: var(--fp-primary-ink); }
+.mod-drag-bar:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 2px; }
+.mod-drag-bar:active { cursor: grabbing; }
+.mod-drag-bar span { flex: 1; }
+.mod-drag-bar small { color: var(--fp-muted); font-size: 11px; }
+.drop-caption {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 4; padding: 6px 12px; border-radius: 8px; white-space: nowrap;
+  background: var(--fp-primary-fill); color: #fff; font-size: 12px; pointer-events: none;
+  box-shadow: var(--fp-card-shadow);
 }
 .mod::after {
   content: '';
@@ -588,31 +609,29 @@ function scrollShelf(id: string, dir: -1 | 1) {
   right: -12px;
 }
 .row-gap {
-  height: 14px;
-  margin: -16px 0;
-  border-radius: 8px;
-  transition:
-    height 0.15s,
-    background-color 0.15s;
-}
-.row-gap.on {
-  height: 40px;
-  margin: -6px 0;
-  background: color-mix(in srgb, var(--fp-link) 18%, transparent);
-  outline: 2px dashed var(--fp-link);
-}
-.row-gap.end {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 48px;
-  margin: 0;
+  min-height: 36px;
+  margin: -8px 0;
   border: 1px dashed var(--fp-border);
-  color: var(--fp-muted);
+  border-radius: 8px;
   font-size: 12px;
+  color: var(--fp-muted);
+  transition: background-color 150ms, border-color 150ms;
 }
-.row-gap.end.on {
-  color: var(--fp-link);
+.row-gap.on {
+  color: var(--fp-primary-ink);
+  background: var(--fp-primary-soft);
+  border-color: var(--fp-primary);
+}
+.row-gap.end { margin: 0; }
+@media (max-width: 600px) {
+  .edit-bar { flex-wrap: wrap; top: 64px; }
+  .edit-bar-copy { flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mod-drag-bar, .row-gap { transition: none; }
 }
 .index-head {
   display: flex;

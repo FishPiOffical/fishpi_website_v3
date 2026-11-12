@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { nextTick, onScopeDispose, ref, watch } from 'vue'
 import type { HomeModuleId } from '@/home/modules'
 import { useHomeLayoutStore, type HomeDropTarget } from '@/stores/homeLayout'
 
@@ -18,6 +18,8 @@ export function useHomeDrag() {
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move'
       e.dataTransfer.setData('text/plain', id)
+      const card = (e.currentTarget as HTMLElement).closest<HTMLElement>('[data-home-module]')
+      if (card) e.dataTransfer.setDragImage(card, 24, 22)
     }
   }
 
@@ -50,9 +52,34 @@ export function useHomeDrag() {
 
   function onDrop(e: DragEvent) {
     e.preventDefault()
-    if (dragging.value && target.value) layout.moveTo(dragging.value, target.value)
+    e.stopPropagation()
+    if (layout.editing && dragging.value && target.value) layout.moveTo(dragging.value, target.value)
     onDragEnd()
   }
+
+  function dropLabel(id: HomeModuleId) {
+    return { top: '插入上方', bottom: '插入下方', left: '左侧新建一列', right: '右侧新建一列' }[edgeOf(id) || 'top']
+  }
+
+  async function onHandleKeydown(e: KeyboardEvent, id: HomeModuleId) {
+    if (e.key === 'Escape') { onDragEnd(); return }
+    if (!layout.editing || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return
+    e.preventDefault()
+    const ids = layout.visibleRows.flatMap(row => row.cells.flatMap(cell => cell.modules.map(mod => mod.id)))
+    const index = ids.indexOf(id)
+    const after = e.key === 'ArrowDown' || e.key === 'ArrowRight'
+    const anchor = ids[index + (after ? 1 : -1)]
+    if (!anchor) return
+    const side = e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+    if (side && !layout.canAddCell(anchor, id)) return
+    layout.moveTo(id, side ? { kind: 'side', anchor, after } : { kind: 'stack', anchor, after })
+    // 跨列移动会重建节点，恢复手柄焦点以便连续调整。
+    await nextTick()
+    document.querySelector<HTMLElement>(`[data-home-module="${id}"] .mod-drag-bar`)?.focus()
+  }
+
+  watch(() => layout.editing, value => { if (!value) onDragEnd() })
+  onScopeDispose(onDragEnd)
 
   function edgeOf(id: HomeModuleId): HomeDropEdge | null {
     const t = target.value
@@ -66,5 +93,5 @@ export function useHomeDrag() {
     return Boolean(t && t.kind === 'row' && t.anchor === anchor)
   }
 
-  return { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive }
+  return { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive, dropLabel, onHandleKeydown }
 }

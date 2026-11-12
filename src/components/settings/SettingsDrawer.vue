@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DragGrip from '@/components/home/DragGrip.vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
@@ -289,7 +290,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           <div v-else-if="section === 'home'" class="content">
             <fieldset class="setting-options"><legend>首页版本</legend><label :class="{ selected: home.mode === 'compact' }"><input type="radio" name="home-variant" value="compact" :checked="home.mode === 'compact'" @change="home.setMode('compact')" /><span><b>紧凑版</b><small>最新、长篇和聊天优先进入首屏</small></span></label><label :class="{ selected: home.mode === 'classic' }"><input type="radio" name="home-variant" value="classic" :checked="home.mode === 'classic'" @change="home.setMode('classic')" /><span><b>经典版</b><small>保留原来的双列最新与分行布局</small></span></label><p>两个版本分别保存模块位置与显隐，仅在此浏览器生效。</p></fieldset>
             <button type="button" class="drag-entry" @click="startHomeEdit">
-              <b>⠿ 拖动调整布局</b>
+              <b><DragGrip /> 拖动调整布局</b>
               <span>在首页直接拖动模块，左中右、上下任意摆放</span>
             </button>
             <div class="chips">
