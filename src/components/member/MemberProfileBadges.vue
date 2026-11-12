@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onScopeDispose, ref, useId, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { fetchV3ProfessionSummary } from '@/api/v3-profession-public'
 import { usePublicMedals } from '@/composables/usePublicMedals'
@@ -16,6 +16,7 @@ const { value, p, loading, error, read } = medals
 const previewCount = 1
 const showMedals = ref(false)
 const openMedal = ref<number | null>(null)
+const medalHintId = useId()
 const summary = ref<Awaited<ReturnType<typeof fetchV3ProfessionSummary>>>(null)
 const shownMedals = computed(() => showMedals.value ? value.value?.list : value.value?.list.slice(0, previewCount))
 const remaining = computed(() => Math.max(0, (value.value?.total ?? 0) - previewCount))
@@ -58,12 +59,11 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
   <div class="profile-badges">
     <section id="member-medals" aria-label="公开勋章">
       <div v-if="shownMedals?.length" class="medal-row">
-        <div v-for="(medal, index) in shownMedals" :key="`${p}:${index}:${medal.id}`" class="medal-entry">
-          <div class="medal-preview">
+        <div v-for="(medal, index) in shownMedals" :key="`${p}:${index}:${medal.id}`" class="medal-entry" :class="{ 'is-open': openMedal === index }" @mouseleave="openMedal=null">
+          <div class="medal-preview" role="button" tabindex="0" :aria-expanded="openMedal === index" :aria-label="`${medal.name}，查看勋章说明`" :aria-describedby="`${medalHintId}-${index}`" @click="openMedal = openMedal === index ? null : index" @keydown.enter.prevent="openMedal = openMedal === index ? null : index" @keydown.space.prevent="openMedal = openMedal === index ? null : index">
             <V3MedalImage :id="medal.id" :name="medal.name" :user-name="userName" />
-            <button type="button" class="medal-info" :aria-label="`查看${medal.name}的说明`" :aria-expanded="openMedal === index" @click="openMedal = openMedal === index ? null : index">ⓘ</button>
           </div>
-          <div v-if="openMedal === index" class="medal-description">
+          <div :id="`${medalHintId}-${index}`" class="medal-description" role="tooltip">
             <strong>{{ medal.name }}</strong>
             <p v-if="medal.description">{{ medal.description }}</p>
             <small>{{ medal.expiresAt === 0 ? '永久有效' : `有效至 ${formatDateTime(medal.expiresAt)}` }}</small>
@@ -96,10 +96,15 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
 .profile-badges button { background: var(--fp-surface-subtle); border: 1px solid var(--fp-border); border-radius: 7px; color: var(--fp-text); font: inherit; font-size: 12px; padding: 3px 7px; cursor: pointer; }
 .profile-badges button:disabled { opacity: .55; cursor: default; }
 .medal-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; }
-.medal-entry { max-width: 100%; }
+.medal-entry { position: relative; max-width: 100%; }
 .medal-preview, nav, .badge-error { display: flex; align-items: center; justify-content: center; gap: 5px; }
 .medal-preview button { background: transparent; border: 0; color: var(--fp-muted); padding: 3px; }
-.medal-description { padding: 6px; font-size: 12px; }
+.medal-preview { cursor: help; border-radius: 6px; }
+.medal-preview:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
+.medal-description { display: none; position: absolute; z-index: 20; top: 100%; left: 50%; transform: translateX(-50%); box-sizing: border-box; width: min(230px, 65vw); padding: 10px 12px; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-card); color: var(--fp-text); box-shadow: 0 6px 20px rgb(0 0 0 / 12%); font-size: 12px; line-height: 1.6; text-align: left; overflow-wrap: anywhere; }
+.medal-entry.is-open .medal-description,
+.medal-entry:has(.medal-preview:focus-visible) .medal-description { display: block; }
+@media (hover: hover) { .medal-entry:hover .medal-description { display: block; } }
 .medal-description p { margin: 4px 0; }
 small { color: var(--fp-muted); }
 .profile-badges .profession-badge { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 10px; text-align: left; color: var(--fp-text); background: var(--fp-surface-subtle); border: 1px solid var(--fp-border); border-radius: 8px; }
