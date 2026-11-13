@@ -6,15 +6,16 @@ import assert from 'node:assert/strict'
 
 // 在独立浏览器和临时只读静态服务中检查素材，不访问站点接口或正在长跑的服务。
 const root = process.cwd()
-const temp = path.join(root, '.temp/hexiaotun-animations-v1/qa')
+const siteRoot = process.env.PET_PREVIEW_SITE_DIR ? path.resolve(process.env.PET_PREVIEW_SITE_DIR, 'dist') : null
+const temp = path.join(root, `.temp/hexiaotun-animations-v1/${siteRoot ? 'site-qa' : 'qa'}`)
 await fs.mkdir(temp, { recursive: true })
 const mime = { '.html': 'text/html; charset=utf-8', '.png': 'image/png', '.webp': 'image/webp', '.webm': 'video/webm', '.json': 'application/json' }
 const failures = []
 const server = http.createServer(async (request, response) => {
   try {
     const name = decodeURIComponent(new URL(request.url, 'http://localhost').pathname)
-    const file = path.resolve(root, `.${name}`)
-    if (!file.startsWith(`${root}/docs/pets-art/hexiaotun-animations-v1/`) && !file.startsWith(`${root}/public/images/pets/animations/hexiaotun-v1/`)) throw new Error('denied')
+    const file = path.resolve(siteRoot || root, name === '/' && siteRoot ? 'index.html' : `.${name}`)
+    if (siteRoot ? !file.startsWith(`${siteRoot}/`) : (!file.startsWith(`${root}/docs/pets-art/hexiaotun-animations-v1/`) && !file.startsWith(`${root}/public/images/pets/animations/hexiaotun-v1/`))) throw new Error('denied')
     const content = await fs.readFile(file)
     response.writeHead(200, { 'content-type': mime[path.extname(file)] || 'application/octet-stream', 'content-length': content.length })
     response.end(content)
@@ -64,7 +65,7 @@ try {
   await call('Runtime.enable')
   await call('Page.enable')
   await call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false })
-  await call('Page.navigate', { url: `http://127.0.0.1:${port}/docs/pets-art/hexiaotun-animations-v1/preview.html` })
+  await call('Page.navigate', { url: `http://127.0.0.1:${port}${siteRoot ? '/' : '/docs/pets-art/hexiaotun-animations-v1/preview.html'}` })
   await delay(700)
   const manifest = JSON.parse(await fs.readFile(path.join(root, 'public/images/pets/animations/hexiaotun-v1/manifest.json'), 'utf8'))
   assert.equal(manifest.clips.length, 10)
@@ -107,7 +108,7 @@ try {
   assert.equal(mobile.width, mobile.scrollWidth); assert.equal(mobile.renderedVideo, 128); assert.equal(mobile.buttons, 10)
   assert.deepEqual(failures, []); assert.deepEqual(exceptions, [])
   const report = { date: new Date().toISOString(), browser: version.product, clips, mobile, failedLocalResources: failures, runtimeExceptions: exceptions, note: '独立素材预览验证；不代表已接入宠物家园或服务端活动。' }
-  await fs.writeFile(path.join(root, 'docs/pets-art/hexiaotun-animations-v1/validation.json'), JSON.stringify(report, null, 2) + '\n')
+  await fs.writeFile(siteRoot ? path.join(temp, 'validation.json') : path.join(root, 'docs/pets-art/hexiaotun-animations-v1/validation.json'), JSON.stringify(report, null, 2) + '\n')
   console.log(JSON.stringify({ passed: clips.length, totalBytes: manifest.totalBytes, mobile, screenshots: temp }, null, 2))
 } finally {
   socket?.close()
