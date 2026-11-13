@@ -3,7 +3,7 @@
   "species": "momota",
   "transparent": true,
   "codec": "vp9",
-  "previewOnly": true,
+  "previewOnly": false,
   "totalBytes": 929796,
   "clips": [
     {

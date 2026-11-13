@@ -14,10 +14,14 @@ const pet = (id = 'pet-a', speciesId = 'hexiaotun') => ({ id, speciesId, activit
 const pets = reactive({ pet: pet(), confirmedEvent: null, refreshNeeded: false, busy: false })
 globalThis.__petAnimationState = { usePetsStore: () => pets }
 const moduleUrl = value => `data:text/javascript;base64,${Buffer.from(value).toString('base64')}`
+const mappingSource = ts.transpileModule(await fs.readFile('src/components/pets/animations.ts', 'utf8'), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+}).outputText
 let source = await fs.readFile('src/components/pets/usePetAnimationState.ts', 'utf8')
 source = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
 source = source.replaceAll("from 'vue'", `from '${import.meta.resolve('vue')}'`)
 source = source.replaceAll("from '@/stores/pets'", `from '${moduleUrl('export const { usePetsStore } = globalThis.__petAnimationState')}'`)
+source = source.replaceAll("from './animations'", `from '${moduleUrl(mappingSource)}'`)
 const { usePetAnimationState } = await import(moduleUrl(source))
 const realSetTimeout = globalThis.setTimeout, realClearTimeout = globalThis.clearTimeout
 let time = 0, timerId = 0
@@ -51,26 +55,30 @@ try {
   assert.equal(animation.loop.value, true)
   console.log('PASS 动画初挂载只读取当前活动，不重播历史确认事件')
 
-  for (const [kind, action, expected] of [
-    ['actions', 'feed', 'eat'], ['actions', 'water', 'drink'], ['actions', 'pet', 'pet'], ['actions', 'play', 'play'],
-    ['crafts', '', 'work'], ['adoption', '', 'celebrate'], ['readoption', '', 'celebrate'],
-    ['activities/claim', '', 'celebrate'], ['stories/claim', '', 'celebrate'], ['supplies', '', 'celebrate'],
-  ]) {
-    cue(kind, action)
-    assert.equal(animation.action.value, expected)
-    assert.equal(animation.loop.value, false)
-    assert.equal(timers.size, 1, '新的单次动作替换旧动作，不累积结束计时器')
-    animation.end(animation.playbackKey.value)
-    assert.equal(animation.action.value, 'idle')
-    assert.equal(animation.loop.value, true)
-    assert.equal(timers.size, 0)
+  const speciesIds = ['hexiaotun', 'momota', 'yubingmiao', 'paixiaoyu']
+  for (const species of speciesIds) {
+    pets.pet = pet(`pet-${species}`, species)
+    for (const [kind, action, expected] of [
+      ['actions', 'feed', 'eat'], ['actions', 'water', 'drink'], ['actions', 'pet', 'pet'], ['actions', 'play', 'play'],
+      ['crafts', '', 'work'], ['adoption', '', 'celebrate'], ['readoption', '', 'celebrate'],
+      ['activities/claim', '', 'celebrate'], ['stories/claim', '', 'celebrate'], ['supplies', '', 'celebrate'],
+    ]) {
+      cue(kind, action)
+      assert.equal(animation.action.value, expected, `${species} 当前确认应播放 ${expected}`)
+      assert.equal(animation.loop.value, false)
+      assert.equal(timers.size, 1, '新的单次动作替换旧动作，不累积结束计时器')
+      animation.end(animation.playbackKey.value)
+      assert.equal(animation.action.value, 'idle')
+      assert.equal(animation.loop.value, true)
+      assert.equal(timers.size, 0)
+    }
+    for (const [kind, action] of [['actions', 'rest'], ['actions', 'wake'], ['name', ''], ['purchases', '']]) {
+      cue(kind, action)
+      assert.equal(animation.action.value, 'idle')
+      assert.equal(animation.loop.value, true)
+    }
   }
-  for (const [kind, action] of [['actions', 'rest'], ['actions', 'wake'], ['name', ''], ['purchases', '']]) {
-    cue(kind, action)
-    assert.equal(animation.action.value, 'idle')
-    assert.equal(animation.loop.value, true)
-  }
-  console.log('PASS 已确认互动、制作和领取对应单次动作，无关操作不产生动画')
+  console.log('PASS 四物种已确认互动、制作和领取对应单次动作，无关操作不产生动画')
 
   cue('actions', 'feed')
   const oldKey = animation.playbackKey.value
@@ -109,7 +117,7 @@ try {
   pets.pet = null
   pets.confirmedEvent = null
   assert.equal(animation.action.value, 'idle')
-  pets.pet = pet('pet-c', 'paixiaoyu')
+  pets.pet = pet('pet-c', 'unlisted-species')
   cue('actions', 'water')
   assert.equal(animation.action.value, 'idle', '没有对应素材的宠物继续静态展示')
   pets.pet = pet('pet-d')
@@ -122,18 +130,33 @@ try {
   pets.busy = true
   assert.equal(animation.action.value, 'idle', '新操作进行中清除上次单次反馈')
   pets.busy = false
-  console.log('PASS 换宠、空状态、错误目标与过时状态清理，其他宠物无冒用动画')
+  for (const species of speciesIds) {
+    pets.pet = pet('same-pet', species)
+    cue('actions', 'feed')
+    const oldKey = animation.playbackKey.value
+    pets.pet.speciesId = speciesIds[(speciesIds.indexOf(species) + 1) % speciesIds.length]
+    assert.equal(animation.action.value, 'idle', '同一宠物的种类快照变化也必须清掉旧短动作')
+    assert.equal(timers.size, 0)
+    cue('actions', 'water')
+    animation.end(oldKey)
+    assert.equal(animation.action.value, 'drink', '旧物种动画的迟到结束事件不得结束新动作')
+    animation.end(animation.playbackKey.value)
+  }
+  console.log('PASS 换宠、换种、空状态、错误目标与过时状态清理，未知宠物无冒用动画')
 
-  for (const [kind, expected] of [['rest', 'sleep'], ['outing', 'explore'], ['course', 'study'], ['work', 'work']]) {
-    pets.pet.activity = { kind, endsAt: now.value + 5000, ...(kind !== 'rest' ? { status: 'running' } : {}) }
-    assert.equal(animation.action.value, expected)
-    assert.equal(animation.loop.value, true)
-    assert.equal(timers.size, 0, '长期活动不能通过额外计时器或接口模拟成果')
-    const oldEvent = pets.confirmedEvent
-    now.value += 5000
-    assert.equal(animation.action.value, 'idle', '活动到期停止原活动动画')
-    assert.equal(pets.confirmedEvent, oldEvent, '到期不能伪造领取确认或庆祝')
-    assert.equal(pets.pet.activity.kind, kind, '动画到期不能自行修改服务端活动状态')
+  for (const species of speciesIds) {
+    pets.pet = pet(`pet-${species}`, species)
+    for (const [kind, expected] of [['rest', 'sleep'], ['outing', 'explore'], ['course', 'study'], ['work', 'work']]) {
+      pets.pet.activity = { kind, endsAt: now.value + 5000, ...(kind !== 'rest' ? { status: 'running' } : {}) }
+      assert.equal(animation.action.value, expected, `${species} 的 ${kind} 应播放 ${expected}`)
+      assert.equal(animation.loop.value, true)
+      assert.equal(timers.size, 0, '长期活动不能通过额外计时器或接口模拟成果')
+      const oldEvent = pets.confirmedEvent
+      now.value += 5000
+      assert.equal(animation.action.value, 'idle', '活动到期停止原活动动画')
+      assert.equal(pets.confirmedEvent, oldEvent, '到期不能伪造领取确认或庆祝')
+      assert.equal(pets.pet.activity.kind, kind, '动画到期不能自行修改服务端活动状态')
+    }
   }
   pets.pet.activity = { kind: 'course', endsAt: now.value + 5000, status: 'claimable' }
   assert.equal(animation.action.value, 'idle')
@@ -142,7 +165,7 @@ try {
   assert.equal(animation.action.value, 'idle')
   pets.refreshNeeded = false
   assert.equal(animation.action.value, 'study')
-  console.log('PASS 休息、外出、学习、工作按真实活动循环；到期或待领取回待机，不奖励、不改状态')
+  console.log('PASS 四物种休息、外出、学习、工作按真实活动循环；到期或待领取回待机，不奖励、不改状态')
 
   pets.pet.activity = null
   cue('actions', 'feed')

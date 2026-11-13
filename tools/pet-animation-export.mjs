@@ -32,6 +32,12 @@ const definitions = [
 
 const requested = argumentsList.filter(value => !value.startsWith('--species='))
 if (requested.some(id => !definitions.some(item => item.id === id))) throw new Error('未知的宠物动作')
+// 调整素材节奏不能把已经接入家园的动画重新标成仅预览；新目录仍默认等待接入验收。
+let previewOnly = true
+try {
+  const previous = JSON.parse(await fs.readFile(path.join(outputDir, 'manifest.json'), 'utf8'))
+  previewOnly = previous.previewOnly !== false
+} catch (error) { if (error.code !== 'ENOENT') throw error }
 await fs.mkdir(outputDir, { recursive: true })
 await fs.mkdir(tempDir, { recursive: true })
 
@@ -165,4 +171,4 @@ for (const definition of definitions) {
     clips.push({ id: definition.id, name: definition.name, mode: definition.mode, file: `${definition.id}.webm`, poster: `${definition.id}.webp`, width: 256, height: 256, fps: 24, uniqueFrames: definition.holds?.length || 16, frames, duration: frames / 24, bytes: stat.size, interpolated: false, approvedEatingSource: Boolean(definition.approved) })
   } catch (error) { if (error.code !== 'ENOENT') throw error }
 }
-await fs.writeFile(path.join(outputDir, 'manifest.json'), JSON.stringify({ version: 1, species, transparent: true, codec: 'vp9', previewOnly: true, totalBytes: clips.reduce((sum, clip) => sum + clip.bytes, 0), clips }, null, 2) + '\n')
+await fs.writeFile(path.join(outputDir, 'manifest.json'), JSON.stringify({ version: 1, species, transparent: true, codec: 'vp9', previewOnly, totalBytes: clips.reduce((sum, clip) => sum + clip.bytes, 0), clips }, null, 2) + '\n')

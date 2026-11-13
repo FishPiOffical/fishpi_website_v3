@@ -3,7 +3,7 @@
   "species": "yubingmiao",
   "transparent": true,
   "codec": "vp9",
-  "previewOnly": true,
+  "previewOnly": false,
   "totalBytes": 1276025,
   "clips": [
     {

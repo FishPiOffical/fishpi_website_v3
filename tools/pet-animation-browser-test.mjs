@@ -25,7 +25,8 @@ let serial = 0
 export const calls = []
 export const nextKey = () => 'animation-browser:' + ++serial
 ${suite.slice(begin, end).replace('const now = Date.UTC', 'let now = Date.UTC')}
-serverState = adopted('animation-pet', '荷小满', new URLSearchParams(location.search).get('species') || 'hexiaotun')
+const selectedSpecies = catalog.species.find(species => species.id === new URLSearchParams(location.search).get('species')) || catalog.species.find(species => species.id === 'hexiaotun')
+serverState = adopted('animation-pet', selectedSpecies.name, selectedSpecies.id)
 serverState.pet.hunger = 45; serverState.pet.water = 50; serverState.pet.energy = 60; serverState.pet.mood = 50
 for (const skill of serverState.pet.skills) skill.experience = 30
 serverState.wallet.coins = 920
@@ -127,14 +128,32 @@ import { usePetDisplayStore } from './${displayStore}'
 import { useAuthStore, useRoute } from './stubs.ts'
 import * as fixture from './data.js'
 const pets = usePetsStore(), display = usePetDisplayStore(), auth = useAuthStore(), route = useRoute()
-const desktopOnly = new URLSearchParams(location.search).has('desktop')
+const parameters = new URLSearchParams(location.search)
+const desktopOnly = parameters.has('desktop')
+const speciesOptions = [{ id: 'hexiaotun', name: '荷小豚' }, { id: 'momota', name: '摸摸獭' }, { id: 'yubingmiao', name: '鱼饼喵' }, { id: 'paixiaoyu', name: '派小鱼' }]
+const selectedSpecies = speciesOptions.some(species => species.id === parameters.get('species')) ? parameters.get('species') : 'hexiaotun'
+function previewUrl(desktop = desktopOnly, species = selectedSpecies) {
+  const next = new URLSearchParams(parameters)
+  next.set('species', species)
+  if (desktop) next.set('desktop', '1'); else next.delete('desktop')
+  return '/?' + next
+}
+function changeSpecies(event) { location.assign(previewUrl(desktopOnly, event.target.value)) }
 onMounted(() => {
+  if (desktopOnly) { display.show(); display.setCollapsed(false) }
   window.petFixture = { pets, display, auth, route, ...fixture }
   document.body.dataset.fixtureReady = 'true'
 })
 </script>
 <template>
-  <header class="fixture-nav" data-site-navigation><strong>摸鱼派</strong><span>动画接入 · 本地隔离验收</span></header>
+  <header class="fixture-nav" data-site-navigation>
+    <strong>摸鱼派 <span>本地动画预览</span></strong>
+    <nav aria-label="预览场景">
+      <select aria-label="预览宠物" :value="selectedSpecies" @change="changeSpecies"><option v-for="species in speciesOptions" :key="species.id" :value="species.id">{{ species.name }}</option></select>
+      <a :href="previewUrl(false)" :aria-current="desktopOnly ? undefined : 'page'">家园</a>
+      <a :href="previewUrl(true)" :aria-current="desktopOnly ? 'page' : undefined">桌宠</a>
+    </nav>
+  </header>
   <main v-if="!desktopOnly"><View /></main>
   <main v-else class="desktop-fixture"><h1>桌宠陪伴</h1><p>此处仅检查桌宠播放、拖动和收纳，不连接真实服务。</p></main>
   <Desktop />
@@ -142,6 +161,10 @@ onMounted(() => {
 <style>
 .fixture-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 1180px; margin: 0 auto 20px; min-height: 40px; border-bottom: 1px solid var(--fp-border); padding-bottom: 14px; color: var(--fp-text); }
 .fixture-nav span { font-size: 12px; color: var(--fp-muted); }
+.fixture-nav nav { display: flex; align-items: center; gap: 8px; }
+.fixture-nav select, .fixture-nav a { padding: 7px 10px; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-card); color: var(--fp-text); font: inherit; font-size: 13px; text-decoration: none; }
+.fixture-nav a[aria-current] { background: var(--fp-primary-soft); color: var(--fp-primary); }
+@media (max-width: 600px) { .fixture-nav { flex-wrap: wrap; }.fixture-nav nav { margin-left: auto; }.fixture-nav strong span { display: none; } }
 .desktop-fixture { min-height: 70vh; padding: 30px; }
 </style>
 `)
@@ -156,11 +179,11 @@ import '${path.join(root, 'src/packs/themes/classic-dark/style.css')}'
 document.documentElement.dataset.theme = new URLSearchParams(location.search).get('theme') === 'dark' ? 'classic-dark' : 'classic-light'
 createApp(Shell).use(createPinia()).mount('#app')
 `)
-await fs.writeFile(path.join(sourceDirectory, 'index.html'), `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>荷小豚动画接入 · 隔离验证</title><style>body{margin:0;padding:24px 16px;font-family:system-ui,sans-serif!important}*{box-sizing:border-box}@media(max-width:600px){body{padding:16px 10px}}</style></head><body><div id="app"></div><script type="module" src="./main.ts"></script></body></html>`)
+await fs.writeFile(path.join(sourceDirectory, 'index.html'), `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>宠物家园与桌宠 · 本地动画预览</title><style>body{margin:0;padding:24px 16px;font-family:system-ui,sans-serif!important}*{box-sizing:border-box}@media(max-width:600px){body{padding:16px 10px}}</style></head><body><div id="app"></div><script type="module" src="./main.ts"></script></body></html>`)
 await build({ configFile: false, root: sourceDirectory, publicDir: false, plugins: [vue()], logLevel: 'warn',
   resolve: { alias: { '@': path.join(root, 'src') } }, build: { outDir: output, emptyOutDir: true } })
 
-const requests = [], failures = [], exceptions = [], results = [], expectedMediaFailures = []
+const requests = [], requestDetails = [], failures = [], exceptions = [], results = [], expectedMediaFailures = []
 let failingVideo = ''
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webp': 'image/webp', '.webm': 'video/webm', '.json': 'application/json' }
 const server = http.createServer(async (request, response) => {
@@ -168,6 +191,7 @@ const server = http.createServer(async (request, response) => {
     assert(['GET', 'HEAD'].includes(request.method), '验证服务不接收写请求')
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname)
     requests.push(pathname)
+    requestDetails.push({ pathname, referer: request.headers.referer || '' })
     if (failingVideo && pathname.endsWith(`/${failingVideo}.webm`)) {
       expectedMediaFailures.push(pathname); response.writeHead(404); response.end(); return
     }
@@ -533,18 +557,126 @@ try {
   await until(`!document.querySelector('.pet-desktop')`, '隐藏桌宠释放')
   results.push('桌宠展开播放、收起停播、隐藏卸载')
 
-  const beforeStatic = requests.length
-  await navigate('?species=paixiaoyu')
-  await delay(250)
-  assert.equal(await evaluate('document.querySelectorAll("video").length'), 0)
-  assert.equal(requests.slice(beforeStatic).filter(url => url.endsWith('.webm')).length, 0)
-  results.push('其他宠物维持静态展示，无多余视频请求')
+  const speciesChecks = []
+  for (const species of ['momota', 'yubingmiao', 'paixiaoyu']) {
+    await setViewport(1440)
+    await call('Network.setCacheDisabled', { cacheDisabled: true })
+    const initialRequests = requests.length
+    await navigate(`?species=${species}`)
+    await until(sceneAction('idle'), `${species}家园待机`)
+    assert.deepEqual([...new Set(requests.slice(initialRequests).filter(url => url.endsWith('.webm')))], [`/images/pets/animations/${species}-v1/idle.webm`])
+    const transparency = await evaluate(`(()=>{const v=${sceneVideo};const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');x.drawImage(v,0,0,256,256);const a=x.getImageData(0,0,256,256).data;let clear=0,solid=0;for(let i=3;i<a.length;i+=4){if(!a[i])clear++;if(a[i]>240)solid++}return {clear,solid,width:v.videoWidth,height:v.videoHeight}})()`)
+    assert(transparency.clear > 10000 && transparency.solid > 10000)
+    assert.equal(transparency.width, 256); assert.equal(transparency.height, 256)
+    assert.equal(await evaluate('petFixture.pets.pet.speciesId'), species)
+    await screenshot(`${species}-home.png`)
+    await evaluate('petFixture.display.show();petFixture.display.setCollapsed(false)')
+    await until(`${desktopVideo}?.readyState >= 2 && !${desktopVideo}.paused`, `${species}桌宠待机`)
+    const durations = {}
+    for (const { action, label, clip, effects, food } of careCases) {
+      const before = await careSnapshot(), beforeCalls = await evaluate('petFixture.calls.length')
+      if (action === 'water') {
+        await evaluate(`document.querySelector('.pet-character').click()`)
+        await until(`!!document.querySelector('.pet-desktop-panel .pet-actions')`, `${species}桌宠照顾面板`)
+      }
+      await clickCare(label, action === 'water' ? '.pet-desktop-panel' : undefined)
+      await until(sceneAction(clip), `${species}${label}家园动画`)
+      await until(`${desktopVideo}?.currentSrc.includes('/${species}-v1/${clip}.webm') && ${desktopVideo}.readyState >= 2 && !${desktopVideo}.paused`, `${species}${label}桌宠动画`)
+      const after = await careSnapshot()
+      for (const key of ['hunger', 'water', 'mood', 'energy']) assert.equal(after[key], Math.max(0, Math.min(100, before[key] + (effects[key] || 0))))
+      assert.equal(after.food, before.food + food)
+      assert.equal(after.experience, before.experience + 10)
+      assert.equal(after.friendship, before.friendship + 2)
+      assert.equal(after.used, before.used + 1)
+      await checkHomeState(after)
+      assert.deepEqual(await evaluate(`petFixture.calls.slice(${beforeCalls}).map(x=>x.method)`), ['POST', 'GET'])
+      assert.equal(await evaluate(`${sceneVideo}.loop`), false)
+      durations[clip] = await evaluate(`${sceneVideo}.duration`)
+      if (action === 'water') await evaluate(`document.querySelector('button[aria-label="关闭桌宠面板"]').click()`)
+      await finishCare(`${species}${label}`)
+      await until(`${desktopVideo}?.currentSrc.includes('/idle.webm') && !${desktopVideo}.paused`, `${species}桌宠回待机`)
+    }
+    results.push(`${species}：首屏仅加载透明待机；四项互动正常改变状态和成长，家园与桌宠同步，每项仅一次POST及一次GET`)
+
+    for (const [kind, clip] of [['rest', 'sleep'], ['outing', 'explore'], ['course', 'study'], ['work', 'work']]) {
+      await evaluate(`petFixture.setActivity('${kind}');petFixture.pets.refresh()`)
+      await until(sceneAction(clip), `${species}${kind}家园活动`)
+      await until(`${desktopVideo}?.currentSrc.includes('/${species}-v1/${clip}.webm') && ${desktopVideo}.readyState >= 2 && !${desktopVideo}.paused`, `${species}${kind}桌宠活动`)
+      assert.equal(await evaluate(`${sceneVideo}.loop && ${desktopVideo}.loop`), true)
+      durations[clip] = await evaluate(`${sceneVideo}.duration`)
+    }
+    await evaluate('petFixture.finishActivity();petFixture.pets.refresh()')
+    await until(sceneAction('idle'), `${species}活动到期回待机`)
+    await evaluate("document.querySelector('.supply-panel button').click()")
+    await until(sceneAction('celebrate'), `${species}补给庆祝`)
+    await until(`${desktopVideo}?.currentSrc.includes('/celebrate.webm') && !${desktopVideo}.paused`, `${species}桌宠补给庆祝`)
+    assert.equal(await evaluate('petFixture.pets.state.dailySupply.claimed'), true)
+    assert.equal(await evaluate('petFixture.pets.coins'), 940)
+    await finishCare(`${species}补给庆祝`)
+    results.push(`${species}：四种长期活动两处同步循环、到期回待机，补给到账后两处庆祝一次`)
+
+    await evaluate('petFixture.display.setCollapsed(true)')
+    await until(`!${desktopVideo} || ${desktopVideo}.paused`, `${species}桌宠收纳停播`)
+    await evaluate('petFixture.display.setCollapsed(false)')
+    await until(`${desktopVideo}?.readyState >= 2 && !${desktopVideo}.paused`, `${species}桌宠展开恢复`)
+    await screenshot(`${species}-desktop.png`)
+    await call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+    await until(`!${sceneVideo} && !${desktopVideo}`, `${species}减少动态静态回退`)
+    await call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] })
+    await until(sceneAction('idle'), `${species}恢复动态`)
+    for (const width of [390, 320]) {
+      await setViewport(width, 900)
+      await delay(250)
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true)
+      assert.equal(await evaluate(`!${desktopVideo} || ${desktopVideo}.paused`), true, '窄屏收纳桌宠不播放视频')
+      await screenshot(`${species}-home-${width}.png`)
+    }
+    results.push(`${species}：桌宠收纳停播、展开恢复；减少动态回退静态；390px和320px无横向溢出`)
+
+    await setViewport(1440)
+    const beforeSave = requests.length
+    await navigate(`?species=${species}&saveData=1`)
+    await delay(250)
+    assert.equal(await evaluate('document.querySelectorAll("video").length'), 0)
+    // 导航前的在途视频可能此刻才抵达服务；只计算由省流页面发起的媒体请求。
+    assert.equal(requestDetails.slice(beforeSave).filter(entry => entry.pathname.endsWith('.webm') && entry.referer.includes('saveData=1')).length, 0)
+    await navigate(`?species=${species}`)
+    await until(sceneAction('idle'), `${species}故障场景待机`)
+    failingVideo = 'work'
+    const previousFailures = expectedMediaFailures.length
+    await evaluate("petFixture.setActivity('work');petFixture.pets.refresh()")
+    await until(`document.querySelector('.pet-scene [data-pet-action="work"]') && !${sceneVideo}`, `${species}故障回退静态`)
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('.pet-scene .pet-animation img')).opacity"), '1')
+    assert(expectedMediaFailures.length > previousFailures)
+    const failedAttempts = expectedMediaFailures.length
+    await evaluate('petFixture.pets.refresh()')
+    await delay(300)
+    assert.equal(expectedMediaFailures.length, failedAttempts)
+    failingVideo = ''
+    results.push(`${species}：省流首次零视频；视频故障回退静态，同一动作不反复请求`)
+    speciesChecks.push({ species, transparency, durations })
+  }
+
+  // 人工预览导航只切换隔离页面，不写真实账号，也不丢失所选物种和显示场景。
+  await navigate('?species=paixiaoyu&theme=dark')
+  await until(sceneAction('idle'), '预览导航初始派小鱼')
+  await evaluate(`document.querySelector('.fixture-nav a[href*="desktop"]').click()`)
+  await until(`new URLSearchParams(location.search).has('desktop') && !!document.querySelector('.desktop-fixture') && ${desktopVideo}?.readyState >= 2 && !${desktopVideo}.paused`, '预览导航进入桌宠')
+  assert.equal(await evaluate('petFixture.pets.pet.speciesId'), 'paixiaoyu')
+  await evaluate(`(()=>{const select=document.querySelector('select[aria-label="预览宠物"]');select.value='momota';select.dispatchEvent(new Event('change',{bubbles:true}))})()`)
+  await until(`window.petFixture?.pets.pet?.speciesId==='momota' && ${desktopVideo}?.currentSrc.includes('/momota-v1/idle.webm') && !${desktopVideo}.paused`, '桌宠选择摸摸獭')
+  assert.equal(await evaluate("new URLSearchParams(location.search).get('theme')"), 'dark')
+  assert.equal(await evaluate("new URLSearchParams(location.search).has('desktop')"), true)
+  await evaluate(`document.querySelector('.fixture-nav a:not([href*="desktop"])').click()`)
+  await until(`!!document.querySelector('.pet-scene') && ${sceneAction('idle')}`, '预览导航返回家园')
+  assert.equal(await evaluate('petFixture.pets.pet.speciesId'), 'momota')
+  results.push('预览顶栏可切换家园和桌宠、选择物种，并保留当前物种、显示模式和主题参数')
 
   const beforeSaveData = requests.length
   await navigate('?saveData=1')
   await delay(250)
   assert.equal(await evaluate('document.querySelectorAll("video").length'), 0)
-  assert.equal(requests.slice(beforeSaveData).filter(url => url.endsWith('.webm')).length, 0)
+  assert.equal(requestDetails.slice(beforeSaveData).filter(entry => entry.pathname.endsWith('.webm') && entry.referer.includes('saveData=1')).length, 0)
   results.push('省流偏好首次加载不请求视频，直接展示静态图')
 
   await call('Network.setCacheDisabled', { cacheDisabled: true })
@@ -564,8 +696,8 @@ try {
 
   assert.deepEqual(failures, []); assert.deepEqual(exceptions, [])
   assert.equal(requests.some(url => url.startsWith('/api/')), false)
-  const report = { date: new Date().toISOString(), browser: version.product, passed: results.length, results, alpha,
-    media: [...new Set(requests.filter(url => url.endsWith('.webm')))].map(url => path.basename(url)),
+  const report = { date: new Date().toISOString(), browser: version.product, passed: results.length, results, alpha, speciesChecks,
+    media: [...new Set(requests.filter(url => url.endsWith('.webm')))],
     failedResources: failures, expectedMediaFailures, exceptions, screenshots: temporary,
     note: '真实组件、浏览器、WebM与本地模拟传输；未访问真实账号，未中断原8小时测试，不代表真机Safari验收。' }
   await fs.writeFile(path.join(temporary, 'report.json'), JSON.stringify(report, null, 2) + '\n')

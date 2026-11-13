@@ -6,7 +6,7 @@
 
 ## 项目范围
 
-- `pet` 分支养成、外出、学校及见习兼职由 `v3-pets.ts`、`pets` store 和 `PetsView/PetDesktop` 共用，服务端权威状态、独立宠物币；写回执后只重读聚合状态，未知保留原键，换号清私有数据。桌宠仅持久化位置/显示偏好，不轮询；工作熟练度独立于课程技能，共享产币额度由服务端结算。活动记录由 `petActivityHistory` 按展开状态惰性读取，不进 SSR 或持久缓存。规则及人工验收见 `docs/pets-phase-one.md`、`docs/pets-phase-two.md`、`docs/pets-phase-three.md`、`docs/pets-phase-four.md`、`docs/pets-phase-five.md`；旅程按真实操作推进且奖励每账号一次，重新领养保留账号资产/补给/日额度及旧日志；进阶探索材料、制作收藏、食品饮料及日常事件共用事务和统一日志，旧活动接口保留，日志只记真实净变化。荷小豚十套透明 WebM 已通过 PetAnimation/usePetAnimationState 接入家园和桌宠；仅完整确认后的当前宠物播放短动作，活动循环跟随当前快照，隐藏/省流/减少动态时停播或静态回退，不新增业务读取。其他宠物动画另批实施，见 docs/pets-phase-eight.md。
+- `pet` 分支养成、外出、学校及见习兼职由 `v3-pets.ts`、`pets` store 和 `PetsView/PetDesktop` 共用，服务端权威状态、独立宠物币；写回执后只重读聚合状态，未知保留原键，换号清私有数据。桌宠仅持久化位置/显示偏好，不轮询；工作熟练度独立于课程技能，共享产币额度由服务端结算。活动记录由 `petActivityHistory` 按展开状态惰性读取，不进 SSR 或持久缓存。规则及人工验收见 `docs/pets-phase-one.md`、`docs/pets-phase-two.md`、`docs/pets-phase-three.md`、`docs/pets-phase-four.md`、`docs/pets-phase-five.md`；旅程按真实操作推进且奖励每账号一次，重新领养保留账号资产/补给/日额度及旧日志；进阶探索材料、制作收藏、食品饮料及日常事件共用事务和统一日志，旧活动接口保留，日志只记真实净变化。四种宠物各十套透明 WebM 已通过 PetAnimation/usePetAnimationState 的物种白名单接入家园和桌宠；仅完整确认后的当前宠物播放短动作，活动循环跟随当前快照，隐藏/省流/减少动态时停播或静态回退，不新增业务读取。换宠或物种变化清旧短动作，未知物种不借用其他素材；见 docs/pets-phase-eight.md 与 docs/pets-animation-all-species.md。
 
 - 项目为摸鱼派用户站，采用 Vue 3、TypeScript、Pinia、Vite 与 SSR。
 - 后端继续使用 Rhythm，功能行为与接口参考 https://fishpi.cn。

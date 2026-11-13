@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 import { usePetsStore, type PetConfirmedEvent } from '@/stores/pets'
-import type { PetAnimationAction } from './animations'
+import { petAnimationClip, type PetAnimationAction } from './animations'
 
 function confirmedAction(event: PetConfirmedEvent): PetAnimationAction | null {
   if (event.kind === 'actions') {
@@ -40,16 +40,17 @@ export function usePetAnimationState(now: Ref<number>, active: MaybeRefOrGetter<
   watch(() => pets.confirmedEvent, event => {
     clear()
     if (!event || !toValue(active) || typeof document === 'undefined' || document.hidden
-        || event.petId !== pets.pet?.id || pets.pet.speciesId !== 'hexiaotun') return
+        || event.petId !== pets.pet?.id) return
     const next = confirmedAction(event)
-    if (!next) return
+    // 家园和桌宠只播放当前物种已有的动作，未知物种不借用其他宠物的素材。
+    if (!next || !petAnimationClip(pets.pet.speciesId, next)) return
     transient.value = { action: next, sequence: event.sequence }
     // 媒体无法播放或结束事件丢失时有界退出，不能永久卡在一次性的动作中。
     expiry = setTimeout(clear, 12_000)
   }, { flush: 'sync' })
-  watch(() => [pets.pet?.id, pets.busy, pets.refreshNeeded, toValue(active)] as const,
-    ([petId, busy, stale, enabled], previous) => {
-      if (petId !== previous?.[0] || busy || stale || !enabled) clear()
+  watch(() => [pets.pet?.id, pets.pet?.speciesId, pets.busy, pets.refreshNeeded, toValue(active)] as const,
+    ([petId, speciesId, busy, stale, enabled], previous) => {
+      if (petId !== previous?.[0] || speciesId !== previous?.[1] || busy || stale || !enabled) clear()
     }, { flush: 'sync' })
   function end(key: string | number) { if (key === playbackKey.value) clear() }
   function visibility() { if (document.hidden) clear() }

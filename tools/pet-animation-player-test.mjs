@@ -66,20 +66,31 @@ try {
     app.mount(host); await flush()
     return { props, ended, host, observer: observers.at(-1), app, video: () => host.querySelector('video'), destroy: () => { app.unmount(); host.remove() } }
   }
-  const manifest = JSON.parse(await fs.readFile('public/images/pets/animations/hexiaotun-v1/manifest.json', 'utf8'))
-  assert.deepEqual(mapping.petAnimationActions, manifest.clips.map(clip => clip.id))
-  for (const clip of manifest.clips) {
-    const entry = mapping.petAnimationClip('hexiaotun', clip.id)
-    assert.equal((await fs.stat(path.join('public', entry.src))).size, clip.bytes)
-    assert.ok((await fs.stat(path.join('public', entry.poster))).size > 0)
+  const speciesIds = ['hexiaotun', 'momota', 'yubingmiao', 'paixiaoyu']
+  for (const species of speciesIds) {
+    const manifest = JSON.parse(await fs.readFile(`public/images/pets/animations/${species}-v1/manifest.json`, 'utf8'))
+    assert.deepEqual(mapping.petAnimationActions, manifest.clips.map(clip => clip.id))
+    for (const clip of manifest.clips) {
+      const entry = mapping.petAnimationClip(species, clip.id)
+      assert.ok(entry, `${species} 应有 ${clip.id} 素材`)
+      assert.equal(entry.src, `/images/pets/animations/${species}-v1/${clip.id}.webm`)
+      assert.equal((await fs.stat(path.join('public', entry.src))).size, clip.bytes)
+      assert.ok((await fs.stat(path.join('public', entry.poster))).size > 0)
+    }
   }
-  assert.equal(mapping.petAnimationClip('paixiaoyu', 'idle'), null)
-  assert.equal(mapping.petAnimationClip('hexiaotun', '../unknown'), null)
-  pass('十项素材与实际 manifest 一致，其他物种及未知动作无视频')
+  for (const species of ['unlisted-species', '../momota', 'toString', '__proto__', 'https://example.invalid/pet']) {
+    assert.equal(mapping.petAnimationClip(species, 'idle'), null, '仅允许显式目录，不能从物种名称拼接路径')
+  }
+  for (const action of ['../unknown', 'constructor', '__proto__', 'https://example.invalid/action']) {
+    assert.equal(mapping.petAnimationClip('hexiaotun', action), null)
+  }
+  pass('四物种四十项素材与实际 manifest 一致，未知物种和动作不能拼接视频地址')
 
-  const html = await renderToString(createSSRApp(Component, { species: 'hexiaotun', alt: '荷小豚' }))
-  assert.match(html, /<img[^>]+hexiaotun.webp/); assert.doesNotMatch(html, /<video|\.webm/)
-  pass('SSR 只有静态图，不生成媒体下载地址')
+  for (const species of speciesIds) {
+    const html = await renderToString(createSSRApp(Component, { species, alt: species }))
+    assert.match(html, new RegExp(`<img[^>]+${species}\\.webp`)); assert.doesNotMatch(html, /<video|\.webm/)
+  }
+  pass('四物种 SSR 都只有静态图，不生成媒体下载地址')
 
   const instance = await mount({ active: false })
   assert.equal(instance.video(), null)
@@ -120,6 +131,23 @@ try {
   instance.video().dispatchEvent(new Event('ended')); await flush(); assert.deepEqual(instance.ended, [2, 3])
   pass('同动作的新操作可重新播放，循环动作不发单次结束事件')
 
+  for (const species of ['momota', 'yubingmiao', 'paixiaoyu']) {
+    const previousVideo = instance.video()
+    instance.props.species = species; await flush()
+    assert.equal(previousVideo.getAttribute('src'), null, '切换物种立即释放前一套媒体')
+    assert.match(instance.video().src, new RegExp(`/${species}-v1/idle\\.webm$`))
+    assert.equal(instance.host.querySelector('.is-playing'), null, '不同物种首帧不能沿用透明解码结果')
+    for (const action of ['eat', 'drink', 'pet', 'play', 'sleep', 'explore', 'study', 'work', 'celebrate', 'idle']) {
+      instance.props.action = action; await flush()
+      assert.match(instance.video().src, new RegExp(`/${species}-v1/${action}\\.webm$`))
+      assert.equal(instance.host.querySelectorAll('video').length, 1, '一次只挂载一个当前动作')
+      assert.equal(instance.video().playbackRate, 1, '直接使用已调速的素材，不重复在播放器加速')
+      instance.video().dispatchEvent(new Event('loadeddata')); await flush()
+      assert.ok(instance.host.querySelector('.is-playing'), `${species} 的 ${action} 首帧应切换到视频`)
+    }
+  }
+  pass('三个新增物种切换后释放旧视频，每套十种动作沿原速播放且重新验证透明首帧')
+
   instance.video().dispatchEvent(new Event('loadeddata')); await flush(); assert.ok(instance.host.querySelector('.is-playing'))
   motion.matches = true; motion.dispatchEvent(new Event('change')); await flush()
   assert.equal(instance.video(), null); assert.ok(instance.host.querySelector('img'))
@@ -151,7 +179,7 @@ try {
   support = ''
   const unsupported = await mount(); unsupported.observer.send(true); await flush(); assert.equal(unsupported.video(), null); unsupported.destroy()
   support = 'probably'
-  const other = await mount({ species: 'momota' }); other.observer.send(true); await flush(); assert.equal(other.video(), null); assert.match(other.host.querySelector('img').src, /momota.webp$/); other.destroy()
-  pass('不支持 VP9 或其他物种保持原静态图')
+  const other = await mount({ species: 'unlisted-species', image: '/images/pets/momota.webp' }); other.observer.send(true); await flush(); assert.equal(other.video(), null); assert.match(other.host.querySelector('img').src, /momota.webp$/); other.destroy()
+  pass('不支持 VP9 或未知物种保持原静态图')
   console.log(`PASS pet-animation-player ${count} 组`)
 } finally { await fs.rm(directory, { recursive: true, force: true }); dom.window.close() }

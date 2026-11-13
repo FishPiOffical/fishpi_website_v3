@@ -3,7 +3,7 @@
   "species": "paixiaoyu",
   "transparent": true,
   "codec": "vp9",
-  "previewOnly": true,
+  "previewOnly": false,
   "totalBytes": 834513,
   "clips": [
     {
