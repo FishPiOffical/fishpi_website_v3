@@ -520,7 +520,7 @@ export async function readPetJournal(kind: PetHistoryKind, page: number, signal?
   return result
 }
 
-export async function executePetCommand(command: PetCommand, signal?: AbortSignal): Promise<void> {
+export async function executePetCommand(command: PetCommand, signal?: AbortSignal): Promise<{ petId: string }> {
   if (!/^[A-Za-z0-9._:-]{1,128}$/.test(command.key)) throw new ApiError('操作标识不合法', 422)
   const { kind, key, ...input } = command
   // 命令的本地路由标识与服务端活动类型分开，原键恢复始终发送冻结的活动类型。
@@ -548,4 +548,6 @@ export async function executePetCommand(command: PetCommand, signal?: AbortSigna
     text(receipt.activityId, 64)
     if (command.kind === 'activities/claim' && receipt.activityId !== command.activityId) throw invalid()
   }
+  // 仅返回已校验的目标标识，供动画核对当前宠物；养成状态仍只采用后续聚合读取。
+  return { petId: receipt.petId as string }
 }

@@ -8,6 +8,13 @@ import {
 } from '@/api/v3-pets'
 import { useAuthStore } from '@/stores/auth'
 
+export interface PetConfirmedEvent {
+  sequence: number
+  petId: string
+  kind: PetCommand['kind']
+  action?: PetAction
+}
+
 export const usePetsStore = defineStore('pets', () => {
   const { accessToken, account } = storeToRefs(useAuthStore())
   const state = ref<PetState | null>(null)
@@ -15,6 +22,9 @@ export const usePetsStore = defineStore('pets', () => {
   const loading = ref(false), catalogLoading = ref(false), busy = ref(false)
   const error = ref(''), catalogError = ref(''), pendingError = ref('')
   const pending = ref<PetCommand | null>(null)
+  // 仅内存中的本次操作确认信号，不持久化、不广播，也不代替养成快照。
+  const confirmedEvent = ref<PetConfirmedEvent | null>(null)
+  let confirmationSequence = 0
   const refreshNeeded = ref(false), receivedAt = ref(0)
   const offline = ref(typeof navigator !== 'undefined' && navigator.onLine === false)
   const pet = computed(() => state.value?.pet ?? null)
@@ -61,6 +71,7 @@ export const usePetsStore = defineStore('pets', () => {
     catalogFlight = null
     state.value = catalog.value = null
     pending.value = null
+    confirmedEvent.value = null
     busy.value = catalogLoading.value = refreshNeeded.value = false
     error.value = catalogError.value = pendingError.value = ''
     receivedAt.value = 0
@@ -224,11 +235,12 @@ export const usePetsStore = defineStore('pets', () => {
     const controller = new AbortController()
     writeAbort = controller
     pending.value = Object.freeze({ ...command })
+    confirmedEvent.value = null
     busy.value = true
     pendingError.value = error.value = ''
     let confirmed = false
     try {
-      await executePetCommand(command, controller.signal)
+      const receipt = await executePetCommand(command, controller.signal)
       if (!valid()) return false
       confirmed = true
       pending.value = null
@@ -236,6 +248,11 @@ export const usePetsStore = defineStore('pets', () => {
       refreshNeeded.value = true
       try { channel?.postMessage({ type: 'changed', owner: account.value?.oId }) } catch { /* 本页照常重读。 */ }
       await loadState()
+      // 写入和当前状态都核对成功才播放；读取失败或已换宠时不延后补播历史成功。
+      if (valid() && !refreshNeeded.value && pet.value?.id === receipt.petId) {
+        confirmedEvent.value = { sequence: ++confirmationSequence, petId: receipt.petId,
+          kind: command.kind, ...(command.kind === 'actions' ? { action: command.action } : {}) }
+      }
     } catch (reason) {
       if (!valid()) return false
       const description = message(reason, '这次操作的结果尚未确认，请恢复原操作')
@@ -384,7 +401,7 @@ export const usePetsStore = defineStore('pets', () => {
     }
   })
   return {
-    state, catalog, pet, coins, foodQuantity, ready, receivedAt,
+    state, catalog, pet, coins, foodQuantity, ready, receivedAt, confirmedEvent,
     loading, catalogLoading, error, catalogError, busy, pending, pendingError, refreshNeeded, offline,
     ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, craft, claimStory, readopt, startActivity, claimActivity, retryPending,
   }

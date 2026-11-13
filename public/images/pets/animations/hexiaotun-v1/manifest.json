@@ -3,7 +3,7 @@
   "species": "hexiaotun",
   "transparent": true,
   "codec": "vp9",
-  "previewOnly": true,
+  "previewOnly": false,
   "totalBytes": 990040,
   "clips": [
     {

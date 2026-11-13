@@ -1,0 +1,363 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import http from 'node:http'
+import { spawn } from 'node:child_process'
+import { build } from 'vite'
+import vue from '@vitejs/plugin-vue'
+
+// 真实组件和视频在独立浏览器运行，只有传输与身份使用本地夹具，不连接业务服务。
+const root = process.cwd()
+const temporary = path.join(root, '.temp/pet-animation-browser')
+const sourceDirectory = path.join(temporary, 'fixture')
+const output = path.join(temporary, 'built')
+await fs.mkdir(sourceDirectory, { recursive: true })
+const suite = await fs.readFile(path.join(root, 'tools/pets-ui-test.mjs'), 'utf8')
+const begin = suite.indexOf('const skillNames =')
+const end = suite.indexOf('\nhandler = success')
+assert(begin >= 0 && end > begin, '宠物界面测试夹具的来源锚点已变化')
+await fs.writeFile(path.join(sourceDirectory, 'data.js'), `
+import { ApiError } from './stubs.ts'
+const assert = { equal(actual, expected) { if (actual !== expected) throw new Error('本地夹具状态不匹配') } }
+let serial = 0
+export const calls = []
+export const nextKey = () => 'animation-browser:' + ++serial
+${suite.slice(begin, end)}
+serverState = adopted('animation-pet', '荷小满', new URLSearchParams(location.search).get('species') || 'hexiaotun')
+serverState.pet.hunger = 45; serverState.pet.water = 50; serverState.pet.energy = 60
+for (const skill of serverState.pet.skills) skill.experience = 30
+serverState.wallet.coins = 920
+let fault = '', hold = null
+const receipts = new Map()
+export const setFault = value => { fault = value }
+export const readState = () => structuredClone(serverState)
+export const setActivity = kind => {
+  if (!kind) { serverState.pet.activity = null; return }
+  if (kind === 'rest') { serverState.pet.activity = { kind, startedAt: now, endsAt: now + 600000 }; return }
+  const choice = catalog[kind === 'course' ? 'courses' : kind === 'work' ? 'jobs' : 'places'][0]
+  serverState.pet.activity = { id: 'browser-activity', kind, entryId: choice.id, name: choice.name,
+    startedAt: now, endsAt: now + 600000, status: 'running', cost: choice.cost, rewards: choice.rewards }
+}
+export const finishActivity = () => { serverState.pet.activity.startedAt = now - 600000; serverState.pet.activity.endsAt = now - 1; serverState.pet.activity.status = 'claimable' }
+export const request = async (url, options) => {
+  calls.push({ url, method: options?.method || 'GET' })
+  const write = options?.method && options.method !== 'GET'
+  if (!write && fault === 'read' && url === '/api/v3/me/pet') { fault = ''; throw new ApiError('读取失败夹具', 503) }
+  if (write && fault === 'hold') { fault = ''; await new Promise(resolve => { hold = resolve }) }
+  const key = options?.headers?.['Idempotency-Key']
+  if (key && receipts.has(key)) return receipts.get(key)
+  const result = await success(url, options)
+  if (write && url.endsWith('/actions')) {
+    const action = JSON.parse(options.body).action
+    if (action === 'rest') setActivity('rest')
+    if (action === 'water') serverState.pet.water = Math.min(100, serverState.pet.water + 20)
+  }
+  if (key) receipts.set(key, result)
+  if (write && fault === 'unknown') { fault = ''; throw new ApiError('未知结果夹具', 0) }
+  return result
+}
+export const releaseWrite = () => { hold?.(); hold = null }
+`)
+await fs.writeFile(path.join(sourceDirectory, 'stubs.ts'), `
+import { ref, computed, h, reactive } from 'vue'
+import { defineStore } from 'pinia'
+export { request } from './data.js'
+import { nextKey } from './data.js'
+export const profileOperationKey = nextKey
+export class ApiError extends Error { constructor(message, status, code) { super(message); this.status = status; this.code = code } }
+export const getAuthContextVersion = () => 1
+export const usePageSeo = () => {}
+export const useAuthStore = defineStore('animation-auth', () => {
+  const accessToken = ref('isolated-fixture')
+  return { accessToken, account: ref({ oId: 'fixture-owner' }), isLoggedIn: computed(() => !!accessToken.value) }
+})
+export const RouterLink = { props: ['to'], setup(props, { slots }) { return () => h('a', { href: '#', onClick: e => e.preventDefault() }, slots.default?.()) } }
+const route = reactive({ path: '/pets' })
+export const useRoute = () => route
+export const useLayoutStore = defineStore('animation-layout', () => ({ immersive: ref(false) }))
+`)
+const copied = new Map()
+const stubs = new Set(['@/api/http', '@/stores/auth', '@/stores/layout', '@/api/v3-profile', '@/composables/usePageSeo', 'vue-router'])
+async function copy(file) {
+  file = path.resolve(file)
+  if (copied.has(file)) return copied.get(file)
+  const name = `module-${copied.size}${path.extname(file)}`
+  copied.set(file, name)
+  let contents = await fs.readFile(file, 'utf8')
+  for (const match of [...contents.matchAll(/from\s*(['"])([^'"]+)\1/g)]) {
+    const specifier = match[2]
+    let replacement
+    if (stubs.has(specifier) || (path.basename(file) === 'v3-pets.ts' && specifier === './http')) replacement = './stubs.ts'
+    else if (specifier.startsWith('@/') || specifier.startsWith('.')) {
+      let dependency = specifier.startsWith('@/') ? path.join(root, 'src', specifier.slice(2)) : path.resolve(path.dirname(file), specifier)
+      if (!path.extname(dependency)) dependency += '.ts'
+      replacement = `./${await copy(dependency)}`
+    }
+    if (replacement) contents = contents.replaceAll(match[0], `from '${replacement}'`)
+  }
+  await fs.writeFile(path.join(sourceDirectory, name), contents)
+  return name
+}
+const view = await copy(path.join(root, 'src/views/PetsView.vue'))
+const desktop = await copy(path.join(root, 'src/components/pets/PetDesktop.vue'))
+const petsStore = await copy(path.join(root, 'src/stores/pets.ts'))
+const displayStore = await copy(path.join(root, 'src/stores/petDisplay.ts'))
+await fs.writeFile(path.join(sourceDirectory, 'Shell.vue'), `
+<script setup>
+import { onMounted } from 'vue'
+import View from './${view}'
+import Desktop from './${desktop}'
+import { usePetsStore } from './${petsStore}'
+import { usePetDisplayStore } from './${displayStore}'
+import { useAuthStore, useRoute } from './stubs.ts'
+import * as fixture from './data.js'
+const pets = usePetsStore(), display = usePetDisplayStore(), auth = useAuthStore(), route = useRoute()
+const desktopOnly = new URLSearchParams(location.search).has('desktop')
+onMounted(() => {
+  window.petFixture = { pets, display, auth, route, ...fixture }
+  document.body.dataset.fixtureReady = 'true'
+})
+</script>
+<template>
+  <header class="fixture-nav" data-site-navigation><strong>摸鱼派</strong><span>动画接入 · 本地隔离验收</span></header>
+  <main v-if="!desktopOnly"><View /></main>
+  <main v-else class="desktop-fixture"><h1>桌宠陪伴</h1><p>此处仅检查桌宠播放、拖动和收纳，不连接真实服务。</p></main>
+  <Desktop />
+</template>
+<style>
+.fixture-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 1180px; margin: 0 auto 20px; min-height: 40px; border-bottom: 1px solid var(--fp-border); padding-bottom: 14px; color: var(--fp-text); }
+.fixture-nav span { font-size: 12px; color: var(--fp-muted); }
+.desktop-fixture { min-height: 70vh; padding: 30px; }
+</style>
+`)
+await fs.writeFile(path.join(sourceDirectory, 'main.ts'), `
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import Shell from './Shell.vue'
+import '${path.join(root, 'src/styles/base.css')}'
+import '${path.join(root, 'src/styles/inner-pages.css')}'
+import '${path.join(root, 'src/packs/themes/classic-light/style.css')}'
+import '${path.join(root, 'src/packs/themes/classic-dark/style.css')}'
+document.documentElement.dataset.theme = new URLSearchParams(location.search).get('theme') === 'dark' ? 'classic-dark' : 'classic-light'
+createApp(Shell).use(createPinia()).mount('#app')
+`)
+await fs.writeFile(path.join(sourceDirectory, 'index.html'), `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>荷小豚动画接入 · 隔离验证</title><style>body{margin:0;padding:24px 16px;font-family:system-ui,sans-serif!important}*{box-sizing:border-box}@media(max-width:600px){body{padding:16px 10px}}</style></head><body><div id="app"></div><script type="module" src="./main.ts"></script></body></html>`)
+await build({ configFile: false, root: sourceDirectory, publicDir: false, plugins: [vue()], logLevel: 'warn',
+  resolve: { alias: { '@': path.join(root, 'src') } }, build: { outDir: output, emptyOutDir: true } })
+
+const requests = [], failures = [], exceptions = [], results = [], expectedMediaFailures = []
+let failingVideo = ''
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webp': 'image/webp', '.webm': 'video/webm', '.json': 'application/json' }
+const server = http.createServer(async (request, response) => {
+  try {
+    assert(['GET', 'HEAD'].includes(request.method), '验证服务不接收写请求')
+    const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname)
+    requests.push(pathname)
+    if (failingVideo && pathname.endsWith(`/${failingVideo}.webm`)) {
+      expectedMediaFailures.push(pathname); response.writeHead(404); response.end(); return
+    }
+    const base = pathname.startsWith('/images/pets/') ? path.join(root, 'public') : output
+    const filename = path.resolve(base, pathname === '/' ? 'index.html' : `.${pathname}`)
+    assert(filename.startsWith(`${base}/`), '不能访问夹具目录之外的文件')
+    const bytes = await fs.readFile(filename)
+    const headers = { 'content-type': mime[path.extname(filename)] || 'application/octet-stream', 'cache-control': 'public,max-age=3600' }
+    const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range || '')
+    if (range) {
+      const start = Number(range[1]), end = Math.min(range[2] ? Number(range[2]) : bytes.length - 1, bytes.length - 1)
+      assert(start <= end, '视频区间有效')
+      response.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${bytes.length}`, 'content-length': end - start + 1, 'accept-ranges': 'bytes' })
+      response.end(request.method === 'HEAD' ? undefined : bytes.subarray(start, end + 1))
+    } else {
+      response.writeHead(200, { ...headers, 'content-length': bytes.length })
+      response.end(request.method === 'HEAD' ? undefined : bytes)
+    }
+  } catch {
+    if (request.url !== '/favicon.ico') failures.push(request.url)
+    response.writeHead(404); response.end()
+  }
+})
+await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+const port = server.address().port
+const profile = path.join(temporary, `chrome-${Date.now()}`)
+const browser = spawn(process.env.PET_CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', ['--headless=new', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--autoplay-policy=no-user-gesture-required', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' })
+let socket
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+try {
+  let address
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { const [debugPort, endpoint] = (await fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).trim().split('\n'); address = `ws://127.0.0.1:${debugPort}${endpoint}`; break } catch { await delay(100) }
+  }
+  assert(address, '独立浏览器启动成功')
+  socket = new WebSocket(address)
+  await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject })
+  let nextId = 0
+  const pending = new Map()
+  socket.onmessage = event => {
+    const message = JSON.parse(event.data)
+    if (message.id && pending.has(message.id)) {
+      const { resolve, reject, timer } = pending.get(message.id)
+      pending.delete(message.id); clearTimeout(timer)
+      if (message.error) reject(new Error(message.error.message)); else resolve(message.result)
+    }
+    if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text)
+  }
+  const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
+    const id = ++nextId, timer = setTimeout(() => { pending.delete(id); reject(new Error(`超时：${method}`)) }, 20000)
+    pending.set(id, { resolve, reject, timer }); socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }))
+  })
+  const version = await send('Browser.getVersion')
+  const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
+  const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
+  const call = (method, params = {}) => send(method, params, sessionId)
+  const evaluate = async expression => {
+    const response = await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
+    if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description || response.exceptionDetails.text)
+    return response.result.value
+  }
+  async function until(expression, label, timeout = 7000) {
+    const start = Date.now()
+    while (Date.now() - start < timeout) { if (await evaluate(expression)) return; await delay(70) }
+    throw new Error(`等待失败：${label}；${JSON.stringify(await evaluate(`({error:petFixture?.pets.error,pending:!!petFixture?.pets.pending,busy:petFixture?.pets.busy,event:petFixture?.pets.confirmedEvent,videos:[...document.querySelectorAll('video')].map(v=>({src:v.currentSrc,ready:v.readyState,paused:v.paused,time:v.currentTime}))})`))}`)
+  }
+  async function screenshot(name) {
+    const { data } = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+    await fs.writeFile(path.join(temporary, name), Buffer.from(data, 'base64'))
+  }
+  await call('Runtime.enable'); await call('Page.enable'); await call('Network.enable')
+  // 用浏览器启动脚本模拟省流偏好，其余媒体检测仍由真实浏览器执行。
+  await call('Page.addScriptToEvaluateOnNewDocument', { source: `if(new URLSearchParams(location.search).has('saveData')){const connection=new EventTarget();connection.saveData=true;Object.defineProperty(navigator,'connection',{configurable:true,value:connection})}` })
+  await call('Network.setBlockedURLs', { urls: ['https://*', 'http://localhost:*'] })
+  const setViewport = (width, height = 1000) => call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 })
+  async function navigate(query = '') {
+    await call('Page.navigate', { url: `http://127.0.0.1:${port}/${query}` })
+    await until(`!!window.petFixture?.pets.pet`, '宠物夹具已加载')
+  }
+  const sceneVideo = `document.querySelector('.pet-scene video')`
+  const sceneAction = action => `${sceneVideo}?.currentSrc.includes('/${action}.webm') && ${sceneVideo}.readyState >= 2 && !${sceneVideo}.paused`
+  await setViewport(1440)
+  await navigate()
+  await until(sceneAction('idle'), '待机真实播放')
+  assert.deepEqual([...new Set(requests.filter(url => url.endsWith('.webm')).map(url => path.basename(url)))], ['idle.webm'])
+  const alpha = await evaluate(`(()=>{const v=${sceneVideo};const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');x.drawImage(v,0,0,256,256);const a=x.getImageData(0,0,256,256).data;let clear=0,solid=0;for(let i=3;i<a.length;i+=4){if(!a[i])clear++;if(a[i]>240)solid++}return {clear,solid,width:v.videoWidth,height:v.videoHeight}})()`)
+  assert(alpha.clear > 10000 && alpha.solid > 10000)
+  assert.equal(alpha.width, 256); assert.equal(alpha.height, 256)
+  await screenshot('home-desktop.png')
+  results.push('首屏只加载待机，真实256透明视频正常播放')
+
+  for (const [action, clip] of [['feed', 'eat'], ['water', 'drink'], ['pet', 'pet'], ['play', 'play']]) {
+    const before = await evaluate('petFixture.calls.length')
+    await evaluate(`petFixture.pets.act('${action}'${action === 'feed' ? ", 'food'" : ''})`)
+    await until(sceneAction(clip), `${action} 对应动画`)
+    assert.deepEqual(await evaluate(`petFixture.calls.slice(${before}).map(x=>x.method)`), ['POST', 'GET'])
+    assert.equal(await evaluate(`${sceneVideo}.loop`), false)
+    await evaluate(`(()=>{const v=${sceneVideo};v.currentTime=v.duration-.15})()`)
+    await until(sceneAction('idle'), `${action} 播放完回待机`)
+  }
+  results.push('四种照顾操作成功后播一次，结束回待机，无动画附加API请求')
+
+  await evaluate(`petFixture.setFault('hold');void(window.waitingWrite=petFixture.pets.act('pet'))`)
+  await delay(150)
+  assert.equal(await evaluate(`${sceneVideo}?.currentSrc.includes('/pet.webm')`), false)
+  await evaluate('petFixture.releaseWrite();waitingWrite')
+  await until(sceneAction('pet'), '确认后才播动作')
+  await evaluate(`(()=>{const v=${sceneVideo};v.currentTime=v.duration-.15})()`)
+  await until(sceneAction('idle'), '确认动作结束')
+  await evaluate(`petFixture.setFault('unknown');petFixture.pets.act('pet')`)
+  assert.equal(await evaluate('!!petFixture.pets.pending'), true)
+  assert.equal(await evaluate(`${sceneVideo}?.currentSrc.includes('/pet.webm')`), false)
+  await evaluate('petFixture.pets.retryPending()')
+  await until(sceneAction('pet'), '原键恢复确认后播放')
+  results.push('等待和未知结果不播放成功动作，原键恢复确认后才播放')
+
+  for (const [kind, clip] of [['rest', 'sleep'], ['outing', 'explore'], ['course', 'study'], ['work', 'work']]) {
+    await evaluate(`petFixture.setActivity('${kind}');petFixture.pets.refresh()`)
+    await until(sceneAction(clip), `${kind} 当前活动动画`)
+    assert.equal(await evaluate(`${sceneVideo}.loop`), true)
+  }
+  await evaluate('petFixture.finishActivity();petFixture.pets.refresh()')
+  await until(sceneAction('idle'), '活动到期待领取使用待机')
+  results.push('休息、外出、上课、工作使用循环动作；到期待领取不继续活动动画')
+  await evaluate('petFixture.pets.claimSupply()')
+  await until(sceneAction('celebrate'), '补给确认后庆祝')
+  await evaluate(`(()=>{const v=${sceneVideo};v.currentTime=v.duration-.15})()`)
+  await until(sceneAction('idle'), '庆祝完回待机')
+  results.push('补给确认后庆祝一次，结束恢复当前状态')
+
+  await call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
+  await until(`!${sceneVideo} || ${sceneVideo}.paused`, '减少动态停止播放')
+  await screenshot('home-reduced-motion.png')
+  await call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] })
+  await until(sceneAction('idle'), '恢复动态播放')
+  results.push('系统减少动态偏好即时停播并回退静态')
+
+  // 真实滚动使主画面离开视口，检查播放暂停，而非直接篡改可见性判断。
+  await setViewport(1440, 450)
+  await evaluate('window.scrollTo(0, document.documentElement.scrollHeight)')
+  await until(`!${sceneVideo} || ${sceneVideo}.paused`, '离开视口暂停')
+  await evaluate('window.scrollTo(0,0)')
+  await setViewport(1440)
+  await until(sceneAction('idle'), '回到视口恢复')
+  results.push('滚出视口暂停，回到视口恢复当前长期动作')
+
+  for (const width of [390, 320]) {
+    await setViewport(width, 900)
+    await delay(250)
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true)
+    await screenshot(`home-${width}.png`)
+  }
+  results.push('390px与320px布局无横向溢出')
+
+  await setViewport(1440)
+  await navigate('?desktop')
+  const desktopVideo = `document.querySelector('.pet-character video')`
+  await until(`${desktopVideo}?.readyState >= 2 && !${desktopVideo}.paused`, '桌宠待机播放')
+  await screenshot('desktop-pet.png')
+  await evaluate('petFixture.display.setCollapsed(true)')
+  await until(`!${desktopVideo} || ${desktopVideo}.paused`, '桌宠收起停播')
+  await evaluate('petFixture.display.setCollapsed(false)')
+  await until(`${desktopVideo}?.readyState >= 2 && !${desktopVideo}.paused`, '桌宠展开恢复')
+  await evaluate('petFixture.display.hide()')
+  await until(`!document.querySelector('.pet-desktop')`, '隐藏桌宠释放')
+  results.push('桌宠展开播放、收起停播、隐藏卸载')
+
+  const beforeStatic = requests.length
+  await navigate('?species=paixiaoyu')
+  await delay(250)
+  assert.equal(await evaluate('document.querySelectorAll("video").length'), 0)
+  assert.equal(requests.slice(beforeStatic).filter(url => url.endsWith('.webm')).length, 0)
+  results.push('其他宠物维持静态展示，无多余视频请求')
+
+  const beforeSaveData = requests.length
+  await navigate('?saveData=1')
+  await delay(250)
+  assert.equal(await evaluate('document.querySelectorAll("video").length'), 0)
+  assert.equal(requests.slice(beforeSaveData).filter(url => url.endsWith('.webm')).length, 0)
+  results.push('省流偏好首次加载不请求视频，直接展示静态图')
+
+  await call('Network.setCacheDisabled', { cacheDisabled: true })
+  await navigate()
+  await until(sceneAction('idle'), '故障场景先正常待机')
+  failingVideo = 'work'
+  await evaluate("petFixture.setActivity('work');petFixture.pets.refresh()")
+  await until(`document.querySelector('.pet-scene [data-pet-action="work"]') && !${sceneVideo}`, '视频失败回退静态')
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.pet-scene .pet-animation img')).opacity"), '1')
+  assert(expectedMediaFailures.length > 0)
+  const attempts = expectedMediaFailures.length
+  await evaluate('petFixture.pets.refresh()')
+  await delay(400)
+  assert.equal(expectedMediaFailures.length, attempts)
+  results.push('视频加载故障回退静态，同一动作不自动反复请求')
+  failingVideo = ''
+
+  assert.deepEqual(failures, []); assert.deepEqual(exceptions, [])
+  assert.equal(requests.some(url => url.startsWith('/api/')), false)
+  const report = { date: new Date().toISOString(), browser: version.product, passed: results.length, results, alpha,
+    media: [...new Set(requests.filter(url => url.endsWith('.webm')))].map(url => path.basename(url)),
+    failedResources: failures, expectedMediaFailures, exceptions, screenshots: temporary,
+    note: '真实组件、浏览器、WebM与本地模拟传输；未访问真实账号，未中断原8小时测试，不代表真机Safari验收。' }
+  await fs.writeFile(path.join(temporary, 'report.json'), JSON.stringify(report, null, 2) + '\n')
+  console.log(JSON.stringify(report, null, 2))
+} finally {
+  socket?.close(); browser.kill('SIGTERM')
+  server.closeAllConnections(); await new Promise(resolve => server.close(resolve))
+}

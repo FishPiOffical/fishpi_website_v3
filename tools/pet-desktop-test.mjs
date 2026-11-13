@@ -14,7 +14,7 @@ Object.defineProperty(document, 'hidden', { configurable: true, value: false })
 const viewport = new window.EventTarget()
 Object.assign(viewport, { width: 1200, height: 800, offsetLeft: 0, offsetTop: 0 })
 Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport })
-window.matchMedia = () => ({ matches: viewport.width <= 640 })
+window.matchMedia = query => ({ matches: /max-width: 640px/.test(query) && viewport.width <= 640, addEventListener() {}, removeEventListener() {} })
 const resizeObservers = new Set()
 globalThis.ResizeObserver = class { nodes = new Set(); constructor(callback) { this.callback = callback; resizeObservers.add(this) } observe(node) { this.nodes.add(node) } disconnect() { this.nodes.clear() } }
 let frames = 0
@@ -39,7 +39,7 @@ const { createPinia, defineStore } = await import('pinia')
 let reads = 0
 const useAuthStore = defineStore('desktop-test-auth', () => ({ isLoggedIn: ref(true), account: ref({ oId: 'local-fixture' }), accessToken: ref('test') }))
 const useLayoutStore = defineStore('desktop-test-layout', () => ({ immersive: ref(false) }))
-const usePetsStore = defineStore('desktop-test-pets', () => ({ pet: ref({ id: 'pet-one', name: '小伙伴', speciesId: 'hexiaotun', level: 2, hunger: 60, water: 60, mood: 60, energy: 60, activity: null, cooldowns: { pet: 0, play: 0 } }), state: ref({ serverNow: Date.now() }), receivedAt: ref(Date.now()), refreshNeeded: ref(false), loading: ref(false), busy: ref(false), pending: ref(null), foodQuantity: ref(5), ensureLoaded: () => { reads++ }, refresh: () => { reads++ } }))
+const usePetsStore = defineStore('desktop-test-pets', () => ({ confirmedEvent: ref(null), pet: ref({ id: 'pet-one', name: '小伙伴', speciesId: 'hexiaotun', level: 2, hunger: 60, water: 60, mood: 60, energy: 60, activity: null, cooldowns: { pet: 0, play: 0 } }), state: ref({ serverNow: Date.now() }), receivedAt: ref(Date.now()), refreshNeeded: ref(false), loading: ref(false), busy: ref(false), pending: ref(null), foodQuantity: ref(5), ensureLoaded: () => { reads++ }, refresh: () => { reads++ } }))
 const route = reactive({ path: '/pets' })
 const RouterLink = { props: ['to'], setup(props, { slots }) { return () => h('a', { href: props.to }, slots.default?.()) } }
 globalThis.__desktopTest = { getAuthContextVersion: () => 1, useAuthStore, useLayoutStore, usePetsStore, RouterLink, useRoute: () => route }

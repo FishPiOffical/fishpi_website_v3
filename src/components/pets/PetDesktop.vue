@@ -9,6 +9,8 @@ import { useLayoutStore } from '@/stores/layout'
 import PetActions from './PetActions.vue'
 import PetFeedback from './PetFeedback.vue'
 import PetIcon from './PetIcon.vue'
+import PetAnimation from './PetAnimation.vue'
+import { usePetAnimationState } from './usePetAnimationState'
 import { usePetClock } from './usePetClock'
 import { petActivityStatus } from './petActivityStatus'
 import { usePetPlacement } from './layout/usePetPlacement'
@@ -32,6 +34,8 @@ const placement = usePetPlacement({ element, panel, preferred: () => display.pos
   active: () => available.value, panelOpen: () => panelOpen.value })
 const shown = computed(() => available.value && !placement.suppressed.value)
 const compact = placement.compact, narrow = placement.narrow, panelStyle = placement.panelStyle
+const animationActive = computed(() => shown.value && !compact.value && !dragging.value)
+const animation = usePetAnimationState(now, animationActive)
 const actualPosition = computed(() => dragPosition.value ?? placement.position.value)
 let drag: { pointer: number; x: number; y: number; left: number; top: number; moved: boolean } | null = null
 let ignoreClickUntil = 0
@@ -127,7 +131,7 @@ onBeforeUnmount(() => {
         <button type="button" title="隐藏桌宠，可在宠物家园重新显示" aria-label="隐藏桌宠" @click="close"><PetIcon name="close" /></button>
       </div>
       <button v-if="pets.pet" type="button" class="pet-character" :aria-label="display.collapsed && !narrow ? `展开${pets.pet.name}` : `照顾${pets.pet.name}`" :title="narrow ? '点击照顾，拖动调整位置' : undefined" :aria-expanded="panelOpen" @click="activateCharacter" @pointerdown="narrow && pointerDown($event)" @pointermove="narrow && pointerMove($event)" @pointerup="narrow && pointerUp($event)" @pointercancel="pointerLost" @lostpointercapture="pointerLost" @keydown="narrow && moveByKey($event)">
-        <img :src="`/images/pets/${pets.pet.speciesId}.webp`" :alt="pets.pet.name" :width="compact ? 48 : 128" :height="compact ? 48 : 128" draggable="false" />
+        <PetAnimation :key="pets.pet.id" :species="pets.pet.speciesId" :alt="pets.pet.name" :action="animation.action.value" :loop="animation.loop.value" :playback-key="animation.playbackKey.value" :active="animationActive" :width="compact ? 48 : 128" :height="compact ? 48 : 128" @ended="animation.end" />
         <span v-if="!compact" class="desktop-name">{{ pets.pet.name }}<small>Lv. {{ pets.pet.level }}</small></span>
         <span v-if="pets.pet.activity?.kind === 'rest'" class="desktop-sleep" aria-label="休息中">z</span>
         <span v-else-if="pets.pet.activity" class="desktop-activity" :aria-label="activityClaimable ? '活动成果待领取' : pets.pet.activity.kind === 'outing' ? '外出中' : pets.pet.activity.kind === 'work' ? '工作中' : '上课中'"><PetIcon :name="activityClaimable ? 'gift' : pets.pet.activity.kind" /></span>
@@ -149,14 +153,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .pet-desktop { position: fixed; z-index: 35; width: 144px; color: var(--fp-text); user-select: none; }
 .pet-desktop.collapsed, .pet-desktop.recovering { width: 56px; }
-.pet-desktop.narrow { width: 48px; }.narrow .desktop-tools { display: none; }.narrow .pet-character { width: 48px; height: 48px; touch-action: none; }.narrow .pet-character img { width: 44px; height: 44px; }.narrow .pet-character:hover img { transform: none; }.narrow .pet-recovery { margin: 0; }
+.pet-desktop.narrow { width: 48px; }.narrow .desktop-tools { display: none; }.narrow .pet-character { width: 48px; height: 48px; touch-action: none; }.narrow .pet-character .pet-animation { width: 44px; height: 44px; }.narrow .pet-character:hover .pet-animation { transform: none; }.narrow .pet-recovery { margin: 0; }
 .desktop-tools { display: flex; align-items: center; justify-content: center; gap: 2px; opacity: 0; transition: opacity .16s; }
 .pet-desktop:hover .desktop-tools, .pet-desktop:focus-within .desktop-tools, .pet-desktop.dragging .desktop-tools { opacity: 1; }
 .desktop-tools button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--fp-border); border-radius: 7px; color: var(--fp-muted); background: var(--fp-card); cursor: pointer; }
 .desktop-tools svg { width: 14px; height: 14px; }.desktop-tools button:hover { color: var(--fp-primary); }
 .desktop-tools button.pet-drag-handle { cursor: grab; touch-action: none; }.dragging .pet-drag-handle { cursor: grabbing; }
 .pet-character { position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; }
-.pet-character img { display: block; object-fit: contain; filter: drop-shadow(0 4px 4px rgb(0 0 0 / .05)); transition: transform .2s; }.pet-character:hover img { transform: translateY(-3px); }
+.pet-character .pet-animation { display: block; object-fit: contain; filter: drop-shadow(0 4px 4px rgb(0 0 0 / .05)); transition: transform .2s; }.pet-character:hover .pet-animation { transform: translateY(-3px); }
 .desktop-name { display: flex; align-items: center; justify-content: center; gap: 5px; width: max-content; max-width: 100%; padding: 4px 8px; border: 1px solid var(--fp-border); border-radius: 7px; background: var(--fp-card); font-size: 11px; overflow-wrap: anywhere; }.desktop-name small { font-size: 10px; color: var(--fp-muted); white-space: nowrap; }
 .pet-recovery { display: grid; place-items: center; width: 48px; height: 48px; margin: 4px auto 0; border: 1px solid var(--fp-border); border-radius: 12px; color: var(--fp-muted); background: var(--fp-card); cursor: pointer; }
 .desktop-sleep { position: absolute; top: 18px; right: 15px; font-weight: 700; font-size: 16px; color: var(--fp-muted); }
@@ -171,5 +175,5 @@ onBeforeUnmount(() => {
 button:focus-visible, a:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
 @media (hover: none) { .desktop-tools { opacity: 1; }.desktop-tools button { width: 32px; height: 32px; } }
 @media (max-width: 640px) { .pet-desktop-panel { padding: 12px; }.pet-desktop-panel header { padding-bottom: 8px; gap: 6px; }.pet-desktop-panel header a, .desktop-panel-close { width: 44px; height: 44px; }.desktop-panel-tools button, .desktop-activity-link { min-height: 44px; }.pet-desktop-panel :deep(.pet-actions button) { min-height: 44px; }.pet-desktop-panel :deep(.pet-feedback button) { width: 44px; height: 44px; }.pet-desktop-panel .desktop-stats { gap: 4px; } }
-@media (prefers-reduced-motion: reduce) { .desktop-tools, .pet-character img { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .desktop-tools, .pet-character .pet-animation { transition: none; } }
 </style>

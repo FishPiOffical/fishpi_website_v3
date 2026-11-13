@@ -1120,6 +1120,130 @@ for (let index = 0; index < randomCases; index++) {
 }
 console.log(`PASS 随机身份时序：换号/退出/重新认证、目录和状态乱序回包、普通令牌轮换（${randomCases}例，seed=${seed}）`)
 
+// 动画只消费当前身份、当前宠物的完整确认，不因失回执、重读或普通令牌轮换重复播报。
+{
+  const { auth, pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); await pets.ensureLoaded()
+    handler = async () => { throw new Error('模拟饮水结果未知') }
+    assert.equal(await pets.act('water'), false)
+    assert.equal(pets.confirmedEvent, null)
+    const frozen = { ...pets.pending }, reading = deferred()
+    auth.accessToken = 'animation-same-owner-rotation'
+    handler = (path, options) => {
+      if (options?.method) {
+        assert.equal(options.headers['Idempotency-Key'], frozen.key)
+        return Promise.resolve(response({ operation: 'water', petId: 'pet-a', committedAt: now }))
+      }
+      return reading.promise
+    }
+    const recovery = pets.retryPending()
+    await flushRecovery()
+    assert.equal(pets.confirmedEvent, null, '写成功但当前宠物尚未核对时不能播动画')
+    reading.resolve(response(adopted()))
+    assert.equal(await recovery, true)
+    assert.deepEqual(pets.confirmedEvent, { sequence: 1, petId: 'pet-a', kind: 'actions', action: 'water' })
+    const event = pets.confirmedEvent, count = writes().length
+    auth.accessToken = 'animation-another-normal-rotation'
+    assert.equal(pets.confirmedEvent, event, '普通令牌轮换不重新发确认事件')
+    assert.equal(await pets.retryPending(), false)
+    handler = success; await pets.refresh()
+    assert.equal(pets.confirmedEvent, event, '读取聚合状态不重复播成功动画')
+    assert.equal(writes().length, count)
+    auth.accessToken = null
+    assert.equal(pets.confirmedEvent, null, '退出立即清除上一个身份的动画事件')
+  } finally { pets.$dispose() }
+}
+console.log('PASS 动画确认等待写回执与当前GET，未知原键恢复仅一次，令牌轮换和状态重读不重复，退出清除')
+
+{
+  const { pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); await pets.ensureLoaded()
+    handler = (path, options) => options?.method ? success(path, options) : Promise.reject(new Error('模拟动画后置读取失败'))
+    assert.equal(await pets.act('feed', 'food'), true)
+    assert.equal(pets.confirmedEvent, null)
+    assert.equal(pets.pending, null)
+    const count = writes().length
+    handler = success; await pets.refresh()
+    assert.equal(pets.confirmedEvent, null, '后置读取失败后的刷新不得补播历史成功')
+    assert.equal(writes().length, count)
+    handler = async () => { throw new ApiError('模拟互动明确拒绝', 422) }
+    assert.equal(await pets.act('pet'), false)
+    assert.equal(pets.confirmedEvent, null)
+    assert.equal(pets.pending, null)
+  } finally { pets.$dispose() }
+}
+console.log('PASS 后置GET失败与明确拒绝不发动画，恢复读取不补播且不重写')
+
+{
+  const { pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); await pets.ensureLoaded()
+    handler = (path, options) => options?.method
+      ? Promise.resolve(response({ operation: 'water', petId: 'wrong-pet', committedAt: now }))
+      : success(path, options)
+    const before = calls.length
+    assert.equal(await pets.act('water'), false)
+    assert.equal(pets.confirmedEvent, null)
+    assert(pets.pending)
+    assert.equal(calls.length, before + 1, '回执错误目标不能触发后续读取或动画')
+  } finally { pets.$dispose() }
+}
+console.log('PASS 错误宠物回执保持未知，不发成功动画或额外GET')
+
+{
+  const { pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); await pets.ensureLoaded()
+    handler = (path, options) => {
+      if (options?.method) return Promise.resolve(response({ operation: 'water', petId: 'pet-a', committedAt: now }))
+      const replacement = adopted(); replacement.pet.id = 'replacement-by-other-device'
+      return Promise.resolve(response(replacement))
+    }
+    assert.equal(await pets.act('water'), true)
+    assert.equal(pets.pet.id, 'replacement-by-other-device')
+    assert.equal(pets.confirmedEvent, null, '旧宠物的成功不能播放在跨设备换来的新宠物上')
+  } finally { pets.$dispose() }
+}
+console.log('PASS 当前GET已换宠时不把旧目标成功动画套到新宠物')
+
+{
+  const { auth, pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); await pets.ensureLoaded()
+    const oldRead = deferred()
+    handler = (path, options) => options?.method ? success(path, options) : oldRead.promise
+    const writing = pets.act('play'); await flushRecovery()
+    assert.equal(pets.confirmedEvent, null)
+    context++; auth.account = { oId: 'animation-next-account' }; auth.accessToken = 'animation-next-token'
+    serverState = adopted(); serverState.pet.id = 'next-account-pet'
+    handler = success; await pets.ensureLoaded()
+    oldRead.resolve(response(adopted())); await writing; await flushRecovery()
+    assert.equal(pets.pet.id, 'next-account-pet')
+    assert.equal(pets.confirmedEvent, null, '旧身份写后的迟到GET不能向新身份发动画')
+  } finally { pets.$dispose() }
+}
+console.log('PASS 写后读取期间换号，迟到旧状态与成功动画均丢弃')
+
+{
+  const { pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); serverState.wallet.coins = 1024; await pets.ensureLoaded()
+    handler = (path, options) => {
+      if (options?.method) {
+        serverState = adopted(); serverState.pet.id = 'adopted-new-hexiaotun'
+        return Promise.resolve(response({ operation: 'readoption', previousPetId: 'pet-a', petId: serverState.pet.id, committedAt: now }))
+      }
+      return success(path, options)
+    }
+    assert.equal(await pets.readopt('hexiaotun', '新的荷小豚', true), true)
+    assert.deepEqual(pets.confirmedEvent, { sequence: 1, petId: 'adopted-new-hexiaotun', kind: 'readoption' })
+    assert.equal(pets.pet.id, 'adopted-new-hexiaotun')
+  } finally { pets.$dispose() }
+}
+console.log('PASS 重新领养完整确认后动画绑定已核对的新宠物ID')
+
 Date.now = realNow
 globalThis.setTimeout = realSetTimeout
 globalThis.clearTimeout = realClearTimeout
