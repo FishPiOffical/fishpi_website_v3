@@ -5,6 +5,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawn, execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { backendMetrics, renderSoakReport } from './pet-soak/report.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const runs = path.join(root, '.temp/pet-soak')
@@ -170,39 +171,7 @@ if (action === 'start') {
     state.updatedAt = Date.now()
     await writeJson(path.join(directory, 'state.json'), state)
     const live = await json(path.join(directory, 'live-summary.json'), null)
-    const passed = state.suites.filter(x => x.status === 'passed'), failed = state.suites.filter(x => x.status === 'failed')
-    const table = state.suites.map(x => `| ${x.name} | ${x.seed ?? '—'} | ${x.status} | ${x.passGroups ?? '—'} | ${x.seconds}s | ${x.log} |`).join('\n')
-    const cleanCell = value => String(value ?? '—').replace(/[|\r\n]/g, ' ')
-    const activities = (live?.completedActivities || []).map(item => `| ${item.actor + 1} | ${cleanCell(item.kind)} | ${cleanCell(item.name)} | ${cleanCell(item.entryId)} | ${item.rewards.experience} | ${item.rewards.coins} | ${new Date(item.verifiedAt).toISOString()} |`).join('\n')
-    const resources = Object.keys(config.processes).map(name => {
-      const rows = state.samples.flatMap(sample => sample.values.filter(value => value.name === name))
-      if (!rows.length) return `- ${name}：等待采样。`
-      const rss = rows.map(row => Number(row.rssCpu.trim().split(/\s+/)[0]) / 1024)
-      const cpu = rows.map(row => Number(row.rssCpu.trim().split(/\s+/)[1]))
-      const descriptors = rows.map(row => row.fileDescriptors)
-      return `- ${name}：RSS ${Math.min(...rss).toFixed(1)}–${Math.max(...rss).toFixed(1)} MiB，首末差 ${(rss.at(-1) - rss[0]).toFixed(1)} MiB；CPU ${Math.min(...cpu).toFixed(1)}–${Math.max(...cpu).toFixed(1)}%；文件描述符 ${Math.min(...descriptors)}–${Math.max(...descriptors)}，${rows.length} 次采样。`
-    }).join('\n')
-    const text = `# 宠物本地自动检查（目标 ${(config.durationMs / 3_600_000).toFixed(3)} 小时）\n\n状态：**${state.status}**。运行编号：\`${config.id}\`。\n\n` +
-      `- 开始：${new Date(config.startedAt).toISOString()}\n- 计划结束：${new Date(config.endsAt).toISOString()}\n- 最近更新：${stamp()}\n` +
-      `- 累计有效心跳时间：${(state.validElapsedMs / 3_600_000).toFixed(3)} 小时 / 目标 ${(config.durationMs / 3_600_000).toFixed(3)} 小时\n` +
-      `- 最大心跳间隔：${(state.maxHeartbeatGapMs / 1000).toFixed(1)} 秒；剩余待核验命令：${state.pendingCommands.length}。\n` +
-      `- 代码版本：website ${config.source.frontend.head.slice(0, 8)}；Rhythm ${config.source.backend.head.slice(0, 8)}\n` +
-      `- 专项轮次：${passed.length} 成功、${failed.length} 失败；进行中的轮次不会提前记为通过。\n` +
-      `- 真实HTTP：${live?.status ?? '启动中'}，请求 ${live?.requests ?? 0} 次，断言 ${live?.checks ?? 0} 次。\n\n` +
-      `## 问题与中断\n\n${[...state.failures, ...state.interruptions.map(x => x.reason), ...(live?.failures || []), ...(live?.reason ? [live.reason] : [])].map(x => '- ' + x).join('\n') || '尚未发现（测试结束前不能视为完整结论）。'}\n\n` +
-      `## 覆盖方式\n\n` +
-      `1. 前端真实API解码/Pinia/Vue组件与桌宠算法，每15分钟换种子检查；包含身份隔离、超时、断流、原键恢复、离线与额度边界。\n` +
-      `2. 后端真实服务与隔离SQLite事务，首次完整回归，随后每小时不同种子运行随机状态序列。时间推进与自然等待结果分开。\n` +
-      `3. 四个专用普通账号通过 localhost:8081 自然时间领养、照顾、购买、课程/工作/探索、领取、日志与刷新Cookie；全部账号共用30请求/分钟上限，已成功写入用同键核验幂等。\n` +
-      `4. 每15秒核对本地服务身份、源码版本、测试进程和睡眠间隔；每5分钟采样服务RSS/CPU及文件描述符数。\n\n` +
-      `## 明确未覆盖\n\n真机软键盘与触摸、真实浏览器连续8小时内存、网络运营商/CORS/CDN及生产风控、动画。` +
-      `有限场景不能证明穷尽所有潜在缺陷；未在真实时间完成的活动由隔离专项验证，不能称为全部功能真实HTTP验收。` +
-      `长跑未结束、进程中断、源码/服务变化、任何失败或睡眠缺口，都不能标记8小时通过。\n\n` +
-      `## 专项明细\n\n| 专项 | 种子 | 结果 | PASS组数 | 耗时 | 日志 |\n|---|---|---|---|---|---|\n${table}\n\n` +
-      `## 真实接口覆盖\n\n${Object.entries(live?.coverage || {}).map(([name, count]) => '- ' + name + '：' + count).join('\n') || '等待首批结果。'}\n\n` +
-      `## 自然计时完成的活动\n\n${activities ? '| 测试账号 | 类型 | 名称 | 条目 | 经验 | 宠物币 | 核验时间 |\n|---|---|---|---|---|---|---|\n' + activities : '尚无自然到期并成功领取的活动。'}\n\n未列出的活动不算真实 HTTP 完成，完整目录由隔离专项分别验证。技能、工作熟练度与物品增量见 live-summary.json。\n\n` +
-      `## 服务资源观察\n\n${resources}\n\nRSS 包含运行时缓存与垃圾回收波动，仅作观察，不把首末差直接判定为内存泄漏或无泄漏。\n\n` +
-      `完整可复现记录见 events.jsonl、live-events.jsonl、各专项日志、state.json。账号凭据文件不属于报告，禁止上传。\n`
+    const text = renderSoakReport(config, state, live, state.updatedAt)
     await fs.writeFile(path.join(directory, 'report.md.tmp'), text, { mode: 0o600 })
     await fs.rename(path.join(directory, 'report.md.tmp'), path.join(directory, 'report.md'))
   }
@@ -228,8 +197,8 @@ if (action === 'start') {
     if (name === 'backend') {
       const summaryPath = args[args.indexOf('--summary') + 1]
       const result = await json(summaryPath, {})
-      record.backend = { status: result.status, baseline: !!result.baselineRequested, suites: result.baselineSuitesPassed,
-        steps: result.sequence?.requestedSteps, invariantChecks: result.sequence?.invariantChecks, concurrency: result.sequence?.concurrencyScenarios }
+      record.passGroups = null
+      record.backend = backendMetrics(result)
       if (code === 0 && (result.status !== 'passed' || result.sequence?.status !== 'passed')) record.status = 'failed'
     }
     if (record.status === 'failed') state.failures.push(`${name} 失败，seed=${seed ?? '—'}，见 ${filename}`)

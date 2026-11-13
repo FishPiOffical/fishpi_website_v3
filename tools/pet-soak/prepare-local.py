@@ -24,10 +24,12 @@ if not docker_host:
     context = subprocess.check_output(['docker', 'context', 'show'], text=True).strip()
     docker_host = json.loads(subprocess.check_output(['docker', 'context', 'inspect', context]))[0]['Endpoints']['docker']['Host']
 assert docker_host.startswith('unix://'), '只能使用本机 Docker socket'
-info = json.loads(subprocess.check_output(['docker', 'inspect', 'rhythm-dev-mysql']))[0]
+# 固定已经校验的本机 socket，后续切换 Docker context 也不能把测试账号写到别处。
+docker = ['docker', '--host', docker_host]
+info = json.loads(subprocess.check_output([*docker, 'inspect', 'rhythm-dev-mysql']))[0]
 environment = dict(item.split('=', 1) for item in info['Config']['Env'] if '=' in item)
 mysql_environment = dict(os.environ, MYSQL_PWD=environment['MYSQL_ROOT_PASSWORD'])
-command = ['docker', 'exec', '-i', '-e', 'MYSQL_PWD',
+command = [*docker, 'exec', '-i', '-e', 'MYSQL_PWD',
            'rhythm-dev-mysql', 'mysql', '-uroot', environment.get('MYSQL_DATABASE', 'rhythm'), '-N', '-B']
 
 def sql(statement):

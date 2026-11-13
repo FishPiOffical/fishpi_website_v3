@@ -2,6 +2,8 @@
 """低频本地 HTTP 耐久测试；不改变服务器时钟、不向生产发送请求。"""
 import argparse
 from collections import deque
+from copy import deepcopy
+from assertions import assert_activity_rewards, assert_history, assert_pages, assert_unchanged, delta
 import hashlib
 import http.cookiejar
 import json
@@ -15,23 +17,33 @@ import urllib.error
 import urllib.request
 import uuid
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--directory', required=True)
-args = parser.parse_args()
-directory = Path(args.directory).resolve()
-config = json.loads((directory / 'config.json').read_text())
 BASE = 'http://localhost:8081'
-assert config['api'] == BASE and '.temp/pet-soak/' in str(directory)
-accounts = json.loads((directory / 'accounts.private.json').read_text())
-assert len(accounts) == 4 and all(a['name'].startswith('petSoak') for a in accounts)
-end = config['endsAt'] / 1000
+directory, config, accounts, end = None, {}, [], 0
 stopped = False
 request_times = deque()
-summary = {'status': 'running', 'requests': 0, 'checks': 0, 'failures': [], 'coverage': {}, 'actors': [],
-           'startedActivities': [], 'completedActivities': [], 'startedAt': time.time()}
+summary = {}
+
+
+def configure(run_directory):
+    """仅显式启动时读取本地夹具，导入模块不会登录、联网或执行命令。"""
+    global directory, config, accounts, end, stopped
+    directory = Path(run_directory).resolve()
+    config = json.loads((directory / 'config.json').read_text())
+    assert config['api'] == BASE and '.temp/pet-soak/' in str(directory)
+    accounts = json.loads((directory / 'accounts.private.json').read_text())
+    assert len(accounts) == 4 and all(a['name'].startswith('petSoak') for a in accounts)
+    end, stopped = config['endsAt'] / 1000, False
+    request_times.clear()
+    summary.clear()
+    summary.update(status='running', requests=0, checks=0, failures=[], coverage={}, actors=[],
+                   startedActivities=[], completedActivities=[], startedAt=time.time())
+    return accounts
+
 
 class StopRun(Exception):
-    pass
+    def __init__(self, reason, kind):
+        super().__init__(reason)
+        self.kind = kind
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *arguments):
@@ -41,12 +53,11 @@ def halt(*_):
     global stopped
     stopped = True
 
-signal.signal(signal.SIGTERM, halt)
-signal.signal(signal.SIGINT, halt)
-
 def checkpoint():
-    if stopped or time.time() >= end or (directory / 'STOP').exists():
-        raise StopRun('测试时间结束或用户停止')
+    if stopped or (directory / 'STOP').exists():
+        raise StopRun('收到停止指令', 'manual')
+    if time.time() >= end:
+        raise StopRun('预定测试时间已结束', 'deadline')
 
 def wait(seconds):
     until = time.monotonic() + max(0, seconds)
@@ -87,6 +98,9 @@ def record(kind, label, **details):
 
 def check(condition, label):
     if not condition:
+        # label 仅由受控断言构造，不记录任意异常正文或请求凭据。
+        summary.setdefault('failedChecks', []).append(label)
+        record('failure', label)
         raise AssertionError(label)
     record('pass', label)
 
@@ -102,6 +116,8 @@ class Actor:
         self.last_id, self.experience = None, 0
         self.coins = None
         self.wait_until = 0
+        self.operations, self.claims = [], []
+        self.last_write_before = self.last_write_after = self.last_write_receipt = None
         self.login()
 
     def request(self, path, body=None, key=None, method=None, auth=True):
@@ -146,10 +162,10 @@ class Actor:
         record('request', path, actor=self.index, status=status, code=result.get('code'))
         if status in (401, 403, 429):
             summary['status'] = 'blocked'
-            raise StopRun('身份或限流响应，已停止后续请求：' + str(status))
+            raise StopRun('身份或限流响应，已停止后续请求：' + str(status), 'blocked')
         if status >= 500:
             summary['status'] = 'failed'
-            raise StopRun('本地服务异常，停止写入：' + str(status))
+            raise StopRun('本地服务异常，停止写入：' + str(status), 'service_error')
         return status, result
 
     def login(self):
@@ -198,6 +214,8 @@ class Actor:
         return state
 
     def write(self, endpoint, body, method='POST', expected=200):
+        # 拒绝写也必须有写前快照，不能只检验返回码。
+        before = deepcopy(self.read() if expected != 200 else self.state)
         key = 'soak:' + uuid.uuid4().hex
         command_file = directory / ('pending-' + str(self.index) + '.json')
         check(not command_file.exists(), '未完成命令不得被新操作覆盖')
@@ -226,18 +244,7 @@ class Actor:
             check(result.get('code') == 0, '写回执成功 ' + endpoint)
         if expected == 200:
             self.read()
-            def assets(state):
-                pet = state['pet']
-                ordered = lambda values: sorted(values, key=lambda value: json.dumps(value, sort_keys=True))
-                activity = pet['activity']
-                return {'wallet': state['wallet'], 'inventory': ordered(state['inventory']), 'collections': ordered(state['collections']),
-                        'stories': ordered(state['stories']), 'petId': pet['id'], 'name': pet['name'], 'speciesId': pet['speciesId'],
-                        'experience': pet['experience'], 'friendship': pet['friendship'], 'cooldowns': pet['cooldowns'],
-                        'skills': ordered(pet['skills']), 'jobs': ordered(pet['jobs']),
-                        # 到期状态随自然时间变化，计时活动的身份与冻结快照不应变化。
-                        'activity': {k: v for k, v in activity.items() if k != 'status'} if activity and activity['kind'] != 'rest' else None}
-            confirmed_assets = assets(self.state)
-            confirmed_state = self.state
+            confirmed_state = deepcopy(self.state)
             command['verification'] = 'confirmed-replay'
             save_command()
             # 测试明确重复同一已成功命令，再核对实际资产没有发生第二次变化。
@@ -247,12 +254,17 @@ class Actor:
             save_command()
         self.read()
         if expected == 200:
-            check(assets(self.state) == confirmed_assets, '同键重放不重复变更资产 ' + endpoint)
-            # 跨日会自然重置额度；仅同一服务端日期内核对这些按日投影。
-            if self.state['today'] == confirmed_state['today']:
-                check(self.state['pet']['growthToday'] == confirmed_state['pet']['growthToday']
-                      and self.state['income'] == confirmed_state['income']
-                      and self.state['dailySupply'] == confirmed_state['dailySupply'], '同键重放不重复消耗每日额度 ' + endpoint)
+            assert_unchanged(confirmed_state, self.state, check, '同键重放 ' + endpoint + '：')
+            operation = {'endpoint': endpoint, 'before': before, 'after': deepcopy(confirmed_state), 'receipt': deepcopy(result['data'])}
+            self.operations.append(operation)
+            if endpoint == 'activities/claim':
+                activity = before['pet']['activity']
+                expected_rewards = assert_activity_rewards(before, confirmed_state, activity, check)
+                self.claims.append({'before': before, 'activity': deepcopy(activity), 'expected': expected_rewards})
+            self.last_write_before, self.last_write_after, self.last_write_receipt = before, deepcopy(confirmed_state), deepcopy(result['data'])
+        else:
+            check(result.get('code') != 0, '拒绝写返回明确业务错误 ' + endpoint)
+            assert_unchanged(before, self.state, check, '拒绝写 ' + endpoint + '：')
         command_file.unlink()
         return result
 
@@ -275,12 +287,50 @@ class Actor:
         self.write('supplies', {'expectedDate': self.state['today']})
         # 刚领养时饱食/水分均为100，普通喂食饮水留到自然衰减后验证。
         self.care('pet')
-        self.care('play')
         self.care('rest')
         self.care('wake')
         self.write('purchases', {'petId': self.state['pet']['id'], 'itemId': 'fruit', 'quantity': 1, 'catalogVersion': self.catalog['version']})
         self.care('feed', 'fruit')
+        check(self.care_story()['completedSteps'] == 1, '陪伴旅程先完成喂食')
         self.wait_until = 0
+
+    def care_story(self):
+        return next(story for story in self.state['stories'] if story['id'] == 'care-companion')
+
+    def claim_story(self, story_id):
+        before = deepcopy(self.state)
+        body = {'petId': before['pet']['id'], 'storyId': story_id, 'catalogVersion': self.catalog['version']}
+        self.write('stories/claim', body)
+        expected = next(story for story in self.catalog['stories'] if story['id'] == story_id)['rewards']['items']
+        check(delta(before['inventory'], self.state['inventory']) == {row['itemId']: row['quantity'] for row in expected}, '旅程奖励物品准确到账')
+        check(next(story for story in self.state['stories'] if story['id'] == story_id)['status'] == 'claimed', '旅程奖励标记已领取')
+        # 同键回放由 write 覆盖；再用新键验证业务层也拒绝重复发奖。
+        self.write('stories/claim', body, expected=409)
+
+    def advance_care_story(self):
+        story, pet = self.care_story(), self.state['pet']
+        if story['status'] != 'active':
+            return
+        if story['completedSteps'] == 1 and pet['water'] <= 99:
+            self.care('water')
+            check(self.care_story()['completedSteps'] == 2, '陪伴旅程第二步饮水')
+        if self.care_story()['completedSteps'] == 2 and self.state['pet']['cooldowns']['play'] <= self.state['serverNow']:
+            self.care('play')
+            check(self.care_story()['completedSteps'] == 3 and self.care_story()['status'] == 'claimable', '陪伴旅程最后玩耍后才可领取')
+
+    def audit_history(self, require_multiple_pages=False):
+        def pages(resource):
+            first = self.get('/api/v3/me/pet/' + resource + '?kind=all&p=1&size=10')
+            count = first['pagination']['pageCount']
+            check(isinstance(count, int) and 1 <= count <= 200, '历史分页在有界读取预算内')
+            values = [first]
+            for page in range(2, count + 1):
+                values.append(self.get('/api/v3/me/pet/' + resource + '?kind=all&p=' + str(page) + '&size=10'))
+            return assert_pages(values, check, resource, require_multiple_pages)
+        journal, activities = pages('journal'), pages('activities')
+        assert_history(journal, activities, self.operations, self.claims, check)
+        record('history-audit', '全页日志与活动成果对账完成', actor=self.index, journal=len(journal), activities=len(activities))
+        return journal, activities
 
     def eligible(self, entry):
         skills = {s['id']: s['experience'] for s in self.state['pet']['skills']}
@@ -322,9 +372,12 @@ class Actor:
             return
         if not state['dailySupply']['claimed']:
             self.write('supplies', {'expectedDate': state['today']})
+        self.advance_care_story()
         for story in self.state['stories']:
             if story['status'] == 'claimable':
-                self.write('stories/claim', {'petId': pet['id'], 'storyId': story['id'], 'catalogVersion': self.catalog['version']})
+                self.claim_story(story['id'])
+        # 旅程可能刚完成饮水/玩耍，后续照顾必须使用新快照，避免再次饮水。
+        pet = self.state['pet']
         food = next((i['quantity'] for i in self.state['inventory'] if i['itemId'] == 'food'), 0)
         if pet['hunger'] <= 65:
             if not food:
@@ -366,42 +419,55 @@ class Actor:
         summary['startedActivities'].append(activity_record)
         record('activity-start', '真实计时活动已开始', activity=activity_record)
         if time.monotonic() - self.last_journal > 600:
-            journal = self.get('/api/v3/me/pet/journal?kind=all&p=1&size=10')
-            check(len(journal['list']) <= 10, '活动日志真实分页')
-            self.get('/api/v3/me/pet/activities?kind=all&p=1&size=10')
+            self.audit_history()
             self.last_journal = time.monotonic()
 
-try:
-    actors = []
-    for index, account in enumerate(accounts):
-        actor = Actor(account, index)
-        actors.append(actor)
-        actor.initialize()
-    summary['initialized'] = True
-    record('pass', '四种宠物真实接口初始化完成')
-    while True:
-        checkpoint()
-        cycle_start = time.monotonic()
-        for actor in actors:
-            actor.step()
-        wait(max(1, 60 - (time.monotonic() - cycle_start)))
-except StopRun as error:
-    if summary['status'] == 'running':
-        summary['status'] = 'complete' if time.time() >= end else 'stopped'
-    summary['reason'] = str(error)
-except Exception as error:
-    summary['status'] = 'failed'
-    # 只记录异常类型与堆栈位置，不记录异常正文、代码行或局部变量中的凭据。
-    summary['failures'].append(type(error).__name__)
-    summary['failureFrames'] = [{'file': Path(frame.filename).name, 'line': frame.lineno, 'function': frame.name}
-                                for frame in traceback.extract_tb(error.__traceback__)]
-finally:
-    summary['pendingCommands'] = sorted(path.name for path in directory.glob('pending-*.json'))
-    if summary['status'] == 'complete' and summary['pendingCommands']:
-        summary['status'] = 'incomplete'
-        summary['reason'] = '到期时仍有未确认或未完成核验的操作，未视为完整通过'
-    summary['finishedAt'] = time.time()
-    save()
-    print(json.dumps({'status': summary['status'], 'checks': summary['checks'], 'requests': summary['requests']}), flush=True)
 
-sys.exit(0 if summary['status'] == 'complete' else 2 if summary['status'] == 'stopped' else 1)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--directory', required=True)
+    args = parser.parse_args()
+    configure(args.directory)
+    signal.signal(signal.SIGTERM, halt)
+    signal.signal(signal.SIGINT, halt)
+    try:
+        actors = []
+        for index, account in enumerate(accounts):
+            actor = Actor(account, index)
+            actors.append(actor)
+            actor.initialize()
+        summary['initialized'] = True
+        record('pass', '四种宠物真实接口初始化完成')
+        while True:
+            checkpoint()
+            cycle_start = time.monotonic()
+            for actor in actors:
+                actor.step()
+            wait(max(1, 60 - (time.monotonic() - cycle_start)))
+    except StopRun as error:
+        if summary['status'] == 'running':
+            summary['status'] = 'complete' if error.kind == 'deadline' else 'stopped'
+        summary['reason'] = str(error)
+        summary['stopReason'] = error.kind
+    except Exception as error:
+        summary['status'] = 'failed'
+        summary['stopReason'] = 'failure'
+        # 只记录异常类型与堆栈位置，不记录异常正文、代码行或局部变量中的凭据。
+        summary['failures'].append(type(error).__name__)
+        summary['failureFrames'] = [{'file': Path(frame.filename).name, 'line': frame.lineno, 'function': frame.name}
+                                    for frame in traceback.extract_tb(error.__traceback__)]
+    finally:
+        summary['pendingCommands'] = sorted(path.name for path in directory.glob('pending-*.json'))
+        if summary['status'] == 'complete' and summary['pendingCommands']:
+            summary['status'] = 'incomplete'
+            summary['stopReason'] = 'pending'
+            summary['reason'] = '到期时仍有未确认或未完成核验的操作，未视为完整通过'
+        summary['finishedAt'] = time.time()
+        save()
+        print(json.dumps({'status': summary['status'], 'checks': summary['checks'], 'requests': summary['requests']}), flush=True)
+
+    return 0 if summary['status'] == 'complete' else 2 if summary['status'] == 'stopped' else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
