@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-13T05:07:55.154Z",
+  "changed": [
+    "public/images/pets/animations/momota-v1/explore.webm",
+    "public/images/pets/animations/momota-v1/explore.webp",
+    "public/images/pets/animations/paixiaoyu-v1/explore.webm",
+    "public/images/pets/animations/paixiaoyu-v1/explore.webp",
+    "public/images/pets/animations/yubingmiao-v1/explore.webm",
+    "public/images/pets/animations/yubingmiao-v1/explore.webp"
+  ],
+  "unchangedAssetCount": 74,
+  "clips": [
+    {
+      "species": "momota",
+      "bytes": 43368,
+      "width": 256,
+      "height": 256,
+      "decodedFrames": 24,
+      "duration": 1,
+      "minTransparent": 34868,
+      "minSolid": 24780
+    },
+    {
+      "species": "yubingmiao",
+      "bytes": 56547,
+      "width": 256,
+      "height": 256,
+      "decodedFrames": 24,
+      "duration": 1,
+      "minTransparent": 35726,
+      "minSolid": 24728
+    },
+    {
+      "species": "paixiaoyu",
+      "bytes": 34512,
+      "width": 256,
+      "height": 256,
+      "decodedFrames": 24,
+      "duration": 1,
+      "minTransparent": 34253,
+      "minSolid": 28342
+    }
+  ],
+  "note": "本轮八关键帧使用同一锚点，每原绘帧保持三帧；仅编码/透明度/锚点/文件范围检查。近远腿连贯性另经逐格目视审查，不声称程序可证明步态自然；未运行全套业务验收。"
+}

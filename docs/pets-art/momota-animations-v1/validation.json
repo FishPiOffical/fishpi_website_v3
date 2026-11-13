@@ -1,10 +1,10 @@
 {
   "species": "momota",
   "date": "2026-11-13",
-  "scope": "source cells, poster dimensions, FFmpeg VP9 decode and decoded alpha; explore revision 2 checked all 48 decoded frames, other clips retain first-pass verification; not browser playback or art acceptance",
-  "totalVideoBytes": 1003797,
-  "totalPosterBytes": 181060,
-  "totalDeliveryBytes": 1184857,
+  "scope": "source cells, poster dimensions, FFmpeg VP9 decode and decoded alpha; explore revision 3 checked all 24 decoded frames and fixed anchor, other clips retain first-pass verification; not browser playback or art acceptance",
+  "totalVideoBytes": 944475,
+  "totalPosterBytes": 174442,
+  "totalDeliveryBytes": 1118917,
   "results": [
     {
       "id": "idle",
@@ -716,123 +716,84 @@
     },
     {
       "id": "explore",
-      "sourceRevision": 2,
+      "sourceRevision": 3,
       "sourceSize": [
-        1254,
-        1254
+        1774,
+        887
       ],
       "sourceMode": "RGBA",
+      "sourceGrid": [
+        4,
+        2
+      ],
       "sourceCells": [
         {
           "index": 1,
-          "transparentPixels": 33059,
-          "solidPixels": 41840,
-          "sha256": "4c7db8e7c158ef710e99b8dca12f1a72f665390fd64e32fc899c099454266d42"
+          "transparentPixels": 111007,
+          "solidPixels": 81887,
+          "sha256": "a5f2a1d277a6f91568a65a9d4d2faa67be6006e63eec6b29c722f5f23bb35013"
         },
         {
           "index": 2,
-          "transparentPixels": 37623,
-          "solidPixels": 41593,
-          "sha256": "c6e68d43c20655110cb33d4711120e9e184108ee8ad074fd0b05f0027864e63a"
+          "transparentPixels": 112461,
+          "solidPixels": 79541,
+          "sha256": "eb5629acf81e96db53b02c7629465e581b96ed67ecc664838d1f3d29146d60c2"
         },
         {
           "index": 3,
-          "transparentPixels": 39102,
-          "solidPixels": 40665,
-          "sha256": "01af7016aa1e2057f638bbcb9c78d1d4fac65b4ccccb0457cc5aa0d8e16cad83"
+          "transparentPixels": 117567,
+          "solidPixels": 74755,
+          "sha256": "b7c40b8a5c53a5c4697c769007fedbc8c5d1dd5ed3eff54526190cfd2887cea8"
         },
         {
           "index": 4,
-          "transparentPixels": 45261,
-          "solidPixels": 39848,
-          "sha256": "324f8064ea2ef460a9f9d7e745f71e5316cd6d435faee58b414531f2f4a3cd64"
+          "transparentPixels": 111551,
+          "solidPixels": 81251,
+          "sha256": "ef3043ffe5057a4fcc9e339b9d5bb71a481da6c1e2e43f16020ed47d188a72b7"
         },
         {
           "index": 5,
-          "transparentPixels": 37431,
-          "solidPixels": 39873,
-          "sha256": "5ddb493800a39f43f9a089586b9443b6b92883cc44f043ada51c16a54b62bf5c"
+          "transparentPixels": 107758,
+          "solidPixels": 84175,
+          "sha256": "c2648b01aabf65321c471e79a545f459cb656ecd7b3d9c12cf69769407c237c4"
         },
         {
           "index": 6,
-          "transparentPixels": 43497,
-          "solidPixels": 39563,
-          "sha256": "0c47bb007377361fd03704a4d25c73762f3d3292756d28792bf2ca212bf2cf14"
+          "transparentPixels": 110978,
+          "solidPixels": 79186,
+          "sha256": "4e4dd925cb7f95ed2a720489d82a2c99264b6fd52c4c070ccafa829cbef7bfb1"
         },
         {
           "index": 7,
-          "transparentPixels": 42103,
-          "solidPixels": 39864,
-          "sha256": "36f5b0ce8868fd389e4a5ae4c63df3613b3e68ce1d41007697e8c2485cb3da66"
+          "transparentPixels": 115985,
+          "solidPixels": 75675,
+          "sha256": "a350d89f97905f936dc1384322ed302947f14a757ade4eec499b690fec8c0030"
         },
         {
           "index": 8,
-          "transparentPixels": 45969,
-          "solidPixels": 40453,
-          "sha256": "79ce9b30136a55e4ccba37fd51f2ff8faf1f9e36e6c461bcd3b69054210c616b"
-        },
-        {
-          "index": 9,
-          "transparentPixels": 36562,
-          "solidPixels": 40992,
-          "sha256": "192788d065849fb7213332897fdcff526c777cfceb38db086ab328a46050b07d"
-        },
-        {
-          "index": 10,
-          "transparentPixels": 37605,
-          "solidPixels": 40602,
-          "sha256": "1be38b269720d75f51f306a204e6bff13b025f130cd2774bcc6f20d1194db65b"
-        },
-        {
-          "index": 11,
-          "transparentPixels": 38761,
-          "solidPixels": 39372,
-          "sha256": "16730979e3d1278b5f45d09bfa7417da8f5e824d44d328aad870201f11c26d10"
-        },
-        {
-          "index": 12,
-          "transparentPixels": 42744,
-          "solidPixels": 39095,
-          "sha256": "0b23f0daad1fec0595144c5d014722a0568944db6bde3af847ce04bfcace4085"
-        },
-        {
-          "index": 13,
-          "transparentPixels": 32674,
-          "solidPixels": 39980,
-          "sha256": "f3cd33b73bd3b4821df0f6fc5ef6e12fe9ccd1877ed20737e3c84fa626fe82c6"
-        },
-        {
-          "index": 14,
-          "transparentPixels": 34567,
-          "solidPixels": 40507,
-          "sha256": "fe91d38744b1f2345c7dbc5615d3a600cf49705c9547627758454cd55edc1d37"
-        },
-        {
-          "index": 15,
-          "transparentPixels": 35437,
-          "solidPixels": 41213,
-          "sha256": "9b731816e2ee2baed82abb7a511ae3b4679c81896fdeeb24c1353cc22363ff2d"
-        },
-        {
-          "index": 16,
-          "transparentPixels": 37906,
-          "solidPixels": 41549,
-          "sha256": "b0a8cc3fd7ded2602b090b7470d78bd2e93c5d1b785945348dd172e9466fa393"
+          "transparentPixels": 109991,
+          "solidPixels": 81499,
+          "sha256": "17e960e1e31b0c54288d1abf278cff4ebb555233eb93f5ba5a0ee73b53f15007"
         }
       ],
-      "uniqueSourceCells": 16,
-      "videoBytes": 102690,
-      "posterBytes": 20204,
-      "durationSeconds": 2.0,
+      "uniqueSourceCells": 8,
+      "fixedAnchor": [
+        202.5,
+        414
+      ],
+      "scale": 0.581453634085213,
+      "videoBytes": 43368,
+      "posterBytes": 13586,
+      "durationSeconds": 1.0,
       "videoCodec": "vp9",
       "decodedSize": [
         256,
         256
       ],
       "decodedMode": "RGBA",
-      "decodedTransparentPixels": 19175,
-      "decodedSolidPixels": 29341,
-      "decodedFrameCount": 48
+      "decodedTransparentPixels": 35923,
+      "decodedSolidPixels": 27660,
+      "decodedFrameCount": 24
     },
     {
       "id": "study",

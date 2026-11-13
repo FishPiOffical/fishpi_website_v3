@@ -21,8 +21,9 @@ const definitions = [
   { id: 'pet', name: '被摸摸', mode: 'once', holds: [10, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 6, 6, 6, 6, 10] },
   { id: 'play', name: '玩耍', mode: 'once', holds: Array(16).fill(6) },
   { id: 'sleep', name: '睡觉', mode: 'loop', holds: Array(16).fill(12) },
-  // 新重绘的站立步态两秒走完一轮；荷小豚保留已确认的原节奏。
-  { id: 'explore', name: '外出', mode: 'loop', holds: Array(16).fill(species === 'hexiaotun' ? 5 : 3) },
+  // 外出先锁定八个完整关键姿势，使用固定画布锚点，避免落脚变化让整只宠物跳动。
+  // 荷小豚保留已确认的原始帧表和节奏。
+  { id: 'explore', name: '外出', mode: 'loop', holds: Array(species === 'hexiaotun' ? 16 : 8).fill(species === 'hexiaotun' ? 5 : 3), grid: species === 'hexiaotun' ? [4, 4] : [4, 2], fixedAnchor: species !== 'hexiaotun' },
   { id: 'study', name: '上课', mode: 'loop', holds: Array(16).fill(8) },
   { id: 'work', name: '工作', mode: 'loop', holds: Array(16).fill(6) },
   { id: 'celebrate', name: '开心庆祝', mode: 'once', holds: [10, 6, 6, 6, 6, 6, 6, 8, 8, 6, 6, 6, 6, 6, 6, 10] },
@@ -50,11 +51,12 @@ function extractInBrowser() {
     grid.width = image.naturalWidth
     grid.height = image.naturalHeight
     grid.getContext('2d').drawImage(image, 0, 0)
-    for (let index = 0; index < 16; index += 1) {
-      const x = Math.round(index % 4 * grid.width / 4)
-      const y = Math.round(Math.floor(index / 4) * grid.height / 4)
-      const width = Math.round((index % 4 + 1) * grid.width / 4) - x
-      const height = Math.round((Math.floor(index / 4) + 1) * grid.height / 4) - y
+    const [columns, rows] = LAYOUT.grid
+    for (let index = 0; index < columns * rows; index += 1) {
+      const x = Math.round(index % columns * grid.width / columns)
+      const y = Math.round(Math.floor(index / columns) * grid.height / rows)
+      const width = Math.round((index % columns + 1) * grid.width / columns) - x
+      const height = Math.round((Math.floor(index / columns) + 1) * grid.height / rows) - y
       const cell = document.createElement('canvas')
       cell.width = width
       cell.height = height
@@ -95,7 +97,14 @@ function extractInBrowser() {
       if (!largest || transparent < width * height * .08) throw new Error('源图不是可用的透明连续帧')
       frames.push({ cell, bounds, anchorX: (largest.left + largest.right + 1) / 2, anchorY: largest.bottom + 1, transparent })
     }
-    // 同一动作使用同一个缩放比例，只校准角色脚下基线，避免每帧自动缩放造成呼吸式变形。
+    if (LAYOUT.fixedAnchor) {
+      // 行走帧共用一个坐标原点，保留原绘重心起伏，不逐帧追着脚尖或尾巴移动全图。
+      const centers = frames.map(frame => frame.anchorX).sort((a, b) => a - b)
+      const anchorX = (centers[Math.floor((centers.length - 1) / 2)] + centers[Math.floor(centers.length / 2)]) / 2
+      const anchorY = Math.max(...frames.map(frame => frame.anchorY))
+      for (const frame of frames) { frame.anchorX = anchorX; frame.anchorY = anchorY }
+    }
+    // 同一动作使用同一个缩放比例和既定锚点，避免每帧自动缩放造成呼吸式变形。
     let left = 0, right = 0, height = 0, below = 0
     for (const frame of frames) {
       left = Math.max(left, frame.anchorX - frame.bounds[0])
@@ -124,7 +133,9 @@ for (const definition of definitions.filter(item => requested.length ? requested
   const source = await fs.readFile(path.join(sourceDir, `${definition.id}.png`))
   const dir = path.join(tempDir, definition.id)
   await fs.mkdir(dir, { recursive: true })
-  const html = `<!doctype html><pre></pre><script>const SOURCE=${JSON.stringify(`data:image/png;base64,${source.toString('base64')}`)};(${extractInBrowser.toString()})()</script>`
+  const layout = { grid: definition.grid || [4, 4], fixedAnchor: Boolean(definition.fixedAnchor) }
+  if (definition.holds.length !== layout.grid[0] * layout.grid[1]) throw new Error('动作帧数与网格不符')
+  const html = `<!doctype html><pre></pre><script>const LAYOUT=${JSON.stringify(layout)};const SOURCE=${JSON.stringify(`data:image/png;base64,${source.toString('base64')}`)};(${extractInBrowser.toString()})()</script>`
   const htmlPath = path.join(dir, 'extract.html')
   await fs.writeFile(htmlPath, html)
   const dom = command(chrome, ['--headless=new', '--no-first-run', '--disable-background-networking', `--user-data-dir=${path.join(tempDir, 'chrome-export')}`, '--virtual-time-budget=3000', '--dump-dom', `file://${htmlPath}`]).toString()
@@ -132,7 +143,7 @@ for (const definition of definitions.filter(item => requested.length ? requested
   if (!match || !match[1].startsWith('{')) throw new Error(`${definition.id} 提取失败`)
   const extracted = JSON.parse(match[1].replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>'))
   let frameNumber = 0
-  for (let index = 0; index < 16; index += 1) {
+  for (let index = 0; index < definition.holds.length; index += 1) {
     const bytes = Buffer.from(extracted.frames[index].png, 'base64')
     for (let hold = 0; hold < definition.holds[index]; hold += 1) await fs.writeFile(path.join(dir, `${String(frameNumber++).padStart(3, '0')}.png`), bytes)
   }
@@ -150,7 +161,7 @@ for (const definition of definitions) {
   try {
     const stat = await fs.stat(filename)
     const frames = definition.frames || definition.holds.reduce((sum, value) => sum + value, 0)
-    clips.push({ id: definition.id, name: definition.name, mode: definition.mode, file: `${definition.id}.webm`, poster: `${definition.id}.webp`, width: 256, height: 256, fps: 24, uniqueFrames: 16, frames, duration: frames / 24, bytes: stat.size, interpolated: false, approvedEatingSource: Boolean(definition.approved) })
+    clips.push({ id: definition.id, name: definition.name, mode: definition.mode, file: `${definition.id}.webm`, poster: `${definition.id}.webp`, width: 256, height: 256, fps: 24, uniqueFrames: definition.holds?.length || 16, frames, duration: frames / 24, bytes: stat.size, interpolated: false, approvedEatingSource: Boolean(definition.approved) })
   } catch (error) { if (error.code !== 'ENOENT') throw error }
 }
 await fs.writeFile(path.join(outputDir, 'manifest.json'), JSON.stringify({ version: 1, species, transparent: true, codec: 'vp9', previewOnly: true, totalBytes: clips.reduce((sum, clip) => sum + clip.bytes, 0), clips }, null, 2) + '\n')

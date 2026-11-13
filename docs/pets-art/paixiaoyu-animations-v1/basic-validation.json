@@ -138,25 +138,30 @@
     {
       "id": "explore",
       "sourceSize": [
-        1261,
-        1247
+        1774,
+        887
       ],
       "sourceMode": "RGBA",
-      "sheetFrames": 16,
+      "sheetFrames": 8,
       "videoSize": [
         256,
         256
       ],
       "codec": "vp9",
       "fps": 24,
-      "frames": 48,
-      "durationSeconds": 2,
-      "videoBytes": 108102,
-      "posterBytes": 15980,
-      "decodedFirstFrameTransparentPixels": 30973,
-      "decodedFirstFrameSolidPixels": 30900,
+      "frames": 24,
+      "durationSeconds": 1,
+      "videoBytes": 34512,
+      "posterBytes": 12758,
+      "decodedFirstFrameTransparentPixels": 34446,
+      "decodedFirstFrameSolidPixels": 29511,
       "decodedFirstFrameHasAlpha": true,
-      "revision": "standing-walk-v2"
+      "revision": "standing-walk-v3-eight-keys",
+      "sourceGrid": [
+        4,
+        2
+      ],
+      "fixedAnchor": true
     },
     {
       "id": "study",
@@ -225,7 +230,7 @@
       "decodedFirstFrameHasAlpha": true
     }
   ],
-  "totalVideoBytes": 925281,
-  "totalVideoAndPosterBytes": 1078265,
-  "exploreRevision": "2026-11-13 standing walk, 48 timeline frames / 2 seconds"
+  "totalVideoBytes": 851691,
+  "totalVideoAndPosterBytes": 1001453,
+  "exploreRevision": "2026-11-13 eight-key standing walk, fixed canvas anchor, 24 timeline frames / 1 second"
 }

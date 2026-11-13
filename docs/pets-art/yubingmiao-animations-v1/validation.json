@@ -1,7 +1,7 @@
 {
   "date": "2026-11-13",
   "species": "yubingmiao",
-  "scope": "首版历史基本检查；explore已由v2替换，当前外出结果见explore-v2-validation.json。其余九项未重新生成。",
+  "scope": "历史基本检查；当前explore已由v3替换，结果见explore-v3-validation.json。其余九项未重新生成。",
   "imageGeneration": "built-in image_gen",
   "reference": "public/images/pets/yubingmiao.webp",
   "sourceDrawingsPerClip": 16,
@@ -2066,6 +2066,6 @@
     }
   ],
   "supersededBy": {
-    "explore": "explore-v2-validation.json"
+    "explore": "explore-v3-validation.json"
   }
 }

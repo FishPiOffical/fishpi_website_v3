@@ -238,5 +238,8 @@
   "allPassed": true,
   "browserUiTested": false,
   "userArtAccepted": false,
-  "scope": "仅当前外出v2源图、WebP和WebM基本检查；旧版全套记录保留为历史，不代表用户艺术验收。"
+  "scope": "历史基本检查；当前explore已由v3替换，结果见explore-v3-validation.json。其余九项未重新生成。",
+  "supersededBy": {
+    "explore": "explore-v3-validation.json"
+  }
 }
