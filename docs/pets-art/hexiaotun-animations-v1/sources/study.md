@@ -1,0 +1,16 @@
+# 荷小豚上课动作源图
+
+工具：内置 imagegen，透明背景，2026-11-13。
+初版：`exec-1a2ee95d-3680-48b8-86dc-e5ea8500e40a.png`。
+当前源图：`exec-d1a7f8c6-0838-44fd-83d4-2348f692f488.png`，通过内置 imagegen 清理初版背景残留，保留全部 16 帧姿态。
+参考：已认可的吃叶子 16 帧源图与静态 hexiaotun.webp。
+
+```text
+Use case: identity-preserve. Asset: a square 2D animation SPRITE SHEET, exactly 4 columns × 4 rows, 16 equal square cells, read left-to-right then top-to-bottom. Input images are the approved 荷小豚 character identity and style references, not a request to reproduce eating. Draw exactly the SAME plump orange-brown capybara with the same brown muzzle, warm dark-brown hand-drawn outline, pink cheek marks, tiny closed calm eyes, green lotus-leaf hat resting securely on its head, and small orange fish crossbody bag at its lower left. Keep the same seated proportions, foot positions and three-quarter view facing slightly right. New action: calmly studying a small open cream paper book with pale muted-blue cover held in front of its lower chest by its TWO front paws. Exactly two front paws and two hind feet total, never duplicate paws on belly. NO leaf branch and no eating. The 16 frames are consecutive small changes for a gentle reading/page-turning loop: frames 1–3 book open and head calm; frames 4–6 head dips very slightly toward the book; frames 7–10 right paw slowly turns ONE paper page from right to left, left paw supports the book; frames 11–13 page settles and paws return; frames 14–16 head returns near the first pose. Book remains present throughout, satchel remains visible beside it. No legs moving, no body turning, no dramatic sways. All 16 frames same fixed camera, exact same body scale, exact same horizontal alignment and ground baseline. Hat follows the head subtly, does not float. Pet occupies 82% of each cell height with clear transparent margins, entire pet/book/hat/feet fully inside each cell. Background is REAL alpha transparency, no white or checkerboard. Only a subtle warm oval foot shadow. NO text anywhere, no words or marks on pages, no letters, no frame numbers, no captions, no grid lines, no border, no floating symbols. Warm softly shaded 2D illustration matching reference exactly, not 3D. Strict consistent character anatomy and consistent prop geometry across adjacent frames.
+```
+
+## 透明背景修正提示词
+
+```text
+Use case: background-extraction. Edit this exact 4×4 sprite sheet. The ONLY change is remove ALL the low-opacity colored background residue between and around the sixteen characters. The current image has an unwanted lightly translucent gray/yellow/pink rectangle covering the full sheet; it must be removed to exact clean fully transparent alpha=0. Preserve every single character pixel, pose, anatomy, book, leaf hat, fish bag, colors, shading, foot positions, fixed 4 columns × 4 rows grid, 16 cells, image scale and cell boundaries. Do not redraw or reinterpret the animals. Do not change or rearrange the sequence. Do not add poses, text or grid lines. Preserve local soft foot shadows immediately below each character and clean antialiasing at character edges; the wide empty space must be perfectly clear with no low-opacity matte, colored speckles, gray fog, white fill or checkerboard. Deliver the same sprite sheet, 16 identical preserved character frames, on true clean transparent background.
+```
