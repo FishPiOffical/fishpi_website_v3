@@ -1,5 +1,7 @@
 # 鱼饼喵：吃蓝鱼
 
+以下保留首版生成记录。当前 `eat.png` 已修正项圈随食物移动的问题，最终来源与提示词见 [eat-collar-fix.md](eat-collar-fix.md)。
+
 工具：内置 imagegen；透明背景；2026-11-13。
 参考：`public/images/pets/yubingmiao.webp`（已查看）。
 原始输出：`exec-9ed2c554-4fc2-41b6-bb3c-06a4ef209e76.png`。
