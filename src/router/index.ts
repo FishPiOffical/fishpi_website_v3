@@ -380,6 +380,12 @@ const routes = [
     component: () => import('@/views/GamesView.vue'),
   },
   {
+    path: '/pets/chat/:messageId',
+    name: 'chat-pet-profile',
+    component: () => import('@/views/ChatPetProfileView.vue'),
+    meta: { auth: true, robots: 'noindex' },
+  },
+  {
     path: '/pets',
     name: 'pets',
     component: () => import('@/views/PetsView.vue'),

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { chatPetStatusLabels, type ChatPetStatus, type ChatTail } from '@/api/v3-chat-messages'
+import { useAuthStore } from '@/stores/auth'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { formatDisplayTime } from '@/utils/time'
@@ -21,6 +22,7 @@ const props = withDefaults(
   defineProps<{
     tail?: ChatTail
     petStatus?: ChatPetStatus
+    messageId?: string
     appearance?: ChatAppearance
     userId?: string
     userName: string
@@ -39,6 +41,11 @@ const props = withDefaults(
   { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
+const auth = useAuthStore()
+const ownPet = computed(() => !!props.userId && props.userId === auth.account?.oId)
+const petDestination = computed(() => ownPet.value
+  ? { name: 'pets' }
+  : { name: 'chat-pet-profile', params: { messageId: props.messageId } })
 const mention = inject(CHAT_MENTION, null)
 const canMention = computed(() => props.chatroom && !props.self && !!chatMentionText(props.userName) && !!mention?.enabled())
 const chatPreferences = useChatPreferencesStore()
@@ -131,8 +138,8 @@ function onBodyClick(e: MouseEvent) {
               <small v-if="nickname && nickname !== userName">({{ userName }})</small>
             </span>
           </component>
-          <RouterLink v-if="petStatus && !simpleMode" :to="{ name: 'pets' }" class="fp-chat-pet-status" :data-species="petStatus.speciesId"
-            :title="`宠物：${petStatus.name}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${chatPetStatusLabels[petStatus.state]} · 前往宠物家园`">
+          <RouterLink v-if="petStatus && messageId && !simpleMode" :to="petDestination" class="fp-chat-pet-status" :data-species="petStatus.speciesId"
+            :title="`宠物：${petStatus.name}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${chatPetStatusLabels[petStatus.state]} · ${ownPet ? '前往宠物家园' : '查看宠物资料'}`">
             <span class="fp-chat-pet-name">{{ petStatus.name }}</span>
             <span v-if="petStatus.level" class="fp-chat-pet-level" :data-tier="Math.floor(petStatus.level / 10)">Lv.{{ petStatus.level }}</span>
             <span class="fp-chat-pet-state">{{ chatPetStatusLabels[petStatus.state] }}</span>
@@ -234,7 +241,7 @@ function onBodyClick(e: MouseEvent) {
 a.fp-chat-pet-status:hover,
 a.fp-chat-pet-status:focus-visible {
   background: color-mix(in srgb, var(--pet-color) 23%, transparent);
-  text-decoration: underline;
+  text-decoration: none;
 }
 .fp-chat-pet-status[data-species="momota"] { --pet-color: #a76a45; }
 .fp-chat-pet-status[data-species="hexiaotun"] { --pet-color: #5c913c; }
