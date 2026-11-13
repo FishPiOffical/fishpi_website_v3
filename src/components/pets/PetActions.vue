@@ -4,10 +4,12 @@ import { usePetsStore } from '@/stores/pets'
 import type { PetAction } from '@/api/v3-pets'
 import PetIcon from './PetIcon.vue'
 import { petDuration, usePetClock } from './usePetClock'
+import { usePetCareAvailability } from './usePetCareAvailability'
 
-defineProps<{ compact?: boolean }>()
+const props = defineProps<{ compact?: boolean; active?: boolean }>()
 const pets = usePetsStore()
 const { now } = usePetClock()
+usePetCareAvailability(() => props.active !== false)
 const occupied = computed(() => !!pets.pet?.activity)
 const resting = computed(() => pets.pet?.activity?.kind === 'rest')
 const occupiedHint = computed(() => resting.value ? '休息时暂不能进行其他互动' : '当前活动结束并领取成果后，才能继续照顾')
@@ -15,9 +17,12 @@ const actions = computed<{ id: PetAction; label: string; hint: string; blocked: 
   const pet = pets.pet
   if (!pet) return []
   const until = pet.activity?.endsAt ?? 0
+  // 满值展示会向上取整；服务端确认已到可互动时间后，即使显示 100 也允许照顾。
+  const feedFull = pet.hunger >= 100 && !(pet.careAvailableAt && pet.careAvailableAt.feed <= (pets.state?.serverNow ?? 0))
+  const waterFull = pet.water >= 100 && !(pet.careAvailableAt && pet.careAvailableAt.water <= (pets.state?.serverNow ?? 0))
   return [
-    { id: 'feed', label: '喂食', hint: pets.foodQuantity ? `余 ${pets.foodQuantity} 份口粮` : '背包里没有口粮了', blocked: occupied.value || !pets.foodQuantity || pet.hunger >= 100 },
-    { id: 'water', label: '饮水', hint: pet.water >= 100 ? '水分充足' : '补充水分', blocked: occupied.value || pet.water >= 100 },
+    { id: 'feed', label: '喂食', hint: pets.foodQuantity ? `余 ${pets.foodQuantity} 份口粮` : '背包里没有口粮了', blocked: occupied.value || !pets.foodQuantity || feedFull },
+    { id: 'water', label: '饮水', hint: waterFull ? '水分充足' : '补充水分', blocked: occupied.value || waterFull },
     { id: 'pet', label: '抚摸', hint: pet.cooldowns.pet > now.value ? `${petDuration(pet.cooldowns.pet - now.value)}后` : '陪伴一下', blocked: occupied.value || pet.cooldowns.pet > now.value },
     { id: 'play', label: '玩耍', hint: pet.cooldowns.play > now.value ? `${petDuration(pet.cooldowns.play - now.value)}后` : pet.energy < 10 ? '需要先休息' : '消耗 10 精力', blocked: occupied.value || pet.cooldowns.play > now.value || pet.energy < 10 },
     { id: resting.value ? 'wake' : 'rest', label: resting.value ? '唤醒' : '休息', hint: resting.value ? until > now.value ? `${petDuration(until - now.value)}后结束` : '结束休息' : '恢复精力', blocked: !resting.value && (occupied.value || pet.energy >= 100) },

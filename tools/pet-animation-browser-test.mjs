@@ -31,6 +31,13 @@ serverState.pet.hunger = 45; serverState.pet.water = 50; serverState.pet.energy 
 for (const skill of serverState.pet.skills) skill.experience = 30
 serverState.wallet.coins = 920
 let fault = '', hold = null
+let riskRequired = false, riskVerified = false, riskRetryAt = 0, challenge = null, careDue = null
+export const setRisk = mode => { riskRequired = mode === 'verification'; riskVerified = false; riskRetryAt = mode === 'cooldown' ? Date.now() + 1000 : 0 }
+export const setFullCareSoon = () => {
+  serverState.pet.hunger = serverState.pet.water = 100
+  serverState.pet.careAvailableAt = { feed: now + 1000, water: now + 1000 }
+  careDue = { at: Date.now() + 1000, server: now + 1000 }
+}
 const receipts = new Map()
 const clockBase = now, clockStarted = Date.now()
 let clockOffset = 0
@@ -41,6 +48,12 @@ const care = createPetPreviewCare({ getState: () => serverState, catalog,
 const syncClock = () => {
   now = clockBase + clockOffset + (fixedClock ? 0 : Date.now() - clockStarted)
   care.settle(now)
+  if (careDue && Date.now() >= careDue.at) {
+    clockOffset += 1001; now = careDue.server + 1; careDue = null
+    serverState.serverNow = now
+    serverState.pet.hunger = serverState.pet.water = 99
+    serverState.pet.careAvailableAt = { feed: now, water: now }
+  }
 }
 syncClock()
 // 测试只推进此页面的内存时钟，不修改机器时间或长测服务。
@@ -61,6 +74,16 @@ export const request = async (url, options) => {
   const key = options?.headers?.['Idempotency-Key']
   calls.push({ url, method: options?.method || 'GET', key })
   const write = options?.method && options.method !== 'GET'
+  if (url === '/api/v3/me/pet/risk') return response({ verificationRequired: riskRequired && !riskVerified, retryAt: riskRetryAt, serverNow: Date.now() })
+  if (url.endsWith('/risk/challenge')) {
+    challenge = { ...JSON.parse(options.body), challengeId: 'isolated-challenge', expiresAt: Date.now() + 60000, provider: 'geetest4', captchaId: 'isolated-provider', serverNow: Date.now() }
+    return response(challenge)
+  }
+  if (url.endsWith('/risk/verify')) { riskVerified = true; return response({ ...challenge, verified: true }) }
+  if (write && key && !receipts.has(key)) {
+    if (Date.now() < riskRetryAt) { const error = new ApiError('操作稍快，请稍后继续', 429, 'pet_rate_limited'); error.retryAfter = '1'; throw error }
+    if (riskRequired && !riskVerified) throw new ApiError('请完成安全验证', 403, 'pet_verification_required')
+  }
   if (!write && fault === 'read' && url === '/api/v3/me/pet') { fault = ''; throw new ApiError('读取失败夹具', 503) }
   if (write && fault === 'hold') { fault = ''; await new Promise(resolve => { hold = resolve }) }
   if (key && receipts.has(key)) return receipts.get(key)
@@ -87,8 +110,8 @@ export const useAuthStore = defineStore('animation-auth', () => {
   const accessToken = ref('isolated-fixture')
   return { accessToken, account: ref({ oId: 'fixture-owner' }), isLoggedIn: computed(() => !!accessToken.value) }
 })
-export const RouterLink = { props: ['to'], setup(props, { slots }) { return () => h('a', { href: '#', onClick: e => e.preventDefault() }, slots.default?.()) } }
-const route = reactive({ path: '/pets' })
+export const RouterLink = { props: ['to'], setup(props, { slots }) { return () => h('a', { href: props.to, onClick: e => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); const url=new URL(props.to,location.origin); route.path=url.pathname; route.hash=url.hash } }, slots.default?.()) } }
+const route = reactive({ path: '/pets', hash: '' })
 export const useRoute = () => route
 export const useLayoutStore = defineStore('animation-layout', () => ({ immersive: ref(false) }))
 `)
@@ -116,6 +139,7 @@ async function copy(file) {
 }
 const view = await copy(path.join(root, 'src/views/PetsView.vue'))
 const desktop = await copy(path.join(root, 'src/components/pets/PetDesktop.vue'))
+const riskPanel = await copy(path.join(root, 'src/components/pets/PetRiskVerification.vue'))
 const petsStore = await copy(path.join(root, 'src/stores/pets.ts'))
 const displayStore = await copy(path.join(root, 'src/stores/petDisplay.ts'))
 await fs.writeFile(path.join(sourceDirectory, 'Shell.vue'), `
@@ -123,6 +147,7 @@ await fs.writeFile(path.join(sourceDirectory, 'Shell.vue'), `
 import { onMounted } from 'vue'
 import View from './${view}'
 import Desktop from './${desktop}'
+import RiskPanel from './${riskPanel}'
 import { usePetsStore } from './${petsStore}'
 import { usePetDisplayStore } from './${displayStore}'
 import { useAuthStore, useRoute } from './stubs.ts'
@@ -156,7 +181,7 @@ onMounted(() => {
   </header>
   <main v-if="!desktopOnly"><View /></main>
   <main v-else class="desktop-fixture"><h1>桌宠陪伴</h1><p>此处仅检查桌宠播放、拖动和收纳，不连接真实服务。</p></main>
-  <Desktop />
+  <Desktop /><RiskPanel />
 </template>
 <style>
 .fixture-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 1180px; margin: 0 auto 20px; min-height: 40px; border-bottom: 1px solid var(--fp-border); padding-bottom: 14px; color: var(--fp-text); }
@@ -177,6 +202,12 @@ import '${path.join(root, 'src/styles/inner-pages.css')}'
 import '${path.join(root, 'src/packs/themes/classic-light/style.css')}'
 import '${path.join(root, 'src/packs/themes/classic-dark/style.css')}'
 document.documentElement.dataset.theme = new URLSearchParams(location.search).get('theme') === 'dark' ? 'classic-dark' : 'classic-light'
+// 仅隔离浏览器夹具安装验证控件替身，生产组件仍使用真实 useGeetest4。
+window.initGeetest4 = (options, callback) => {
+  let handler, button
+  const instance = { appendTo(target) { button=document.createElement('button');button.textContent='完成本地验证';button.dataset.testCaptcha='true';button.onclick=()=>handler?.();target.appendChild(button);return instance }, onSuccess(fn) { handler=fn;return instance }, getValidate() { return { lot_number:'local-lot',captcha_output:'local-output',pass_token:'local-pass',gen_time:'local-time' } },reset(){},destroy(){button?.remove()} }
+  callback(instance)
+}
 createApp(Shell).use(createPinia()).mount('#app')
 `)
 await fs.writeFile(path.join(sourceDirectory, 'index.html'), `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>宠物家园与桌宠 · 本地动画预览</title><style>body{margin:0;padding:24px 16px;font-family:system-ui,sans-serif!important}*{box-sizing:border-box}@media(max-width:600px){body{padding:16px 10px}}</style></head><body><div id="app"></div><script type="module" src="./main.ts"></script></body></html>`)
@@ -259,7 +290,7 @@ try {
     throw new Error(`等待失败：${label}；${JSON.stringify(await evaluate(`({error:petFixture?.pets.error,pending:!!petFixture?.pets.pending,busy:petFixture?.pets.busy,event:petFixture?.pets.confirmedEvent,videos:[...document.querySelectorAll('video')].map(v=>({src:v.currentSrc,ready:v.readyState,paused:v.paused,time:v.currentTime}))})`))}`)
   }
   async function screenshot(name) {
-    const { data } = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+    const { data } = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: !name.startsWith('pet-risk-') })
     await fs.writeFile(path.join(temporary, name), Buffer.from(data, 'base64'))
   }
   await call('Runtime.enable'); await call('Page.enable'); await call('Network.enable')
@@ -693,6 +724,72 @@ try {
   assert.equal(expectedMediaFailures.length, attempts)
   results.push('视频加载故障回退静态，同一动作不自动反复请求')
   failingVideo = ''
+
+  // 在同一真实组件夹具复核风控入口，所有写入仅修改隔离内存状态。
+  for (const width of [1440, 390]) {
+    await setViewport(width, 900)
+    await navigate()
+    await evaluate("petFixture.setRisk('verification')")
+    const beforeRisk = await careSnapshot()
+    await clickCare('喂食')
+    await until("petFixture.pets.riskStage==='verification' && !petFixture.pets.busy", '明确验证拒绝保留原命令')
+    const originalKey = await evaluate('petFixture.pets.pending.key')
+    assert.deepEqual(await careSnapshot(), beforeRisk)
+    await evaluate(`document.querySelector('button[aria-label="查看宠物操作验证"]').click()`)
+    await until("!!document.querySelector('[data-test-captcha]')", '真实弹窗挂载验证码控件')
+    assert.equal(await evaluate('document.querySelectorAll("[role=dialog]").length'), 1)
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true)
+    await until("getComputedStyle(document.querySelector('.fp-dialog-mask')).opacity === '1'", '弹窗过渡完成')
+    await screenshot(`pet-risk-${width}.png`)
+    await evaluate("document.querySelector('[data-test-captcha]').click()")
+    await until("petFixture.pets.riskStage==='ready' && !petFixture.pets.riskBusy", '验证完成等待手动继续')
+    assert.equal(await evaluate('petFixture.calls.filter(x=>x.url.endsWith("/actions")).length'), 1)
+    assert.deepEqual(await careSnapshot(), beforeRisk)
+    await evaluate("[...document.querySelectorAll('.pet-risk button')].find(x=>x.textContent==='继续原操作').click()")
+    await until('!petFixture.pets.pending && !petFixture.pets.busy && !petFixture.pets.riskOpen', '原命令继续后关闭验证')
+    assert.deepEqual(await evaluate('petFixture.calls.filter(x=>x.url.endsWith("/actions")).map(x=>x.key)'), [originalKey, originalKey])
+    assert.equal((await careSnapshot()).food, beforeRisk.food - 1)
+    assert.equal((await careSnapshot()).hunger, beforeRisk.hunger + 35)
+    results.push(`${width}px：风险验证真实弹窗正常，验证不自动消费，明确继续沿原键一次扣粮并更新状态`)
+  }
+  await navigate()
+  await evaluate("petFixture.setRisk('cooldown')")
+  await clickCare('饮水')
+  await until("petFixture.pets.riskStage==='cooldown' && !petFixture.pets.busy", '账号冷却保留命令')
+  const cooldownCalls = await evaluate('petFixture.calls.length')
+  await delay(1400)
+  assert.equal(await evaluate('petFixture.calls.length'), cooldownCalls, '冷却结束不自动重发')
+  await evaluate('petFixture.pets.prepareRisk()')
+  await until("petFixture.pets.riskStage==='ready'", '冷却结束按需核对')
+  await evaluate('petFixture.pets.retryPending()')
+  assert.equal(await evaluate('!!petFixture.pets.pending'), false)
+  results.push('账号冷却期间及结束后均无后台重发，用户继续才恢复原命令')
+
+  await setViewport(1440)
+  await navigate()
+  await evaluate('petFixture.display.show();petFixture.display.setCollapsed(false);petFixture.setFullCareSoon();petFixture.pets.refresh()')
+  await until("!!document.querySelector('.pet-character')", '桌宠照顾入口已挂载')
+  await evaluate("document.querySelector('.pet-character').click()")
+  await until("!!document.querySelector('.pet-desktop-panel .pet-actions')", '两处照顾面板同时挂载')
+  assert.equal(await evaluate(`${careButton('喂食')}.disabled && ${careButton('饮水')}.disabled`), true)
+  const dueCalls = await evaluate('petFixture.calls.length')
+  await until(`!${careButton('喂食')}.disabled && !${careButton('饮水')}.disabled`, '服务端时间到期后自动核对解锁')
+  assert.deepEqual(await evaluate(`petFixture.calls.slice(${dueCalls}).map(x=>x.method)`), ['GET'])
+  assert.equal((await careSnapshot()).hunger, 99)
+  results.push('满值按钮按服务端期限刷新，两处面板合并为一次GET，拿到新状态后才解锁')
+
+  await evaluate("petFixture.setActivity('work');petFixture.finishActivity();petFixture.pets.refresh()")
+  const desktopClaim = `document.querySelector('.pet-desktop-panel a[href="/pets#pet-activities"]')`
+  await until(`!!${desktopClaim}`, '桌宠活动领取入口可见')
+  await evaluate(`${desktopClaim}.click()`)
+  await until("document.getElementById('pet-home-tab-activities')?.getAttribute('aria-selected')==='true'", '桌宠领取入口打开活动分区')
+  await evaluate("document.getElementById('pet-home-tab-care').click()")
+  await until("document.getElementById('pet-home-tab-care')?.getAttribute('aria-selected')==='true'", '主动返回照顾分区')
+  await evaluate("document.querySelector('.pet-character').click()")
+  await until(`!!${desktopClaim}`, '再次打开桌宠面板')
+  await evaluate(`${desktopClaim}.click()`)
+  await until("document.getElementById('pet-home-tab-activities')?.getAttribute('aria-selected')==='true'", '相同hash再次点击仍回到活动分区')
+  results.push('桌宠领取入口切到活动分区，相同路由再次点击仍可打开，不要求用户手动切Tab')
 
   assert.deepEqual(failures, []); assert.deepEqual(exceptions, [])
   assert.equal(requests.some(url => url.startsWith('/api/')), false)

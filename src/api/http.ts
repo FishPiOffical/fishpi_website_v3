@@ -146,7 +146,9 @@ function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promi
       // Rhythm uses structured unauthorized when a visitor has no refresh cookie.
       const guestRefresh = path === '/api/v3/auth/refresh' && !accessToken &&
         error instanceof ApiError && error.status === 401 && error.code === 'unauthorized'
-      if (generation === homeReadGeneration && version === authVersion && !guestRefresh &&
+      const petAccountLimit = /^\/api\/v3\/me\/pet(?:\/|\?|$)/.test(path) && error instanceof ApiError &&
+        (error.code === 'pet_rate_limited' || error.code === 'pet_transport_limited')
+      if (generation === homeReadGeneration && version === authVersion && !guestRefresh && !petAccountLimit &&
         error instanceof ApiError && (error.status === 401 || error.status === 429 || error.code === 'offline' || isCaptchaRequired(error))) {
         const now = Date.now()
         const header = error.retryAfter
@@ -347,6 +349,18 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
   }
 
   if (res.status === 429) {
+    // 宠物账号冷却只限制宠物操作，不能误当成全站 IP 风控。其它接口保持原有处理。
+    if (/^\/api\/v3\/me\/pet(?:\/|\?|$)/.test(path) && isJsonContentType(res.headers.get('content-type'))) {
+      const text = await readNetworkBody(() => res.text(), init.signal, identity)
+      let code: string | undefined
+      try {
+        const candidate = JSON.parse(text)?.code
+        if (candidate === 'pet_rate_limited' || candidate === 'pet_transport_limited') code = candidate
+      } catch { /* 无法确认来源时仍按普通限流保护。 */ }
+      const error = new ApiError('操作过于频繁，请稍后重试', 429, code)
+      error.retryAfter = res.headers.get('Retry-After') ?? undefined
+      throw error
+    }
     void res.body?.cancel().catch(() => {})
     const error = new ApiError('操作过于频繁，请稍后重试', 429)
     error.retryAfter = res.headers.get('Retry-After') ?? undefined

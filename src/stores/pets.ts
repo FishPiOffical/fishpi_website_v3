@@ -3,8 +3,9 @@ import { defineStore, storeToRefs } from 'pinia'
 import { ApiError, getAuthContextVersion } from '@/api/http'
 import { profileOperationKey } from '@/api/v3-profile'
 import {
-  executePetCommand, normalizePetName, readPetCatalog, readPetState,
+  createPetRiskChallenge, executePetCommand, normalizePetName, readPetCatalog, readPetRisk, readPetState, verifyPetRiskChallenge,
   type PetAction, type PetActivityKind, type PetCatalog, type PetCommand, type PetSpeciesId, type PetState,
+  type PetRiskChallenge,
 } from '@/api/v3-pets'
 import { useAuthStore } from '@/stores/auth'
 
@@ -22,6 +23,11 @@ export const usePetsStore = defineStore('pets', () => {
   const loading = ref(false), catalogLoading = ref(false), busy = ref(false)
   const error = ref(''), catalogError = ref(''), pendingError = ref('')
   const pending = ref<PetCommand | null>(null)
+  const riskStage = ref<'verification' | 'cooldown' | 'ready' | null>(null)
+  const riskOpen = ref(false), riskBusy = ref(false), riskError = ref(''), riskUntil = ref(0)
+  const riskChallenge = ref<PetRiskChallenge | null>(null)
+  const pendingUncertain = ref(false)
+  let riskAbort: AbortController | null = null, riskSequence = 0, verifiedUntil = 0, riskClockOffset = 0
   // 仅内存中的本次操作确认信号，不持久化、不广播，也不代替养成快照。
   const confirmedEvent = ref<PetConfirmedEvent | null>(null)
   let confirmationSequence = 0
@@ -71,12 +77,115 @@ export const usePetsStore = defineStore('pets', () => {
     catalogFlight = null
     state.value = catalog.value = null
     pending.value = null
+    pendingUncertain.value = false
+    resetRisk()
     confirmedEvent.value = null
     busy.value = catalogLoading.value = refreshNeeded.value = false
     error.value = catalogError.value = pendingError.value = ''
     receivedAt.value = 0
     attempted = catalogAttempted = invalidated = false
     stateFailures = catalogFailures = stateRetryAt = catalogRetryAt = lastAutoRead = 0
+  }
+
+  function cancelRiskRead() {
+    riskSequence++
+    riskAbort?.abort()
+    riskAbort = null
+    riskBusy.value = false
+    riskChallenge.value = null
+  }
+  function resetRisk() {
+    cancelRiskRead()
+    riskOpen.value = false
+    riskStage.value = null
+    riskError.value = ''
+    riskUntil.value = verifiedUntil = riskClockOffset = 0
+  }
+  function closeRisk() {
+    // 关闭仅销毁证明与请求，原命令仍保留，不能把未知消费当成取消成功。
+    cancelRiskRead()
+    riskOpen.value = false
+  }
+  function cancelRejectedOperation() {
+    // 账号冷却期间也不能借“放弃”立即换键再发，窗口仍可关闭稍后处理。
+    if (busy.value || pendingUncertain.value || !riskStage.value || Date.now() < riskUntil.value) return
+    pending.value = null
+    pendingError.value = ''
+    resetRisk()
+  }
+  function applyCooldown(reason: ApiError) {
+    const value = reason.retryAfter ?? ''
+    const until = /^\d+$/.test(value) ? Date.now() + Number(value) * 1000 : Date.parse(value)
+    riskUntil.value = Math.max(riskUntil.value, Number.isFinite(until) ? until : Date.now() + 60_000)
+    riskStage.value = 'cooldown'
+  }
+  async function prepareRisk() {
+    if (!active() || offline.value || busy.value || riskBusy.value || !pending.value || !riskStage.value) return
+    riskOpen.value = true
+    riskError.value = ''
+    if (Date.now() < riskUntil.value) return
+    const command = pending.value, valid = capture(), run = ++riskSequence, controller = new AbortController()
+    riskAbort = controller
+    riskChallenge.value = null
+    riskBusy.value = true
+    const current = () => valid() && run === riskSequence && pending.value?.key === command.key && !controller.signal.aborted
+    try {
+      const result = await readPetRisk(controller.signal)
+      if (!current()) return
+      // 服务端时间换算到本机倒计时，避免用户系统时钟不同导致长时间锁住或提前恢复。
+      riskClockOffset = result.serverNow - Date.now()
+      riskUntil.value = result.retryAt ? result.retryAt - riskClockOffset : 0
+      if (riskUntil.value > Date.now()) { riskStage.value = 'cooldown'; return }
+      if (!result.verificationRequired || verifiedUntil > Date.now()) { riskStage.value = 'ready'; return }
+      riskStage.value = 'verification'
+      const challenge = await createPetRiskChallenge(command, controller.signal)
+      if (current()) {
+        if (challenge.serverNow !== undefined) riskClockOffset = challenge.serverNow - Date.now()
+        if (challenge.verified === true && challenge.expiresAt > Date.now() + riskClockOffset) {
+          // 验证已成功但回执丢失时，只恢复原命令的授权事实，不重复验证或自动消费。
+          verifiedUntil = challenge.expiresAt - riskClockOffset
+          riskStage.value = 'ready'
+        } else riskChallenge.value = challenge
+      }
+    } catch (reason) {
+      if (!current()) return
+      if (reason instanceof ApiError && reason.status === 429) applyCooldown(reason)
+      riskError.value = message(reason, '暂时无法开始验证，请稍后重试')
+    } finally {
+      if (current()) { riskBusy.value = false; riskAbort = null }
+    }
+  }
+  async function submitRiskProof(proof: unknown): Promise<boolean> {
+    if (!active() || offline.value || busy.value || riskBusy.value || !pending.value || !riskChallenge.value || !riskOpen.value) return false
+    const command = pending.value, challenge = riskChallenge.value
+    if (challenge.idempotencyKey !== command.key || challenge.expiresAt <= Date.now() + riskClockOffset) {
+      riskChallenge.value = null
+      riskError.value = '验证已过期，请重新验证'
+      return false
+    }
+    const valid = capture(), run = ++riskSequence, controller = new AbortController()
+    riskAbort = controller
+    riskBusy.value = true
+    riskError.value = ''
+    const current = () => valid() && run === riskSequence && pending.value?.key === command.key && !controller.signal.aborted
+    try {
+      const result = await verifyPetRiskChallenge(challenge, proof, controller.signal)
+      if (!current()) return false
+      if (result.serverNow !== undefined) riskClockOffset = result.serverNow - Date.now()
+      verifiedUntil = result.expiresAt - riskClockOffset
+      riskStage.value = 'ready'
+      riskChallenge.value = null
+      // 验证只解除当前命令的限制；继续消费必须由用户再次点击，不能暗中重发。
+      return true
+    } catch (reason) {
+      if (!current()) return false
+      if (reason instanceof ApiError && reason.status === 429) applyCooldown(reason)
+      riskError.value = message(reason, '验证结果未确认，请重新验证')
+      riskChallenge.value = null
+      return false
+    } finally {
+      if (current()) { riskBusy.value = false; riskAbort = null }
+    }
   }
 
   function loadState(): Promise<void> {
@@ -182,6 +291,7 @@ export const usePetsStore = defineStore('pets', () => {
     catalogFlight = null
     catalogLoading.value = false
     writeAbort?.abort(new ApiError('网络已断开，操作结果尚未确认', 0, 'pet_offline'))
+    cancelRiskRead()
     if (attempted) { invalidated = refreshNeeded.value = true; error.value = '网络已断开，联网后会核对宠物状态' }
   }
   function onOnline() {
@@ -228,7 +338,7 @@ export const usePetsStore = defineStore('pets', () => {
   }
 
   async function execute(command: PetCommand, recovering = false): Promise<boolean> {
-    if (!active() || offline.value || busy.value) return false
+    if (!active() || offline.value || busy.value || riskBusy.value || Date.now() < riskUntil.value) return false
     const valid = capture()
     cancelAutoRead()
     cancelRead()
@@ -244,6 +354,8 @@ export const usePetsStore = defineStore('pets', () => {
       if (!valid()) return false
       confirmed = true
       pending.value = null
+      pendingUncertain.value = false
+      resetRisk()
       // 确认后的读取期间保留画面，refreshNeeded 阻止旧余额继续操作，避免桌宠闪烁。
       refreshNeeded.value = true
       try { channel?.postMessage({ type: 'changed', owner: account.value?.oId }) } catch { /* 本页照常重读。 */ }
@@ -256,10 +368,20 @@ export const usePetsStore = defineStore('pets', () => {
     } catch (reason) {
       if (!valid()) return false
       const description = message(reason, '这次操作的结果尚未确认，请恢复原操作')
+      if (reason instanceof ApiError && (reason.code === 'pet_verification_required' || reason.status === 429)) {
+        // 首次明确拒绝与未知结果恢复分开保存，冷却或验证都沿用冻结内容与原键。
+        pendingUncertain.value = recovering
+        if (reason.status === 429) applyCooldown(reason)
+        else { riskStage.value = 'verification'; verifiedUntil = 0 }
+        pendingError.value = description
+        return false
+      }
       // 首次明确拒绝允许改正；未知命令恢复期间的 4xx 不能证明此前未提交。
       if (!recovering && reason instanceof ApiError && reason.status >= 400 && reason.status < 500
           && reason.code !== 'confirmation_required') {
         pending.value = null
+        pendingUncertain.value = false
+        resetRisk()
         if (reason.code === 'catalog_changed') {
           // 价格版本被明确拒绝后，先让用户更新目录，不能继续按旧价格创建新命令。
           catalog.value = null
@@ -272,6 +394,9 @@ export const usePetsStore = defineStore('pets', () => {
           error.value = description
         }
       } else {
+        pendingUncertain.value = true
+        riskStage.value = null
+        closeRisk()
         pendingError.value = description
       }
     } finally {
@@ -380,7 +505,12 @@ export const usePetsStore = defineStore('pets', () => {
     return execute({ kind: 'activities/claim', petId: pet.value.id, activityId: activity.id, key: profileOperationKey() })
   }
   function retryPending(): Promise<boolean> {
-    return pending.value ? execute(pending.value, true) : Promise.resolve(false)
+    if (!pending.value) return Promise.resolve(false)
+    if (riskStage.value === 'verification' || riskStage.value === 'cooldown') {
+      void prepareRisk()
+      return Promise.resolve(false)
+    }
+    return execute(pending.value, pendingUncertain.value)
   }
 
   const stop = watch([accessToken, () => account.value?.oId], () => {
@@ -403,6 +533,8 @@ export const usePetsStore = defineStore('pets', () => {
   return {
     state, catalog, pet, coins, foodQuantity, ready, receivedAt, confirmedEvent,
     loading, catalogLoading, error, catalogError, busy, pending, pendingError, refreshNeeded, offline,
+    riskStage, riskOpen, riskBusy, riskError, riskUntil, riskChallenge, pendingUncertain,
+    prepareRisk, submitRiskProof, closeRisk, cancelRejectedOperation,
     ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, craft, claimStory, readopt, startActivity, claimActivity, retryPending,
   }
 })

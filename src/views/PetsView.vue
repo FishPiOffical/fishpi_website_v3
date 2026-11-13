@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { getAuthContextVersion } from '@/api/http'
 import { normalizePetName, petNameLength, type PetSpeciesId } from '@/api/v3-pets'
 import { usePageSeo } from '@/composables/usePageSeo'
@@ -22,19 +22,21 @@ import { usePetAnimationState } from '@/components/pets/usePetAnimationState'
 import PetGrowthSummary from '@/components/pets/PetGrowthSummary.vue'
 import PetHomeNavigation from '@/components/pets/PetHomeNavigation.vue'
 import PetHomeGuide from '@/components/pets/PetHomeGuide.vue'
-import type { PetHomeSection, PetHomeTarget } from '@/components/pets/petNavigation'
+import { PET_ACTIVITIES_NAVIGATION_EVENT, type PetHomeSection, type PetHomeTarget } from '@/components/pets/petNavigation'
 import { usePetClock } from '@/components/pets/usePetClock'
 import { petActivityStatus } from '@/components/pets/petActivityStatus'
 
 usePageSeo(() => ({ title: '宠物家园', path: '/pets', description: '领养你的摸鱼伙伴，照顾它，一起慢慢长大。', robots: 'noindex,follow' }))
 const auth = useAuthStore(), pets = usePetsStore(), display = usePetDisplayStore()
 const history = usePetActivityHistoryStore()
+const route = useRoute()
 const section = ref<PetHomeSection>('care')
 const page = ref<HTMLElement | null>(null)
 const activities = ref<InstanceType<typeof PetActivities> | null>(null)
 const shop = ref<InstanceType<typeof PetShop> | null>(null)
 const rewards = computed(() => pets.state?.stories.filter(story => story.status === 'claimable').length ?? 0)
 let navigationVersion = 0
+let activityRouteIntent: { owner: string } | null = null
 const mounted = ref(false), selected = ref<PetSpeciesId>('hexiaotun'), name = ref(''), nameError = ref('')
 const editingName = ref(false), renameDraft = ref('')
 const { now } = usePetClock()
@@ -82,13 +84,15 @@ async function rename() {
 }
 function load() { if (mounted.value && auth.isLoggedIn && !document.hidden) void pets.ensureLoaded() }
 async function navigate(target: PetHomeTarget, focusPanel = true) {
+  // 用户主动切换分区后，不让较晚完成的初次读取重新抢回活动区。
+  activityRouteIntent = null
   if (!loggedIn.value || !pets.pet) return
   const version = ++navigationVersion, context = owner.value, petId = pets.pet.id
   section.value = target.section
   // 隐藏的日志面板不能因聚焦或其它照顾操作继续读取私人记录。
   if (target.section !== 'history') history.close()
   await nextTick()
-  const valid = () => version === navigationVersion && context === owner.value && petId === pets.pet?.id && !!page.value
+  const valid = () => version === navigationVersion && context === owner.value && petId === pets.pet?.id && route.path === '/pets' && !!page.value
   if (!valid()) return
   if (target.section === 'history' && !history.opened) void history.open()
   if (!focusPanel) return
@@ -103,6 +107,18 @@ async function navigate(target: PetHomeTarget, focusPanel = true) {
     destination?.scrollIntoView?.({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
   }
 }
+function applyActivityRouteIntent() {
+  if (!activityRouteIntent || activityRouteIntent.owner !== owner.value || !loggedIn.value || !pets.pet || pets.loading || pets.refreshNeeded
+    || route.path !== '/pets' || route.hash !== '#pet-activities') return
+  const activity = pets.pet.activity
+  void navigate({ section: 'activities', kind: activity && activity.kind !== 'rest' ? activity.kind : undefined })
+}
+function requestActivityRouteIntent() {
+  // 只响应本页当前锚点；其他页面的桌宠点击由正常 RouterLink 导航处理。
+  if (route.path !== '/pets' || route.hash !== '#pet-activities') return
+  activityRouteIntent = { owner: owner.value }
+  applyActivityRouteIntent()
+}
 function resetNavigation() {
   navigationVersion++
   section.value = 'care'
@@ -115,8 +131,20 @@ watch(owner, () => {
   load()
 })
 watch(() => pets.pet?.id, resetNavigation)
-onBeforeUnmount(() => { navigationVersion++; history.close() })
-onMounted(() => { mounted.value = true; display.restore(); load() })
+watch([() => route.path, () => route.hash, owner], () => {
+  navigationVersion++
+  activityRouteIntent = null
+  requestActivityRouteIntent()
+}, { immediate: true, flush: 'post' })
+watch([loggedIn, () => pets.pet?.id, () => pets.loading, () => pets.refreshNeeded], applyActivityRouteIntent, { flush: 'post' })
+onBeforeUnmount(() => {
+  navigationVersion++; activityRouteIntent = null; history.close()
+  window.removeEventListener(PET_ACTIVITIES_NAVIGATION_EVENT, requestActivityRouteIntent)
+})
+onMounted(() => {
+  mounted.value = true; display.restore(); load()
+  window.addEventListener(PET_ACTIVITIES_NAVIGATION_EVENT, requestActivityRouteIntent)
+})
 </script>
 
 <template>
@@ -174,7 +202,7 @@ onMounted(() => { mounted.value = true; display.restore(); load() })
           <div class="care-panel">
             <header class="care-heading"><h2>今天也要好好照顾它</h2><button type="button" class="icon-button" :disabled="pets.loading || pets.busy" aria-label="刷新宠物状态" title="刷新状态" @click="pets.refresh()"><PetIcon name="refresh" /></button></header>
             <div class="pet-stats"><div v-for="stat in stats" :key="stat.key" class="pet-stat" :class="[stat.key, { low: stat.value < 25 }]"><div><span><PetIcon :name="stat.icon" />{{ stat.label }}</span><strong>{{ stat.value }}<small> / 100</small></strong></div><div class="stat-track" role="progressbar" :aria-label="stat.label" :aria-valuenow="stat.value" :aria-valuemin="0" :aria-valuemax="100"><span :style="{ width: `${stat.value}%` }" /></div></div></div>
-            <PetActions />
+            <PetActions :active="section === 'care'" />
             <p class="care-note">{{ resting ? '休息时暂停其他互动，想提前见面也可以唤醒它。' : pets.pet.activity ? '这次活动结束并领取成果后，就可以继续照顾它了。' : '不在身边时也会慢慢消耗状态，休息可以恢复精力。' }}</p>
             <div class="daily-growth"><span>今日照顾成长</span><strong>{{ pets.pet.growthToday.used }} / {{ pets.pet.growthToday.limit }} 次</strong></div>
             <p v-if="pets.catalog?.growthRules" class="daily-growth-note">每日前 {{ pets.pet.growthToday.limit }} 次成功喂食、饮水、抚摸或玩耍，获得 {{ pets.catalog.growthRules.careExperience }} 经验及至多 {{ pets.catalog.growthRules.careFriendship }} 亲密度。之后仍可照顾宠物。</p>

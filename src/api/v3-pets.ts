@@ -137,6 +137,7 @@ export interface Pet {
   skills: { id: PetSkillId; experience: number; level: number }[]
   jobs: { id: PetJobId; experience: number; level: number; completed: number }[]
   cooldowns: { pet: number; play: number }
+  careAvailableAt?: { feed: number; water: number }
   growthToday: { used: number; limit: number }
 }
 export interface PetState {
@@ -390,6 +391,9 @@ export function decodePetState(value: unknown): PetState {
         return { id: job(entry.id), experience: integer(entry.experience), level: integer(entry.level, 1, 30), completed: integer(entry.completed) }
       }), entry => entry.id),
       cooldowns: { pet: integer(cooldowns.pet), play: integer(cooldowns.play) },
+      ...(data.careAvailableAt === undefined ? {} : { careAvailableAt: {
+        feed: integer(object(data.careAvailableAt).feed), water: integer(object(data.careAvailableAt).water),
+      } }),
       growthToday: { used: integer(growth.used), limit: integer(growth.limit, 1) },
     }
     if (pet.growthToday.used > pet.growthToday.limit || pet.skills.length !== 6 || pet.jobs.length !== 6) throw invalid()
@@ -503,6 +507,51 @@ async function read<T>(path: string, decode: (value: unknown) => T, signal?: Abo
 }
 export const readPetCatalog = (signal?: AbortSignal) => read('/api/v3/pets/catalog', decodePetCatalog, signal)
 export const readPetState = (signal?: AbortSignal) => read('/api/v3/me/pet', decodePetState, signal)
+
+export interface PetRiskState { retryAt: number; verificationRequired: boolean; serverNow: number }
+export interface PetRiskChallenge {
+  challengeId: string; operation: string; idempotencyKey: string; expiresAt: number
+  provider: 'geetest4'; captchaId: string; serverNow?: number; verified?: boolean
+}
+export function petRiskOperation(command: PetCommand): string {
+  return command.kind === 'actions' ? 'action' : command.kind === 'purchases' ? 'purchase'
+    : command.kind === 'activities' ? 'activity-start' : command.kind === 'activities/claim' ? 'activity-claim'
+      : command.kind === 'crafts' ? 'craft' : command.kind === 'stories/claim' ? 'story-claim' : command.kind
+}
+export const readPetRisk = (signal?: AbortSignal) => read('/api/v3/me/pet/risk', (value): PetRiskState => {
+  const row = object(value)
+  return { retryAt: integer(row.retryAt), verificationRequired: flag(row.verificationRequired), serverNow: integer(row.serverNow) }
+}, signal)
+export async function createPetRiskChallenge(command: PetCommand, signal?: AbortSignal): Promise<PetRiskChallenge> {
+  const operation = petRiskOperation(command)
+  const response = await petRequest<{ code: number; data: unknown }>('/api/v3/me/pet/risk/challenge', {
+    method: 'POST', body: JSON.stringify({ operation, idempotencyKey: command.key }), signal,
+  })
+  if (response?.code !== 0) throw invalid()
+  const row = object(response.data)
+  if (row.operation !== operation || row.idempotencyKey !== command.key || row.provider !== 'geetest4') throw invalid()
+  return { challengeId: text(row.challengeId, 128), operation, idempotencyKey: command.key,
+    expiresAt: integer(row.expiresAt), provider: 'geetest4', captchaId: text(row.captchaId, 128),
+    ...(row.serverNow === undefined ? {} : { serverNow: integer(row.serverNow) }),
+    ...(row.verified === undefined ? {} : { verified: flag(row.verified) }) }
+}
+export async function verifyPetRiskChallenge(challenge: PetRiskChallenge, proof: unknown, signal?: AbortSignal): Promise<{ expiresAt: number; serverNow?: number }> {
+  // 证明只在本次调用中使用；仅取极验需要的四个字段，不保存在账号状态或本地存储。
+  const raw = object(proof), captcha: Record<string, string> = {}
+  for (const field of ['lot_number', 'captcha_output', 'pass_token', 'gen_time']) {
+    const value = text(raw[field], 2048)
+    if (/[\u0000-\u001f\u007f-\u009f]/.test(value)) throw new ApiError('验证结果不完整，请重新验证', 422)
+    captcha[field] = value
+  }
+  if (new TextEncoder().encode(JSON.stringify(captcha)).length > 4096) throw new ApiError('验证结果过长，请重新验证', 422)
+  const response = await petRequest<{ code: number; data: unknown }>('/api/v3/me/pet/risk/verify', {
+    method: 'POST', body: JSON.stringify({ challengeId: challenge.challengeId, captcha: JSON.stringify(captcha) }), signal,
+  })
+  if (response?.code !== 0) throw invalid()
+  const row = object(response.data)
+  if (row.verified !== true || row.operation !== challenge.operation || row.idempotencyKey !== challenge.idempotencyKey) throw invalid()
+  return { expiresAt: integer(row.expiresAt), ...(row.serverNow === undefined ? {} : { serverNow: integer(row.serverNow) }) }
+}
 export async function readPetActivityHistory(kind: PetActivityKind | 'all', page: number, signal?: AbortSignal): Promise<PetActivityHistory> {
   if (!['all', 'outing', 'course', 'work'].includes(kind)) throw invalid()
   integer(page, 1, 10000)

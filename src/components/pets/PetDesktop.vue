@@ -13,6 +13,7 @@ import PetAnimation from './PetAnimation.vue'
 import { usePetAnimationState } from './usePetAnimationState'
 import { usePetClock } from './usePetClock'
 import { petActivityStatus } from './petActivityStatus'
+import { requestPetActivitiesNavigation } from './petNavigation'
 import { usePetPlacement } from './layout/usePetPlacement'
 import type { FloatingPoint } from './layout/floatingPlacement'
 
@@ -144,7 +145,7 @@ onBeforeUnmount(() => {
       <PetActions v-if="pets.pet" compact />
       <PetFeedback />
       <p v-if="pets.pet?.activity" class="desktop-hint">{{ activityText }}</p>
-      <RouterLink v-if="pets.pet?.activity && pets.pet.activity.kind !== 'rest'" class="desktop-activity-link" to="/pets#pet-activities" @click="panelOpen = false">{{ activityClaimable ? '回家领取成果' : '查看活动' }} <span aria-hidden="true">↗</span></RouterLink>
+      <RouterLink v-if="pets.pet?.activity && pets.pet.activity.kind !== 'rest'" class="desktop-activity-link" to="/pets#pet-activities" @click="panelOpen = false; requestPetActivitiesNavigation($event)">{{ activityClaimable ? '回家领取成果' : '查看活动' }} <span aria-hidden="true">↗</span></RouterLink>
       <footer class="desktop-panel-tools"><button v-if="!narrow" type="button" @click="collapse(!display.collapsed)">{{ display.collapsed ? '展开桌宠' : '收起桌宠' }}</button><button type="button" @click="display.resetPosition(); panelOpen = false">恢复位置</button><button type="button" @click="close">隐藏桌宠</button></footer>
     </section>
   </Teleport>
