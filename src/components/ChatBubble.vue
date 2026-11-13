@@ -128,6 +128,9 @@ function onBodyClick(e: MouseEvent) {
           <template v-else>{{ nickname || userName }}</template>
           <small v-if="nickname && nickname !== userName">({{ userName }})</small>
         </component>
+        <span v-if="petStatus && !simpleMode" class="fp-chat-pet-status" :title="`宠物：${petStatus.name}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${chatPetStatusLabels[petStatus.state]}`">
+          {{ petStatus.name }}<template v-if="petStatus.level"> · Lv.{{ petStatus.level }}</template> · {{ chatPetStatusLabels[petStatus.state] }}
+        </span>
         <MedalList :items="medals" variant="chat" />
       </div>
       <div class="fp-bubble" @click="onBodyClick">
@@ -153,11 +156,6 @@ function onBodyClick(e: MouseEvent) {
             <time>{{ formatDisplayTime(time) }}</time>
           </div>
         </template>
-      </div>
-      <div v-if="chatroom && petStatus && !simpleMode" class="fp-chat-pet-status">
-        <span>宠物</span>
-        <strong>{{ petStatus.name }}</strong>
-        <span>{{ chatPetStatusLabels[petStatus.state] }}</span>
       </div>
       <div v-if="chatroom" class="foot">
         <time>{{ formatDisplayTime(time) }}</time>
@@ -198,16 +196,15 @@ function onBodyClick(e: MouseEvent) {
   overflow-wrap: anywhere;
 }
 .fp-chat-pet-status {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 3px 8px;
-  border: 1px solid var(--border-color, #dce5df);
-  border-radius: 8px;
-  font-size: 12px;
-  overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: min(100%, 15em);
+  padding-inline-start: 6px;
+  border-inline-start: 1px solid currentColor;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .fp-chat-tail {
   display: flex;

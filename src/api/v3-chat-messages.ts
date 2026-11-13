@@ -4,14 +4,15 @@ import {decodeReactionSnapshot,type ReactionState} from './v3-reactions'
 export type ChatMessageType='text'|'music'|'weather'|'redPacket'|'unavailable'
 export interface ChatTail{text:string}
 export const chatPetStatusLabels = { idle: '空闲', rest: '休息中', outing: '外出中', course: '上课中', work: '兼职中', claimable: '待领取' } as const
-export interface ChatPetStatus { name: string; state: keyof typeof chatPetStatusLabels }
+export interface ChatPetStatus { name: string; state: keyof typeof chatPetStatusLabels; level?: number }
 
 function decodeChatPetStatus(value: unknown): ChatPetStatus | undefined {
   if (!value || typeof value !== 'object') return
-  const { name, state } = value as Record<string, unknown>
+  const { name, state, level } = value as Record<string, unknown>
   if (typeof name !== 'string' || !name.trim() || name.length > 256 ||
       typeof state !== 'string' || !Object.hasOwn(chatPetStatusLabels, state)) return
-  return { name, state: state as ChatPetStatus['state'] }
+  return { name, state: state as ChatPetStatus['state'],
+    ...(typeof level === 'number' && Number.isInteger(level) && level >= 1 && level <= 30 ? { level } : {}) }
 }
 
 export interface ChatMessage{petStatus?:ChatPetStatus;tail?:ChatTail;appearance?:ChatAppearance;reactions?:ReactionState|null;reactionsUnavailable?:boolean;reactionReadStarted?:number;id:string;createdAt:number;type:ChatMessageType;content:string;contentHtml:string;author:{id:string;userName:string;userNickname:string;userAvatarURL:string};client:string;card:Record<string,string|number>}
