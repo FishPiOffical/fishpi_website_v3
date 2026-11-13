@@ -139,10 +139,10 @@ function onBodyClick(e: MouseEvent) {
             </span>
           </component>
           <RouterLink v-if="petStatus && messageId && !simpleMode" :to="petDestination" class="fp-chat-pet-status" :data-species="petStatus.speciesId"
-            :title="`宠物：${petStatus.name}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${chatPetStatusLabels[petStatus.state]} · ${ownPet ? '前往宠物家园' : '查看宠物资料'}`">
+            :title="`宠物：${petStatus.name} · ${chatPetStatusLabels[petStatus.state]}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${ownPet ? '前往宠物家园' : '查看宠物资料'}`">
             <span class="fp-chat-pet-name">{{ petStatus.name }}</span>
-            <span v-if="petStatus.level" class="fp-chat-pet-level" :data-tier="Math.floor(petStatus.level / 10)">Lv.{{ petStatus.level }}</span>
             <span class="fp-chat-pet-state">{{ chatPetStatusLabels[petStatus.state] }}</span>
+            <span v-if="petStatus.level" class="fp-chat-pet-level" :data-tier="Math.floor(petStatus.level / 10)">Lv.{{ petStatus.level }}</span>
           </RouterLink>
         </div>
         <MedalList :items="medals" variant="chat" />
