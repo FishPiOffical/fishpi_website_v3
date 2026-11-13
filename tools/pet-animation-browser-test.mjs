@@ -16,42 +16,57 @@ const suite = await fs.readFile(path.join(root, 'tools/pets-ui-test.mjs'), 'utf8
 const begin = suite.indexOf('const skillNames =')
 const end = suite.indexOf('\nhandler = success')
 assert(begin >= 0 && end > begin, '宠物界面测试夹具的来源锚点已变化')
+await fs.copyFile(path.join(root, 'tools/pet-preview-care.mjs'), path.join(sourceDirectory, 'pet-preview-care.mjs'))
 await fs.writeFile(path.join(sourceDirectory, 'data.js'), `
 import { ApiError } from './stubs.ts'
+import { createPetPreviewCare } from './pet-preview-care.mjs'
 const assert = { equal(actual, expected) { if (actual !== expected) throw new Error('本地夹具状态不匹配') } }
 let serial = 0
 export const calls = []
 export const nextKey = () => 'animation-browser:' + ++serial
-${suite.slice(begin, end)}
+${suite.slice(begin, end).replace('const now = Date.UTC', 'let now = Date.UTC')}
 serverState = adopted('animation-pet', '荷小满', new URLSearchParams(location.search).get('species') || 'hexiaotun')
-serverState.pet.hunger = 45; serverState.pet.water = 50; serverState.pet.energy = 60
+serverState.pet.hunger = 45; serverState.pet.water = 50; serverState.pet.energy = 60; serverState.pet.mood = 50
 for (const skill of serverState.pet.skills) skill.experience = 30
 serverState.wallet.coins = 920
 let fault = '', hold = null
 const receipts = new Map()
+const clockBase = now, clockStarted = Date.now()
+let clockOffset = 0
+const fixedClock = new URLSearchParams(location.search).has('testClock')
+const care = createPetPreviewCare({ getState: () => serverState, catalog,
+  fail: (message, code) => { throw new ApiError(message, 409, code) },
+  journal: (action, name, changes) => journalEvent('care', action, name, changes) })
+const syncClock = () => {
+  now = clockBase + clockOffset + (fixedClock ? 0 : Date.now() - clockStarted)
+  care.settle(now)
+}
+syncClock()
+// 测试只推进此页面的内存时钟，不修改机器时间或长测服务。
+export const advanceTime = ms => { if (!Number.isFinite(ms) || ms < 0) throw new Error('时间增量无效'); clockOffset += ms; syncClock() }
 export const setFault = value => { fault = value }
-export const readState = () => structuredClone(serverState)
+export const readState = () => { syncClock(); return structuredClone(serverState) }
+export const readJournal = () => structuredClone(historyRows)
 export const setActivity = kind => {
+  syncClock()
   if (!kind) { serverState.pet.activity = null; return }
-  if (kind === 'rest') { serverState.pet.activity = { kind, startedAt: now, endsAt: now + 600000 }; return }
+  if (kind === 'rest') { serverState.pet.activity = { kind, startedAt: now, endsAt: now + catalog.rules.restDurationMs }; return }
   const choice = catalog[kind === 'course' ? 'courses' : kind === 'work' ? 'jobs' : 'places'][0]
   serverState.pet.activity = { id: 'browser-activity', kind, entryId: choice.id, name: choice.name,
     startedAt: now, endsAt: now + 600000, status: 'running', cost: choice.cost, rewards: choice.rewards }
 }
 export const finishActivity = () => { serverState.pet.activity.startedAt = now - 600000; serverState.pet.activity.endsAt = now - 1; serverState.pet.activity.status = 'claimable' }
 export const request = async (url, options) => {
-  calls.push({ url, method: options?.method || 'GET' })
+  const key = options?.headers?.['Idempotency-Key']
+  calls.push({ url, method: options?.method || 'GET', key })
   const write = options?.method && options.method !== 'GET'
   if (!write && fault === 'read' && url === '/api/v3/me/pet') { fault = ''; throw new ApiError('读取失败夹具', 503) }
   if (write && fault === 'hold') { fault = ''; await new Promise(resolve => { hold = resolve }) }
-  const key = options?.headers?.['Idempotency-Key']
   if (key && receipts.has(key)) return receipts.get(key)
-  const result = await success(url, options)
-  if (write && url.endsWith('/actions')) {
-    const action = JSON.parse(options.body).action
-    if (action === 'rest') setActivity('rest')
-    if (action === 'water') serverState.pet.water = Math.min(100, serverState.pet.water + 20)
-  }
+  syncClock()
+  const result = write && url.endsWith('/actions')
+    ? response(care.act(JSON.parse(options.body), now))
+    : await success(url, options)
   if (key) receipts.set(key, result)
   if (write && fault === 'unknown') { fault = ''; throw new ApiError('未知结果夹具', 0) }
   return result
@@ -229,7 +244,9 @@ try {
   await call('Network.setBlockedURLs', { urls: ['https://*', 'http://localhost:*'] })
   const setViewport = (width, height = 1000) => call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 })
   async function navigate(query = '') {
-    await call('Page.navigate', { url: `http://127.0.0.1:${port}/${query}` })
+    const parameters = new URLSearchParams(query.replace(/^\?/, ''))
+    parameters.set('testClock', '1')
+    await call('Page.navigate', { url: `http://127.0.0.1:${port}/?${parameters}` })
     await until(`!!window.petFixture?.pets.pet`, '宠物夹具已加载')
   }
   const sceneVideo = `document.querySelector('.pet-scene video')`
@@ -244,31 +261,201 @@ try {
   await screenshot('home-desktop.png')
   results.push('首屏只加载待机，真实256透明视频正常播放')
 
-  for (const [action, clip] of [['feed', 'eat'], ['water', 'drink'], ['pet', 'pet'], ['play', 'play']]) {
-    const before = await evaluate('petFixture.calls.length')
-    await evaluate(`petFixture.pets.act('${action}'${action === 'feed' ? ", 'food'" : ''})`)
-    await until(sceneAction(clip), `${action} 对应动画`)
-    assert.deepEqual(await evaluate(`petFixture.calls.slice(${before}).map(x=>x.method)`), ['POST', 'GET'])
-    assert.equal(await evaluate(`${sceneVideo}.loop`), false)
-    await evaluate(`(()=>{const v=${sceneVideo};v.currentTime=v.duration-.15})()`)
-    await until(sceneAction('idle'), `${action} 播放完回待机`)
+  const careButton = (label, scope = '.care-panel') => `[...document.querySelectorAll('${scope} .pet-actions button')].find(button=>button.querySelector(':scope > span')?.textContent===${JSON.stringify(label)})`
+  async function clickCare(label, scope) {
+    assert.equal(await evaluate(`!!${careButton(label, scope)} && !${careButton(label, scope)}.disabled`), true, `${label}入口可用`)
+    await evaluate(`${careButton(label, scope)}.click()`)
   }
-  results.push('四种照顾操作成功后播一次，结束回待机，无动画附加API请求')
+  const careSnapshot = () => evaluate(`(()=>{const s=petFixture.pets,p=s.pet;return {hunger:p.hunger,water:p.water,mood:p.mood,energy:p.energy,experience:p.experience,friendship:p.friendship,used:p.growthToday.used,food:s.foodQuantity,coins:s.coins,petCooldown:p.cooldowns.pet,playCooldown:p.cooldowns.play,now:s.state.serverNow}})()`)
+  async function checkHomeState(expected) {
+    assert.deepEqual(await evaluate(`Object.fromEntries(['hunger','water','mood','energy'].map(key=>[key,Number(document.querySelector('.pet-stat.'+key+' [role=progressbar]').getAttribute('aria-valuenow'))]))`),
+      { hunger: expected.hunger, water: expected.water, mood: expected.mood, energy: expected.energy })
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('.growth-values strong')].map(node=>Number(node.textContent))`), [expected.experience, expected.friendship])
+    assert.equal(await evaluate(`document.querySelector('.daily-growth strong').textContent.trim()`), `${expected.used} / 10 次`)
+    assert.match(await evaluate(`${careButton('喂食')}.title`), new RegExp(`余 ${expected.food} 份口粮`))
+  }
+  async function finishCare(label) {
+    // 家园与桌宠都由确认事件播放一次；加速结束媒体，不篡改业务状态。
+    await evaluate(`document.querySelectorAll('.pet-animation video').forEach(video=>{if(!video.loop&&Number.isFinite(video.duration))video.currentTime=video.duration-.15})`)
+    await until(sceneAction('idle'), `${label}播放完回待机`)
+  }
+  const careCases = [
+    { action: 'feed', label: '喂食', clip: 'eat', effects: { hunger: 35 }, food: -1 },
+    { action: 'water', label: '饮水', clip: 'drink', effects: { water: 40 }, food: 0 },
+    { action: 'pet', label: '抚摸', clip: 'pet', effects: { mood: 10 }, food: 0 },
+    { action: 'play', label: '玩耍', clip: 'play', effects: { mood: 20, energy: -10 }, food: 0 },
+  ]
+  const expectedCareLogs = []
+  for (const { action, label, clip, effects, food } of careCases) {
+    const before = await careSnapshot(), beforeCalls = await evaluate('petFixture.calls.length')
+    await clickCare(label)
+    await until(sceneAction(clip), `${label}对应动画`)
+    const after = await careSnapshot()
+    for (const key of ['hunger', 'water', 'mood', 'energy']) assert.equal(after[key], Math.max(0, Math.min(100, before[key] + (effects[key] || 0))), `${label}实际改变${key}`)
+    assert.equal(after.food, before.food + food)
+    assert.equal(after.coins, before.coins)
+    assert.equal(after.experience, before.experience + 10)
+    assert.equal(after.friendship, before.friendship + 2)
+    assert.equal(after.used, before.used + 1)
+    if (action === 'pet' || action === 'play') assert.equal(after[`${action}Cooldown`] - after.now, 30 * 60_000)
+    await checkHomeState(after)
+    assert.deepEqual(await evaluate(`petFixture.calls.slice(${beforeCalls}).map(x=>x.method)`), ['POST', 'GET'])
+    assert.equal(await evaluate(`${sceneVideo}.loop`), false)
+    expectedCareLogs.push({ action, label, food, effects: Object.fromEntries(['hunger', 'water', 'mood', 'energy', 'experience', 'friendship'].map(key => [key, after[key] - before[key]])) })
+    await finishCare(label)
+  }
+  results.push('四种真实照顾按钮同步改变四项状态、经验、亲密度和口粮；DOM与store一致，成功后各播一次且无额外API')
+  await screenshot('home-care-changes.png')
 
-  await evaluate(`petFixture.setFault('hold');void(window.waitingWrite=petFixture.pets.act('pet'))`)
+  // 饱食和水分临近上限时只记录实际增量，已满和冷却中的按钮不能再次消耗。
+  for (const { action, label, clip, food } of careCases.slice(0, 2)) {
+    const before = await careSnapshot()
+    await clickCare(label)
+    await until(sceneAction(clip), `${label}达到上限`)
+    const after = await careSnapshot()
+    assert.equal(after[action === 'feed' ? 'hunger' : 'water'], 100)
+    await checkHomeState(after)
+    expectedCareLogs.push({ action, label, food, effects: Object.fromEntries(['hunger', 'water', 'mood', 'energy', 'experience', 'friendship'].map(key => [key, after[key] - before[key]])) })
+    await finishCare(label)
+  }
+  const beforeBlocked = await evaluate('petFixture.calls.length')
+  for (const { label } of careCases) {
+    assert.equal(await evaluate(`${careButton(label)}.disabled`), true, `${label}上限或冷却期间禁用`)
+    await evaluate(`${careButton(label)}.click()`)
+  }
+  assert.equal(await evaluate('petFixture.calls.length'), beforeBlocked)
+  assert.match(await evaluate(`${careButton('抚摸')}.title`), /分钟后/)
+  assert.match(await evaluate(`${careButton('玩耍')}.title`), /分钟后/)
+  results.push('饱食、水分封顶100，已满或冷却中的重复点击不请求、不扣口粮')
+
+  await evaluate(`document.getElementById('pet-home-tab-history').click()`)
+  await until(`document.querySelectorAll('.history-item').length===${expectedCareLogs.length}`, '照顾日志按真实操作展示')
+  const journal = await evaluate('petFixture.readJournal().filter(row=>row.kind==="care")')
+  assert.equal(journal.length, expectedCareLogs.length)
+  for (const [index, expected] of [...expectedCareLogs].reverse().entries()) {
+    const row = journal[index]
+    assert.equal(row.action, expected.action)
+    assert.deepEqual(row.effects, expected.effects)
+    assert.deepEqual(row.itemChanges, expected.food ? [{ itemId: 'food', quantity: expected.food }] : [])
+    assert.equal(row.coinsDelta, 0)
+    const text = await evaluate(`document.querySelectorAll('.history-item')[${index}].textContent`)
+    assert(text.includes(expected.label))
+    for (const [key, name] of Object.entries({ hunger: '饱食', water: '水分', mood: '心情', energy: '精力', experience: '经验', friendship: '亲密度' })) {
+      const value = expected.effects[key]
+      if (value) assert(text.includes(`${name} ${value > 0 ? '+' : ''}${value}`), `${expected.label}日志展示${name}净变化`)
+    }
+    if (expected.food) assert(text.includes('基础口粮 -1'))
+  }
+  results.push('活动记录展示六次实际互动及封顶净增量；无额外扣币或失败重复日志')
+
+  // 独立页面重置测试数据，避免前一组的真实冷却让弱网场景根本没有发送。
+  await navigate()
+  await until(sceneAction('idle'), '延迟场景先待机')
+  const beforeHold = await careSnapshot()
+  await evaluate(`petFixture.setFault('hold')`)
+  await clickCare('抚摸')
   await delay(150)
+  assert.deepEqual(await careSnapshot(), beforeHold)
   assert.equal(await evaluate(`${sceneVideo}?.currentSrc.includes('/pet.webm')`), false)
-  await evaluate('petFixture.releaseWrite();waitingWrite')
+  await evaluate('petFixture.releaseWrite()')
   await until(sceneAction('pet'), '确认后才播动作')
-  await evaluate(`(()=>{const v=${sceneVideo};v.currentTime=v.duration-.15})()`)
-  await until(sceneAction('idle'), '确认动作结束')
-  await evaluate(`petFixture.setFault('unknown');petFixture.pets.act('pet')`)
+  assert.equal((await careSnapshot()).mood, beforeHold.mood + 10)
+  await finishCare('延迟确认')
+  await navigate()
+  await until(sceneAction('idle'), '未知结果场景先待机')
+  const beforeUnknown = await careSnapshot()
+  await evaluate(`petFixture.setFault('unknown')`)
+  await clickCare('喂食')
+  await until('!!petFixture.pets.pending && !petFixture.pets.busy', '等待原操作核对')
   assert.equal(await evaluate('!!petFixture.pets.pending'), true)
-  assert.equal(await evaluate(`${sceneVideo}?.currentSrc.includes('/pet.webm')`), false)
-  await evaluate('petFixture.pets.retryPending()')
-  await until(sceneAction('pet'), '原键恢复确认后播放')
-  results.push('等待和未知结果不播放成功动作，原键恢复确认后才播放')
+  assert.equal(await evaluate(`${sceneVideo}?.currentSrc.includes('/eat.webm')`), false)
+  assert.deepEqual(await careSnapshot(), beforeUnknown)
+  const committed = await evaluate('petFixture.readState()'), pendingKey = await evaluate('petFixture.pets.pending.key')
+  assert.equal(committed.pet.hunger, beforeUnknown.hunger + 35)
+  assert.equal(committed.inventory.find(item => item.itemId === 'food').quantity, beforeUnknown.food - 1)
+  assert.equal(await evaluate('petFixture.readJournal().length'), 1)
+  await evaluate(`document.querySelector('button[aria-label="核对上次宠物操作"]').click()`)
+  await until(sceneAction('eat'), '原键恢复确认后播放')
+  const recovered = await careSnapshot()
+  assert.equal(recovered.hunger, beforeUnknown.hunger + 35)
+  assert.equal(recovered.food, beforeUnknown.food - 1)
+  assert.equal(recovered.experience, beforeUnknown.experience + 10)
+  assert.equal(recovered.friendship, beforeUnknown.friendship + 2)
+  assert.equal(recovered.used, beforeUnknown.used + 1)
+  assert.equal(await evaluate('petFixture.readJournal().length'), 1)
+  assert.deepEqual(await evaluate('petFixture.calls.filter(call=>call.method==="POST").map(call=>call.key)'), [pendingKey, pendingKey])
+  await checkHomeState(recovered)
+  await finishCare('原键恢复')
+  results.push('等待时状态与动画不提前成功；未知结果原键核对后只消耗一次口粮、成长一次、日志一条')
 
+  await evaluate('petFixture.display.show();petFixture.display.setCollapsed(false)')
+  await until(`!!document.querySelector('.pet-character')`, '家园中的桌宠可见')
+  await evaluate(`document.querySelector('.pet-character').click()`)
+  await until(`!!document.querySelector('.pet-desktop-panel .pet-actions')`, '打开桌宠照顾面板')
+  const beforeDesktopCare = await careSnapshot()
+  await clickCare('饮水', '.pet-desktop-panel')
+  await until(sceneAction('drink'), '桌宠饮水同步播放家园动画')
+  await until(`document.querySelector('.pet-character video')?.currentSrc.includes('/drink.webm')`, '桌宠同步播放饮水动画')
+  const afterDesktopCare = await careSnapshot()
+  assert.equal(afterDesktopCare.water, beforeDesktopCare.water + 40)
+  assert.equal(afterDesktopCare.experience, beforeDesktopCare.experience + 10)
+  assert.equal(afterDesktopCare.friendship, beforeDesktopCare.friendship + 2)
+  await checkHomeState(afterDesktopCare)
+  assert.deepEqual(await evaluate(`[...document.querySelectorAll('.desktop-stats b')].map(node=>Number(node.textContent))`),
+    [afterDesktopCare.hunger, afterDesktopCare.water, afterDesktopCare.mood, afterDesktopCare.energy])
+  await evaluate(`document.querySelector('button[aria-label="关闭桌宠面板"]').click()`)
+  await finishCare('桌宠饮水')
+  results.push('从桌宠真实按钮饮水，家园四项状态与成长、桌宠面板和两处动画同步')
+
+  await navigate()
+  await until(sceneAction('idle'), '冷却和成长上限场景先待机')
+  const initialGrowth = await careSnapshot()
+  for (let index = 0; index < 11; index++) {
+    if (index > 0) {
+      await evaluate('petFixture.advanceTime(30*60_000+1);petFixture.pets.refresh()')
+      await until(`!${careButton('抚摸')}.disabled`, '三十分钟冷却到期恢复按钮')
+    }
+    const beforePetting = await careSnapshot()
+    await clickCare('抚摸')
+    await until(sceneAction('pet'), `第${index + 1}次抚摸成功`)
+    const current = await careSnapshot(), rewarded = Math.min(index + 1, 10)
+    assert.equal(current.used, rewarded)
+    assert.equal(current.experience, initialGrowth.experience + rewarded * 10)
+    assert.equal(current.friendship, initialGrowth.friendship + rewarded * 2)
+    assert.equal(current.mood, Math.min(100, beforePetting.mood + 10))
+    assert.equal(await evaluate(`${careButton('抚摸')}.disabled`), true)
+    await checkHomeState(current)
+    await finishCare(`第${index + 1}次抚摸`)
+  }
+  const finalCareLog = await evaluate('petFixture.readJournal()[0]')
+  assert.equal(finalCareLog.effects.experience, 0)
+  assert.equal(finalCareLog.effects.friendship, 0)
+  assert(finalCareLog.effects.mood >= 0 && finalCareLog.effects.mood < 10)
+  results.push('抚摸冷却到期恢复可用；前十次成长，十一次仍可互动但不重复发成长，心情封顶只记实际增量')
+
+  await navigate()
+  await until(sceneAction('idle'), '真实休息场景先待机')
+  const beforeRest = await careSnapshot()
+  await clickCare('休息')
+  await until(sceneAction('sleep'), '休息按钮进入睡眠')
+  assert.equal(await evaluate('petFixture.pets.pet.activity.kind'), 'rest')
+  assert.equal(await evaluate(`${careButton('唤醒')}.disabled`), false)
+  assert.equal(await evaluate(`['喂食','饮水','抚摸','玩耍'].every(label=>[...document.querySelectorAll('.care-panel .pet-actions button')].find(button=>button.querySelector(':scope > span')?.textContent===label).disabled)`), true)
+  await evaluate('petFixture.advanceTime(60*60_000);petFixture.pets.refresh()')
+  await until('petFixture.pets.pet.energy > ' + beforeRest.energy, '一小时休息实际恢复精力')
+  assert.equal((await careSnapshot()).energy, Math.min(100, beforeRest.energy + 20))
+  await clickCare('唤醒')
+  await until('!petFixture.pets.busy && petFixture.pets.pet.activity===null', '唤醒清除休息状态')
+  await until(sceneAction('idle'), '唤醒回待机')
+  const afterRest = await careSnapshot()
+  assert.equal(afterRest.used, beforeRest.used)
+  assert.equal(afterRest.experience, beforeRest.experience)
+  assert.equal(afterRest.friendship, beforeRest.friendship)
+  await checkHomeState(afterRest)
+  results.push('真实休息与唤醒按钮更新活动，休息一小时精力增加20，不误发日常成长')
+
+  await navigate()
+  await until(sceneAction('idle'), '长期动作场景先待机')
   for (const [kind, clip] of [['rest', 'sleep'], ['outing', 'explore'], ['course', 'study'], ['work', 'work']]) {
     await evaluate(`petFixture.setActivity('${kind}');petFixture.pets.refresh()`)
     await until(sceneAction(clip), `${kind} 当前活动动画`)
