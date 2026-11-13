@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { PetActivityEntry, PetActivityKind, PetActivityRewards, PetJobEntry } from '@/api/v3-pets'
 import { getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
@@ -12,6 +12,8 @@ import { petActivityLabels, petJobNames, petSkillNames } from './petActivityStat
 const pets = usePetsStore(), auth = useAuthStore()
 const { now } = usePetClock()
 const tab = ref<PetActivityKind>('outing')
+const root = ref<HTMLElement | null>(null)
+let focusVersion = 0
 let refreshedDate = ''
 const tabs = [{ id: 'outing', name: '外出' }, { id: 'course', name: '学校' }, { id: 'work', name: '兼职' }] as const
 const locked = computed(() => pets.loading || pets.busy || !!pets.pending || pets.refreshNeeded)
@@ -85,6 +87,27 @@ function moveTab(event: KeyboardEvent) {
   tab.value = event.key === 'Home' ? 'outing' : event.key === 'End' ? 'work' : tabs[(index + (event.key === 'ArrowRight' ? 1 : 2)) % tabs.length]!.id
   void nextTick(() => document.getElementById(`pet-${tab.value}-tab`)?.focus())
 }
+/** 来源入口只切换分类并定位，不自动出发；换号或目标失效时放弃本次聚焦。 */
+async function focusEntry(kind: PetActivityKind = tab.value, entryId?: string, stillActive: () => boolean = () => true): Promise<boolean> {
+  const version = ++focusVersion
+  const owner = `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.accessToken}:${pets.pet?.id ?? ''}`
+  const catalogEntries = () => kind === 'outing' ? pets.catalog?.places : kind === 'course' ? pets.catalog?.courses : pets.catalog?.jobs
+  if (!stillActive() || !pets.pet || !tabs.some(item => item.id === kind) || (entryId && !catalogEntries()?.some(entry => entry.id === entryId))) return false
+  tab.value = kind
+  await nextTick()
+  // 分区切换会先更新状态再更新 DOM，不能只依赖隐藏样式判断导航是否仍有效。
+  if (!stillActive() || version !== focusVersion || tab.value !== kind || owner !== `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.accessToken}:${pets.pet?.id ?? ''}`
+    || (entryId && !catalogEntries()?.some(entry => entry.id === entryId))) return false
+  const heading = entryId
+    ? [...root.value?.querySelectorAll<HTMLElement>('[data-pet-entry]') ?? []].find(element => element.dataset.petEntry === entryId)
+    : root.value?.querySelector<HTMLElement>('#pet-activities-title')
+  if (!heading?.isConnected || root.value?.closest<HTMLElement>('[data-pet-panel]')?.style.display === 'none') return false
+  heading.focus({ preventScroll: true })
+  heading.scrollIntoView?.({ block: 'nearest' })
+  return document.activeElement === heading
+}
+defineExpose({ focusEntry })
+onBeforeUnmount(() => { focusVersion++ })
 watch(() => `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.accessToken}`, () => { tab.value = 'outing'; refreshedDate = '' })
 watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () => {
   if (!pets.state || pets.loading || pets.busy || pets.pending || document.hidden) return
@@ -97,8 +120,8 @@ watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () =>
 </script>
 
 <template>
-  <section v-if="pets.pet" id="pet-activities" class="pet-activities" aria-labelledby="pet-activities-title">
-    <header class="activities-heading"><div><h2 id="pet-activities-title">安排一段充实的时光</h2><p>出去看看、学习本领，也可以试着做一份兼职。</p></div><PetIcon name="outing" /></header>
+  <section v-if="pets.pet" id="pet-activities" ref="root" class="pet-activities" aria-labelledby="pet-activities-title">
+    <header class="activities-heading"><div><h2 id="pet-activities-title" tabindex="-1">安排一段充实的时光</h2><p>出去看看、学习本领，也可以试着做一份兼职。</p></div><PetIcon name="outing" /></header>
 
     <div v-if="activity" class="current-activity" :class="{ claimable }">
       <div class="current-icon"><PetIcon :name="claimable ? 'gift' : activity.kind" /></div>
@@ -119,7 +142,7 @@ watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () =>
       <template v-for="group in entryGroups" :key="group.name">
       <h3 v-if="group.name" class="activity-group-heading">{{ group.name }}<span v-if="group.name === '进阶探索'">带回材料，制作你的第一份收藏</span><span v-else-if="group.name === '进阶课程'">在已有本领上，再前进一步</span></h3>
       <article v-for="entry in group.entries" :key="`${tab}:${entry.id}`" class="activity-option">
-        <header><h3>{{ entry.name }}</h3><span><PetIcon name="clock" />{{ petDuration(entry.durationMs) }}</span></header>
+        <header><h3 :data-pet-entry="entry.id" tabindex="-1">{{ entry.name }}</h3><span><PetIcon name="clock" />{{ petDuration(entry.durationMs) }}</span></header>
         <p class="activity-description">{{ entry.description }}</p>
         <p v-if="requirement(entry)" class="activity-requirement">需要{{ requirement(entry) }}</p>
         <div class="activity-rewards"><span class="detail-label">预计</span><p><span v-for="reward in rewards(entry.rewards)" :key="reward">{{ reward }}</span></p></div>
@@ -150,7 +173,8 @@ watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () =>
 .work-income { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 16px; padding: 12px 14px; border-radius: 9px; background: var(--fp-bg); }.work-income > div { display: flex; align-items: center; gap: 7px; font-size: 12px; }.work-income svg { width: 17px; height: 17px; color: var(--fp-accent); }.work-income strong { font-size: 15px; font-variant-numeric: tabular-nums; }.work-income small { font-size: 11px; font-weight: 400; color: var(--fp-muted); }.work-income p { margin: 0; font-size: 11px; color: var(--fp-muted); line-height: 1.6; }
 .activity-requirement { margin: -5px 0 12px; color: var(--fp-muted); font-size: 11px; line-height: 1.6; }
 .job-progress { border-top: 1px solid var(--fp-border); padding-top: 20px; margin-top: 24px; }.job-progress > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 16px; }.job-progress h3 { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 14px; color: var(--fp-title); }.job-progress h3 svg { width: 17px; height: 17px; color: var(--fp-primary); }.job-progress > header > span { color: var(--fp-muted); font-size: 11px; }.jobs-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 24px; }.pet-job { padding: 10px 0; min-width: 0; }.pet-job header { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; }.pet-job header strong { color: var(--fp-primary); font-size: 11px; font-weight: 500; white-space: nowrap; }.pet-job p { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; margin: 7px 0 0; color: var(--fp-muted); font-size: 11px; }.pet-job p b { color: var(--fp-text); font-weight: 600; }.pet-job p > span { margin-left: auto; }
-button:disabled { opacity: .45; cursor: default; }button:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
+button:disabled { opacity: .45; cursor: default; }button:focus-visible { outline: 2px solid var(--fp-primary-ink, var(--fp-primary)); outline-offset: 3px; }
+.activity-option:has(h3:focus) { border-color: var(--fp-primary); background: var(--fp-primary-soft); }h2[tabindex]:focus, h3[tabindex]:focus { outline: 2px solid var(--fp-primary-ink, var(--fp-primary)); outline-offset: 4px; border-radius: 2px; }h2[tabindex], h3[tabindex] { scroll-margin-block: calc(var(--fp-nav-h, 58px) + 16px) 24px; }
 @media (max-width: 950px) { .activity-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }.skills-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 24px; } }
 @media (max-width: 600px) { .pet-activities { padding: 20px; }.activity-options { grid-template-columns: 1fr; }.activity-description, .activity-rewards { min-height: 0; }.activity-description { margin-bottom: 12px; }.activity-option { padding: 16px; }.activity-option footer { padding-top: 14px; }.current-activity { padding: 16px; gap: 12px; }.current-icon { width: 40px; height: 40px; }.current-duration { flex-basis: 100%; }.activities-heading h2 { font-size: 18px; }.skills-grid { gap: 18px 16px; }.activity-tabs button { min-height: 44px; }.activity-option footer button, .activity-primary { min-height: 44px; } }
 @media (max-width: 600px) { .jobs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 18px; }.pet-job p > span { flex-basis: 100%; margin: 0; } }

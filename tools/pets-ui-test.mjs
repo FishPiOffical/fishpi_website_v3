@@ -378,6 +378,7 @@ try {
   console.log('PASS 缓存状态的冷却倒计时使用共享接收时间')
 
   serverState = adopted('pet-b', '小伙伴'); await pets.refresh(); await settle()
+  await click(document.querySelector('[data-pet-section="activities"]'))
   const beforeTabs = calls.length
   assert.equal(document.querySelectorAll('.activity-option').length, 6)
   assert.equal(document.querySelectorAll('.activity-group-heading').length, 2)
@@ -834,6 +835,214 @@ try {
   assert.equal(document.querySelector('.pet-history'), null)
   assert(!document.body.textContent.includes('工作记录'))
   console.log('PASS 日志失败与空结果分离，技术错误友好展示，快速筛选和换号不回写旧记录')
+
+  // 家园导航使用实际挂载节点，验证隐藏与焦点；不把能点击隐藏节点当成可见性证明。
+  serverState = adopted('navigation-pet', '导航伙伴', 'hexiaotun')
+  serverState.wallet.coins = 900
+  historyRows = []
+  context++; auth.account = { oId: 'D' }; auth.accessToken = 'token-d'
+  handler = success
+  await settle(); await settle()
+  const sectionButton = section => document.querySelector(`[data-pet-section="${section}"]`)
+  const sectionPanel = section => document.querySelector(`[data-pet-panel="${section}"]`)
+  const sections = ['care', 'activities', 'stories', 'shop', 'workshop', 'history']
+  function selectedSection(section) {
+    for (const candidate of sections) {
+      assert(sectionButton(candidate), `导航 ${candidate} 应存在`)
+      assert(sectionPanel(candidate), `分区 ${candidate} 应存在`)
+      assert.equal(sectionButton(candidate).getAttribute('aria-selected'), String(candidate === section))
+      assert.equal(sectionPanel(candidate).style.display === 'none', candidate !== section)
+    }
+  }
+  selectedSection('care')
+  const navigationReadCount = calls.length
+  await click(sectionButton('shop'))
+  selectedSection('shop')
+  const retainedQuantity = document.querySelector('#pet-item-quantity-food')
+  retainedQuantity.value = '10'; retainedQuantity.dispatchEvent(new Event('change', { bubbles: true })); await settle()
+  await click(sectionButton('activities'))
+  await click(document.querySelector('#pet-work-tab'))
+  await click(sectionButton('stories'))
+  await click(sectionButton('workshop'))
+  await click(sectionButton('shop'))
+  assert.equal(document.querySelector('#pet-item-quantity-food'), retainedQuantity, '切区保留组件节点和草稿')
+  assert.equal(retainedQuantity.value, '10')
+  await click(sectionButton('activities'))
+  assert.equal(document.querySelector('#pet-work-tab').getAttribute('aria-selected'), 'true')
+  assert.equal(calls.length, navigationReadCount, '普通分区切换不得读取聚合状态或提交操作')
+  console.log('PASS 家园六区只显示当前面板，切换保留购买数量和活动选择且零额外请求')
+
+  await click(sectionButton('care'))
+  const navigationKeys = calls.length
+  sectionButton('care').focus()
+  sectionButton('care').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+  await settle()
+  selectedSection('activities')
+  assert.equal(document.activeElement, sectionButton('activities'))
+  sectionButton('activities').dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }))
+  await settle()
+  selectedSection('care')
+  assert.equal(document.activeElement, sectionButton('care'))
+  assert.equal(calls.length, navigationKeys)
+  console.log('PASS 家园分区支持方向键和 Home，焦点与面板同步且不触发额外请求')
+
+  await click(sectionButton('workshop'))
+  const materialRequestCount = calls.length
+  await click(document.querySelector('[aria-label="查看芦苇来源：荷塘采集"]'))
+  selectedSection('activities')
+  assert.equal(document.querySelector('#pet-outing-tab').getAttribute('aria-selected'), 'true')
+  assert.equal(document.activeElement, document.querySelector('h3[data-pet-entry="lotus-pond"]'))
+  assert.equal(document.querySelector('[aria-label="开始荷塘采集"]').disabled, true, '来源可查看不代表已具备开始条件')
+  await click(sectionButton('workshop'))
+  await click(document.querySelector('[aria-label="查看芦苇来源：家园小铺"]'))
+  selectedSection('shop')
+  assert.equal(document.activeElement, document.querySelector('h3[data-pet-item="reed"]'))
+  assert.equal(document.querySelectorAll('.shop-item').length, 1, '定位材料时切到真实商品分类')
+  await click(sectionButton('workshop'))
+  assert(document.querySelector('[aria-label="查看森林种子来源：森林寻种"]'))
+  assert.equal(document.querySelector('[aria-label="查看森林种子来源：家园小铺"]'), null, '非卖品不能伪造购买来源')
+  assert.equal(calls.length, materialRequestCount, '材料指引只能定位，不能自动探索、购买或刷新')
+  console.log('PASS 缺材料显示目录中的真实来源，导航聚焦正确条目，不把锁定活动或非卖品变成可执行操作')
+
+  await click(sectionButton('shop'))
+  handler = (url, options) => options?.method ? Promise.reject(new Error('导航测试模拟购买结果未知')) : success(url, options)
+  await click(document.querySelector('[aria-label="购买芦苇"]'))
+  assert(pets.pending)
+  const navigationPending = structuredClone(vue.toRaw(pets.pending)), pendingCalls = calls.length
+  for (const section of ['stories', 'care', 'activities', 'shop']) await click(sectionButton(section))
+  assert.deepEqual(structuredClone(vue.toRaw(pets.pending)), navigationPending)
+  assert.equal(calls.length, pendingCalls, '切区不得自动恢复未知写入')
+  auth.accessToken = 'token-d-rotated'; await settle()
+  selectedSection('shop')
+  assert.deepEqual(structuredClone(vue.toRaw(pets.pending)), navigationPending)
+  handler = success
+  await pets.retryPending(); await settle()
+  console.log('PASS 未确认购买跨家园分区保留原命令和幂等键，普通令牌轮换不重置分区或自动重写')
+
+  const beforeJournalNavigation = historyCount()
+  await click(sectionButton('history'))
+  selectedSection('history')
+  assert.equal(historyCount(), beforeJournalNavigation + 1)
+  assert.equal(document.querySelector('.history-toggle').getAttribute('aria-expanded'), 'true')
+  await click(sectionButton('care'))
+  assert.equal(document.querySelector('.history-toggle').getAttribute('aria-expanded'), 'false')
+  const historyWhileHidden = historyCount()
+  await pets.refresh(); await settle()
+  window.dispatchEvent(new Event('focus')); await settle()
+  assert.equal(historyCount(), historyWhileHidden, '隐藏日志不能因状态刷新或聚焦继续读取')
+  const oldJournal = deferred()
+  handler = (url, options) => url.startsWith('/api/v3/me/pet/journal?') ? oldJournal.promise : success(url, options)
+  await click(sectionButton('history'))
+  assert.equal(document.querySelector('.history-refresh').disabled, true)
+  await click(sectionButton('shop'))
+  oldJournal.resolve(response({ serverNow: now, list: [{ recordType: 'event', id: 'late-navigation-event', petId: 'navigation-pet', kind: 'care', action: 'water', name: '不应出现的迟到日志', occurredAt: now, itemChanges: [], coinsDelta: 0, effects: { hunger: 0, water: 1, mood: 0, energy: 0, experience: 0, friendship: 0 }, collectionId: null }], pagination: { page: 1, pageSize: 10, total: 1, pageCount: 1 } }))
+  await settle()
+  assert(!document.body.textContent.includes('不应出现的迟到日志'))
+  selectedSection('shop')
+  handler = success
+  console.log('PASS 进入日志分区才读取，离开后取消读取与自动刷新并拒绝迟到结果')
+
+  handler = (url, options) => options?.method ? Promise.reject(new Error('换号前模拟购买结果未知')) : success(url, options)
+  await click(document.querySelector('[aria-label="购买芦苇"]'))
+  assert(pets.pending, '换号前应确实存在待确认操作')
+  handler = success
+  serverState = adopted('navigation-other-pet', '另一位伙伴', 'paixiaoyu')
+  context++; auth.account = { oId: 'E' }; auth.accessToken = 'token-e'; await settle(); await settle()
+  selectedSection('care')
+  assert.equal(document.querySelector('#pet-item-quantity-food').value, '1')
+  assert.equal(document.querySelector('#pet-outing-tab').getAttribute('aria-selected'), 'true')
+  assert.equal(pets.pending, null)
+  assert.equal(document.querySelector('.history-toggle').getAttribute('aria-expanded'), 'false')
+  console.log('PASS 换号恢复照顾分区并清除旧购买草稿、活动选择、未确认操作与日志')
+
+
+  const guideRequests = calls.length
+  await click(document.querySelector('.pet-guide-activity'))
+  selectedSection('activities')
+  assert.equal(document.activeElement, document.querySelector('#pet-activities-title'))
+  await click(document.querySelector('.pet-guide-supply'))
+  selectedSection('care')
+  assert.equal(document.activeElement, document.querySelector('#pet-daily-supplies'))
+  assert.equal(pets.state.dailySupply.claimed, false, '补给摘要不能代替用户领取')
+  await click(document.querySelector('.pet-guide-journey'))
+  selectedSection('stories')
+  assert.equal(calls.length, guideRequests)
+  const readyCourse = catalog.courses[0]
+  serverState.pet.activity = { id: 'guide-course', kind: 'course', entryId: readyCourse.id, name: readyCourse.name,
+    startedAt: now - readyCourse.durationMs, endsAt: now, status: 'claimable', cost: readyCourse.cost, rewards: readyCourse.rewards }
+  serverState.stories[0].completedSteps = 3; serverState.stories[0].status = 'claimable'; serverState.stories[0].completedAt = now
+  await pets.refresh(); await settle()
+  const readyGuideRequests = calls.length
+  assert(document.querySelector('.pet-guide-activity').textContent.includes('收获等你领取'))
+  await click(document.querySelector('.pet-guide-activity'))
+  selectedSection('activities')
+  assert.equal(document.querySelector('#pet-course-tab').getAttribute('aria-selected'), 'true')
+  assert.equal(pets.pet.activity.id, 'guide-course', '活动摘要不可自动领取成果')
+  await click(document.querySelector('.pet-guide-journey'))
+  selectedSection('stories')
+  assert.equal(pets.state.stories[0].status, 'claimable', '旅程摘要不可自动领取奖励')
+  assert.equal(calls.length, readyGuideRequests)
+  serverState.pet.activity = { kind: 'rest', startedAt: now, endsAt: now + catalog.rules.restDurationMs }
+  serverState.dailySupply.claimed = true
+  await pets.refresh(); await settle()
+  const restGuideRequests = calls.length
+  assert.equal(document.querySelector('.pet-guide-supply'), null)
+  await click(document.querySelector('.pet-guide-activity'))
+  selectedSection('care')
+  assert.equal(pets.pet.activity.kind, 'rest', '休息摘要不可自动唤醒')
+  assert.equal(calls.length, restGuideRequests)
+  console.log('PASS 近况、补给和旅程摘要只导航，领取与唤醒必须由用户单独操作')
+
+  serverState.pet.activity = null; await pets.refresh(); await settle()
+  const rapidNavigationRequests = calls.length
+  for (const source of ['荷塘采集', '家园小铺']) {
+    await click(sectionButton('workshop'))
+    document.querySelector(`[aria-label="查看芦苇来源：${source}"]`).click()
+    // 让父导航进入子组件的 nextTick 等待，再模拟用户切到另一分区。
+    await nextTick(); await Promise.resolve()
+    sectionButton('stories').focus(); sectionButton('stories').click()
+    await settle()
+    selectedSection('stories')
+    assert.equal(document.activeElement, sectionButton('stories'), '旧材料来源的延迟聚焦不能抢走新分区焦点')
+  }
+  assert.equal(calls.length, rapidNavigationRequests)
+  console.log('PASS 外出与小铺来源异步定位期间快速切区，不聚焦已经隐藏的旧目标')
+
+  const originalNavigationCatalog = pets.catalog, removedTargetRequests = calls.length
+  for (const source of ['荷塘采集', '家园小铺']) {
+    // 先切到不同分类，使来源定位确实经历子组件的 DOM 更新等待。
+    if (source === '荷塘采集') {
+      await click(sectionButton('activities')); await click(document.querySelector('#pet-course-tab'))
+    } else {
+      await click(sectionButton('shop')); await click(shopFilter('食品'))
+    }
+    await click(sectionButton('workshop'))
+    document.querySelector(`[aria-label="查看芦苇来源：${source}"]`).click()
+    await nextTick(); await Promise.resolve()
+    // 模拟下一份有效目录在子组件聚焦前到达，不能把已移除目标当成仍可选择。
+    pets.catalog = { ...originalNavigationCatalog,
+      places: originalNavigationCatalog.places.filter(entry => entry.id !== 'lotus-pond'),
+      items: originalNavigationCatalog.items.filter(item => item.id !== 'reed') }
+    await settle()
+    const target = source === '荷塘采集' ? 'activities' : 'shop'
+    selectedSection(target)
+    assert.equal(document.activeElement, sectionPanel(target))
+    assert.equal(document.querySelector('h3[data-pet-entry="lotus-pond"]'), null)
+    assert.equal(document.querySelector('h3[data-pet-item="reed"]'), null)
+    pets.catalog = originalNavigationCatalog; await settle()
+  }
+  assert.equal(calls.length, removedTargetRequests)
+  console.log('PASS 定位期间目录移除目标时回到当前分区，不聚焦旧条目或发起补查')
+
+  await click(sectionButton('history'))
+  serverState.pet = adopted('navigation-replaced-pet', '同账号新伙伴').pet
+  await pets.refresh(); await settle()
+  selectedSection('care')
+  assert.equal(document.querySelector('.history-toggle').getAttribute('aria-expanded'), 'false')
+  const changedPetHistoryCount = historyCount()
+  await pets.refresh(); await settle()
+  assert.equal(historyCount(), changedPetHistoryCount)
+  console.log('PASS 同账号更换宠物回到照顾分区并关闭旧日志，后续状态读取不后台刷日志')
 } finally {
   app?.unmount()
   await fs.rm(temporary, { recursive: true, force: true })

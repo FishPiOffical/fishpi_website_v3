@@ -76,6 +76,7 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 第四批加入进阶探索、材料配方与永久收藏、扩展食品饮料商店，以及包含日常互动的统一日志，详见 [探索、手作与日常记录](docs/pets-phase-four.md)。
 第五批加入六门进阶课程、三条成长旅程，以及 512 宠物币重新领养；更换宠物保留账号资产与已领取奖励，详见 [进阶课程、旅程与重新领养](docs/pets-phase-five.md)。
 第六批调整散步与进阶课成长效率，补齐成长进度、移动端桌宠避让及弱网恢复，详见 [成长节奏与恢复](docs/pets-phase-six.md)。
+第七批整理家园分区、近况与成长引导，增加缺少材料的来源定位；保留分区内草稿与选择，活动记录仍按需读取，详见 [家园交互与引导](docs/pets-phase-seven.md)。
 本地八小时持续检查使用 `node tools/pets-soak.mjs start --hours 8`，以专用账号、隔离事务专项和前端交互专项分别记录结果；状态、停止方式及覆盖边界见 [持续检查说明](docs/pets-soak-test.md)。
 补测全部宠物课程、工作、探索、制作和重新领养可运行 `python3 tools/pet-soak/focused.py --rhythm /Users/ling/Documents/GitHub/rhythm`；它使用独立本地账号及局部时间夹具，与自然八小时观察分开记录，详见 [针对性测试记录](docs/pets-soak-targeted-review.md)。
 用户列表/内容读取失败明确显示错误和重试，合法空结果单独展示，不用 mock 冒充。
