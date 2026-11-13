@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChatTail } from '@/api/v3-chat-messages'
+import { chatPetStatusLabels, type ChatPetStatus, type ChatTail } from '@/api/v3-chat-messages'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { formatDisplayTime } from '@/utils/time'
@@ -20,6 +20,7 @@ import { extractChatQuotes, hasChatQuoteBody, type ChatQuote } from '@/utils/cha
 const props = withDefaults(
   defineProps<{
     tail?: ChatTail
+    petStatus?: ChatPetStatus
     appearance?: ChatAppearance
     userId?: string
     userName: string
@@ -153,6 +154,11 @@ function onBodyClick(e: MouseEvent) {
           </div>
         </template>
       </div>
+      <div v-if="chatroom && petStatus && !simpleMode" class="fp-chat-pet-status">
+        <span>宠物</span>
+        <strong>{{ petStatus.name }}</strong>
+        <span>{{ chatPetStatusLabels[petStatus.state] }}</span>
+      </div>
       <div v-if="chatroom" class="foot">
         <time>{{ formatDisplayTime(time) }}</time>
         <CollectChatEmoji v-if="/<img\b/i.test(html)" :html="html" />
@@ -189,6 +195,18 @@ function onBodyClick(e: MouseEvent) {
   border-radius: 6px;
   background: var(--fp-hover);
   overflow: visible;
+  overflow-wrap: anywhere;
+}
+.fp-chat-pet-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--border-color, #dce5df);
+  border-radius: 8px;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 .fp-chat-tail {
