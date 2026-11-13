@@ -81,3 +81,19 @@ v=mount('pets');await tick();assert.match(v.text(),/摸摸獭/);assert.match(v.t
 assert.ok(find(v.root,n=>n.tag==='a'&&n.props.href?.name==='ranked-pet-profile'&&n.props.href.params.petId==='1'))
 v.app.unmount()
 console.log('PASS pets ranking shows pet profile links and validates level and experience')
+
+const archivedPet = {id:'80',name:'荷小豚',speciesId:'hexiaotun',level:5,experience:400,archived:true,user,
+  learning:[{id:'knowledge',name:'知识',level:3}],career:[{id:'library-assistant',name:'图书助理',level:2}]}
+state.dispatch=async path=>env(path.includes('/chat/messages/') ? {...archivedPet,state:'course'} : archivedPet)
+const signal=new AbortController().signal
+const archivedById=await api.fetchRankedPet('80',signal)
+const archivedByChat=await api.fetchChatPetProfile('100',signal)
+assert.equal(archivedById.archived,true)
+assert.equal(archivedByChat.archived,true)
+assert.equal(archivedByChat.state,'course')
+assert.deepEqual(archivedByChat.learning,archivedById.learning)
+assert.deepEqual(archivedByChat.career,archivedById.career)
+state.dispatch=async()=>env({...archivedPet,archived:undefined})
+assert.equal((await api.fetchRankedPet('80',signal)).archived,false)
+state.dispatch=dispatch
+console.log('PASS archived pet profiles preserve the original learning and career levels from both entries')

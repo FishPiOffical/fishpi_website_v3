@@ -77,7 +77,8 @@ watch([id, fromChat, viewer, mounted, attempt], async ([target, chat, owner, rea
             <div v-if="profile.experience !== undefined"><dt>经验</dt><dd>{{ profile.experience.toLocaleString('zh-CN') }}</dd></div>
             <div v-if="activity"><dt>活动状态</dt><dd>{{ activity }}</dd></div>
           </dl>
-          <p v-if="fromChat" class="snapshot-note">{{ profile.experience === undefined ? '发言时的宠物资料' : '活动状态取自发言时' }}</p>
+          <p v-if="profile.archived" class="snapshot-note">已归档 · 成长等级保留至重新领养前{{ fromChat && activity ? ' · 活动状态取自发言时' : '' }}</p>
+          <p v-else-if="fromChat" class="snapshot-note">{{ profile.experience === undefined ? '发言时的宠物资料' : '活动状态取自发言时' }}</p>
         </div>
       </section>
 

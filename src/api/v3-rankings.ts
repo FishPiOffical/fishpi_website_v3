@@ -107,7 +107,7 @@ export async function fetchRankedPet(id: string, signal: AbortSignal) {
   const data = await fetchPetProfile(`/api/v3/pets/${id}/profile`, signal, 'omit')
   const pet = decodeRankedPet(data)
   if (pet.id !== id) throw bad()
-  return { ...pet, user: decodeV3RelationUser(data.user), ...decodePetProfileProgress(data) }
+  return { ...pet, archived: data.archived === true, user: decodeV3RelationUser(data.user), ...decodePetProfileProgress(data) }
 }
 
 export async function fetchChatPetProfile(id: string, signal: AbortSignal) {
@@ -119,7 +119,7 @@ export async function fetchChatPetProfile(id: string, signal: AbortSignal) {
   if (!name.trim() || name.length > 256 || (level !== undefined && (level < 1 || level > 30)) ||
     (experience !== undefined && experience < 0)) throw bad()
   return {
-    name, state, level, experience,
+    name, state, level, experience, archived: data.archived === true,
     speciesId: data.speciesId === undefined ? undefined : decodePetSpecies(data.speciesId),
     user: decodeV3RelationUser(data.user),
     ...decodePetProfileProgress(data),
