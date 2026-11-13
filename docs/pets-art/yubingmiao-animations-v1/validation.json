@@ -1,7 +1,7 @@
 {
   "date": "2026-11-13",
   "species": "yubingmiao",
-  "scope": "基本源图、静态预览、文件大小与 FFmpeg VP9 全帧解码透明度核验；不是浏览器或艺术验收。",
+  "scope": "首版历史基本检查；explore已由v2替换，当前外出结果见explore-v2-validation.json。其余九项未重新生成。",
   "imageGeneration": "built-in image_gen",
   "reference": "public/images/pets/yubingmiao.webp",
   "sourceDrawingsPerClip": 16,
@@ -2064,5 +2064,8 @@
       },
       "passed": true
     }
-  ]
+  ],
+  "supersededBy": {
+    "explore": "explore-v2-validation.json"
+  }
 }

@@ -4,7 +4,7 @@
   "transparent": true,
   "codec": "vp9",
   "previewOnly": true,
-  "totalBytes": 1464353,
+  "totalBytes": 1412959,
   "clips": [
     {
       "id": "idle",
@@ -112,9 +112,9 @@
       "height": 256,
       "fps": 24,
       "uniqueFrames": 16,
-      "frames": 80,
-      "duration": 3.3333333333333335,
-      "bytes": 224617,
+      "frames": 48,
+      "duration": 2,
+      "bytes": 173223,
       "interpolated": false,
       "approvedEatingSource": false
     },

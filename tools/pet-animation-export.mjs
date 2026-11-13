@@ -21,7 +21,8 @@ const definitions = [
   { id: 'pet', name: '被摸摸', mode: 'once', holds: [10, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 6, 6, 6, 6, 10] },
   { id: 'play', name: '玩耍', mode: 'once', holds: Array(16).fill(6) },
   { id: 'sleep', name: '睡觉', mode: 'loop', holds: Array(16).fill(12) },
-  { id: 'explore', name: '外出', mode: 'loop', holds: Array(16).fill(5) },
+  // 新重绘的站立步态两秒走完一轮；荷小豚保留已确认的原节奏。
+  { id: 'explore', name: '外出', mode: 'loop', holds: Array(16).fill(species === 'hexiaotun' ? 5 : 3) },
   { id: 'study', name: '上课', mode: 'loop', holds: Array(16).fill(8) },
   { id: 'work', name: '工作', mode: 'loop', holds: Array(16).fill(6) },
   { id: 'celebrate', name: '开心庆祝', mode: 'once', holds: [10, 6, 6, 6, 6, 6, 6, 8, 8, 6, 6, 6, 6, 6, 6, 10] },

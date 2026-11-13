@@ -1,10 +1,10 @@
 {
   "species": "momota",
   "date": "2026-11-13",
-  "scope": "source cells, poster dimensions, FFmpeg VP9 decode and decoded alpha; not browser playback or art acceptance",
-  "totalVideoBytes": 992863,
-  "totalPosterBytes": 178306,
-  "totalDeliveryBytes": 1171169,
+  "scope": "source cells, poster dimensions, FFmpeg VP9 decode and decoded alpha; explore revision 2 checked all 48 decoded frames, other clips retain first-pass verification; not browser playback or art acceptance",
+  "totalVideoBytes": 1003797,
+  "totalPosterBytes": 181060,
+  "totalDeliveryBytes": 1184857,
   "results": [
     {
       "id": "idle",
@@ -716,6 +716,7 @@
     },
     {
       "id": "explore",
+      "sourceRevision": 2,
       "sourceSize": [
         1254,
         1254
@@ -724,113 +725,114 @@
       "sourceCells": [
         {
           "index": 1,
-          "transparentPixels": 48349,
-          "solidPixels": 44442,
-          "sha256": "1de1e29bc973a4768d9c5b13247eac87c90932406c405fa29fe9cd1f3ef3c832"
+          "transparentPixels": 33059,
+          "solidPixels": 41840,
+          "sha256": "4c7db8e7c158ef710e99b8dca12f1a72f665390fd64e32fc899c099454266d42"
         },
         {
           "index": 2,
-          "transparentPixels": 47692,
-          "solidPixels": 43863,
-          "sha256": "2767e09fcf30e4c24c13567f86af31d7fbe5970cb31db09fcfa9df55858a4def"
+          "transparentPixels": 37623,
+          "solidPixels": 41593,
+          "sha256": "c6e68d43c20655110cb33d4711120e9e184108ee8ad074fd0b05f0027864e63a"
         },
         {
           "index": 3,
-          "transparentPixels": 48857,
-          "solidPixels": 43108,
-          "sha256": "3fed8cfbd69988478904e02c711ff2e624bf1bd0ac9a89f17fb34e001ada71e2"
+          "transparentPixels": 39102,
+          "solidPixels": 40665,
+          "sha256": "01af7016aa1e2057f638bbcb9c78d1d4fac65b4ccccb0457cc5aa0d8e16cad83"
         },
         {
           "index": 4,
-          "transparentPixels": 50157,
-          "solidPixels": 43169,
-          "sha256": "408a4af72031d69cd8a46d1c934d5c343094a2c8d6e541173077d0793e3a09da"
+          "transparentPixels": 45261,
+          "solidPixels": 39848,
+          "sha256": "324f8064ea2ef460a9f9d7e745f71e5316cd6d435faee58b414531f2f4a3cd64"
         },
         {
           "index": 5,
-          "transparentPixels": 48962,
-          "solidPixels": 43092,
-          "sha256": "04b744ec98d75dc7a5a9f45286275564a3ef507d8e54eacb0427de968d6cef71"
+          "transparentPixels": 37431,
+          "solidPixels": 39873,
+          "sha256": "5ddb493800a39f43f9a089586b9443b6b92883cc44f043ada51c16a54b62bf5c"
         },
         {
           "index": 6,
-          "transparentPixels": 47915,
-          "solidPixels": 42714,
-          "sha256": "be82bec6d4288b47beda6a9354ac1a6edbecee93d6b87f0e3603480efb3d0254"
+          "transparentPixels": 43497,
+          "solidPixels": 39563,
+          "sha256": "0c47bb007377361fd03704a4d25c73762f3d3292756d28792bf2ca212bf2cf14"
         },
         {
           "index": 7,
-          "transparentPixels": 47231,
-          "solidPixels": 43549,
-          "sha256": "1ce2d2f68a10c1662d3852a2ffe1ad2969b5c8c6e766590a3522b5f66e9af3e1"
+          "transparentPixels": 42103,
+          "solidPixels": 39864,
+          "sha256": "36f5b0ce8868fd389e4a5ae4c63df3613b3e68ce1d41007697e8c2485cb3da66"
         },
         {
           "index": 8,
-          "transparentPixels": 48745,
-          "solidPixels": 43779,
-          "sha256": "73a1e7a035733ab5cc4f6cf1a1753ca0226758350cc316a178699a733e5d9451"
+          "transparentPixels": 45969,
+          "solidPixels": 40453,
+          "sha256": "79ce9b30136a55e4ccba37fd51f2ff8faf1f9e36e6c461bcd3b69054210c616b"
         },
         {
           "index": 9,
-          "transparentPixels": 49439,
-          "solidPixels": 43808,
-          "sha256": "4344551d5a4defaa54ed1a57db6b373fa95b9d2a5bd7d6a7f7b600d414eac803"
+          "transparentPixels": 36562,
+          "solidPixels": 40992,
+          "sha256": "192788d065849fb7213332897fdcff526c777cfceb38db086ab328a46050b07d"
         },
         {
           "index": 10,
-          "transparentPixels": 47595,
-          "solidPixels": 43164,
-          "sha256": "316708f67910f335adbaad3c7e89a157b1749159cbec2a6e4cf9eb667c2ecf16"
+          "transparentPixels": 37605,
+          "solidPixels": 40602,
+          "sha256": "1be38b269720d75f51f306a204e6bff13b025f130cd2774bcc6f20d1194db65b"
         },
         {
           "index": 11,
-          "transparentPixels": 46977,
-          "solidPixels": 42757,
-          "sha256": "30dc8117118bb1161c3c8a7fa28c2fae477ffa441bfad32c88982e1bc9a95eaa"
+          "transparentPixels": 38761,
+          "solidPixels": 39372,
+          "sha256": "16730979e3d1278b5f45d09bfa7417da8f5e824d44d328aad870201f11c26d10"
         },
         {
           "index": 12,
-          "transparentPixels": 49750,
-          "solidPixels": 42323,
-          "sha256": "64872a19737e1b14a2aad086e132a21a27f23225de9eabab38ad033a718115ec"
+          "transparentPixels": 42744,
+          "solidPixels": 39095,
+          "sha256": "0b23f0daad1fec0595144c5d014722a0568944db6bde3af847ce04bfcace4085"
         },
         {
           "index": 13,
-          "transparentPixels": 49404,
-          "solidPixels": 42138,
-          "sha256": "ac2b3cbef861a1d36fec86549961251f2934f4b824b7bff6615b7a99d9472275"
+          "transparentPixels": 32674,
+          "solidPixels": 39980,
+          "sha256": "f3cd33b73bd3b4821df0f6fc5ef6e12fe9ccd1877ed20737e3c84fa626fe82c6"
         },
         {
           "index": 14,
-          "transparentPixels": 46902,
-          "solidPixels": 42121,
-          "sha256": "d86dfd13a42da197a9f32d0ec6222447359005674490858c0341111af96756f4"
+          "transparentPixels": 34567,
+          "solidPixels": 40507,
+          "sha256": "fe91d38744b1f2345c7dbc5615d3a600cf49705c9547627758454cd55edc1d37"
         },
         {
           "index": 15,
-          "transparentPixels": 47340,
-          "solidPixels": 42881,
-          "sha256": "132845bb550e2f0e5f017c5b106510a5356a0ef7b68cd743af6f012851c1ac02"
+          "transparentPixels": 35437,
+          "solidPixels": 41213,
+          "sha256": "9b731816e2ee2baed82abb7a511ae3b4679c81896fdeeb24c1353cc22363ff2d"
         },
         {
           "index": 16,
-          "transparentPixels": 47778,
-          "solidPixels": 43678,
-          "sha256": "22f2c945955b8a4d3137c6e2ece28b8496732d79eba1d3ecbb38810ef37f51e7"
+          "transparentPixels": 37906,
+          "solidPixels": 41549,
+          "sha256": "b0a8cc3fd7ded2602b090b7470d78bd2e93c5d1b785945348dd172e9466fa393"
         }
       ],
       "uniqueSourceCells": 16,
-      "videoBytes": 91756,
-      "posterBytes": 17450,
-      "durationSeconds": 3.33,
+      "videoBytes": 102690,
+      "posterBytes": 20204,
+      "durationSeconds": 2.0,
       "videoCodec": "vp9",
       "decodedSize": [
         256,
         256
       ],
       "decodedMode": "RGBA",
-      "decodedTransparentPixels": 27620,
-      "decodedSolidPixels": 34328
+      "decodedTransparentPixels": 19175,
+      "decodedSolidPixels": 29341,
+      "decodedFrameCount": 48
     },
     {
       "id": "study",
