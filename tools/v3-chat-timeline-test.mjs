@@ -74,7 +74,8 @@ const delivered=[]
 const unsubscribe=realtime.subscribeChatChanges(value=>delivered.push(value),()=>{})
 await tick()
 const frame=(type,data)=>socket.onmessage({data:JSON.stringify({type,data})})
-const payload={messageId:'12',revision:'1',message:{...msg('12'),tail:{text:'今天也要开心🐟'},appearance:{bubbleId:'candy',frameId:'gold',version:1}}}
+const petStatus={name:'荷小豚',state:'idle',speciesId:'hexiaotun',level:15}
+const payload={messageId:'12',revision:'1',message:{...msg('12'),petStatus,tail:{text:'今天也要开心🐟'},appearance:{bubbleId:'candy',frameId:'gold',version:1}}}
 frame('chat.message.created',payload)
 assert.equal(delivered.length,0)
 socket.onopen()
@@ -89,6 +90,10 @@ assert.deepEqual(delivered,[
 ])
 assert.deepEqual(delivered[0].message.appearance,payload.message.appearance)
 assert.deepEqual(delivered[0].message.tail,payload.message.tail)
+assert.deepEqual(delivered[0].message.petStatus,petStatus)
+assert.deepEqual(api.decodeChatMessage({...msg('12'),petStatus:{...petStatus,speciesId:'unknown'}}).petStatus,
+  {name:'荷小豚',state:'idle',level:15})
+assert.equal(api.decodeChatMessage({...msg('12'),type:'unavailable',petStatus}).petStatus,undefined)
 console.log('PASS timeline 19 authenticated transport decodes HTTP-equivalent snapshot, rejects mismatched IDs, ignores deletion bodies')
 
 const summary = {targetId:'12',targetType:'chat',groupType:'emoji',currentUserReaction:'heart',

@@ -120,17 +120,24 @@ function onBodyClick(e: MouseEvent) {
     </RouterLink>
     <div class="message-stack">
       <div v-if="chatroom" class="head">
-        <component :is="canMention ? 'button' : RouterLink" v-bind="canMention ? { type: 'button' } : { to: `/member/${userName}` }" class="name" :class="{ 'name--mention': canMention }" :data-user-card="canMention ? undefined : userName" :aria-label="canMention ? `点击 @${nickname || userName}` : undefined" @click="canMention && mention?.insert(userName)">
-          <span v-if="canMention" class="mention-prefix" aria-hidden="true">@</span>
-          <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">
-            {{ nickname || userName }}
-          </VipNickname>
-          <template v-else>{{ nickname || userName }}</template>
-          <small v-if="nickname && nickname !== userName">({{ userName }})</small>
-        </component>
-        <span v-if="petStatus && !simpleMode" class="fp-chat-pet-status" :title="`宠物：${petStatus.name}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${chatPetStatusLabels[petStatus.state]}`">
-          {{ petStatus.name }}<template v-if="petStatus.level"> · Lv.{{ petStatus.level }}</template> · {{ chatPetStatusLabels[petStatus.state] }}
-        </span>
+        <div class="chat-author">
+          <component :is="canMention ? 'button' : RouterLink" v-bind="canMention ? { type: 'button' } : { to: `/member/${userName}` }" class="name" :class="{ 'name--mention': canMention }" :data-user-card="canMention ? undefined : userName" :aria-label="canMention ? `点击 @${nickname || userName}` : undefined" @click="canMention && mention?.insert(userName)">
+            <span v-if="canMention" class="mention-prefix" aria-hidden="true">@</span>
+            <span class="chat-author-name">
+              <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">
+                {{ nickname || userName }}
+              </VipNickname>
+              <template v-else>{{ nickname || userName }}</template>
+              <small v-if="nickname && nickname !== userName">({{ userName }})</small>
+            </span>
+          </component>
+          <span v-if="petStatus && !simpleMode" class="fp-chat-pet-status" :data-species="petStatus.speciesId"
+            :title="`宠物：${petStatus.name}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${chatPetStatusLabels[petStatus.state]}`">
+            <span class="fp-chat-pet-name">{{ petStatus.name }}</span>
+            <span v-if="petStatus.level" class="fp-chat-pet-level" :data-tier="Math.floor(petStatus.level / 10)">Lv.{{ petStatus.level }}</span>
+            <span class="fp-chat-pet-state">{{ chatPetStatusLabels[petStatus.state] }}</span>
+          </span>
+        </div>
         <MedalList :items="medals" variant="chat" />
       </div>
       <div class="fp-bubble" @click="onBodyClick">
@@ -195,17 +202,53 @@ function onBodyClick(e: MouseEvent) {
   overflow: visible;
   overflow-wrap: anywhere;
 }
-.fp-chat-pet-status {
+.chat-author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
-  max-width: min(100%, 15em);
-  padding-inline-start: 6px;
-  border-inline-start: 1px solid currentColor;
-  font-size: 11px;
-  line-height: 1.3;
+  max-width: 100%;
+}
+.chat-author .name { min-width: 0; }
+.chat-author-name {
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.fp-chat-pet-status {
+  --pet-color: #758295;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 15em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--pet-color) 13%, transparent);
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--pet-color) 65%, var(--fp-text));
+}
+.fp-chat-pet-status[data-species="momota"] { --pet-color: #a76a45; }
+.fp-chat-pet-status[data-species="hexiaotun"] { --pet-color: #5c913c; }
+.fp-chat-pet-status[data-species="yubingmiao"] { --pet-color: #cc6b26; }
+.fp-chat-pet-status[data-species="paixiaoyu"] { --pet-color: #448bb8; }
+.fp-chat-pet-name { overflow: hidden; text-overflow: ellipsis; }
+.fp-chat-pet-level {
+  --level-color: #758295;
+  flex: none;
+  padding-inline: 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--level-color) 19%, transparent);
+  color: color-mix(in srgb, var(--level-color) 65%, var(--fp-text));
+  font-weight: 700;
+}
+.fp-chat-pet-level[data-tier="1"] { --level-color: #4383ce; }
+.fp-chat-pet-level[data-tier="2"] { --level-color: #9564c5; }
+.fp-chat-pet-level[data-tier="3"] { --level-color: #bd841f; }
+.fp-chat-pet-state { flex: none; color: var(--fp-muted); }
 .fp-chat-tail {
   display: flex;
   align-items: baseline;
