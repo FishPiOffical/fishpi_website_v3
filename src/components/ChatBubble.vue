@@ -229,7 +229,6 @@ function onBodyClick(e: MouseEvent) {
   --pet-color: #758295;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   min-width: 0;
   max-width: 15em;
   font-size: 10px;
@@ -254,6 +253,10 @@ a.fp-chat-pet-status:focus-visible {
   border-radius: 5px;
   background: color-mix(in srgb, var(--pet-color) 13%, transparent);
 }
+.fp-chat-pet-info:not(:last-child) {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
 a.fp-chat-pet-status:hover .fp-chat-pet-info,
 a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
   background: color-mix(in srgb, var(--pet-color) 23%, transparent);
@@ -263,7 +266,9 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
   --level-color: #758295;
   flex: none;
   padding: 1px 5px;
-  border-radius: 5px;
+  border-inline-start: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-start-end-radius: 5px;
+  border-end-end-radius: 5px;
   background: color-mix(in srgb, var(--level-color) 19%, transparent);
   color: color-mix(in srgb, var(--level-color) 65%, var(--fp-text));
   font-weight: 700;
