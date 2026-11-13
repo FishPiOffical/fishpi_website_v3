@@ -152,6 +152,14 @@ const success = async (url, options) => {
   if (options?.method) {
     const body = JSON.parse(options.body), kind = url.split('/').at(-1)
     if (kind === 'adoption') serverState = adopted('pet-a', body.name, body.speciesId)
+    // 演示补给完整更新资产与日期标记，避免只返回成功却没有实际领取效果。
+    if (kind === 'supplies') {
+      if (body.expectedDate !== serverState.today) throw new ApiError('补给日期已变化', 409, 'date_changed')
+      if (serverState.dailySupply.claimed) throw new ApiError('今天的补给已经领取了', 409, 'supply_claimed')
+      serverState.wallet.coins += serverState.dailySupply.coins
+      changeInventory('food', serverState.dailySupply.food)
+      serverState.dailySupply.claimed = true
+    }
     if (url.endsWith('/stories/claim')) {
       const story = catalog.stories.find(story => story.id === body.storyId), progress = serverState.stories.find(story => story.id === body.storyId)
       assert.equal(progress.status, 'claimable')
@@ -1043,6 +1051,29 @@ try {
   await pets.refresh(); await settle()
   assert.equal(historyCount(), changedPetHistoryCount)
   console.log('PASS 同账号更换宠物回到照顾分区并关闭旧日志，后续状态读取不后台刷日志')
+
+  // 补给须同时改变资产和今日状态，不能只凭成功回执或动画判定领取完成。
+  serverState = adopted('supply-preview-pet', '补给测试', 'hexiaotun')
+  await pets.refresh(); await settle()
+  const supplyCoins = pets.coins, supplyFood = pets.foodQuantity, supplyCalls = calls.length
+  const supplyButton = () => document.querySelector('.supply-panel button')
+  await click(supplyButton())
+  assert.equal(pets.coins, supplyCoins + serverState.dailySupply.coins)
+  assert.equal(pets.foodQuantity, supplyFood + serverState.dailySupply.food)
+  assert.equal(pets.state.dailySupply.claimed, true)
+  assert.equal(supplyButton().textContent, '今日已领取')
+  assert.equal(supplyButton().disabled, true)
+  assert.equal(document.querySelector('.pet-guide-supply'), null)
+  assert.deepEqual(calls.slice(supplyCalls).map(call => call.options?.method || 'GET'), ['POST', 'GET'])
+  const afterSupply = calls.length
+  await click(supplyButton())
+  assert.equal(await pets.claimSupply(), false)
+  assert.equal(calls.length, afterSupply, '已领取后点击或直接调用均不能重发请求')
+  await pets.refresh(); await settle()
+  assert.equal(pets.coins, supplyCoins + serverState.dailySupply.coins)
+  assert.equal(pets.foodQuantity, supplyFood + serverState.dailySupply.food)
+  assert.equal(supplyButton().disabled, true)
+  console.log('PASS 补给领取增加宠物币和口粮，更新已领取状态；重复点击及重新读取不重复发奖')
 } finally {
   app?.unmount()
   await fs.rm(temporary, { recursive: true, force: true })
