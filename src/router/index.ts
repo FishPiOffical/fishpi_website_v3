@@ -275,6 +275,8 @@ const routes = [
   { path: '/breezemoons', component: () => import('@/views/BreezemoonView.vue') },
   { path: '/repeater', component: () => import('@/views/RepeaterView.vue') },
   { path: '/logs', component: () => import('@/views/LogsView.vue'), meta: { auth: true, robots: 'noindex' } },
+  { path: '/top/pets', component: () => import('@/views/TopView.vue') },
+  { path: '/pets/profile/:petId', name: 'ranked-pet-profile', component: () => import('@/views/PetProfileView.vue'), meta: { robots: 'noindex' } },
   { path: '/top/links', component: () => import('@/views/TopView.vue') },
   { path: '/top', component: () => import('@/views/TopView.vue') },
   { path: '/member/:userName', name: 'member', component: () => import('@/views/MemberView.vue') },
@@ -378,6 +380,18 @@ const routes = [
     path: '/games',
     name: 'games',
     component: () => import('@/views/GamesView.vue'),
+  },
+  {
+    path: '/pets/chat/:messageId',
+    name: 'chat-pet-profile',
+    component: () => import('@/views/PetProfileView.vue'),
+    meta: { auth: true, robots: 'noindex' },
+  },
+  {
+    path: '/pets',
+    name: 'pets',
+    component: () => import('@/views/PetsView.vue'),
+    meta: { robots: 'noindex' },
   },
   {
     path: '/vips',

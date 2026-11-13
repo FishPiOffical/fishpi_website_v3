@@ -67,7 +67,7 @@ export default defineConfig(({ mode }) => {
           },
         },
         '/api/v3/realtime': { ...proxy, ws: true },
-        '^/api/v3/auth/(?:login|refresh|logout)(?:\\?|$)': {
+        '^/api/v3/auth/(?:login|refresh|logout|session)(?:\\?|$)': {
           ...proxy,
           changeOrigin: false,
           // Keep the browser Host/Origin/Referer tuple for credential-origin checks.

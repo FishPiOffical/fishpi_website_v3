@@ -16,7 +16,7 @@ watch(value, data => {
   if (moved && !props.compact) void nextTick(() => { if (value.value === data) panel.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) })
 })
 const choices = computed(() => props.type === 'evolve' ? rankingSubTypes.evolve : props.type === 'xiaoice' ? rankingSubTypes.xiaoice : [])
-const metricLabels: Record<string, string> = { points: '积分', streak: '连续签到天数', minutes: '在线分钟', clickCount: '点击次数', count: '次数', amount: '赞助金额（元）', times: '重开次数', achievement: '成就', know: '知识', reset: '重置', days: '天数', currentKnow: '当前知识', currentDays: '当前天数', exp: '经验', dieTimes: '死亡次数', allExTimes: '历练次数', allBsTimes: '吐纳次数', ancestry: '出身', gongfa: '功法' }
+const metricLabels: Record<string, string> = { level: '等级', experience: '经验', points: '积分', streak: '连续签到天数', minutes: '在线分钟', clickCount: '点击次数', count: '次数', amount: '赞助金额（元）', times: '重开次数', achievement: '成就', know: '知识', reset: '重置', days: '天数', currentKnow: '当前知识', currentDays: '当前天数', exp: '经验', dieTimes: '死亡次数', allExTimes: '历练次数', allBsTimes: '吐纳次数', ancestry: '出身', gongfa: '功法' }
 function metricName(key: string) { if (key === 'points') return ['balance', 'consumption'].includes(props.type) ? '积分' : '得分'; if (key === 'count') return props.type === 'perfect' ? '优选文章数' : props.type === 'invite' ? '邀请次数' : '赞助次数'; if (props.type === 'evolve' && ['achievement', 'know', 'reset', 'days'].includes(key)) return '历史最高' + metricLabels[key]; return metricLabels[key] || key }
 </script>
 
@@ -49,7 +49,14 @@ function metricName(key: string) { if (key === 'points') return ['balance', 'con
       <ol class="ranking-rows">
         <li v-for="entry in value.list" :key="entry.rank" :value="entry.rank" :data-rank="entry.rank">
           <span class="ranking-number" :data-rank="entry.rank">{{ entry.rank }}</span>
-          <RouterLink v-if="entry.user" :to="`/member/${encodeURIComponent(entry.user.userName)}`" class="ranking-user" :data-user-card="entry.user.userName">
+          <RouterLink v-if="entry.pet" :to="{ name: 'ranked-pet-profile', params: { petId: entry.pet.id } }" class="ranking-user ranking-pet">
+            <img :src="`/images/pets/${entry.pet.speciesId}.webp`" alt="" loading="lazy" />
+            <span class="ranking-user-info">
+              <span>{{ entry.pet.name }}</span>
+              <small v-if="entry.user" class="ranking-handle">主人：{{ entry.user.userNickname || entry.user.userName }}</small>
+            </span>
+          </RouterLink>
+          <RouterLink v-else-if="entry.user" :to="`/member/${encodeURIComponent(entry.user.userName)}`" class="ranking-user" :data-user-card="entry.user.userName">
             <img :src="avatarThumbnail(entry.user.userAvatarURL, compact ? 20 : 40)" alt="" loading="lazy" referrerpolicy="no-referrer" @error="fallbackAvatar" />
             <span class="ranking-user-info">
               <VipNickname :user-id="entry.user.id" :text="entry.user.userNickname || entry.user.userName" />
@@ -239,6 +246,8 @@ select {
     box-shadow: 0 2px 6px rgba(211, 84, 0, 0.28);
   }
 }
+
+.ranking-user.ranking-pet img { object-fit: contain; }
 
 .ranking-user {
   display: flex;

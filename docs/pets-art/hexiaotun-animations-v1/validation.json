@@ -1,0 +1,125 @@
+{
+  "date": "2026-11-13T03:12:30.937Z",
+  "browser": "Chrome/157.0.8103.51",
+  "clips": [
+    {
+      "id": "idle",
+      "width": 256,
+      "height": 256,
+      "duration": 4.834,
+      "transparent": 32033,
+      "partial": 3245,
+      "solid": 30258,
+      "currentTime": 0.5014,
+      "error": null
+    },
+    {
+      "id": "eat",
+      "width": 256,
+      "height": 256,
+      "duration": 4.584,
+      "transparent": 32154,
+      "partial": 1267,
+      "solid": 32115,
+      "currentTime": 0.5014,
+      "error": null
+    },
+    {
+      "id": "drink",
+      "width": 256,
+      "height": 256,
+      "duration": 5.084,
+      "transparent": 31590,
+      "partial": 2957,
+      "solid": 30989,
+      "currentTime": 0.5016,
+      "error": null
+    },
+    {
+      "id": "pet",
+      "width": 256,
+      "height": 256,
+      "duration": 4.834,
+      "transparent": 31601,
+      "partial": 3100,
+      "solid": 30835,
+      "currentTime": 0.502,
+      "error": null
+    },
+    {
+      "id": "play",
+      "width": 256,
+      "height": 256,
+      "duration": 4,
+      "transparent": 30391,
+      "partial": 3372,
+      "solid": 31773,
+      "currentTime": 0.5011,
+      "error": null
+    },
+    {
+      "id": "sleep",
+      "width": 256,
+      "height": 256,
+      "duration": 8,
+      "transparent": 31295,
+      "partial": 3148,
+      "solid": 31093,
+      "currentTime": 0.5019,
+      "error": null
+    },
+    {
+      "id": "explore",
+      "width": 256,
+      "height": 256,
+      "duration": 3.334,
+      "transparent": 34284,
+      "partial": 3302,
+      "solid": 27950,
+      "currentTime": 0.5007,
+      "error": null
+    },
+    {
+      "id": "study",
+      "width": 256,
+      "height": 256,
+      "duration": 5.334,
+      "transparent": 31282,
+      "partial": 2931,
+      "solid": 31323,
+      "currentTime": 0.5013,
+      "error": null
+    },
+    {
+      "id": "work",
+      "width": 256,
+      "height": 256,
+      "duration": 4,
+      "transparent": 30997,
+      "partial": 3383,
+      "solid": 31156,
+      "currentTime": 0.5021,
+      "error": null
+    },
+    {
+      "id": "celebrate",
+      "width": 256,
+      "height": 256,
+      "duration": 4.5,
+      "transparent": 31296,
+      "partial": 3188,
+      "solid": 31052,
+      "currentTime": 0.5013,
+      "error": null
+    }
+  ],
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390,
+    "renderedVideo": 128,
+    "buttons": 10
+  },
+  "failedLocalResources": [],
+  "runtimeExceptions": [],
+  "note": "独立素材预览验证；不代表已接入宠物家园或服务端活动。"
+}

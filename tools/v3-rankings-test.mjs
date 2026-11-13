@@ -9,7 +9,8 @@ const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.E
 globalThis.Document=class{};globalThis.ShadowRoot=class{}
 const state=globalThis.__rankings={context:1,calls:[],dispatch:null,ssr:false,initial:null}
 const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAuthContextVersion(){return globalThis.__rankings.context}export async function request(path,init){globalThis.__rankings.calls.push({path,init});return globalThis.__rankings.dispatch(path,init)}`),{ApiError}=await import(http)
-const contentURL=url(replace(compile(await fs.readFile('src/api/v3-content.ts','utf8')),[['./http',http]])),usersURL=url(replace(compile(await fs.readFile('src/api/v3-user-relations.ts','utf8')),[['./http',http]])),apiURL=url(replace(compile(await fs.readFile('src/api/v3-rankings.ts','utf8')),[['./http',http],['./v3-content',contentURL],['./v3-user-relations',usersURL]])),api=await import(apiURL)
+const petsURL=url(replace(compile(await fs.readFile('src/api/v3-pets.ts','utf8')),[['./http',http]]))
+const contentURL=url(replace(compile(await fs.readFile('src/api/v3-content.ts','utf8')),[['./http',http]])),usersURL=url(replace(compile(await fs.readFile('src/api/v3-user-relations.ts','utf8')),[['./http',http]])),apiURL=url(replace(compile(await fs.readFile('src/api/v3-rankings.ts','utf8')),[['./http',http],['./v3-content',contentURL],['./v3-user-relations',usersURL],['./v3-pets',petsURL]])),api=await import(apiURL)
 const auth=defineStore('ranking-auth',()=>({accessToken:ref(null),account:ref(null)}));globalThis.__rankingAuth=auth
 const avatarURL=url(compile(await fs.readFile('src/utils/avatar.ts','utf8'))),snapshotsURL=url(compile(await fs.readFile('src/utils/publicSnapshots.ts','utf8')))
 const feedURL=url(replace(compile((await fs.readFile('src/composables/useRankingBoard.ts','utf8')).replaceAll('import.meta.env.SSR','globalThis.__rankings.ssr')),[['vue',import.meta.resolve('vue')],['@/api/http',http],['@/api/v3-rankings',apiURL],['@/utils/publicSnapshots',snapshotsURL],['@/stores/auth',url('export const useAuthStore=globalThis.__rankingAuth')]]))
@@ -20,12 +21,12 @@ const Board=await component('src/components/RankingBoard.vue');globalThis.__Rank
 const insert=(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}const i=a?p.children.indexOf(a):-1;p.children.splice(i<0?p.children.length:i,0,n);n.parent=p},renderer=createRenderer({patchProp(n,k,o,v){n.props[k]=v},insert,remove(n){if(n.parent)n.parent.children=n.parent.children.filter(c=>c!==n)},createElement(tag){return{tag,tagName:tag.toUpperCase(),props:{},children:[],value:'',get options(){return this.children.filter(c=>c.tag==='option')},multiple:false,addEventListener(){},removeEventListener(){},getRootNode(){return{activeElement:null}}}},createText(text){return{text,children:[]}},createComment(){return{children:[]}},setText(n,t){n.text=t},setElementText(n,t){n.children=[{text:t,children:[]}]},parentNode:n=>n.parent,nextSibling(n){const c=n.parent?.children||[];return c[c.indexOf(n)+1]||null},insertStaticContent(t,p,a){const n={text:t,children:[]};insert(n,p,a);return[n,n]}})
 const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' '),find=(n,f)=>f(n)?n:(n.children||[]).map(c=>find(c,f)).find(Boolean),all=(n,f)=>[...(f(n)?[n]:[]),...(n.children||[]).flatMap(c=>all(c,f))],tick=async()=>{for(let i=0;i<30;i++)await Promise.resolve();await nextTick()}
 const user={id:'1',userName:'rank_user',userNickname:'literal <b>name</b>',userAvatarURL:''}
-function data(type='checkin',sub=api.rankingSubType(type),p=1,size=20,total=21){const fields=api.rankingMetricFields(type,sub),primary=type==='evolve'?sub:fields[0];return{type,subType:sub,list:Array.from({length:Math.max(0,Math.min(size,total-(p-1)*size))},(_,i)=>{const rank=(p-1)*size+i+1,metrics=Object.fromEntries(fields.map(key=>[key,['ancestry','gongfa'].includes(key)?'literal <b>text</b>':key==='amount'?123.45:rank]));return{rank,score:metrics[primary],metrics,...(type==='links'?{link:{id:String(rank),title:'link <b>title</b>',url:'https://example.test/path?q=1'}}:{user:{...user,id:String(rank),userName:'rank_'+rank}})}}),pagination:{p,size,total,pageCount:Math.ceil(total/size)},...(type==='donate'?{summary:{amount:456.78,supportedDays:1.25}}:{})}}
+function data(type='checkin',sub=api.rankingSubType(type),p=1,size=20,total=21){const fields=api.rankingMetricFields(type,sub),primary=type==='evolve'?sub:fields[0];return{type,subType:sub,list:Array.from({length:Math.max(0,Math.min(size,total-(p-1)*size))},(_,i)=>{const rank=(p-1)*size+i+1,metrics=Object.fromEntries(fields.map(key=>[key,['ancestry','gongfa'].includes(key)?'literal <b>text</b>':key==='amount'?123.45:rank]));return{rank,score:metrics[primary],metrics,...(type==='pets'?{pet:{id:String(rank),name:'摸摸獭',speciesId:'momota',level:metrics.level,experience:metrics.experience}}:{}),...(type==='links'?{link:{id:String(rank),title:'link <b>title</b>',url:'https://example.test/path?q=1'}}:{user:{...user,id:String(rank),userName:'rank_'+rank}})}}),pagination:{p,size,total,pageCount:Math.ceil(total/size)},...(type==='donate'?{summary:{amount:456.78,supportedDays:1.25}}:{})}}
 const env=data=>({code:0,data}),dispatch=async path=>{const u=new URL(path,'https://local'),type=u.pathname.split('/').at(-1),p=Number(u.searchParams.get('p')),size=Number(u.searchParams.get('size')),sub=u.searchParams.get('subType')??api.rankingSubType(type);return env(data(type,sub,p,size))};state.dispatch=dispatch
 function mount(type='checkin',props={},pinia=createPinia(),page=false){const root={children:[]},app=renderer.createApp({setup(){return()=>h(page?Page:Board,{type,...props})}});app.use(pinia);app.mount(root);return{app,root,user:auth(pinia),text:()=>text(root)}}
 const click=(v,label)=>{const b=find(v.root,n=>n.tag==='button'&&text(n).trim()===label);assert.ok(b,'Missing '+label+' '+v.text());assert.ok(!b.props.disabled);return b.props.onClick()}
 for(const type of Object.keys(api.rankingTitles)){for(const sub of type==='evolve'?['achievement','know','reset','days']:type==='xiaoice'?['0','1','2','3']:['']){const page=await api.fetchRanking(type,1,sub);assert.equal(page.type,type);assert.equal(page.subType,sub);assert.equal(page.list.length,20);assert.equal(page.total,21)}}assert.equal(state.calls[0].path,'/api/v3/rankings/checkin?p=1&size=20');assert.ok(state.calls.some(c=>c.path==='/api/v3/rankings/evolve?p=1&size=20&subType=days'));assert.ok(state.calls.every(c=>c.init.cache==='no-store'&&!c.path.includes('apiKey')))
-console.log('PASS rankings 1 all fifteen types and all game subtypes use exact v3 endpoint and snapshot pagination')
+console.log('PASS rankings 1 all ranking types and all game subtypes use exact v3 endpoint and snapshot pagination')
 for(const [type,p,sub,size]of [['bad',1],['toString',1],['online',0],['online',1,'bad'],['evolve',1,'all'],['xiaoice',1,'4'],['checkin',1,'',51],['online',1.5],['online',1,'',0]])await assert.rejects(api.fetchRanking(type,p,sub,size),e=>e.status===422)
 console.log('PASS rankings 2 closed types/subtypes and bounded integer paging')
 let row=data();row.list[0].user.userPhone='SECRET';row.list[0].metrics.secret='SECRET';row.list[0].user.userAvatarURL='javascript:alert(1)';let decoded=api.decodeRanking(row,'checkin');assert.ok(!JSON.stringify(decoded).includes('SECRET'));assert.equal(decoded.list[0].user.userAvatarURL,'');for(const edit of [d=>d.type='online',d=>d.subType='bad',d=>d.list[0].rank=2,d=>d.list[0].score=999,d=>d.list[0].metrics.streak='1',d=>d.pagination.pageCount=1,d=>d.list=[],d=>delete d.list[0].user]){const d=data();edit(d);assert.throws(()=>api.decodeRanking(d,'checkin'),e=>e.status===502)}
@@ -72,3 +73,27 @@ console.log('PASS rankings 15 catalogue and profession route do not fetch unrela
 state.dispatch=async path=>{const u=new URL(path,'https://x');return env(data(u.pathname.split('/').at(-1),undefined,Number(u.searchParams.get('p')),Number(u.searchParams.get('size')),0))};v=mount();await tick();assert.match(v.text(),/本页暂无排名/);assert.match(v.text(),/共\s*0\s*条/);v.app.unmount();state.dispatch=dispatch
 const [home,facade,server,routes]=await Promise.all(['src/views/HomeView.vue','src/api/fishpi.ts','src/entry-server.ts','src/router/index.ts'].map(p=>fs.readFile(p,'utf8')));assert.ok(home.includes('<RankingBoard type="checkin"')&&home.includes('<RankingBoard type="online"')&&!home.includes('fetchCheckinRank')&&!home.includes('safe(fetchOnlineRank'));assert.ok(!facade.includes('/api/top/')&&!facade.includes('mockCheckin')&&!facade.includes('mockOnline'));assert.ok(server.includes("fetchRanking('checkin', 1, undefined, 8, 'omit')")&&server.includes('rankingPage: await readPublicOverview'));assert.ok(routes.includes("path: '/top/links'"))
 console.log('PASS rankings 16 real empty snapshot, actual home/SSR/full-route wiring and old mock/error-swallowing wrappers removed')
+
+row=data('pets');assert.equal(api.decodeRanking(row,'pets').list[0].pet.speciesId,'momota')
+row.list[0].pet.experience++
+assert.throws(()=>api.decodeRanking(row,'pets'))
+v=mount('pets');await tick();assert.match(v.text(),/摸摸獭/);assert.match(v.text(),/等级/);assert.match(v.text(),/经验/)
+assert.ok(find(v.root,n=>n.tag==='a'&&n.props.href?.name==='ranked-pet-profile'&&n.props.href.params.petId==='1'))
+v.app.unmount()
+console.log('PASS pets ranking shows pet profile links and validates level and experience')
+
+const archivedPet = {id:'80',name:'荷小豚',speciesId:'hexiaotun',level:5,experience:400,archived:true,user,
+  learning:[{id:'knowledge',name:'知识',level:3}],career:[{id:'library-assistant',name:'图书助理',level:2}]}
+state.dispatch=async path=>env(path.includes('/chat/messages/') ? {...archivedPet,state:'course'} : archivedPet)
+const signal=new AbortController().signal
+const archivedById=await api.fetchRankedPet('80',signal)
+const archivedByChat=await api.fetchChatPetProfile('100',signal)
+assert.equal(archivedById.archived,true)
+assert.equal(archivedByChat.archived,true)
+assert.equal(archivedByChat.state,'course')
+assert.deepEqual(archivedByChat.learning,archivedById.learning)
+assert.deepEqual(archivedByChat.career,archivedById.career)
+state.dispatch=async()=>env({...archivedPet,archived:undefined})
+assert.equal((await api.fetchRankedPet('80',signal)).archived,false)
+state.dispatch=dispatch
+console.log('PASS archived pet profiles preserve the original learning and career levels from both entries')

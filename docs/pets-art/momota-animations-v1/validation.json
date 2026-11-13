@@ -1,0 +1,1153 @@
+{
+  "species": "momota",
+  "date": "2026-11-13",
+  "scope": "source cells, poster dimensions, FFmpeg VP9 decode and decoded alpha; explore revision 3 checked all 24 decoded frames and fixed anchor, other clips retain first-pass verification; not browser playback or art acceptance",
+  "totalVideoBytes": 944475,
+  "totalPosterBytes": 174442,
+  "totalDeliveryBytes": 1118917,
+  "results": [
+    {
+      "id": "idle",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sourceCells": [
+        {
+          "index": 1,
+          "transparentPixels": 49123,
+          "solidPixels": 43629,
+          "sha256": "d2f480e5a8fbd5183d5f840fd57bbdebc7c7ff8af9b59eda0ea84e3f11f54df7"
+        },
+        {
+          "index": 2,
+          "transparentPixels": 48068,
+          "solidPixels": 43862,
+          "sha256": "b4bd84666cee081479c85e2cacc13381e94cbe527e71a2c33c491c9128e77f46"
+        },
+        {
+          "index": 3,
+          "transparentPixels": 48268,
+          "solidPixels": 44476,
+          "sha256": "e6455a2d0d4916af4a8c511b5d5aaafc136fea337a16ba0dae35288ac21d201c"
+        },
+        {
+          "index": 4,
+          "transparentPixels": 48518,
+          "solidPixels": 44917,
+          "sha256": "da7f444ea53577da9f6fff7f4d7e4808376f801271381d5b98f940a9ec4ee930"
+        },
+        {
+          "index": 5,
+          "transparentPixels": 46394,
+          "solidPixels": 44180,
+          "sha256": "3f4bfce24efcd1efb6c413695d37dfc42cced42288246935943f7222ad5e238b"
+        },
+        {
+          "index": 6,
+          "transparentPixels": 46933,
+          "solidPixels": 43590,
+          "sha256": "6fbe6dea4df01901179e5d1f565ec402fdba12d56ad2d77c0677e4d491ae9efe"
+        },
+        {
+          "index": 7,
+          "transparentPixels": 46567,
+          "solidPixels": 43394,
+          "sha256": "bfe222ed62048d704758070949d5d626bbc79d22470d4c85260c72c1e81c7a8b"
+        },
+        {
+          "index": 8,
+          "transparentPixels": 47812,
+          "solidPixels": 43296,
+          "sha256": "76420d6549e3e6325a2f3164a109e5076938d8583c9ae8dd81703d6cabb2c2a0"
+        },
+        {
+          "index": 9,
+          "transparentPixels": 49249,
+          "solidPixels": 43230,
+          "sha256": "c20ccfe350f94f4fbaafc397a8fd56e3ae259077e82db7748406dbc9021749b1"
+        },
+        {
+          "index": 10,
+          "transparentPixels": 47218,
+          "solidPixels": 43122,
+          "sha256": "803dc2b5838509479bddec5791c009c5c3a1052ab9078537929670de07dec652"
+        },
+        {
+          "index": 11,
+          "transparentPixels": 47291,
+          "solidPixels": 43098,
+          "sha256": "88ab21c0a2d8b776619ee95cd6c8c714bf4af6130e8080443c2ae843d516c313"
+        },
+        {
+          "index": 12,
+          "transparentPixels": 48736,
+          "solidPixels": 43016,
+          "sha256": "608b7382edd613d4c8a3307df3c91ed2ce194cd34132ec86f0e7bd2ef2d54227"
+        },
+        {
+          "index": 13,
+          "transparentPixels": 49370,
+          "solidPixels": 42639,
+          "sha256": "c0208d7d796c5720046aac6c1a3cb04cb68e0463c56d012f9c4938b8aef79cb9"
+        },
+        {
+          "index": 14,
+          "transparentPixels": 46171,
+          "solidPixels": 42477,
+          "sha256": "a56a45cdd0acb75d4ea06904f82754193d519af74de324fa3301b83fb82d8a76"
+        },
+        {
+          "index": 15,
+          "transparentPixels": 47401,
+          "solidPixels": 42465,
+          "sha256": "d0d8f1c85a9f4f99d5450c83f31cef92ebe759f85017793b0d98a465f0973a12"
+        },
+        {
+          "index": 16,
+          "transparentPixels": 49877,
+          "solidPixels": 42485,
+          "sha256": "0bfad20622c2b5c7dc3c8517063ad1eaf1c7820623ed3b3671eb8a9c57035812"
+        }
+      ],
+      "uniqueSourceCells": 16,
+      "videoBytes": 97356,
+      "posterBytes": 18338,
+      "durationSeconds": 4.83,
+      "videoCodec": "vp9",
+      "decodedSize": [
+        256,
+        256
+      ],
+      "decodedMode": "RGBA",
+      "decodedTransparentPixels": 28174,
+      "decodedSolidPixels": 33441
+    },
+    {
+      "id": "eat",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sourceCells": [
+        {
+          "index": 1,
+          "transparentPixels": 44965,
+          "solidPixels": 47866,
+          "sha256": "63909dc95b13d47746b57b3588f08a14709869adabad2a4e0293a68c2d81d0dd"
+        },
+        {
+          "index": 2,
+          "transparentPixels": 43141,
+          "solidPixels": 47903,
+          "sha256": "00e160b1d5607b711d66147347fda3df6778bb2070dab7b8fe69ed9ec3daee8c"
+        },
+        {
+          "index": 3,
+          "transparentPixels": 43002,
+          "solidPixels": 47863,
+          "sha256": "561904e4a116f437d144ef47836a28a23d228f0c5d9601428f76c1e50978fdd1"
+        },
+        {
+          "index": 4,
+          "transparentPixels": 44118,
+          "solidPixels": 47830,
+          "sha256": "a58113da451441387cbe2bc6a43992aaf91b77801a7426261913656004ea73ae"
+        },
+        {
+          "index": 5,
+          "transparentPixels": 43774,
+          "solidPixels": 47921,
+          "sha256": "a8e216cc9ad3940df343834a16a3ec96bb07cc0d2c8effd2e714e4c2f2c81f58"
+        },
+        {
+          "index": 6,
+          "transparentPixels": 43138,
+          "solidPixels": 47817,
+          "sha256": "2e296c5477b598260905b4d3db47985d56df55bfcae6349a67a461176e71b600"
+        },
+        {
+          "index": 7,
+          "transparentPixels": 43819,
+          "solidPixels": 47780,
+          "sha256": "4f75bbf37641affcc021cb84a85f14c2052068f6b56fd83bc0a2cb514142a7d4"
+        },
+        {
+          "index": 8,
+          "transparentPixels": 44625,
+          "solidPixels": 47778,
+          "sha256": "48c83c450640cc33063cd86101138a83fa24e08f151e40a7febd86b04209627f"
+        },
+        {
+          "index": 9,
+          "transparentPixels": 43915,
+          "solidPixels": 47674,
+          "sha256": "2553ab318bfb8cf5fb4f21fdcc85f831557edf1f5256663c1fb124bd852f3cbe"
+        },
+        {
+          "index": 10,
+          "transparentPixels": 41484,
+          "solidPixels": 47739,
+          "sha256": "ff234c77015f81f6520c7e8c9a99caff4b1ef5943144be092fc7f50bc70b9476"
+        },
+        {
+          "index": 11,
+          "transparentPixels": 42899,
+          "solidPixels": 47697,
+          "sha256": "4036c40a3044c72cb05e05282bdcd6cf3e279d31891c2941a715275bb66b6b95"
+        },
+        {
+          "index": 12,
+          "transparentPixels": 43808,
+          "solidPixels": 47584,
+          "sha256": "f34e3f81721e021e0e8c3b3597ea07db74adebf2d7f62c9d75fa44616d2c727f"
+        },
+        {
+          "index": 13,
+          "transparentPixels": 43915,
+          "solidPixels": 47478,
+          "sha256": "5b0e7d9ae85337b280af9a6e1c4e52df33664b21e12e8d06ae9409e796050335"
+        },
+        {
+          "index": 14,
+          "transparentPixels": 41769,
+          "solidPixels": 47448,
+          "sha256": "861f08dcf1324ac7fde3cdc542db02e2fb07ae2ad95e7ac384485e99ccab903f"
+        },
+        {
+          "index": 15,
+          "transparentPixels": 42321,
+          "solidPixels": 47470,
+          "sha256": "38a51f4bb88c1ed27fb19fd7e8e7a9298937f7a5969c1219e58d49b48522603a"
+        },
+        {
+          "index": 16,
+          "transparentPixels": 43220,
+          "solidPixels": 47382,
+          "sha256": "dc4b5f0b88741ee3254272a06824d6d733a5b414a96cfb3a649bc1ca408eebd6"
+        }
+      ],
+      "uniqueSourceCells": 16,
+      "videoBytes": 112400,
+      "posterBytes": 19444,
+      "durationSeconds": 5.0,
+      "videoCodec": "vp9",
+      "decodedSize": [
+        256,
+        256
+      ],
+      "decodedMode": "RGBA",
+      "decodedTransparentPixels": 24732,
+      "decodedSolidPixels": 36412
+    },
+    {
+      "id": "drink",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sourceCells": [
+        {
+          "index": 1,
+          "transparentPixels": 43178,
+          "solidPixels": 51899,
+          "sha256": "a51a4cf27d49e3b09411394d3462fd67bcaddb7b571bbd648e5e97bc082f5c40"
+        },
+        {
+          "index": 2,
+          "transparentPixels": 42821,
+          "solidPixels": 51828,
+          "sha256": "b17840bc539eac337d19390d961d21b201c8b611c6ce46e0946b252a2fa22f28"
+        },
+        {
+          "index": 3,
+          "transparentPixels": 43108,
+          "solidPixels": 51728,
+          "sha256": "27c033a79a552ab83e896e0e45e22fabd0ca9b529abe4301064596a646768a73"
+        },
+        {
+          "index": 4,
+          "transparentPixels": 43743,
+          "solidPixels": 51644,
+          "sha256": "2dc99f495c701b7a8214de5edd7a37f2354c24e0acfbf1e4f76193dae054dcb4"
+        },
+        {
+          "index": 5,
+          "transparentPixels": 43401,
+          "solidPixels": 51503,
+          "sha256": "590e27945e2f27c14cb2f36f9d6afef91675043efd3b7e6d08c469217de9a961"
+        },
+        {
+          "index": 6,
+          "transparentPixels": 42894,
+          "solidPixels": 51360,
+          "sha256": "4c857d3efdc04683654a23725983778c32aef3a7ce45c8dd8b69fc301fb07061"
+        },
+        {
+          "index": 7,
+          "transparentPixels": 43317,
+          "solidPixels": 51298,
+          "sha256": "c261de226eb7ca0df2e6ee5c1b8cf08f84e39d10b6e4e4398c75dc32061d4a37"
+        },
+        {
+          "index": 8,
+          "transparentPixels": 43585,
+          "solidPixels": 51153,
+          "sha256": "8776e4035c6156f752f9cf354d9f7b0e3d635bd66f0dd93f2ebefd174b0ffd3d"
+        },
+        {
+          "index": 9,
+          "transparentPixels": 43736,
+          "solidPixels": 50938,
+          "sha256": "11f1ec0b82467b410f81695f09a8572b4f69d583804942da934cb72c364c1ef6"
+        },
+        {
+          "index": 10,
+          "transparentPixels": 43431,
+          "solidPixels": 50973,
+          "sha256": "6353e117bcd857a507fa2d70c085f8132ba49af72b229a0021c00808e0073517"
+        },
+        {
+          "index": 11,
+          "transparentPixels": 43155,
+          "solidPixels": 51033,
+          "sha256": "7592124468058eccb3e3961258417917f30eb2398daeffefb35deca3b1071871"
+        },
+        {
+          "index": 12,
+          "transparentPixels": 43398,
+          "solidPixels": 51161,
+          "sha256": "034aec66166b43d1415b14b793a2d4bdb9447525f228d960404d689e1a63680d"
+        },
+        {
+          "index": 13,
+          "transparentPixels": 43706,
+          "solidPixels": 51167,
+          "sha256": "380c134f8c48215c52f41e16b9f31e08df81ee794a70114bf4b4da0ad7327e90"
+        },
+        {
+          "index": 14,
+          "transparentPixels": 42416,
+          "solidPixels": 51256,
+          "sha256": "86c248566928127fcdc2079355aaddb13317b0880d327c1eb6ed872957b0e515"
+        },
+        {
+          "index": 15,
+          "transparentPixels": 42755,
+          "solidPixels": 51363,
+          "sha256": "2aba517cfbacd92101d03dff6ce4abe79b8188f8ed9d6e698ab9497371e16e23"
+        },
+        {
+          "index": 16,
+          "transparentPixels": 42715,
+          "solidPixels": 51428,
+          "sha256": "a4cd49859bfa910c3ba856cb909ee4586d187e424adc6e3c533f8b9de16b550e"
+        }
+      ],
+      "uniqueSourceCells": 16,
+      "videoBytes": 88851,
+      "posterBytes": 17390,
+      "durationSeconds": 5.08,
+      "videoCodec": "vp9",
+      "decodedSize": [
+        256,
+        256
+      ],
+      "decodedMode": "RGBA",
+      "decodedTransparentPixels": 27425,
+      "decodedSolidPixels": 35372
+    },
+    {
+      "id": "pet",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sourceCells": [
+        {
+          "index": 1,
+          "transparentPixels": 47965,
+          "solidPixels": 46641,
+          "sha256": "a33c88e6cbaa21b5ec1435079dd590d80d3fc5e16f423fdab35f48bd77a18307"
+        },
+        {
+          "index": 2,
+          "transparentPixels": 46308,
+          "solidPixels": 46490,
+          "sha256": "6f21ff6caab368423298461a0584707a75c4246bc3dc2d2cd381614489c7eb8b"
+        },
+        {
+          "index": 3,
+          "transparentPixels": 46949,
+          "solidPixels": 46812,
+          "sha256": "3729196f652f009c17179c2fb62c703f9956afcbed8b6accb8ccab3c4f6006c8"
+        },
+        {
+          "index": 4,
+          "transparentPixels": 46794,
+          "solidPixels": 47163,
+          "sha256": "798949416ecd7c1ca6c5531f39321dd5192085498ad45ad010fbdb09b71c83e4"
+        },
+        {
+          "index": 5,
+          "transparentPixels": 46207,
+          "solidPixels": 47041,
+          "sha256": "7e328476d29b42d99fc7136d9eae306620886bf9620889e6662278680e428bc4"
+        },
+        {
+          "index": 6,
+          "transparentPixels": 43516,
+          "solidPixels": 47186,
+          "sha256": "33ed69508c4076cd9f82f5d544b6651fa02bbe31f24b2e0109d5bb9cc0b6759a"
+        },
+        {
+          "index": 7,
+          "transparentPixels": 43356,
+          "solidPixels": 47430,
+          "sha256": "63285180dfbbf5bd098db5c507392776ca4163a12e3cbbb545b765ecf68177d1"
+        },
+        {
+          "index": 8,
+          "transparentPixels": 45827,
+          "solidPixels": 47361,
+          "sha256": "f6a99da40ae868645aad7d65887304430dc150824edce6b0c1ae53c7d1f20b18"
+        },
+        {
+          "index": 9,
+          "transparentPixels": 46829,
+          "solidPixels": 47094,
+          "sha256": "e20e52d354e4da559634fbb4fb8a329c3071598873263e13a2a7e8588fd25f16"
+        },
+        {
+          "index": 10,
+          "transparentPixels": 44802,
+          "solidPixels": 46946,
+          "sha256": "561a6ce67a6b6b7aafb7b9165b4a591c88259bafda51872352696423750e3f85"
+        },
+        {
+          "index": 11,
+          "transparentPixels": 44531,
+          "solidPixels": 46827,
+          "sha256": "0dcba57b0834e78214c48e7067abb08e1f640524ade282cced35fbd43431fd52"
+        },
+        {
+          "index": 12,
+          "transparentPixels": 46269,
+          "solidPixels": 46522,
+          "sha256": "7099707aa5eb22e08eb84f2cd8e79e327cd01374e750bff7d49ef61177b3f159"
+        },
+        {
+          "index": 13,
+          "transparentPixels": 47484,
+          "solidPixels": 46216,
+          "sha256": "b27a9d2f73cf009307bec4534218027057027218ad1ca4a9f60c43ff92a7e073"
+        },
+        {
+          "index": 14,
+          "transparentPixels": 44534,
+          "solidPixels": 46157,
+          "sha256": "f8fa02f6c23eb768c20a2c5ae0a953ad209f77786dc148abec4f4bc1fb712105"
+        },
+        {
+          "index": 15,
+          "transparentPixels": 44877,
+          "solidPixels": 46079,
+          "sha256": "8d9251ee471fc3f7933d806e7b0c9b77099bf09747dcfd4f16fc1a5e1e7861e1"
+        },
+        {
+          "index": 16,
+          "transparentPixels": 46439,
+          "solidPixels": 46052,
+          "sha256": "17e8681161cd50bfb5b8f7c746ef24a5683a86f8dbfe7970c9a94864e2ac0297"
+        }
+      ],
+      "uniqueSourceCells": 16,
+      "videoBytes": 93214,
+      "posterBytes": 16390,
+      "durationSeconds": 4.83,
+      "videoCodec": "vp9",
+      "decodedSize": [
+        256,
+        256
+      ],
+      "decodedMode": "RGBA",
+      "decodedTransparentPixels": 30502,
+      "decodedSolidPixels": 32244
+    },
+    {
+      "id": "play",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sourceCells": [
+        {
+          "index": 1,
+          "transparentPixels": 45590,
+          "solidPixels": 49123,
+          "sha256": "fdf054f20d0b10ad7828c9e3660653167e6e8d208f38823faff8cf08034a725f"
+        },
+        {
+          "index": 2,
+          "transparentPixels": 45234,
+          "solidPixels": 49028,
+          "sha256": "1fa2f0b98215e17bd7b7d1cf72d036ee8df4c837ddc2bc9eb86ce64968b703a8"
+        },
+        {
+          "index": 3,
+          "transparentPixels": 45775,
+          "solidPixels": 48711,
+          "sha256": "9402af3ba02a3f6fda16e110ae0b0b28e95dfd8adaa0ee0ee573bf93cae20acd"
+        },
+        {
+          "index": 4,
+          "transparentPixels": 46182,
+          "solidPixels": 48256,
+          "sha256": "9600875c2eed4bc64f108a991d0f2570880848d4b3a3f0fcde8fb3ad749ff1d2"
+        },
+        {
+          "index": 5,
+          "transparentPixels": 46152,
+          "solidPixels": 47916,
+          "sha256": "30373b7b4492185149ebcca63879f8ea1033122fd1632cf321d8bed568a2b41a"
+        },
+        {
+          "index": 6,
+          "transparentPixels": 46494,
+          "solidPixels": 46799,
+          "sha256": "ed52e5be852009cd295551de929714a30984c8a0843e54465984fe5adf431124"
+        },
+        {
+          "index": 7,
+          "transparentPixels": 47679,
+          "solidPixels": 46364,
+          "sha256": "849d724fdb68ce4f2f80adcaf79d41b5a031426922943c1ed5781781ffb8c9b8"
+        },
+        {
+          "index": 8,
+          "transparentPixels": 47812,
+          "solidPixels": 46047,
+          "sha256": "da9e27a53a848459bce4b216ba2dafcf45baed7fa647f808a4aa185486895067"
+        },
+        {
+          "index": 9,
+          "transparentPixels": 47579,
+          "solidPixels": 46062,
+          "sha256": "3cc04fc24d3d7121e7c3fc38abf73fd524c059171d2caddcf611a5040b6a3fb4"
+        },
+        {
+          "index": 10,
+          "transparentPixels": 48306,
+          "solidPixels": 45944,
+          "sha256": "fd4443c89e4c57bcce417a1432c00bdbba0594e6cf77073143a0b418a5fdce8c"
+        },
+        {
+          "index": 11,
+          "transparentPixels": 48481,
+          "solidPixels": 45841,
+          "sha256": "2e6c19dbb6cec51f429135733d8100c16b32c72e0fb7fdf1989bd34546ad08e3"
+        },
+        {
+          "index": 12,
+          "transparentPixels": 48681,
+          "solidPixels": 45901,
+          "sha256": "3f9b005db55e79e01eac53887f9ec6a4fc2a263389672fdd3d6f909fedac77b8"
+        },
+        {
+          "index": 13,
+          "transparentPixels": 48297,
+          "solidPixels": 46138,
+          "sha256": "1611e2fc3c69cc9f8bc1b1187bb1c9fce0b58733fc99c1030b42134bbb6d8352"
+        },
+        {
+          "index": 14,
+          "transparentPixels": 47677,
+          "solidPixels": 46679,
+          "sha256": "1d8bd7173b4c4dfd2262078d28b4334452b56716096771b1e3ac4ae7f2891891"
+        },
+        {
+          "index": 15,
+          "transparentPixels": 47212,
+          "solidPixels": 47105,
+          "sha256": "ce448466fa1447d72525081a2066751ce58f253c40fd0e7b00b0e61f5383fe25"
+        },
+        {
+          "index": 16,
+          "transparentPixels": 46824,
+          "solidPixels": 47698,
+          "sha256": "fd4dfcecfde65fea4c69187f5fea6dc21561bfd4d5ad22bf322dcace2461006f"
+        }
+      ],
+      "uniqueSourceCells": 16,
+      "videoBytes": 100714,
+      "posterBytes": 18254,
+      "durationSeconds": 4.0,
+      "videoCodec": "vp9",
+      "decodedSize": [
+        256,
+        256
+      ],
+      "decodedMode": "RGBA",
+      "decodedTransparentPixels": 26207,
+      "decodedSolidPixels": 36258
+    },
+    {
+      "id": "sleep",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sourceCells": [
+        {
+          "index": 1,
+          "transparentPixels": 41499,
+          "solidPixels": 51172,
+          "sha256": "4ea2efc202df0f70d160767f125a22192c0bff506106f1a824b59056bf1949ff"
+        },
+        {
+          "index": 2,
+          "transparentPixels": 40900,
+          "solidPixels": 50660,
+          "sha256": "c90dd1f43143473ebd270312a43521836343d6e17ffa42da24ee30e8b01fe42f"
+        },
+        {
+          "index": 3,
+          "transparentPixels": 41954,
+          "solidPixels": 49995,
+          "sha256": "36699d98b891d4c289ede04eaaf87f6b44deed698db6ab7c684eeadf4416d7c9"
+        },
+        {
+          "index": 4,
+          "transparentPixels": 44157,
+          "solidPixels": 49249,
+          "sha256": "9f4c925ff3f1f7d2b738f84a659d19cf30fea6b44bf42cb9ce4c51e77b7123f0"
+        },
+        {
+          "index": 5,
+          "transparentPixels": 45496,
+          "solidPixels": 48584,
+          "sha256": "e76ba1d49b8989c20fe0e681d1362eda87e6c0504642d713551470d05e74f37a"
+        },
+        {
+          "index": 6,
+          "transparentPixels": 43829,
+          "solidPixels": 48305,
+          "sha256": "7b0e07edf116478b718c12860534557efa276a30aa1c4cac08e8beb3c56dd165"
+        },
+        {
+          "index": 7,
+          "transparentPixels": 43473,
+          "solidPixels": 48514,
+          "sha256": "0c1489a7924c91776ae878b67b2fe28fc6e996f9593d7a695324505eeea6cf5f"
+        },
+        {
+          "index": 8,
+          "transparentPixels": 43779,
+          "solidPixels": 49097,
+          "sha256": "72ab0788549f5aa0c095012008ba08f0bfbe134c5061d57a2a9276d59f0e0e6f"
+        },
+        {
+          "index": 9,
+          "transparentPixels": 43551,
+          "solidPixels": 49271,
+          "sha256": "25d5621d2469a5ef84b0520d491adc1441d9db6a24d1e936c77c495ebad9528c"
+        },
+        {
+          "index": 10,
+          "transparentPixels": 40898,
+          "solidPixels": 49984,
+          "sha256": "e134aeb8c60de83f10833ca9c7ecb95613e588f098782e77b6498d6fa3d8194b"
+        },
+        {
+          "index": 11,
+          "transparentPixels": 40143,
+          "solidPixels": 50972,
+          "sha256": "aa306ab7d53e0a27383126702237fbb30050540fcb7fdf30d947969528c49967"
+        },
+        {
+          "index": 12,
+          "transparentPixels": 40565,
+          "solidPixels": 51636,
+          "sha256": "b88fa7f5b3912f84add23e9814b95a4cf293e4d618c6d8c5be68f1ffcbf2f73e"
+        },
+        {
+          "index": 13,
+          "transparentPixels": 40202,
+          "solidPixels": 51020,
+          "sha256": "245dce9a7afddc965c5b8dbdd90dc239ab80f0c47ff7701699620b8075a37642"
+        },
+        {
+          "index": 14,
+          "transparentPixels": 40085,
+          "solidPixels": 50743,
+          "sha256": "842d898b9850d657a68399ac5aa626030414b95c6d9ae4c62c3cde0e0f454d41"
+        },
+        {
+          "index": 15,
+          "transparentPixels": 40177,
+          "solidPixels": 50422,
+          "sha256": "875893697d8bf36825d8cd353734ca6ea98fe63012bedea6132f91219b633617"
+        },
+        {
+          "index": 16,
+          "transparentPixels": 42036,
+          "solidPixels": 50144,
+          "sha256": "001f2bfd9fc12aaa16cd1e48484a7bb78a512db4d40ba951a8cd72489b0de117"
+        }
+      ],
+      "uniqueSourceCells": 16,
+      "videoBytes": 112361,
+      "posterBytes": 17558,
+      "durationSeconds": 8.0,
+      "videoCodec": "vp9",
+      "decodedSize": [
+        256,
+        256
+      ],
+      "decodedMode": "RGBA",
+      "decodedTransparentPixels": 25112,
+      "decodedSolidPixels": 36691
+    },
+    {
+      "id": "explore",
+      "sourceRevision": 3,
+      "sourceSize": [
+        1774,
+        887
+      ],
+      "sourceMode": "RGBA",
+      "sourceGrid": [
+        4,
+        2
+      ],
+      "sourceCells": [
+        {
+          "index": 1,
+          "transparentPixels": 111007,
+          "solidPixels": 81887,
+          "sha256": "a5f2a1d277a6f91568a65a9d4d2faa67be6006e63eec6b29c722f5f23bb35013"
+        },
+        {
+          "index": 2,
+          "transparentPixels": 112461,
+          "solidPixels": 79541,
+          "sha256": "eb5629acf81e96db53b02c7629465e581b96ed67ecc664838d1f3d29146d60c2"
+        },
+        {
+          "index": 3,
+          "transparentPixels": 117567,
+          "solidPixels": 74755,
+          "sha256": "b7c40b8a5c53a5c4697c769007fedbc8c5d1dd5ed3eff54526190cfd2887cea8"
+        },
+        {
+          "index": 4,
+          "transparentPixels": 111551,
+          "solidPixels": 81251,
+          "sha256": "ef3043ffe5057a4fcc9e339b9d5bb71a481da6c1e2e43f16020ed47d188a72b7"
+        },
+        {
+          "index": 5,
+          "transparentPixels": 107758,
+          "solidPixels": 84175,
+          "sha256": "c2648b01aabf65321c471e79a545f459cb656ecd7b3d9c12cf69769407c237c4"
+        },
+        {
+          "index": 6,
+          "transparentPixels": 110978,
+          "solidPixels": 79186,
+          "sha256": "4e4dd925cb7f95ed2a720489d82a2c99264b6fd52c4c070ccafa829cbef7bfb1"
+        },
+        {
+          "index": 7,
+          "transparentPixels": 115985,
+          "solidPixels": 75675,
+          "sha256": "a350d89f97905f936dc1384322ed302947f14a757ade4eec499b690fec8c0030"
+        },
+        {
+          "index": 8,
+          "transparentPixels": 109991,
+          "solidPixels": 81499,
+          "sha256": "17e960e1e31b0c54288d1abf278cff4ebb555233eb93f5ba5a0ee73b53f15007"
+        }
+      ],
+      "uniqueSourceCells": 8,
+      "fixedAnchor": [
+        202.5,
+        414
+      ],
+      "scale": 0.581453634085213,
+      "videoBytes": 43368,
+      "posterBytes": 13586,
+      "durationSeconds": 1.0,
+      "videoCodec": "vp9",
+      "decodedSize": [
+        256,
+        256
+      ],
+      "decodedMode": "RGBA",
+      "decodedTransparentPixels": 35923,
+      "decodedSolidPixels": 27660,
+      "decodedFrameCount": 24
+    },
+    {
+      "id": "study",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sourceCells": [
+        {
+          "index": 1,
+          "transparentPixels": 47870,
+          "solidPixels": 46799,
+          "sha256": "8bbbbaad1e80c50dbef386e14d0ca31b8b7abf91a92bf9643f962237595d20dc"
+        },
+        {
+          "index": 2,
+          "transparentPixels": 46846,
+          "solidPixels": 46789,
+          "sha256": "9f953ac38a45d20a6e90fc7fbce0d67f3fc556c99afcf740289967fd8751b2ca"
+        },
+        {
+          "index": 3,
+          "transparentPixels": 47181,
+          "solidPixels": 46524,
+          "sha256": "a50d558bcc997e287c1e149235b1745c9037609f9c640f8944b0c733c99a1a31"
+        },
+        {
+          "index": 4,
+          "transparentPixels": 47699,
+          "solidPixels": 46272,
+          "sha256": "7a64b01efd9a64891d4f370b316d77a4e376bde7ece6fb9db5162b079ea0cc43"
+        },
+        {
+          "index": 5,
+          "transparentPixels": 48485,
+          "solidPixels": 45945,
+          "sha256": "afd382f91d86c5bfd7bdcc882a80b1422db497debdcb742bf0d6fbb231aac90e"
+        },
+        {
+          "index": 6,
+          "transparentPixels": 47216,
+          "solidPixels": 45897,
+          "sha256": "d000b6c3e8e0a8f062756bf15a4dae6fbdf27a6ca42ba9fe3b89e6d2d8de6c49"
+        },
+        {
+          "index": 7,
+          "transparentPixels": 47154,
+          "solidPixels": 45990,
+          "sha256": "60bb8d05f46b723d87601e1ac9c148576bc33b68e70551f7f50c4ec83eb5453d"
+        },
+        {
+          "index": 8,
+          "transparentPixels": 47776,
+          "solidPixels": 46024,
+          "sha256": "6c85b57cf4931ec97a6da454f5316769ac1c99a5b704756f97fc9c8a44008b60"
+        },
+        {
+          "index": 9,
+          "transparentPixels": 48545,
+          "solidPixels": 45932,
+          "sha256": "27a1b7db53e9cc05fb28da5ea68aba5fd65902a7773cf120adc5cd1d970c18c9"
+        },
+        {
+          "index": 10,
+          "transparentPixels": 47603,
+          "solidPixels": 45592,
+          "sha256": "cbe159bd904a27d7ebc385ae43f680860c58fce8994a43835b21b71f9314294e"
+        },
+        {
+          "index": 11,
+          "transparentPixels": 47429,
+          "solidPixels": 46017,
+          "sha256": "e846dcd15672f3a8a8dba1779deb39dd0ab29e1e64444a91260de012690be651"
+        },
+        {
+          "index": 12,
+          "transparentPixels": 47087,
+          "solidPixels": 46333,
+          "sha256": "e89821cdaebf72cde6d8060a28d9a77e3cc10ae52697fe39ccbbdf3d82b6c882"
+        },
+        {
+          "index": 13,
+          "transparentPixels": 47175,
+          "solidPixels": 46407,
+          "sha256": "812665c3c7281c85f9ef22fd261a7bcd81da94da93fdea918d81da6aa1bdc781"
+        },
+        {
+          "index": 14,
+          "transparentPixels": 45634,
+          "solidPixels": 46504,
+          "sha256": "898da8944bd247c04b1612bcfbc0002772a08e997bc3a90d1039e3f10f3e2247"
+        },
+        {
+          "index": 15,
+          "transparentPixels": 46411,
+          "solidPixels": 46552,
+          "sha256": "fd303ebf9634ff0723a3aceacede53624668f83ed4192de229eff7e4cb4cd3c4"
+        },
+        {
+          "index": 16,
+          "transparentPixels": 46401,
+          "solidPixels": 46698,
+          "sha256": "0462c529a208cd4e5afec4b888cb4806a2fe16540faaafa8cf4ff85ecbe38da9"
+        }
+      ],
+      "uniqueSourceCells": 16,
+      "videoBytes": 102970,
+      "posterBytes": 18200,
+      "durationSeconds": 5.33,
+      "videoCodec": "vp9",
+      "decodedSize": [
+        256,
+        256
+      ],
+      "decodedMode": "RGBA",
+      "decodedTransparentPixels": 26397,
+      "decodedSolidPixels": 35883
+    },
+    {
+      "id": "work",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sourceCells": [
+        {
+          "index": 1,
+          "transparentPixels": 40818,
+          "solidPixels": 52085,
+          "sha256": "ea0055bc7343b4e736441964a0917595e57227b86e19c1a6bfeae17d2735a571"
+        },
+        {
+          "index": 2,
+          "transparentPixels": 40133,
+          "solidPixels": 51526,
+          "sha256": "08b5d1c6ea34624069367c143bd97a22ef1f4c778da008e16f39516298c5bd96"
+        },
+        {
+          "index": 3,
+          "transparentPixels": 41474,
+          "solidPixels": 50829,
+          "sha256": "b6f40e345e854178894e90390571dfcd34e1d1abf5180f74f05afdf9d01f11d7"
+        },
+        {
+          "index": 4,
+          "transparentPixels": 43132,
+          "solidPixels": 50080,
+          "sha256": "6e7727adf07aa3e1315c5dc578fd97827820afd5d616d3aca4c9ac22027bdbda"
+        },
+        {
+          "index": 5,
+          "transparentPixels": 44263,
+          "solidPixels": 49667,
+          "sha256": "4f0db636d33d2c411817780559771bc51bfccb25b07440504bf77fd387007c6e"
+        },
+        {
+          "index": 6,
+          "transparentPixels": 44035,
+          "solidPixels": 49650,
+          "sha256": "18a8bedbdddf73b5f5d482e9ac9ae8cec1d1821d538f985c7fa9da0e871a55e5"
+        },
+        {
+          "index": 7,
+          "transparentPixels": 44590,
+          "solidPixels": 49504,
+          "sha256": "fb47f91eba3cc493171de6d0f6a2e09ec4f8cb6891ac71d38b5b704d4adf3fd3"
+        },
+        {
+          "index": 8,
+          "transparentPixels": 44785,
+          "solidPixels": 49613,
+          "sha256": "5d378e7f4cbcd11ba73e276402719b47fff408dc6cc7fadf56b63f75fe851869"
+        },
+        {
+          "index": 9,
+          "transparentPixels": 43451,
+          "solidPixels": 49702,
+          "sha256": "71e8a8231200a6857ce4f60a736afeacbabd35286c4711a2b3c1993b5294c642"
+        },
+        {
+          "index": 10,
+          "transparentPixels": 41941,
+          "solidPixels": 50215,
+          "sha256": "f8ec44f0b64476e5ea82565e27260534e96aa0f93f884614eb2797b1e685461f"
+        },
+        {
+          "index": 11,
+          "transparentPixels": 41921,
+          "solidPixels": 50736,
+          "sha256": "be0e216569075fdcac47ced44d75b598e3a5e05e22379a91c68b495e3e1ce941"
+        },
+        {
+          "index": 12,
+          "transparentPixels": 42005,
+          "solidPixels": 51379,
+          "sha256": "fa2394d526fdbc4b8fe304fb50b4e1a3fa81f4266c3e602838876b571807d28d"
+        },
+        {
+          "index": 13,
+          "transparentPixels": 41704,
+          "solidPixels": 50814,
+          "sha256": "803db7668500cbe5665bb037eb3d301dfc117882af5023cdfa086cd06ab2b73d"
+        },
+        {
+          "index": 14,
+          "transparentPixels": 41419,
+          "solidPixels": 50651,
+          "sha256": "f6cd5edfb1399dc976f40b26d433dfc5870123104664967fc9536d5393b44771"
+        },
+        {
+          "index": 15,
+          "transparentPixels": 41966,
+          "solidPixels": 50492,
+          "sha256": "f4c9cb2e94af385f5c98ab17f10ac0c389da1bb83dfa4ef821132a37adc45c28"
+        },
+        {
+          "index": 16,
+          "transparentPixels": 43156,
+          "solidPixels": 50907,
+          "sha256": "47f9ed54ef752f5fcc1fbadb9d97d1bbd14563bf320eedf0ef1a0058c3b5aeee"
+        }
+      ],
+      "uniqueSourceCells": 16,
+      "videoBytes": 100859,
+      "posterBytes": 17978,
+      "durationSeconds": 4.0,
+      "videoCodec": "vp9",
+      "decodedSize": [
+        256,
+        256
+      ],
+      "decodedMode": "RGBA",
+      "decodedTransparentPixels": 26661,
+      "decodedSolidPixels": 35002
+    },
+    {
+      "id": "celebrate",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sourceCells": [
+        {
+          "index": 1,
+          "transparentPixels": 49045,
+          "solidPixels": 45551,
+          "sha256": "3556889d3e073a705eee523a811dca8b49302b4e7bffc8bddf0d7f7bdea4698b"
+        },
+        {
+          "index": 2,
+          "transparentPixels": 48862,
+          "solidPixels": 45492,
+          "sha256": "b71a646ddfc753437751d07f2b73785ca0d1106f08146b00d8dc60266419066c"
+        },
+        {
+          "index": 3,
+          "transparentPixels": 48589,
+          "solidPixels": 45579,
+          "sha256": "fb1f9802a8dde49e5f65d89e36dcb0565b756509f7ebb9fba504bc923e316de0"
+        },
+        {
+          "index": 4,
+          "transparentPixels": 49181,
+          "solidPixels": 45877,
+          "sha256": "c66bd1eef181492b582b52856afe7ade357b1f6381662dd9d6a9ffd7ebcbdcf9"
+        },
+        {
+          "index": 5,
+          "transparentPixels": 48919,
+          "solidPixels": 45906,
+          "sha256": "0a0b0e00a3752a14153d974a0183a8a0432c16264a5f6cfe37f5ab0428faac02"
+        },
+        {
+          "index": 6,
+          "transparentPixels": 48239,
+          "solidPixels": 45716,
+          "sha256": "ab4509dc27c5e34fe2a621f6b2370ea18bf156db2e840e48d37cc621f4b376ed"
+        },
+        {
+          "index": 7,
+          "transparentPixels": 48949,
+          "solidPixels": 45578,
+          "sha256": "905bbdbd4aba59c0130a67d664816c1d45568f1e843c20eae913e5257bd17423"
+        },
+        {
+          "index": 8,
+          "transparentPixels": 48871,
+          "solidPixels": 45613,
+          "sha256": "55673674cf72636e063b87396ae3f5c5dd77d6cba0fb611e72947ea7fb24adf2"
+        },
+        {
+          "index": 9,
+          "transparentPixels": 49513,
+          "solidPixels": 45577,
+          "sha256": "7fd2f996c418c399b2a47ff1b50d03613a8633c553cbe8a01e25ec6d75480c30"
+        },
+        {
+          "index": 10,
+          "transparentPixels": 48772,
+          "solidPixels": 45803,
+          "sha256": "a007794a6e6592fec5dc7388b2910be559a9e02d22cc7d72a4d02bf50a714d0f"
+        },
+        {
+          "index": 11,
+          "transparentPixels": 48582,
+          "solidPixels": 45640,
+          "sha256": "a8682371631237c1230ac0e3bfa120d25dc27745204d805239af8e0dafe31b1d"
+        },
+        {
+          "index": 12,
+          "transparentPixels": 49167,
+          "solidPixels": 45596,
+          "sha256": "7257a2ddf9f28f49543fbebf7b6c2327d8adc8877784823a67fbe2019be9e563"
+        },
+        {
+          "index": 13,
+          "transparentPixels": 50280,
+          "solidPixels": 45041,
+          "sha256": "9b562ebb032af9c61c6eee1ac89c3e8825aee68b87b64293658bfb79f1326295"
+        },
+        {
+          "index": 14,
+          "transparentPixels": 48898,
+          "solidPixels": 44926,
+          "sha256": "791a53d058959b08d9714b37fe0a891c545b84014947e7d9ec6c76fb43569bbb"
+        },
+        {
+          "index": 15,
+          "transparentPixels": 48680,
+          "solidPixels": 44847,
+          "sha256": "4a1bf88f73d5e51e1be08577866432de7ab30c489485dac77ab2b96d5206060d"
+        },
+        {
+          "index": 16,
+          "transparentPixels": 50297,
+          "solidPixels": 44709,
+          "sha256": "16639d579f1c36dd80f2800c58bd70d2ac2c779fc5544da0b9e2931133207aef"
+        }
+      ],
+      "uniqueSourceCells": 16,
+      "videoBytes": 92382,
+      "posterBytes": 17304,
+      "durationSeconds": 4.5,
+      "videoCodec": "vp9",
+      "decodedSize": [
+        256,
+        256
+      ],
+      "decodedMode": "RGBA",
+      "decodedTransparentPixels": 25934,
+      "decodedSolidPixels": 35995
+    }
+  ]
+}

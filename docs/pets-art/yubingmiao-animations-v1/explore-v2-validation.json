@@ -1,0 +1,245 @@
+{
+  "date": "2026-11-13",
+  "species": "yubingmiao",
+  "action": "explore",
+  "revision": 2,
+  "reason": "用户指出首版臀部贴地，仅抬坐姿脚；本版以新站姿重画真正双足原地行走。",
+  "sourceFile": "sources/explore.png",
+  "sourceOutput": "exec-0a031075-ee81-43e4-af5d-b80b8931f605.png",
+  "standingReferenceOutput": "exec-4ba46f9f-9633-4e9c-8a8a-89e0d480c94e.png",
+  "previousSourceOutput": "exec-5726b24a-a425-42a3-9f12-9b003bdc1d90.png",
+  "sourceMode": "RGBA",
+  "sourceSize": [
+    1254,
+    1254
+  ],
+  "sourceCellCount": 16,
+  "sourceCells": [
+    {
+      "index": 0,
+      "solidBounds": [
+        40,
+        11,
+        279,
+        295
+      ],
+      "minSolidMargin": 11,
+      "transparentPixels": 56218
+    },
+    {
+      "index": 1,
+      "solidBounds": [
+        39,
+        11,
+        278,
+        294
+      ],
+      "minSolidMargin": 11,
+      "transparentPixels": 56844
+    },
+    {
+      "index": 2,
+      "solidBounds": [
+        38,
+        7,
+        278,
+        291
+      ],
+      "minSolidMargin": 7,
+      "transparentPixels": 57603
+    },
+    {
+      "index": 3,
+      "solidBounds": [
+        39,
+        7,
+        278,
+        289
+      ],
+      "minSolidMargin": 7,
+      "transparentPixels": 58422
+    },
+    {
+      "index": 4,
+      "solidBounds": [
+        36,
+        7,
+        278,
+        288
+      ],
+      "minSolidMargin": 7,
+      "transparentPixels": 58892
+    },
+    {
+      "index": 5,
+      "solidBounds": [
+        36,
+        7,
+        278,
+        286
+      ],
+      "minSolidMargin": 7,
+      "transparentPixels": 58867
+    },
+    {
+      "index": 6,
+      "solidBounds": [
+        37,
+        8,
+        278,
+        288
+      ],
+      "minSolidMargin": 8,
+      "transparentPixels": 57517
+    },
+    {
+      "index": 7,
+      "solidBounds": [
+        39,
+        10,
+        279,
+        289
+      ],
+      "minSolidMargin": 10,
+      "transparentPixels": 57065
+    },
+    {
+      "index": 8,
+      "solidBounds": [
+        38,
+        13,
+        278,
+        296
+      ],
+      "minSolidMargin": 13,
+      "transparentPixels": 57104
+    },
+    {
+      "index": 9,
+      "solidBounds": [
+        39,
+        13,
+        278,
+        295
+      ],
+      "minSolidMargin": 13,
+      "transparentPixels": 57820
+    },
+    {
+      "index": 10,
+      "solidBounds": [
+        40,
+        10,
+        278,
+        288
+      ],
+      "minSolidMargin": 10,
+      "transparentPixels": 58563
+    },
+    {
+      "index": 11,
+      "solidBounds": [
+        39,
+        9,
+        278,
+        286
+      ],
+      "minSolidMargin": 9,
+      "transparentPixels": 59647
+    },
+    {
+      "index": 12,
+      "solidBounds": [
+        38,
+        12,
+        278,
+        292
+      ],
+      "minSolidMargin": 12,
+      "transparentPixels": 59228
+    },
+    {
+      "index": 13,
+      "solidBounds": [
+        37,
+        14,
+        278,
+        293
+      ],
+      "minSolidMargin": 14,
+      "transparentPixels": 57996
+    },
+    {
+      "index": 14,
+      "solidBounds": [
+        38,
+        14,
+        278,
+        294
+      ],
+      "minSolidMargin": 14,
+      "transparentPixels": 57226
+    },
+    {
+      "index": 15,
+      "solidBounds": [
+        40,
+        14,
+        279,
+        296
+      ],
+      "minSolidMargin": 14,
+      "transparentPixels": 56838
+    }
+  ],
+  "visualReview": "检查16格均保持站立，臀腹离地、两短腿在腹下，支撑脚与摆动脚交替，两前爪摆动；没有蓝鱼道具和额外四肢。",
+  "videoBytes": 173223,
+  "videoSha256": "83c80815e56d532611da4ce58701840f1382981eb82210389d930bf4d5802039",
+  "posterBytes": 22200,
+  "posterSize": [
+    256,
+    256
+  ],
+  "decodedVideoSize": [
+    256,
+    256
+  ],
+  "decodedFrames": 48,
+  "durationSeconds": 2.0,
+  "drawings": 16,
+  "timelineFps": 24,
+  "holdFramesPerDrawing": 3,
+  "opticalFlowInterpolation": false,
+  "skeletalDeformation": false,
+  "decodedAlpha": {
+    "minTransparentPixelsPerFrame": 37261,
+    "minSolidPixelsPerFrame": 24164
+  },
+  "unchangedOtherFiles": [
+    "drink.webm",
+    "play.webp",
+    "drink.webp",
+    "play.webm",
+    "pet.webm",
+    "pet.webp",
+    "celebrate.webp",
+    "celebrate.webm",
+    "work.webm",
+    "idle.webm",
+    "work.webp",
+    "idle.webp",
+    "sleep.webp",
+    "sleep.webm",
+    "study.webm",
+    "eat.webm",
+    "study.webp",
+    "eat.webp"
+  ],
+  "allPassed": true,
+  "browserUiTested": false,
+  "userArtAccepted": false,
+  "scope": "历史基本检查；当前explore已由v3替换，结果见explore-v3-validation.json。其余九项未重新生成。",
+  "supersededBy": {
+    "explore": "explore-v3-validation.json"
+  }
+}

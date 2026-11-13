@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-13T04:48:30.542Z",
+  "changed": [
+    "public/images/pets/animations/momota-v1/explore.webm",
+    "public/images/pets/animations/momota-v1/explore.webp",
+    "public/images/pets/animations/paixiaoyu-v1/explore.webm",
+    "public/images/pets/animations/paixiaoyu-v1/explore.webp",
+    "public/images/pets/animations/yubingmiao-v1/explore.webm",
+    "public/images/pets/animations/yubingmiao-v1/explore.webp"
+  ],
+  "unchangedAssetCount": 74,
+  "clips": [
+    {
+      "species": "momota",
+      "bytes": 102690,
+      "width": 256,
+      "height": 256,
+      "decodedFrames": 48,
+      "duration": 2,
+      "minTransparent": 19120,
+      "minSolid": 26594
+    },
+    {
+      "species": "yubingmiao",
+      "bytes": 173223,
+      "width": 256,
+      "height": 256,
+      "decodedFrames": 48,
+      "duration": 2,
+      "minTransparent": 31870,
+      "minSolid": 24188
+    },
+    {
+      "species": "paixiaoyu",
+      "bytes": 108102,
+      "width": 256,
+      "height": 256,
+      "decodedFrames": 48,
+      "duration": 2,
+      "minTransparent": 30464,
+      "minSolid": 28977
+    }
+  ],
+  "note": "仅检查本次外出素材编码与修改范围；动作自然度由实际预览继续确认，未运行全套业务验收。"
+}

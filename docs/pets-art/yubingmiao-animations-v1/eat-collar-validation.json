@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-13T05:48:12.671Z",
+  "clip": {
+    "id": "eat",
+    "name": "吃小鱼",
+    "mode": "once",
+    "file": "eat.webm",
+    "poster": "eat.webp",
+    "width": 256,
+    "height": 256,
+    "fps": 24,
+    "uniqueFrames": 16,
+    "frames": 64,
+    "duration": 2.6666666666666665,
+    "bytes": 115121,
+    "interpolated": false,
+    "approvedEatingSource": false
+  },
+  "decodedFrames": 64,
+  "minTransparentPixels": 27843,
+  "minSolidPixels": 33477,
+  "changed": [
+    "public/images/pets/animations/yubingmiao-v1/eat.webm",
+    "public/images/pets/animations/yubingmiao-v1/eat.webp"
+  ],
+  "unchangedMediaCount": 78,
+  "videoBytes": 1241689,
+  "posterBytes": 192574,
+  "totalBytes": 1434263,
+  "note": "仅修正鱼饼喵吃鱼的项圈/吊牌遮挡；其他78个媒体文件哈希不变。真实浏览器交互报告见 .temp/pet-animation-browser/report.json。"
+}

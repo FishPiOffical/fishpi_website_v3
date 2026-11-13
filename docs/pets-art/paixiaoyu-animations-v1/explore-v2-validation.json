@@ -1,0 +1,47 @@
+{
+  "checkedAt": "2026-11-13",
+  "scope": "explore-only local encode/decode, dimensions, actual alpha and unchanged-file checks; no UI/business testing",
+  "source": "exec-415b120b-5c6d-4139-836c-ec647b98f7ad.png",
+  "sourceSize": [
+    1261,
+    1247
+  ],
+  "sourceMode": "RGBA",
+  "standingReference": "exec-faac94cd-2a16-437c-b02d-a1ef771a94e4.png",
+  "videoSize": [
+    256,
+    256
+  ],
+  "videoCodec": "vp9",
+  "fps": 24,
+  "timelineFrames": 48,
+  "drawnFrames": 16,
+  "durationSeconds": 2,
+  "videoBytes": 108102,
+  "posterBytes": 15980,
+  "allDecodedFramesHaveAlpha": true,
+  "minTransparentPixelsPerFrame": 30464,
+  "minSolidPixelsPerFrame": 29745,
+  "unchangedOtherVideosAndPosters": {
+    "drink.webm": "8fbf22195d1724de3b3920c5e70ecbeaa4d6690a7c6f7a579685a15afec2fb03",
+    "play.webp": "6d83eda63cc0af134b9b80781d9169268289ed271b6c3529ef8b40dc27cc3d6a",
+    "drink.webp": "51017cc646745d5e7b2ba935e81e7c086ba0557e78688942c7475f109dab549d",
+    "play.webm": "98768aee4c97bc6b68424375927373efdc237678aa2316d19bf02f3aed05c9bd",
+    "pet.webm": "e77de7b18c7f562ca1298cd801d049d6f3bdba48ede6ccde0722ff954238ee3a",
+    "pet.webp": "0877b6f7e6c68178ded1dcb0317c717ac1e1dfaa065086e4613fe7434ae18798",
+    "celebrate.webp": "501822c45049c92b060f7652cfaaf2345b550c31961a97673ee0759f553751df",
+    "celebrate.webm": "410295b4637f4188f5054b2e618a07272e7f5affde6e2a622af1b627f5919f2c",
+    "work.webm": "be50f104fec972a1731df0bde5f2d57a82e94339d6236b049ed7535926c538e2",
+    "idle.webm": "fbdf7c10c5aa1e4ad290878a76083a698251fdebd92452eaf9b541d833046b2c",
+    "work.webp": "64eea79e23332c3bb5a05e1d3b18414ab46a21848894640b2e14342b2905fbad",
+    "idle.webp": "9655bb494dfb8ea7d597456af54a6954637a9733de1387af5c52bf4aa0b1c77d",
+    "sleep.webp": "3655348a6fe8ad1a0c69caf538571c215f7f5e43f9fb228e861de8b712a5b27b",
+    "sleep.webm": "1819bed2ee97dd9e71513b03bae7478b5de72e74349899bfdf8eb368d61fd5a4",
+    "study.webm": "632dbb009776472ac5b0877b5ebd59c82cf94bfcb14a087cc0c640250b18beb7",
+    "eat.webm": "22beb68ac39a6325f122360323978d366e86063f1a7baad467dab6059b01f266",
+    "study.webp": "b06af4dd106743e1a8ef1ce5dd0d10f908deefb9103720779bf23e43318a469d",
+    "eat.webp": "f39630a464ca2bfb97b4c31d60be2a78618c915bb4a08ef13cafb1157689ac11"
+  },
+  "videoSha256": "85266561c1b6b2a2c9141b8f1310fa24c2ee9c826cf1b96fea5f1a9c954f48ca",
+  "visualCheck": "Standing through all cells; hips off ground, two short feet under body; near and far legs reverse front/back order between source frames 1 and 9. Final playback acceptance remains with user."
+}

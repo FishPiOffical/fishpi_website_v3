@@ -1,0 +1,218 @@
+{
+  "date": "2026-11-13",
+  "species": "yubingmiao",
+  "action": "explore",
+  "revision": 3,
+  "reason": "修正v2近远腿互换和逐帧最低脚锚点造成的浮动；固定近侧奶白腿/远侧阴影腿及前后层次，使用八关键姿势和共享锚点。",
+  "sourceFile": "sources/explore.png",
+  "sourceOutput": "exec-e6d2dda0-2a21-48ec-8bfd-1aac881c56aa.png",
+  "promptRecord": "sources/explore-v3.md",
+  "sourceMode": "RGBA",
+  "sourceSize": [
+    1774,
+    887
+  ],
+  "sourceGrid": [
+    4,
+    2
+  ],
+  "sourceCellCount": 8,
+  "sourceCells": [
+    {
+      "index": 0,
+      "solidBounds": [
+        53,
+        11,
+        380,
+        407
+      ],
+      "minSolidMargin": 11,
+      "transparentPixels": 114897
+    },
+    {
+      "index": 1,
+      "solidBounds": [
+        54,
+        20,
+        379,
+        409
+      ],
+      "minSolidMargin": 20,
+      "transparentPixels": 117828
+    },
+    {
+      "index": 2,
+      "solidBounds": [
+        55,
+        24,
+        381,
+        410
+      ],
+      "minSolidMargin": 24,
+      "transparentPixels": 120649
+    },
+    {
+      "index": 3,
+      "solidBounds": [
+        54,
+        15,
+        381,
+        409
+      ],
+      "minSolidMargin": 15,
+      "transparentPixels": 117369
+    },
+    {
+      "index": 4,
+      "solidBounds": [
+        54,
+        13,
+        381,
+        409
+      ],
+      "minSolidMargin": 13,
+      "transparentPixels": 115387
+    },
+    {
+      "index": 5,
+      "solidBounds": [
+        54,
+        21,
+        379,
+        409
+      ],
+      "minSolidMargin": 21,
+      "transparentPixels": 118581
+    },
+    {
+      "index": 6,
+      "solidBounds": [
+        55,
+        22,
+        380,
+        409
+      ],
+      "minSolidMargin": 22,
+      "transparentPixels": 119737
+    },
+    {
+      "index": 7,
+      "solidBounds": [
+        54,
+        15,
+        381,
+        410
+      ],
+      "minSolidMargin": 15,
+      "transparentPixels": 116904
+    }
+  ],
+  "sourcePosePeerReviewPassed": true,
+  "visualReview": "源帧已由主代理交叉检查完整图与腿部放大：第一行近腿承重、第二行远腿承重，近奶白腿保持前层，远阴影腿保持后层；两腿的颜色及层次可连续追踪。",
+  "videoBytes": 56547,
+  "videoSha256": "964a7363fac1624e89dd42dfd07fa76302242f629fb82ebfec78ec690aca6aa7",
+  "posterBytes": 17220,
+  "posterSize": [
+    256,
+    256
+  ],
+  "decodedVideoSize": [
+    256,
+    256
+  ],
+  "decodedPixelFormat": "RGBA",
+  "decodedFrames": 24,
+  "durationSeconds": 1.0,
+  "drawings": 8,
+  "timelineFps": 24,
+  "holdFramesPerDrawing": 3,
+  "fixedAnchor": [
+    217.5,
+    410
+  ],
+  "uniformScale": 0.58,
+  "opticalFlowInterpolation": false,
+  "skeletalDeformation": false,
+  "decodedAlpha": {
+    "minTransparentPixelsPerFrame": 37718,
+    "minSolidPixelsPerFrame": 24701
+  },
+  "unchangedOtherFiles": [
+    {
+      "file": "drink.webm",
+      "sha256": "478929fc0d4d4faa9b1303ab04d07d1ea7a207e56442de16abc1a8369c77f56f"
+    },
+    {
+      "file": "play.webp",
+      "sha256": "b40aebfaa8c0c8eaca13b4d03e4699a7172d8b824be6caae435dbd924123695d"
+    },
+    {
+      "file": "drink.webp",
+      "sha256": "c5034c62c0f43c40d68bd0ea98f2fa2bbaf8d90b97483b0528fde03eb5bbd0aa"
+    },
+    {
+      "file": "play.webm",
+      "sha256": "a3bd985e36c2154602ed2d86997752b4f9d52307d27e317afeabecca18850863"
+    },
+    {
+      "file": "pet.webm",
+      "sha256": "1e6b95e0c42e130fac671ddfe2b0b0fb50b939b0823706e8d4e84cac5e200d37"
+    },
+    {
+      "file": "pet.webp",
+      "sha256": "929a53bfcfc47339f42d83d78a8b3aa851810436bbbd1828409aa0f04c3c1e55"
+    },
+    {
+      "file": "celebrate.webp",
+      "sha256": "9c640f1d8246ffbd20aacb110f8cc1670d0193403ced579c51c59ab435755eac"
+    },
+    {
+      "file": "celebrate.webm",
+      "sha256": "2eeaf0df30c68eff117bb956ae6ede6d2ab87e3ef3bacd54f77f8b206483286a"
+    },
+    {
+      "file": "work.webm",
+      "sha256": "db8fce63a798cbb09e46a95804dde0290b30c3a8f68ed20b3f67250504090e00"
+    },
+    {
+      "file": "idle.webm",
+      "sha256": "569f41b46dc06eeb3b4d79f46cf26ae26bab7c6099fae7bf82757e7e898d86dc"
+    },
+    {
+      "file": "work.webp",
+      "sha256": "6bfa5a024f8a327ada1bb9a525fecab96efd776ffbfcdc233d7386550de2b04a"
+    },
+    {
+      "file": "idle.webp",
+      "sha256": "60443fdeb5dcb4d26145208d3958a78045a17bfdd28211be1dde98a471165a28"
+    },
+    {
+      "file": "sleep.webp",
+      "sha256": "8d2b4e1e13c979c63434d0de07e64663e7d7468fe47a801ff6cfd61789ce4846"
+    },
+    {
+      "file": "sleep.webm",
+      "sha256": "6b89f3a0b621d937201d1df2cbd0f08ee921205d4e625cbe3824f819cdc9134b"
+    },
+    {
+      "file": "study.webm",
+      "sha256": "e6345328738f27c941f740f3ecd5c1baac65a26bc938c97a0380980cd44b58e8"
+    },
+    {
+      "file": "eat.webm",
+      "sha256": "0fe373b0fd2658b0eb0d1e89cb7212a0f800cab02c9b959b0769c402531b93f1"
+    },
+    {
+      "file": "study.webp",
+      "sha256": "461139d15ba7c0db61a115d86418b321535a95d54a46be552ea61904be0f280d"
+    },
+    {
+      "file": "eat.webp",
+      "sha256": "dcc1629d465fd129fb724ecc24f22085bc7b9f8f0d3f4a59b42efacfcf05fcbd"
+    }
+  ],
+  "allPassed": true,
+  "browserUiTested": false,
+  "userArtAccepted": false,
+  "scope": "当前外出v3源帧复核与WebP/WebM基本检查；不代表用户艺术或浏览器验收。"
+}

@@ -1,0 +1,236 @@
+{
+  "checkedAt": "2026-11-13",
+  "scope": "basic local file decode, dimensions and alpha checks; no browser or application acceptance",
+  "species": "paixiaoyu",
+  "clips": [
+    {
+      "id": "idle",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sheetFrames": 16,
+      "videoSize": [
+        256,
+        256
+      ],
+      "codec": "vp9",
+      "fps": 24,
+      "frames": 116,
+      "durationSeconds": 4.833333333333333,
+      "videoBytes": 97516,
+      "posterBytes": 14956,
+      "decodedFirstFrameTransparentPixels": 30546,
+      "decodedFirstFrameSolidPixels": 32408,
+      "decodedFirstFrameHasAlpha": true
+    },
+    {
+      "id": "eat",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sheetFrames": 16,
+      "videoSize": [
+        256,
+        256
+      ],
+      "codec": "vp9",
+      "fps": 24,
+      "frames": 120,
+      "durationSeconds": 5,
+      "videoBytes": 82582,
+      "posterBytes": 15758,
+      "decodedFirstFrameTransparentPixels": 29825,
+      "decodedFirstFrameSolidPixels": 33390,
+      "decodedFirstFrameHasAlpha": true
+    },
+    {
+      "id": "drink",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sheetFrames": 16,
+      "videoSize": [
+        256,
+        256
+      ],
+      "codec": "vp9",
+      "fps": 24,
+      "frames": 122,
+      "durationSeconds": 5.083333333333333,
+      "videoBytes": 99210,
+      "posterBytes": 16230,
+      "decodedFirstFrameTransparentPixels": 30037,
+      "decodedFirstFrameSolidPixels": 32664,
+      "decodedFirstFrameHasAlpha": true
+    },
+    {
+      "id": "pet",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sheetFrames": 16,
+      "videoSize": [
+        256,
+        256
+      ],
+      "codec": "vp9",
+      "fps": 24,
+      "frames": 116,
+      "durationSeconds": 4.833333333333333,
+      "videoBytes": 89950,
+      "posterBytes": 14606,
+      "decodedFirstFrameTransparentPixels": 31050,
+      "decodedFirstFrameSolidPixels": 31964,
+      "decodedFirstFrameHasAlpha": true
+    },
+    {
+      "id": "play",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sheetFrames": 16,
+      "videoSize": [
+        256,
+        256
+      ],
+      "codec": "vp9",
+      "fps": 24,
+      "frames": 96,
+      "durationSeconds": 4,
+      "videoBytes": 95852,
+      "posterBytes": 14842,
+      "decodedFirstFrameTransparentPixels": 33608,
+      "decodedFirstFrameSolidPixels": 29671,
+      "decodedFirstFrameHasAlpha": true
+    },
+    {
+      "id": "sleep",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sheetFrames": 16,
+      "videoSize": [
+        256,
+        256
+      ],
+      "codec": "vp9",
+      "fps": 24,
+      "frames": 192,
+      "durationSeconds": 8,
+      "videoBytes": 99658,
+      "posterBytes": 14466,
+      "decodedFirstFrameTransparentPixels": 30013,
+      "decodedFirstFrameSolidPixels": 33030,
+      "decodedFirstFrameHasAlpha": true
+    },
+    {
+      "id": "explore",
+      "sourceSize": [
+        1774,
+        887
+      ],
+      "sourceMode": "RGBA",
+      "sheetFrames": 8,
+      "videoSize": [
+        256,
+        256
+      ],
+      "codec": "vp9",
+      "fps": 24,
+      "frames": 24,
+      "durationSeconds": 1,
+      "videoBytes": 34512,
+      "posterBytes": 12758,
+      "decodedFirstFrameTransparentPixels": 34446,
+      "decodedFirstFrameSolidPixels": 29511,
+      "decodedFirstFrameHasAlpha": true,
+      "revision": "standing-walk-v3-eight-keys",
+      "sourceGrid": [
+        4,
+        2
+      ],
+      "fixedAnchor": true
+    },
+    {
+      "id": "study",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sheetFrames": 16,
+      "videoSize": [
+        256,
+        256
+      ],
+      "codec": "vp9",
+      "fps": 24,
+      "frames": 128,
+      "durationSeconds": 5.333333333333333,
+      "videoBytes": 85984,
+      "posterBytes": 15710,
+      "decodedFirstFrameTransparentPixels": 29355,
+      "decodedFirstFrameSolidPixels": 33905,
+      "decodedFirstFrameHasAlpha": true
+    },
+    {
+      "id": "work",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sheetFrames": 16,
+      "videoSize": [
+        256,
+        256
+      ],
+      "codec": "vp9",
+      "fps": 24,
+      "frames": 96,
+      "durationSeconds": 4,
+      "videoBytes": 82295,
+      "posterBytes": 15174,
+      "decodedFirstFrameTransparentPixels": 28710,
+      "decodedFirstFrameSolidPixels": 34631,
+      "decodedFirstFrameHasAlpha": true
+    },
+    {
+      "id": "celebrate",
+      "sourceSize": [
+        1254,
+        1254
+      ],
+      "sourceMode": "RGBA",
+      "sheetFrames": 16,
+      "videoSize": [
+        256,
+        256
+      ],
+      "codec": "vp9",
+      "fps": 24,
+      "frames": 108,
+      "durationSeconds": 4.5,
+      "videoBytes": 84132,
+      "posterBytes": 15262,
+      "decodedFirstFrameTransparentPixels": 29327,
+      "decodedFirstFrameSolidPixels": 33731,
+      "decodedFirstFrameHasAlpha": true
+    }
+  ],
+  "totalVideoBytes": 851691,
+  "totalVideoAndPosterBytes": 1001453,
+  "exploreRevision": "2026-11-13 eight-key standing walk, fixed canvas anchor, 24 timeline frames / 1 second"
+}

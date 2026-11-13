@@ -1,0 +1,281 @@
+{
+  "species": "momota",
+  "action": "explore",
+  "revision": 2,
+  "date": "2026-11-13",
+  "change": "从摊坐迈脚重画为双短腿站立行走，臀腹离地，近侧三分之二朝右",
+  "videoBytes": 102690,
+  "posterBytes": 20204,
+  "sourceSize": [
+    1254,
+    1254
+  ],
+  "durationSeconds": 2,
+  "frames": 48,
+  "independentDrawnFrames": 16,
+  "fps": 24,
+  "interpolated": false,
+  "decodedFrames": [
+    {
+      "file": "decoded-001.png",
+      "transparentPixels": 19175,
+      "solidPixels": 29341
+    },
+    {
+      "file": "decoded-002.png",
+      "transparentPixels": 19120,
+      "solidPixels": 29341
+    },
+    {
+      "file": "decoded-003.png",
+      "transparentPixels": 19123,
+      "solidPixels": 29341
+    },
+    {
+      "file": "decoded-004.png",
+      "transparentPixels": 24300,
+      "solidPixels": 29180
+    },
+    {
+      "file": "decoded-005.png",
+      "transparentPixels": 24179,
+      "solidPixels": 29183
+    },
+    {
+      "file": "decoded-006.png",
+      "transparentPixels": 24158,
+      "solidPixels": 29183
+    },
+    {
+      "file": "decoded-007.png",
+      "transparentPixels": 24006,
+      "solidPixels": 28532
+    },
+    {
+      "file": "decoded-008.png",
+      "transparentPixels": 22885,
+      "solidPixels": 28532
+    },
+    {
+      "file": "decoded-009.png",
+      "transparentPixels": 25522,
+      "solidPixels": 28518
+    },
+    {
+      "file": "decoded-010.png",
+      "transparentPixels": 29441,
+      "solidPixels": 27944
+    },
+    {
+      "file": "decoded-011.png",
+      "transparentPixels": 29873,
+      "solidPixels": 27949
+    },
+    {
+      "file": "decoded-012.png",
+      "transparentPixels": 29874,
+      "solidPixels": 27949
+    },
+    {
+      "file": "decoded-013.png",
+      "transparentPixels": 25204,
+      "solidPixels": 27971
+    },
+    {
+      "file": "decoded-014.png",
+      "transparentPixels": 25204,
+      "solidPixels": 27971
+    },
+    {
+      "file": "decoded-015.png",
+      "transparentPixels": 25204,
+      "solidPixels": 27971
+    },
+    {
+      "file": "decoded-016.png",
+      "transparentPixels": 28797,
+      "solidPixels": 27741
+    },
+    {
+      "file": "decoded-017.png",
+      "transparentPixels": 30072,
+      "solidPixels": 27743
+    },
+    {
+      "file": "decoded-018.png",
+      "transparentPixels": 30077,
+      "solidPixels": 27743
+    },
+    {
+      "file": "decoded-019.png",
+      "transparentPixels": 28359,
+      "solidPixels": 27969
+    },
+    {
+      "file": "decoded-020.png",
+      "transparentPixels": 28743,
+      "solidPixels": 27969
+    },
+    {
+      "file": "decoded-021.png",
+      "transparentPixels": 27750,
+      "solidPixels": 27970
+    },
+    {
+      "file": "decoded-022.png",
+      "transparentPixels": 27416,
+      "solidPixels": 28370
+    },
+    {
+      "file": "decoded-023.png",
+      "transparentPixels": 28767,
+      "solidPixels": 28370
+    },
+    {
+      "file": "decoded-024.png",
+      "transparentPixels": 28750,
+      "solidPixels": 28372
+    },
+    {
+      "file": "decoded-025.png",
+      "transparentPixels": 23678,
+      "solidPixels": 28766
+    },
+    {
+      "file": "decoded-026.png",
+      "transparentPixels": 23928,
+      "solidPixels": 28766
+    },
+    {
+      "file": "decoded-027.png",
+      "transparentPixels": 24927,
+      "solidPixels": 28766
+    },
+    {
+      "file": "decoded-028.png",
+      "transparentPixels": 26031,
+      "solidPixels": 28493
+    },
+    {
+      "file": "decoded-029.png",
+      "transparentPixels": 25970,
+      "solidPixels": 28487
+    },
+    {
+      "file": "decoded-030.png",
+      "transparentPixels": 25703,
+      "solidPixels": 28487
+    },
+    {
+      "file": "decoded-031.png",
+      "transparentPixels": 25811,
+      "solidPixels": 27636
+    },
+    {
+      "file": "decoded-032.png",
+      "transparentPixels": 25651,
+      "solidPixels": 27636
+    },
+    {
+      "file": "decoded-033.png",
+      "transparentPixels": 25035,
+      "solidPixels": 27636
+    },
+    {
+      "file": "decoded-034.png",
+      "transparentPixels": 26527,
+      "solidPixels": 27399
+    },
+    {
+      "file": "decoded-035.png",
+      "transparentPixels": 27156,
+      "solidPixels": 27401
+    },
+    {
+      "file": "decoded-036.png",
+      "transparentPixels": 26932,
+      "solidPixels": 27401
+    },
+    {
+      "file": "decoded-037.png",
+      "transparentPixels": 23836,
+      "solidPixels": 28036
+    },
+    {
+      "file": "decoded-038.png",
+      "transparentPixels": 24381,
+      "solidPixels": 28036
+    },
+    {
+      "file": "decoded-039.png",
+      "transparentPixels": 23836,
+      "solidPixels": 28036
+    },
+    {
+      "file": "decoded-040.png",
+      "transparentPixels": 22485,
+      "solidPixels": 28429
+    },
+    {
+      "file": "decoded-041.png",
+      "transparentPixels": 22344,
+      "solidPixels": 28425
+    },
+    {
+      "file": "decoded-042.png",
+      "transparentPixels": 22280,
+      "solidPixels": 28425
+    },
+    {
+      "file": "decoded-043.png",
+      "transparentPixels": 22648,
+      "solidPixels": 28917
+    },
+    {
+      "file": "decoded-044.png",
+      "transparentPixels": 23032,
+      "solidPixels": 28917
+    },
+    {
+      "file": "decoded-045.png",
+      "transparentPixels": 22355,
+      "solidPixels": 28914
+    },
+    {
+      "file": "decoded-046.png",
+      "transparentPixels": 23631,
+      "solidPixels": 29122
+    },
+    {
+      "file": "decoded-047.png",
+      "transparentPixels": 23853,
+      "solidPixels": 29125
+    },
+    {
+      "file": "decoded-048.png",
+      "transparentPixels": 24013,
+      "solidPixels": 29125
+    }
+  ],
+  "otherOutputFilesUnchanged": [
+    "idle.webm",
+    "idle.webp",
+    "eat.webm",
+    "eat.webp",
+    "drink.webm",
+    "drink.webp",
+    "pet.webm",
+    "pet.webp",
+    "play.webm",
+    "play.webp",
+    "sleep.webm",
+    "sleep.webp",
+    "study.webm",
+    "study.webp",
+    "work.webm",
+    "work.webp",
+    "celebrate.webm",
+    "celebrate.webp"
+  ],
+  "scope": "源帧目视、RGBA/布局、48帧解码和原其他18个输出文件字节对比；未做浏览器或艺术验收"
+}

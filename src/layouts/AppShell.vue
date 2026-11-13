@@ -23,6 +23,8 @@ import CountToast from '@/components/count/CountToast.vue'
 import ChatRedPacketDialog from '@/components/chat/ChatRedPacketDialog.vue'
 import AppearanceShop from '@/components/packs/AppearanceShop.vue'
 import ChatMountOverlay from '@/components/chat/ChatMountOverlay.vue'
+import PetDesktop from '@/components/pets/PetDesktop.vue'
+import PetRiskVerification from '@/components/pets/PetRiskVerification.vue'
 import ChatBarrageOverlay from '@/components/chat/ChatBarrageOverlay.vue'
 import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
 import MemberLayout from '@/components/member/MemberLayout.vue'
@@ -458,6 +460,8 @@ onUnmounted(() => {
     <ChatBarrageOverlay />
     <AppearanceShop />
     <ChatMountOverlay />
+    <PetDesktop />
+    <PetRiskVerification />
     <ChatRedPacketDialog />
     <SettingsDrawer />
     <UserHoverCard />

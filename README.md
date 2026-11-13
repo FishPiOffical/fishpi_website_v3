@@ -70,6 +70,20 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 
 闲聊室 `/idle-talk` 现网 404，**明确不做**。管理后台不在本站范围（继续用 Rhythm FTL `/admin`）。
 游戏入口：`/games`（官方小游戏跳转 Rhythm + 鱼游投稿）；VIP：`/vips`（v3 本人会员及原子积分开通）。
+`pet` 分支新增 `/pets` 宠物家园第一批：免费领养、日常照顾、宠物币/口粮及静态桌宠。依赖配套 Rhythm 迁移和接口；规则、验证与后续批次见 [宠物家园工作记录](docs/pets-phase-one.md)。
+第二批继续加入三个外出地点、六门课程、技能成长与到期成果领取；活动与休息互斥，使用服务器快照与原键恢复，不轮询或自动发奖。需先更新 Rhythm 的活动表和接口，详见 [外出与学校](docs/pets-phase-two.md)。
+第三批加入六类见习兼职、独立职业熟练度和可筛选的活动记录；工作收益按领取日共享每日 60 宠物币额度。履历仅展开时读取，详见 [兼职与活动记录](docs/pets-phase-three.md)。
+第四批加入进阶探索、材料配方与永久收藏、扩展食品饮料商店，以及包含日常互动的统一日志，详见 [探索、手作与日常记录](docs/pets-phase-four.md)。
+第五批加入六门进阶课程、三条成长旅程，以及 512 宠物币重新领养；更换宠物保留账号资产与已领取奖励，详见 [进阶课程、旅程与重新领养](docs/pets-phase-five.md)。
+
+宠物操作已接账号冷却与按需安全验证，未知结果沿用原操作键；家园与桌宠共用状态到期核对和活动领取导航。接口配套、隔离验证及人工验收边界见 [宠物账号保护与交互修复](docs/pets-account-protection.md)。
+第六批调整散步与进阶课成长效率，补齐成长进度、移动端桌宠避让及弱网恢复，详见 [成长节奏与恢复](docs/pets-phase-six.md)。
+第七批整理家园分区、近况与成长引导，增加缺少材料的来源定位；保留分区内草稿与选择，活动记录仍按需读取，详见 [家园交互与引导](docs/pets-phase-seven.md)。
+荷小豚十个 256 × 256 透明 WebM 动作已接入家园和桌宠：互动确认后播放，长期动作跟随当前活动，隐藏/省流/减少动态时停播或静态回退；不新增业务请求。详见 [动作接入](docs/pets-phase-eight.md) 与 [素材预览和大小](docs/pets-art/hexiaotun-animations-v1/README.md)。
+摸摸獭、鱼饼喵和派小鱼各十段透明动作也已接入家园和桌宠，复用荷小豚的确认后播放、活动循环与静态回退。三只采用已确认的放慢行走、加快日常互动节奏，待机与睡觉不变；本地接入和验证见 [四种宠物动画接入](docs/pets-animation-all-species.md)。独立素材预览及实际大小见 [四种宠物动作素材](docs/pets-art/action-video-library.md)，可用 `node tools/pet-animation-serve.mjs` 在独立端口查看，不影响原有长跑测试。
+宠物预览的固定 Sites 身份已登记；后续复用同一站点，发布进度及更新方式见 [固定预览站](docs/pets-art/preview-site.md)。
+本地八小时持续检查使用 `node tools/pets-soak.mjs start --hours 8`，以专用账号、隔离事务专项和前端交互专项分别记录结果；状态、停止方式及覆盖边界见 [持续检查说明](docs/pets-soak-test.md)。
+补测全部宠物课程、工作、探索、制作和重新领养可运行 `python3 tools/pet-soak/focused.py --rhythm /Users/ling/Documents/GitHub/rhythm`；它使用独立本地账号及局部时间夹具，与自然八小时观察分开记录，详见 [针对性测试记录](docs/pets-soak-targeted-review.md)。
 用户列表/内容读取失败明确显示错误和重试，合法空结果单独展示，不用 mock 冒充。
 SSR 另 prefetch：`/domains`、`/tags`、`/breezemoons`、`/top`、`/repeater`。
 补齐页面：`/download`、`/agreement`、`/privacy`、`/activity`、`/following`、`/settings/point`、`/member/:name/medals`、`/city/:city`、`/charge/point`、`/column/:id`。

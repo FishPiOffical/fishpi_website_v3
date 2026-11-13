@@ -1,0 +1,1251 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import ts from 'typescript'
+import { createPinia, defineStore, setActivePinia } from 'pinia'
+import { ref } from 'vue'
+
+// 固定种子可复现长时测试中的同一轮，默认场景数保持日常专项足够轻量。
+const options = new Map(process.argv.slice(2).map(argument => {
+  const match = /^--(seed|cases)=(\d+)$/.exec(argument)
+  if (!match) throw new Error(`不支持的测试参数：${argument}；使用 --seed=整数 --cases=整数`)
+  return [match[1], match[2]]
+}))
+const seed = Number(options.get('seed') ?? process.env.PET_TEST_SEED ?? 20261113)
+const randomCases = Number(options.get('cases') ?? process.env.PET_TEST_CASES ?? 32)
+assert(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff, 'seed 必须为 uint32')
+assert(Number.isInteger(randomCases) && randomCases >= 1 && randomCases <= 2000, 'cases 必须为 1～2000')
+let randomState = seed
+const random = maximum => {
+  randomState = (randomState + 0x6d2b79f5) >>> 0
+  let value = Math.imul(randomState ^ randomState >>> 15, 1 | randomState)
+  value ^= value + Math.imul(value ^ value >>> 7, 61 | value)
+  return Math.floor(((value ^ value >>> 14) >>> 0) / 0x100000000 * maximum)
+}
+const shuffled = values => {
+  const result = [...values]
+  for (let index = result.length - 1; index > 0; index--) { const other = random(index + 1); [result[index], result[other]] = [result[other], result[index]] }
+  return result
+}
+console.log(`SEED pets-store seed=${seed} cases=${randomCases}`)
+
+const moduleUrl = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
+const compile = source => moduleUrl(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
+class ApiError extends Error { constructor(message, status, code) { super(message); this.status = status; this.code = code } }
+let context = 1, serial = 0, handler
+const calls = []
+const useAuthStore = defineStore('pet-test-auth', () => ({ accessToken: ref('token-a'), account: ref({ oId: 'A' }) }))
+globalThis.__petTest = {
+  ApiError, getAuthContextVersion: () => context, useAuthStore,
+  profileOperationKey: () => `pet:${++serial}`,
+  request: (path, options) => { calls.push({ path, options }); return handler(path, options) },
+}
+globalThis.window = new EventTarget()
+globalThis.document = Object.assign(new EventTarget(), { hidden: false })
+class Channel {
+  static all = []
+  messages = []
+  constructor() { Channel.all.push(this) }
+  postMessage(data) { this.messages.push(data) }
+  close() { this.closed = true }
+}
+globalThis.BroadcastChannel = Channel
+
+const transport = moduleUrl('export const {ApiError,getAuthContextVersion,request}=globalThis.__petTest')
+const apiUrl = compile((await fs.readFile('src/api/v3-pets.ts', 'utf8')).replace("from './http'", `from '${transport}'`))
+const api = await import(apiUrl)
+let source = await fs.readFile('src/stores/pets.ts', 'utf8')
+for (const [name, url] of [
+  ['vue', import.meta.resolve('vue')], ['pinia', import.meta.resolve('pinia')],
+  ['@/api/http', transport], ['@/api/v3-pets', apiUrl],
+  ['@/api/v3-profile', moduleUrl('export const {profileOperationKey}=globalThis.__petTest')],
+  ['@/stores/auth', moduleUrl('export const {useAuthStore}=globalThis.__petTest')],
+]) source = source.replaceAll(`from '${name}'`, `from '${url}'`)
+const { usePetsStore } = await import(compile(source.replaceAll('import.meta.env.SSR', 'false')))
+
+const catalog = {
+  version: 3,
+  activityVersion: 4,
+  skills: ['vitality', 'exploration', 'knowledge', 'expression', 'crafting', 'kindness'].map(id => ({ id, name: id, description: '入门技能' })),
+  places: [{ id: 'plaza', name: '广场散步', description: '和伙伴走一走', durationMs: 300000,
+    cost: { coins: 0, energy: 5, hunger: 2, water: 3 },
+    rewards: { coins: 0, proficiency: 0, experience: 10, food: 0, mood: 8, skills: [{ id: 'exploration', experience: 3 }] } }],
+  courses: [{ id: 'reading-basics', name: '阅读入门', description: '认识新的知识', durationMs: 600000,
+    cost: { coins: 5, energy: 8, hunger: 3, water: 4 },
+    rewards: { coins: 0, proficiency: 0, experience: 15, food: 0, mood: 3, skills: [{ id: 'knowledge', experience: 10 }] } }],
+  incomeRules: { dailyLimit: 60 },
+  jobs: ['delivery-assistant','trail-assistant','library-assistant','broadcast-assistant','craft-assistant','care-assistant'].map((id, index) => ({ id, name: id, description: '见习工作', durationMs: 1200000, cost: { coins: 0, energy: 12, hunger: 4, water: 6 }, rewards: { coins: 12, proficiency: 10, experience: 15, food: 0, mood: 3, skills: [] }, requirement: { skillId: ['vitality','exploration','knowledge','expression','crafting','kindness'][index], experience: 10 } })),
+  species: ['momota', 'hexiaotun', 'yubingmiao', 'paixiaoyu'].map(id => ({ id, name: id, description: '社区伙伴' })),
+  items: [
+    { id: 'food', name: '基础口粮', description: '日常口粮', category: 'food', price: 5, hunger: 35, effects: { hunger: 35, water: 0, mood: 0, energy: 0 } },
+    { id: 'fruit', name: '鲜果', description: '香甜鲜果', category: 'food', price: 6, hunger: 20, effects: { hunger: 20, water: 0, mood: 8, energy: 0 } },
+    { id: 'spring-water', name: '清泉饮', description: '补充水分', category: 'drink', price: 5, hunger: 0, effects: { hunger: 0, water: 35, mood: 0, energy: 5 } },
+    { id: 'reed', name: '芦苇', description: '手作材料', category: 'material', price: 6, hunger: 0, effects: { hunger: 0, water: 0, mood: 0, energy: 0 } },
+    { id: 'sea-shell', name: '海贝', description: '海边拾取', category: 'material', price: null, hunger: 0, effects: { hunger: 0, water: 0, mood: 0, energy: 0 } },
+  ],
+  recipes: [{ id: 'reed-boat', name: '芦苇小舟', description: '留下荷塘的回忆', requirements: [{ skillId: 'exploration', experience: 10 }], ingredients: [{ itemId: 'reed', quantity: 2 }], coins: 2, collectionId: 'reed-boat' }],
+  collections: [{ id: 'reed-boat', name: '芦苇小舟', description: '荷塘的回忆' }],
+  stories: [{ id: 'care-companion', name: '照顾小伙伴', description: '一起熟悉家园',
+    steps: [{ id: 'feed', description: '喂食一次' }, { id: 'water', description: '饮水一次' }, { id: 'play', description: '玩耍一次' }],
+    rewards: { items: [{ itemId: 'food', quantity: 2 }] } }],
+  readoptionRules: { coins: 512 },
+  rules: { maxNameLength: 12, initialCoins: 100, initialFood: 6, dailyCoins: 20, dailyFood: 2,
+    restDurationMs: 14400000, restEnergyPerHour: 20, growthDailyLimit: 10 },
+}
+for (const entry of [...catalog.places, ...catalog.courses, ...catalog.jobs]) {
+  entry.requirements = entry.requirement ? [entry.requirement] : []
+  entry.rewards.items = []
+}
+catalog.places.push({ ...structuredClone(catalog.places[0]), id: 'lotus-pond', name: '荷塘采集',
+  requirements: [{ skillId: 'exploration', experience: 10 }],
+  rewards: { ...structuredClone(catalog.places[0].rewards), items: [{ itemId: 'reed', quantity: 2 }] } })
+const now = Date.UTC(2026, 10, 12, 10)
+const empty = () => ({ serverNow: now, today: '2026-11-12', catalogVersion: 3, wallet: { coins: 0 },
+  income: { date: '2026-11-12', earned: 0, limit: 60, remaining: 60 },
+  inventory: [], collections: [], stories: [{ id: 'care-companion', completedSteps: 0, status: 'active', completedAt: null, claimedAt: null }], dailySupply: { claimed: false, coins: 20, food: 2 }, pet: null })
+const adopted = () => ({ ...empty(), wallet: { coins: 100 }, inventory: [{ itemId: 'food', quantity: 6 }], pet: {
+  id: 'pet-a', speciesId: 'hexiaotun', name: '荷小豚', hunger: 90, water: 90, mood: 90, energy: 80,
+  experience: 0, level: 1, friendship: 0, adoptedAt: now - 3600000, activity: null,
+  skills: catalog.skills.map(skill => ({ id: skill.id, experience: 0, level: 1 })),
+  jobs: catalog.jobs.map(job => ({ id: job.id, experience: 0, level: 1, completed: 0 })),
+  cooldowns: { pet: 0, play: 0 }, growthToday: { used: 0, limit: 10 },
+} })
+const response = data => ({ code: 0, data: structuredClone(data) })
+let serverState = empty()
+const success = async (path, options) => {
+  if (options?.method) {
+    const body = JSON.parse(options.body)
+    const kind = path.split('/').at(-1)
+    if (kind === 'adoption') serverState = adopted()
+    return response({ operation: kind === 'actions' ? body.action : kind === 'purchases' ? 'purchase' : kind,
+      petId: serverState.pet?.id ?? 'pet-a', committedAt: now })
+  }
+  return response(path.endsWith('/catalog') ? catalog : serverState)
+}
+const writes = () => calls.filter(call => call.options?.method)
+const tick = () => new Promise(resolve => setTimeout(resolve, 0))
+function deferred() {
+  let resolve, reject
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no })
+  return { promise, resolve, reject }
+}
+
+assert.equal(api.petNameLength('👨‍👩‍👧‍👦👍🏽🇨🇳é'), 4)
+assert.equal(api.normalizePetName('  荷小豚  '), '荷小豚')
+assert.equal(api.normalizePetName('鱼'.repeat(12)), '鱼'.repeat(12))
+for (const name of ['鱼'.repeat(13), ' ', '\ud800', 'a\nb', 'a\u202eb', 'a\u00adb', '<鱼>', 'a'.repeat(257)]) {
+  assert.throws(() => api.normalizePetName(name))
+}
+assert.deepEqual(api.decodePetState(empty()), empty())
+assert.deepEqual(api.decodePetCatalog(catalog), catalog)
+for (const patch of [{ today: '2026-02-30' }, { wallet: { coins: -1 } }, { pet: undefined },
+  { inventory: [{ itemId: 'food', quantity: 1 }, { itemId: 'food', quantity: 2 }] }]) {
+  assert.throws(() => api.decodePetState({ ...empty(), ...patch }))
+}
+assert.throws(() => api.decodePetState({ ...adopted(), pet: { ...adopted().pet, hunger: 101 } }))
+assert.throws(() => api.decodePetState({ ...adopted(), pet: { ...adopted().pet,
+  activity: { kind: 'school', startedAt: now, endsAt: now + 10 } } }))
+console.log('PASS 真实字段校验、Unicode名字边界、无宠物空状态及非法快照拒绝')
+
+handler = success
+setActivePinia(createPinia())
+const auth = useAuthStore(), store = usePetsStore()
+auth.accessToken = null
+await store.ensureLoaded()
+assert.equal(calls.length, 0)
+auth.accessToken = 'token-a'
+await Promise.all([store.ensureLoaded(), store.ensureLoaded(), store.ensureLoaded()])
+assert.equal(calls.length, 2)
+await store.ensureLoaded()
+assert.equal(calls.length, 2)
+assert.equal(store.pet, null)
+assert.equal(store.receivedAt > 0, true)
+console.log('PASS 游客零请求，页面与桌宠合并两次初始化GET，重复挂载复用状态')
+
+await store.adopt('hexiaotun', '荷小豚')
+assert.equal(store.pet.name, '荷小豚')
+assert.equal(store.coins, 100)
+assert.equal(store.foodQuantity, 6)
+assert.equal(writes().length, 1)
+await store.adopt('momota', '不能再领养')
+assert.equal(writes().length, 1)
+assert.deepEqual(Channel.all.at(-1).messages, [{ type: 'changed', owner: 'A' }])
+console.log('PASS 领养成功后只重读聚合状态，重复点击无额外写入，跨标签只传失效元数据')
+
+let purchase = deferred()
+handler = (path, options) => options?.method ? purchase.promise : success(path, options)
+const purchasing = store.buyFood(1)
+assert.equal(store.busy, true)
+assert.equal(await store.buyFood(1), false)
+assert.equal(writes().length, 2)
+purchase.resolve(response({ operation: 'purchase', petId: 'pet-a', committedAt: now }))
+await purchasing
+assert.equal(store.busy, false)
+console.log('PASS 并发点击前端串行，命令携带当前宠物ID与目录版本')
+
+handler = async () => { throw new ApiError('商品价格已更新，请重新查看', 409, 'catalog_changed') }
+await store.buyFood(1)
+assert.equal(store.pending, null)
+assert.equal(store.catalog, null)
+assert(store.catalogError)
+const rejectedPurchases = writes().length
+await store.buyFood(1)
+assert.equal(writes().length, rejectedPurchases)
+handler = success
+await store.reloadCatalog()
+assert.equal(store.catalog.version, 3)
+assert.equal(store.catalogError, '')
+console.log('PASS 目录版本变化阻止旧价继续下单，显式刷新目录后恢复购买')
+
+handler = async (path, options) => {
+  if (options?.method) return success(path, options)
+  throw new Error('正文断流')
+}
+assert.equal(await store.act('water'), true)
+assert.equal(store.pending, null)
+assert.equal(store.state, null)
+assert.equal(store.refreshNeeded, true)
+const completedWrites = writes().length
+await store.retryPending()
+assert.equal(writes().length, completedWrites)
+handler = success
+await store.refresh()
+assert.equal(store.ready, true)
+console.log('PASS 已确认写入后的GET失败仅重读，不重复收费或操作')
+
+handler = async () => { throw new Error('连接断开') }
+await store.claimSupply()
+const unknown = { ...store.pending }
+assert.equal(unknown.expectedDate, '2026-11-12')
+auth.accessToken = 'token-a-rotated'
+assert.deepEqual(store.pending, unknown)
+handler = async () => { throw new ApiError('结果暂不可确认', 409) }
+await store.retryPending()
+assert.equal(store.pending.key, unknown.key)
+assert.equal(writes().at(-1).options.headers['Idempotency-Key'], unknown.key)
+assert.equal(JSON.parse(writes().at(-1).options.body).expectedDate, unknown.expectedDate)
+handler = success
+await store.retryPending()
+assert.equal(store.pending, null)
+console.log('PASS 未确认补给固定日期及原键，跨日/令牌轮换/恢复4xx不会生成新操作')
+
+handler = async () => response({ operation: 'feed', petId: 'pet-a', committedAt: now })
+await store.rename('新名字')
+assert.equal(store.pending?.kind, 'name')
+assert(store.pendingError)
+handler = success
+await store.retryPending()
+console.log('PASS 回执操作不匹配保留未知命令，不能误清原键')
+
+const activeTrip = { id: 'trip-a', kind: 'outing', entryId: 'plaza', name: '广场散步',
+  startedAt: now, endsAt: now + 300000, status: 'running',
+  cost: catalog.places[0].cost, rewards: catalog.places[0].rewards }
+assert.deepEqual(api.decodePetState({ ...adopted(), pet: { ...adopted().pet, activity: activeTrip } }).pet.activity, activeTrip)
+for (const activity of [{ ...activeTrip, status: 'claimable' }, { ...activeTrip, endsAt: now },
+  { ...activeTrip, cost: { ...activeTrip.cost, energy: -1 } },
+  { ...activeTrip, rewards: { ...activeTrip.rewards, skills: [{ id: 'made-up-skill', experience: 2 }] } }]) {
+  assert.throws(() => api.decodePetState({ ...adopted(), pet: { ...adopted().pet, activity } }))
+}
+assert.throws(() => api.decodePetState({ ...adopted(), pet: { ...adopted().pet, skills: [] } }))
+assert.throws(() => api.decodePetCatalog({ ...catalog, places: [catalog.places[0], catalog.places[0]] }))
+assert.throws(() => api.decodePetCatalog({ ...catalog, activityVersion: 0 }))
+const oldCatalog = structuredClone(catalog), oldState = adopted()
+for (const field of ['activityVersion', 'skills', 'places', 'courses']) delete oldCatalog[field]
+delete oldState.pet.skills
+assert.throws(() => api.decodePetCatalog(oldCatalog), '旧服务缺少活动协议时应明确报错，不能伪装为空目录')
+assert.throws(() => api.decodePetState(oldState), '缺少技能字段不能伪装成六项零经验')
+const tripStart = deferred(), beforeStart = calls.length
+handler = (path, options) => options?.method ? tripStart.promise : success(path, options)
+const starting = store.startActivity('outing', 'plaza')
+assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', kind: 'outing', entryId: 'plaza', activityVersion: 4 })
+assert.equal(await store.startActivity('course', 'reading-basics'), false)
+assert.equal(await store.act('rest'), false)
+serverState = { ...adopted(), pet: { ...adopted().pet, activity: activeTrip, energy: 75 } }
+tripStart.resolve(response({ operation: 'activity-start', petId: 'pet-a', activityId: 'trip-a', committedAt: now }))
+await starting
+assert.equal(calls.length, beforeStart + 2, '活动开始仅一写一次聚合读取，不额外查询课程或技能')
+assert.equal(store.pet.activity.id, 'trip-a')
+const blockedCount = calls.length
+assert.equal(await store.startActivity('course', 'reading-basics'), false)
+assert.equal(await store.act('wake'), false)
+assert.equal(await store.act('feed', 'food'), false)
+assert.equal(await store.claimActivity(), false)
+assert.equal(calls.length, blockedCount)
+console.log('PASS 活动快照严格解码，开始双击串行，只重读聚合，进行中禁止覆盖、照顾及提前领取')
+
+serverState.serverNow = activeTrip.endsAt
+serverState.pet.activity.status = 'claimable'
+handler = success
+await store.refresh()
+handler = async () => { throw new Error('领取响应断流') }
+await store.claimActivity()
+const claimCommand = { ...store.pending }
+assert.equal(claimCommand.activityId, 'trip-a')
+assert.equal(claimCommand.kind, 'activities/claim')
+auth.accessToken = 'token-a-activity-rotated'
+assert.deepEqual(store.pending, claimCommand)
+handler = async () => response({ operation: 'activity-claim', petId: 'pet-a', activityId: 'trip-b', committedAt: activeTrip.endsAt })
+await store.retryPending()
+assert.equal(store.pending.key, claimCommand.key, '不能把别的活动回执当成当前领取完成')
+handler = async (path, options) => {
+  if (options?.method) {
+    assert.equal(path, '/api/v3/me/pet/activities/claim')
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', activityId: 'trip-a' })
+    assert.equal(options.headers['Idempotency-Key'], claimCommand.key)
+    return response({ operation: 'activity-claim', petId: 'pet-a', activityId: 'trip-a', committedAt: activeTrip.endsAt })
+  }
+  throw new Error('成果已提交但当前读取失败')
+}
+await store.retryPending()
+assert.equal(store.pending, null)
+assert.equal(store.refreshNeeded, true)
+const claimWrites = writes().length
+await store.retryPending()
+assert.equal(writes().length, claimWrites)
+serverState = adopted(); handler = success
+await store.refresh()
+console.log('PASS 待领取原activityId/原键冻结，普通令牌轮换与错配回执不丢命令，提交后读错不重复领成果')
+
+const claimableState = () => ({ ...adopted(), serverNow: activeTrip.endsAt,
+  pet: { ...adopted().pet, activity: { ...activeTrip, status: 'claimable' } } })
+serverState = claimableState(); handler = success; await store.refresh()
+const claimedRead = deferred(), beforeAlreadyClaimed = calls.length
+handler = (path, options) => options?.method
+  ? Promise.reject(new ApiError('这次活动已经领取过了', 409, 'activity_claimed')) : claimedRead.promise
+const alreadyClaimed = store.claimActivity(); await tick()
+assert.equal(store.pending, null)
+assert.equal(store.busy, true)
+assert.equal(store.refreshNeeded, true)
+assert.equal(calls.length, beforeAlreadyClaimed + 2, '首次明确已领取只提交一次并重读一次聚合状态')
+assert.equal(await store.claimActivity(), false)
+auth.accessToken = 'token-a-claimed-rotated'
+serverState = adopted(); serverState.pet.skills[1].experience = 3
+claimedRead.resolve(response(serverState))
+assert.equal(await alreadyClaimed, false, '跨设备已领取不能冒充本次写入成功')
+assert.equal(store.pet.activity, null)
+assert.equal(store.pet.skills[1].experience, 3)
+assert.equal(store.error, '')
+assert.equal(store.refreshNeeded, false)
+assert.equal(calls.length, beforeAlreadyClaimed + 2)
+console.log('PASS 首次明确已领取仅重读一次，普通令牌轮换接受同身份迟到状态，不重复领奖')
+
+serverState = claimableState(); handler = success; await store.refresh()
+handler = async (path, options) => {
+  if (options?.method) throw new ApiError('这次活动已经领取过了', 409, 'activity_claimed')
+  throw new Error('读取响应断流')
+}
+const beforeClaimedReadFailure = calls.length
+await store.claimActivity()
+assert.equal(calls.length, beforeClaimedReadFailure + 2)
+assert.equal(store.pending, null)
+assert.equal(store.state, null)
+assert.equal(store.refreshNeeded, true)
+assert(store.error.includes('宠物暂时没能回到画面'), '重读失败保留友好错误和纯读取恢复入口')
+const beforeReadOnlyRecovery = writes().length
+await store.retryPending(); await store.claimActivity()
+assert.equal(writes().length, beforeReadOnlyRecovery)
+serverState = adopted(); handler = success; await store.refresh()
+assert.equal(writes().length, beforeReadOnlyRecovery)
+console.log('PASS 跨设备已领取后的读取失败只恢复GET，不保留可重复领取的过时画面')
+
+serverState = claimableState(); await store.refresh()
+handler = async () => { throw new Error('领取结果未知') }
+await store.claimActivity()
+const originalClaim = { ...store.pending }, beforeClaimConflict = calls.length
+handler = async () => { throw new ApiError('这次活动已经领取过了', 409, 'activity_claimed') }
+await store.retryPending()
+assert.deepEqual(store.pending, originalClaim, '未知结果恢复收到已领取仍不能释放原命令')
+assert.equal(calls.length, beforeClaimConflict + 1, '恢复期间的409不触发额外GET')
+assert.equal(writes().at(-1).options.headers['Idempotency-Key'], originalClaim.key)
+handler = async (path, options) => options?.method
+  ? response({ operation: 'activity-claim', petId: 'pet-a', activityId: 'trip-a', committedAt: activeTrip.endsAt }) : success(path, options)
+serverState = adopted(); await store.retryPending()
+console.log('PASS 未知原键恢复的已领取409仍保留命令，只能用原键核对结果')
+
+serverState = claimableState(); handler = success; await store.refresh()
+const oldSessionRead = deferred()
+handler = (path, options) => options?.method
+  ? Promise.reject(new ApiError('这次活动已经领取过了', 409, 'activity_claimed')) : oldSessionRead.promise
+const oldSessionClaim = store.claimActivity(); await tick()
+context++; auth.accessToken = 'token-a-new-session'
+serverState = adopted(); serverState.pet.name = '新会话当前名字'; handler = success; await store.ensureLoaded()
+const afterNewSessionRead = calls.length
+oldSessionRead.resolve(response(claimableState())); await oldSessionClaim
+assert.equal(store.pet.name, '新会话当前名字')
+assert.equal(store.pet.activity, null)
+assert.equal(store.pending, null)
+assert.equal(calls.length, afterNewSessionRead, '同账号新的认证代际不能触发旧恢复读的后续操作')
+console.log('PASS 同账号重新认证后拒绝旧恢复读取，不复活已领取活动或覆盖当前宠物')
+
+const lateRead = deferred()
+handler = () => lateRead.promise
+const reading = store.refresh()
+context++; auth.account = { oId: 'B' }; auth.accessToken = 'token-b'
+lateRead.resolve(response(adopted()))
+await reading
+assert.equal(store.state, null)
+assert.equal(store.catalog, null)
+assert.equal(store.pending, null)
+serverState = { ...adopted(), pet: { ...adopted().pet, id: 'pet-b', name: '小鱼' } }
+handler = success
+await store.ensureLoaded()
+assert.equal(store.pet.id, 'pet-b')
+const lateWrite = deferred()
+handler = () => lateWrite.promise
+const writing = store.rename('B的新名字')
+context++; auth.account = { oId: 'C' }; auth.accessToken = 'token-c'
+lateWrite.resolve(response({ operation: 'name', petId: 'pet-b', committedAt: now }))
+const countBeforeLate = calls.length
+await writing
+assert.equal(calls.length, countBeforeLate)
+assert.equal(store.state, null)
+assert.equal(store.pending, null)
+console.log('PASS 换号废弃迟到读取/写回执，不污染新身份且不触发旧身份后置GET')
+
+serverState = adopted()
+handler = success
+await store.ensureLoaded()
+const channel = Channel.all.at(-1), beforeNotice = calls.length
+channel.onmessage({ data: { type: 'changed', owner: 'A' } })
+assert.equal(calls.length, beforeNotice)
+document.hidden = true
+channel.onmessage({ data: { type: 'changed', owner: 'C' } })
+assert.equal(calls.length, beforeNotice)
+document.hidden = false
+document.dispatchEvent(new Event('visibilitychange'))
+await tick()
+assert.equal(calls.length, beforeNotice + 1)
+window.dispatchEvent(new Event('focus'))
+assert.equal(calls.length, beforeNotice + 1)
+auth.accessToken = null
+assert.equal(store.state, null)
+assert.equal(store.catalog, null)
+store.$dispose()
+assert.equal(channel.closed, true)
+console.log('PASS 跨账号广播忽略，后台标签延迟重读，聚焦去重，退出和销毁清理')
+
+setActivePinia(createPinia())
+const { usePetsStore: useSsrStore } = await import(compile(source.replaceAll('import.meta.env.SSR', 'true')))
+const ssr = useSsrStore(), beforeSsr = calls.length
+await ssr.ensureLoaded()
+await ssr.refresh()
+assert.equal(calls.length, beforeSsr)
+ssr.$dispose()
+console.log('PASS SSR不读取宠物私有数据')
+// 第三批沿用真实 API 与 Pinia 状态，隔离传输，验证开工门槛和日志竞态。
+setActivePinia(createPinia())
+const workAuth = useAuthStore(), workStore = usePetsStore()
+serverState = adopted(); handler = success; await workStore.ensureLoaded()
+const beforeLocked = calls.length
+assert.equal(await workStore.startActivity('work', 'library-assistant'), false)
+assert.equal(calls.length, beforeLocked)
+serverState.pet.skills[2].experience = 9; await workStore.refresh()
+assert.equal(await workStore.startActivity('work', 'library-assistant'), false)
+serverState.pet.skills[2].experience = 10
+serverState.income = { date: '2026-11-12', earned: 60, limit: 60, remaining: 0 }
+await workStore.refresh()
+assert.equal(await workStore.startActivity('work', 'library-assistant'), false)
+serverState.income = { date: '2026-11-12', earned: 55, limit: 60, remaining: 5 }
+await workStore.refresh()
+const working = { ...activeTrip, id: 'work-a', kind: 'work', entryId: 'library-assistant', name: '图书助理',
+  status: 'running', endsAt: now + 1200000, cost: catalog.jobs[2].cost, rewards: catalog.jobs[2].rewards }
+handler = async (path, options) => {
+  if (options?.method) {
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', kind: 'work', entryId: 'library-assistant', activityVersion: 4 })
+    serverState.pet.activity = working
+    return response({ operation: 'activity-start', petId: 'pet-a', activityId: 'work-a', committedAt: now })
+  }
+  return success(path, options)
+}
+const beforeWork = calls.length
+assert.equal(await workStore.startActivity('work', 'library-assistant'), true)
+assert.equal(calls.length, beforeWork + 2)
+api.decodePetState(serverState)
+assert.equal(workStore.pet.activity.kind, 'work')
+assert.equal(workStore.coins, 100, '启动工作不能预先把工资加入钱包')
+assert.equal(workStore.pet.jobs[2].experience, 0, '未领取不能预先增加职业熟练度')
+assert.equal(await workStore.startActivity('outing', 'plaza'), false)
+console.log('PASS 工作只按对应技能门槛与服务端收入额度解锁，单槽互斥，报酬和熟练度不在本地预发')
+
+const historyPage = (records = [], page = 1, total = records.length) => ({ serverNow: now + 1200001, list: records.map(record => ({ ...record, recordType: record.recordType ?? 'activity' })),
+  pagination: { page, pageSize: 10, total, pageCount: Math.max(1, Math.ceil(total / 10)) } })
+const oldRecord = { ...activeTrip, petId: 'pet-a', status: 'claimed', claimedAt: activeTrip.endsAt, actualRewards: null }
+const workRecord = { ...working, petId: 'pet-a', status: 'claimed', claimedAt: working.endsAt,
+  actualRewards: { ...working.rewards, coins: 5, mood: 2.3 } }
+assert.equal(api.decodePetActivityHistory(historyPage([oldRecord])).list[0].actualRewards, null)
+assert.equal(api.decodePetActivityHistory(historyPage([workRecord])).list[0].actualRewards.coins, 5)
+assert.equal(api.decodePetActivityHistory(historyPage([workRecord])).list[0].actualRewards.mood, 2.3)
+for (const record of [{ ...workRecord, actualRewards: undefined }, { ...workRecord, claimedAt: null },
+  { ...workRecord, actualRewards: { ...workRecord.actualRewards, coins: -1 } },
+  { ...workRecord, actualRewards: { ...workRecord.actualRewards, mood: NaN } },
+  { ...workRecord, status: 'running', claimedAt: null }]) {
+  assert.throws(() => api.decodePetActivityHistory(historyPage([record])))
+}
+assert.throws(() => api.decodePetActivityHistory({ ...historyPage(), pagination: { page: 1, pageSize: 10, total: 11, pageCount: 1 } }))
+console.log('PASS 工作履历实际发币、封顶小数心情与旧记录未知成果分别保留，非法奖励/分页拒绝')
+
+globalThis.__petTest.usePetsStore = usePetsStore
+let historySource = await fs.readFile('src/stores/petActivityHistory.ts', 'utf8')
+for (const [name, url] of [
+  ['vue', import.meta.resolve('vue')], ['pinia', import.meta.resolve('pinia')], ['@/api/http', transport],
+  ['@/api/v3-pets', apiUrl], ['@/stores/auth', moduleUrl('export const {useAuthStore}=globalThis.__petTest')],
+  ['@/stores/pets', moduleUrl('export const {usePetsStore}=globalThis.__petTest')],
+]) historySource = historySource.replaceAll(`from '${name}'`, `from '${url}'`)
+const { usePetActivityHistoryStore } = await import(compile(historySource.replaceAll('import.meta.env.SSR', 'false')))
+const historyStore = usePetActivityHistoryStore()
+const isHistory = path => path.includes('/pet/journal?')
+let historyRequests = () => calls.filter(call => isHistory(call.path))
+handler = (path, options) => isHistory(path) ? Promise.resolve(response(historyPage([oldRecord, workRecord]))) : success(path, options)
+await workStore.refresh()
+assert.equal(historyRequests().length, 0, '折叠状态没有日志请求')
+await Promise.all([historyStore.open(), historyStore.open(), historyStore.refresh()])
+assert.equal(historyRequests().length, 1, '展开双击与刷新合并')
+assert.equal(historyStore.history.list.length, 2)
+const oldPage = deferred(), latestPage = deferred()
+handler = path => path.includes('kind=work') ? latestPage.promise : oldPage.promise
+const staleHistory = historyStore.refresh()
+const switchFilter = historyStore.setFilter('work')
+latestPage.resolve(response(historyPage([workRecord], 1, 11))); await switchFilter
+oldPage.resolve(response(historyPage([oldRecord]))); await staleHistory
+assert.equal(historyStore.history.list[0].id, 'work-a')
+assert.equal(historyStore.filter, 'work')
+const pageTwo = deferred()
+handler = () => pageTwo.promise
+const nextPage = historyStore.setPage(2)
+assert.equal(historyStore.history, null, '换页期间不能把旧页当作新页')
+pageTwo.resolve(response(historyPage([], 2, 11))); await nextPage
+assert.equal(historyStore.history.pagination.page, 2)
+console.log('PASS 日志按需展开与并发合并，分类/页码切换废弃旧响应，真实分页')
+
+const staleBeforeClaim = deferred(), currentAfterClaim = deferred()
+let historyCounter = 0
+handler = (path, options) => isHistory(path) ? (++historyCounter === 1 ? staleBeforeClaim.promise : currentAfterClaim.promise) : success(path, options)
+const staleClaimRead = historyStore.refresh()
+await workStore.refresh()
+assert.equal(historyCounter, 2, '状态重读必须废弃领取前在途履历再读取一次')
+currentAfterClaim.resolve(response(historyPage([], 2, 11))); await tick()
+staleBeforeClaim.resolve(response(historyPage([workRecord], 2, 11))); await staleClaimRead
+assert.equal(historyStore.history.list.length, 0)
+historyStore.close()
+const beforeClosed = historyRequests().length
+handler = success; await workStore.refresh()
+assert.equal(historyRequests().length, beforeClosed)
+console.log('PASS 状态更新废弃旧在途履历后刷新一次，关闭后桌宠更新不再读日志')
+
+const rotateHistory = deferred(); handler = () => rotateHistory.promise
+const rotatedRead = historyStore.open()
+workAuth.accessToken = 'token-a-rotated-for-history'
+rotateHistory.resolve(response(historyPage([], 2, 11))); await rotatedRead
+assert.equal(historyStore.history.pagination.page, 2, '同账号令牌轮换保留在途读取')
+const oldIdentity = deferred(); handler = () => oldIdentity.promise
+const identityRead = historyStore.refresh()
+context++; workAuth.account = { oId: 'another-owner' }; workAuth.accessToken = 'other-token'
+oldIdentity.resolve(response(historyPage([workRecord], 2, 11))); await identityRead
+assert.equal(historyStore.history, null)
+assert.equal(historyStore.opened, false)
+assert.equal(historyStore.filter, 'all')
+assert.equal(historyStore.page, 1)
+workAuth.accessToken = null
+const beforeGuestHistory = calls.length; await historyStore.open(); await historyStore.refresh()
+assert.equal(calls.length, beforeGuestHistory)
+historyStore.$dispose(); workStore.$dispose()
+console.log('PASS 日志普通轮换保留，换号清除/关闭且拒迟到响应，游客零请求')
+// 第四批测试在同一真实 API/store 上继续运行。
+
+const careRecord = { recordType: 'event', id: 'care-1', petId: 'pet-a', kind: 'care', action: 'feed', name: '喂食鲜果',
+  occurredAt: now, itemChanges: [{ itemId: 'fruit', quantity: -1 }], coinsDelta: 0,
+  effects: { hunger: 10.25, water: 0, mood: 8, energy: 0, experience: 2, friendship: 1 }, collectionId: null }
+const craftRecord = { ...careRecord, id: 'craft-1', kind: 'craft', action: 'craft', name: '制作芦苇小舟',
+  coinsDelta: -2, itemChanges: [{ itemId: 'reed', quantity: -2 }],
+  effects: { hunger: 0, water: 0, mood: 0, energy: 0, experience: 0, friendship: 0 }, collectionId: 'reed-boat' }
+const mixedJournal = api.decodePetJournal(historyPage([careRecord, craftRecord, oldRecord, workRecord]))
+assert.equal(mixedJournal.list[0].effects.hunger, 10.25)
+assert.equal(mixedJournal.list[0].itemChanges[0].quantity, -1)
+assert.equal(mixedJournal.list[1].collectionId, 'reed-boat')
+assert.equal(mixedJournal.list[2].actualRewards, null)
+for (const patch of [{ recordType: 'fake' }, { kind: 'care', action: 'purchase' }, { effects: { ...careRecord.effects, hunger: Infinity } },
+  { itemChanges: [{ itemId: 'fruit', quantity: 0 }] }, { collectionId: 'reed-boat' }, { coinsDelta: '2' },
+  { itemChanges: [{ itemId: 'fruit', quantity: -1 }, { itemId: 'fruit', quantity: -2 }] }]) {
+  assert.throws(() => api.decodePetJournal(historyPage([{ ...careRecord, ...patch }])))
+}
+assert.throws(() => api.decodePetJournal(historyPage([{ ...craftRecord, collectionId: null }])))
+assert.throws(() => api.decodePetJournal({ ...historyPage([]), list: [workRecord], pagination: { page: 1, pageSize: 10, total: 1, pageCount: 1 } }))
+console.log('PASS 统一日志按记录类型解码，保留实际小数效果、消费负数及旧成果未知，拒绝伪造类型与非法变化')
+
+for (const patch of [{ recipes: undefined }, { collections: [{ id: 'other', name: '其他', description: '无对应收藏' }] },
+  { recipes: [{ ...catalog.recipes[0], ingredients: [{ itemId: 'absent', quantity: 1 }] }] },
+  { items: [{ ...catalog.items[0], effects: { ...catalog.items[0].effects, hunger: 20 } }, ...catalog.items.slice(1)] },
+  { places: [{ ...catalog.places[0], rewards: { ...catalog.places[0].rewards, items: [{ itemId: 'absent', quantity: 1 }] } }] }]) {
+  assert.throws(() => api.decodePetCatalog({ ...catalog, ...patch }))
+}
+assert.throws(() => api.decodePetState({ ...adopted(), collections: undefined }))
+assert.throws(() => api.decodePetState({ ...adopted(), collections: [{ id: 'reed-boat', unlockedAt: now }, { id: 'reed-boat', unlockedAt: now }] }))
+assert.equal(api.decodePetCatalog(catalog).items.find(item => item.id === 'sea-shell').price, null)
+console.log('PASS 商品用途/不可购买材料与配方引用严格验证，缺失收藏数据不伪装为空')
+
+setActivePinia(createPinia())
+const exploreAuth = useAuthStore(), exploreStore = usePetsStore()
+serverState = adopted(); handler = success; await exploreStore.ensureLoaded()
+const beforeUntrained = calls.length
+assert.equal(await exploreStore.startActivity('outing', 'lotus-pond'), false)
+assert.equal(await exploreStore.craft('reed-boat'), false)
+assert.equal(await exploreStore.buyItem('sea-shell', 1), false)
+assert.equal(await exploreStore.buyItem('fruit', 21), false)
+assert.equal(calls.length, beforeUntrained)
+serverState.pet.skills[1].experience = 10
+serverState.inventory.push({ itemId: 'reed', quantity: 1 })
+await exploreStore.refresh()
+const beforeInsufficient = calls.length
+assert.equal(await exploreStore.craft('reed-boat'), false)
+assert.equal(calls.length, beforeInsufficient)
+let launched = false
+handler = async (path, options) => {
+  if (options?.method) {
+    const body = JSON.parse(options.body)
+    assert.equal(body.entryId, 'lotus-pond'); assert.equal(body.activityVersion, 4)
+    launched = true
+    return response({ operation: 'activity-start', petId: 'pet-a', activityId: 'advanced-1', committedAt: now })
+  }
+  return success(path, options)
+}
+assert.equal(await exploreStore.startActivity('outing', 'lotus-pond'), true)
+assert(launched)
+assert.equal(exploreStore.state.inventory.find(item => item.itemId === 'reed').quantity, 1, '出发回执不能预发材料')
+console.log('PASS 进阶探索与制作门槛在本地阻止无效请求，出发不预发材料，不可购买资源无写请求')
+
+handler = async (path, options) => {
+  if (options?.method) {
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', itemId: 'fruit', quantity: 2, catalogVersion: 3 })
+    serverState.inventory.push({ itemId: 'fruit', quantity: 2 }, { itemId: 'spring-water', quantity: 1 })
+    serverState.wallet.coins -= 12
+    return response({ operation: 'purchase', petId: 'pet-a', committedAt: now })
+  }
+  return success(path, options)
+}
+const beforeShop = calls.length
+assert.equal(await exploreStore.buyItem('fruit', 2), true)
+assert.equal(calls.length, beforeShop + 2, '购买仅一写一次聚合读取')
+assert.equal(exploreStore.coins, 88)
+const beforeWrongUse = calls.length
+assert.equal(await exploreStore.act('feed', 'reed'), false)
+assert.equal(await exploreStore.act('feed', 'spring-water'), false)
+assert.equal(await exploreStore.act('water', 'fruit'), false)
+assert.equal(calls.length, beforeWrongUse)
+handler = success
+assert.equal(await exploreStore.act('feed', 'fruit'), true)
+assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', action: 'feed', itemId: 'fruit' })
+assert.equal(await exploreStore.act('water', 'spring-water'), true)
+assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', action: 'water', itemId: 'spring-water' })
+assert.equal(await exploreStore.act('water'), true)
+assert.deepEqual(JSON.parse(writes().at(-1).options.body), { petId: 'pet-a', action: 'water' })
+console.log('PASS 商店冻结商品与价格版本，物品按用途使用，原免费饮水保留')
+
+serverState.inventory.find(item => item.itemId === 'reed').quantity = 2
+await exploreStore.refresh()
+handler = async () => { throw new Error('制作回包中断') }
+assert.equal(await exploreStore.craft('reed-boat'), false)
+const frozenCraft = structuredClone({ ...exploreStore.pending })
+assert.equal(frozenCraft.kind, 'crafts'); assert.equal(frozenCraft.recipeId, 'reed-boat')
+assert.equal(exploreStore.state.collections.length, 0, '未知制作不能本地解锁收藏')
+exploreAuth.accessToken = 'token-craft-rotated'
+assert.deepEqual({ ...exploreStore.pending }, frozenCraft)
+const beforeOtherCraft = calls.length
+assert.equal(await exploreStore.craft('reed-boat'), false)
+assert.equal(calls.length, beforeOtherCraft)
+handler = async (path, options) => {
+  if (options?.method) {
+    assert.equal(options.headers['Idempotency-Key'], frozenCraft.key)
+    assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', recipeId: 'reed-boat', catalogVersion: 3 })
+    serverState.inventory.find(item => item.itemId === 'reed').quantity = 0
+    serverState.wallet.coins -= 2
+    serverState.collections.push({ id: 'reed-boat', unlockedAt: now })
+    return response({ operation: 'craft', petId: 'pet-a', committedAt: now })
+  }
+  throw new Error('制作成功后状态读取断流')
+}
+assert.equal(await exploreStore.retryPending(), true)
+assert.equal(exploreStore.pending, null)
+assert.equal(exploreStore.state, null)
+const confirmedCrafts = writes().length
+assert.equal(await exploreStore.retryPending(), false)
+assert.equal(writes().length, confirmedCrafts)
+handler = success; await exploreStore.refresh()
+assert.equal(exploreStore.state.collections[0].id, 'reed-boat')
+const beforeDuplicate = calls.length
+assert.equal(await exploreStore.craft('reed-boat'), false)
+assert.equal(calls.length, beforeDuplicate)
+console.log('PASS 制作未知结果保留原材料命令/键，令牌轮换不丢失，成功后读取失败不再消费，收藏不可重复制作')
+
+const exploreHistory = usePetActivityHistoryStore()
+handler = (path, options) => isHistory(path) ? Promise.resolve(response(historyPage([careRecord]))) : success(path, options)
+await exploreHistory.open()
+await exploreHistory.setFilter('care')
+assert(calls.at(-1).path.includes('/journal?kind=care'))
+assert.equal(exploreHistory.history.list[0].action, 'feed')
+handler = (path, options) => isHistory(path) ? Promise.resolve(response(historyPage([workRecord]))) : success(path, options)
+await exploreHistory.refresh()
+assert.equal(exploreHistory.history, null, '分类错配不能让其他记录冒充日常')
+assert(exploreHistory.error)
+const staleCare = deferred(); handler = () => staleCare.promise
+const staleCareRead = exploreHistory.refresh()
+exploreHistory.close()
+staleCare.resolve(response(historyPage([careRecord]))); await staleCareRead
+assert.equal(exploreHistory.history, null)
+exploreHistory.$dispose(); exploreStore.$dispose()
+console.log('PASS 日常日志过滤走新接口，错误分类明确失败，关闭后迟到响应不再回写')
+
+const claimableStory = { id: 'care-companion', completedSteps: 3, status: 'claimable', completedAt: now, claimedAt: null }
+for (const patch of [
+  { stories: undefined }, { stories: [claimableStory, claimableStory] },
+  { stories: [{ ...claimableStory, completedSteps: -1 }] },
+  { stories: [{ ...claimableStory, status: 'active' }] },
+  { stories: [{ ...claimableStory, completedSteps: 0 }] },
+  { stories: [{ ...claimableStory, status: 'claimed', claimedAt: now - 1 }] },
+  { stories: [{ ...claimableStory, completedAt: now + 1 }] },
+]) assert.throws(() => api.decodePetState({ ...adopted(), ...patch }))
+for (const patch of [
+  { stories: undefined }, { readoptionRules: { coins: 0 } },
+  { stories: [{ ...catalog.stories[0], steps: [] }] },
+  { stories: [{ ...catalog.stories[0], rewards: { items: [{ itemId: 'unknown', quantity: 1 }] } }] },
+]) assert.throws(() => api.decodePetCatalog({ ...catalog, ...patch }))
+const storyLog = { ...careRecord, id: 'story-1', kind: 'story', action: 'story-claim', name: '照顾小伙伴奖励', itemChanges: [{ itemId: 'food', quantity: 2 }] }
+const readoptionLog = { ...careRecord, id: 'readoption-1', petId: 'pet-new', kind: 'readoption', action: 'readoption', name: '重新领养派小鱼', coinsDelta: -512 }
+assert.equal(api.decodePetJournal(historyPage([storyLog, readoptionLog])).list.length, 2)
+assert.throws(() => api.decodePetJournal(historyPage([{ ...storyLog, action: 'readoption' }])))
+console.log('PASS 事件链进度、领奖时间与奖励目录严格校验，重新领养及旅程日志可独立解码')
+
+setActivePinia(createPinia())
+context++
+const journeyAuth = useAuthStore(), journeyStore = usePetsStore()
+serverState = { ...adopted(), wallet: { coins: 600 } }
+handler = success
+await journeyStore.ensureLoaded()
+let beforeJourneyWrites = writes().length
+assert.equal(await journeyStore.claimStory('care-companion'), false)
+assert.equal(await journeyStore.readopt('paixiaoyu', '派派', false), false)
+assert.equal(writes().length, beforeJourneyWrites)
+serverState.stories = [claimableStory]
+await journeyStore.refresh()
+handler = async () => { throw new Error('领奖响应中断') }
+assert.equal(await journeyStore.claimStory('care-companion'), false)
+const storyCommand = { ...journeyStore.pending }
+assert.equal(storyCommand.kind, 'stories/claim')
+journeyAuth.accessToken = 'journey-token-rotated'
+assert.deepEqual(journeyStore.pending, storyCommand)
+assert.equal(await journeyStore.readopt('paixiaoyu', '派派', true), false)
+handler = async (path, options) => {
+  if (!options?.method) return success(path, options)
+  assert(path.endsWith('/stories/claim'))
+  assert.equal(options.headers['Idempotency-Key'], storyCommand.key)
+  assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', storyId: 'care-companion', catalogVersion: 3 })
+  serverState.stories = [{ ...claimableStory, status: 'claimed', claimedAt: now }]
+  return response({ operation: 'story-claim', petId: 'pet-a', storyId: 'care-companion', committedAt: now })
+}
+assert.equal(await journeyStore.retryPending(), true)
+assert.equal(journeyStore.state.stories[0].status, 'claimed')
+beforeJourneyWrites = writes().length
+assert.equal(await journeyStore.claimStory('care-companion'), false)
+assert.equal(writes().length, beforeJourneyWrites)
+console.log('PASS 事件链仅完成后可领，未知结果固定原键，令牌轮换保留，成功重读且不可再领')
+
+handler = async () => { throw new Error('换宠响应中断') }
+assert.equal(await journeyStore.readopt('paixiaoyu', ' 新派派 ', true), false)
+const readoptionCommand = { ...journeyStore.pending }
+assert.equal(readoptionCommand.petId, 'pet-a')
+assert.equal(readoptionCommand.name, '新派派')
+assert.equal(readoptionCommand.resetAccepted, true)
+journeyAuth.accessToken = 'readoption-token-rotated'
+assert.deepEqual(journeyStore.pending, readoptionCommand)
+handler = async (path, options) => {
+  if (!options?.method) throw new Error('换宠后聚合读取失败')
+  assert(path.endsWith('/readoption'))
+  assert.equal(options.headers['Idempotency-Key'], readoptionCommand.key)
+  assert.deepEqual(JSON.parse(options.body), { petId: 'pet-a', speciesId: 'paixiaoyu', name: '新派派', catalogVersion: 3, resetAccepted: true })
+  serverState = { ...serverState, wallet: { coins: 88 }, pet: { ...adopted().pet, id: 'pet-new', speciesId: 'paixiaoyu', name: '新派派' } }
+  return response({ operation: 'readoption', petId: 'pet-new', previousPetId: 'pet-a', committedAt: now })
+}
+assert.equal(await journeyStore.retryPending(), true)
+assert.equal(journeyStore.pending, null)
+assert.equal(journeyStore.state, null)
+const afterReadoption = writes().length
+assert.equal(await journeyStore.retryPending(), false)
+assert.equal(writes().length, afterReadoption)
+handler = success
+await journeyStore.refresh()
+assert.equal(journeyStore.pet.id, 'pet-new')
+assert.equal(journeyStore.coins, 88)
+assert.equal(journeyStore.state.stories[0].status, 'claimed')
+assert.equal(await journeyStore.readopt('hexiaotun', '再换一次', true), false)
+console.log('PASS 重新领养明确确认、512费用门槛和新旧petId回执，换宠后读取失败不重复收费')
+
+for (const receipt of [
+  { operation: 'readoption', petId: 'pet-a', previousPetId: 'pet-a', committedAt: now },
+  { operation: 'readoption', petId: 'pet-new', previousPetId: 'someone-else', committedAt: now },
+  { operation: 'adoption', petId: 'pet-new', previousPetId: 'pet-a', committedAt: now },
+]) {
+  handler = async () => response(receipt)
+  await assert.rejects(() => api.executePetCommand(readoptionCommand))
+}
+handler = async () => response({ operation: 'story-claim', petId: 'pet-a', storyId: 'another-story', committedAt: now })
+await assert.rejects(() => api.executePetCommand(storyCommand))
+handler = success
+serverState = { ...adopted(), wallet: { coins: 600 }, pet: { ...adopted().pet, activity: activeTrip }, stories: [claimableStory] }
+await journeyStore.refresh()
+beforeJourneyWrites = writes().length
+assert.equal(await journeyStore.readopt('paixiaoyu', '活动中', true), false)
+assert.equal(await journeyStore.claimStory('care-companion'), false)
+assert.equal(writes().length, beforeJourneyWrites)
+console.log('PASS 错配回执保持未知，不接受同petId假换宠，活动中不能领奖或重新领养')
+
+serverState.pet.activity = null
+await journeyStore.refresh()
+const staleReadoption = deferred()
+handler = () => staleReadoption.promise
+const staleSwitch = journeyStore.readopt('paixiaoyu', '旧账号命令', true)
+context++
+journeyAuth.account = { oId: 'B' }
+journeyAuth.accessToken = 'token-b'
+staleReadoption.resolve(response({ operation: 'readoption', petId: 'pet-other', previousPetId: 'pet-a', committedAt: now }))
+assert.equal(await staleSwitch, false)
+assert.equal(journeyStore.state, null)
+assert.equal(journeyStore.pending, null)
+assert.equal(journeyStore.catalog, null)
+journeyStore.$dispose()
+console.log('PASS 换账号清除待确认领养命令，迟到成功回执不污染新账号')
+
+// 第六批使用可控时钟验证真实超时与事件退避，不等待墙上时间，也不自动重发写操作。
+const realNow = Date.now, realSetTimeout = globalThis.setTimeout, realClearTimeout = globalThis.clearTimeout
+let recoveryNow = realNow(), timerId = 0
+const timers = new Map()
+Date.now = () => recoveryNow
+globalThis.setTimeout = (callback, delay = 0) => { const id = ++timerId; timers.set(id, { callback, at: recoveryNow + delay }); return id }
+globalThis.clearTimeout = id => timers.delete(id)
+const flushRecovery = () => new Promise(resolve => realSetTimeout(resolve, 0))
+async function advanceRecovery(ms) {
+  recoveryNow += ms
+  for (let round = 0; round < 20; round++) {
+    const due = [...timers.entries()].filter(([, timer]) => timer.at <= recoveryNow)
+    if (!due.length) { await flushRecovery(); if (![...timers.values()].some(timer => timer.at <= recoveryNow)) break; continue }
+    for (const [id, timer] of due) { if (timers.delete(id)) timer.callback() }
+    await flushRecovery()
+  }
+}
+const focusRecovery = () => { window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')) }
+const newRecoveryStore = () => { setActivePinia(createPinia()); context++; return { auth: useAuthStore(), pets: usePetsStore() } }
+
+const growthRules = { experiencePerLevel: 100, maxLevel: 30, careExperience: 10, careFriendship: 2 }
+assert.equal(api.decodePetCatalog(catalog).growthRules, undefined)
+assert.deepEqual(api.decodePetCatalog({ ...catalog, growthRules }).growthRules, growthRules)
+for (const invalidGrowth of [null, {}, { ...growthRules, experiencePerLevel: 0 }, { ...growthRules, maxLevel: 31 }, { ...growthRules, careFriendship: -1 }]) {
+  assert.throws(() => api.decodePetCatalog({ ...catalog, growthRules: invalidGrowth }))
+}
+console.log('PASS 可选成长规则保留旧目录兼容，缺失不编造，非法规则明确拒绝')
+
+{
+  const { pets } = newRecoveryStore()
+  handler = async () => { throw new ApiError('服务暂不可用', 503) }
+  let before = calls.length
+  await pets.ensureLoaded()
+  assert.equal(calls.length, before + 2)
+  assert(pets.error); assert(pets.catalogError)
+  for (let i = 0; i < 30; i++) focusRecovery()
+  await advanceRecovery(29_999)
+  assert.equal(calls.length, before + 2, '首次503不能被重复聚焦或隐藏切换刷请求')
+  await advanceRecovery(1)
+  focusRecovery(); await flushRecovery()
+  assert.equal(calls.length, before + 4, '冷却后一个前台事件合并为两种资源各一次探测')
+  await advanceRecovery(59_999); focusRecovery(); await flushRecovery()
+  assert.equal(calls.length, before + 4)
+  handler = success; serverState = adopted()
+  await advanceRecovery(1); focusRecovery(); await flushRecovery()
+  assert.equal(pets.pet.id, 'pet-a'); assert(pets.catalog)
+  assert.equal(calls.length, before + 6)
+  pets.$dispose()
+}
+console.log('PASS 初次503可聚焦恢复，状态/目录独立30秒起退避，重复事件不产生自动请求风暴')
+
+{
+  const { pets } = newRecoveryStore()
+  handler = success; serverState = adopted(); await pets.ensureLoaded()
+  const writeResult = deferred()
+  handler = (path, options) => options?.method ? writeResult.promise : success(path, options)
+  const writing = pets.buyFood(1)
+  const original = { ...pets.pending }, writeCount = writes().length
+  await advanceRecovery(15_000)
+  assert.equal(await writing, false)
+  assert.equal(pets.busy, false); assert.deepEqual(pets.pending, original)
+  writeResult.resolve(response({ operation: 'purchase', petId: 'pet-a', committedAt: now }))
+  await flushRecovery()
+  assert.deepEqual(pets.pending, original, '超时之后到达的旧回执不能自行清掉未知状态')
+  handler = success
+  window.dispatchEvent(new Event('offline'))
+  assert.equal(await pets.retryPending(), false)
+  window.dispatchEvent(new Event('online')); focusRecovery(); await flushRecovery()
+  assert.equal(writes().length, writeCount, '联网只读取，不能自动重发未知购买')
+  assert.deepEqual(pets.pending, original)
+  handler = (path, options) => {
+    if (options?.method) {
+      assert.equal(options.headers['Idempotency-Key'], original.key)
+      return Promise.resolve(response({ operation: 'purchase', petId: 'pet-a', committedAt: now }))
+    }
+    return Promise.reject(new Error('写后状态读取断流'))
+  }
+  assert.equal(await pets.retryPending(), true)
+  assert.equal(pets.pending, null); assert.equal(pets.refreshNeeded, true)
+  const confirmedWrites = writes().length
+  window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('online'))
+  handler = success
+  await advanceRecovery(1000); focusRecovery(); await flushRecovery()
+  await pets.refresh()
+  assert.equal(writes().length, confirmedWrites)
+  assert.equal(pets.pet.id, 'pet-a')
+  pets.$dispose()
+}
+console.log('PASS 写超时保留原键与命令、迟到回执不清未知，联网不重写，确认后GET失败只恢复读')
+
+{
+  const { auth, pets } = newRecoveryStore()
+  handler = success; serverState = adopted(); await pets.ensureLoaded()
+  const delayedRead = deferred(); handler = () => delayedRead.promise
+  const reading = pets.refresh()
+  await advanceRecovery(15_000)
+  await reading
+  assert.equal(pets.loading, false); assert.equal(pets.state, null); assert(pets.refreshNeeded)
+  delayedRead.resolve(response(adopted())); await flushRecovery()
+  assert.equal(pets.state, null)
+  handler = success
+  window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('online')); await flushRecovery()
+  assert.equal(pets.pet.id, 'pet-a')
+  const delayedWrite = deferred(); handler = () => delayedWrite.promise
+  const writing = pets.act('water'), oldSignal = calls.at(-1).options.signal
+  auth.accessToken = 'same-account-rotation'
+  assert.equal(oldSignal.aborted, false)
+  context++; auth.account = { oId: 'new-owner' }; auth.accessToken = 'new-token'
+  assert.equal(oldSignal.aborted, true)
+  assert.equal(await writing, false)
+  const count = calls.length
+  delayedWrite.resolve(response({ operation: 'water', petId: 'pet-a', committedAt: now })); await flushRecovery()
+  assert.equal(calls.length, count); assert.equal(pets.state, null); assert.equal(pets.pending, null)
+  pets.$dispose()
+}
+console.log('PASS 读取正文挂起可超时退出，迟到数据丢弃；正常令牌轮换保命令、换号立即取消旧请求')
+
+{
+  const { pets } = newRecoveryStore()
+  handler = success; serverState = adopted(); await pets.ensureLoaded()
+  const channel = Channel.all.at(-1), notices = () => channel.onmessage({ data: { type: 'changed', owner: 'A' } })
+  const old = deferred(), fresh = deferred()
+  let reads = 0
+  handler = () => (++reads === 1 ? old.promise : fresh.promise)
+  notices()
+  const originalSignal = calls.at(-1).options.signal
+  for (let i = 0; i < 40; i++) notices()
+  assert.equal(reads, 1); assert.equal(originalSignal.aborted, false, '广播不能反复中断并重启同一请求')
+  old.resolve(response({ ...adopted(), wallet: { coins: 999 } })); await flushRecovery()
+  assert.equal(pets.coins, 100, '已经失效的在途快照不能覆盖当前状态')
+  assert.equal(pets.refreshNeeded, true)
+  await advanceRecovery(1000)
+  assert.equal(reads, 2)
+  fresh.resolve(response({ ...adopted(), wallet: { coins: 80 } })); await flushRecovery()
+  assert.equal(pets.coins, 80)
+  handler = async () => { throw new ApiError('暂时失败', 503) }
+  await advanceRecovery(1000); notices(); await flushRecovery()
+  for (let i = 0; i < 40; i++) notices()
+  const failedReads = calls.length
+  await advanceRecovery(29_999)
+  assert.equal(calls.length, failedReads)
+  pets.$dispose()
+}
+console.log('PASS 双标签广播合并在途与后续读取，旧快照不回写，广播失败遵守退避')
+
+for (const status of [401, 429]) {
+  const { pets } = newRecoveryStore()
+  handler = async () => { throw new ApiError('请求受限', status) }
+  await pets.ensureLoaded()
+  const count = calls.length
+  await advanceRecovery(600_000); focusRecovery()
+  window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('online')); await flushRecovery()
+  assert.equal(calls.length, count, '认证或限流拒绝后不能以聚焦/联网探测绕过暂停')
+  handler = success; await pets.refresh(); await pets.reloadCatalog()
+  assert(pets.state); assert(pets.catalog)
+  pets.$dispose()
+}
+console.log('PASS 401和429暂停自动读取，恢复仅由用户明确请求，不借联网绕过')
+
+{
+  const { pets } = newRecoveryStore()
+  handler = success; serverState = adopted(); await pets.ensureLoaded()
+  const history = usePetActivityHistoryStore()
+  let journalReads = 0
+  handler = (path, options) => isHistory(path) ? (++journalReads, Promise.reject(new ApiError('日志暂不可用', 503))) : success(path, options)
+  await history.open()
+  for (let i = 0; i < 8; i++) { await pets.refresh(); focusRecovery() }
+  assert.equal(journalReads, 1, '聚合状态刷新不能反复请求失败的日志')
+  await advanceRecovery(30_000); focusRecovery(); await flushRecovery()
+  assert.equal(journalReads, 2)
+  window.dispatchEvent(new Event('offline'))
+  handler = (path, options) => isHistory(path) ? (++journalReads, Promise.resolve(response(historyPage([oldRecord])))) : success(path, options)
+  window.dispatchEvent(new Event('online')); await flushRecovery(); await advanceRecovery(1000)
+  assert.equal(journalReads, 3, '联网先恢复聚合后只读取一次当前日志')
+  assert.equal(history.history.list.length, 1)
+  history.close()
+  const count = journalReads
+  await advanceRecovery(60_001); focusRecovery(); await pets.refresh()
+  assert.equal(journalReads, count)
+  history.$dispose(); pets.$dispose()
+}
+console.log('PASS 履历失败不随聚合更新反复读取，联网合并恢复当前页，折叠始终零请求')
+
+const recoveryKinds = shuffled(['purchase', 'readoption', 'craft', 'story', 'water'])
+for (let index = 0; index < randomCases; index++) {
+  const { auth, pets } = newRecoveryStore()
+  const kind = recoveryKinds[index % recoveryKinds.length]
+  try {
+    serverState = adopted()
+    serverState.wallet.coins = 2000 + random(500)
+    serverState.inventory.push({ itemId: 'reed', quantity: 2 })
+    serverState.pet.skills.find(skill => skill.id === 'exploration').experience = 20
+    serverState.stories = [structuredClone(claimableStory)]
+    handler = success; await pets.ensureLoaded()
+    const quantity = random(20) + 1, originalId = pets.pet.id, initialCoins = pets.coins
+    const failuresAfterCommit = random(2) === 1
+    let commandKey, commandBody, committedReceipt, commits = 0, requests = 0, readingFails = false
+    // 此传输夹具只验证客户端发出的原命令与回执边界，不代替后端幂等事务测试。
+    handler = async (path, request) => {
+      if (!request?.method) {
+        if (readingFails && !path.endsWith('/catalog')) throw new ApiError('模拟读取断流', 503)
+        return success(path, request)
+      }
+      requests++
+      if (committedReceipt) {
+        assert.equal(request.headers['Idempotency-Key'], commandKey)
+        assert.equal(request.body, commandBody, '恢复不得用换宠后的 petId 或新版本重建命令')
+        readingFails = failuresAfterCommit
+        return response(committedReceipt)
+      }
+      commandKey = request.headers['Idempotency-Key']; commandBody = request.body
+      const body = JSON.parse(commandBody)
+      assert.equal(body.petId, originalId)
+      commits++
+      committedReceipt = { operation: kind === 'story' ? 'story-claim' : kind, petId: originalId, committedAt: now }
+      if (kind === 'purchase') {
+        serverState.wallet.coins -= 5 * quantity
+        serverState.inventory.find(item => item.itemId === 'food').quantity += quantity
+      } else if (kind === 'readoption') {
+        serverState.wallet.coins -= 512
+        serverState.pet = { ...adopted().pet, id: `new-pet-${seed}-${index}`, speciesId: body.speciesId, name: body.name }
+        committedReceipt.previousPetId = originalId; committedReceipt.petId = serverState.pet.id
+      } else if (kind === 'craft') {
+        serverState.wallet.coins -= 2
+        serverState.inventory.find(item => item.itemId === 'reed').quantity = 0
+        serverState.collections = [{ id: 'reed-boat', unlockedAt: now }]
+      } else if (kind === 'story') {
+        serverState.stories = [{ ...claimableStory, status: 'claimed', claimedAt: now }]
+        serverState.inventory.find(item => item.itemId === 'food').quantity += 2
+        committedReceipt.storyId = 'care-companion'
+      } else serverState.pet.water = 100
+      throw new ApiError('模拟已提交但回执丢失', 503)
+    }
+    const write = kind === 'purchase' ? pets.buyFood(quantity)
+      : kind === 'readoption' ? pets.readopt(catalog.species[random(4)].id, `新伙伴${index}`, true)
+        : kind === 'craft' ? pets.craft('reed-boat')
+          : kind === 'story' ? pets.claimStory('care-companion') : pets.act('water')
+    assert.equal(await write, false)
+    const frozen = { ...pets.pending }, channel = Channel.all.at(-1)
+    assert(frozen.key)
+    for (const event of shuffled(['rotation', 'focus', 'offline', 'broadcast', 'foreign-broadcast'])) {
+      if (event === 'rotation') auth.accessToken = `rotated-${index}-${random(1000)}`
+      if (event === 'focus') for (let count = random(20) + 1; count > 0; count--) focusRecovery()
+      if (event === 'offline') {
+        window.dispatchEvent(new Event('offline'))
+        assert.equal(await pets.retryPending(), false)
+        window.dispatchEvent(new Event('online'))
+      }
+      if (event.includes('broadcast')) channel.onmessage({ data: { type: 'changed', owner: event === 'broadcast' ? 'A' : 'unrelated-account' } })
+      await flushRecovery(); await advanceRecovery(random(1200))
+      assert.deepEqual(pets.pending, frozen)
+      assert.equal(requests, 1, '恢复网络、换令牌或广播都不能自动重发未知写入')
+    }
+    const outcomes = await Promise.all([pets.retryPending(), pets.retryPending(), pets.retryPending()])
+    assert.deepEqual(outcomes, [true, false, false], '并发核对仍只能发送同一个原命令一次')
+    assert.equal(commits, 1); assert.equal(requests, 2); assert.equal(pets.pending, null)
+    readingFails = false
+    await pets.refresh(); await advanceRecovery(1100)
+    assert.equal(pets.coins, initialCoins - (kind === 'purchase' ? quantity * 5 : kind === 'readoption' ? 512 : kind === 'craft' ? 2 : 0))
+    assert.equal(pets.pet.id, serverState.pet.id)
+    assert.equal(await pets.retryPending(), false)
+    assert.equal(requests, 2)
+    assert.deepEqual(channel.messages, [{ type: 'changed', owner: 'A' }], '跨标签通知不包含资产、宠物或访问令牌')
+  } catch (error) {
+    error.message = `seed=${seed} case=${index} kind=${kind}: ${error.message}`
+    throw error
+  } finally { pets.$dispose() }
+}
+console.log(`PASS 随机原键恢复：五类命令、失回执、事件顺序、并发核对与后置读失败（${randomCases}例，seed=${seed}）`)
+
+for (let index = 0; index < randomCases; index++) {
+  const { auth, pets } = newRecoveryStore()
+  const oldState = deferred(), oldCatalog = deferred()
+  try {
+    const oldReads = []
+    handler = (path, request) => { oldReads.push(request.signal); return path.endsWith('/catalog') ? oldCatalog.promise : oldState.promise }
+    const initial = pets.ensureLoaded()
+    assert.equal(oldReads.length, 2)
+    const boundaryKind = index % 3
+    auth.accessToken = `old-rotated-${random(10000)}`
+    assert(oldReads.every(signal => !signal.aborted), '同账号令牌轮换不得取消当前读取')
+    context++
+    if (boundaryKind === 0) auth.account = { oId: `next-owner-${index}` }
+    else if (boundaryKind === 1) auth.accessToken = null
+    auth.accessToken = `next-session-${index}`
+    assert(oldReads.every(signal => signal.aborted), '换号、退出和同账号重新认证都要隔离旧读取')
+    serverState = adopted()
+    serverState.pet.id = `current-${index}`; serverState.wallet.coins = random(10000)
+    handler = success
+    await pets.ensureLoaded()
+    const currentId = pets.pet.id, currentCoins = pets.coins
+    for (const responseKind of shuffled(['state', 'catalog'])) {
+      if (responseKind === 'state') oldState.resolve(response({ ...adopted(), wallet: { coins: 999999 } }))
+      else oldCatalog.resolve(response({ ...catalog, version: 999 }))
+      if (random(2)) auth.accessToken = `current-rotated-${index}-${responseKind}`
+      await flushRecovery()
+      assert.equal(pets.pet.id, currentId); assert.equal(pets.coins, currentCoins)
+      assert.equal(pets.catalog.version, 3)
+    }
+    await initial
+    assert.equal(pets.pending, null)
+  } catch (error) {
+    error.message = `seed=${seed} identity-case=${index}: ${error.message}`
+    throw error
+  } finally { pets.$dispose() }
+}
+console.log(`PASS 随机身份时序：换号/退出/重新认证、目录和状态乱序回包、普通令牌轮换（${randomCases}例，seed=${seed}）`)
+
+// 动画只消费当前身份、当前宠物的完整确认，不因失回执、重读或普通令牌轮换重复播报。
+{
+  const { auth, pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); await pets.ensureLoaded()
+    handler = async () => { throw new Error('模拟饮水结果未知') }
+    assert.equal(await pets.act('water'), false)
+    assert.equal(pets.confirmedEvent, null)
+    const frozen = { ...pets.pending }, reading = deferred()
+    auth.accessToken = 'animation-same-owner-rotation'
+    handler = (path, options) => {
+      if (options?.method) {
+        assert.equal(options.headers['Idempotency-Key'], frozen.key)
+        return Promise.resolve(response({ operation: 'water', petId: 'pet-a', committedAt: now }))
+      }
+      return reading.promise
+    }
+    const recovery = pets.retryPending()
+    await flushRecovery()
+    assert.equal(pets.confirmedEvent, null, '写成功但当前宠物尚未核对时不能播动画')
+    reading.resolve(response(adopted()))
+    assert.equal(await recovery, true)
+    assert.deepEqual(pets.confirmedEvent, { sequence: 1, petId: 'pet-a', kind: 'actions', action: 'water' })
+    const event = pets.confirmedEvent, count = writes().length
+    auth.accessToken = 'animation-another-normal-rotation'
+    assert.equal(pets.confirmedEvent, event, '普通令牌轮换不重新发确认事件')
+    assert.equal(await pets.retryPending(), false)
+    handler = success; await pets.refresh()
+    assert.equal(pets.confirmedEvent, event, '读取聚合状态不重复播成功动画')
+    assert.equal(writes().length, count)
+    auth.accessToken = null
+    assert.equal(pets.confirmedEvent, null, '退出立即清除上一个身份的动画事件')
+  } finally { pets.$dispose() }
+}
+console.log('PASS 动画确认等待写回执与当前GET，未知原键恢复仅一次，令牌轮换和状态重读不重复，退出清除')
+
+{
+  const { pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); await pets.ensureLoaded()
+    handler = (path, options) => options?.method ? success(path, options) : Promise.reject(new Error('模拟动画后置读取失败'))
+    assert.equal(await pets.act('feed', 'food'), true)
+    assert.equal(pets.confirmedEvent, null)
+    assert.equal(pets.pending, null)
+    const count = writes().length
+    handler = success; await pets.refresh()
+    assert.equal(pets.confirmedEvent, null, '后置读取失败后的刷新不得补播历史成功')
+    assert.equal(writes().length, count)
+    handler = async () => { throw new ApiError('模拟互动明确拒绝', 422) }
+    assert.equal(await pets.act('pet'), false)
+    assert.equal(pets.confirmedEvent, null)
+    assert.equal(pets.pending, null)
+  } finally { pets.$dispose() }
+}
+console.log('PASS 后置GET失败与明确拒绝不发动画，恢复读取不补播且不重写')
+
+{
+  const { pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); await pets.ensureLoaded()
+    handler = (path, options) => options?.method
+      ? Promise.resolve(response({ operation: 'water', petId: 'wrong-pet', committedAt: now }))
+      : success(path, options)
+    const before = calls.length
+    assert.equal(await pets.act('water'), false)
+    assert.equal(pets.confirmedEvent, null)
+    assert(pets.pending)
+    assert.equal(calls.length, before + 1, '回执错误目标不能触发后续读取或动画')
+  } finally { pets.$dispose() }
+}
+console.log('PASS 错误宠物回执保持未知，不发成功动画或额外GET')
+
+{
+  const { pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); await pets.ensureLoaded()
+    handler = (path, options) => {
+      if (options?.method) return Promise.resolve(response({ operation: 'water', petId: 'pet-a', committedAt: now }))
+      const replacement = adopted(); replacement.pet.id = 'replacement-by-other-device'
+      return Promise.resolve(response(replacement))
+    }
+    assert.equal(await pets.act('water'), true)
+    assert.equal(pets.pet.id, 'replacement-by-other-device')
+    assert.equal(pets.confirmedEvent, null, '旧宠物的成功不能播放在跨设备换来的新宠物上')
+  } finally { pets.$dispose() }
+}
+console.log('PASS 当前GET已换宠时不把旧目标成功动画套到新宠物')
+
+{
+  const { auth, pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); await pets.ensureLoaded()
+    const oldRead = deferred()
+    handler = (path, options) => options?.method ? success(path, options) : oldRead.promise
+    const writing = pets.act('play'); await flushRecovery()
+    assert.equal(pets.confirmedEvent, null)
+    context++; auth.account = { oId: 'animation-next-account' }; auth.accessToken = 'animation-next-token'
+    serverState = adopted(); serverState.pet.id = 'next-account-pet'
+    handler = success; await pets.ensureLoaded()
+    oldRead.resolve(response(adopted())); await writing; await flushRecovery()
+    assert.equal(pets.pet.id, 'next-account-pet')
+    assert.equal(pets.confirmedEvent, null, '旧身份写后的迟到GET不能向新身份发动画')
+  } finally { pets.$dispose() }
+}
+console.log('PASS 写后读取期间换号，迟到旧状态与成功动画均丢弃')
+
+{
+  const { pets } = newRecoveryStore()
+  try {
+    handler = success; serverState = adopted(); serverState.wallet.coins = 1024; await pets.ensureLoaded()
+    handler = (path, options) => {
+      if (options?.method) {
+        serverState = adopted(); serverState.pet.id = 'adopted-new-hexiaotun'
+        return Promise.resolve(response({ operation: 'readoption', previousPetId: 'pet-a', petId: serverState.pet.id, committedAt: now }))
+      }
+      return success(path, options)
+    }
+    assert.equal(await pets.readopt('hexiaotun', '新的荷小豚', true), true)
+    assert.deepEqual(pets.confirmedEvent, { sequence: 1, petId: 'adopted-new-hexiaotun', kind: 'readoption' })
+    assert.equal(pets.pet.id, 'adopted-new-hexiaotun')
+  } finally { pets.$dispose() }
+}
+console.log('PASS 重新领养完整确认后动画绑定已核对的新宠物ID')
+
+Date.now = realNow
+globalThis.setTimeout = realSetTimeout
+globalThis.clearTimeout = realClearTimeout
+assert.equal(timers.size, 0, '销毁后不能遗留超时或自动恢复计时器')
+delete globalThis.__petTest

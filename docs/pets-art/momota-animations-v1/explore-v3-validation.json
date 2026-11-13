@@ -1,0 +1,262 @@
+{
+  "species": "momota",
+  "action": "explore",
+  "revision": 3,
+  "date": "2026-11-13",
+  "change": "八关键姿势固定近远腿身份，第7/8帧腿根修正，第7帧经过中线；最终整张采用passfix，未拼接不同帧源",
+  "finalOriginalOutput": "exec-377d5548-8932-444a-88a9-4eb5d3b5c676.png",
+  "sourceSha256": "183433f4faa92b3f936582dea554dbe7c2c51a52d4188aae2280c17b311c7d0e",
+  "sourceSize": [
+    1774,
+    887
+  ],
+  "sourceGrid": [
+    4,
+    2
+  ],
+  "videoBytes": 43368,
+  "posterBytes": 13586,
+  "durationSeconds": 1,
+  "frames": 24,
+  "independentDrawnFrames": 8,
+  "fps": 24,
+  "interpolated": false,
+  "fixedAnchor": [
+    202.5,
+    414
+  ],
+  "scale": 0.581453634085213,
+  "decodedFrames": [
+    {
+      "file": "decoded-001.png",
+      "transparentPixels": 35923,
+      "solidPixels": 27660
+    },
+    {
+      "file": "decoded-002.png",
+      "transparentPixels": 35923,
+      "solidPixels": 27660
+    },
+    {
+      "file": "decoded-003.png",
+      "transparentPixels": 35923,
+      "solidPixels": 27660
+    },
+    {
+      "file": "decoded-004.png",
+      "transparentPixels": 36483,
+      "solidPixels": 26888
+    },
+    {
+      "file": "decoded-005.png",
+      "transparentPixels": 36407,
+      "solidPixels": 26888
+    },
+    {
+      "file": "decoded-006.png",
+      "transparentPixels": 36407,
+      "solidPixels": 26888
+    },
+    {
+      "file": "decoded-007.png",
+      "transparentPixels": 37956,
+      "solidPixels": 25279
+    },
+    {
+      "file": "decoded-008.png",
+      "transparentPixels": 37956,
+      "solidPixels": 25279
+    },
+    {
+      "file": "decoded-009.png",
+      "transparentPixels": 37959,
+      "solidPixels": 25284
+    },
+    {
+      "file": "decoded-010.png",
+      "transparentPixels": 36041,
+      "solidPixels": 27476
+    },
+    {
+      "file": "decoded-011.png",
+      "transparentPixels": 36003,
+      "solidPixels": 27472
+    },
+    {
+      "file": "decoded-012.png",
+      "transparentPixels": 36001,
+      "solidPixels": 27472
+    },
+    {
+      "file": "decoded-013.png",
+      "transparentPixels": 34868,
+      "solidPixels": 28446
+    },
+    {
+      "file": "decoded-014.png",
+      "transparentPixels": 34870,
+      "solidPixels": 28446
+    },
+    {
+      "file": "decoded-015.png",
+      "transparentPixels": 34872,
+      "solidPixels": 28446
+    },
+    {
+      "file": "decoded-016.png",
+      "transparentPixels": 36600,
+      "solidPixels": 26774
+    },
+    {
+      "file": "decoded-017.png",
+      "transparentPixels": 36570,
+      "solidPixels": 26777
+    },
+    {
+      "file": "decoded-018.png",
+      "transparentPixels": 36570,
+      "solidPixels": 26777
+    },
+    {
+      "file": "decoded-019.png",
+      "transparentPixels": 37715,
+      "solidPixels": 25587
+    },
+    {
+      "file": "decoded-020.png",
+      "transparentPixels": 37715,
+      "solidPixels": 25587
+    },
+    {
+      "file": "decoded-021.png",
+      "transparentPixels": 37745,
+      "solidPixels": 25589
+    },
+    {
+      "file": "decoded-022.png",
+      "transparentPixels": 35742,
+      "solidPixels": 27580
+    },
+    {
+      "file": "decoded-023.png",
+      "transparentPixels": 35740,
+      "solidPixels": 27581
+    },
+    {
+      "file": "decoded-024.png",
+      "transparentPixels": 35737,
+      "solidPixels": 27580
+    }
+  ],
+  "otherOutputFilesSha256": [
+    {
+      "file": "idle.webm",
+      "sha256Before": "a34cd41c59ea9b28986dae1320cab7ed51f33a875d53b960f79c9e86bea33596",
+      "sha256After": "a34cd41c59ea9b28986dae1320cab7ed51f33a875d53b960f79c9e86bea33596",
+      "unchanged": true
+    },
+    {
+      "file": "idle.webp",
+      "sha256Before": "c1003a80b324827f296a490607b964fcb6009f9d3a2306cabfb97ce6f78ee08d",
+      "sha256After": "c1003a80b324827f296a490607b964fcb6009f9d3a2306cabfb97ce6f78ee08d",
+      "unchanged": true
+    },
+    {
+      "file": "eat.webm",
+      "sha256Before": "ec80dbc73521b297b21626137b73769b34f5dbf89ef256fa3c15544bca2e84c0",
+      "sha256After": "ec80dbc73521b297b21626137b73769b34f5dbf89ef256fa3c15544bca2e84c0",
+      "unchanged": true
+    },
+    {
+      "file": "eat.webp",
+      "sha256Before": "2531e0d82b70bb8b788ddb427b5fbb576a9b6fca9ae3492a223c88aaa0b68798",
+      "sha256After": "2531e0d82b70bb8b788ddb427b5fbb576a9b6fca9ae3492a223c88aaa0b68798",
+      "unchanged": true
+    },
+    {
+      "file": "drink.webm",
+      "sha256Before": "4ec37ed11fc4d1a6fffbbc1cb1b8b127de1c6d4bdae868046da994c3a94147ca",
+      "sha256After": "4ec37ed11fc4d1a6fffbbc1cb1b8b127de1c6d4bdae868046da994c3a94147ca",
+      "unchanged": true
+    },
+    {
+      "file": "drink.webp",
+      "sha256Before": "99fbf111625591ba81551d5b777b747600b0231db7a3ac512f8295734dde73ab",
+      "sha256After": "99fbf111625591ba81551d5b777b747600b0231db7a3ac512f8295734dde73ab",
+      "unchanged": true
+    },
+    {
+      "file": "pet.webm",
+      "sha256Before": "188bc676f9f311cea1d9290d02491f67b73bcdc50a82febdd5bc64e1ebe662da",
+      "sha256After": "188bc676f9f311cea1d9290d02491f67b73bcdc50a82febdd5bc64e1ebe662da",
+      "unchanged": true
+    },
+    {
+      "file": "pet.webp",
+      "sha256Before": "3e9662b5c81f8a6dfb2ae230491b827569e0b10bd8570b122ad4759de60047eb",
+      "sha256After": "3e9662b5c81f8a6dfb2ae230491b827569e0b10bd8570b122ad4759de60047eb",
+      "unchanged": true
+    },
+    {
+      "file": "play.webm",
+      "sha256Before": "25388d9c48f2b4af10bd611774d53440336bd60a53aa80f06d3cde042244938d",
+      "sha256After": "25388d9c48f2b4af10bd611774d53440336bd60a53aa80f06d3cde042244938d",
+      "unchanged": true
+    },
+    {
+      "file": "play.webp",
+      "sha256Before": "da3fcd76086d6aead4885f7e6c3e35f04ab3160a3eb63d4682d3c0fbb9194f06",
+      "sha256After": "da3fcd76086d6aead4885f7e6c3e35f04ab3160a3eb63d4682d3c0fbb9194f06",
+      "unchanged": true
+    },
+    {
+      "file": "sleep.webm",
+      "sha256Before": "a84a9f1afe1909324fb20c15c4c7bf264e034779816e8119f896f83f78ea6687",
+      "sha256After": "a84a9f1afe1909324fb20c15c4c7bf264e034779816e8119f896f83f78ea6687",
+      "unchanged": true
+    },
+    {
+      "file": "sleep.webp",
+      "sha256Before": "853a77c549b158e25a81cb42641147f2d398e8fc102551a8e61b2a6f8e8bc214",
+      "sha256After": "853a77c549b158e25a81cb42641147f2d398e8fc102551a8e61b2a6f8e8bc214",
+      "unchanged": true
+    },
+    {
+      "file": "study.webm",
+      "sha256Before": "23f3077b58d0f121841d508c59fb4f88816063ff62fb258a4d18a3d3419ce907",
+      "sha256After": "23f3077b58d0f121841d508c59fb4f88816063ff62fb258a4d18a3d3419ce907",
+      "unchanged": true
+    },
+    {
+      "file": "study.webp",
+      "sha256Before": "d6404d8db4d41dc19f927e6e34afbe6440646c51ac01bdf083ca2a93a079b20e",
+      "sha256After": "d6404d8db4d41dc19f927e6e34afbe6440646c51ac01bdf083ca2a93a079b20e",
+      "unchanged": true
+    },
+    {
+      "file": "work.webm",
+      "sha256Before": "bd205ece32441209044186b35240fa05d99668b2da41d26bc27ce6a84ec5abf4",
+      "sha256After": "bd205ece32441209044186b35240fa05d99668b2da41d26bc27ce6a84ec5abf4",
+      "unchanged": true
+    },
+    {
+      "file": "work.webp",
+      "sha256Before": "afe92f50f250b734728d7532a56400f56c4fbcd5696988a57a16adfea122ed9c",
+      "sha256After": "afe92f50f250b734728d7532a56400f56c4fbcd5696988a57a16adfea122ed9c",
+      "unchanged": true
+    },
+    {
+      "file": "celebrate.webm",
+      "sha256Before": "86256f4d8ece2fabe6e61b7f8bef693f54b29ecf2bc44561431b681a6fb46bca",
+      "sha256After": "86256f4d8ece2fabe6e61b7f8bef693f54b29ecf2bc44561431b681a6fb46bca",
+      "unchanged": true
+    },
+    {
+      "file": "celebrate.webp",
+      "sha256Before": "f9b90ecb554e7e681851b4035df3b466740d1210a5d43160c1ea714ea81b01da",
+      "sha256After": "f9b90ecb554e7e681851b4035df3b466740d1210a5d43160c1ea714ea81b01da",
+      "unchanged": true
+    }
+  ],
+  "scope": "八源帧和24个解码帧RGBA检查、固定锚点、其余九动作18输出SHA-256不变；不代替最终观感或浏览器验收"
+}
