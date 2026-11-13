@@ -78,6 +78,7 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 第六批调整散步与进阶课成长效率，补齐成长进度、移动端桌宠避让及弱网恢复，详见 [成长节奏与恢复](docs/pets-phase-six.md)。
 第七批整理家园分区、近况与成长引导，增加缺少材料的来源定位；保留分区内草稿与选择，活动记录仍按需读取，详见 [家园交互与引导](docs/pets-phase-seven.md)。
 荷小豚十个 256 × 256 透明 WebM 动作已接入家园和桌宠：互动确认后播放，长期动作跟随当前活动，隐藏/省流/减少动态时停播或静态回退；不新增业务请求。详见 [动作接入](docs/pets-phase-eight.md) 与 [素材预览和大小](docs/pets-art/hexiaotun-animations-v1/README.md)。
+摸摸獭、鱼饼喵和派小鱼各十段透明动作候选已制作，尚未接入家园，按计划最后统一验收。独立素材预览及实际大小见 [四种宠物动作素材](docs/pets-art/action-video-library.md)，可用 `node tools/pet-animation-serve.mjs` 在独立端口查看，不影响原有长跑测试。
 宠物预览的固定 Sites 身份已登记；后续复用同一站点，发布进度及更新方式见 [固定预览站](docs/pets-art/preview-site.md)。
 本地八小时持续检查使用 `node tools/pets-soak.mjs start --hours 8`，以专用账号、隔离事务专项和前端交互专项分别记录结果；状态、停止方式及覆盖边界见 [持续检查说明](docs/pets-soak-test.md)。
 补测全部宠物课程、工作、探索、制作和重新领养可运行 `python3 tools/pet-soak/focused.py --rhythm /Users/ling/Documents/GitHub/rhythm`；它使用独立本地账号及局部时间夹具，与自然八小时观察分开记录，详见 [针对性测试记录](docs/pets-soak-targeted-review.md)。

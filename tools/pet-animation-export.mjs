@@ -4,14 +4,19 @@ import { execFileSync } from 'node:child_process'
 
 // 仅规范化已绘制的连续帧并编码，不拆分身体，也不生成光流过渡帧。
 const root = process.cwd()
-const sourceDir = path.join(root, 'docs/pets-art/hexiaotun-animations-v1/sources')
-const outputDir = path.join(root, 'public/images/pets/animations/hexiaotun-v1')
-const tempDir = path.join(root, '.temp/hexiaotun-animations-v1')
+const argumentsList = process.argv.slice(2)
+const species = argumentsList.find(value => value.startsWith('--species='))?.slice('--species='.length) || 'hexiaotun'
+if (!['hexiaotun', 'momota', 'yubingmiao', 'paixiaoyu'].includes(species)) throw new Error('未知的宠物种类')
+const sourceDir = path.join(root, `docs/pets-art/${species}-animations-v1/sources`)
+const outputDir = path.join(root, `public/images/pets/animations/${species}-v1`)
+const tempDir = path.join(root, `.temp/${species}-animations-v1`)
 const chrome = process.env.PET_CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const ffmpeg = process.env.PET_FFMPEG || 'ffmpeg'
 const definitions = [
   { id: 'idle', name: '待机', mode: 'loop', holds: [12, 8, 6, 6, 6, 6, 6, 8, 12, 8, 6, 6, 6, 6, 6, 8] },
-  { id: 'eat', name: '吃叶子', mode: 'once', approved: true, frames: 110, duration: 110 / 24 },
+  species === 'hexiaotun'
+    ? { id: 'eat', name: '吃叶子', mode: 'once', approved: true, frames: 110, duration: 110 / 24 }
+    : { id: 'eat', name: species === 'paixiaoyu' ? '吃点心' : '吃小鱼', mode: 'once', holds: [10, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6, 6, 10] },
   { id: 'drink', name: '喝水', mode: 'once', holds: [10, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6, 6, 12] },
   { id: 'pet', name: '被摸摸', mode: 'once', holds: [10, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 6, 6, 6, 6, 10] },
   { id: 'play', name: '玩耍', mode: 'once', holds: Array(16).fill(6) },
@@ -22,7 +27,7 @@ const definitions = [
   { id: 'celebrate', name: '开心庆祝', mode: 'once', holds: [10, 6, 6, 6, 6, 6, 6, 8, 8, 6, 6, 6, 6, 6, 6, 10] },
 ]
 
-const requested = process.argv.slice(2)
+const requested = argumentsList.filter(value => !value.startsWith('--species='))
 if (requested.some(id => !definitions.some(item => item.id === id))) throw new Error('未知的宠物动作')
 await fs.mkdir(outputDir, { recursive: true })
 await fs.mkdir(tempDir, { recursive: true })
@@ -147,4 +152,4 @@ for (const definition of definitions) {
     clips.push({ id: definition.id, name: definition.name, mode: definition.mode, file: `${definition.id}.webm`, poster: `${definition.id}.webp`, width: 256, height: 256, fps: 24, uniqueFrames: 16, frames, duration: frames / 24, bytes: stat.size, interpolated: false, approvedEatingSource: Boolean(definition.approved) })
   } catch (error) { if (error.code !== 'ENOENT') throw error }
 }
-await fs.writeFile(path.join(outputDir, 'manifest.json'), JSON.stringify({ version: 1, species: 'hexiaotun', transparent: true, codec: 'vp9', previewOnly: true, totalBytes: clips.reduce((sum, clip) => sum + clip.bytes, 0), clips }, null, 2) + '\n')
+await fs.writeFile(path.join(outputDir, 'manifest.json'), JSON.stringify({ version: 1, species, transparent: true, codec: 'vp9', previewOnly: true, totalBytes: clips.reduce((sum, clip) => sum + clip.bytes, 0), clips }, null, 2) + '\n')
