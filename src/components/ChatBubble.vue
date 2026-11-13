@@ -131,12 +131,12 @@ function onBodyClick(e: MouseEvent) {
               <small v-if="nickname && nickname !== userName">({{ userName }})</small>
             </span>
           </component>
-          <span v-if="petStatus && !simpleMode" class="fp-chat-pet-status" :data-species="petStatus.speciesId"
-            :title="`宠物：${petStatus.name}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${chatPetStatusLabels[petStatus.state]}`">
+          <RouterLink v-if="petStatus && !simpleMode" :to="{ name: 'pets' }" class="fp-chat-pet-status" :data-species="petStatus.speciesId"
+            :title="`宠物：${petStatus.name}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${chatPetStatusLabels[petStatus.state]} · 前往宠物家园`">
             <span class="fp-chat-pet-name">{{ petStatus.name }}</span>
             <span v-if="petStatus.level" class="fp-chat-pet-level" :data-tier="Math.floor(petStatus.level / 10)">Lv.{{ petStatus.level }}</span>
             <span class="fp-chat-pet-state">{{ chatPetStatusLabels[petStatus.state] }}</span>
-          </span>
+          </RouterLink>
         </div>
         <MedalList :items="medals" variant="chat" />
       </div>
@@ -230,6 +230,11 @@ function onBodyClick(e: MouseEvent) {
   line-height: 1.5;
   white-space: nowrap;
   color: color-mix(in srgb, var(--pet-color) 65%, var(--fp-text));
+}
+a.fp-chat-pet-status:hover,
+a.fp-chat-pet-status:focus-visible {
+  background: color-mix(in srgb, var(--pet-color) 23%, transparent);
+  text-decoration: underline;
 }
 .fp-chat-pet-status[data-species="momota"] { --pet-color: #a76a45; }
 .fp-chat-pet-status[data-species="hexiaotun"] { --pet-color: #5c913c; }
