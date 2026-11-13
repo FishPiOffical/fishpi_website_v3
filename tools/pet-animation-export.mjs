@@ -16,14 +16,15 @@ const definitions = [
   { id: 'idle', name: '待机', mode: 'loop', holds: [12, 8, 6, 6, 6, 6, 6, 8, 12, 8, 6, 6, 6, 6, 6, 8] },
   species === 'hexiaotun'
     ? { id: 'eat', name: '吃叶子', mode: 'once', approved: true, frames: 110, duration: 110 / 24 }
-    : { id: 'eat', name: species === 'paixiaoyu' ? '吃点心' : '吃小鱼', mode: 'once', holds: [10, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6, 6, 10] },
-  { id: 'drink', name: '喝水', mode: 'once', holds: [10, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6, 6, 12] },
-  { id: 'pet', name: '被摸摸', mode: 'once', holds: [10, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 6, 6, 6, 6, 10] },
-  { id: 'play', name: '玩耍', mode: 'once', holds: Array(16).fill(6) },
+    : { id: 'eat', name: species === 'paixiaoyu' ? '吃点心' : '吃小鱼', mode: 'once', holds: [4, 3, 3, 3, 5, 5, 6, 6, 5, 4, 4, 3, 3, 3, 3, 4] },
+  // 三只新宠物保留入口、享受等关键姿势的短暂停顿，缩短收尾；荷小豚已确认的节奏不变。
+  { id: 'drink', name: '喝水', mode: 'once', holds: species === 'hexiaotun' ? [10, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6, 6, 12] : species === 'yubingmiao' ? [4, 3, 3, 3, 3, 4, 5, 5, 6, 6, 6, 5, 4, 3, 3, 4] : [4, 3, 3, 3, 4, 5, 6, 6, 6, 5, 4, 4, 3, 3, 3, 4] },
+  { id: 'pet', name: '被摸摸', mode: 'once', holds: species === 'hexiaotun' ? [10, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 6, 6, 6, 6, 10] : [4, 3, 3, 3, 4, 5, 5, 6, 6, 5, 4, 3, 3, 3, 3, 4] },
+  { id: 'play', name: '玩耍', mode: 'once', holds: species === 'hexiaotun' ? Array(16).fill(6) : [4, 3, 3, 4, 4, 3, 3, 4, 4, 3, 3, 3, 3, 3, 4, 5] },
   { id: 'sleep', name: '睡觉', mode: 'loop', holds: Array(16).fill(12) },
   // 外出先锁定八个完整关键姿势，使用固定画布锚点，避免落脚变化让整只宠物跳动。
   // 荷小豚保留已确认的原始帧表和节奏。
-  { id: 'explore', name: '外出', mode: 'loop', holds: Array(species === 'hexiaotun' ? 16 : 8).fill(species === 'hexiaotun' ? 5 : 3), grid: species === 'hexiaotun' ? [4, 4] : [4, 2], fixedAnchor: species !== 'hexiaotun' },
+  { id: 'explore', name: '外出', mode: 'loop', holds: species === 'hexiaotun' ? Array(16).fill(5) : [5, 4, 4, 5, 5, 4, 4, 5], grid: species === 'hexiaotun' ? [4, 4] : [4, 2], fixedAnchor: species !== 'hexiaotun' },
   { id: 'study', name: '上课', mode: 'loop', holds: Array(16).fill(8) },
   { id: 'work', name: '工作', mode: 'loop', holds: Array(16).fill(6) },
   { id: 'celebrate', name: '开心庆祝', mode: 'once', holds: [10, 6, 6, 6, 6, 6, 6, 8, 8, 6, 6, 6, 6, 6, 6, 10] },

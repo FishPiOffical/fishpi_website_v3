@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 
 // 三种新宠物外出动作并排预览；只合成视频，不修改游戏使用的透明素材。
 const root = process.cwd()
-const version = process.argv.slice(2).find(value => value.startsWith('--version='))?.slice('--version='.length) || '3'
+const version = process.argv.slice(2).find(value => value.startsWith('--version='))?.slice('--version='.length) || '4'
 if (!/^[1-9][0-9]?$/.test(version)) throw new Error('预览版本号不合法')
 const pets = [['momota', '摸摸獭'], ['yubingmiao', '鱼饼喵'], ['paixiaoyu', '派小鱼']]
 const font = process.env.PET_FONT || '/System/Library/Fonts/STHeiti Medium.ttc'
