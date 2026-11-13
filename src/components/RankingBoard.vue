@@ -53,7 +53,7 @@ function metricName(key: string) { if (key === 'points') return ['balance', 'con
             <img :src="`/images/pets/${entry.pet.speciesId}.webp`" alt="" loading="lazy" />
             <span class="ranking-user-info">
               <span>{{ entry.pet.name }}</span>
-              <small class="ranking-handle">{{ entry.user?.userNickname || entry.user?.userName }}</small>
+              <small v-if="entry.user" class="ranking-handle">主人：{{ entry.user.userNickname || entry.user.userName }}</small>
             </span>
           </RouterLink>
           <RouterLink v-else-if="entry.user" :to="`/member/${encodeURIComponent(entry.user.userName)}`" class="ranking-user" :data-user-card="entry.user.userName">

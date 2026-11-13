@@ -80,11 +80,48 @@ function decodeRankedPet(value: unknown): RankedPet {
   return { id, name, speciesId: decodePetSpecies(row.speciesId), level, experience }
 }
 
+interface PetProgress { id: string; name: string; level: number }
+
+function decodePetProgress(value: unknown): PetProgress[] | undefined {
+  if (value === undefined) return
+  if (!Array.isArray(value) || value.length > 32) throw bad()
+  return value.map(item => {
+    const row = object(item), id = string(row.id), name = string(row.name), level = number(row.level)
+    if (!/^[a-z-]{1,48}$/.test(id) || !name.trim() || name.length > 64 || level < 1 || level > 30) throw bad()
+    return { id, name, level }
+  })
+}
+
+async function fetchPetProfile(path: string, signal: AbortSignal, credentials?: RequestCredentials) {
+  const envelope = object(await request(path, { signal, credentials, cache: 'no-store' }))
+  if (envelope.code !== 0) throw bad()
+  return object(envelope.data)
+}
+
+function decodePetProfileProgress(data: Record<string, unknown>) {
+  return { learning: decodePetProgress(data.learning), career: decodePetProgress(data.career) }
+}
+
 export async function fetchRankedPet(id: string, signal: AbortSignal) {
   if (!/^[0-9]{1,19}$/.test(id)) throw new ApiError('宠物 ID 不合法', 422)
-  const envelope = object(await request(`/api/v3/pets/${id}/profile`, { signal, credentials: 'omit', cache: 'no-store' }))
-  if (envelope.code !== 0) throw bad()
-  const data = object(envelope.data), pet = decodeRankedPet(data)
+  const data = await fetchPetProfile(`/api/v3/pets/${id}/profile`, signal, 'omit')
+  const pet = decodeRankedPet(data)
   if (pet.id !== id) throw bad()
-  return { ...pet, user: decodeV3RelationUser(data.user) }
+  return { ...pet, user: decodeV3RelationUser(data.user), ...decodePetProfileProgress(data) }
+}
+
+export async function fetchChatPetProfile(id: string, signal: AbortSignal) {
+  if (!/^[0-9]{1,32}$/.test(id)) throw new ApiError('消息 ID 不合法', 422)
+  const data = await fetchPetProfile(`/api/v3/chat/messages/${id}/pet`, signal)
+  const name = string(data.name), state = string(data.state)
+  const level = data.level === undefined ? undefined : number(data.level)
+  const experience = data.experience === undefined ? undefined : number(data.experience)
+  if (!name.trim() || name.length > 256 || (level !== undefined && (level < 1 || level > 30)) ||
+    (experience !== undefined && experience < 0)) throw bad()
+  return {
+    name, state, level, experience,
+    speciesId: data.speciesId === undefined ? undefined : decodePetSpecies(data.speciesId),
+    user: decodeV3RelationUser(data.user),
+    ...decodePetProfileProgress(data),
+  }
 }
