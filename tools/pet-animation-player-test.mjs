@@ -73,9 +73,11 @@ try {
     for (const clip of manifest.clips) {
       const entry = mapping.petAnimationClip(species, clip.id)
       assert.ok(entry, `${species} 应有 ${clip.id} 素材`)
-      assert.equal(entry.src, `/images/pets/animations/${species}-v1/${clip.id}.webm`)
-      assert.equal((await fs.stat(path.join('public', entry.src))).size, clip.bytes)
-      assert.ok((await fs.stat(path.join('public', entry.poster))).size > 0)
+      assert.match(entry.src, /^https:\/\/file\.fishpi\.cn\/.*\.webm$/)
+      assert.match(entry.poster, /^https:\/\/file\.fishpi\.cn\/.*\.webp$/)
+      const local = `public/images/pets/animations/${species}-v1/${clip.id}`
+      assert.equal((await fs.stat(local + '.webm')).size, clip.bytes)
+      assert.ok((await fs.stat(local + '.webp')).size > 0)
     }
   }
   for (const species of ['unlisted-species', '../momota', 'toString', '__proto__', 'https://example.invalid/pet']) {
@@ -88,7 +90,7 @@ try {
 
   for (const species of speciesIds) {
     const html = await renderToString(createSSRApp(Component, { species, alt: species }))
-    assert.match(html, new RegExp(`<img[^>]+${species}\\.webp`)); assert.doesNotMatch(html, /<video|\.webm/)
+    assert.ok(html.includes(`src="${mapping.petPortrait(species)}"`)); assert.doesNotMatch(html, /<video|\.webm/)
   }
   pass('四物种 SSR 都只有静态图，不生成媒体下载地址')
 
@@ -96,7 +98,7 @@ try {
   assert.equal(instance.video(), null)
   instance.observer.send(true); await flush(); assert.equal(instance.video(), null)
   instance.props.active = true; await flush()
-  let video = instance.video(); assert.ok(video); assert.match(video.src, /idle.webm$/)
+  let video = instance.video(); assert.ok(video); assert.equal(video.src, mapping.petAnimationClip('hexiaotun', 'idle').src); assert.equal(video.crossOrigin, 'anonymous')
   assert.equal(video.preload, 'none'); assert.equal(instance.host.querySelectorAll('video').length, 1)
   assert.equal(calls.play, 1)
   video.dispatchEvent(new Event('loadeddata')); await flush()
@@ -115,7 +117,7 @@ try {
 
   instance.props.action = 'eat'; instance.props.loop = false; instance.props.playbackKey = 2; await flush()
   const old = video; video = instance.video()
-  assert.notEqual(video, old); assert.match(video.src, /eat.webm$/); assert.equal(old.getAttribute('src'), null)
+  assert.notEqual(video, old); assert.equal(video.src, mapping.petAnimationClip('hexiaotun', 'eat').src); assert.equal(old.getAttribute('src'), null)
   old.dispatchEvent(new Event('ended')); await flush(); assert.deepEqual(instance.ended, [])
   video.dispatchEvent(new Event('loadeddata')); video.dispatchEvent(new Event('ended')); video.dispatchEvent(new Event('ended')); await flush()
   assert.deepEqual(instance.ended, [2])
@@ -125,7 +127,7 @@ try {
   pass('动作切换释放旧资源，旧节点结束事件不结束新动作，当前单次结束只上报一次')
 
   instance.props.playbackKey = 3; await flush()
-  assert.notEqual(instance.video(), video); assert.match(instance.video().src, /eat.webm$/)
+  assert.notEqual(instance.video(), video); assert.equal(instance.video().src, mapping.petAnimationClip('hexiaotun', 'eat').src)
   instance.video().dispatchEvent(new Event('ended')); await flush(); assert.deepEqual(instance.ended, [2, 3])
   instance.props.loop = true; instance.props.action = 'idle'; instance.props.playbackKey = 4; await flush()
   instance.video().dispatchEvent(new Event('ended')); await flush(); assert.deepEqual(instance.ended, [2, 3])
@@ -135,11 +137,11 @@ try {
     const previousVideo = instance.video()
     instance.props.species = species; await flush()
     assert.equal(previousVideo.getAttribute('src'), null, '切换物种立即释放前一套媒体')
-    assert.match(instance.video().src, new RegExp(`/${species}-v1/idle\\.webm$`))
+    assert.equal(instance.video().src, mapping.petAnimationClip(species, 'idle').src)
     assert.equal(instance.host.querySelector('.is-playing'), null, '不同物种首帧不能沿用透明解码结果')
     for (const action of ['eat', 'drink', 'pet', 'play', 'sleep', 'explore', 'study', 'work', 'celebrate', 'idle']) {
       instance.props.action = action; await flush()
-      assert.match(instance.video().src, new RegExp(`/${species}-v1/${action}\\.webm$`))
+      assert.equal(instance.video().src, mapping.petAnimationClip(species, action).src)
       assert.equal(instance.host.querySelectorAll('video').length, 1, '一次只挂载一个当前动作')
       assert.equal(instance.video().playbackRate, 1, '直接使用已调速的素材，不重复在播放器加速')
       instance.video().dispatchEvent(new Event('loadeddata')); await flush()

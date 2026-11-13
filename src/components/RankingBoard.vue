@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { petPortrait } from '@/components/pets/animations'
 import { avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -50,7 +51,7 @@ function metricName(key: string) { if (key === 'points') return ['balance', 'con
         <li v-for="entry in value.list" :key="entry.rank" :value="entry.rank" :data-rank="entry.rank">
           <span class="ranking-number" :data-rank="entry.rank">{{ entry.rank }}</span>
           <RouterLink v-if="entry.pet" :to="{ name: 'ranked-pet-profile', params: { petId: entry.pet.id } }" class="ranking-user ranking-pet">
-            <img :src="`/images/pets/${entry.pet.speciesId}.webp`" alt="" loading="lazy" />
+            <img :src="petPortrait(entry.pet.speciesId)" alt="" loading="lazy" />
             <span class="ranking-user-info">
               <span>{{ entry.pet.name }}</span>
               <small v-if="entry.user" class="ranking-handle">主人：{{ entry.user.userNickname || entry.user.userName }}</small>

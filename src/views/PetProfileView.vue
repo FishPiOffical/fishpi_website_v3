@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { petPortrait } from '@/components/pets/animations'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ApiError, getAuthContextVersion } from '@/api/http'
@@ -65,7 +66,7 @@ watch([id, fromChat, viewer, mounted, attempt], async ([target, chat, owner, rea
     <template v-if="profile">
       <section class="pet-profile" :data-species="profile.speciesId" aria-labelledby="pet-profile-title">
         <div v-if="profile.speciesId" class="pet-portrait">
-          <img :src="`/images/pets/${profile.speciesId}.webp`" width="180" height="180" alt="" />
+          <img :src="petPortrait(profile.speciesId)" width="180" height="180" alt="" />
         </div>
         <div class="pet-profile-body">
           <h1 id="pet-profile-title">{{ profile.name }}</h1>

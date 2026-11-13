@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { petPortrait } from '@/components/pets/animations'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { getAuthContextVersion } from '@/api/http'
@@ -155,7 +156,7 @@ onMounted(() => {
     </header>
 
     <section v-if="!loggedIn" class="guest-panel pet-panel">
-      <div class="guest-pets" aria-hidden="true"><img v-for="choice in choices" :key="choice.id" :src="`/images/pets/${choice.id}.webp`" width="144" height="144" alt="" /></div>
+      <div class="guest-pets" aria-hidden="true"><img v-for="choice in choices" :key="choice.id" :src="petPortrait(choice.id)" width="144" height="144" alt="" /></div>
       <h2>领养一位摸鱼伙伴</h2><p>四种宠物，选择一只带回家。喂食、陪伴，记录一起长大的日常。</p>
       <RouterLink class="pet-primary" :to="{ path: '/login', query: { redirect: '/pets' } }">登录后领养</RouterLink>
       <span class="guest-note">每个账号可以免费领养一只</span>
@@ -171,7 +172,7 @@ onMounted(() => {
           <label v-for="species in pets.catalog.species" :key="species.id" class="species-option" :class="{ selected: selected === species.id }">
             <input type="radio" name="pet-species" :value="species.id" :checked="selected === species.id" :disabled="locked" @change="choose(species.id)" />
             <span class="selection-check" aria-hidden="true"><PetIcon v-if="selected === species.id" name="check" /></span>
-            <img :src="`/images/pets/${species.id}.webp`" :alt="species.name" width="180" height="180" />
+            <img :src="petPortrait(species.id)" :alt="species.name" width="180" height="180" />
             <strong>{{ species.name }}</strong><span class="species-description">{{ species.description }}</span>
           </label>
         </fieldset>

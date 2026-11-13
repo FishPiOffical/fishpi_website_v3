@@ -109,8 +109,13 @@
     let kind = 'mount';
     let days = 7;
     let cleanup;
+    const mountAssets = {
+      "deepsea-submarine": "https://file.fishpi.cn/yui/files/2026/11/13/271617.png?imageView2/1/w/224/h/224",
+      "paipai-scooter": "https://file.fishpi.cn/yui/files/2026/11/13/271618.png?imageView2/1/w/224/h/224",
+      "paper-plane": "https://file.fishpi.cn/yui/files/2026/11/13/271619.png?imageView2/1/w/224/h/224"
+    };
     function art(product) {
-      if (product.kind === 'mount') return `<img class="mount" src="assets/${product.id}-v1.png" alt="${product.name}">${product.id === 'paipai-scooter' ? '<img class="brand-mark" src="../../public/logo.png" alt="">' : ''}`;
+      if (product.kind === 'mount') return `<img class="mount" src="${mountAssets[product.id]}" alt="${product.name}">${product.id === 'paipai-scooter' ? '<img class="brand-mark" src="../../public/logo.png" alt="">' : ''}`;
       if (product.kind === 'bubble') return `<div class="bubble ${product.id}">今天也要开心摸鱼。</div>`;
       return `<span class="frame ${product.id}"><img class="avatar" src="../../public/logo.png" alt="${product.name}"></span>`;
     }
@@ -139,7 +144,7 @@
         old?.remove();
         const banner = document.createElement('div');
         banner.className = 'entrance';
-        banner.innerHTML = `<img src="assets/${product.id}-v1.png" alt=""><div class="entrance-text"><b>摸鱼派</b>${product.verb}${product.name}进入了聊天室</div>`;
+        banner.innerHTML = `<img src="${mountAssets[product.id]}" alt=""><div class="entrance-text"><b>摸鱼派</b>${product.verb}${product.name}进入了聊天室</div>`;
         document.querySelector('#stage').append(banner);
         document.querySelector('#live').textContent = `摸鱼派${product.verb}${product.name}进入了聊天室`;
         document.querySelector('#live').style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';

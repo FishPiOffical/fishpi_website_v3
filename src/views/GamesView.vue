@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { petPortrait } from '@/components/pets/animations'
 import FishGameRecovery from '@/components/FishGameRecovery.vue'
 import {nextTick,onMounted,ref,watch} from 'vue'
 import {RouterLink} from 'vue-router'
@@ -50,7 +51,7 @@ watch(selected,id=>{if(id)void nextTick(()=>{if(selected.value===id)detailPanel.
       <svg class="hero-art" viewBox="0 0 200 160" fill="none" aria-hidden="true"><circle cx="104" cy="80" r="66" fill="currentColor" opacity=".06"/><g transform="translate(27 15) scale(6)"><path :d="gamepad" stroke="currentColor" stroke-width=".45" stroke-linecap="round" stroke-linejoin="round"/></g><path d="M38 29v12m-6-6h12m120 79v12m-6-6h12" stroke="currentColor" stroke-width="2" opacity=".5"/></svg>
     </header>
     <nav class="section-nav" aria-label="游戏分区"><a href="#official">官方游戏 <span>{{ official.length }}</span></a><a href="#activities">活动小游戏 <span>{{ activities.length }}</span></a><a href="#community">社区鱼游 <span v-if="games">{{ games.total }}</span></a><a href="#submission" class="submit-shortcut" @click="submissionOpen=true">分享游戏 <span aria-hidden="true">＋</span></a></nav>
-    <RouterLink to="/pets" class="pet-game-entry"><span class="pet-game-art"><img src="/images/pets/hexiaotun.webp" alt="" width="72" height="72" /></span><span><strong>宠物家园</strong><span>领养一位摸鱼伙伴，喂食、陪伴，一起慢慢长大。</span></span><span class="pet-game-arrow" aria-hidden="true">↗</span></RouterLink>
+    <RouterLink to="/pets" class="pet-game-entry"><span class="pet-game-art"><img :src="petPortrait('hexiaotun')" alt="" width="72" height="72" /></span><span><strong>宠物家园</strong><span>领养一位摸鱼伙伴，喂食、陪伴，一起慢慢长大。</span></span><span class="pet-game-arrow" aria-hidden="true">↗</span></RouterLink>
     <section v-for="section in sections" :id="section.id" :key="section.id" class="catalog-section" :aria-labelledby="section.id+'-title'">
       <header class="section-head"><span class="section-number" aria-hidden="true">{{ section.number }}</span><div><h2 :id="section.id+'-title'">{{ section.title }}</h2><p>{{ section.description }}</p></div><RouterLink v-if="section.id==='activities'" to="/activity" class="section-more">签到与昨日活跃 ↗</RouterLink><span v-else class="section-more">在经典站点打开</span></header>
       <ul class="official-grid"><li v-for="g in section.items" :key="g.href"><a class="official-game" :href="'https://fishpi.cn'+g.href" target="_blank" rel="noopener noreferrer"><span class="catalog-icon"><img :src="g.icon" alt="" width="34" height="34" referrerpolicy="no-referrer" /></span><span class="catalog-copy"><strong>{{ g.title }}</strong><span>{{ g.tip }}</span></span><span class="card-arrow" aria-hidden="true">↗</span></a></li></ul>

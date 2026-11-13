@@ -11,7 +11,7 @@ if (!Number.isInteger(port) || port < 1024 || port > 65535 || [5173, 5186, 8081]
 const app = express()
 app.disable('x-powered-by')
 app.use((request, response, next) => {
-  response.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; media-src 'self'; connect-src 'none'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+  response.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' https://file.fishpi.cn; media-src 'self' https://file.fishpi.cn; connect-src 'none'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'")
   response.setHeader('Referrer-Policy', 'no-referrer')
   response.setHeader('Cache-Control', 'no-store')
   if (!['GET', 'HEAD'].includes(request.method)) return response.sendStatus(405)

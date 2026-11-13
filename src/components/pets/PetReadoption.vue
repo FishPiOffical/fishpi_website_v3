@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { petPortrait } from '@/components/pets/animations'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import FpDialog from '@/components/FpDialog.vue'
 import { getAuthContextVersion } from '@/api/http'
@@ -69,7 +70,7 @@ onBeforeUnmount(() => { sequence++; unlock() })
     <FpDialog :open="opened" title="重新领养宠物" :width="580" :persistent="pets.busy" :closable="!pets.busy" @close="close">
       <form ref="panel" class="readoption-form" tabindex="-1" @submit.prevent="submit">
         <p class="readoption-intro">本次需要 <strong>{{ price }} 宠物币</strong>。请先选好新伙伴，再确认要重置的内容。</p>
-        <fieldset class="readoption-species"><legend>选择新伙伴</legend><label v-for="item in pets.catalog.species" :key="item.id" :class="{ selected: selected === item.id }"><input v-model="selected" type="radio" name="readoption-species" :value="item.id" :disabled="locked" /><img :src="`/images/pets/${item.id}.webp`" width="96" height="96" alt="" /><span>{{ item.name }}</span></label></fieldset>
+        <fieldset class="readoption-species"><legend>选择新伙伴</legend><label v-for="item in pets.catalog.species" :key="item.id" :class="{ selected: selected === item.id }"><input v-model="selected" type="radio" name="readoption-species" :value="item.id" :disabled="locked" /><img :src="petPortrait(item.id)" width="96" height="96" alt="" /><span>{{ item.name }}</span></label></fieldset>
         <div class="readoption-name"><label for="readoption-name">新伙伴的名字<span>{{ petNameLength(name || species?.name || '') }} / {{ pets.catalog.rules.maxNameLength }}</span></label><input id="readoption-name" v-model="name" :placeholder="species?.name" autocomplete="off" :disabled="locked" /></div>
         <div class="readoption-rules"><div><h3>重新开始</h3><p>宠物回到初始等级，经验、亲密度、课程技能和职业熟练度归零。</p></div><div><h3>继续保留</h3><p>剩余宠物币、背包、收藏、成长旅程进度和已领奖励，以及旧伙伴的活动记录。</p></div></div>
         <p class="readoption-note">当日补给、收入与成长额度、互动冷却继续沿用，不会再次发放首次领养奖励。</p>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { petAnimationClip, type PetAnimationAction } from './animations'
+import { petAnimationClip, petPortrait, type PetAnimationAction } from './animations'
 
 const props = withDefaults(defineProps<{
   species: string
@@ -21,7 +21,7 @@ const reducedMotion = ref(false), saveData = ref(false), failed = ref(false), de
 const loadedKey = ref('')
 const clip = computed(() => petAnimationClip(props.species, props.action))
 const mediaKey = computed(() => `${props.species}:${props.action}:${typeof props.playbackKey}:${props.playbackKey}`)
-const staticImage = computed(() => props.image || `/images/pets/${props.species}.webp`)
+const staticImage = computed(() => props.image || petPortrait(props.species))
 const allowed = computed(() => mounted.value && capable.value && !!clip.value && !reducedMotion.value && !saveData.value && !failed.value)
 const shouldPlay = computed(() => allowed.value && props.active && visible.value && intersecting.value)
 const showVideo = computed(() => allowed.value && loadedKey.value === mediaKey.value)
@@ -141,7 +141,7 @@ onBeforeUnmount(() => {
 <template>
   <span ref="element" class="pet-animation" :class="{ 'is-playing': shouldPlay && decoded }" :style="{ '--pet-animation-width': `${width}px`, '--pet-animation-ratio': `${width} / ${height}` }" :data-pet-action="action">
     <img :src="staticImage" :alt="alt" :width="width" :height="height" draggable="false" />
-    <video v-if="showVideo && clip" :key="mediaKey" ref="video" :src="clip.src" :data-media-key="mediaKey" :width="width" :height="height" :loop="loop" preload="none" muted playsinline disablepictureinpicture tabindex="-1" aria-hidden="true" @loadeddata="onData" @error="onError" @ended="onEnded" />
+    <video v-if="showVideo && clip" :key="mediaKey" ref="video" crossorigin="anonymous" :src="clip.src" :data-media-key="mediaKey" :width="width" :height="height" :loop="loop" preload="none" muted playsinline disablepictureinpicture tabindex="-1" aria-hidden="true" @loadeddata="onData" @error="onError" @ended="onEnded" />
   </span>
 </template>
 

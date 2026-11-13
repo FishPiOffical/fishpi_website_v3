@@ -5,10 +5,14 @@ import http from 'node:http'
 import { spawn } from 'node:child_process'
 import { build } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { petAnimationActions, petAnimationClip, petPortrait } from '../src/components/pets/animations.ts'
+import { mountAssets } from '../src/utils/mounts.ts'
 
 // 真实组件和视频在独立浏览器运行，只有传输与身份使用本地夹具，不连接业务服务。
 const root = process.cwd()
-const temporary = path.join(root, '.temp/pet-animation-browser')
+const useRhyPic = process.argv.includes('--rhypic')
+const speciesIds = ['hexiaotun', 'momota', 'yubingmiao', 'paixiaoyu']
+const temporary = path.join(root, useRhyPic ? '.temp/pet-rhypic-browser' : '.temp/pet-animation-browser')
 const sourceDirectory = path.join(temporary, 'fixture')
 const output = path.join(temporary, 'built')
 await fs.mkdir(sourceDirectory, { recursive: true })
@@ -112,10 +116,17 @@ export const useAuthStore = defineStore('animation-auth', () => {
 })
 export const RouterLink = { props: ['to'], setup(props, { slots }) { return () => h('a', { href: props.to, onClick: e => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); const url=new URL(props.to,location.origin); route.path=url.pathname; route.hash=url.hash } }, slots.default?.()) } }
 const route = reactive({ path: '/pets', hash: '' })
+export const mountTimeline = reactive({ notices: [], connected: true })
+export const useV3ChatTimelineStore = () => mountTimeline
+export const useChatStore = () => ({ floatingChatroomOpen: false })
+export const useChatPreferencesStore = () => ({ showMountEffects: true })
+export const useChatFilterStore = () => ({ modeFor: () => 'show' })
+export const setChatPresenceWanted = () => {}
 export const useRoute = () => route
 export const useLayoutStore = defineStore('animation-layout', () => ({ immersive: ref(false) }))
 `)
 const copied = new Map()
+const mountStubs = new Set(['@/stores/chat', '@/stores/v3ChatTimeline', '@/stores/chatPreferences', '@/stores/chatFilter', '@/api/v3-realtime'])
 const stubs = new Set(['@/api/http', '@/stores/auth', '@/stores/layout', '@/api/v3-profile', '@/composables/usePageSeo', 'vue-router'])
 async function copy(file) {
   file = path.resolve(file)
@@ -123,10 +134,21 @@ async function copy(file) {
   const name = `module-${copied.size}${path.extname(file)}`
   copied.set(file, name)
   let contents = await fs.readFile(file, 'utf8')
+  // 默认套件保持本地可离线运行，包括主动模拟视频加载失败。
+  if (!useRhyPic && path.basename(file) === 'animations.ts') {
+    for (const species of speciesIds) {
+      contents = contents.replaceAll(petPortrait(species), `/images/pets/${species}.webp`)
+      for (const action of petAnimationActions) {
+        const clip = petAnimationClip(species, action)
+        const base = `/images/pets/animations/${species}-v1/${action}`
+        contents = contents.replaceAll(clip.src, base + '.webm').replaceAll(clip.poster, base + '.webp')
+      }
+    }
+  }
   for (const match of [...contents.matchAll(/from\s*(['"])([^'"]+)\1/g)]) {
     const specifier = match[2]
     let replacement
-    if (stubs.has(specifier) || (path.basename(file) === 'v3-pets.ts' && specifier === './http')) replacement = './stubs.ts'
+    if (stubs.has(specifier) || mountStubs.has(specifier) || (path.basename(file) === 'v3-pets.ts' && specifier === './http')) replacement = './stubs.ts'
     else if (specifier.startsWith('@/') || specifier.startsWith('.')) {
       let dependency = specifier.startsWith('@/') ? path.join(root, 'src', specifier.slice(2)) : path.resolve(path.dirname(file), specifier)
       if (!path.extname(dependency)) dependency += '.ts'
@@ -137,6 +159,7 @@ async function copy(file) {
   await fs.writeFile(path.join(sourceDirectory, name), contents)
   return name
 }
+const mountOverlay = useRhyPic ? await copy(path.join(root, 'src/components/chat/ChatMountOverlay.vue')) : null
 const view = await copy(path.join(root, 'src/views/PetsView.vue'))
 const desktop = await copy(path.join(root, 'src/components/pets/PetDesktop.vue'))
 const riskPanel = await copy(path.join(root, 'src/components/pets/PetRiskVerification.vue'))
@@ -145,12 +168,13 @@ const displayStore = await copy(path.join(root, 'src/stores/petDisplay.ts'))
 await fs.writeFile(path.join(sourceDirectory, 'Shell.vue'), `
 <script setup>
 import { onMounted } from 'vue'
+${mountOverlay ? `import MountOverlay from './${mountOverlay}'` : ''}
 import View from './${view}'
 import Desktop from './${desktop}'
 import RiskPanel from './${riskPanel}'
 import { usePetsStore } from './${petsStore}'
 import { usePetDisplayStore } from './${displayStore}'
-import { useAuthStore, useRoute } from './stubs.ts'
+import { mountTimeline, useAuthStore, useRoute } from './stubs.ts'
 import * as fixture from './data.js'
 const pets = usePetsStore(), display = usePetDisplayStore(), auth = useAuthStore(), route = useRoute()
 const parameters = new URLSearchParams(location.search)
@@ -166,7 +190,7 @@ function previewUrl(desktop = desktopOnly, species = selectedSpecies) {
 function changeSpecies(event) { location.assign(previewUrl(desktopOnly, event.target.value)) }
 onMounted(() => {
   if (desktopOnly) { display.show(); display.setCollapsed(false) }
-  window.petFixture = { pets, display, auth, route, ...fixture }
+  window.petFixture = { pets, display, auth, route, mountTimeline, ...fixture }
   document.body.dataset.fixtureReady = 'true'
 })
 </script>
@@ -181,7 +205,7 @@ onMounted(() => {
   </header>
   <main v-if="!desktopOnly"><View /></main>
   <main v-else class="desktop-fixture"><h1>桌宠陪伴</h1><p>此处仅检查桌宠播放、拖动和收纳，不连接真实服务。</p></main>
-  <Desktop /><RiskPanel />
+  <Desktop /><RiskPanel />${mountOverlay ? "<MountOverlay />" : ""}
 </template>
 <style>
 .fixture-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 1180px; margin: 0 auto 20px; min-height: 40px; border-bottom: 1px solid var(--fp-border); padding-bottom: 14px; color: var(--fp-text); }
@@ -296,7 +320,7 @@ try {
   await call('Runtime.enable'); await call('Page.enable'); await call('Network.enable')
   // 用浏览器启动脚本模拟省流偏好，其余媒体检测仍由真实浏览器执行。
   await call('Page.addScriptToEvaluateOnNewDocument', { source: `if(new URLSearchParams(location.search).has('saveData')){const connection=new EventTarget();connection.saveData=true;Object.defineProperty(navigator,'connection',{configurable:true,value:connection})}` })
-  await call('Network.setBlockedURLs', { urls: ['https://*', 'http://localhost:*'] })
+  if (!useRhyPic) await call('Network.setBlockedURLs', { urls: ['https://*', 'http://localhost:*'] })
   const setViewport = (width, height = 1000) => call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 })
   async function navigate(query = '') {
     const parameters = new URLSearchParams(query.replace(/^\?/, ''))
@@ -304,6 +328,66 @@ try {
     await call('Page.navigate', { url: `http://127.0.0.1:${port}/?${parameters}` })
     await until(`!!window.petFixture?.pets.pet`, '宠物夹具已加载')
   }
+  async function verifyRhyPic() {
+    for (const [desktop, width] of [[false, 1440], [true, 1440], [true, 390]]) {
+      await setViewport(width)
+      for (const species of speciesIds) {
+        await navigate(`?species=${species}${desktop ? '&desktop=1' : ''}`)
+        const target = desktop ? '.pet-character' : '.pet-scene'
+        const mediaReady = width < 600 ? '!v' : `v?.currentSrc===${JSON.stringify(petAnimationClip(species, 'idle').src)} && host.classList.contains('is-playing') && v.currentTime>0`
+        await until(`(()=>{const host=document.querySelector('${target} .pet-animation'),img=host?.querySelector('img'),v=host?.querySelector('video');return img?.naturalWidth>0 && img.currentSrc===${JSON.stringify(petPortrait(species))} && (${mediaReady})})()`, `${species} ${target} RhyPic 素材就绪（${width}px）`, 12000)
+      }
+      await screenshot(desktop ? `rhypic-desktop-pet-${width}.png` : 'rhypic-pet-home.png')
+    }
+    for (const species of speciesIds) {
+      const clips = petAnimationActions.map(action => ({ action, ...petAnimationClip(species, action) }))
+      const decoded = await evaluate(`(async()=>{
+        const clips=${JSON.stringify(clips)};
+        const canvas=document.createElement('canvas'); canvas.width=canvas.height=256;
+        const context=canvas.getContext('2d',{willReadFrequently:true});
+        for(const clip of clips){
+          const poster=new Image(); poster.src=clip.poster; await poster.decode();
+          const video=document.createElement('video'); video.crossOrigin='anonymous'; video.muted=true; video.playsInline=true;
+          try {
+            video.src=clip.src;
+            await video.play();
+            context.clearRect(0,0,256,256); context.drawImage(video,0,0);
+            const pixels=context.getImageData(0,0,256,256).data;
+            let transparent=0,solid=0;
+            for(let i=3;i<pixels.length;i+=4){if(pixels[i]===0)transparent++;if(pixels[i]>=240)solid++}
+            if(video.videoWidth!==256 || video.videoHeight!==256 || transparent<10000 || solid<10000) throw Error('透明视频解码异常：'+clip.action);
+          } finally { video.pause(); video.removeAttribute('src'); video.load() }
+        }
+        return clips.length;
+      })()`)
+      assert.equal(decoded, 10, `${species} 十段 WebM 和海报均可加载`)
+    }
+    const fixtures = [
+      ['paipai-scooter', '骑着', '派派小电驴'],
+      ['paper-plane', '坐着', '摸鱼纸飞机'],
+      ['deepsea-submarine', '开着', '深海潜艇'],
+    ].map(([id, verb, name], i) => ({ id: String(i), kind: 'join', actor: { id: String(i), userName: '素材测试' }, avatarURL: petPortrait('paixiaoyu'), text: `素材测试${verb}${name}进入了聊天室`, mount: { id } }))
+    await navigate()
+    // 先让浏览器读取实际 CDN 图片，再模拟三个进场事件验证动画和堆叠。
+    await evaluate(`Promise.all(${JSON.stringify(Object.values(mountAssets))}.map(async url=>{const img=new Image();img.src=url;await img.decode()}))`)
+    await evaluate(`petFixture.route.path='/cr'; petFixture.mountTimeline.notices=${JSON.stringify(fixtures)}`)
+    const rows = await evaluate(`[...document.querySelectorAll('.mount-arrival')].map(row=>({text:row.querySelector('.arrival-copy > span').textContent, offset:row.style.getPropertyValue('--arrival-offset'), animation:getComputedStyle(row).animationName, src:row.querySelector('.vehicle').src}))`)
+    assert.deepEqual(rows.map(({ animation, ...row }) => row), fixtures.map((entry, i) => ({
+      text: entry.text.slice('素材测试'.length).replace('进入了聊天室', '来了'),
+      offset: `${(2 - i) * 64}px`, src: mountAssets[entry.mount.id],
+    })))
+    assert(rows.every(row => row.animation.includes('mount-arrive')))
+    await until(`[...document.querySelectorAll('.vehicle')].filter(img=>img.naturalWidth>0).length===3`, '三种座驾缩图显示')
+    await delay(650)
+    await screenshot('rhypic-mount-arrivals.png')
+    await until(`!document.querySelector('.mount-arrival')`, '三条进场提示按时消失')
+    assert.deepEqual(failures, []); assert.deepEqual(exceptions, [])
+    console.log('PASS RhyPic 四种宠物家园、桌宠与窄屏静态回退、三种座驾进场与堆叠')
+  }
+  if (useRhyPic) await verifyRhyPic()
+  else await verifyLocalAssets()
+
+  async function verifyLocalAssets() {
   const sceneVideo = `document.querySelector('.pet-scene video')`
   const sceneAction = action => `${sceneVideo}?.currentSrc.includes('/${action}.webm') && ${sceneVideo}.readyState >= 2 && !${sceneVideo}.paused`
   await setViewport(1440)
@@ -799,6 +883,7 @@ try {
     note: '真实组件、浏览器、WebM与本地模拟传输；未访问真实账号，未中断原8小时测试，不代表真机Safari验收。' }
   await fs.writeFile(path.join(temporary, 'report.json'), JSON.stringify(report, null, 2) + '\n')
   console.log(JSON.stringify(report, null, 2))
+  }
 } finally {
   socket?.close(); browser.kill('SIGTERM')
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve))

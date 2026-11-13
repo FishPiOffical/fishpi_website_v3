@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { petAnimationClip } from '../src/components/pets/animations.ts'
 
-// 生成离线美术验收工具；不访问宠物 API，也不改变线上或本地测试账号。
+// 生成独立美术验收工具；不访问宠物 API，也不改变线上或本地测试账号。
 const root = process.cwd()
 const species = process.argv.slice(2).find(value => value.startsWith('--species='))?.slice('--species='.length) || 'hexiaotun'
 const names = { hexiaotun: '荷小豚', momota: '摸摸獭', yubingmiao: '鱼饼喵', paixiaoyu: '派小鱼' }
@@ -9,6 +10,11 @@ if (!Object.hasOwn(names, species)) throw new Error('未知的宠物种类')
 const name = names[species]
 const manifest = JSON.parse(await fs.readFile(path.join(root, `public/images/pets/animations/${species}-v1/manifest.json`), 'utf8'))
 if (!manifest.clips?.length) throw new Error('尚无可预览的动作')
+manifest.clips = manifest.clips.map(clip => {
+  const media = petAnimationClip(species, clip.id)
+  if (!media) throw new Error(`缺少 RhyPic 素材：${species}/${clip.id}`)
+  return { ...clip, file: media.src, poster: media.poster }
+})
 const target = path.join(root, `docs/pets-art/${species}-animations-v1/preview.html`)
 const available = []
 for (const [id, label] of Object.entries(names)) {
@@ -28,23 +34,22 @@ const html = `<!doctype html>
 <nav class="species" aria-label="选择宠物">${available.join('')}</nav>
 <header><div><h1>${name}，动起来了</h1><p>先看看每个动作，再一起放进宠物家园。</p></div><span class="tag">256 × 256 · 透明 WebM</span></header>
 <div class="layout"><div>
-<section class="viewer"><div id="stage" class="stage checker"><span class="stage-label">实际显示 256px</span><video id="player" muted playsinline loop preload="metadata" aria-label="${name}动作预览"></video></div><div class="viewer-tools"><div><h2 id="clip-name"></h2><small id="clip-size"></small></div><div class="actions"><button id="replay" title="从头播放">重播</button><button id="toggle" class="primary">播放</button></div></div></section>
+<section class="viewer"><div id="stage" class="stage checker"><span class="stage-label">实际显示 256px</span><video id="player" crossorigin="anonymous" muted playsinline loop preload="metadata" aria-label="${name}动作预览"></video></div><div class="viewer-tools"><div><h2 id="clip-name"></h2><small id="clip-size"></small></div><div class="actions"><button id="replay" title="从头播放">重播</button><button id="toggle" class="primary">播放</button></div></div></section>
 <div class="controls"><label>背景<select id="background"><option value="checker">透明网格</option><option value="light">浅色</option><option value="dark">深色</option></select></label><label>大小<select id="size"><option value="256">256px</option><option value="128">128px</option></select></label><label><input id="loop" type="checkbox" checked>循环预览</label></div><p id="error" class="error" role="status"></p>
 </div><nav id="clip-list" class="clip-list" aria-label="选择动作"></nav></div>
 <div class="foot"><span id="total"></span><button id="compare">同时对比全部动作</button></div><section id="all" class="all" aria-label="全部动作对比"></section>
 <p class="summary">这是独立美术预览，不连接账号，也不会消耗宠物币。可用深色背景检查透明边缘。</p>
 </main><script>
 const manifest=${JSON.stringify(manifest).replaceAll('<', '\\u003c')};
-const base='../../../public/images/pets/animations/${species}-v1/';
 const clips=manifest.clips;const player=document.querySelector('#player');const error=document.querySelector('#error');const list=document.querySelector('#clip-list');let current;let generation=0;
 function size(bytes){return (bytes/1024).toFixed(1)+' KiB'}
 async function play(){const request=generation;try{await player.play();if(request===generation)error.textContent=''}catch(e){if(request===generation&&e.name!=='AbortError')error.textContent='请点播放开始预览；无法播放时可使用 Chrome 打开本页。'}}
-function select(id){const clip=clips.find(item=>item.id===id);if(!clip)return;generation++;current=clip;player.pause();player.poster=base+clip.poster;player.src=base+clip.file;player.loop=document.querySelector('#loop').checked;document.querySelector('#clip-name').textContent=clip.name;document.querySelector('#clip-size').textContent=clip.duration.toFixed(2)+' 秒 · '+size(clip.bytes);for(const b of list.querySelectorAll('button'))b.setAttribute('aria-pressed',String(b.dataset.id===id));error.textContent='';if(!matchMedia('(prefers-reduced-motion: reduce)').matches)play()}
-for(const clip of clips){const button=document.createElement('button');button.className='clip';button.dataset.id=clip.id;button.setAttribute('aria-pressed','false');button.innerHTML='<img alt="" width="54" height="54"><span><strong></strong><small></small></span>';button.querySelector('img').src=base+clip.poster;button.querySelector('strong').textContent=clip.name;button.querySelector('small').textContent=size(clip.bytes);button.onclick=()=>select(clip.id);list.append(button)}
+function select(id){const clip=clips.find(item=>item.id===id);if(!clip)return;generation++;current=clip;player.pause();player.poster=clip.poster;player.src=clip.file;player.loop=document.querySelector('#loop').checked;document.querySelector('#clip-name').textContent=clip.name;document.querySelector('#clip-size').textContent=clip.duration.toFixed(2)+' 秒 · '+size(clip.bytes);for(const b of list.querySelectorAll('button'))b.setAttribute('aria-pressed',String(b.dataset.id===id));error.textContent='';if(!matchMedia('(prefers-reduced-motion: reduce)').matches)play()}
+for(const clip of clips){const button=document.createElement('button');button.className='clip';button.dataset.id=clip.id;button.setAttribute('aria-pressed','false');button.innerHTML='<img alt="" width="54" height="54"><span><strong></strong><small></small></span>';button.querySelector('img').src=clip.poster;button.querySelector('strong').textContent=clip.name;button.querySelector('small').textContent=size(clip.bytes);button.onclick=()=>select(clip.id);list.append(button)}
 document.querySelector('#toggle').onclick=()=>player.paused?play():player.pause();document.querySelector('#replay').onclick=()=>{player.currentTime=0;play()};player.onplay=()=>document.querySelector('#toggle').textContent='暂停';player.onpause=()=>document.querySelector('#toggle').textContent='播放';player.onended=()=>document.querySelector('#toggle').textContent='播放';player.onerror=()=>error.textContent='这个动作暂时无法播放，请用 Chrome 打开预览。';document.querySelector('#loop').onchange=e=>player.loop=e.target.checked;
 document.querySelector('#background').onchange=e=>{document.querySelector('#stage').classList.remove('checker','light','dark');document.querySelector('#stage').classList.add(e.target.value);document.querySelector('#all').classList.toggle('dark',e.target.value==='dark')};document.querySelector('#size').onchange=e=>{document.querySelector('#stage').classList.toggle('small',e.target.value==='128');document.querySelector('.stage-label').textContent='实际显示 '+e.target.value+'px'};
 document.querySelector('#total').textContent=clips.length+' 个动作 · 视频总计 '+(manifest.totalBytes/1024/1024).toFixed(2)+' MiB · 按需加载';
-let compareOpen=false;document.querySelector('#compare').onclick=async()=>{compareOpen=!compareOpen;const all=document.querySelector('#all');all.classList.toggle('visible',compareOpen);document.querySelector('#compare').textContent=compareOpen?'收起对比':'同时对比全部动作';if(compareOpen){player.pause();if(!all.children.length)for(const clip of clips){const article=document.createElement('article');const video=document.createElement('video');video.muted=true;video.playsInline=true;video.loop=true;video.src=base+clip.file;video.poster=base+clip.poster;video.setAttribute('aria-label',clip.name);const label=document.createElement('strong');label.textContent=clip.name;article.append(video,label);all.append(article)}await Promise.allSettled([...all.querySelectorAll('video')].map(video=>video.play()))}else{for(const video of all.querySelectorAll('video'))video.pause();play()}};
+let compareOpen=false;document.querySelector('#compare').onclick=async()=>{compareOpen=!compareOpen;const all=document.querySelector('#all');all.classList.toggle('visible',compareOpen);document.querySelector('#compare').textContent=compareOpen?'收起对比':'同时对比全部动作';if(compareOpen){player.pause();if(!all.children.length)for(const clip of clips){const article=document.createElement('article');const video=document.createElement('video');video.muted=true;video.playsInline=true;video.loop=true;video.crossOrigin="anonymous";video.src=clip.file;video.poster=clip.poster;video.setAttribute('aria-label',clip.name);const label=document.createElement('strong');label.textContent=clip.name;article.append(video,label);all.append(article)}await Promise.allSettled([...all.querySelectorAll('video')].map(video=>video.play()))}else{for(const video of all.querySelectorAll('video'))video.pause();play()}};
 document.addEventListener('visibilitychange',()=>{if(document.hidden){player.pause();for(const video of document.querySelectorAll('#all video'))video.pause()}});
 select(clips.some(c=>c.id==='idle')?'idle':clips[0].id);
 </script></body></html>`
