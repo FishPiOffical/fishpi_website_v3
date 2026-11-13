@@ -1,4 +1,5 @@
 import { ApiError, request } from './http'
+import { decodePetSpecies, type PetSpeciesId } from './v3-pets'
 import { decodeV3ContentPage } from './v3-content'
 import { decodeV3RelationUser, type RelationUser } from './v3-user-relations'
 
@@ -6,10 +7,11 @@ export const rankingTitles = {
   checkin: '连签排行', online: '在线时间排行', balance: '积分财富排行', consumption: '积分支出排行',
   donate: '鱼排续命师', perfect: '优选排行', invite: '邀请成员排行', links: '链接点击排行',
   xiaoice: '小冰修仙排行', evolve: '进化 Evolve 排行', adr: '小黑屋 ADR 排行', mofish: '摸鱼大闯关排行',
-  smallmofish: '摸鱼小闯关排行', lifeRestart: '人生重开排行', emoji: '真假小黄脸排行',
+  pets: '宠物排行榜', smallmofish: '摸鱼小闯关排行', lifeRestart: '人生重开排行', emoji: '真假小黄脸排行',
 } as const
 export type RankingType = keyof typeof rankingTitles
-export interface RankingEntry { rank: number; score: number; metrics: Record<string, number | string>; user?: RelationUser; link?: { id: string; title: string; url: string } }
+export interface RankedPet { id: string; name: string; speciesId: PetSpeciesId; level: number; experience: number }
+export interface RankingEntry { pet?: RankedPet; rank: number; score: number; metrics: Record<string, number | string>; user?: RelationUser; link?: { id: string; title: string; url: string } }
 export interface RankingPage { type: RankingType; subType: string; list: RankingEntry[]; p: number; size: number; total: number; pageCount: number; summary?: { amount: number; supportedDays: number } }
 export const rankingSubTypes = { evolve: [['achievement', '成就'], ['know', '知识'], ['reset', '重置'], ['days', '天数']], xiaoice: [['0', '经验'], ['1', '死亡次数'], ['2', '历练次数'], ['3', '吐纳次数']] } as const
 const bad = () => new ApiError('排行榜响应格式不正确', 502)
@@ -26,6 +28,7 @@ function string(value: unknown) { if (typeof value !== 'string' || value.length 
 function url(value: string) { if (/[\\\u0000-\u0020\u007f]/u.test(value)) return ''; try { const parsed = new URL(value); return ['http:', 'https:'].includes(parsed.protocol) && !parsed.username && !parsed.password ? value : '' } catch { return value.startsWith('/') && !value.startsWith('//') && !/[\\\u0000-\u0020]/u.test(value) ? value : '' } }
 export function rankingMetricFields(type: RankingType, sub: string) {
   switch (type) {
+    case 'pets': return ['level', 'experience'];
     case 'checkin': return ['streak']; case 'online': return ['minutes']; case 'links': return ['clickCount'];
     case 'invite': case 'perfect': return ['count']; case 'donate': return ['amount', 'count'];
     case 'lifeRestart': return ['times', 'achievement']; case 'evolve': return ['achievement', 'know', 'reset', 'days', 'currentKnow', 'currentDays'];
@@ -43,7 +46,13 @@ export function decodeRanking(value: unknown, type: RankingType, sub = rankingSu
     for (const field of fields) metrics[field] = field === 'ancestry' || field === 'gongfa' ? string(source[field]) : number(source[field], field === 'amount')
     if (score !== metrics[primary]) throw bad()
     if (type === 'links') { const link = object(entry.link), id = string(link.id); if (!id || id.length > 32 || id[0] === '0' || /[^0-9]/.test(id)) throw bad(); return { rank, score, metrics, link: { id, title: string(link.title), url: url(string(link.url)) } } }
-    return { rank, score, metrics, user: decodeV3RelationUser(entry.user) }
+    const user = decodeV3RelationUser(entry.user)
+    if (type === 'pets') {
+      const pet = decodeRankedPet(entry.pet)
+      if (pet.level !== metrics.level || pet.experience !== metrics.experience) throw bad()
+      return { rank, score, metrics, user, pet }
+    }
+    return { rank, score, metrics, user }
   })
   const result: RankingPage = { type, subType: sub, ...page.pagination, list }
   if (type === 'donate') { const summary = object(row.summary); result.summary = { amount: number(summary.amount, true), supportedDays: number(summary.supportedDays, true) } }
@@ -61,4 +70,21 @@ export async function fetchRanking(type: RankingType, p = 1, sub?: string, size 
   const envelope = object(await request(`/api/v3/rankings/${type}?${query}`, { cache: 'no-store', ...(credentials ? { credentials } : {}) }))
   if (envelope.code !== 0) throw bad()
   return decodeRanking(envelope.data, type, normalized, p, size)
+}
+
+function decodeRankedPet(value: unknown): RankedPet {
+  const row = object(value)
+  const id = string(row.id), name = string(row.name)
+  const level = number(row.level), experience = number(row.experience)
+  if (!/^[0-9]{1,19}$/.test(id) || !name.trim() || name.length > 256 || level < 1 || experience < 0) throw bad()
+  return { id, name, speciesId: decodePetSpecies(row.speciesId), level, experience }
+}
+
+export async function fetchRankedPet(id: string, signal: AbortSignal) {
+  if (!/^[0-9]{1,19}$/.test(id)) throw new ApiError('宠物 ID 不合法', 422)
+  const envelope = object(await request(`/api/v3/pets/${id}/profile`, { signal, credentials: 'omit', cache: 'no-store' }))
+  if (envelope.code !== 0) throw bad()
+  const data = object(envelope.data), pet = decodeRankedPet(data)
+  if (pet.id !== id) throw bad()
+  return { ...pet, user: decodeV3RelationUser(data.user) }
 }

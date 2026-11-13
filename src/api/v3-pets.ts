@@ -185,7 +185,7 @@ function flag(value: unknown): boolean {
   if (typeof value !== 'boolean') throw invalid()
   return value
 }
-function species(value: unknown): PetSpeciesId {
+export function decodePetSpecies(value: unknown): PetSpeciesId {
   if (typeof value !== 'string' || !speciesIds.has(value)) throw invalid()
   return value as PetSpeciesId
 }
@@ -306,7 +306,7 @@ export function decodePetCatalog(value: unknown): PetCatalog {
     incomeRules: { dailyLimit: integer(object(row.incomeRules).dailyLimit, 1) },
     species: unique(list(row.species, 4).map(value => {
       const entry = object(value)
-      return { id: species(entry.id), name: text(entry.name, 40), description: text(entry.description, 500) }
+      return { id: decodePetSpecies(entry.id), name: text(entry.name, 40), description: text(entry.description, 500) }
     }), entry => entry.id),
     items: unique(list(row.items, 50).map(value => {
       const entry = object(value)
@@ -377,7 +377,7 @@ export function decodePetState(value: unknown): PetState {
       if (activity.endsAt <= activity.startedAt) throw invalid()
     }
     pet = {
-      id: text(data.id, 64), speciesId: species(data.speciesId), name: text(data.name),
+      id: text(data.id, 64), speciesId: decodePetSpecies(data.speciesId), name: text(data.name),
       hunger: integer(data.hunger, 0, 100), water: integer(data.water, 0, 100),
       mood: integer(data.mood, 0, 100), energy: integer(data.energy, 0, 100),
       experience: integer(data.experience), level: integer(data.level, 1, 30),

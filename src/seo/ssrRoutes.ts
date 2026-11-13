@@ -35,6 +35,7 @@ export function shouldPrefetchSsr(path: string) {
     p === '/top/smallmofish' ||
     p === '/top/lifeRestart' ||
     p === '/top/emoji' ||
+    p === '/top/pets' ||
     p === '/statistic' ||
     p === '/milestones' ||
     p === '/repeater' ||

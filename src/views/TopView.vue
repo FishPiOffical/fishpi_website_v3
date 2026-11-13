@@ -21,6 +21,7 @@ const catalog = [
   { key:'donate', title:'鱼排续命师', desc:'感谢每一份对摸鱼派的支持', group:'community', icon:'heart' },
   { key:'invite', title:'邀请成员', desc:'好社区，和朋友一起分享', group:'community', icon:'users' },
   { key:'links', title:'热门外链', desc:'发现鱼油们分享的精彩链接', group:'community', icon:'link' },
+  { key:'pets', title:'宠物排行榜', desc:'按等级与经验查看宠物排名', group:'games', icon:'growth' },
   { key:'xiaoice', title:'小冰修仙', desc:'漫漫修仙路，谁能更进一步', group:'games', icon:'star' },
   { key:'evolve', title:'进化 Evolve', desc:'从微小生命走向文明进化', group:'games', icon:'growth' },
   { key:'adr', title:'A Dark Room', desc:'小黑屋里的探索与冒险', group:'games', icon:'moon' },
