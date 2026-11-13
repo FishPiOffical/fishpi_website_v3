@@ -1,0 +1,63 @@
+--- a/scripts/site-workflow.mjs
++++ b/scripts/site-workflow.mjs
+@@ -205,7 +205,7 @@
+   // local commit for recovery; it never triggers a fetch, merge, or force push.
+   const push = await remoteGit(["push", credential.remote_url, `${head}:${ref}`], { check: false });
+   if (push.code !== 0) {
+-    const detail = push.stderr.split(credential.token).join("[redacted]").trim();
++    const detail = redactGitError(push.stderr);
+     throw new WorkflowError(`${detail}\nLocal source and commits are retained. Reconcile remote changes and rebuild before retrying publishing.`, push.code);
+   }
+   const pushed = (await remoteGit(["ls-remote", "--heads", credential.remote_url, ref])).stdout.trim().split(/\s+/)[0];
+@@ -304,13 +304,19 @@
+   try { request = JSON.parse(input); } catch { throw new WorkflowError("Provide the workflow inputs as one JSON object on stdin.", 64); }
+   const value = request?.credential;
+   const privateAuth = value?.auth_mode === "work_proxy";
++  // 桌面宿主负责认证，不从用户登录缓存读取或复制令牌。
++  const codexAuth = value?.auth_mode === "codex_auth";
+   const bearerAuth = value?.auth_mode === "http_extra_header" && typeof value.token === "string" && value.token && !/[\r\n\0]/.test(value.token);
+-  if ((!privateAuth && !bearerAuth) || typeof value.branch !== "string" || !value.branch || value.branch.startsWith("-")) {
++  if ((!privateAuth && !bearerAuth && !codexAuth) || typeof value.branch !== "string" || !value.branch || value.branch.startsWith("-")) {
+     throw new WorkflowError("Use the returned source repository access with its auth_mode, remote_url, and branch.", 64);
+   }
+   let url;
+   try { url = new URL(value.remote_url); } catch { throw new WorkflowError("The source credential remote_url must be an HTTPS URL.", 64); }
+   if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new WorkflowError("Use the credential's HTTPS remote_url without embedded credentials, query, or fragment.", 64);
++  // 宿主凭据只允许用于当前 Sites 仓库，不能随调用方 URL 发往其他站点。
++  if (codexAuth && (url.origin !== "https://chatgpt.com" || ![`/backend-api/codex/sites/git/${projectId}`, `/backend-api/codex/sites/git/${projectId}/`].includes(url.pathname))) {
++    throw new WorkflowError("Codex authentication is restricted to this Site source repository.", 64);
++  }
+   if (value.token_expires_at && (!Number.isFinite(Date.parse(value.token_expires_at)) || Date.parse(value.token_expires_at) <= Date.now())) throw new WorkflowError("Renew the source credential for the same Site before retrying.");
+   return request;
+ }
+@@ -320,7 +326,9 @@
+   const auth = [];
+   if (network) {
+     for (const key of Object.keys(env)) if (key.startsWith("GIT_TRACE") || key === "GIT_CURL_VERBOSE") delete env[key];
+-    auth.push("-c", "credential.helper=", "-c", "http.extraHeader=", "-c", "http.followRedirects=false");
++    // codex_auth 必须保留桌面宿主的凭据助手；其他模式仍隔离本机凭据。
++    if (credential.auth_mode !== "codex_auth") auth.push("-c", "credential.helper=");
++    auth.push("-c", "http.extraHeader=", "-c", "http.followRedirects=false");
+     if (credential.auth_mode === "http_extra_header") {
+       env.SITES_GIT_AUTHORIZATION = `Authorization: Bearer ${credential.token}`;
+       auth.push(`--config-env=http.${credential.remote_url}.extraHeader=SITES_GIT_AUTHORIZATION`);
+@@ -340,10 +348,18 @@
+     });
+   });
+   if (result.signal || check && result.code !== 0) {
+-    const detail = result.stderr.split(credential.token).join("[redacted]").trim();
++    const detail = redactGitError(result.stderr);
+     const error = new WorkflowError(detail || "Git could not complete the Site source operation.", result.code || 1);
+     error.signal = result.signal;
+     throw error;
+   }
+   return result;
+ }
++
++// 无令牌模式不能按空字符串拆分错误，Bearer 错误也不能输出凭据。
++function redactGitError(message) {
++  const text = typeof message === "string" ? message : "";
++  return (typeof credential?.token === "string" && credential.token
++    ? text.split(credential.token).join("[redacted]")
++    : text).replace(/(authorization\s*:\s*(?:bearer|basic)\s+)\S+/gi, "$1[redacted]").trim();
++}

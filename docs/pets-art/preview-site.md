@@ -13,12 +13,13 @@
 
 **已创建站点，尚未发布成功。** `get_site` 复核 `latest_version_number=0`、`current_live_url=null`，预定地址不能作为已上线证明。
 
-静态导出及浏览器检查已完成。发布被本机 Sites 源码同步兼容问题阻断：
+静态导出及浏览器检查已完成。Sites 1.1.6 的本地脚本兼容缺口已修复，但发布仍被宿主认证接入问题阻断：
 
 1. Sites 创建及刷新源码凭据均返回 `auth_mode=codex_auth`，没有明文令牌。
-2. 安装的 Sites 1.1.6 `site-workflow.mjs` 只接受 `work_proxy` 和 `http_extra_header`，拒绝当前返回的认证方式。
-3. 使用返回的源码地址执行普通 `git ls-remote` 也返回 HTTP 400。没有读取或手工导出用户登录凭据，没有伪造其他认证方式。
-4. 未同步源码，因此未调用保存版本或部署接口。后续修复本机插件/宿主兼容后，复用上面的 ID 继续同步和发布，不再调用 `create_site`。
+2. 已修补 `site-workflow.mjs`：接受 `codex_auth`、保留宿主 Git 凭据助手，并限定其只能用于当前 Sites 仓库；另外两种模式保持原来的凭据隔离。
+3. 修补后的真实同步越过了本地校验，但仍返回 HTTP 400。只读检查返回 `missing_account_user_id` / `Unable to determine account user id.`；没有 `WWW-Authenticate` 响应头。本机 Git 仅配置系统 `osxkeychain`，未发现 Sites 专用认证助手。刷新 Sites 源码凭据没有改变该结果。
+4. 未读取或手工导出用户登录凭据，没有伪造认证方式或绕过身份校验。源码还未同步，因此未调用保存版本或部署接口；需要宿主提供 Sites Git 身份通道后继续。
+5. 18 项隔离回归通过，覆盖三认证方式、完整源码同步和打包、非法输入拒绝、日志脱敏及失败不重试；全部远端请求均为本地夹具，不能代替线上身份验证。补丁和复现说明见 [Sites 认证兼容修复](sites-auth-compat.md)。后续继续复用此站点 ID，不再调用 `create_site`。
 
 本次独立导出目录：`/Users/ling/Documents/fishpi/website_v3-pet-next/.temp/sites/pet-preview`。其中 `.openai/hosting.json` 已原子写入固定站点 ID，目录内不包含网站运行配置、账号数据、测试数据或 `.host`。
 
