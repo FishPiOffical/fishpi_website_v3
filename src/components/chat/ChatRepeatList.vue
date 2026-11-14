@@ -1,14 +1,16 @@
 <script setup lang="ts" generic="T extends RepeatEntry">
 import { computed, ref, watch, onMounted, onUpdated, onBeforeUnmount } from 'vue'
-import { groupChatRepeats, type RepeatEntry } from '@/utils/chatRepeatGroups'
-import { avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
+import { groupChatRepeats, chatRepeatPreview, type RepeatEntry } from '@/utils/chatRepeatGroups'
+import { avatarThumbnail, fallbackAvatar, rhyPicThumbnail } from '@/utils/avatar'
 import ChatRepeatAction from './ChatRepeatAction.vue'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
+import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 const props = defineProps<{ entries: T[]; reverse?: boolean; ownName?: string }>()
 defineSlots<{ default(props: { entry: T }): unknown }>()
 // 最多露出六张后层和一张完整前层，长复读仍可展开查看全部。
 const visibleBackLayers = 6
 const preferences = useChatPreferencesStore()
+const functions = useFunctionPreferencesStore()
 const mounted = ref(false)
 const expanded = ref(new Set<string>())
 const root = ref<HTMLElement | null>(null)
@@ -41,6 +43,11 @@ const groups = computed(() => {
   const result = groupChatRepeats(props.entries)
   return props.reverse ? result.reverse() : result
 })
+// 只解析折叠后实际露出的后层；单条消息和已展开组不重复生成预览。
+const previews = computed(() => new Map(mounted.value ? groups.value.flatMap(group =>
+  group.length > 1 && !expanded.value.has(group[0]!.key)
+    ? group.slice(Math.max(0, group.length - visibleBackLayers - 1), -1).map(entry => [entry.key, chatRepeatPreview(entry.message?.html || '')] as const)
+    : []) : []))
 // 清屏、撤回或换号后丢弃已不存在的组，避免保存旧会话展开状态。
 watch(groups, value => {
   const keys = new Set(value.filter(group => group.length > 1).map(group => group[0]!.key))
@@ -61,9 +68,11 @@ function toggle(key: string) {
       <div v-if="!expanded.has(group[0]!.key)" class="repeat-deck" :style="{ '--layers': Math.min(group.length - 1, visibleBackLayers) }">
         <div v-for="(entry, index) in group.slice(Math.max(0, group.length - visibleBackLayers - 1), -1)" :key="entry.key" class="fp-msg is-room repeat-layer-shell" data-appearance-snapshot="v1" :data-bubble="mounted && preferences.simpleMode ? 'none' : entry.message?.appearance?.bubbleId" :style="{ '--layer': index }">
         <button class="repeat-layer" type="button" aria-label="展开复读消息" @click="toggle(group[0]!.key)">
-          <img :src="avatarThumbnail(entry.message?.userAvatarURL, 20)" :alt="entry.message?.userNickname || entry.message?.userName" :data-user-card="entry.message?.userName" @error="fallbackAvatar" />
+          <img class="repeat-avatar" :src="avatarThumbnail(entry.message?.userAvatarURL, 20)" :alt="entry.message?.userNickname || entry.message?.userName" :data-user-card="entry.message?.userName" @error="fallbackAvatar" />
           <span class="repeat-author">{{ entry.message?.userNickname || entry.message?.userName }}</span>
-          <span class="fp-bubble repeat-sheet" aria-hidden="true"></span>
+          <span class="fp-bubble repeat-sheet" :class="{ 'repeat-sheet--blur': mounted && functions.blurChatImages }">
+            <span class="repeat-preview"><template v-for="(part, partIndex) in previews.get(entry.key)" :key="partIndex"><img v-if="'image' in part" class="repeat-picture" :src="rhyPicThumbnail(part.image, 80, 64)" :alt="part.alt" loading="lazy" /><span v-else>{{ part.text }}</span></template></span>
+          </span>
         </button>
         </div>
         <!-- 新复读覆盖在前层；组标识仍用最早消息，追加时不重置展开状态。 -->
@@ -72,7 +81,7 @@ function toggle(key: string) {
       <template v-else><template v-for="entry in (reverse ? [...group].reverse() : group)" :key="entry.key"><slot :entry="entry" /></template></template>
       <div class="repeat-controls">
         <button type="button" :aria-expanded="expanded.has(group[0]!.key)" @click="toggle(group[0]!.key)">{{ expanded.has(group[0]!.key) ? '收起' : '展开' }} · {{ group.length }} 条复读 <span aria-hidden="true">{{ expanded.has(group[0]!.key) ? '⌃' : '⌄' }}</span></button>
-        <ChatRepeatAction :id="group[group.length - 1]!.message!.oId" label="+1" />
+        <ChatRepeatAction :id="group[group.length - 1]!.message!.oId" label="+1" compact />
       </div>
     </template>
   </div>
@@ -84,17 +93,22 @@ function toggle(key: string) {
 /* 后层沿用消息的外观包底色，只隐藏装饰，避免多个角标挤在一起。 */
 .repeat-layer-shell .repeat-sheet::before, .repeat-layer-shell .repeat-sheet::after { display: none !important; }
 .repeat-group { min-width: 0; flex-shrink: 0; }
-.repeat-deck { --step: 8px; --layer-height: 36px; position: relative; padding-top: calc(var(--layers) * var(--layer-height)); padding-right: calc(var(--layers) * var(--step)); isolation: isolate; }
+.repeat-deck { --step: 8px; --layer-height: 60px; position: relative; padding-top: calc(var(--layers) * var(--layer-height)); padding-right: calc(var(--layers) * var(--step)); isolation: isolate; }
 .repeat-layer { position: absolute; top: calc(var(--layer) * var(--layer-height)); left: calc(var(--card-left, 44px) + var(--layer) * var(--step)); width: var(--card-width, min(220px, calc(100% - 76px))); height: var(--layer-height); display: flex; align-items: flex-start; padding: 0; border: 0; background: transparent; color: var(--fp-text-muted, #77808d); font: inherit; font-size: 11px; text-align: left; cursor: pointer; animation: repeat-arrive .22s ease-out; }
-.repeat-sheet { position: absolute !important; top: 24px; left: 0; width: 100%; height: 12px; min-height: 0 !important; box-sizing: border-box; padding: 0 !important; border: 1px solid var(--fp-border, #dfe3e8); border-bottom: 0; border-radius: 10px 10px 0 0; background: var(--fp-card, #fff); pointer-events: none; }
+.repeat-sheet { position: absolute !important; top: 24px; left: 0; width: 100%; height: 32px; min-height: 0 !important; box-sizing: border-box; padding: 3px 10px !important; border: 1px solid var(--fp-border, #dfe3e8); border-radius: 6px 12px 12px; background: var(--fp-card, #fff); pointer-events: none; }
+.repeat-preview { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; width: 100%; height: 26px; line-height: 26px; font-size: 12px; color: var(--fp-text); }
+.repeat-picture { display: inline-block; vertical-align: middle; width: auto; max-width: 48px; height: 24px; object-fit: contain; border-radius: 3px; margin-right: 4px; }
+.repeat-sheet--blur .repeat-picture { filter: blur(6px); }
 .repeat-layer:hover .repeat-author { color: var(--fp-primary); }
 /* 头像放在卡片外侧，每层独占一条头像行，不被下一层气泡盖住。 */
-.repeat-layer img { position: absolute; left: -28px; top: 2px; width: 20px; height: 20px; object-fit: cover; border-radius: 4px; flex: none; }
-.repeat-group--self .repeat-layer img { left: auto; right: -28px; }
+.repeat-layer .repeat-avatar { position: absolute; left: -28px; top: 2px; width: 20px; height: 20px; object-fit: cover; border-radius: 4px; flex: none; }
+.repeat-group--self .repeat-layer .repeat-avatar { left: auto; right: -28px; }
 .repeat-author { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 20px; }
 .repeat-front { position: relative; z-index: 2; transform: translateX(calc(var(--layers) * var(--step))); }
-.repeat-controls { display: flex; align-items: center; gap: 14px; margin: 2px 0 14px 44px; color: var(--fp-text-muted, #77808d); font-size: 12px; }
-.repeat-controls > button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 4px 0; }
+.repeat-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 14px 44px; color: var(--fp-text-muted, #77808d); font-size: 12px; }
+.repeat-controls > button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; min-height: 30px; padding: 4px 8px; border-radius: 7px; }
+.repeat-controls > button:hover { background: var(--fp-hover); }
+.repeat-controls > button:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 2px; }
 .repeat-controls button:hover { color: var(--fp-primary); }
 .repeat-group--self .repeat-deck { padding-right: 0; padding-left: calc(var(--layers) * var(--step)); }
 .repeat-group--self .repeat-layer { left: auto; right: calc(var(--card-right, 44px) + var(--layer) * var(--step)); flex-direction: row-reverse; }

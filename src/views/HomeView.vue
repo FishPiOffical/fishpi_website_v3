@@ -164,7 +164,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             v-for="mod in cell.modules"
             :key="mod.id"
             class="mod"
-            :class="[edgeOf(mod.id) ? `drop-${edgeOf(mod.id)}` : '', { dragging: dragging === mod.id }]"
+            :class="[edgeOf(mod.id) ? `drop-${edgeOf(mod.id)}` : '', { dragging: dragging === mod.id, 'tool-module': ['side:profile', 'side:income', 'checkin'].includes(mod.id), 'tool-module--profile': mod.id === 'side:profile', 'tool-module--income': mod.id === 'side:income', 'tool-module--checkin': mod.id === 'checkin' }]"
             :data-home-module="mod.id"
             :data-home-title="mod.title"
             @dragover="onModuleOver($event, mod.id)"
@@ -507,12 +507,12 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .is-classic .recent-continuation { visibility: visible; }
 @media (max-width: 960px) { .is-classic .recent-continuation { visibility: visible; } }
-/* 首页工具卡统一为标题、主信息、底部操作三段；内页仍使用原侧栏样式。 */
+/* 首页只负责工具卡的等高与固定展开，共享内容排版见 tool-module.css。 */
 .home-tool { min-height: 0; }
 .home .home-checkin-tool { padding: 0; }
 .home [data-home-module="side:profile"].mod,
 .home [data-home-module="side:income"].mod,
-.home [data-home-module="checkin"].mod { container: home-tool / inline-size; }
+.home [data-home-module="checkin"].mod { container: tool-module / inline-size; }
 .board--aligned [data-home-module="side:income"] :deep(.home-side-widget),
 .board--aligned [data-home-module="side:profile"] :deep(.home-side-widget) { flex: 1; min-height: 0; }
 .home [data-home-module="side:profile"] :deep(.home-side-widget),
@@ -528,62 +528,13 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home [data-home-module="side:profile"] :deep(.guest-card),
 .home [data-home-module="side:income"] :deep(.schedule),
 .home .home-checkin-tool :deep(.checkin-panel) { width: 100%; min-width: 0; margin: 0; }
-/* 身份与积分占主信息区，关注、收藏、发帖保留为底部三个独立入口。 */
-.home [data-home-module="side:profile"] :deep(.person-card) { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: minmax(86px, 1fr) auto; padding: 0; }
-.home [data-home-module="side:profile"] :deep(.person-head) { grid-column: 1 / 5; margin: 0; padding-right: 12px; gap: 10px; }
-.home [data-home-module="side:profile"] :deep(.person-avatar) { width: 40px; height: 40px; }
-.home [data-home-module="side:profile"] :deep(.person-sub) { flex-wrap: wrap; gap: 4px; }
-.home [data-home-module="side:profile"] :deep(.person-stats) { display: contents; }
-.home [data-home-module="side:profile"] :deep(.stat-col) { grid-column: span 2; min-height: 38px; flex-direction: row; align-items: center; justify-content: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--fp-border); border-radius: 0; }
-.home [data-home-module="side:profile"] :deep(.stat-col:first-child) { grid-column: 5 / 7; grid-row: 1; flex-direction: column; align-items: flex-end; border: 0; gap: 3px; }
-.home [data-home-module="side:profile"] :deep(.stat-col:first-child strong) { max-width: 100%; font-size: 22px; font-variant-numeric: tabular-nums; }
-.home [data-home-module="side:profile"] :deep(.stat-col span) { font-size: 11px; }
-.home [data-home-module="side:profile"] :deep(.stat-col.action) { color: var(--fp-primary); }
-.home [data-home-module="side:profile"] :deep(.post-strong svg) { width: 15px; height: 15px; }
-/* 倒计时和收入共享同一基线，设置入口恢复到独立底栏。 */
-.home [data-home-module="side:income"] :deep(.schedule) { display: flex; }
-.home [data-home-module="side:income"] :deep(.income) { display: flex; flex-direction: column; align-items: stretch; gap: 0; text-align: left; }
-.home [data-home-module="side:income"] :deep(.income-main) { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; min-height: 86px; gap: 0 12px; }
-.home [data-home-module="side:income"] :deep(.label) { grid-column: 1; grid-row: 2; align-self: start; padding-top: 3px; }
-.home [data-home-module="side:income"] :deep(.time) { grid-column: 1; grid-row: 1; align-self: end; font-size: clamp(24px, 7cqi, 30px); line-height: 1.2; letter-spacing: -.5px; }
-.home [data-home-module="side:income"] :deep(.money) { grid-column: 2; grid-row: 1 / 3; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; margin: 0; }
-.home [data-home-module="side:income"] :deep(.money.big) { grid-column: 1 / -1; grid-row: 1; align-self: end; align-items: flex-start; font-size: 28px; }
-.home [data-home-module="side:income"] :deep(.time-placeholder),
-.home [data-home-module="side:income"] :deep(.sub) { grid-column: 1; grid-row: 1; align-self: end; }
-.home [data-home-module="side:income"] :deep(.money-label) { order: 1; color: var(--fp-muted); font-size: 11px; }
-.home [data-home-module="side:income"] :deep(.money-value) { font-size: 20px; font-weight: 650; }
-.home [data-home-module="side:income"] :deep(.hint) { display: flex; align-items: center; justify-content: space-between; min-height: 38px; margin: 0; padding: 6px 0; font-size: 11px; }
-/* 活跃度和连续天数都进入主信息区，底部只承载状态和领取操作。 */
-.home .home-checkin-tool :deep(.checkin-section) { display: flex; flex-direction: column; height: 100%; margin: 0; padding: 0; border: 0; background: transparent; }
-.home .home-checkin-tool :deep(.checkin-head) { display: none; }
-.home .home-checkin-tool :deep(.activity-meter) { flex: 1; min-height: 86px; gap: 10px; padding: 12px 0; border-radius: 0; background: transparent; }
-.home .home-checkin-tool :deep(.activity-ring) { width: 40px; height: 40px; }
-.home .home-checkin-tool :deep(.activity-details) { flex: 1; }
-.home .home-checkin-tool :deep(.activity-value) { display: flex; flex-direction: column; gap: 3px; }
-.home .home-checkin-tool :deep(.activity-value strong) { font-size: 24px; }
-.home .home-checkin-tool :deep(.activity-target) { display: none; }
-.home .home-checkin-tool :deep(.activity-streak) { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; color: var(--fp-muted); font-size: 11px; }
-.home .home-checkin-tool :deep(.activity-streak strong) { color: var(--fp-title); font-size: 22px; line-height: 1.25; font-variant-numeric: tabular-nums; }
-.home .home-checkin-tool :deep(.activity-streak small) { color: var(--fp-muted); font-size: 11px; font-weight: 400; }
-.home .home-checkin-tool :deep(.checkin-footer) { min-height: 38px; margin: 0; padding: 6px 0; border-top: 1px solid var(--fp-border); gap: 6px; }
-.home .home-checkin-tool :deep(.claim-reward-btn) { margin-left: auto; }
-.home .home-checkin-tool :deep(.dashboard-goal) { color: var(--fp-muted); font-size: 11px; }
-.home .home-checkin-tool :deep(.checkin-status) { padding: 2px 8px; }
+.home .home-checkin-tool :deep(.checkin-section) { height: 100%; }
 .home-checkin-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px; }
 .home-checkin-guest strong { width: 100%; font-size: 14px; }
 .home-checkin-guest p { flex: 1; color: var(--fp-muted); font-size: 12px; }
 .home-checkin-guest a { color: var(--fp-primary); font-size: 12px; }
 .home-download-tool { display: flex; align-items: center; }
 .home-download-tool :deep(.client-download) { width: 100%; border: 0; padding: 0; background: transparent; }
-@container home-tool (max-width: 310px) {
-  .home [data-home-module="side:profile"] :deep(.person-avatar) { width: 32px; height: 32px; }
-  .home [data-home-module="side:profile"] :deep(.person-head) { gap: 6px; }
-  .home [data-home-module="side:profile"] :deep(.stat-col:first-child strong),
-  .home .home-checkin-tool :deep(.activity-streak strong) { font-size: 18px; }
-  .home .home-checkin-tool :deep(.activity-ring) { width: 30px; height: 30px; }
-  .home .home-checkin-tool :deep(.activity-meter) { gap: 6px; }
-  .home [data-home-module="side:income"] :deep(.money-value) { font-size: 16px; }
-}
 .home-person { margin-bottom: 10px; }
 .home-person :deep(.person-head) { margin-bottom: 8px; gap: 8px; }
 .home-person :deep(.person-avatar) { width: 34px; height: 34px; }
@@ -1191,3 +1142,5 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .home-a11y-title{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 </style>
+
+<style scoped src="../components/sidebar/tool-module.css"></style>

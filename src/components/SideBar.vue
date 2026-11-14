@@ -37,7 +37,7 @@ const summaries = ref<Partial<Record<PageSidebarModuleId, string>>>({})
         v-for="(mod, index) in renderedModules"
         :key="mod.id"
         class="module side-module-card"
-        :class="{ 'is-collapsed': pageSidebar.isCollapsed(mod.id) }"
+        :class="{ 'is-collapsed': pageSidebar.isCollapsed(mod.id), 'tool-module': ['profile', 'income', 'checkin'].includes(mod.id), 'tool-module--profile': mod.id === 'profile', 'tool-module--income': mod.id === 'income', 'tool-module--checkin': mod.id === 'checkin' }"
       >
         <header class="module-header side-module-head">
           <SidebarModuleHeader
@@ -59,7 +59,7 @@ const summaries = ref<Partial<Record<PageSidebarModuleId, string>>>({})
           class="module-panel side-module-body"
         >
           <PersonInfoCard v-if="mod.id === 'profile'" />
-          <CheckinPanel v-else-if="mod.id === 'checkin'" class="embedded-checkin" @summary="summaries.checkin = $event" />
+          <CheckinPanel dashboard v-else-if="mod.id === 'checkin'" class="embedded-checkin" @summary="summaries.checkin = $event" />
           <ClientDownloadCard v-else-if="mod.id === 'download'" />
           <BreezemoonFeed v-else-if="mod.id === 'breezemoons'" @summary="summaries.breezemoons = $event" />
           <IncomeModule v-else-if="mod.id === 'income'" />
@@ -185,3 +185,5 @@ const summaries = ref<Partial<Record<PageSidebarModuleId, string>>>({})
   padding: 0 0 0 14px;
 }
 </style>
+
+<style scoped src="./sidebar/tool-module.css"></style>

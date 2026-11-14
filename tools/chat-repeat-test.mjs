@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom'
 globalThis.document = new JSDOM('').window.document
 const source = fs.readFileSync('src/utils/chatRepeatGroups.ts', 'utf8')
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText
-const { groupChatRepeats, repeatKey } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'))
+const { groupChatRepeats, repeatKey, chatRepeatPreview } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'))
 const line = (id, content = '摸鱼 +1', extra = {}) => ({ key: id, message: { oId: id, userName: id, content, html: `<p>${content}</p>`, ...extra } })
 const a = line('a'), b = line('b'), c = line('c', '其他'), d = line('d')
 assert.deepEqual(groupChatRepeats([a,b,c,d]).map(g=>g.length), [2,1,1])
@@ -32,3 +32,17 @@ assert.equal(repeatKey(image('1','javascript:alert(1)').message),null)
 assert.equal(repeatKey(line('1','引用',{html:`<blockquote><img src="${original}"></blockquote>`}).message),null)
 assert.deepEqual(groupChatRepeats([image('1',original),{key:'notice',message:null},image('2',original)]).map(g=>g.length),[1,1,1])
 console.log('PASS 图片原地址、尺寸归一化、图文精确匹配、多图顺序、签名及第三方参数保留、引用隔离')
+
+for (const kind of ['join', 'leave', 'claim']) {
+  const notice = {key:kind, message:null, notice:{kind}}
+  const groups = groupChatRepeats([a,notice,b])
+  assert.deepEqual(groups, [[notice],[a,b]], '通知保留且不打断复读，整叠按最新消息定位')
+  assert.deepEqual(groupChatRepeats([a,notice,c,b]), [[a],[notice],[c],[b]], '其他正文仍打断复读')
+  assert.deepEqual(groupChatRepeats([a,b,notice]), [[a,b],[notice]], '尾部通知不改变组内容')
+}
+const join={key:'join',message:null,notice:{kind:'join'}}, claim={key:'claim',message:null,notice:{kind:'claim'}}
+assert.deepEqual(groupChatRepeats([join,a,claim,b,join]), [[join],[claim],[a,b],[join]])
+assert.deepEqual(chatRepeatPreview('<p>摸鱼 &amp; 开心<br>下一行</p>'), [{text:'摸鱼 & 开心'},{text:' '},{text:'下一行'},{text:' '}])
+assert.deepEqual(chatRepeatPreview('<p><img src="https://file.fishpi.cn/a.png" alt="鱼">一起摸鱼</p>'), [{image:'https://file.fishpi.cn/a.png',alt:'鱼'},{text:'一起摸鱼'},{text:' '}])
+assert.deepEqual(chatRepeatPreview('<script>恶意脚本</script><img src="javascript:alert(1)">'), [])
+console.log('PASS 进出场/领取通知跨越分组、最新定位、正文预览和不安全资源隔离')

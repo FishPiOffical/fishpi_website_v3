@@ -1,0 +1,59 @@
+/* 首页、内页和聊天室共用三段工具卡；折叠状态仍由各自布局管理。 */
+.tool-module { container: tool-module / inline-size; }
+.tool-module :deep(.person-card), .tool-module :deep(.guest-card), .tool-module :deep(.schedule), .tool-module :deep(.checkin-panel) { width: 100%; min-width: 0; margin: 0; }
+.tool-module :deep(.card-toggle[aria-expanded='true']) { min-height: 0; padding: 14px 16px 0; color: var(--fp-muted); font-size: 13px; }
+.tool-module :deep(.module-icon) { width: 16px; height: 16px; }
+.tool-module :deep(.card-toggle[aria-expanded='false']) { font-size: 13px; }
+.tool-module > .card-body, .tool-module > .side-module-body { padding: 0 16px 6px; }
+.tool-module > .side-module-head { border-bottom: 0; }
+.tool-module--checkin :deep(.activity) { width: 100%; }
+/* 身份与积分占主信息区，关注、收藏、发帖保留为底部三个独立入口。 */
+.tool-module--profile :deep(.person-card) { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: minmax(86px, 1fr) auto; padding: 0; }
+.tool-module--profile :deep(.person-head) { grid-column: 1 / 5; margin: 0; padding-right: 12px; gap: 10px; }
+.tool-module--profile :deep(.person-avatar) { width: 40px; height: 40px; }
+.tool-module--profile :deep(.person-sub) { flex-wrap: wrap; gap: 4px; }
+.tool-module--profile :deep(.person-stats) { display: contents; }
+.tool-module--profile :deep(.stat-col) { grid-column: span 2; min-height: 38px; flex-direction: row; align-items: center; justify-content: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--fp-border); border-radius: 0; }
+.tool-module--profile :deep(.stat-col:first-child) { grid-column: 5 / 7; grid-row: 1; flex-direction: column; align-items: flex-end; border: 0; gap: 3px; }
+.tool-module--profile :deep(.stat-col:first-child strong) { max-width: 100%; font-size: 22px; font-variant-numeric: tabular-nums; }
+.tool-module--profile :deep(.stat-col span) { font-size: 11px; }
+.tool-module--profile :deep(.stat-col.action) { color: var(--fp-primary); }
+.tool-module--profile :deep(.post-strong svg) { width: 15px; height: 15px; }
+/* 倒计时和收入共享同一基线，设置入口恢复到独立底栏。 */
+.tool-module--income :deep(.schedule) { display: flex; }
+.tool-module--income :deep(.income) { display: flex; flex-direction: column; align-items: stretch; gap: 0; text-align: left; }
+.tool-module--income :deep(.income-main) { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; min-height: 86px; gap: 0 12px; }
+.tool-module--income :deep(.label) { grid-column: 1; grid-row: 2; align-self: start; padding-top: 3px; }
+.tool-module--income :deep(.time) { grid-column: 1; grid-row: 1; align-self: end; font-size: clamp(24px, 7cqi, 30px); line-height: 1.2; letter-spacing: -.5px; }
+.tool-module--income :deep(.money) { grid-column: 2; grid-row: 1 / 3; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; margin: 0; }
+.tool-module--income :deep(.money.big) { grid-column: 1 / -1; grid-row: 1; align-self: end; align-items: flex-start; font-size: 28px; }
+.tool-module--income :deep(.time-placeholder),
+.tool-module--income :deep(.sub) { grid-column: 1; grid-row: 1; align-self: end; }
+.tool-module--income :deep(.money-label) { order: 1; color: var(--fp-muted); font-size: 11px; }
+.tool-module--income :deep(.money-value) { font-size: 20px; font-weight: 650; }
+.tool-module--income :deep(.hint) { display: flex; align-items: center; justify-content: space-between; min-height: 38px; margin: 0; padding: 6px 0; font-size: 11px; }
+/* 活跃度和连续天数都进入主信息区，底部只承载状态和领取操作。 */
+.tool-module--checkin :deep(.checkin-section) { display: flex; flex-direction: column; margin: 0; padding: 0; border: 0; background: transparent; }
+.tool-module--checkin :deep(.checkin-head) { display: none; }
+.tool-module--checkin :deep(.activity-meter) { flex: 1; min-height: 86px; gap: 10px; padding: 12px 0; border-radius: 0; background: transparent; }
+.tool-module--checkin :deep(.activity-ring) { width: 40px; height: 40px; }
+.tool-module--checkin :deep(.activity-details) { flex: 1; }
+.tool-module--checkin :deep(.activity-value) { display: flex; flex-direction: column; gap: 3px; }
+.tool-module--checkin :deep(.activity-value strong) { font-size: 24px; }
+.tool-module--checkin :deep(.activity-target) { display: none; }
+.tool-module--checkin :deep(.activity-streak) { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; color: var(--fp-muted); font-size: 11px; }
+.tool-module--checkin :deep(.activity-streak strong) { color: var(--fp-title); font-size: 22px; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.tool-module--checkin :deep(.activity-streak small) { color: var(--fp-muted); font-size: 11px; font-weight: 400; }
+.tool-module--checkin :deep(.checkin-footer) { min-height: 38px; margin: 0; padding: 6px 0; border-top: 1px solid var(--fp-border); gap: 6px; }
+.tool-module--checkin :deep(.claim-reward-btn) { margin-left: auto; }
+.tool-module--checkin :deep(.dashboard-goal) { color: var(--fp-muted); font-size: 11px; }
+.tool-module--checkin :deep(.checkin-status) { padding: 2px 8px; }
+@container tool-module (max-width: 310px) {
+  .tool-module--profile :deep(.person-avatar) { width: 32px; height: 32px; }
+  .tool-module--profile :deep(.person-head) { gap: 6px; }
+  .tool-module--profile :deep(.stat-col:first-child strong),
+  .tool-module--checkin :deep(.activity-streak strong) { font-size: 18px; }
+  .tool-module--checkin :deep(.activity-ring) { width: 30px; height: 30px; }
+  .tool-module--checkin :deep(.activity-meter) { gap: 6px; }
+  .tool-module--income :deep(.money-value) { font-size: 16px; }
+}

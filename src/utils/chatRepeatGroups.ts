@@ -1,6 +1,30 @@
 import type { ChatLine } from '@/stores/chat'
 
-export interface RepeatEntry { key: string; message: ChatLine | null }
+export interface RepeatEntry { key: string; message: ChatLine | null; notice?: { kind: string } | null }
+export type RepeatPreviewPart = { text: string } | { image: string; alt: string }
+
+// 后层仅投影已有正文的文字和图片，不挂载表态、用户资料等有读取行为的组件。
+export function chatRepeatPreview(html: string): RepeatPreviewPart[] {
+  if (typeof document === 'undefined') return []
+  const template = document.createElement('template')
+  template.innerHTML = html
+  const parts: RepeatPreviewPart[] = []
+  function visit(node: Node) {
+    if (node.nodeType === 3) { parts.push({ text: node.textContent || '' }); return }
+    if (node.nodeType !== 1) return
+    const element = node as Element
+    if (element.tagName === 'IMG') {
+      const image = element.getAttribute('src') || ''
+      if (repeatImageSource(image)) parts.push({ image, alt: element.getAttribute('alt') || '图片' })
+      return
+    }
+    if (!['P', 'BR', 'STRONG', 'EM', 'S', 'DEL', 'CODE'].includes(element.tagName)) return
+    element.childNodes.forEach(visit)
+    if (['P', 'BR'].includes(element.tagName)) parts.push({ text: ' ' })
+  }
+  template.content.childNodes.forEach(visit)
+  return parts
+}
 // 仅去掉已知图床的缩放指令；签名、其他查询参数及第三方地址完整保留。
 export function repeatImageSource(source: string): string | null {
   try {
@@ -54,10 +78,23 @@ export function repeatKey(line: ChatLine | null): string | null {
 export function groupChatRepeats<T extends RepeatEntry>(entries: T[]): T[][] {
   const groups: T[][] = []
   let previous: string | null = null
+  let previousGroup: T[] | undefined
   for (const entry of entries) {
+    // 进出场和领取提示独立保留，不参与正文比较，也不打断连续复读。
+    if (!entry.message && entry.notice && ['join', 'leave', 'claim'].includes(entry.notice.kind)) {
+      groups.push([entry])
+      continue
+    }
     const key = repeatKey(entry.message)
-    if (key !== null && key === previous) groups[groups.length - 1]!.push(entry)
-    else groups.push([entry])
+    if (key !== null && key === previous && previousGroup) {
+      previousGroup.push(entry)
+      // 以组内最新消息定位整叠，穿插的通知仍在列表中各自显示一次。
+      const index = groups.indexOf(previousGroup)
+      if (index !== groups.length - 1) { groups.splice(index, 1); groups.push(previousGroup) }
+    } else {
+      previousGroup = [entry]
+      groups.push(previousGroup)
+    }
     previous = key
   }
   return groups

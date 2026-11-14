@@ -15,7 +15,7 @@ const id = useId()
 
 <template>
   <aside class="chat-sidebar" aria-label="聊天室侧栏">
-    <section v-for="(mod, index) in visibleModules" :key="mod.id" class="card">
+    <section v-for="(mod, index) in visibleModules" :key="mod.id" class="card" :class="{ 'tool-module': ['profile', 'income', 'activity'].includes(mod.id), 'tool-module--profile': mod.id === 'profile', 'tool-module--income': mod.id === 'income', 'tool-module--checkin': mod.id === 'activity' }">
       <header class="card-header">
         <SidebarModuleHeader
           :module-id="mod.id"
@@ -45,3 +45,5 @@ const id = useId()
 .card-body { padding: 0 14px 14px; font-size: 12px; line-height: 1.6; }
 .empty { justify-content: space-between; min-height: 46px; padding-inline-start: 14px; border: 1px dashed var(--fp-border); border-radius: 8px; color: var(--fp-muted); font-size: 12px; }
 </style>
+
+<style scoped src="../../components/sidebar/tool-module.css"></style>

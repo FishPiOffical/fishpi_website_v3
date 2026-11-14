@@ -9,7 +9,7 @@ const emit = defineEmits<{ summary: [text: string] }>()
 
 <template>
   <div class="activity">
-    <CheckinPanel v-if="isLoggedIn" class="embedded-checkin" @summary="emit('summary', $event)" />
+    <CheckinPanel dashboard v-if="isLoggedIn" class="embedded-checkin" @summary="emit('summary', $event)" />
     <p v-else class="guest-hint">登录后查看今日活跃情况</p>
   </div>
 </template>
