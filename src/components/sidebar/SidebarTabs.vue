@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onScopeDispose, ref, useId, watch } from 'vue'
+import { computed, nextTick, onMounted, onScopeDispose, ref, useId, watch } from 'vue'
 import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import SidebarIcon from '@/chat/sidebar/SidebarIcon.vue'
@@ -8,17 +8,22 @@ import SidebarConfigureButton from './SidebarConfigureButton.vue'
 
 type ModuleId = ChatSidebarModuleId | 'checkin' | 'download'
 interface SidebarModule { id: ModuleId; title: string }
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modules: SidebarModule[]
   section: 'pageSidebar' | 'chatSidebar'
   ariaLabel: string
-}>()
+  showConfigure?: boolean
+}>(), { showConfigure: true })
 const auth = useAuthStore()
 const ready = ref(false)
 const activeId = ref<ModuleId | ''>('')
 const focusedId = ref<ModuleId | ''>('')
 const visited = ref(new Set<ModuleId>())
 const tablist = ref<HTMLElement | null>(null)
+const overflow = ref(false)
+const canScrollBack = ref(false)
+const canScrollForward = ref(false)
+let resizeObserver: ResizeObserver | undefined
 const uid = useId()
 const authVersion = ref(getAuthContextVersion())
 const unsubscribe = onAccessTokenChange(() => { authVersion.value = getAuthContextVersion() })
@@ -28,6 +33,38 @@ const current = computed(() => props.modules.find(mod => mod.id === activeId.val
 const storageKey = computed(() => `fp.sidebarTab.${props.section}.v1`)
 const labels: Partial<Record<ModuleId, string>> = {
   activity: '活跃签到', checkin: '活跃签到', appearance: '外观', download: '客户端下载', ad: '社区赞助',
+}
+
+function updateOverflow() {
+  const list = tablist.value
+  if (!list) {
+    overflow.value = false
+    canScrollBack.value = false
+    canScrollForward.value = false
+    return
+  }
+  overflow.value = list.scrollWidth > list.clientWidth + 1
+  canScrollBack.value = list.scrollLeft > 1
+  canScrollForward.value = list.scrollLeft + list.clientWidth < list.scrollWidth - 1
+}
+
+function revealTab(id: ModuleId | '') {
+  const list = tablist.value
+  const index = props.modules.findIndex(mod => mod.id === id)
+  const button = list?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]
+  if (!list || !button) return
+  // 只调整标签条的水平位置，避免切换标签时带动页面上下滚动。
+  const area = list.getBoundingClientRect()
+  const item = button.getBoundingClientRect()
+  if (item.left < area.left) list.scrollLeft -= area.left - item.left
+  else if (item.right > area.right) list.scrollLeft += item.right - area.right
+  updateOverflow()
+}
+
+function scrollTabs(direction: -1 | 1) {
+  const list = tablist.value
+  if (!list) return
+  list.scrollBy({ left: direction * list.clientWidth * .7, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
 }
 
 function remember() {
@@ -59,6 +96,7 @@ function select(id: ModuleId) {
   focusedId.value = id
   visited.value.add(id)
   remember()
+  revealTab(id)
 }
 
 function navigate(event: KeyboardEvent, id: ModuleId) {
@@ -75,10 +113,27 @@ function navigate(event: KeyboardEvent, id: ModuleId) {
   const target = props.modules[next]
   if (!target) return
   focusedId.value = target.id
-  tablist.value?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+  tablist.value?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus({ preventScroll: true })
+  revealTab(target.id)
 }
 
-watch(() => props.modules.map(mod => mod.id).join(','), reconcile)
+watch(() => props.modules.map(mod => mod.id).join(','), () => {
+  reconcile()
+  void nextTick(() => { updateOverflow(); revealTab(activeId.value) })
+})
+watch(tablist, (list) => {
+  resizeObserver?.disconnect()
+  if (list && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => {
+      updateOverflow()
+      revealTab(focusedId.value || activeId.value)
+    })
+    resizeObserver.observe(list)
+  }
+  updateOverflow()
+}, { flush: 'post' })
+watch(overflow, () => { void nextTick(updateOverflow) })
+onScopeDispose(() => resizeObserver?.disconnect())
 watch(() => props.section, () => { visited.value.clear(); restore() })
 watch(identity, () => {
   // 普通令牌轮换不会改变此边界；退出或换号则销毁旧面板和其中的私人草稿。
@@ -88,6 +143,7 @@ watch(identity, () => {
 onMounted(() => {
   ready.value = true
   restore()
+  void nextTick(() => { updateOverflow(); revealTab(activeId.value) })
 })
 </script>
 
@@ -98,32 +154,29 @@ onMounted(() => {
     </div>
     <template v-else>
       <header class="sidebar-tabs-heading">
-        <h3>
-          <SidebarIcon :name="current?.id ?? 'settings'" />
-          <span>{{ current?.title ?? '侧栏模块' }}</span>
-        </h3>
-        <div class="sidebar-tabs-actions">
-          <slot v-if="current" name="header-actions" :module="current" />
-          <SidebarConfigureButton :section="section" />
+        <button v-if="overflow" type="button" class="tab-scroll tab-scroll-back" aria-label="向前滚动标签" :disabled="!canScrollBack" @click="scrollTabs(-1)"><SidebarIcon name="chevron" /></button>
+        <div v-if="modules.length" ref="tablist" class="sidebar-tablist" role="tablist" :aria-label="ariaLabel" @scroll.passive="updateOverflow">
+          <button
+            v-for="mod in modules"
+            :id="`${uid}-tab-${mod.id}`"
+            :key="mod.id"
+            type="button"
+            role="tab"
+            class="sidebar-tab"
+            :aria-selected="activeId === mod.id"
+            :aria-controls="`${uid}-panel-${mod.id}`"
+            :tabindex="(focusedId || activeId) === mod.id ? 0 : -1"
+            :title="mod.title"
+            @click="select(mod.id)"
+            @focus="focusedId = mod.id"
+            @keydown="navigate($event, mod.id)"
+          >{{ labels[mod.id] ?? mod.title }}</button>
         </div>
+        <span v-else class="sidebar-tabs-empty-title">侧栏模块</span>
+        <button v-if="overflow" type="button" class="tab-scroll tab-scroll-forward" aria-label="向后滚动标签" :disabled="!canScrollForward" @click="scrollTabs(1)"><SidebarIcon name="chevron" /></button>
+        <SidebarConfigureButton v-if="showConfigure" :section="section" />
       </header>
-      <div v-if="modules.length" ref="tablist" class="sidebar-tablist" role="tablist" :aria-label="ariaLabel">
-        <button
-          v-for="mod in modules"
-          :id="`${uid}-tab-${mod.id}`"
-          :key="mod.id"
-          type="button"
-          role="tab"
-          class="sidebar-tab"
-          :aria-selected="activeId === mod.id"
-          :aria-controls="`${uid}-panel-${mod.id}`"
-          :tabindex="(focusedId || activeId) === mod.id ? 0 : -1"
-          :title="mod.title"
-          @click="select(mod.id)"
-          @focus="focusedId = mod.id"
-          @keydown="navigate($event, mod.id)"
-        >{{ labels[mod.id] ?? mod.title }}</button>
-      </div>
+      <div v-if="current" class="sidebar-panel-actions"><slot name="header-actions" :module="current" /></div>
       <div v-if="!modules.length" class="sidebar-tabs-empty">还没有启用模块，点击右上角齿轮添加。</div>
       <!-- 已访问面板只隐藏，保留输入和分页；关闭模块或切换账号时才卸载。 -->
       <div
@@ -156,24 +209,32 @@ onMounted(() => {
   box-shadow: 0 2px 5px rgb(20 30 45 / 4%);
   container: sidebar-tabs / inline-size;
 }
-.sidebar-tabs-heading { display: flex; flex: none; align-items: center; gap: 8px; min-height: 54px; padding: 10px 12px 6px 16px; }
-.sidebar-tabs-heading h3 { display: flex; flex: 1; align-items: center; gap: 9px; min-width: 0; margin: 0; color: var(--fp-title); font-size: 14px; font-weight: 650; }
-.sidebar-tabs-heading h3 svg { flex: none; width: 17px; height: 17px; color: var(--fp-muted); }
-.sidebar-tabs-heading h3 span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.sidebar-tabs-actions { display: flex; flex: none; align-items: center; gap: 3px; }
-.sidebar-tabs-actions :deep(.sidebar-configure) { margin-inline-end: 0; }
-.sidebar-tablist { display: grid; flex: none; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; margin: 0 12px 10px; padding: 4px; border-radius: 9px; background: var(--fp-bg); }
-.sidebar-tab { min-width: 0; min-height: 32px; padding: 6px 4px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--fp-muted); font: inherit; font-size: 12px; line-height: 1.5; white-space: nowrap; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; }
-.sidebar-tab:hover { color: var(--fp-title); background: var(--fp-hover); }
-.sidebar-tab[aria-selected='true'] { color: var(--fp-primary); background: var(--fp-card); box-shadow: 0 1px 3px rgb(20 30 45 / 9%); font-weight: 600; }
-.sidebar-tab:focus-visible, .sidebar-panel:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: -2px; }
-.sidebar-panel { flex: 0 1 auto; min-width: 0; min-height: 0; max-height: 640px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; border-top: 1px solid var(--fp-border); border-radius: 0 0 12px 12px; }
+.sidebar-tabs-heading { display: flex; flex: none; align-items: center; gap: 2px; min-height: 50px; padding: 0 10px; border-bottom: 1px solid var(--fp-border); }
+.sidebar-tablist { display: flex; flex: 1; align-self: stretch; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.sidebar-tablist::-webkit-scrollbar { display: none; }
+.sidebar-tab { position: relative; flex: none; min-height: 49px; padding: 0 12px; border: 0; border-radius: 0; background: transparent; color: var(--fp-muted); font: inherit; font-size: 13px; line-height: 1.5; white-space: nowrap; cursor: pointer; transition: color .15s; }
+.sidebar-tab::after { content: ''; position: absolute; inset-inline: 12px; bottom: 0; height: 2px; border-radius: 2px; background: var(--fp-primary); transform: scaleX(0); transition: transform .15s; }
+.sidebar-tab:hover { color: var(--fp-title); }
+.sidebar-tab[aria-selected='true'] { color: var(--fp-title); font-weight: 650; }
+.sidebar-tab[aria-selected='true']::after { transform: scaleX(1); }
+.sidebar-tab:focus-visible, .sidebar-panel:focus-visible, .tab-scroll:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: -3px; }
+.tab-scroll { display: grid; flex: none; place-items: center; width: 24px; height: 36px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--fp-muted); cursor: pointer; transition: background .15s, color .15s; }
+.tab-scroll:hover:not(:disabled) { background: var(--fp-hover); color: var(--fp-title); }
+.tab-scroll:disabled { opacity: .25; cursor: default; }
+.tab-scroll svg { width: 14px; height: 14px; }
+.tab-scroll-back svg { transform: rotate(90deg); }
+.tab-scroll-forward svg { transform: rotate(-90deg); }
+.sidebar-tabs-heading :deep(.sidebar-configure) { margin-inline-end: 0; }
+.sidebar-panel-actions { display: none; }
+.sidebar-panel-actions:has(> *) { display: flex; flex: none; justify-content: flex-end; padding: 8px 16px 0; }
+.sidebar-tabs-empty-title { flex: 1; padding: 0 6px; color: var(--fp-title); font-size: 13px; font-weight: 600; }
+.sidebar-panel { flex: 0 1 auto; min-width: 0; min-height: 0; max-height: 640px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; border-radius: 0 0 12px 12px; }
 .sidebar-panel.is-active { animation: sidebar-tab-enter .15s ease-out; }
 .sidebar-tabs-empty { padding: 8px 16px 20px; color: var(--fp-muted); font-size: 12px; line-height: 1.8; }
 .sidebar-placeholder { display: grid; gap: 14px; padding: 20px 16px; min-height: 134px; }
 .sidebar-placeholder span { height: 26px; border-radius: 6px; background: var(--fp-bg); }
 .sidebar-placeholder span:first-child { width: 50%; }
-@container sidebar-tabs (max-width: 290px) { .sidebar-tablist { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (pointer: coarse) { .tab-scroll { width: 32px; height: 44px; } }
 @keyframes sidebar-tab-enter { from { opacity: .6; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .sidebar-panel.is-active { animation: none; } .sidebar-tab { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .sidebar-panel.is-active { animation: none; } .sidebar-tab, .sidebar-tab::after, .tab-scroll { transition: none; } }
 </style>

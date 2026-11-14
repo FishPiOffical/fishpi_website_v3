@@ -47,7 +47,7 @@ function compile(file) {
 }
 const component = compile('src/components/sidebar/SidebarTabs.vue')
 const modules = [
-  { id: 'profile', title: '我的资料' }, { id: 'breezemoons', title: '清风明月' },
+  { id: 'checkin', title: '活跃签到' }, { id: 'breezemoons', title: '清风明月' },
   { id: 'income', title: '上下班时间' }, { id: 'topic', title: '当前话题' },
   { id: 'online', title: '在线成员' }, { id: 'activity', title: '当前活跃情况' },
   { id: 'appearance', title: '外观' }, { id: 'mutes', title: '思过崖' },
@@ -61,13 +61,13 @@ body.dark{background:#202326;--fp-card:#282b2e;--fp-border:#41474d;--fp-text:#e3
 ${css}</style><script type="importmap">${JSON.stringify({ imports })}</script><div id="app"></div><script type="module">
 import {createApp,h,reactive,ref,onMounted,onUnmounted} from 'vue';
 import SidebarTabs from '${component}';import {auth,drawer,rotate,identity} from '@/stores/auth';
-const all=${JSON.stringify(modules)},state=reactive({modules:[...all],section:'chatSidebar',mounts:{},unmounts:{}});
+const all=${JSON.stringify(modules)},state=reactive({modules:[...all],section:'chatSidebar',showConfigure:undefined,mounts:{},unmounts:{}});
 const FixturePanel={props:['id','active'],setup(props){const draft=ref('');const owner=auth.account?.oId||'guest';onMounted(()=>{state.mounts[props.id]=(state.mounts[props.id]||0)+1});onUnmounted(()=>{state.unmounts[props.id]=(state.unmounts[props.id]||0)+1});return()=>h('div',{class:'fixture-panel','data-fixture':props.id,'data-owner':owner},[
 h('h4',{},all.find(m=>m.id===props.id)?.title),h('div',{class:'fixture-summary'},[h('strong',{},props.id==='income'?'03:42:38':'31.42%'),h('span',{},props.id==='income'?'今日已赚 ¥214.507':'今日签到已完成')]),
 h('label',{},['输入草稿',h('input',{'aria-label':props.id+'草稿',value:draft.value,onInput:e=>draft.value=e.target.value})]),
 ...Array.from({length:props.id==='breezemoons'?5:2},(_,i)=>h('div',{class:'fixture-row'},'模块内容 '+(i+1)+' · 保留已输入的内容和当前状态'))])}};
 window.fixture={state,all,drawer,rotate,identity};
-createApp({setup:()=>()=>h('div',{class:'test-layout'},[h('main',{class:'main-content'},[h('h1',{},'社区内页'),h('p',{},'右侧按已启用模块显示标签，切换后保留输入。')]),h('aside',{},[h(SidebarTabs,{modules:state.modules,section:state.section,ariaLabel:'社区侧栏模块'},{default:({module,active})=>h(FixturePanel,{id:module.id,active}),'header-actions':({module})=>module.id==='breezemoons'?h('a',{class:'fixture-link',href:'/breezemoons'},'更多'):null})])])}).mount('#app');
+createApp({setup:()=>()=>h('div',{class:'test-layout'},[h('main',{class:'main-content'},[h('h1',{},'社区内页'),h('p',{},'右侧按已启用模块显示标签，切换后保留输入。')]),h('aside',{},[h(SidebarTabs,{modules:state.modules,section:state.section,showConfigure:state.showConfigure,ariaLabel:'社区侧栏模块'},{default:({module,active})=>h(FixturePanel,{id:module.id,active}),'header-actions':({module})=>module.id==='breezemoons'?h('a',{class:'fixture-link',href:'/breezemoons'},'更多'):null})])])}).mount('#app');
 </script></html>`
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const errors = [], externalRequests = [], successes = []
@@ -90,19 +90,34 @@ const tab = (page, id) => page.locator(`.sidebar-tab[id$="-tab-${id}"]`)
 const input = (page, id) => page.getByRole('textbox', { name: id + '草稿', exact: true })
 const selected = page => page.locator('.sidebar-tab[aria-selected="true"]').getAttribute('id')
 const count = (page, id, kind = 'mounts') => page.evaluate(({ id, kind }) => fixture.state[kind][id] || 0, { id, kind })
+const waitTabVisible = (page, id) => page.waitForFunction(id => {
+  const list = document.querySelector('[role="tablist"]')
+  const button = document.querySelector(`.sidebar-tab[id$="-tab-${id}"]`)
+  if (!list || !button) return false
+  const area = list.getBoundingClientRect(), item = button.getBoundingClientRect()
+  return item.left >= area.left - 1 && item.right <= area.right + 1
+}, id)
 try {
   const page = await newPage()
   await check('首次仅挂载当前模块，真实图标及配置按钮可用', async () => {
     assert.equal(await page.locator('[data-fixture]').count(), 1)
-    assert.equal(await count(page, 'profile'), 1)
+    assert.equal(await count(page, 'checkin'), 1)
     assert.equal(await count(page, 'breezemoons'), 0)
-    assert.ok(await tab(page, 'profile').getAttribute('aria-controls'))
+    assert.ok(await tab(page, 'checkin').getAttribute('aria-controls'))
+    assert.equal(await tab(page, 'profile').count(), 0)
+    assert.equal(await page.locator('.sidebar-tabs > header').getByRole('heading').count(), 0, '标签条不再重复显示当前模块标题')
     assert.equal(await page.locator('.sidebar-configure svg path').count(), 1)
   })()
   await check('切换保留草稿，已访问面板不重复挂载，辅助操作跟随当前模块', async () => {
     await tab(page, 'breezemoons').click()
     await input(page, 'breezemoons').fill('尚未发送的清风草稿')
     assert.equal(await page.locator('.fixture-link').getAttribute('href'), '/breezemoons')
+    const positions = await page.evaluate(() => ({
+      tabs: document.querySelector('[role="tablist"]').getBoundingClientRect().bottom,
+      action: document.querySelector('.fixture-link').getBoundingClientRect(),
+      panel: document.querySelector('.sidebar-panel.is-active').getBoundingClientRect().top,
+    }))
+    assert.ok(positions.action.top >= positions.tabs && positions.action.bottom <= positions.panel, '辅助操作应位于标签条下方、内容面板上方')
     await tab(page, 'income').click()
     assert.equal(await page.locator('.fixture-link').count(), 0)
     await tab(page, 'breezemoons').click()
@@ -110,24 +125,37 @@ try {
     assert.equal(await count(page, 'breezemoons'), 1)
     assert.equal(await page.locator('.sidebar-panel:visible').count(), 1)
   })()
+  await check('独立资料卡拥有配置入口时，标签面板可隐藏齿轮且不重建内容', async () => {
+    const before = await count(page, 'breezemoons')
+    await page.evaluate(() => { fixture.state.showConfigure = false })
+    assert.equal(await page.getByRole('button', { name: '配置模块', exact: true }).count(), 0)
+    assert.equal(await input(page, 'breezemoons').inputValue(), '尚未发送的清风草稿')
+    assert.equal(await count(page, 'breezemoons'), before)
+    await page.evaluate(() => { fixture.state.showConfigure = undefined })
+    assert.equal(await page.getByRole('button', { name: '配置模块', exact: true }).count(), 1)
+  })()
   await check('方向键及 Home/End 只移动焦点，回车和空格才挂载模块', async () => {
     await tab(page, 'breezemoons').focus()
     await page.keyboard.press('ArrowRight')
     assert.equal(await tab(page, 'income').evaluate(el => el === document.activeElement), true)
+    await waitTabVisible(page, 'income')
     assert.match(await selected(page), /-breezemoons$/)
     await page.keyboard.press('End')
     assert.equal(await tab(page, 'mutes').evaluate(el => el === document.activeElement), true)
+    await waitTabVisible(page, 'mutes')
     assert.equal(await count(page, 'mutes'), 0)
     await page.keyboard.press('Enter')
     await page.waitForSelector('[data-fixture="mutes"]')
     assert.equal(await count(page, 'mutes'), 1)
     await page.keyboard.press('Home')
-    assert.equal(await tab(page, 'profile').evaluate(el => el === document.activeElement), true)
+    assert.equal(await tab(page, 'checkin').evaluate(el => el === document.activeElement), true)
+    await waitTabVisible(page, 'checkin')
     assert.match(await selected(page), /-mutes$/)
     await page.keyboard.press('Space')
-    assert.match(await selected(page), /-profile$/)
+    assert.match(await selected(page), /-checkin$/)
     await page.keyboard.press('ArrowLeft')
     assert.equal(await tab(page, 'mutes').evaluate(el => el === document.activeElement), true)
+    await waitTabVisible(page, 'mutes')
   })()
   await check('排序保持当前模块，禁用后卸载并回退，重新启用按需挂载', async () => {
     await tab(page, 'breezemoons').click()
@@ -162,11 +190,14 @@ try {
     await page.evaluate(() => { fixture.state.modules = [] })
     await page.waitForSelector('.sidebar-tabs-empty')
     assert.equal(await page.locator('.sidebar-tab,.sidebar-panel').count(), 0)
+    await page.evaluate(() => { fixture.state.showConfigure = false })
+    assert.equal(await page.getByRole('button', { name: '配置模块', exact: true }).count(), 0)
+    await page.evaluate(() => { fixture.state.showConfigure = true })
     await page.getByRole('button', { name: '配置模块', exact: true }).click()
     assert.equal(await page.evaluate(() => fixture.drawer.opened.at(-1)), 'chatSidebar')
     await page.evaluate(() => { fixture.state.modules = [...fixture.all] })
     await page.waitForSelector('.sidebar-tab')
-    assert.match(await selected(page), /-profile$/)
+    assert.match(await selected(page), /-checkin$/)
   })()
   await check('只持久化标签 ID，刷新恢复选择，不恢复私人草稿', async () => {
     await tab(page, 'breezemoons').click()
@@ -176,7 +207,7 @@ try {
     await page.waitForSelector('[data-fixture="breezemoons"]')
     assert.match(await selected(page), /-breezemoons$/)
     assert.equal(await input(page, 'breezemoons').inputValue(), '')
-    assert.equal(await count(page, 'profile'), 0)
+    assert.equal(await count(page, 'checkin'), 0)
     await page.evaluate(() => { localStorage.setItem('fp.sidebarTab.pageSidebar.v1', 'income'); fixture.state.section = 'pageSidebar' })
     await page.waitForFunction(() => document.querySelector('.sidebar-tab[aria-selected="true"]')?.id.endsWith('-income'))
     await page.getByRole('button', { name: '配置模块', exact: true }).click()
@@ -184,7 +215,7 @@ try {
   })()
   await check('无效偏好安全回退，存储被禁用仍可切换', async () => {
     const invalid = await newPage(() => localStorage.setItem('fp.sidebarTab.chatSidebar.v1', 'unknown-module'))
-    assert.match(await selected(invalid), /-profile$/)
+    assert.match(await selected(invalid), /-checkin$/)
     await invalid.close()
     const denied = await newPage(() => {
       Storage.prototype.getItem = function () { throw new DOMException('访问已禁用', 'SecurityError') }
@@ -193,6 +224,58 @@ try {
     await tab(denied, 'income').click()
     assert.match(await selected(denied), /-income$/)
     await denied.close()
+  })()
+  await check('单行标签横向溢出可通过左右按钮抵达两端，滚动不触发面板读取', async () => {
+    await page.setViewportSize({ width: 390, height: 850 })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await tab(page, 'checkin').focus()
+    await page.keyboard.press('Home')
+    await waitTabVisible(page, 'checkin')
+    const geometry = await page.getByRole('tablist').evaluate(list => ({
+      overflow: list.scrollWidth > list.clientWidth,
+      rows: new Set([...list.querySelectorAll('[role="tab"]')].map(el => Math.round(el.getBoundingClientRect().top))).size,
+    }))
+    assert.deepEqual(geometry, { overflow: true, rows: 1 })
+    const activeBefore = await selected(page)
+    const mountsBefore = await page.evaluate(() => ({ ...fixture.state.mounts }))
+    const back = page.getByRole('button', { name: '向前滚动标签', exact: true })
+    const forward = page.getByRole('button', { name: '向后滚动标签', exact: true })
+    await page.waitForFunction(() => document.querySelector('[aria-label="向前滚动标签"]')?.disabled === true)
+    for (let attempt = 0; attempt < 20 && await page.getByRole('tablist').evaluate(list => list.scrollLeft + list.clientWidth < list.scrollWidth - 1); attempt++) {
+      const before = await page.getByRole('tablist').evaluate(list => list.scrollLeft)
+      await forward.click()
+      await page.waitForFunction(before => document.querySelector('[role="tablist"]').scrollLeft > before, before)
+    }
+    await page.waitForFunction(() => document.querySelector('[aria-label="向后滚动标签"]')?.disabled === true)
+    assert.equal(await forward.isDisabled(), true, '向后按钮应能抵达最后一个标签')
+    await waitTabVisible(page, 'mutes')
+    for (let attempt = 0; attempt < 20 && await page.getByRole('tablist').evaluate(list => list.scrollLeft > 1); attempt++) {
+      const before = await page.getByRole('tablist').evaluate(list => list.scrollLeft)
+      await back.click()
+      await page.waitForFunction(before => document.querySelector('[role="tablist"]').scrollLeft < before, before)
+    }
+    await page.waitForFunction(() => document.querySelector('[aria-label="向前滚动标签"]')?.disabled === true)
+    assert.equal(await back.isDisabled(), true, '向前按钮应能返回第一个标签')
+    await waitTabVisible(page, 'checkin')
+    assert.equal(await selected(page), activeBefore)
+    assert.deepEqual(await page.evaluate(() => ({ ...fixture.state.mounts })), mountsBefore)
+    await page.evaluate(() => { fixture.state.modules = [fixture.all[0]] })
+    await page.waitForFunction(() => document.querySelectorAll('.tab-scroll').length === 0)
+    await page.evaluate(() => { fixture.state.modules = [...fixture.all] })
+    await page.waitForFunction(() => document.querySelectorAll('.tab-scroll').length === 2)
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+  })()
+  await check('恢复条尾偏好时所选标签自动滚入可见区域', async () => {
+    const restored = await newPage(() => localStorage.setItem('fp.sidebarTab.chatSidebar.v1', 'mutes'))
+    assert.match(await selected(restored), /-mutes$/)
+    await waitTabVisible(restored, 'mutes')
+    await restored.setViewportSize({ width: 760, height: 850 })
+    await waitTabVisible(restored, 'mutes')
+    await restored.setViewportSize({ width: 390, height: 850 })
+    await waitTabVisible(restored, 'mutes')
+    assert.equal(await count(restored, 'mutes'), 1)
+    assert.equal(await count(restored, 'checkin'), 0)
+    await restored.close()
   })()
   await check('桌面和 390px 无横向溢出，长面板内部滚动，浅暗主题截图', async () => {
     await page.evaluate(() => { fixture.state.section = 'chatSidebar' })

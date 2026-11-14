@@ -326,7 +326,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
 
           <div v-else-if="section === 'pageSidebar'" class="content">
-            <p class="drag-hint">开启模块后，会在各内页侧栏添加对应标签。拖动 ⠿ 调整标签顺序，也可用右侧箭头微调。</p>
+            <p class="drag-hint">我的资料保持顶部独立卡片，可单独折叠，不随下方排序移动。其余已开启模块显示为标签，可拖动 ⠿ 或使用右侧箭头调整标签顺序。</p>
             <div class="chips">
               <button type="button" @click="pageSidebar.applyPreset('compact')">精简</button>
               <button type="button" @click="pageSidebar.applyPreset('all')">全部显示</button>
@@ -398,7 +398,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
 
           <div v-else-if="section === 'chatSidebar'" class="content">
-            <p class="drag-hint">开启模块后，会在聊天室侧栏添加对应标签。拖动 ⠿ 调整标签顺序，也可用右侧箭头微调。</p>
+            <p class="drag-hint">我的资料保持顶部独立卡片，可单独折叠，不随下方排序移动。其余已开启模块显示为标签，可拖动 ⠿ 或使用右侧箭头调整标签顺序。</p>
             <div class="chips">
               <button type="button" @click="sidebar.reset()">恢复默认</button>
             </div>

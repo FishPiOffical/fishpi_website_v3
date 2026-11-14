@@ -21,21 +21,28 @@ const js = ts.transpileModule(compiled, {
 const { default: SidebarTabs } = await import(moduleUrl(js))
 
 let mountedPanels = 0
+let mountedActions = 0
 // 模拟浏览器已保存其他标签；SSR 不能读取本机设置，更不能挂载本人模块。
 Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
   get() { throw new Error('SSR 不得访问 localStorage') },
 })
 try {
-  for (const modules of [[], [{ id: 'profile', title: '我的资料' }], [{ id: 'checkin', title: '签到' }, { id: 'income', title: '上下班时间' }]]) {
-    const html = await renderToString(createSSRApp({ render: () => h(SidebarTabs, {
-      modules, section: 'pageSidebar', ariaLabel: '内页侧栏模块',
-    }, { default: () => { mountedPanels++; return h('p', 'private-data') } }) }))
-    assert.match(html, /sidebar-placeholder/)
-    assert.doesNotMatch(html, /private-data|private-owner|role="tab"|role="tabpanel"/)
+  for (const modules of [[], [{ id: 'checkin', title: '签到' }], [{ id: 'checkin', title: '签到' }, { id: 'income', title: '上下班时间' }]]) {
+    for (const showConfigure of [undefined, true, false]) {
+      const html = await renderToString(createSSRApp({ render: () => h(SidebarTabs, {
+        modules, showConfigure, section: 'pageSidebar', ariaLabel: '内页侧栏模块',
+      }, {
+        default: () => { mountedPanels++; return h('p', 'private-data') },
+        'header-actions': () => { mountedActions++; return h('a', 'private-actions') },
+      }) }))
+      assert.match(html, /sidebar-placeholder/)
+      assert.doesNotMatch(html, /private-data|private-owner|private-actions|role="tab"|role="tabpanel"|tab-scroll/)
+    }
   }
   assert.equal(mountedPanels, 0)
-  console.log('PASS 侧栏 SSR：空配置、默认配置和私人配置均输出统一准备态，不读取存储或挂载私人面板')
+  assert.equal(mountedActions, 0)
+  console.log('PASS 侧栏 SSR：三种模块配置和三种齿轮配置均输出统一准备态，不读取存储或挂载私人面板、辅助操作')
 } finally {
   delete globalThis.localStorage
 }
