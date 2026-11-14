@@ -367,9 +367,9 @@ function clearScreen() {
                 <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-expanded="toolOpen(tool.id)" aria-haspopup="dialog" @click="togglePanel(tool.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="tool.path" /></svg><span>{{ tool.label }}</span>
                 </button>
-                <ChatConnectionStatus />
+                <ChatConnectionStatus compact />
               </template>
-              <template #context>
+              <template #inline-context>
                 <div class="classic-topic-pill" :title="discuss">
                   <span class="topic-label">话题</span>
                   <span class="topic-text">{{ discuss || '聊点什么？' }}</span>
@@ -381,10 +381,10 @@ function clearScreen() {
                 <button type="button" v-if="nodeOptions.length" class="classic-btn" :title="nodeName || '选择大区'" @click="openNodePicker">
                   🌐 {{ nodeName ? `大区: ${nodeName}` : '选择大区' }}
                 </button>
-                <button type="button" class="classic-btn style-toggle" title="切换到简约气泡版本（输入框吸底）" @click="toggleChatStyle">
-                  简约模式
+                <button type="button" class="classic-btn style-toggle toolbar-icon" aria-label="切换到简约模式" title="切换到简约模式" @click="toggleChatStyle">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15h18M8 8h8"/></svg>
                 </button>
-                <button type="button" class="classic-btn" @click="clearScreen">清屏</button>
+                <button type="button" class="classic-btn toolbar-icon" title="清屏，保留最近 10 条消息" aria-label="清屏，保留最近 10 条消息" @click="clearScreen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m14 3 7 7-10 10H5l-3-3L14 3ZM8 9l7 7M11 20h11"/></svg></button>
               </template>
             </ChatComposer>
             <div v-else-if="composerReady" class="comment-login-hint">
@@ -593,9 +593,9 @@ function clearScreen() {
                 <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-expanded="toolOpen(tool.id)" aria-haspopup="dialog" @click="togglePanel(tool.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="tool.path" /></svg><span>{{ tool.label }}</span>
                 </button>
-                <ChatConnectionStatus />
+                <ChatConnectionStatus compact />
               </template>
-              <template #context>
+              <template #inline-context>
                 <div class="classic-topic-pill" :title="discuss">
                   <span class="topic-label">话题</span>
                   <span class="topic-text">{{ discuss || '聊点什么？' }}</span>
@@ -748,8 +748,10 @@ function clearScreen() {
 
 /* 工具栏与操作行（经典版） */
 
+.toolbar-icon { width: 34px; height: 34px; padding: 7px !important; display: inline-flex; align-items: center; justify-content: center; svg { width: 18px; height: 18px; } }
 .composer-tool-btn {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 9px;
+  span { display: none; }
+  display: inline-flex; align-items: center; gap: 0; min-height: 34px; padding: 6px 8px;
   background: transparent; border: 1px solid transparent; color: var(--fp-muted); border-radius: 8px;
   font-size: 12px; cursor: pointer; transition: background-color .16s, color .16s;
   svg { width: 17px; height: 17px; flex: none; }
@@ -757,11 +759,11 @@ function clearScreen() {
   &.is-active { background: var(--fp-accent-soft,var(--fp-hover)); color: var(--fp-accent); }
 }
 .classic-topic-pill {
-  display: flex; align-items: center; gap: 9px; min-width: 0; width: 100%; box-sizing: border-box;
-  padding: 5px 8px 5px 10px; border-left: 2px solid var(--fp-accent); border-radius: 0 7px 7px 0;
+  display: flex; align-items: center; gap: 4px; min-width: 0; width: 100%; box-sizing: border-box;
+  padding: 5px 4px 5px 8px; border-left: 2px solid var(--fp-accent); border-radius: 0 7px 7px 0;
   background: var(--fp-surface-subtle,var(--fp-bg)); font-size: 12px;
-  .topic-label { color: var(--fp-muted); flex: none; font-size: 11px; }
-  .topic-text { flex: 1; min-width: 0; color: var(--fp-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topic-label { display: none; }
+  .topic-text { flex: 1; min-width: 0; color: var(--fp-text); white-space: nowrap; line-height: 1.6; }
 }
 .topic-action-btn {
   display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px;
@@ -769,7 +771,7 @@ function clearScreen() {
   svg { width: 14px; height: 14px; }
   &:hover, &[aria-expanded='true'] { background: var(--fp-hover); color: var(--fp-accent); }
 }
-@media(max-width:600px){.composer-tool-btn { padding: 6px 10px; gap: 0; span { display: none; } }.classic-topic-pill { gap: 6px; }}
+@media(max-width:600px){.composer-tool-btn { padding: 6px 10px; gap: 0; span { display: none; } }.classic-topic-pill { gap: 6px; .topic-text { white-space: normal; overflow-wrap: anywhere; } }}
 
 .classic-online-bar {
   margin-top: 12px;

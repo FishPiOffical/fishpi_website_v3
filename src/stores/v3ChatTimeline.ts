@@ -74,7 +74,7 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
      reconcileMissingSnapshot()
    }
  }
- function clearVisible(){notices.value=[];latestRun++;oldestRun++;latestAbort?.abort();olderAbort?.abort();cancelSnapshotRecovery();localChanges.clear();messages.value=[];before='';hasMore.value=false;loading.value=false;loadingMore.value=false;error.value=''}
+ function clearVisible(keepLatest=0){notices.value=[];latestRun++;oldestRun++;latestAbort?.abort();olderAbort?.abort();cancelSnapshotRecovery();localChanges.clear();messages.value=keepLatest>0?messages.value.slice(-keepLatest):[];before='';hasMore.value=false;loading.value=false;loadingMore.value=false;error.value=''}
  function bind() {
    stop?.()
    const valid = proof()

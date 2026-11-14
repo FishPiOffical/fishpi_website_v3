@@ -104,15 +104,16 @@ defineExpose({
     />
     <p v-if="sendError" role="alert">{{ sendError }}</p>
     <div v-if="$slots.context" class="composer-context"><slot name="context" /></div>
-    <div class="bar">
+    <div class="bar" :class="{'has-inline-context': $slots['inline-context']}">
       <div class="tools">
-        <button v-if="!compact" class="emoji-trigger" type="button" data-emoji-trigger aria-label="表情"
+        <button v-if="!compact" class="emoji-trigger" type="button" data-emoji-trigger title="表情" aria-label="表情"
           aria-haspopup="dialog" :aria-expanded="emojiOpen" @click="editor?.toggleEmoji($event?.currentTarget as HTMLElement)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 14c1 4 7 4 8 0M8 9h.01M16 9h.01" stroke-linecap="round"/></svg>
           <span>表情</span>
         </button>
         <slot name="tools" />
       </div>
+      <div v-if="$slots['inline-context']" class="inline-context"><slot name="inline-context" /></div>
       <div class="actions">
         <slot name="actions" />
         <button type="button" class="send" :disabled="!canSend" @click="submit">
@@ -174,6 +175,22 @@ defineExpose({
   cursor: not-allowed;
 }
 .composer-context { min-width: 0; }
+// 桌面工具收为图标，话题居中完整展示；手机让按钮与话题分行。
+.bar.has-inline-context {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: 8px;
+  .tools, .actions { flex-wrap: nowrap; }
+  .emoji-trigger { padding: 6px 8px; span { display: none; } }
+}
+.inline-context { min-width: 0; }
+@media (max-width: 600px) {
+  .bar.has-inline-context {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    .tools, .actions { flex-wrap: wrap; }
+    .inline-context { grid-column: 1 / -1; grid-row: 1; }
+  }
+}
 .emoji-trigger {
   background: transparent; cursor: pointer;
   svg { width:17px; height:17px; }

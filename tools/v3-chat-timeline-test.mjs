@@ -193,3 +193,6 @@ console.log('PASS 同步事件不闪空，切换账号立即清空')
 
 state.dispatch=dispatch;latest=[msg('11'),msg('12')];view=setup();await view.store.connect();view.store.disconnect();historyFail=true;await view.store.connect();assert.deepEqual(view.store.messages.map(m=>m.id),['11','12']);assert.match(view.store.error,/503/);historyFail=false;latest=[msg('12'),msg('13')];await view.store.readLatest();assert.deepEqual(view.store.messages.map(m=>m.id),['12','13']);view.store.$dispose();latest=[msg('11'),msg('12')]
 console.log('PASS 重连补读失败保留内存消息，恢复后更新最新窗口')
+
+latest=Array.from({length:20},(_,i)=>msg(String(100+i)));view=setup();await view.store.connect();const retainedSub=state.subscriptions.at(-1),retainedCalls=state.calls.length;view.store.clearVisible(10);assert.deepEqual(view.store.messages.map(m=>m.id),latest.slice(-10).map(m=>m.id));assert.equal(retainedSub.closed,false);assert.equal(state.calls.length,retainedCalls);assert.equal(view.store.hasMore,false);retainedSub.event({type:'message',id:'120',message:msg('120')});assert.equal(view.store.messages.length,11);view.store.clearVisible(10);assert.equal(view.store.messages.length,10);view.store.$dispose();latest=[msg('11'),msg('12')];view=setup();await view.store.connect();view.store.clearVisible(10);assert.equal(view.store.messages.length,2);view.store.$dispose()
+console.log('PASS 清屏保留最近十条，不足十条保留全部，不断连接不补读，后续新消息正常追加')

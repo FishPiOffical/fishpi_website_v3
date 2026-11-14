@@ -80,7 +80,7 @@ export const useChatStore = defineStore('chat', () => {
   async function refreshMessages(){await timeline.readLatest()}
 
   async function send(text:string){return !!await publication.send(text)}
-  function clearScreen(){timeline.clearVisible()}
+  function clearScreen(){timeline.clearVisible(10)}
 
   return {
     messages,
