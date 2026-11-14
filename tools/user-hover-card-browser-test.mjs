@@ -23,8 +23,8 @@ export const auth=reactive({accessToken:'fixture-token',account:{oId:'viewer',us
 let version=1;export const useAuthStore=()=>auth;export const getAuthContextVersion=()=>version;export const storeToRefs=toRefs;
 export const route=reactive({path:'/',fullPath:'/'});export const useRoute=()=>route;
 export const RouterLink={inheritAttrs:false,props:['to'],setup(p,{attrs,slots}){return()=>h('a',{...attrs,href:typeof p.to==='string'?p.to:p.to.path+(p.to.hash||'')},slots.default?.())}};
-export const state=reactive({background:true,medalCount:10,name:'答辩姐',intro:'厦门的咕咕嘎嘎',failMedal:false,delayMedals:0,follow:false,calls:[]});
-export async function fetchPublicUser(name){state.calls.push('profile:'+name);return {id:name==='self'?'viewer':name,userName:name,userNickname:state.name,userIntro:state.intro,userRole:'成员',userNo:34363,userCity:'厦门',userOnlineFlag:false,userPoint:17008,onlineMinute:15420,userURL:'https://rylan.ma/',userAvatarURL:'https://file.fishpi.cn/fixture-avatar.png',...(state.background?{cardBg:'https://file.fishpi.cn/fixture-bg.png'}:{})}}
+export const state=reactive({background:true,medalCount:10,name:'答辩姐',intro:'厦门的咕咕嘎嘎',website:'https://rylan.ma/',role:'成员',city:'厦门',failMedal:false,delayMedals:0,follow:false,calls:[]});
+export async function fetchPublicUser(name){state.calls.push('profile:'+name);return {id:name==='self'?'viewer':name,userName:name,userNickname:state.name,userIntro:state.intro,userRole:state.role,userNo:34363,userCity:state.city,userOnlineFlag:false,userPoint:17008,onlineMinute:15420,userURL:state.website,userAvatarURL:'https://file.fishpi.cn/fixture-avatar.png',...(state.background?{cardBg:'https://file.fishpi.cn/fixture-bg.png'}:{})}}
 export async function fetchV3PublicMedals(name,p=1){state.calls.push('medals:'+name+':'+p);if(state.delayMedals)await new Promise(resolve=>setTimeout(resolve,state.delayMedals));if(state.failMedal)throw new Error('fixture read failure');const total=state.medalCount;return {list:Array.from({length:Math.min(20,Math.max(0,total-(p-1)*20))},(_,i)=>({id:String((p-1)*20+i),name:'功勋玩家α',description:'真实 SVG 渲染夹具',order:i})),p,total,pageCount:Math.ceil(total/20)}}
 export const cachedVipName=()=>null,loadVipName=async()=>{},vipNameClass=()=>'',vipNameStyle=()=>({}),vipNameRevision=ref(0);
 export const readV3UserFollow=async()=>({following:state.follow}),resolveV3NicknameUser=async name=>({id:name});
@@ -73,17 +73,16 @@ async function withinViewport(){await page.waitForFunction(()=>{const e=document
 try{
 await page.goto('http://card.test/')
 await open()
-await check('背景卡使用真实整卡背景与轻遮罩，头像为64px/128px缩图',async()=>{
-  assert.match(await page.locator('.card-profile').getAttribute('style'),/imageView2\/2\/w\/400/)
-  const cover=await page.locator('.card-cover').boundingBox();assert.ok(Math.abs(cover.height-116)<.01)
-  assert.match(await page.locator('.card-avatar').getAttribute('src'),/imageView2\/2\/w\/128/)
-  const a=await page.locator('.card-avatar').boundingBox();assert.ok(Math.abs(a.width-64)<.01);assert.ok(Math.abs(a.height-64)<.01)
-  assert.equal(await page.locator('.cover-number').innerText(),'# 34363')
+await check('紧凑背景卡保留整卡背景和轻遮罩，头像使用二倍缩图',async()=>{
+  assert.match(await page.locator('.card-profile').getAttribute('style'),/imageView2\/2\/w\/380/)
+  assert.match(await page.locator('.card-avatar').getAttribute('src'),/imageView2\/2\/w\/112/)
+  assert.equal(await page.locator('.card-cover .member-number').count(),0)
   const gradient=await page.locator('.card-content').evaluate(el=>getComputedStyle(el).backgroundImage);assert.match(gradient,/0.58|58%/)
   await withinViewport()
 })
 await check('10枚勋章默认两行，展开/收起保留真实SVG比例且不新增GET',async()=>{
   await page.getByRole('button',{name:'展开全部勋章',exact:true}).waitFor()
+  assert.equal(await page.locator('.medal-count').innerText(),'10')
   const before=await page.evaluate(()=>fixture.state.calls.length)
   assert.equal(await page.locator('.medal-viewport').evaluate(el=>el.clientHeight),62)
   assert.equal(await page.locator('.medal-link[aria-hidden="true"]').count(),4)
@@ -114,13 +113,42 @@ await check('无背景卡无封面留白，保留身份、勋章和双列统计'
   assert.equal(await page.locator('.card-profile--background').count(),0)
   assert.equal(await page.locator('.member-number').innerText(),'# 34363')
   assert.equal(await page.locator('.card-metrics .metric').count(),2)
-  const heights=await page.locator('.card-main,.card-content').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().top));assert.equal(heights[1]-heights[0],20)
   await card.screenshot({animations:'disabled',path:path.join(output,'plain-collapsed.png')})
+})
+await check('链接、编号、位置和角色同行，角色贴右；长内容不破坏对齐',async()=>{
+  const assertRow=async()=>{
+    const row=await page.locator('.card-details').boundingBox()
+    const website=await page.locator('.card-details .website').boundingBox()
+    const number=await page.locator('.card-details .member-number').boundingBox()
+    const city=await page.locator('.card-details .card-city').boundingBox()
+    const role=await page.locator('.card-details .card-badge').boundingBox()
+    assert.ok(website.x+website.width<=number.x&&number.x+number.width<=city.x&&city.x+city.width<=role.x)
+    assert.ok([website,number,city,role].every(item=>Math.abs(item.y+item.height/2-row.y-row.height/2)<1))
+    assert.ok(Math.abs(role.x+role.width-row.x-row.width)<1)
+  }
+  await assertRow()
+  await reopen({background:true,medalCount:1,website:'https://very-long-profile-website-label.example.test/',role:'比较长的公开角色名称',city:'比较长的公开城市名称'})
+  await assertRow()
+  await reopen({background:false,medalCount:1,website:'',role:'成员',city:'厦门'})
+  assert.equal(await page.locator('.card-details .website').count(),0)
+  const row=await page.locator('.card-details').boundingBox()
+  const role=await page.locator('.card-details .card-badge').boundingBox()
+  assert.ok(Math.abs(role.x+role.width-row.x-row.width)<1)
+})
+await check('一行勋章不显示总数，两行显示总数且无需展开',async()=>{
+  for(const medalCount of [1,3,4]){
+    await reopen({background:false,medalCount,website:'https://rylan.ma/'})
+    const rows=await page.locator('.medal-link').evaluateAll(els=>new Set(els.map(el=>el.offsetTop)).size)
+    assert.equal(rows,medalCount<=3?1:2)
+    assert.equal(await page.locator('.medal-count').count(),rows===1?0:1)
+    assert.equal(await page.locator('.medal-toggle').count(),0)
+    if(medalCount===1)await card.screenshot({animations:'disabled',path:path.join(output,'plain-single-medal.png')})
+  }
 })
 await reopen({background:false,medalCount:0})
 await check('合法空勋章不留空分区',async()=>{assert.equal(await page.locator('.card-medals').count(),0);await card.screenshot({animations:'disabled',path:path.join(output,'plain-empty.png')})})
 await reopen({background:true,medalCount:10,name:'这是一个非常长非常长的用户昵称测试内容',intro:'这是一个非常长的个人简介内容，用来检查两行省略以及长文字是否破坏卡片布局。'.repeat(3)})
-await page.setViewportSize({width:640,height:520})
+await page.setViewportSize({width:640,height:375})
 await check('窄桌面与短视口保持边界，长昵称省略，展开卡片可以滚动',async()=>{
   await withinViewport()
   const n=await page.locator('.nickname').evaluate(el=>({client:el.clientWidth,scroll:el.scrollWidth,ellipsis:getComputedStyle(el).textOverflow}));assert.ok(n.scroll>n.client);assert.equal(n.ellipsis,'ellipsis')
