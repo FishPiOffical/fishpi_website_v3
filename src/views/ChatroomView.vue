@@ -426,7 +426,7 @@ function clearScreen() {
             <p v-else-if="messages.length && !timelineEntries.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
             <p v-else-if="!timelineEntries.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
 
-            <ChatRepeatList :entries="timelineEntries" :own-name="me" reverse v-slot="{ entry }">
+            <ChatRepeatList :entries="timelineEntries" :own-name="me" reverse v-slot="{ entry, alignSelf }">
             <ChatMessageEntry :key="entry.key" :animate="animatedEntryKeys.has(entry.key)">
               <ChatRoomNotice v-if="entry.notice" :notice="entry.notice" />
               <ChatBubble
@@ -446,6 +446,7 @@ function clearScreen() {
                 :html="entry.message.html || ''"
                 :source="entry.message.content"
                 :self="entry.message.userName === me"
+                :align-self="alignSelf"
               >
                 <ChatRedPacketCard v-if="entry.message.redPacket" :packet="entry.message.redPacket" :packet-id="entry.message.oId" />
                 <ChatCard v-else-if="entry.message.card" :card="entry.message.card" />
@@ -541,7 +542,7 @@ function clearScreen() {
           <p v-else-if="!timelineEntries.length" class="empty-hint">暂无新消息，快来打破宁静吧！</p>
 
           <div class="messages-container">
-            <ChatRepeatList :entries="timelineEntries" :own-name="me" v-slot="{ entry }">
+            <ChatRepeatList :entries="timelineEntries" :own-name="me" v-slot="{ entry, alignSelf }">
             <ChatMessageEntry :key="entry.key" :animate="animatedEntryKeys.has(entry.key)">
               <ChatRoomNotice v-if="entry.notice" :notice="entry.notice" />
               <ChatBubble
@@ -561,6 +562,7 @@ function clearScreen() {
                 :html="entry.message.html || ''"
                 :source="entry.message.content"
                 :self="entry.message.userName === me"
+                :align-self="alignSelf"
               >
                 <ChatRedPacketCard v-if="entry.message.redPacket" :packet="entry.message.redPacket" :packet-id="entry.message.oId" />
                 <ChatCard v-else-if="entry.message.card" :card="entry.message.card" />

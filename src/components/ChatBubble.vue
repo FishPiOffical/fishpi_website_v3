@@ -34,13 +34,15 @@ const props = withDefaults(
     /** 当前可见消息的原文，仅用于恢复被清洗掉的引用来源，不作为 HTML 渲染。 */
     source?: string
     self?: boolean
+    /** 复读组的显示方向；不改变本人判断、@、撤回等身份行为。 */
+    alignSelf?: boolean
     medals?: unknown
     vipNickname?: boolean
     chatroom?: boolean
     /** 红包、音乐和天气卡片由调用方标记为独立展示。 */
     standalone?: boolean
   }>(),
-  { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', source: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
+  { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', source: '', self: false, alignSelf: undefined, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
 const auth = useAuthStore()
@@ -123,7 +125,7 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
+  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
     <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`">
       <img class="fp-avatar" :src="avatarThumbnail(avatar, avatarSize)" alt="" loading="lazy" @error="onAvatarError" />
     </RouterLink>
