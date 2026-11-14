@@ -551,7 +551,9 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home [data-home-module="side:income"] :deep(.income) { column-gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--fp-hover); }
 .home [data-home-module="side:income"] :deep(.money) { max-width: 100%; font-size: 12px; overflow-wrap: anywhere; }
 .home .home-checkin-tool :deep(.checkin-head) { display: none; }
-.home .home-checkin-tool :deep(.checkin-footer) { margin-top: 8px; }
+.home .home-checkin-tool :deep(.checkin-footer) { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; margin-top: 8px; }
+.home .home-checkin-tool :deep(.checkin-streak) { text-align: right; overflow-wrap: anywhere; }
+.home .home-checkin-tool :deep(.claim-reward-btn) { grid-column: 1 / -1; justify-self: end; margin-left: 0; }
 @container home-tool (min-width: 360px) {
   .home [data-home-module="side:profile"] :deep(.person-card) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 12px; }
   .home [data-home-module="side:profile"] :deep(.person-head) { margin: 0; }
