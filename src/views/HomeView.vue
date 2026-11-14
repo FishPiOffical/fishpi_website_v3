@@ -237,7 +237,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             </aside>
 
             <section v-else-if="mod.id === 'checkin'" class="mod-body home-tool home-checkin-tool">
-              <HomeModuleDisclosure v-if="homeReady && isLoggedIn" class="home-checkin" module-key="rank:checkin" module-id="checkin" title="今日活跃与签到">
+              <HomeModuleDisclosure v-if="homeReady && isLoggedIn" class="home-checkin" fixed-open module-key="rank:checkin" module-id="checkin" title="今日活跃与签到">
                 <template #default="{ reportSummary }">
                   <CheckinPanel @summary="reportSummary" />
                 </template>
@@ -509,7 +509,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .is-classic .recent-continuation { visibility: visible; }
 @media (max-width: 960px) { .is-classic .recent-continuation { visibility: visible; } }
 .home-tool { min-height: 120px; }
-.board--aligned [data-home-module="side:income"] :deep(.home-side-widget) { flex: 1; min-height: 120px; }
+.board--aligned [data-home-module="side:income"] :deep(.home-side-widget),
+.board--aligned [data-home-module="side:profile"] :deep(.home-side-widget) { flex: 1; min-height: 120px; }
 .home-download-tool { display: flex; align-items: center; }
 .home-download-tool :deep(.client-download) { width: 100%; border: 0; padding: 0; background: transparent; }
 .home-checkin-tool :deep(.home-checkin), .home-checkin-tool :deep(.checkin-panel) { margin: 0; }

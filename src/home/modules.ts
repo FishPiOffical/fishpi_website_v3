@@ -64,11 +64,11 @@ export interface HomeLayoutState {
 /** 首页默认三列独立堆叠，最新与聊天优先进入首屏。 */
 export function defaultHomeRows(variant: HomeVariant = 'classic'): HomeRow[] {
   if (variant === 'classic') return [
-    [['recentA'], ['recentB'], ['download', 'rank']],
-    [['side:income'], ['checkin']],
+    [['recentA'], ['recentB'], ['download', 'rank', 'onlineRank']],
+    [['side:profile'], ['side:income'], ['checkin']],
     [['long']],
-    [['chat'], ['hotQna'], ['community', 'onlineRank']],
-    [...SIDE_MODULES.filter(m => m.id !== 'side:income').map(m => [m.id])],
+    [['chat'], ['hotQna'], ['community']],
+    [...SIDE_MODULES.filter(m => !['side:income', 'side:profile'].includes(m.id)).map(m => [m.id])],
   ]
   return [[
     ['checkin', 'rank', 'onlineRank', 'download', ...SIDE_MODULES.map(m => m.id)],
@@ -86,7 +86,7 @@ export function isPreviousDefaultLayout(rows: HomeRow[], hidden: Record<string, 
 
 export function defaultHomeLayout(variant: HomeVariant = 'classic'): HomeLayoutState {
   return {
-    hidden: Object.fromEntries(HOME_MODULES.filter((m) => m.defaultHidden && !(variant === 'classic' && m.id === 'side:income')).map((m) => [m.id, true])),
+    hidden: Object.fromEntries(HOME_MODULES.filter((m) => m.defaultHidden && !(variant === 'classic' && ['side:income', 'side:profile'].includes(m.id))).map((m) => [m.id, true])),
     rows: defaultHomeRows(variant),
   }
 }

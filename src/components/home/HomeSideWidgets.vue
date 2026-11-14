@@ -14,7 +14,7 @@ defineProps<{ modules: HomeModuleMeta[] }>()
     :data-home-module="m.id"
     :data-home-title="m.title"
   >
-    <HomeModuleDisclosure v-if="m.sidebarId" :module-key="m.id" :module-id="m.sidebarId" :title="m.title">
+    <HomeModuleDisclosure v-if="m.sidebarId" :module-key="m.id" :module-id="m.sidebarId" :title="m.title" :fixed-open="m.sidebarId === 'profile' || m.sidebarId === 'income'">
       <template #default="{ reportSummary }">
         <component :is="sidebarModule(m.sidebarId)?.component" @summary="reportSummary" />
       </template>
