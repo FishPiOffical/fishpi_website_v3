@@ -1,4 +1,5 @@
 import { getAccessToken, getAuthContextVersion } from '@/api/http'
+import { avatarThumbnail } from '@/utils/avatar'
 import { userSuggestions } from '@/api/v3-user-suggestions'
 type Hint={value:string;html:string}
 const escape=(s:string)=>s.replace(/[&<>"']/gu,c=>`&#${c.charCodeAt(0)};`)
@@ -18,7 +19,7 @@ export function createMentionHints(onError:(message:string)=>void){
         void userSuggestions(prefix,run.abort.signal).then(users=>{
           if(!current()){if(active===run)active=null;resolve([]);return}
           active=null
-          resolve(users.map(user=>({value:`@${user.userName} `,html:`${user.userAvatarURL?`<img src="${escape(user.userAvatarURL)}" alt=""/>`:''}${escape(user.userName)}${user.userNickname?` <small>${escape(user.userNickname)}</small>`:''}`})))
+          resolve(users.map(user=>({value:`@${user.userName} `,html:`${user.userAvatarURL?`<img class="mention-avatar" src="${escape(avatarThumbnail(user.userAvatarURL, 20))}" width="20" height="20" alt=""/>`:''}${escape(user.userName)}${user.userNickname?` <small>${escape(user.userNickname)}</small>`:''}`})))
         }).catch(()=>{if(current()){active=null;onError('用户联想暂不可用，可手动输入用户名')}else if(active===run)active=null;resolve([])})
       })
     },

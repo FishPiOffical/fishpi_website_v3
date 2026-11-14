@@ -483,6 +483,9 @@ defineExpose({
   border: 1px solid var(--border-color);
   border-radius: 8px;
 }
+.md-editor .vditor-hint img.mention-avatar {
+  width: 20px; height: 20px; object-fit: cover; border-radius: 4px; flex: none;
+}
 .md-editor .vditor-hint button {
   color: var(--fp-text);
 }

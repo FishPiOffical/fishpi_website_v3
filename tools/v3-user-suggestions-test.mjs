@@ -3,7 +3,8 @@ const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.E
 globalThis.__suggest={token:'A',version:1,calls:[],dispatch:null};const state=__suggest
 const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAccessToken(){return globalThis.__suggest.token}export function getAuthContextVersion(){return globalThis.__suggest.version}export async function request(path,init){globalThis.__suggest.calls.push({path,init});return globalThis.__suggest.dispatch(path,init)}`)
 const apiURL=url(compile(await fs.readFile('src/api/v3-user-suggestions.ts','utf8')).replace("from './http'",`from '${http}'`)),api=await import(apiURL)
-const {createMentionHints}=await import(url(compile(await fs.readFile('src/utils/mentionHints.ts','utf8')).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-user-suggestions'",`from '${apiURL}'`)))
+const avatarURL=url(compile(await fs.readFile('src/utils/avatar.ts','utf8')))
+const {createMentionHints}=await import(url(compile(await fs.readFile('src/utils/mentionHints.ts','utf8')).replace("from '@/utils/avatar'",`from '${avatarURL}'`).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-user-suggestions'",`from '${apiURL}'`)))
 const user=(name='Alpha')=>({id:'2',userName:name,userNickname:'<img onerror=x>',userAvatarURL:'https://example.invalid/a.png?sig=x&x=1',userPhone:'SECRET'}),env=list=>({code:0,data:{list}})
 assert.equal(state.calls.length,0);state.dispatch=async()=>env([user()]);let rows=await api.userSuggestions('aL');assert.equal(rows[0].userName,'Alpha');assert.ok(!('userPhone'in rows[0]));assert.equal(state.calls.at(-1).path,'/api/v3/suggestions/users?prefix=aL');assert.equal(state.calls.at(-1).init.cache,'no-store');let n=state.calls.length;assert.deepEqual(await api.userSuggestions(''),[]);assert.equal(state.calls.length,n)
 for(const prefix of ['a%','a b','中文','a/','a'.repeat(65)])await assert.rejects(()=>api.userSuggestions(prefix),e=>e.status===422)
@@ -20,3 +21,13 @@ state.dispatch=()=>new Promise(r=>finishOld=r);const rotated=hints.hint('al');st
 console.log('PASS suggestions client 6 normal token rotation accepted, disposal settles pending and prohibits later reads')
 const source=await fs.readFile('src/components/MarkdownEditor.vue','utf8');assert.ok(!source.includes('searchUsers')&&!source.includes('@participants'));assert.ok(source.includes("hint: mentions.hint")&&source.includes('mentions.dispose()')&&source.includes('clearMentions()'));assert.ok(!source.includes("elements.emoji ="));assert.ok(source.includes('role="status"')&&source.includes('@input.capture="clearMentions"'))
 console.log('PASS suggestions client 7 actual shared editor input/auth/disposal cleanup and no unsafe toolbar alias added')
+
+// 候选头像使用统一二倍缩图，显示尺寸不跟随图片原始尺寸变化。
+state.dispatch=async()=>env([{...user(),userAvatarURL:'https://file.fishpi.cn/2026/11/avatar.gif'}]);
+const avatarHints=createMentionHints(()=>{});
+const avatarRows=await avatarHints.hint('al');
+assert.ok(avatarRows[0].html.includes('avatar.gif?imageView2/2/w/40'));
+assert.ok(avatarRows[0].html.includes('width="20" height="20"'));
+assert.ok(avatarRows[0].html.includes('class="mention-avatar"'));
+avatarHints.dispose();
+console.log('PASS suggestions avatars display 20px and request 40px GIF thumbnail')
