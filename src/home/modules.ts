@@ -1,6 +1,6 @@
 import { CHAT_SIDEBAR_META, type ChatSidebarModuleId } from '@/chat/sidebar/meta'
 
-export type HomeCoreModuleId = 'recentA' | 'recentB' | 'rank' | 'long' | 'chat' | 'hotQna' | 'community'
+export type HomeCoreModuleId = 'recentA' | 'recentB' | 'rank' | 'long' | 'chat' | 'hotQna' | 'community' | 'checkin' | 'download' | 'onlineRank'
 
 /** 聊天室侧边栏模块复用到首页时的 id */
 export type HomeSideModuleId = `side:${ChatSidebarModuleId}`
@@ -35,6 +35,9 @@ export const HOME_MODULES: HomeModuleMeta[] = [
   { id: 'chat', title: '聊天室', width: 'wide' },
   { id: 'hotQna', title: '热议问答', width: 'wide' },
   { id: 'community', title: '社区', width: 'narrow' },
+  { id: 'checkin', title: '活跃与签到', width: 'narrow' },
+  { id: 'download', title: '客户端下载', width: 'narrow' },
+  { id: 'onlineRank', title: '在线时间排行', width: 'narrow' },
   ...SIDE_MODULES,
 ]
 
@@ -60,9 +63,15 @@ export interface HomeLayoutState {
 
 /** 首页默认三列独立堆叠，最新与聊天优先进入首屏。 */
 export function defaultHomeRows(variant: HomeVariant = 'classic'): HomeRow[] {
-  if (variant === 'classic') return [[['recentA'], ['recentB'], [...SIDE_MODULES.map(m => m.id), 'rank']], [['long']], [['chat'], ['hotQna'], ['community']]]
+  if (variant === 'classic') return [
+    [['recentA'], ['recentB'], ['download', 'rank']],
+    [['side:income'], ['checkin']],
+    [['long']],
+    [['chat'], ['hotQna'], ['community', 'onlineRank']],
+    [...SIDE_MODULES.filter(m => m.id !== 'side:income').map(m => [m.id])],
+  ]
   return [[
-    ['rank', ...SIDE_MODULES.map(m => m.id)],
+    ['checkin', 'rank', 'onlineRank', 'download', ...SIDE_MODULES.map(m => m.id)],
     ['recentA', 'long', 'recentB', 'hotQna'],
     ['chat', 'community'],
   ]]
@@ -113,4 +122,21 @@ export function normalizeRows(input: unknown, variant: HomeVariant = 'classic'):
     seen.add(m.id)
   }
   return rows
+}
+
+/** 只迁移完整的旧经典默认排序，用户拖动后的布局保持原样。 */
+export function migrateHomeLayout(input: HomeLayoutState, variant: HomeVariant): HomeLayoutState {
+  const previous = [[['recentA'], ['recentB'], [...SIDE_MODULES.map(m => m.id), 'rank']], [['long']], [['chat'], ['hotQna'], ['community']]]
+  if (variant === 'classic' && JSON.stringify(input.rows) === JSON.stringify(previous)) {
+    return { hidden: { ...input.hidden }, rows: defaultHomeRows('classic') }
+  }
+  const rows = input.rows.map(row => row.map(cell => [...cell]))
+  const rankCell = rows.flat().find(cell => cell.includes('rank'))
+  if (rankCell) {
+    const present = new Set(rows.flat(2))
+    for (const id of ['checkin', 'download', 'onlineRank'] as const) {
+      if (!present.has(id)) rankCell.push(id)
+    }
+  }
+  return { hidden: { ...input.hidden }, rows: normalizeRows(rows, variant) }
 }

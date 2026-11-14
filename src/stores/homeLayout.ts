@@ -9,7 +9,7 @@ import {
   HOME_MODULES,
   defaultHomeLayout,
   isPreviousDefaultLayout,
-  normalizeRows,
+  migrateHomeLayout,
   type HomeLayoutState,
   type HomeModuleId,
   type HomeModuleMeta,
@@ -48,7 +48,7 @@ function read(): HomeLayoutState {
     const raw = localStorage.getItem(HOME_LAYOUT_STORAGE)
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<HomeLayoutState>
-      const rows = normalizeRows(parsed.rows)
+      const rows = migrateHomeLayout({ rows: parsed.rows || [], hidden: parsed.hidden || {} }, 'classic').rows
       const hidden = { ...base.hidden, ...(parsed.hidden || {}) }
       // The previous shipped default showed income; an absent key meant visible.
       const oldHidden = { ...hidden, 'side:income': parsed.hidden?.['side:income'] ?? false }
@@ -99,7 +99,7 @@ export const useHomeLayoutStore = defineStore('homeLayout', () => {
         const saved = JSON.parse(raw)
         for (const variant of ['compact', 'classic'] as const) {
           const value = saved.layouts?.[variant]
-          if (value && Array.isArray(value.rows) && value.hidden && typeof value.hidden === 'object' && !Array.isArray(value.hidden)) layouts[variant] = { rows: normalizeRows(value.rows, variant), hidden: { ...defaultHomeLayout(variant).hidden, ...value.hidden } }
+          if (value && Array.isArray(value.rows) && value.hidden && typeof value.hidden === 'object' && !Array.isArray(value.hidden)) layouts[variant] = migrateHomeLayout({ rows: value.rows, hidden: { ...defaultHomeLayout(variant).hidden, ...value.hidden } }, variant)
         }
         if (saved.mode === 'classic' || saved.mode === 'compact') mode.value = saved.mode
         state.value = copy(layouts[mode.value] || defaultHomeLayout(mode.value))

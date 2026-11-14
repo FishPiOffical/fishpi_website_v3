@@ -65,8 +65,8 @@ onMounted(() => {
 })
 onUnmounted(() => { if (typeof window !== 'undefined') window.removeEventListener('fp:home-reads-paused', syncReadPause) })
 const compactHome = computed(() => layout.mode !== 'classic')
-const left = computed(() => { const rows = recentRead.data || []; return rows.slice(0, compactHome.value ? 8 : Math.ceil(rows.length / 2)) })
-const right = computed(() => { const rows = recentRead.data || []; return compactHome.value ? rows.slice(8, 16) : rows.slice(Math.ceil(rows.length / 2)) })
+const left = computed(() => (recentRead.data || []).slice(0, 8))
+const right = computed(() => (recentRead.data || []).slice(8, 16))
 const hot = computed(() => hotRead.data || []), tags = computed(() => tagsRead.data || [])
 const repeaterItems = ref(consumeRepeaterPayload() || undefined)
 const homeRanks = ref(consumeHomeRankingPayload())
@@ -159,7 +159,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
         @dragover="onGapOver($event, row.cells[0].modules[0].id)"
         @drop="onDrop"
       ><span>＋ 放在这里，新建一行</span></div>
-      <div class="board" :class="{ bare: isBareRow(row) }" :style="{ gridTemplateColumns: row.columns }">
+      <div class="board" :class="{ bare: isBareRow(row), 'board--aligned': row.cells.every(cell => cell.modules.length === 1) || row.cells[0]?.modules[0]?.id === 'recentA' }" :style="{ gridTemplateColumns: row.columns }">
         <div v-for="cell in row.cells" :key="cell.key" class="cell" :class="{ 'cell--narrow': cell.narrow, 'cell--feed': cell.modules.some(m => m.id === 'recentA') }">
           <div
             v-for="mod in cell.modules"
@@ -226,26 +226,38 @@ function scrollShelf(id: string, dir: -1 | 1) {
             </section>
 
             <aside v-else-if="mod.id === 'rank'" class="mod-body">
-              <ClientDownloadCard v-if="!compactHome" class="home-download" />
               <HomeModuleDisclosure v-if="compactHome && homeReady" class="home-person" module-key="rank:profile" module-id="profile" title="我的资料">
                 <PersonInfoCard :avatar-size="34" />
-              </HomeModuleDisclosure>
-              <HomeModuleDisclosure v-if="homeReady && isLoggedIn" class="home-checkin" module-key="rank:checkin" module-id="checkin" title="今日活跃与签到">
-                <template #default="{ reportSummary }">
-                  <CheckinPanel @summary="reportSummary" />
-                </template>
               </HomeModuleDisclosure>
               <div class="index-head">
                 <b>今日连签排行</b>
                 <RouterLink to="/top/checkin">更多</RouterLink>
               </div>
               <RankingBoard type="checkin" :initial="homeRanks.checkin" :initial-expires="homeRanks.expires?.checkin ?? 0" compact />
-              <div class="index-head spaced">
+            </aside>
+
+            <section v-else-if="mod.id === 'checkin'" class="mod-body home-tool home-checkin-tool">
+              <HomeModuleDisclosure v-if="homeReady && isLoggedIn" class="home-checkin" module-key="rank:checkin" module-id="checkin" title="今日活跃与签到">
+                <template #default="{ reportSummary }">
+                  <CheckinPanel @summary="reportSummary" />
+                </template>
+              </HomeModuleDisclosure>
+              <div v-else class="home-checkin-guest">
+                <strong>活跃与签到</strong>
+                <p>登录后查看今日活跃与签到奖励</p>
+                <RouterLink to="/login?goto=%2F">登录</RouterLink>
+              </div>
+            </section>
+            <section v-else-if="mod.id === 'download'" class="mod-body home-download-tool">
+              <ClientDownloadCard />
+            </section>
+            <section v-else-if="mod.id === 'onlineRank'" class="mod-body">
+              <div class="index-head">
                 <b>在线时间排行</b>
                 <RouterLink to="/top/online">更多</RouterLink>
               </div>
               <RankingBoard type="online" :initial="homeRanks.online" :initial-expires="homeRanks.expires?.online ?? 0" compact />
-            </aside>
+            </section>
 
             <section v-else-if="mod.id === 'long'" class="long-zone">
               <div class="long-head">
@@ -491,9 +503,27 @@ function scrollShelf(id: string, dir: -1 | 1) {
   .board { align-items: stretch; }
   /* 列保持等高，剩余留白放在卡片外，避免复读机等模块被拉长。 */
   .board:not(.bare) .cell > .mod { flex: 0 0 auto; }
+  .board--aligned:not(.bare) .cell > .mod:only-child { flex: 1; display: flex; flex-direction: column; }
+  .board--aligned:not(.bare) .cell > .mod:only-child > .mod-body { flex: 1; }
 }
-.is-classic .recent-continuation { visibility: hidden; }
+.is-classic .recent-continuation { visibility: visible; }
 @media (max-width: 960px) { .is-classic .recent-continuation { visibility: visible; } }
+.home-tool { min-height: 120px; }
+.board--aligned [data-home-module="side:income"] :deep(.home-side-widget) { flex: 1; min-height: 120px; }
+.home-download-tool { display: flex; align-items: center; }
+.home-download-tool :deep(.client-download) { width: 100%; border: 0; padding: 0; background: transparent; }
+.home-checkin-tool :deep(.home-checkin), .home-checkin-tool :deep(.checkin-panel) { margin: 0; }
+.home-checkin-tool :deep(.checkin-section) { border: 0; background: transparent; padding: 0; }
+.home-checkin-tool :deep(.activity-ring) { width: 40px; height: 40px; }
+.home-checkin-tool :deep(.disclosure-head) { margin-bottom: 6px; }
+.home-checkin-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.home-checkin-guest strong { width: 100%; font-size: 14px; }
+.home-checkin-guest p { flex: 1; color: var(--fp-muted); font-size: 12px; }
+.home-checkin-guest a { color: var(--fp-primary); font-size: 12px; }
+.home [data-home-module="side:income"] :deep(.hint) { display: none; }
+.home [data-home-module="side:income"] :deep(.income) { display: grid; grid-template-columns: 1fr auto; align-items: center; text-align: left; }
+.home [data-home-module="side:income"] :deep(.time) { grid-column: 1; font-size: 24px; }
+.home [data-home-module="side:income"] :deep(.money) { grid-column: 2; grid-row: 1 / span 2; padding-left: 12px; border-left: 1px solid var(--fp-border); }
 .home-person { margin-bottom: 10px; }
 .home-person :deep(.person-head) { margin-bottom: 8px; gap: 8px; }
 .home-person :deep(.person-avatar) { width: 34px; height: 34px; }
