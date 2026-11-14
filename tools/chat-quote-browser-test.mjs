@@ -49,6 +49,8 @@ const fixtures = [
   { id: 'only', userName: '只有引用', html: linked.replace('<p>这是旧版的消息</p>', '') },
   { id: 'hand', userName: '手写引用', html: '<p>我的正文</p><blockquote><p>没有来源的普通引用</p></blockquote>' },
   { id: 'moon', userName: '清风', html: '<p>分享</p><blockquote><p><a href="https://fishpi.cn/member/Yui/breezemoons/123">清风明月 · Yui</a></p><p>快点放假吧</p></blockquote>' },
+  { id: 'short', userName: '短引用', html: '<p>收到</p><h5>引用 @Yui <a href="/cr#chatroom321">↩</a></h5><blockquote><p>好</p></blockquote>' },
+  { id: 'own-multi', userName: 'Yui', self: true, html: '<p>一起回复</p>' + linked.replace('<p>这是旧版的消息</p>', '') + '<h5>引用 @Yui <a href="/cr#chatroom321">↩</a></h5><blockquote><p>好</p></blockquote>' },
 ]
 const packs = fs.readFileSync('src/packs/bubbles/star-route/style.css', 'utf8')
 const html = `<!doctype html><meta charset="utf-8"><style>
@@ -89,23 +91,34 @@ try {
       .filter(el => el.getBoundingClientRect().right > innerWidth || el.getBoundingClientRect().left < 0)
       .map(el => ({ element: el.className, case: el.closest('[data-case]')?.getAttribute('data-case'), left: el.getBoundingClientRect().left, right: el.getBoundingClientRect().right })))
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `页面横向溢出：${width} ${JSON.stringify(overflow)}`)
-    for (const id of ['own', 'other', 'classic', 'image']) {
+    for (const id of ['own', 'other', 'classic', 'image', 'short']) {
       const layout = await page.locator(`[data-case="${id}"] .chat-quote-card`).evaluate(el => {
         const preview = el.querySelector('.chat-quote-excerpt'), style = getComputedStyle(preview)
         const body = el.closest('.message-stack').querySelector('.fp-bubble').getBoundingClientRect()
         const r = el.getBoundingClientRect()
-        return { whitespace: style.whiteSpace, ellipsis: style.textOverflow, height: r.height, top: r.top, bodyBottom: body.bottom, clipped: preview.scrollWidth > preview.clientWidth }
+        return { whitespace: style.whiteSpace, ellipsis: style.textOverflow, width: r.width, height: r.height, top: r.top, bodyBottom: body.bottom, clipped: preview.scrollWidth > preview.clientWidth }
       })
       assert.equal(layout.whitespace, 'nowrap')
       assert.equal(layout.ellipsis, 'ellipsis')
       assert.ok(layout.top >= layout.bodyBottom, `${id} 引用应在气泡下方`)
-      assert.ok(layout.height < 40, `${id} 必须保持单行高度`)
+      assert.ok(layout.height <= 26, `${id} 必须保持紧凑单行高度`)
+      assert.ok(layout.width <= 240.1, `${id} 引用不能再占用过长空间`)
+      if (id === 'short') assert.ok(layout.width < 150, '短引用应自然收缩')
       if (id === 'own') assert.ok(layout.clipped, '长引用应省略')
     }
+    assert.ok(await page.locator('[data-case="short"] .chat-quote-author').evaluate(el => el.scrollWidth <= el.clientWidth), '短引用不能挤掉完整作者名')
+    const ownEdges = await page.locator('[data-case="own-multi"] .chat-quote-card').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().right))
+    assert.ok(Math.abs(ownEdges[0] - ownEdges[1]) < 1, '本人多条长短引用应保持右侧对齐')
   }
   await page.screenshot({ path: '/tmp/chat-quotes-320.png', fullPage: true })
   await page.setViewportSize({ width: 1000, height: 1200 })
+  await page.evaluate(() => { narrow.value = false })
+  await page.waitForTimeout(60)
   await page.screenshot({ path: '/tmp/chat-quotes-1000.png', fullPage: true })
+  // 暗色复用站点主题变量，引用文字保持弱化但仍可读，不显示醒目卡片边框。
+  await page.addStyleTag({ content: 'body{background:#222424;--fp-card:#282a2a;--fp-text:#cbc5ba;--fp-muted:#9e9689;--fp-border:#424545;--fp-hover:#343737;--fp-bg:#222424}.panel{background:var(--fp-card)}' })
+  await page.screenshot({ path: '/tmp/chat-quotes-dark.png', fullPage: true })
+  assert.equal(await page.locator('[data-case="own"] .chat-quote-excerpt').evaluate(el => getComputedStyle(el).color), 'rgb(158, 150, 137)')
   await page.locator('[data-case="own"] .chat-quote-card').click()
   assert.equal(new URL(page.url()).hash, '#chatroom123')
   await page.locator('[data-case="preview"] button').click()

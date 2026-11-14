@@ -527,6 +527,7 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
   line-height: 1.7;
 }
 .chat-quote-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-width: 100%; min-width: 0; }
+.is-room.is-self .chat-quote-stack { justify-items: end; }
 .fp-bubble + .chat-quote-stack { margin-top: 2px; }
 .is-room .body :deep(p + p) { margin-top: 6px; }
 .is-room .body :deep(.chat-image-frame) {

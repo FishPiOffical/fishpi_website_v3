@@ -29,39 +29,41 @@ defineProps<{ quote: ChatQuote }>()
   display: flex;
   align-items: center;
   gap: 4px;
-  width: 300px;
-  max-width: 100%;
+  width: fit-content;
+  max-width: min(240px, 100%);
   min-width: 0;
   box-sizing: border-box;
-  padding: 7px 9px;
-  border: 1px solid var(--fp-border);
-  border-inline-start: 2px solid color-mix(in srgb, var(--fp-muted) 65%, transparent);
-  border-radius: 7px;
-  background: var(--fp-surface-subtle, var(--fp-bg));
+  padding: 3px 7px;
+  border: 0;
+  border-inline-start: 2px solid color-mix(in srgb, var(--fp-muted) 35%, transparent);
+  border-radius: 0 4px 4px 0;
+  background: transparent;
+  color: var(--fp-muted);
   text-align: start;
   text-decoration: none;
   font-size: 12px;
   line-height: 18px;
 }
-.chat-quote-card:hover { text-decoration: none; border-color: var(--fp-primary); background: var(--fp-hover); }
+.chat-quote-card:hover { text-decoration: none; color: var(--fp-muted); background: var(--fp-hover); }
 .chat-quote-card:hover .chat-quote-excerpt { text-decoration: none; }
 .chat-quote-card:focus-visible { outline: 2px solid var(--fp-link); outline-offset: 2px; }
 .chat-quote-source {
   display: flex;
   align-items: center;
   flex: 0 1 auto;
-  max-width: 36%;
+  max-width: 80px;
   min-width: 0;
   color: var(--fp-muted);
   white-space: nowrap;
 }
 .chat-quote-author { overflow: hidden; text-overflow: ellipsis; }
-.chat-quote-arrow { flex: none; width: 14px; height: 14px; color: var(--fp-muted); margin-inline-start: 3px; }
+.chat-quote-arrow { flex: none; width: 12px; height: 12px; color: inherit; opacity: .55; margin-inline-start: 2px; }
+.chat-quote-card:is(:hover, :focus-visible) .chat-quote-arrow { opacity: 1; }
 .chat-quote-excerpt {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--fp-text);
+  color: inherit;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
