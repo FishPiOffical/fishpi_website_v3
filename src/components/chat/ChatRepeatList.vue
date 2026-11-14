@@ -60,9 +60,10 @@ function toggle(key: string) {
     <template v-else>
       <div v-if="!expanded.has(group[0]!.key)" class="repeat-deck" :style="{ '--layers': Math.min(group.length - 1, visibleBackLayers) }">
         <div v-for="(entry, index) in group.slice(Math.max(0, group.length - visibleBackLayers - 1), -1)" :key="entry.key" class="fp-msg is-room repeat-layer-shell" data-appearance-snapshot="v1" :data-bubble="mounted && preferences.simpleMode ? 'none' : entry.message?.appearance?.bubbleId" :style="{ '--layer': index }">
-        <button class="fp-bubble repeat-layer" type="button" aria-label="展开复读消息" @click="toggle(group[0]!.key)">
+        <button class="repeat-layer" type="button" aria-label="展开复读消息" @click="toggle(group[0]!.key)">
           <img :src="avatarThumbnail(entry.message?.userAvatarURL, 20)" :alt="entry.message?.userNickname || entry.message?.userName" :data-user-card="entry.message?.userName" @error="fallbackAvatar" />
-          <span>{{ entry.message?.userNickname || entry.message?.userName }}</span>
+          <span class="repeat-author">{{ entry.message?.userNickname || entry.message?.userName }}</span>
+          <span class="fp-bubble repeat-sheet" aria-hidden="true"></span>
         </button>
         </div>
         <!-- 新复读覆盖在前层；组标识仍用最早消息，追加时不重置展开状态。 -->
@@ -81,15 +82,16 @@ function toggle(key: string) {
 .repeat-list { display: flex; flex-direction: column; gap: var(--repeat-gap, 12px); min-width: 0; flex-shrink: 0; }
 .repeat-layer-shell { display: contents; }
 /* 后层沿用消息的外观包底色，只隐藏装饰，避免多个角标挤在一起。 */
-.repeat-layer-shell .repeat-layer::before, .repeat-layer-shell .repeat-layer::after { display: none !important; }
+.repeat-layer-shell .repeat-sheet::before, .repeat-layer-shell .repeat-sheet::after { display: none !important; }
 .repeat-group { min-width: 0; flex-shrink: 0; }
-.repeat-deck { --step: 8px; --layer-height: 28px; position: relative; padding-top: calc(var(--layers) * var(--layer-height)); padding-right: calc(var(--layers) * var(--step)); isolation: isolate; }
-.repeat-layer { position: absolute !important; top: calc(var(--layer) * var(--layer-height)); left: calc(var(--card-left, 44px) + var(--layer) * var(--step)); width: var(--card-width, min(220px, calc(100% - 76px))); height: var(--layer-height); display: flex; align-items: flex-start; gap: 6px; padding: 3px 10px !important; border: 1px solid var(--fp-border, #dfe3e8); border-radius: 12px; background: var(--fp-card, #fff); color: var(--fp-text-muted, #77808d); font: inherit; font-size: 11px; cursor: pointer; box-shadow: 0 2px 3px #00000006; animation: repeat-arrive .22s ease-out; }
-.repeat-layer-shell:nth-child(even) .repeat-layer { background: color-mix(in srgb, var(--fp-primary, #65ae42) 5%, var(--fp-card, #fff)); }
+.repeat-deck { --step: 8px; --layer-height: 36px; position: relative; padding-top: calc(var(--layers) * var(--layer-height)); padding-right: calc(var(--layers) * var(--step)); isolation: isolate; }
+.repeat-layer { position: absolute; top: calc(var(--layer) * var(--layer-height)); left: calc(var(--card-left, 44px) + var(--layer) * var(--step)); width: var(--card-width, min(220px, calc(100% - 76px))); height: var(--layer-height); display: flex; align-items: flex-start; padding: 0; border: 0; background: transparent; color: var(--fp-text-muted, #77808d); font: inherit; font-size: 11px; text-align: left; cursor: pointer; animation: repeat-arrive .22s ease-out; }
+.repeat-sheet { position: absolute !important; top: 24px; left: 0; width: 100%; height: 12px; min-height: 0 !important; box-sizing: border-box; padding: 0 !important; border: 1px solid var(--fp-border, #dfe3e8); border-bottom: 0; border-radius: 10px 10px 0 0; background: var(--fp-card, #fff); pointer-events: none; }
+.repeat-layer:hover .repeat-author { color: var(--fp-primary); }
 /* 头像放在卡片外侧，每层独占一条头像行，不被下一层气泡盖住。 */
 .repeat-layer img { position: absolute; left: -28px; top: 2px; width: 20px; height: 20px; object-fit: cover; border-radius: 4px; flex: none; }
 .repeat-group--self .repeat-layer img { left: auto; right: -28px; }
-.repeat-layer span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 20px; }
+.repeat-author { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 20px; }
 .repeat-front { position: relative; z-index: 2; transform: translateX(calc(var(--layers) * var(--step))); }
 .repeat-controls { display: flex; align-items: center; gap: 14px; margin: 2px 0 14px 44px; color: var(--fp-text-muted, #77808d); font-size: 12px; }
 .repeat-controls > button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 4px 0; }
