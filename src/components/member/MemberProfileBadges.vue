@@ -59,7 +59,7 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
 <template>
   <div class="profile-badges">
     <section v-if="medalsMounted && auth.isLoggedIn" id="member-medals" aria-label="公开勋章">
-      <div v-if="shownMedals?.length" class="medal-row">
+      <div v-if="shownMedals?.length" class="medal-row" :class="{ 'medal-row--expanded': showMedals }">
         <div v-for="(medal, index) in shownMedals" :key="`${p}:${index}:${medal.id}`" class="medal-entry" :class="{ 'is-open': openMedal === index }" @mouseleave="openMedal=null">
           <div class="medal-preview" role="button" tabindex="0" :aria-expanded="openMedal === index" :aria-label="`${medal.name}，查看勋章说明`" :aria-describedby="`${medalHintId}-${index}`" @click="openMedal = openMedal === index ? null : index" @keydown.enter.prevent="openMedal = openMedal === index ? null : index" @keydown.space.prevent="openMedal = openMedal === index ? null : index">
             <V3MedalImage :id="medal.id" :name="medal.name" :user-name="userName" />
@@ -70,8 +70,8 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
             <small>{{ medal.expiresAt === 0 ? '永久有效' : `有效至 ${formatDateTime(medal.expiresAt)}` }}</small>
           </div>
         </div>
+        <button v-if="remaining || showMedals && value?.total" type="button" class="medal-toggle" :aria-expanded="showMedals" :title="showMedals ? '收起勋章' : '展开全部勋章'" @click="toggleMedals">{{ showMedals ? '收起勋章' : `+${remaining}` }}</button>
       </div>
-      <button v-if="remaining || showMedals && value?.total" type="button" :aria-expanded="showMedals" @click="toggleMedals">{{ showMedals ? '收起勋章' : `+${remaining}` }}</button>
       <small v-if="showMedals && loading" role="status">正在读取公开勋章…</small>
       <div v-if="error" class="badge-error"><small role="alert">{{ error }}</small><button type="button" @click="read()">重试勋章</button></div>
       <small v-if="showMedals && value?.total === 0">暂无公开勋章</small>
@@ -96,8 +96,12 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
 .profile-badges section:not(:empty) { margin-top: 10px; }
 .profile-badges button { background: var(--fp-surface-subtle); border: 1px solid var(--fp-border); border-radius: 7px; color: var(--fp-text); font: inherit; font-size: 12px; padding: 3px 7px; cursor: pointer; }
 .profile-badges button:disabled { opacity: .55; cursor: default; }
-.medal-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; }
-.medal-entry { position: relative; max-width: 100%; }
+.medal-row { display: flex; align-items: center; justify-content: center; gap: 4px 8px; }
+.medal-row--expanded { flex-wrap: wrap; }
+.medal-entry { position: relative; min-width: 0; max-width: 100%; }
+.profile-badges .medal-toggle { flex: none; padding: 2px 7px; color: var(--fp-muted); white-space: nowrap; }
+.profile-badges .medal-toggle:hover { background: var(--fp-hover); color: var(--fp-text); }
+.medal-row--expanded .medal-toggle { margin-inline: 2px; }
 .medal-preview, nav, .badge-error { display: flex; align-items: center; justify-content: center; gap: 5px; }
 .medal-preview button { background: transparent; border: 0; color: var(--fp-muted); padding: 3px; }
 .medal-preview { cursor: help; border-radius: 6px; }
