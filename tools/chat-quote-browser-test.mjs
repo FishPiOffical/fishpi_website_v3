@@ -41,6 +41,8 @@ const excerpt = '第一行正文，保留引用内容。第二行正文很长很
 const source = `1\n\n##### 引用 @Yui [↩](/cr#chatroom123 "跳转至原消息")  \n> ${excerpt}\n> 第三行引用\n`
 const stripped = `<p>1</p><h5>引用 @Yui <a title="跳转至原消息">↩</a></h5><blockquote><p>${excerpt}<br>第三行引用</p></blockquote>`
 const linked = '<p>这是旧版的消息</p><h5>引用 @小羊 <a href="https://fishpi.cn/cr#chatroom456">↩</a></h5><blockquote><p>普通引用内容<br>还有一行</p></blockquote>'
+const previousQuote = linked.replace('<p>这是旧版的消息</p>', '')
+const nextHeading = '<h5>引用 @Yui <a href="/cr#chatroom321">↩</a></h5>'
 const fixtures = [
   { id: 'own', userName: 'Yui', self: true, html: stripped, source },
   { id: 'other', userName: '冰岚', html: stripped, source },
@@ -50,7 +52,8 @@ const fixtures = [
   { id: 'hand', userName: '手写引用', html: '<p>我的正文</p><blockquote><p>没有来源的普通引用</p></blockquote>' },
   { id: 'moon', userName: '清风', html: '<p>分享</p><blockquote><p><a href="https://fishpi.cn/member/Yui/breezemoons/123">清风明月 · Yui</a></p><p>快点放假吧</p></blockquote>' },
   { id: 'short', userName: '短引用', html: '<p>收到</p><h5>引用 @Yui <a href="/cr#chatroom321">↩</a></h5><blockquote><p>好</p></blockquote>' },
-  { id: 'own-multi', userName: 'Yui', self: true, html: '<p>一起回复</p>' + linked.replace('<p>这是旧版的消息</p>', '') + '<h5>引用 @Yui <a href="/cr#chatroom321">↩</a></h5><blockquote><p>好</p></blockquote>' },
+  { id: 'own-multi', userName: 'Yui', self: true, html: '<p>一起回复</p>' + previousQuote + nextHeading + '<blockquote><p>好</p></blockquote><blockquote><p>手写补充</p></blockquote>' },
+  { id: 'nested', userName: '小羊', html: '<p>再次回复</p>' + nextHeading + '<blockquote><p>直接引用的内容</p>' + previousQuote + '</blockquote>' },
 ]
 const packs = fs.readFileSync('src/packs/bubbles/star-route/style.css', 'utf8')
 const html = `<!doctype html><meta charset="utf-8"><style>
@@ -74,7 +77,7 @@ try {
   await page.route('http://quotes.test/**', r => r.fulfill({ contentType: 'text/html', body: html }))
   await page.goto('http://quotes.test/cr')
   await page.waitForSelector('[data-case="own"] .chat-quote-card')
-  for (const id of ['own', 'other', 'classic', 'image', 'only', 'moon']) {
+  for (const id of ['own', 'other', 'classic', 'image', 'only', 'moon', 'own-multi', 'nested']) {
     const section = page.locator(`[data-case="${id}"]`)
     assert.equal(await section.locator('.chat-quote-card').count(), 1, id)
     assert.equal(await section.locator('.fp-bubble .chat-quote-card, .fp-bubble h5').count(), 0, id)
@@ -83,6 +86,13 @@ try {
   assert.equal(await page.locator('[data-case="image"] .chat-quote-excerpt').innerText(), '图片消息')
   assert.equal(await page.locator('[data-case="only"] .fp-bubble').count(), 0)
   assert.equal(await page.locator('[data-case="hand"] .body blockquote').innerText(), '没有来源的普通引用')
+  for (const [id, excerpt] of [['own-multi', '好'], ['nested', '直接引用的内容']]) {
+    const section = page.locator(`[data-case="${id}"]`)
+    assert.equal(await section.locator('.chat-quote-card').getAttribute('href'), '/cr#chatroom321')
+    assert.equal(await section.locator('.chat-quote-excerpt').innerText(), excerpt)
+    assert.doesNotMatch(await section.innerText(), /普通引用内容/)
+  }
+  assert.equal(await page.locator('[data-case="own-multi"] .body blockquote').innerText(), '手写补充')
   for (const width of [1000, 560, 390, 320]) {
     await page.setViewportSize({ width, height: 1600 })
     await page.evaluate(() => { narrow.value = innerWidth < 560 })
@@ -107,8 +117,8 @@ try {
       if (id === 'own') assert.ok(layout.clipped, '长引用应省略')
     }
     assert.ok(await page.locator('[data-case="short"] .chat-quote-author').evaluate(el => el.scrollWidth <= el.clientWidth), '短引用不能挤掉完整作者名')
-    const ownEdges = await page.locator('[data-case="own-multi"] .chat-quote-card').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().right))
-    assert.ok(Math.abs(ownEdges[0] - ownEdges[1]) < 1, '本人多条长短引用应保持右侧对齐')
+    const ownEdges = await page.locator('[data-case="own-multi"] :is(.chat-quote-card, .fp-bubble)').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().right))
+    assert.ok(Math.abs(ownEdges[0] - ownEdges[1]) < 1, '本人最新引用应和气泡右侧对齐')
   }
   await page.screenshot({ path: '/tmp/chat-quotes-320.png', fullPage: true })
   await page.setViewportSize({ width: 1000, height: 1200 })
@@ -121,6 +131,8 @@ try {
   assert.equal(await page.locator('[data-case="own"] .chat-quote-excerpt').evaluate(el => getComputedStyle(el).color), 'rgb(158, 150, 137)')
   await page.locator('[data-case="own"] .chat-quote-card').click()
   assert.equal(new URL(page.url()).hash, '#chatroom123')
+  await page.locator('[data-case="nested"] .chat-quote-card').click()
+  assert.equal(new URL(page.url()).hash, '#chatroom321')
   await page.locator('[data-case="preview"] button').click()
   assert.equal(await page.evaluate(() => window.removed), true)
   assert.deepEqual(errors, [])

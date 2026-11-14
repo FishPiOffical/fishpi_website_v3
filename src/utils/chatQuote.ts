@@ -65,9 +65,9 @@ function readExcerpt(content: Element | DocumentFragment, imageLabel: string) {
 export function chatMessageQuotePreview(source: { messageId: string; userName: string; html: string; label: string }): ChatQuote {
   const template = document.createElement('template')
   template.innerHTML = source.html
-  const nested = extractChatQuotes(template.content, window.location.origin, source.label)
+  const nested = extractLatestChatQuote(template.content, window.location.origin, source.label)
   const excerpt = readExcerpt(template.content, '图片消息')
-    || nested[0]?.excerpt
+    || nested?.excerpt
     || (source.html ? '' : source.label.split('\n')[0] ?? '')
   return { kind: 'message', href: `/cr#chatroom${source.messageId}`, author: source.userName, excerpt }
 }
@@ -193,21 +193,27 @@ function extractBreezemoonQuote(block: Element, origin: string): ChatQuote | nul
   }
 }
 
-export function extractChatQuotes(fragment: DocumentFragment, origin: string, source = ''): ChatQuote[] {
+export function extractLatestChatQuote(fragment: DocumentFragment, origin: string, source = ''): ChatQuote | null {
   const blocks = Array.from(fragment.querySelectorAll('blockquote'))
   const recovered = recoveredMessageLinks(blocks, origin, source)
-  const extracted = new Map<Element, ChatQuote>()
-  // 从内到外提取，避免外层摘要重复包含内层来源；最终仍按原文顺序展示。
-  for (const block of blocks.slice().reverse()) {
+  let latest: ChatQuote | null = null
+  const ancestors = new Set<Element>()
+  // 从后往前找到最后一条引用。若它嵌在另一条引用里，显示直接引用的外层。
+  for (const block of blocks.reverse()) {
     const quote = extractMessageQuote(block, origin, recovered.get(block)) ?? extractBreezemoonQuote(block, origin)
     if (!quote) continue
-    extracted.set(block, quote)
+    if (!latest) {
+      latest = quote
+      for (let parent = block.parentElement; parent; parent = parent.parentElement) {
+        if (parent.tagName === 'BLOCKQUOTE') ancestors.add(parent)
+      }
+    } else if (ancestors.has(block)) {
+      latest = quote
+    }
+    // 仍移除所有已识别的引用，避免旧引用回到正文或混入外层摘要。
     block.remove()
   }
-  return blocks.flatMap(block => {
-    const quote = extracted.get(block)
-    return quote ? [quote] : []
-  })
+  return latest
 }
 
 /** Markdown 渲染器包装引用后可能留下空段落，不能把这些占位当成消息正文。 */

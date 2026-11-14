@@ -12,10 +12,11 @@ const compile = source => ts.transpileModule(source, { compilerOptions: { target
 const http = moduleUrl('export class ApiError extends Error{}; export const request=()=>{throw Error("unexpected request")}')
 const appearances = moduleUrl(compile(await fs.readFile('src/utils/chatAppearance.ts', 'utf8')))
 const reactions = moduleUrl(compile(await fs.readFile('src/api/v3-reactions.ts', 'utf8')).replace("from './http'", `from '${http}'`))
-const api = await import(moduleUrl(compile(await fs.readFile('src/api/v3-chat-messages.ts', 'utf8'))
+const messageModule = moduleUrl(compile(await fs.readFile('src/api/v3-chat-messages.ts', 'utf8'))
   .replace("from './http'", `from '${http}'`)
   .replace("from '@/utils/chatAppearance'", `from '${appearances}'`)
-  .replace("from './v3-reactions'", `from '${reactions}'`)))
+  .replace("from './v3-reactions'", `from '${reactions}'`))
+const api = await import(messageModule)
 const message = { id: '10', createdAt: 10, type: 'text', content: '原正文', contentHtml: '<p>原正文</p>',
   author: { id: '2', userName: 'fish', userNickname: '鱼', userAvatarURL: '' }, client: 'Web/PC网页端', card: {} }
 const tail = { text: '今天也要快乐🐟', secret: 'not public' }
@@ -37,7 +38,7 @@ const preferences = reactive({ simpleMode: false })
 globalThis.__chatTailPreferences = preferences
 const stateModule = moduleUrl('export const useChatPreferencesStore=()=>globalThis.__chatTailPreferences')
 const componentStub = moduleUrl(`import {h} from '${import.meta.resolve('vue')}';export default {setup(_,{slots}){return()=>h('span',slots.default?.())}}`)
-const quoteModule = moduleUrl('export const extractChatQuotes=()=>[];export const hasChatQuoteBody=()=>true')
+const quoteModule = moduleUrl('export const extractLatestChatQuote=()=>null;export const hasChatQuoteBody=()=>true')
 const imageModule = moduleUrl(compile(await fs.readFile('src/utils/chatMessage.ts', 'utf8')))
 const file = 'src/components/ChatBubble.vue'
 const source = await fs.readFile(file, 'utf8')
@@ -46,6 +47,8 @@ let code = compile(compileScript(descriptor, { id: 'chat-tail-test', inlineTempl
 const replacements = {
   vue: import.meta.resolve('vue'),
   'vue-router': moduleUrl(`import {h} from '${import.meta.resolve('vue')}'; export const RouterLink={setup(_,{slots}){return()=>h('a',slots.default?.())}}`),
+  '@/api/v3-chat-messages': messageModule,
+  '@/stores/auth': moduleUrl('export const useAuthStore=()=>({account:null})'),
   '@/stores/chatPreferences': stateModule,
   '@/stores/functionPreferences': moduleUrl('export const useFunctionPreferencesStore=()=>({blurChatImages:false})'),
   '@/utils/time': moduleUrl('export const formatDisplayTime=()=>""'),

@@ -38,7 +38,7 @@ const chatCode=compile((await fs.readFile('src/stores/chat.ts','utf8')).replaceA
 console.log('PASS chat source 13 actual appearance/chat stores share SSR defaults and defer saved layout/theme reads until mounted shell restoration')
 
 const { JSDOM } = await import('jsdom')
-const { extractChatQuotes, hasChatQuoteBody, chatMessageQuotePreview } = await import(url(compile(await fs.readFile('src/utils/chatQuote.ts','utf8'))))
+const { extractLatestChatQuote, hasChatQuoteBody, chatMessageQuotePreview } = await import(url(compile(await fs.readFile('src/utils/chatQuote.ts','utf8'))))
 const quoteDOM = new JSDOM()
 const quoteTemplate = quoteDOM.window.document.createElement('template')
 quoteTemplate.innerHTML = [
@@ -48,16 +48,15 @@ quoteTemplate.innerHTML = [
   '<h5>引用 <a href="https://example.com/cr#chatroom2">↩</a></h5>',
   '<blockquote><p>外部链接保留原样</p></blockquote>',
 ].join('')
-assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn'), [
-  { kind: 'message', href: '/cr#chatroom2', author: 'fish', excerpt: '第一行 第二行' },
-])
+assert.deepEqual(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn'),
+  { kind: 'message', href: '/cr#chatroom2', author: 'fish', excerpt: '第一行 第二行' })
 assert.equal(quoteTemplate.content.querySelectorAll('blockquote').length, 1)
 assert.match(quoteTemplate.innerHTML, /我的回复.*外部链接保留原样/)
 const moon = '<blockquote><p><a href="/member/fish/breezemoons/7">清风明月 · ?????</a></p><p>快点放假吧</p></blockquote>'
 for (const body of ['', '<p>111</p>', '<p><img src="/logo.png"></p>']) {
   // 浏览器会把服务端的段落包装拆成空段落和引用块。
   quoteTemplate.innerHTML = body + '<p>' + moon + '</p><div><span>&nbsp;<br></span></div>'
-  const [quote] = extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn')
+  const quote = extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn')
   assert.equal(quote.author, '?????')
   assert.equal(quote.excerpt, '快点放假吧')
   assert.equal(hasChatQuoteBody(quoteTemplate.content), Boolean(body))
@@ -68,10 +67,8 @@ quoteTemplate.innerHTML = `<div><p>我的回复</p>
 <blockquote><p>外层正文</p><h5>引用 @inner <a href="https://new.fishpi.cn/cr#chatroom11">↩</a></h5><blockquote><p>内层正文</p></blockquote><blockquote><p>手写引用</p></blockquote></blockquote>
 <h5>引用 @evil <a href="https://fishpi.cn.evil.example/cr#chatroom12">↩</a></h5><blockquote><p>保留原文</p></blockquote>
 <blockquote><p>普通手写内容</p></blockquote></div>`
-assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn'), [
-  { kind: 'message', href: '/cr#chatroom10', author: 'outer', excerpt: '外层正文 手写引用' },
-  { kind: 'message', href: '/cr#chatroom11', author: 'inner', excerpt: '内层正文' },
-])
+assert.deepEqual(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn'),
+  { kind: 'message', href: '/cr#chatroom10', author: 'outer', excerpt: '外层正文 手写引用' })
 assert.match(quoteTemplate.innerHTML, /我的回复/)
 assert.match(quoteTemplate.innerHTML, /保留原文/)
 assert.match(quoteTemplate.innerHTML, /普通手写内容/)
@@ -81,12 +78,11 @@ assert.equal(quoteTemplate.content.querySelectorAll('blockquote').length, 2)
 const legacySource = '1\n\n##### 引用 @Yui [↩](/cr#chatroom123 "跳转至原消息")  \n> 第一行\n> 第二行\n'
 const lostLinkHTML = '<p>1</p><h5>引用 @<a href="https://fishpi.cn/member/Yui">Yui</a> <a title="跳转至原消息">↩</a></h5><blockquote><p>第一行<br>第二行</p></blockquote>'
 quoteTemplate.innerHTML = lostLinkHTML
-assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource), [
-  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '第一行 第二行' },
-])
+assert.deepEqual(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource),
+  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '第一行 第二行' })
 assert.equal(quoteTemplate.innerHTML, '<p>1</p>')
 quoteTemplate.innerHTML = lostLinkHTML.replace('>↩</a>', '><img class="emoji" alt=":leftwards_arrow_with_hook:" src="/arrow.png"></a>')
-assert.equal(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource)[0].href, '/cr#chatroom123')
+assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource).href, '/cr#chatroom123')
 assert.equal(quoteTemplate.innerHTML, '<p>1</p>')
 
 for (const source of [
@@ -101,20 +97,20 @@ for (const source of [
     '/chat#chatroom123'].map(href => legacySource.replace('/cr#chatroom123', href)),
 ]) {
   quoteTemplate.innerHTML = lostLinkHTML
-  assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', source), [])
+  assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', source), null)
   assert.equal(quoteTemplate.innerHTML, lostLinkHTML)
 }
 
 // 代码块中的伪引用不参与对应；真实引用仍可恢复，且不采用原文里任意 HTML。
 quoteTemplate.innerHTML = lostLinkHTML
 const codeThenQuote = '```md\n##### 引用 @fake [↩](/cr#chatroom999 "跳转至原消息")\n> 代码\n```\n' + legacySource
-assert.equal(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', codeThenQuote)[0].href, '/cr#chatroom123')
+assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', codeThenQuote).href, '/cr#chatroom123')
 quoteTemplate.innerHTML = lostLinkHTML
-assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', '<h5>引用 @Yui <a href="/cr#chatroom123">↩</a></h5><blockquote>原始 HTML</blockquote>'), [])
+assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', '<h5>引用 @Yui <a href="/cr#chatroom123">↩</a></h5><blockquote>原始 HTML</blockquote>'), null)
 assert.equal(quoteTemplate.innerHTML, lostLinkHTML)
 for (const html of [lostLinkHTML.replace(' title="跳转至原消息"', ''), lostLinkHTML.replace('>↩</a>', '>其他链接</a>')]) {
   quoteTemplate.innerHTML = html
-  assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource), [])
+  assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource), null)
   assert.equal(quoteTemplate.innerHTML, html)
 }
 
@@ -122,33 +118,30 @@ for (const html of [lostLinkHTML.replace(' title="跳转至原消息"', ''), los
 const nestedSource = '##### 引用 @Yui [↩](/cr#chatroom123 "跳转至原消息")\n> 外层\n>\n> ##### 引用 @Yui [↩](/cr#chatroom456 "跳转至原消息")\n> > 内层'
 const nestedHTML = '<h5>引用 @Yui <a title="跳转至原消息">↩</a></h5><blockquote><p>外层</p><h5>引用 @Yui <a title="跳转至原消息">↩</a></h5><blockquote><p>内层</p></blockquote></blockquote>'
 quoteTemplate.innerHTML = nestedHTML
-assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', nestedSource), [
-  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '外层' },
-  { kind: 'message', href: '/cr#chatroom456', author: 'Yui', excerpt: '内层' },
-])
+assert.deepEqual(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', nestedSource),
+  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '外层' })
 assert.equal(hasChatQuoteBody(quoteTemplate.content), false)
 quoteTemplate.innerHTML = '<h5>引用 @Yui <a title="跳转至原消息">↩</a></h5><blockquote><blockquote><p>手写引用</p></blockquote></blockquote>'
-assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', '##### 引用 @Yui [↩](/cr#chatroom123 "跳转至原消息")\n> > 手写引用'), [
-  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '手写引用' },
-])
+assert.deepEqual(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', '##### 引用 @Yui [↩](/cr#chatroom123 "跳转至原消息")\n> > 手写引用'),
+  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '手写引用' })
 assert.equal(hasChatQuoteBody(quoteTemplate.content), false)
 quoteTemplate.innerHTML = nestedHTML
-assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', nestedSource.replace('> #####', '#####').replace('> > 内层', '> 内层')), [])
+assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', nestedSource.replace('> #####', '#####').replace('> > 内层', '> 内层')), null)
 assert.equal(quoteTemplate.innerHTML, nestedHTML)
 
 // 已有绝对链接与丢失链接可混用；已知链接与原文不符时只保留其自身可验证的引用。
 const mixedHTML = nestedHTML.replace('<a title="跳转至原消息">↩</a>', '<a href="https://fishpi.cn/cr#chatroom123" title="跳转至原消息">↩</a>')
 quoteTemplate.innerHTML = mixedHTML
-assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', nestedSource).map(quote => quote.href), ['/cr#chatroom123', '/cr#chatroom456'])
+assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', nestedSource).excerpt, '外层')
 quoteTemplate.innerHTML = mixedHTML
-assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', nestedSource.replace('#chatroom123', '#chatroom999')).map(quote => quote.href), ['/cr#chatroom123'])
+assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', nestedSource.replace('#chatroom123', '#chatroom999')).href, '/cr#chatroom123')
 
 // 生成器转义的昵称文本可精确匹配；实体或原始 HTML 改变显示后不靠近似作者名猜目标。
 quoteTemplate.innerHTML = lostLinkHTML.replaceAll('Yui', 'a_b')
-assert.equal(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource.replace('@Yui ', '@a\\_b '))[0].author, 'a_b')
+assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource.replace('@Yui ', '@a\\_b ')).author, 'a_b')
 for (const name of ['Y&#117;i', '<b>Yui</b>', 'Yui &amp; other']) {
   quoteTemplate.innerHTML = lostLinkHTML
-  assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource.replace('@Yui ', `@${name} `)), [])
+  assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource.replace('@Yui ', `@${name} `)), null)
   assert.equal(quoteTemplate.innerHTML, lostLinkHTML)
 }
 

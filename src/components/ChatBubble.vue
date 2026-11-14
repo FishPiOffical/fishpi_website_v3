@@ -16,7 +16,7 @@ import VipNickname from '@/components/user/VipNickname.vue'
 import { DEFAULT_AVATAR, avatarThumbnail, rhyPicThumbnail } from '@/utils/avatar'
 import { chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
 import { isSingleImageMessage } from '@/utils/chatMessage'
-import { extractChatQuotes, hasChatQuoteBody, type ChatQuote } from '@/utils/chatQuote'
+import { extractLatestChatQuote, hasChatQuoteBody, type ChatQuote } from '@/utils/chatQuote'
 
 const props = withDefaults(
   defineProps<{
@@ -68,15 +68,15 @@ const singleImage = computed(() => props.chatroom && isSingleImageMessage(props.
 const display = computed(() => {
   const hasImages = /<img\b/i.test(props.html)
   const mayHaveQuotes = /<blockquote\b/i.test(props.html) && (props.html.includes('/breezemoons/') || props.html.includes('#chatroom') || props.source.includes('#chatroom'))
-  const plain = { html: props.html, quotes: [] as ChatQuote[] }
+  const plain = { html: props.html, quote: null as ChatQuote | null }
   if (!props.chatroom || (!hasImages && !mayHaveQuotes)) return plain
   if (!mounted.value) return hasImages ? { ...plain, html: '' } : plain
   // 先在惰性模板里提取引用、替换图片地址，再交给 Vue 插入页面。
   const template = document.createElement('template')
   template.innerHTML = props.html
-  const quotes = mayHaveQuotes ? extractChatQuotes(template.content, window.location.origin, props.source) : []
-  if (!hasImages && !quotes.length) return plain
-  if (quotes.length && !hasChatQuoteBody(template.content)) return { html: '', quotes }
+  const quote = mayHaveQuotes ? extractLatestChatQuote(template.content, window.location.origin, props.source) : null
+  if (!hasImages && !quote) return plain
+  if (quote && !hasChatQuoteBody(template.content)) return { html: '', quote }
   for (const img of template.content.querySelectorAll('img:not(.emoji)')) {
     const picture = img.closest('picture')
     if (!singleImage.value) {
@@ -95,10 +95,10 @@ const display = computed(() => {
     img.removeAttribute('srcset')
     picture?.querySelectorAll('source').forEach(source => source.remove())
   }
-  return { html: template.innerHTML.trim(), quotes }
+  return { html: template.innerHTML.trim(), quote }
 })
 const isStandalone = computed(() => props.chatroom && (
-  props.standalone || singleImage.value || (!display.value.html && display.value.quotes.length > 0)
+  props.standalone || singleImage.value || (!display.value.html && !!display.value.quote)
 ))
 
 
@@ -153,7 +153,7 @@ function onBodyClick(e: MouseEvent) {
         </div>
         <MedalList :items="medals" variant="chat" />
       </div>
-      <div v-if="!display.quotes.length || display.html || $slots.default" class="fp-bubble" @click="onBodyClick">
+      <div v-if="!display.quote || display.html || $slots.default" class="fp-bubble" @click="onBodyClick">
         <div v-if="!chatroom" class="head">
           <RouterLink :to="`/member/${userName}`" class="name">
             <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>
@@ -174,8 +174,8 @@ function onBodyClick(e: MouseEvent) {
           </div>
         </template>
       </div>
-      <div v-if="display.quotes.length" class="chat-quote-stack">
-        <ChatQuoteCard v-for="(quote, index) in display.quotes" :key="index" :quote="quote" />
+      <div v-if="display.quote" class="chat-quote-stack">
+        <ChatQuoteCard :quote="display.quote" />
       </div>
       <div v-if="chatroom" class="foot">
         <time>{{ formatDisplayTime(time) }}</time>
