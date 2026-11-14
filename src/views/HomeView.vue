@@ -65,8 +65,8 @@ onMounted(() => {
 })
 onUnmounted(() => { if (typeof window !== 'undefined') window.removeEventListener('fp:home-reads-paused', syncReadPause) })
 const compactHome = computed(() => layout.mode !== 'classic')
-const left = computed(() => (recentRead.data || []).slice(0, 8))
-const right = computed(() => (recentRead.data || []).slice(8, 16))
+const left = computed(() => (recentRead.data || []).slice(0, 20))
+const right = computed(() => (recentRead.data || []).slice(20, 40))
 const hot = computed(() => hotRead.data || []), tags = computed(() => tagsRead.data || [])
 const repeaterItems = ref(consumeRepeaterPayload() || undefined)
 const homeRanks = ref(consumeHomeRankingPayload())
@@ -507,7 +507,17 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .is-classic .recent-continuation { visibility: visible; }
 @media (max-width: 960px) { .is-classic .recent-continuation { visibility: visible; } }
-.home-tool { min-height: 120px; }
+/* 首页工具行共用紧凑间距，保留等高；不影响内页侧栏。 */
+.home-tool { min-height: 0; }
+.home .home-checkin-tool { padding: 0; }
+.home-checkin-tool :deep(.disclosure-body) { padding: 0 12px 10px; }
+.home-checkin-tool :deep(.disclosure-head) { margin-bottom: 0; }
+.home [data-home-module="side:profile"] :deep(.person-head) { gap: 8px; margin-bottom: 8px; }
+.home [data-home-module="side:profile"] :deep(.person-avatar) { width: 36px; height: 36px; }
+.home [data-home-module="side:profile"] :deep(.person-stats) { padding-top: 6px; }
+.home [data-home-module="side:profile"] :deep(.stat-col) { padding-block: 2px; }
+.home :deep(.fixed-heading) { padding: 10px 12px; }
+
 .board--aligned [data-home-module="side:income"] :deep(.home-side-widget),
 .board--aligned [data-home-module="side:profile"] :deep(.home-side-widget) { flex: 1; min-height: 120px; }
 .home-download-tool { display: flex; align-items: center; }
@@ -515,7 +525,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home-checkin-tool :deep(.home-checkin), .home-checkin-tool :deep(.checkin-panel) { margin: 0; }
 .home-checkin-tool :deep(.checkin-section) { border: 0; background: transparent; padding: 0; }
 .home-checkin-tool :deep(.activity-ring) { width: 40px; height: 40px; }
-.home-checkin-tool :deep(.disclosure-head) { margin-bottom: 6px; }
+
 .home-checkin-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .home-checkin-guest strong { width: 100%; font-size: 14px; }
 .home-checkin-guest p { flex: 1; color: var(--fp-muted); font-size: 12px; }
