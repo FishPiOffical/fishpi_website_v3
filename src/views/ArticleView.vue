@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ArticlePinBadge from '@/components/articles/ArticlePinBadge.vue'
 import { formatDisplayTime } from '@/utils/time'
 
 import RandomArticles from '@/components/discovery/RandomArticles.vue'
@@ -620,9 +621,7 @@ function itemHandlers(c: ArticleComment) {
           <span v-if="isQnA" class="badge offer">
             {{ article.offered === true ? '已采纳' : typeof article.articleQnAOfferPoint === 'number' && typeof article.offered === 'boolean' ? `悬赏 ${article.articleQnAOfferPoint} 积分` : '问答状态暂不可用' }}
           </span>
-          <span v-if="article.stick?.active" class="badge stick">
-            📌 {{ article.stick?.permanent ? '永久置顶' : '置顶中' }}
-          </span>
+          <ArticlePinBadge :article="article" />
           <RouterLink v-if="column" :to="`/column/${column.column.oId}`" class="badge column-link">
             《{{ column.column.columnTitle }}》第 {{ column.chapterNo }} 章 / 共 {{ column.chapters.length }} 章
           </RouterLink>
@@ -1330,10 +1329,6 @@ h1 {
 .badge.offer {
   color: #d4380d;
   border-color: #ffbb96;
-}
-.badge.stick {
-  color: var(--fp-accent);
-  border-color: var(--fp-accent);
 }
 .column-link {
   color: var(--fp-accent);

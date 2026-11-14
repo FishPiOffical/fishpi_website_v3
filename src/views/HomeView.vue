@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ArticlePinBadge from '@/components/articles/ArticlePinBadge.vue'
+import { articlePinKind } from '@/utils/articlePin'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import HomePreferenceRedirect from '@/components/home/HomePreferenceRedirect.vue'
@@ -184,8 +186,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
               </div>
               <HomeReadStatus label="最新文章" :loading="recentRead.loading" :error="recentRead.error" :ready="recentRead.data !== null" :empty="!left.length" empty-text="暂无可见文章。" @retry="recentRead.read" />
               <ol class="module-list">
-                <li v-for="item in left" :key="item.oId">
-                  <span v-if="item.stick?.active" class="cb-stick" title="置顶" />
+                <li v-for="item in left" :key="item.oId" class="article-pin-row" :data-pin="articlePinKind(item)">
                   <RouterLink v-if="item.articleAnonymous !== 1 && item.articleAuthorId && item.articleAuthorName" :to="`/member/${encodeURIComponent(item.articleAuthorName)}`">
                     <span
                       class="avatar-small"
@@ -193,6 +194,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                       :aria-label="item.articleAuthorName"
                     />
                   </RouterLink>
+                  <ArticlePinBadge :article="item" />
                   <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
                     articleTitle(item)
                   }}</RouterLink>
@@ -207,8 +209,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
               </div>
               <HomeReadStatus label="最新文章（续）" :loading="recentRead.loading" :error="recentRead.error" :ready="recentRead.data !== null" :empty="!right.length" :empty-text="left.length ? '本列暂无文章。' : '暂无可见文章。'" @retry="recentRead.read" />
               <ol class="module-list">
-                <li v-for="item in right" :key="item.oId">
-                  <span v-if="item.stick?.active" class="cb-stick" title="置顶" />
+                <li v-for="item in right" :key="item.oId" class="article-pin-row" :data-pin="articlePinKind(item)">
                   <RouterLink v-if="item.articleAnonymous !== 1 && item.articleAuthorId && item.articleAuthorName" :to="`/member/${encodeURIComponent(item.articleAuthorName)}`">
                     <span
                       class="avatar-small"
@@ -216,6 +217,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
                       :aria-label="item.articleAuthorName"
                     />
                   </RouterLink>
+                  <ArticlePinBadge :article="item" />
                   <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{
                     articleTitle(item)
                   }}</RouterLink>
@@ -347,8 +349,9 @@ function scrollShelf(id: string, dir: -1 | 1) {
               </div>
               <HomeReadStatus :label="hotMode === 'hot' ? '热议文章' : '专栏列表'" :loading="hotState.loading" :error="hotState.error" :ready="hotState.data !== null" :empty="!hotState.data?.length" :empty-text="hotMode === 'hot' ? '暂无可见热议文章。' : '暂无可见专栏。'" @retry="hotState.read" />
               <ol v-if="hotMode === 'hot'" class="module-list">
-                <li v-for="item in hot" :key="item.oId">
+                <li v-for="item in hot" :key="item.oId" class="article-pin-row" :data-pin="articlePinKind(item)">
                   <RouterLink v-if="item.articleAnonymous !== 1 && item.articleAuthorId && item.articleAuthorName" :to="`/member/${encodeURIComponent(item.articleAuthorName)}`"><span class="avatar-small" :style="avatarStyle(item.articleAuthorThumbnailURL48, 20)" /></RouterLink>
+                  <ArticlePinBadge :article="item" />
                   <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{ articleTitle(item) }}</RouterLink><span class="count">{{ item.articleCommentCount }} 回帖</span>
                 </li>
               </ol>
@@ -755,6 +758,15 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .module-list li:hover,
 .moons li:hover {
   background-color: var(--fp-hover);
+}
+.module-list .article-pin-row[data-pin] {
+  --pin-tint: var(--fp-primary);
+  background-color: color-mix(in srgb, var(--pin-tint) 5%, var(--fp-card));
+  box-shadow: inset 2px 0 color-mix(in srgb, var(--pin-tint) 40%, transparent);
+}
+.module-list .article-pin-row[data-pin="permanent"] { --pin-tint: var(--fp-accent); }
+.module-list .article-pin-row[data-pin]:hover {
+  background-color: color-mix(in srgb, var(--pin-tint) 10%, var(--fp-card));
 }
 .module-list.rank li {
   padding-left: 20px;

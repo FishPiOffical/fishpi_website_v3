@@ -1,3 +1,4 @@
+import { articlePinFixtureImports } from './helpers/article-pin-fixture.mjs'
 import { nicknameFixtureURL } from './helpers/v3-nickname-fixture.mjs'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
@@ -11,7 +12,7 @@ const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 const avatarStyleURL=url(compile(await fs.readFile('src/utils/avatar.ts','utf8')))
 globalThis.__watch={context:1,requests:[],responses:[]};const state=__watch
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__watch.context}export async function request(path,init){globalThis.__watch.requests.push({path,init});const value=globalThis.__watch.responses.shift();if(value instanceof Error)throw value;return value}`)
-const rewrite=(source,pairs)=>{for(const[from,to]of pairs)source=source.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`);return source}
+const rewrite=(source,pairs)=>{for(const[from,to]of [...articlePinFixtureImports, ...pairs])source=source.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`);return source}
 const contentURL=url(rewrite(compile(await fs.readFile('src/api/v3-content.ts','utf8')),[['./http',http]])),relationsURL=url(rewrite(compile(await fs.readFile('src/api/v3-user-relations.ts','utf8')),[['./http',http]]))
 const moonDataURL=url(rewrite(compile(await fs.readFile('src/api/v3-breezemoon-data.ts','utf8')),[['./http',http],['./v3-user-relations',relationsURL]]))
 const api=await import(url(rewrite(compile(await fs.readFile('src/api/v3-following-feed.ts','utf8')),[['./http',http],['./v3-content',contentURL],['./v3-user-relations',relationsURL],['./v3-breezemoon-data',moonDataURL]]))),{ApiError}=await import(http)

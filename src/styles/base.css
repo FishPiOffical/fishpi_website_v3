@@ -579,22 +579,6 @@ input[type='radio']:disabled {
   white-space: nowrap;
 }
 
-.cb-stick {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 10px 10px 0 0;
-  border-color: #999 transparent transparent transparent;
-}
-
-.cb-stick.gold {
-  border-width: 16px 16px 0 0;
-  border-color: #ffab10 transparent transparent transparent;
-}
-
 .icon-pin-rank {
   position: absolute;
   top: -15px;

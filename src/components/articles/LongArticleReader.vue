@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ArticlePinBadge from '@/components/articles/ArticlePinBadge.vue'
 import CommentVisibilityNotice from '@/components/comments/CommentVisibilityNotice.vue'
 import { rememberChapter } from '@/utils/readingProgress'
 import { formatDisplayTime } from '@/utils/time'
@@ -574,7 +575,7 @@ function chapterTitle(c: LongArticleChapter) {
         </h1>
 
         <div class="la-meta">
-          <span v-if="article.stick?.active">{{ article.stick.permanent ? '永久置顶' : '置顶中' }}</span>
+          <ArticlePinBadge :article="article" />
           <RouterLink v-if="article.articleAnonymous !== 1 && article.articleAuthorId && article.articleAuthorName" :to="`/member/${article.articleAuthorName}`" class="la-author">
             <VipNickname :user-id="article.articleAuthorId" :user-name="article.articleAuthorName" :text="authorLabel" />
           </RouterLink>

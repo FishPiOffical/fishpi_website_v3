@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ArticlePinBadge from '@/components/articles/ArticlePinBadge.vue'
+import { articlePinKind } from '@/utils/articlePin'
 import { formatDisplayTime } from '@/utils/time'
 
 import { articleTitle } from '@/utils/text'
@@ -49,8 +51,7 @@ function avatarOf(a: ArticleSummary) {
   <div class="article-feed-wrap" :class="{ 'author-hidden': hideAuthor }">
     <ol v-if="compact" class="feed compact">
       <li v-if="!rows.length" class="empty">{{ empty }}</li>
-      <li v-for="item in rows" :key="item.oId" class="compact-item">
-        <span v-if="item.stick?.active ?? Boolean(item.articleStick)" class="cb-stick" :title="item.stick?.permanent ? '永久置顶' : '置顶'" />
+      <li v-for="item in rows" :key="item.oId" class="compact-item article-pin-row" :data-pin="articlePinKind(item)">
         <RouterLink
           v-if="!hideAuthor && item.articleAuthorName && item.articleAnonymous !== 1"
           :to="`/member/${item.articleAuthorName}`"
@@ -63,6 +64,7 @@ function avatarOf(a: ArticleSummary) {
             :aria-label="item.articleAuthorNickname || item.articleAuthorName"
           />
         </RouterLink>
+        <ArticlePinBadge :article="item" />
         <span v-if="item.articlePerfect" class="icon-perfect" title="优选">🌟</span>
         <RouterLink class="title fn-ellipsis" :to="`/article/${item.oId}`">{{ titleOf(item) }}</RouterLink>
         <span class="count">{{ views(item) }}</span>
@@ -71,8 +73,7 @@ function avatarOf(a: ArticleSummary) {
 
     <ul v-else class="feed full">
       <li v-if="!rows.length" class="empty">{{ empty }}</li>
-      <li v-for="item in rows" :key="item.oId" class="feed-item">
-        <span v-if="item.stick?.active ?? Boolean(item.articleStick)" class="cb-stick" :title="item.stick?.permanent ? '永久置顶' : '置顶'" />
+      <li v-for="item in rows" :key="item.oId" class="feed-item article-pin-row" :data-pin="articlePinKind(item)">
 
         <!-- 顶部标签与回帖/浏览统计行 -->
         <div class="item-header fn-clear">
@@ -96,6 +97,7 @@ function avatarOf(a: ArticleSummary) {
 
         <!-- 标题行 -->
         <h2 class="item-title">
+          <ArticlePinBadge :article="item" />
           <span v-if="item.articlePerfect" class="icon-perfect" title="优选">🌟</span>
           <RouterLink class="title-link" :to="`/article/${item.oId}`">
             {{ titleOf(item) }}
@@ -274,6 +276,12 @@ function avatarOf(a: ArticleSummary) {
   text-decoration: underline;
 }
 
+.feed-item[data-pin] .title-link {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .column-pill {
   display: inline-block;
   font-size: 12px;
@@ -387,6 +395,7 @@ function avatarOf(a: ArticleSummary) {
 
 .compact-item .title {
   flex: 1;
+  min-width: 0;
   color: var(--fp-title);
   text-decoration: none;
   font-size: 14px;
@@ -402,5 +411,14 @@ function avatarOf(a: ArticleSummary) {
   background: var(--fp-hover);
   padding: 1px 6px;
   border-radius: 9px;
+}
+.feed .article-pin-row[data-pin] {
+  --pin-tint: var(--fp-primary);
+  background-color: color-mix(in srgb, var(--pin-tint) 5%, var(--fp-card));
+  box-shadow: inset 2px 0 color-mix(in srgb, var(--pin-tint) 40%, transparent);
+}
+.feed .article-pin-row[data-pin="permanent"] { --pin-tint: var(--fp-accent); }
+.feed .article-pin-row[data-pin]:hover {
+  background-color: color-mix(in srgb, var(--pin-tint) 10%, var(--fp-card));
 }
 </style>

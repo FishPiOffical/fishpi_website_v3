@@ -1,3 +1,4 @@
+import { articlePinFixtureImports } from './helpers/article-pin-fixture.mjs'
 import { nicknameFixtureURL, nicknameFixtureCalls, nicknameFixtureStyles } from './helpers/v3-nickname-fixture.mjs'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
@@ -15,7 +16,7 @@ const visibilitySource=parse(await fs.readFile('src/components/comments/CommentV
 const visibilityURL=url(compileTemplate({source:visibilitySource,id:'comment-visibility-test'}).code.replaceAll('from "vue"',`from '${import.meta.resolve('vue')}'`)+ '\nexport default {render}')
 globalThis.__comments={context:1,requests:[],responses:[],dispatch:null,confirmations:[],confirmWork:async()=>true,balanceFails:false};const state=__comments
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__comments.context}export async function request(path,init){const s=globalThis.__comments;s.requests.push({path,init});if(s.dispatch)return s.dispatch(path,init);const value=s.responses.shift();if(value instanceof Error)throw value;return value}`)
-const replace=(source,pairs)=>{for(const [from,to]of pairs)source=source.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`);return source}
+const replace=(source,pairs)=>{for(const [from,to]of [...articlePinFixtureImports, ...pairs])source=source.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`);return source}
 const contentSource=compile(await fs.readFile('src/api/v3-content.ts','utf8')).replace("from './http'",`from '${http}'`),contentURL=url(contentSource)
 const apiURL=url(replace(compile(await fs.readFile('src/api/v3-comments.ts','utf8')),[['./http',http],['./v3-content',contentURL]])),api=await import(apiURL),{ApiError}=await import(http),env=data=>({code:0,data})
 globalThis.__commentsAPI=api

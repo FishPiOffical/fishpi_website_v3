@@ -1,3 +1,4 @@
+import { articlePinFixtureImports } from './helpers/article-pin-fixture.mjs'
 import { nicknameFixtureURL } from './helpers/v3-nickname-fixture.mjs'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
@@ -11,7 +12,7 @@ const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 const avatarStyleURL=url(compile(await fs.readFile('src/utils/avatar.ts','utf8')))
 globalThis.__saved={context:1,requests:[],responses:[]};const state=__saved
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__saved.context}export async function request(path,init){globalThis.__saved.requests.push({path,init});const value=globalThis.__saved.responses.shift();if(value instanceof Error)throw value;return value}`)
-const rewrite=(source,pairs)=>{for(const[from,to]of pairs)source=source.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`);return source}
+const rewrite=(source,pairs)=>{for(const[from,to]of [...articlePinFixtureImports, ...pairs])source=source.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`);return source}
 const contentURL=url(rewrite(compile(await fs.readFile('src/api/v3-content.ts','utf8')),[['./http',http]])),relationsURL=url(rewrite(compile(await fs.readFile('src/api/v3-user-relations.ts','utf8')),[['./http',http]]))
 const api=await import(url(rewrite(compile(await fs.readFile('src/api/v3-saved-content.ts','utf8')),[['./http',http],['./v3-content',contentURL],['./v3-user-relations',relationsURL]]))),{ApiError}=await import(http)
 const tag={id:'7',title:'<b>标签文本</b>',description:'<script>描述文本</script>',articleCount:0,followerCount:2},article={id:'101',title:'<b>文章文本</b>',preview:'preview',tags:'a,b',type:0,anonymous:true,author:{id:'99',userName:'PRIVATE_AUTHOR',userNickname:'private',userAvatarURL:'https://example.org/private.png'},createdAt:1700000000000,updatedAt:1700000000001,commentCount:1,viewCount:2},env=data=>({code:0,data}),page=(list,p=1,total=list.length)=>({list,pagination:{p,size:20,total,pageCount:Math.ceil(total/20)}})

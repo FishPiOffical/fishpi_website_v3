@@ -1,3 +1,4 @@
+import { articlePinFixtureImports } from './helpers/article-pin-fixture.mjs'
 import { nicknameFixtureURL, nicknameFixtureCalls, nicknameFixtureStyles } from './helpers/v3-nickname-fixture.mjs'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
@@ -36,9 +37,10 @@ const textUtility=url(compile(await fs.readFile('src/utils/text.ts','utf8')))
 async function component(file){
  const descriptor=parse(await fs.readFile(file,'utf8')).descriptor
  let output=compile(compileScript(descriptor,{id:file,inlineTemplate:true}).content)
- output=output.replace(/from\s+(['"])([^'"]+)\1/g,(whole,q,name)=>`from '${name==='vue'?import.meta.resolve('vue'):name==='vue-router'?router:name==='@/utils/avatar'?url(compileAvatar):name==='@/utils/text'?textUtility:name==='@/components/user/VipNickname.vue'?nicknameFixtureURL:name.endsWith('.vue')?empty:name}'`)
+ output=output.replace(/from\s+(['"])([^'"]+)\1/g,(whole,q,name)=>`from '${articlePinImports.has(name)?articlePinImports.get(name):name==='vue'?import.meta.resolve('vue'):name==='vue-router'?router:name==='@/utils/avatar'?url(compileAvatar):name==='@/utils/text'?textUtility:name==='@/components/user/VipNickname.vue'?nicknameFixtureURL:name.endsWith('.vue')?empty:name}'`)
  return (await import(url(output))).default
 }
+const articlePinImports = new Map(articlePinFixtureImports)
 const compileAvatar=compile(await fs.readFile('src/utils/avatar.ts','utf8'))
 const Feed=await component('src/components/articles/ArticleFeed.vue'),Comment=await component('src/components/CommentItem.vue')
 const render=(Component,props)=>renderToString(createSSRApp({render:()=>h(Component,props)}))
