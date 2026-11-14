@@ -554,10 +554,12 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
 }
 .is-room .body :deep(blockquote) {
   margin: 5px 0 8px;
-  padding: 6px 10px;
-  border-left: 2px solid color-mix(in srgb, var(--fp-muted) 35%, transparent);
-  border-radius: 0 5px 5px 0;
-  background: color-mix(in srgb, var(--fp-card) 45%, transparent);
+  padding: 7px 10px 8px;
+  border: 1px solid var(--fp-border);
+  border-inline-start: 2px solid color-mix(in srgb, var(--fp-muted) 65%, transparent);
+  border-radius: 7px;
+  background: var(--fp-surface-subtle, var(--fp-bg));
+  overflow-wrap: anywhere;
   color: var(--fp-muted);
   font-size: 12px;
   line-height: 1.6;

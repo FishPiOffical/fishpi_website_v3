@@ -47,7 +47,7 @@ function sourceUrl(link: Element, origin: string): URL | null {
   let url: URL
   try { url = new URL(href, origin) } catch { return null }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search) return null
-  return [origin, 'https://fishpi.cn', 'https://yui.fishpi.cn'].includes(url.origin) ? url : null
+  return [origin, 'https://fishpi.cn', 'https://yui.fishpi.cn', 'https://new.fishpi.cn'].includes(url.origin) ? url : null
 }
 
 function readExcerpt(content: Element | DocumentFragment, imageLabel: string) {
@@ -70,9 +70,12 @@ export function chatMessageQuotePreview(source: { messageId: string; userName: s
 
 function extractMessageQuote(block: Element, origin: string): ChatQuote | null {
   const heading = block.previousElementSibling
-  if (heading?.tagName !== 'H5' || !/^引用(?:\s|$)/.test(heading.textContent?.trim() ?? '')) return null
-  const jump = heading.lastElementChild
-  if (jump?.tagName !== 'A' || !/^↩\uFE0F?$/.test(jump.textContent?.trim() ?? '')) return null
+  // 旧站的回跳箭头可能被渲染成 Emoji 图片，标题也可能退化成段落。
+  // 以引用前缀和受信任的消息锚点识别，不依赖箭头的文本或图片形式。
+  if (!heading || !/^(H[1-6]|P)$/.test(heading.tagName)
+    || !/^引用(?:\s|@|$)/.test(heading.textContent?.trim() ?? '')) return null
+  const jump = Array.from(heading.querySelectorAll('a[href]')).at(-1)
+  if (!jump) return null
   const url = sourceUrl(jump, origin)
   if (!url || !/^\/cr\/?$/.test(url.pathname) || !messageAnchor.test(url.hash)) return null
 
@@ -105,15 +108,19 @@ function extractBreezemoonQuote(block: Element, origin: string): ChatQuote | nul
 }
 
 export function extractChatQuotes(fragment: DocumentFragment, origin: string): ChatQuote[] {
-  const quotes: ChatQuote[] = []
-  for (const block of Array.from(fragment.children)) {
-    if (block.tagName !== 'BLOCKQUOTE') continue
+  const blocks = Array.from(fragment.querySelectorAll('blockquote'))
+  const extracted = new Map<Element, ChatQuote>()
+  // 从内到外提取，避免外层摘要重复包含内层来源；最终仍按原文顺序展示。
+  for (const block of blocks.slice().reverse()) {
     const quote = extractMessageQuote(block, origin) ?? extractBreezemoonQuote(block, origin)
     if (!quote) continue
-    quotes.push(quote)
+    extracted.set(block, quote)
     block.remove()
   }
-  return quotes
+  return blocks.flatMap(block => {
+    const quote = extracted.get(block)
+    return quote ? [quote] : []
+  })
 }
 
 /** Markdown 渲染器包装引用后可能留下空段落，不能把这些占位当成消息正文。 */

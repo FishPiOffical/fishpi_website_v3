@@ -62,5 +62,19 @@ for (const body of ['', '<p>111</p>', '<p><img src="/logo.png"></p>']) {
   assert.equal(quote.excerpt, '快点放假吧')
   assert.equal(hasChatQuoteBody(quoteTemplate.content), Boolean(body))
 }
+// 旧版图片箭头、包装层、嵌套引用与新版来源都应识别，不误认外站链接。
+quoteTemplate.innerHTML = `<div><p>我的回复</p>
+<p>引用 @<a href="/member/outer">outer</a> <a href="https://fishpi.cn/cr#chatroom10"><img class="emoji" alt=":leftwards_arrow_with_hook:" src="/arrow.png"></a></p>
+<blockquote><p>外层正文</p><h5>引用 @inner <a href="https://new.fishpi.cn/cr#chatroom11">↩</a></h5><blockquote><p>内层正文</p></blockquote><blockquote><p>手写引用</p></blockquote></blockquote>
+<h5>引用 @evil <a href="https://fishpi.cn.evil.example/cr#chatroom12">↩</a></h5><blockquote><p>保留原文</p></blockquote>
+<blockquote><p>普通手写内容</p></blockquote></div>`
+assert.deepEqual(extractChatQuotes(quoteTemplate.content, 'https://yui.fishpi.cn'), [
+  { kind: 'message', href: '/cr#chatroom10', author: 'outer', excerpt: '外层正文 手写引用' },
+  { kind: 'message', href: '/cr#chatroom11', author: 'inner', excerpt: '内层正文' },
+])
+assert.match(quoteTemplate.innerHTML, /我的回复/)
+assert.match(quoteTemplate.innerHTML, /保留原文/)
+assert.match(quoteTemplate.innerHTML, /普通手写内容/)
+assert.equal(quoteTemplate.content.querySelectorAll('blockquote').length, 2)
 quoteDOM.window.close()
 console.log('PASS chat source 14 compact quote requires a trusted original-message link and preserves surrounding content')
