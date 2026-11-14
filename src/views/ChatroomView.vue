@@ -312,7 +312,8 @@ async function loadOlder() {
 
 function useTopic() {
   if (!syncComposer()) return
-  draft.value += ` # ${discuss.value} # `
+  // 井号按普通文字插入，避免空草稿或换行后被 Markdown 识别成标题。
+  draft.value += ` \\#${discuss.value.trim()}\\# `
 }
 
 function syncComposer() {
