@@ -244,7 +244,7 @@ watch(
   (key) => {
     if (!key) {
       chat.floatingChatroomOpen = false
-      chat.disconnect()
+      // 时间线自身按身份边界清空，页面使用权保留以便重新登录后恢复。
     }
   },
   { immediate: true },

@@ -40,7 +40,7 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
      else void readLatest()
    },1000)
  }
- function sync(keepVisible = false){if(!wanted||!active())return;changeHint.value={id:'',version:++version};localChanges.clear();cancelSnapshotRecovery();if(!keepVisible){messages.value=[];before='';hasMore.value=false}void readLatest();void readTopic()}
+ function sync(keepVisible = true){if(!wanted||!active())return;changeHint.value={id:'',version:++version};localChanges.clear();cancelSnapshotRecovery();if(!keepVisible){messages.value=[];before='';hasMore.value=false}void readLatest();void readTopic()}
  function event(value:ChatRealtimeEvent){
    if(!wanted||!active())return
    if (value.type === 'notice') {
@@ -118,8 +118,15 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
    })
  }
  async function connect(){wanted=true;if(!active()){messages.value=[];error.value='登录后可读取聊天室消息';return}if(stop||loading.value)return;await bind()}
- function disconnect(){wanted=false;clear()}
+ // 页面离开仅释放网络资源；同一身份的消息仍在内存中，返回时先显示再校验。
+ function disconnect(){
+   wanted=false;cancelStartup?.();generation++;latestRun++;oldestRun++;topicRun++
+   latestAbort?.abort();olderAbort?.abort();topicAbort?.abort()
+   latestAbort=olderAbort=topicAbort=null;cancelSnapshotRecovery();stop?.();stop=null
+   loading.value=false;loadingMore.value=false;connected.value=false;connecting.value=false
+   topicBusy=false;topicDirty=false;barrage.value=null;notices.value=[]
+ }
  const stopAuth=watch([accessToken,()=>account.value?.oId],()=>{blocked=false;const next=getAuthContextVersion(),actor=account.value?.oId,changed=next!==boundary||actor!==owner||!accessToken.value;if(changed)clear();else{cancelStartup?.();generation++;latestRun++;oldestRun++;topicRun++;latestAbort?.abort();olderAbort?.abort();topicAbort?.abort();cancelSnapshotRecovery();stop?.();stop=null;loading.value=false;loadingMore.value=false;topicBusy=false;topicDirty=false}boundary=next;owner=actor;if(wanted&&active())void bind()},{flush:'sync'})
- onScopeDispose(()=>{stopAuth();disconnect()})
+ onScopeDispose(()=>{stopAuth();wanted=false;clear()})
  return{barrage,notices,changeHint,messages,loading,loadingMore,hasMore,error,connected,connecting,topic,topicError,connect,disconnect,loadMore,readLatest,readTopic,sync,clearVisible,upsertConfirmed,removeConfirmed}
 })

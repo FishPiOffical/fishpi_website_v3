@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { computed,ref,watch } from 'vue'
+import { createChatConnectionOwners } from '@/utils/chatConnectionOwners'
+import { computed,ref,watch,onScopeDispose } from 'vue'
 import {
   type ChatNodeOption,
   type RedPacketContent,
@@ -57,7 +58,7 @@ export const useChatStore = defineStore('chat', () => {
   const discuss = computed(()=>timeline.topic)
   const connected = computed(()=>timeline.connected)
   const connecting = computed(()=>timeline.connecting)
-  /** 浮动聊天窗正在使用聊天室实时连接；离开 /cr 时据此保留连接。 */
+  /** 浮动聊天窗正在展示聊天室；连接生命周期由各入口的使用权统一管理。 */
   const floatingChatroomOpen = ref(false)
   const sending=computed(()=>publication.busy)
   const loading = computed(()=>timeline.loading)
@@ -71,6 +72,8 @@ export const useChatStore = defineStore('chat', () => {
 
   async function loadMore(){await timeline.loadMore()}
   function disconnect(){timeline.disconnect();online.disconnect()}
+  const consumers = createChatConnectionOwners(() => { void connect() }, disconnect)
+  onScopeDispose(() => consumers.dispose())
   async function switchNode(_option:ChatNodeOption){}
   async function refreshNodes(){}
   watch(()=>publication.currentMessage,message=>{if(message)timeline.upsertConfirmed(message)})
@@ -94,8 +97,8 @@ export const useChatStore = defineStore('chat', () => {
     error,
     nodeName,
     nodeOptions,
-    connect,
-    disconnect,
+    acquire: consumers.acquire,
+    release: consumers.release,
     loadMore,
     refreshMessages,
     topicError:computed(()=>timeline.topicError),

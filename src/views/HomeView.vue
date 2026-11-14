@@ -89,12 +89,11 @@ watch(() => [columnsRecentRead.data, columnsHotRead.data], () => { failedCovers.
 const { editing } = storeToRefs(layout)
 const { dragging, onDragStart, onDragEnd, onModuleOver, onGapOver, onDrop, edgeOf, gapActive, dropLabel, onHandleKeydown } = useHomeDrag()
 const { messages: liveChatMessages } = storeToRefs(chat)
-let homeMounted = false, longShelfTimer: ReturnType<typeof setInterval> | undefined
+let longShelfTimer: ReturnType<typeof setInterval> | undefined
 const chatLines = computed(() => liveChatMessages.value.slice(-10).reverse())
 watch(() => JSON.stringify([getAuthContextVersion(), !!accessToken.value, auth.account?.oId || '']), () => { chatDraft.value = ''; chatMsg.value = '' }, { flush: 'sync' })
-watch(accessToken, () => { if (homeMounted) { if (accessToken.value) void chat.connect(); else chat.disconnect() } }, { flush: 'sync' })
-onMounted(() => { homeMounted = true; if (accessToken.value) void chat.connect(); longShelfTimer = setInterval(() => scrollShelf('long-active', 1), 6000) })
-onUnmounted(() => { clearTimeout(rankingSeedTimer); homeMounted = false; editing.value = false; if (longShelfTimer) clearInterval(longShelfTimer); if (!chat.floatingChatroomOpen) chat.disconnect() })
+onMounted(() => { chat.acquire('home'); longShelfTimer = setInterval(() => scrollShelf('long-active', 1), 6000) })
+onUnmounted(() => { clearTimeout(rankingSeedTimer); editing.value = false; if (longShelfTimer) clearInterval(longShelfTimer); chat.release('home') })
 function isBareRow(row: HomeRowView) { return row.cells.length === 1 && row.cells[0].modules.every(m => m.id === 'long') }
 watch(activeLongShelf, async () => { await nextTick(); document.getElementById('long-active')?.scrollTo({ left: 0 }) })
 usePageSeo(() => ({ title: SITE_NAME, description: SITE_DEFAULT_DESC, path: '/' }))

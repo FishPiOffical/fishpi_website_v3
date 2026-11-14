@@ -30,8 +30,8 @@ view=setup();await view.store.connect();const syncing=state.subscriptions.at(-1)
 console.log('PASS timeline 10 sync replaces the window and cancels scheduled reconciliation')
 view=setup();await view.store.connect();let latePage;state.dispatch=path=>path.includes('/messages?')?new Promise(r=>latePage=r):dispatch(path);const obsolete=view.store.readLatest();await tick();const priorSub=state.subscriptions.at(-1);view.user.accessToken=null;assert.equal(view.store.messages.length,0);assert.equal(priorSub.closed,true);latePage(env(page([msg('40','OLD_OWNER')])));await obsolete;assert.equal(view.store.messages.length,0);view.store.$dispose();state.dispatch=dispatch
 console.log('PASS timeline 11 logout clears messages/cursors/topic and old HTTP or subscription cannot restore them')
-view=setup();await view.store.connect();const prior=state.subscriptions.at(-1);view.user.accessToken='normally-rotated';await tick();assert.equal(prior.closed,true);assert.equal(view.store.messages.length,2);assert.equal(state.subscriptions.at(-1).closed,false);view.store.disconnect();assert.equal(view.store.messages.length,0);view.store.$dispose()
-console.log('PASS timeline 12 normal token rotation rebinds current state and disconnect explicitly clears owned timeline')
+view=setup();await view.store.connect();const prior=state.subscriptions.at(-1);view.user.accessToken='normally-rotated';await tick();assert.equal(prior.closed,true);assert.equal(view.store.messages.length,2);assert.equal(state.subscriptions.at(-1).closed,false);view.store.disconnect();assert.equal(view.store.messages.length,2);view.store.$dispose()
+console.log('PASS timeline 12 normal token rotation rebinds current state and disconnect retains same-account memory history')
 view=setup();view.user.accessToken=null;count=state.calls.length;await view.store.connect();assert.equal(state.calls.length,count);assert.match(view.store.error,/登录/);view.store.$dispose();const chat=await fs.readFile('src/stores/chat.ts','utf8'),home=await fs.readFile('src/views/HomeView.vue','utf8'),ssr=await fs.readFile('src/entry-server.ts','utf8');assert.ok(!chat.includes('chat-room-channel')&&!chat.includes('fetchChatNodeBundle')&&!chat.includes('fetchChatHistory'));assert.ok(!home.includes('fetchChatHistory')&&!ssr.includes('fetchChatHistory'));assert.ok(home.includes('ChatPublicationRecovery'))
 console.log('PASS timeline 13 guest makes no authenticated chat request; facade/Home/SSR remove legacy message/node streams')
 view=setup();await view.store.connect();const clearSub=state.subscriptions.at(-1);view.store.clearVisible();assert.equal(view.store.messages.length,0);assert.equal(clearSub.closed,false);clearSub.event({type:'message',id:'13',message:msg('13')});await tick();assert.deepEqual(view.store.messages.map(m=>m.id),['13']);await view.store.readLatest();assert.deepEqual(view.store.messages.map(m=>m.id),['11','12']);view.store.$dispose()
@@ -169,3 +169,27 @@ view.store.clearVisible()
 assert.deepEqual(view.store.notices,[])
 view.store.$dispose()
 console.log('PASS 红包和进出场事件仅在实时授权后接收，重复事件去重且无额外读取')
+
+// 离页断开保留历史，旧连接与在途响应不能回写；重进后台读取成功才替换。
+state.autoReady=true
+view=setup();await view.store.connect();const cachedSub=state.subscriptions.at(-1)
+view.store.disconnect();assert.equal(cachedSub.closed,true);assert.deepEqual(view.store.messages.map(m=>m.id),['11','12'])
+cachedSub.event({type:'message',id:'99',message:msg('99')});assert.equal(view.store.messages.length,2)
+let resumeResolve;state.dispatch=path=>path.includes('/messages?')?new Promise(resolve=>resumeResolve=resolve):dispatch(path)
+const reconnect=view.store.connect();await tick();assert.equal(view.store.messages.length,2)
+resumeResolve(env(page([msg('12'),msg('13')])));await reconnect
+assert.deepEqual(view.store.messages.map(m=>m.id),['12','13'])
+state.dispatch=dispatch;view.store.disconnect();view.user.accessToken=null;assert.equal(view.store.messages.length,0);view.store.$dispose()
+console.log('PASS 内存历史离页保留、旧订阅拒回写、重连后台覆盖、离页后退出清空')
+
+view=setup();await view.store.connect();let syncResolve
+state.dispatch=path=>path.includes('/messages?')?new Promise(resolve=>syncResolve=resolve):dispatch(path)
+state.subscriptions.at(-1).event({type:'sync'});await tick();assert.equal(view.store.messages.length,2)
+const staleSyncResolve=syncResolve
+view.user.account={oId:'other-account'};assert.equal(view.store.messages.length,0)
+await tick();staleSyncResolve(env(page([msg('80')])));await tick();assert.equal(view.store.messages.length,0)
+syncResolve(env(page([msg('90')])));await tick();assert.deepEqual(view.store.messages.map(m=>m.id),['90']);view.store.$dispose();state.dispatch=dispatch
+console.log('PASS 同步事件不闪空，切换账号立即清空')
+
+state.dispatch=dispatch;latest=[msg('11'),msg('12')];view=setup();await view.store.connect();view.store.disconnect();historyFail=true;await view.store.connect();assert.deepEqual(view.store.messages.map(m=>m.id),['11','12']);assert.match(view.store.error,/503/);historyFail=false;latest=[msg('12'),msg('13')];await view.store.readLatest();assert.deepEqual(view.store.messages.map(m=>m.id),['12','13']);view.store.$dispose();latest=[msg('11'),msg('12')]
+console.log('PASS 重连补读失败保留内存消息，恢复后更新最新窗口')

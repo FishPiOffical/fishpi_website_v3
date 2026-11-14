@@ -278,14 +278,12 @@ function stopResizing(e: PointerEvent) {
 
 function selectPrivate(){
  selectedPeer.value='__private__';chat.floatingChatroomOpen=false
- if(route.path!=='/cr'&&route.path!=='/')chat.disconnect()
 }
 
 async function selectChatroom() {
   selectedPeer.value = CHATROOM_PEER
   draft.value = ''
   chat.floatingChatroomOpen = true
-  if (!roomConnected.value && !roomConnecting.value && !roomLoading.value) await chat.connect()
   await nextTick()
   scrollFollow.jump()
 }
@@ -343,7 +341,6 @@ watch(
       void refreshInbox()
     } else {
       savePanelGeometry()
-      const wasChatroomSelected = isChatroomSelected.value
       chat.floatingChatroomOpen = false
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('resize', keepPanelInView)
@@ -354,10 +351,15 @@ watch(
       isCompactPanel.value = false
       draggingPointer = null
       resizingPointer = null
-      if (wasChatroomSelected && route.path !== '/cr' && route.path !== '/') chat.disconnect()
     }
   },
 )
+
+// 浮窗只在展示聊天室时占用连接，切私信或关闭不会影响页面的订阅。
+watch(() => props.modelValue && isChatroomSelected.value, open => {
+  if (open) chat.acquire('floating')
+  else chat.release('floating')
+}, { flush: 'post' })
 
 watch(() => route.path, () => {
   if (props.modelValue) observeNavigation()
@@ -367,7 +369,7 @@ watch(()=>account.value?.oId,()=>{draft.value='';privateFullId.value='';selected
 
 onUnmounted(() => {
   chat.floatingChatroomOpen=false
-  if(isChatroomSelected.value&&route.path!=='/cr'&&route.path!=='/')chat.disconnect()
+  chat.release('floating')
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('resize', keepPanelInView)
   window.removeEventListener('scroll', keepPanelInView)

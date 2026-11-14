@@ -143,11 +143,11 @@ async function latestFromContext(){closeContext();await chat.refreshMessages();a
 
 onMounted(() => {
   composerReady.value = true
-  if (!chat.connected && !chat.connecting && !chat.loading) void chat.connect()
+  chat.acquire('room')
 })
 
 onUnmounted(() => {
-  if (!chat.floatingChatroomOpen) chat.disconnect()
+  chat.release('room')
 })
 
 const hasNewMessages = ref(false)
