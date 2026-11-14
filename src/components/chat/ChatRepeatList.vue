@@ -54,22 +54,23 @@ function toggle(key: string) {
 </script>
 <template>
   <div ref="root" class="repeat-list">
-  <div v-for="group in groups" :key="group[0]!.key" :data-repeat-messages="group.map(entry => entry.message?.oId).filter(Boolean).join(' ')" class="repeat-group" :class="{ 'repeat-group--self': group[0]!.message?.userName === ownName }">
+  <div v-for="group in groups" :key="group[0]!.key" :data-repeat-messages="group.map(entry => entry.message?.oId).filter(Boolean).join(' ')" class="repeat-group" :class="{ 'repeat-group--self': group[group.length - 1]!.message?.userName === ownName }">
     <template v-if="group.length === 1"><slot :entry="group[0]!" /></template>
     <template v-else>
       <div v-if="!expanded.has(group[0]!.key)" class="repeat-deck" :style="{ '--layers': Math.min(group.length - 1, visibleBackLayers) }">
-        <div v-for="(entry, index) in group.slice(1, visibleBackLayers + 1)" :key="entry.key" class="fp-msg is-room repeat-layer-shell" data-appearance-snapshot="v1" :data-bubble="mounted && preferences.simpleMode ? 'none' : entry.message?.appearance?.bubbleId" :style="{ '--layer': index }">
+        <div v-for="(entry, index) in group.slice(Math.max(0, group.length - visibleBackLayers - 1), -1)" :key="entry.key" class="fp-msg is-room repeat-layer-shell" data-appearance-snapshot="v1" :data-bubble="mounted && preferences.simpleMode ? 'none' : entry.message?.appearance?.bubbleId" :style="{ '--layer': index }">
         <button class="fp-bubble repeat-layer" type="button" aria-label="展开复读消息" @click="toggle(group[0]!.key)">
           <img :src="avatarThumbnail(entry.message?.userAvatarURL, 20)" :alt="entry.message?.userNickname || entry.message?.userName" :data-user-card="entry.message?.userName" @error="fallbackAvatar" />
           <span>{{ entry.message?.userNickname || entry.message?.userName }}</span>
         </button>
         </div>
-        <div class="repeat-front"><slot :entry="group[0]!" /></div>
+        <!-- 新复读覆盖在前层；组标识仍用最早消息，追加时不重置展开状态。 -->
+        <div class="repeat-front"><slot :entry="group[group.length - 1]!" /></div>
       </div>
       <template v-else><template v-for="entry in (reverse ? [...group].reverse() : group)" :key="entry.key"><slot :entry="entry" /></template></template>
       <div class="repeat-controls">
         <button type="button" :aria-expanded="expanded.has(group[0]!.key)" @click="toggle(group[0]!.key)">{{ expanded.has(group[0]!.key) ? '收起' : '展开' }} · {{ group.length }} 条复读 <span aria-hidden="true">{{ expanded.has(group[0]!.key) ? '⌃' : '⌄' }}</span></button>
-        <ChatRepeatAction :id="group[0]!.message!.oId" label="+1" />
+        <ChatRepeatAction :id="group[group.length - 1]!.message!.oId" label="+1" />
       </div>
     </template>
   </div>
