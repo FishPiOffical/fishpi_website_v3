@@ -8,7 +8,7 @@ import { useClientStartupStore } from '@/stores/clientStartup'
 import { useAuthStore } from '@/stores/auth'
 import { getAuthContextVersion } from '@/api/http'
 import { useAppearanceStore } from '@/stores/appearance'
-import { useNoticeStore } from '@/stores/notices'
+import NotificationLauncher from '@/components/notifications/NotificationLauncher.vue'
 import { usePrivateInboxStore } from '@/stores/privateInbox'
 import { useChatStore } from '@/stores/chat'
 import AdSlot from '@/components/ads/AdSlot.vue'
@@ -154,7 +154,6 @@ const auth = useAuthStore()
 const appearance = useAppearanceStore()
 const isDarkTheme = computed(() => appearance.state.theme === 'classic-dark')
 const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到浅色主题' : '切换到暗色主题')
-const notices = useNoticeStore()
 const whispers = usePrivateInboxStore()
 const chat = useChatStore()
 const settingsDrawer = useSettingsDrawerStore()
@@ -170,7 +169,6 @@ watch(() => auth.membershipPending, pending => {
   if (!pending && auth.isLoggedIn) appearance.enforceVip()
 })
 const isLoggedIn = computed(() => mounted.value && authenticated.value)
-const { total: unreadTotal, error: noticeError } = storeToRefs(notices)
 const { unreadTotal: whisperUnread,error: whisperUnreadError } = storeToRefs(whispers)
 
 const isChatroom = computed(() => route.path === '/cr')
@@ -373,16 +371,7 @@ onUnmounted(() => {
             <NavIcon :name="isDarkTheme ? 'theme-dark' : 'theme'" />
           </button>
           <span class="tool-divider" aria-hidden="true" />
-          <RouterLink
-            to="/notifications"
-            class="bar-icon count-link"
-            :class="{ 'has-msg': unreadTotal > 0 }"
-            :title="noticeError || '通知'"
-            :aria-label="noticeError || (unreadTotal > 0 ? `通知（${unreadTotal} 条未读）` : '通知')"
-          >
-            <NavIcon name="notice" />
-            <span v-if="unreadTotal > 0" class="unread-badge" aria-hidden="true">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</span>
-          </RouterLink>
+          <NotificationLauncher />
           <RouterLink
             to="/chat"
             class="bar-icon count-link"

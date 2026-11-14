@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { formatDisplayTime } from '@/utils/time'
 
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, useId } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { getAuthContextVersion } from '@/api/http'
@@ -16,6 +16,11 @@ import { useNoticeStore } from '@/stores/notices'
 import FpLoading from '@/components/FpLoading.vue'
 import { DEFAULT_AVATAR, avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 import NoticeIcon from '@/components/notifications/NoticeIcon.vue'
+
+defineProps<{ embedded?: boolean }>()
+const viewId = useId()
+const titleId = `notifications-title-${viewId}`
+const listId = `notification-list-${viewId}`
 
 const tabs: { id: NoticeType; label: string; hint: string; unreadKey: keyof UnreadCount }[] = [
   { id: 'commented', label: '回帖', hint: '你发布的帖子有了新的回帖', unreadKey: 'unreadCommentedNotificationCnt' },
@@ -180,10 +185,10 @@ function readAll() { return mark('all') }
 </script>
 
 <template>
-  <section class="notifications-page fp-page fp-ui" aria-labelledby="notifications-title">
+  <section class="notifications-page fp-page fp-ui" :class="{ embedded }" :aria-labelledby="titleId">
     <header class="page-heading fp-page-heading">
       <div>
-        <h1 class="fp-page-title" id="notifications-title">通知</h1>
+        <h1 class="fp-page-title" :id="titleId">通知</h1>
         <p class="page-summary fp-page-description" role="status">
           <template v-if="notices.loading">正在更新未读数</template>
           <template v-else-if="notices.error">未读数暂不可用</template>
@@ -207,7 +212,7 @@ function readAll() { return mark('all') }
             class="category fp-control"
             :class="{ selected: type === tab.id }"
             :aria-pressed="type === tab.id"
-            aria-controls="notification-list"
+            :aria-controls="listId"
             @click="selectType(tab)"
           >
             <NoticeIcon :name="tab.id" />
@@ -217,7 +222,7 @@ function readAll() { return mark('all') }
         </nav>
       </aside>
 
-      <div id="notification-list" class="list-panel" :aria-busy="loading">
+      <div :id="listId" class="list-panel" :aria-busy="loading">
         <header class="list-heading fp-page-heading">
           <div class="list-heading-copy">
             <div class="list-title"><h2>{{ currentTab.label }}</h2><span v-if="currentUnread > 0" class="unread-label">{{ currentUnread }} 条未读</span></div>
@@ -382,4 +387,25 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   .category { transition: none; }
 }
+
+.embedded { width: 100%; margin: 0; padding: 0; }
+.embedded .page-heading { margin-bottom: 12px; gap: 8px; }
+.embedded h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.embedded .page-summary { margin: 0; font-size: 12px; }
+.embedded .notification-layout { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.embedded .category-panel { position: static; padding: 5px; box-shadow: none; }
+.embedded .category-heading { display: none; }
+.embedded .categories { flex-direction: row; flex-wrap: wrap; }
+.embedded .category { width: auto; min-height: 34px; padding: 7px 9px; gap: 5px; font-size: 12px; }
+.embedded .category svg { display: none; }
+.embedded .list-panel { min-height: 0; box-shadow: none; }
+.embedded .list-heading { padding: 12px; gap: 8px; }
+.embedded .list-heading p { display: none; }
+.embedded .notice-list { padding: 0 12px; }
+.embedded .notice { gap: 9px; padding: 14px 0; }
+.embedded .notice.unread { margin: 0 -12px; padding: 14px 12px; }
+.embedded .empty-state { min-height: 200px; padding: 24px 12px; }
+.embedded .pager { padding: 12px; }
+.embedded .notice-meta { flex-wrap: wrap; }
+.embedded .notice-meta time { margin-left: 0; }
 </style>
