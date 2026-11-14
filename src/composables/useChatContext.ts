@@ -1,7 +1,7 @@
 import {computed,onScopeDispose,ref,watch} from 'vue'
 import {storeToRefs} from 'pinia'
 import {ApiError,getAuthContextVersion} from '@/api/http'
-import {chatMessageContext,chatMessagePage,type ChatMessage} from '@/api/v3-chat-messages'
+import {CHAT_CONTEXT_RADIUS,chatMessageContext,chatMessagePage,type ChatMessage} from '@/api/v3-chat-messages'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ChatTimelineStore} from '@/stores/v3ChatTimeline'
 export function useChatContext(){
@@ -16,7 +16,7 @@ export function useChatContext(){
  async function read(kind:'anchor'|'before'|'after'='anchor',cursor=anchor.value){if(!active()||!anchor.value)return;cancel();const seq=run,reader=identity.value,id=anchor.value,controller=new AbortController();abort=controller;observed.clear();busy.value=true;error.value='';changed.value=false;attempt={kind,cursor};const valid=()=>active()&&seq===run&&reader===identity.value&&id===anchor.value&&!controller.signal.aborted
  try{let rows:ChatMessage[],left:boolean,right:boolean,first:string,last:string
  if(kind==='anchor'){const d=await chatMessageContext(id,controller.signal);rows=d.list;left=d.hasMoreBefore;right=d.hasMoreAfter;first=d.nextBefore;last=d.nextAfter}
- else{const d=await chatMessagePage({[kind]:cursor,size:20},controller.signal);rows=d.list;left=kind==='before'?d.hasMore:true;right=kind==='after'?d.hasMore:true;first=d.nextBefore;last=d.nextAfter}
+ else{const d=await chatMessagePage({[kind]:cursor,size:CHAT_CONTEXT_RADIUS*2},controller.signal);rows=d.list;left=kind==='before'?d.hasMore:true;right=kind==='after'?d.hasMore:true;first=d.nextBefore;last=d.nextAfter}
  if(!valid())return;if(observed.has('')||rows.some(m=>observed.has(m.id)))throw new Error('上下文读取期间内容已变化，请重读定位消息')
  if(!rows.length){if(kind==='before')hasBefore.value=false;else hasAfter.value=false;return}
  list.value=rows;hasBefore.value=left;hasAfter.value=right;before.value=first;after.value=last

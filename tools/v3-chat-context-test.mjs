@@ -10,17 +10,27 @@ const bubbleChild=url(`import{h}from'${import.meta.resolve('vue')}';export defau
 const bubbleURL=url(`import{h}from'${import.meta.resolve('vue')}';export default{props:['html'],setup(p,{slots}){return()=>h('div',slots.default?slots.default():[h('div',{innerHTML:p.html})])}}`)
 const chatSource=await fs.readFile('src/stores/chat.ts','utf8'),lineSource=chatSource.slice(chatSource.indexOf('export function asV3Line'),chatSource.indexOf('export const useChatStore')),
 lineURL=url(compile(lineSource)),cardURL=url(`import{h}from'${import.meta.resolve('vue')}';export default{props:['card'],setup(p){return()=>h('div','卡片 '+p.card.msgType)}}`),packetURL=url(`import{h}from'${import.meta.resolve('vue')}';export default{props:['packetId'],setup(p){return()=>h('div','红包 '+p.packetId)}}`)
-const dialogStub=url(`import{h}from'${import.meta.resolve('vue')}';export default{props:['open'],setup(p,{slots}){return()=>p.open?h('section',slots.default?.()):null}}`),d=parse(await fs.readFile('src/components/chat/ChatContextPanel.vue','utf8')).descriptor,Panel=(await import(url(replace(compile(compileScript(d,{id:'context',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/components/FpDialog.vue',dialogStub],['@/components/ChatBubble.vue',bubbleURL],['@/components/ChatCard.vue',cardURL],['@/components/chat/ChatRedPacketCard.vue',packetURL],['@/stores/chat',lineURL],['@/composables/useChatContext',contextURL],['@/stores/auth',authURL]])))).default
+const d=parse(await fs.readFile('src/components/chat/ChatContextPanel.vue','utf8')).descriptor,Panel=(await import(url(replace(compile(compileScript(d,{id:'context',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/components/ChatBubble.vue',bubbleURL],['@/components/ChatCard.vue',cardURL],['@/components/chat/ChatRedPacketCard.vue',packetURL],['@/stores/chat',lineURL],['@/composables/useChatContext',contextURL],['@/stores/auth',authURL]])))).default
 globalThis.document={getElementById(){return null}}
 const insert=(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}const i=a?p.children.indexOf(a):-1;p.children.splice(i<0?p.children.length:i,0,n);n.parent=p},renderer=createRenderer({patchProp(n,k,o,v){n.props[k]=v},insert,remove(n){if(n.parent)n.parent.children=n.parent.children.filter(c=>c!==n)},createElement(tag){return{tag,props:{},children:[],querySelector(){return null}}},createText(text){return{text,children:[]}},createComment(){return{children:[]}},setText(n,t){n.text=t},setElementText(n,t){n.children=[{text:t,children:[]}]},parentNode:n=>n.parent,nextSibling(n){const c=n.parent?.children||[];return c[c.indexOf(n)+1]||null},insertStaticContent(t,p,a){const n={text:t,children:[]};insert(n,p,a);return[n,n]}}),text=n=>[n.text||n.props?.innerHTML||'',...(n.children||[]).map(text)].join(' '),find=(n,f)=>f(n)?n:(n.children||[]).map(c=>find(c,f)).find(Boolean),tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()},env=data=>({code:0,data})
 
-const msg=id=>({id,createdAt:Number(id),type:'text',content:'raw '+id,contentHtml:'<p>current '+id+'</p>',author:{id:'1',userName:'owner',userNickname:'owner',userAvatarURL:''},client:'',card:{}}),page=list=>({list,hasMore:true,nextBefore:list[0]?.id||'',nextAfter:list.at(-1)?.id||''}),context=(id='12')=>({anchorId:id,list:[msg('11'),msg(id),msg('13')],hasMoreBefore:true,hasMoreAfter:true,nextBefore:'11',nextAfter:'13'})
-const dispatch=async path=>{if(path.endsWith('/context?radius=10'))return env(context(path.split('/')[5]));if(path.includes('before='))return env(page([msg('9'),msg('10')]));if(path.includes('after='))return env(page([msg('14'),msg('15')]));if(path==='/api/v3/chat/topic')return env({text:''});return env(page([msg('11'),msg('12')]))};state.dispatch=dispatch
+const msg=id=>({id,createdAt:Number(id),type:'text',content:'raw '+id,contentHtml:'<p>current '+id+'</p>',author:{id:'1',userName:'owner',userNickname:'owner',userAvatarURL:''},client:'',card:{}}),page=list=>({list,hasMore:true,nextBefore:list[0]?.id||'',nextAfter:list.at(-1)?.id||''}),context=(id='12')=>{const before=String(BigInt(id)-1n),after=String(BigInt(id)+1n);return{anchorId:id,list:[msg(before),msg(id),msg(after)],hasMoreBefore:true,hasMoreAfter:true,nextBefore:before,nextAfter:after}}
+const dispatch=async path=>{if(path.endsWith('/context?radius=5'))return env(context(path.split('/')[5]));if(path.includes('before='))return env(page([msg('9'),msg('10')]));if(path.includes('after='))return env(page([msg('14'),msg('15')]));if(path==='/api/v3/chat/topic')return env({text:''});return env(page([msg('11'),msg('12')]))};state.dispatch=dispatch
 function setup(){const pinia=createPinia(),root={children:[]};let c;const app=renderer.createApp({setup(){c=useChatContext();return()=>h('div')}});app.use(pinia);app.mount(root);return{app,c,user:auth(pinia),timeline:useV3ChatTimelineStore(pinia)}}
-await messageAPI.chatMessageContext('12');assert.equal(state.calls.at(-1).path,'/api/v3/chat/messages/12/context?radius=10')
+await messageAPI.chatMessageContext('12');assert.equal(state.calls.at(-1).path,'/api/v3/chat/messages/12/context?radius=5')
 for(const data of [{...context(),anchorId:'13'},{...context(),list:[msg('11'),msg('13')]},{...context(),list:[msg('12'),msg('12')]},{...context(),nextAfter:'14'}]){state.dispatch=async()=>env(data);await assert.rejects(messageAPI.chatMessageContext('12'),e=>e.status===502)}state.dispatch=dispatch
-console.log('PASS context 1 exact target/radius, anchor presence/uniqueness, order and cursor contract validated')
-let v=setup();await v.c.open('12');assert.deepEqual(v.c.list.value.map(m=>m.id),['11','12','13']);await v.c.previous();assert.deepEqual(v.c.list.value.map(m=>m.id),['9','10']);assert.ok(state.calls.at(-1).path.endsWith('before=11'));await v.c.next();assert.ok(state.calls.at(-1).path.endsWith('after=10'));assert.deepEqual(v.c.list.value.map(m=>m.id),['14','15']);await v.c.read();assert.equal(v.c.anchor.value,'12');v.app.unmount();v.timeline.$dispose()
+// 前后各五条是契约边界，不能仅检查总长度而放过一边超出半径的响应。
+const boundedContext = (first, count) => {
+ const list = Array.from({length:count}, (_, index) => msg(String(first + index)))
+ return {...context(),list,nextBefore:list[0].id,nextAfter:list.at(-1).id}
+}
+state.dispatch=async()=>env(boundedContext(7,11));assert.equal((await messageAPI.chatMessageContext('12')).list.length,11)
+for(const data of [boundedContext(7,12),boundedContext(6,11),boundedContext(8,11)]){
+ state.dispatch=async()=>env(data);await assert.rejects(messageAPI.chatMessageContext('12'),e=>e.status===502)
+}
+state.dispatch=dispatch
+console.log('PASS context 1 radius five admits eleven centered messages and rejects excess total or either side, invalid target/order/cursor')
+let v=setup();await v.c.open('12');assert.deepEqual(v.c.list.value.map(m=>m.id),['11','12','13']);await v.c.previous();assert.deepEqual(v.c.list.value.map(m=>m.id),['9','10']);assert.equal(state.calls.at(-1).path,'/api/v3/chat/messages?size=10&before=11');await v.c.next();assert.equal(state.calls.at(-1).path,'/api/v3/chat/messages?size=10&after=10');assert.deepEqual(v.c.list.value.map(m=>m.id),['14','15']);await v.c.read();assert.equal(v.c.anchor.value,'12');v.app.unmount();v.timeline.$dispose()
 console.log('PASS context 2 independent ascending windows paginate in both directions with exact cursor then restore anchor')
 v=setup();await v.c.open('12');let failed;state.dispatch=async path=>{failed=path;throw new ApiError('page503',503)};await v.c.previous();assert.equal(v.c.list.value.length,3);state.dispatch=dispatch;await v.c.retry();assert.equal(state.calls.at(-1).path,failed);v.app.unmount();v.timeline.$dispose()
 console.log('PASS context 3 page failure preserves current window and original directional retry cursor')
@@ -36,12 +46,12 @@ v=setup();state.dispatch=()=>new Promise(r=>release=r);const race=v.c.open('12')
 console.log('PASS context 8 event for incoming page member during read prevents stale snapshot commit')
 v=setup();await v.c.open('12');state.dispatch=async()=>{throw new ApiError('gone404',404)};await v.c.read();assert.equal(v.c.list.value.length,0);assert.match(v.c.error.value,/gone404/);v.app.unmount();v.timeline.$dispose();state.dispatch=dispatch
 console.log('PASS context 9 authoritative unavailable/unauthorized clears previous body rather than stale success')
-const root={children:[]},props=reactive({messageId:'12'}),events=[],pinia=createPinia(),app=renderer.createApp({setup(){return()=>h(Panel,{...props,onLatest:()=>events.push('latest'),onClose:()=>events.push('close')})}});app.use(pinia);app.mount(root);await tick();assert.match(text(root),/消息前后/);assert.doesNotMatch(text(root),/定位消息 12|每次翻页替换|卡片：/);assert.match(text(root),/current 12/);const next=find(root,n=>n.tag==='button'&&text(n).trim()==='查看更新消息');await next.props.onClick();await tick();assert.match(text(root),/current 14/);find(root,n=>n.tag==='button'&&text(n).includes('回到聊天室')).props.onClick();assert.deepEqual(events,['latest']);app.unmount();useV3ChatTimelineStore(pinia).$dispose()
-console.log('PASS context 10 actual Vue panel reads, paginates and emits latest action, current cleaned HTML only')
+const root={children:[]},props=reactive({messageId:'12',contained:true,reverse:false}),events=[],pinia=createPinia(),app=renderer.createApp({setup(){return()=>h(Panel,{...props,onLatest:()=>events.push('latest'),onClose:()=>events.push('close')})}});app.use(pinia);app.mount(root);await tick();assert.match(text(root),/正在查看历史消息/);assert.doesNotMatch(text(root),/定位消息 12|每次翻页替换|卡片：/);assert.match(text(root),/current 12/);const targetRow=find(root,n=>n.tag==='li'&&n.props['data-anchor']===true);assert.ok(targetRow);assert.equal(targetRow.props.id,'chatroom12');assert.match(text(targetRow),/current 12/);const next=find(root,n=>n.tag==='button'&&text(n).trim()==='查看更新消息');await next.props.onClick();await tick();assert.match(text(root),/current 14/);find(root,n=>n.tag==='button'&&text(n).includes('回到最新消息')).props.onClick();assert.deepEqual(events,['latest']);app.unmount();useV3ChatTimelineStore(pinia).$dispose()
+console.log('PASS context 10 inline Vue panel reads, paginates and emits latest action, current cleaned HTML only')
 state.ssr=true;v=setup();const count=state.calls.length;await v.c.open('12');assert.equal(state.calls.length,count);v.app.unmount();v.timeline.$dispose();state.ssr=false
 console.log('PASS context 11 SSR cannot issue context read')
 const full=await fs.readFile('src/views/ChatroomView.vue','utf8'),old=await fs.readFile('src/api/fishpi.ts','utf8');assert.ok(full.includes('useRoute,useRouter')&&full.includes('syncContextHash')&&full.includes('<ChatContextPanel'));assert.equal(full.split('openContext(msg.oId)').length-1,0);assert.ok(!old.includes('function fetchChatAround'))
-console.log('PASS context 12 hash quote links still enter panel without message action buttons; unused legacy wrapper removed')
+console.log('PASS context 12 hash quote links select inline history without message action buttons; unused legacy wrapper removed')
 
 const restoredPinia=createPinia(),restoredUser=auth(restoredPinia);restoredUser.accessToken=null;restoredUser.account=null;const restoredRoot={children:[]},restoredProps=reactive({messageId:'12'}),restoredEvents=[],restoredApp=renderer.createApp({setup(){return()=>h(Panel,{...restoredProps,onClose:()=>restoredEvents.push('close')})}});restoredApp.use(restoredPinia);restoredApp.mount(restoredRoot);restoredUser.accessToken='restored';restoredUser.account={oId:'1',userName:'owner'};await tick();assert.equal(restoredEvents.length,0);assert.match(text(restoredRoot),/current 12/);restoredApp.unmount();useV3ChatTimelineStore(restoredPinia).$dispose()
 console.log('PASS context 13 initial credential restoration opens preserved deep link without treating login as an identity replacement')
@@ -57,3 +67,34 @@ assert.match(text(richRoot),/红包 11/);assert.match(text(richRoot),/卡片 mus
 assert.doesNotMatch(text(richRoot),/JSON|"coverURL"|卡片：/)
 richApp.unmount();useV3ChatTimelineStore(richPinia).$dispose()
 console.log('PASS context 14 red packet, music and weather route through shared cards without raw JSON')
+
+// 用真实 Panel watcher 验证原目标在途时换 ID 和普通令牌轮换，不伪造 DOM 定位成功。
+const rapidPinia=createPinia(),rapidRoot={children:[]},rapidProps=reactive({messageId:'12',contained:true,reverse:false}),rapidReads=[]
+state.dispatch=(path,init)=>new Promise(resolve=>rapidReads.push({path,init,resolve}))
+const rapidApp=renderer.createApp({setup(){return()=>h(Panel,rapidProps)}})
+rapidApp.use(rapidPinia);rapidApp.mount(rapidRoot);await tick()
+assert.equal(rapidReads.length,1)
+auth(rapidPinia).accessToken='ordinary-token-rotation';await tick()
+assert.equal(rapidReads.length,1)
+assert.equal(state.calls.at(-1).init.signal.aborted,false)
+const originalSignal=state.calls.at(-1).init.signal
+rapidProps.messageId='20';await tick()
+assert.equal(rapidReads.length,2)
+assert.equal(originalSignal.aborted,true)
+rapidReads[1].resolve(env(context('20')));await tick()
+assert.match(text(rapidRoot),/current 20/)
+const rapidAnchor=find(rapidRoot,n=>n.tag==='li'&&n.props['data-anchor']===true)
+assert.ok(rapidAnchor);assert.equal(rapidAnchor.props.id,'chatroom20');assert.match(text(rapidAnchor),/current 20/)
+rapidReads[0].resolve(env(context('12')));await tick()
+assert.doesNotMatch(text(rapidRoot),/current 12/)
+assert.equal(find(rapidRoot,n=>n.tag==='li'&&n.props['data-anchor']===true).props.id,'chatroom20')
+console.log('PASS context 15 rapid target switch aborts old request and late result cannot replace current target; token rotation does not reread')
+
+const allNodes=(node,predicate)=>[...(predicate(node)?[node]:[]),...(node.children||[]).flatMap(child=>allNodes(child,predicate))]
+assert.deepEqual(allNodes(rapidRoot,node=>node.tag==='li').map(node=>node.props.id),['chatroom19','chatroom20','chatroom21'])
+rapidProps.reverse=true;await tick()
+assert.deepEqual(allNodes(rapidRoot,node=>node.tag==='li').map(node=>node.props.id),['chatroom21','chatroom20','chatroom19'])
+assert.equal(rapidReads.length,2)
+assert.equal(find(rapidRoot,n=>n.tag==='li'&&n.props['data-anchor']===true).props.id,'chatroom20')
+rapidApp.unmount();useV3ChatTimelineStore(rapidPinia).$dispose();state.dispatch=dispatch
+console.log('PASS context 16 inline history reverses display for classic layout without reread or changing real message IDs')

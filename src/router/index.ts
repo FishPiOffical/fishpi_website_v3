@@ -433,6 +433,8 @@ export function createAppRouter(history?: RouterHistory) {
     history: history || (import.meta.env.SSR ? createMemoryHistory() : createWebHistory()),
     routes,
     scrollBehavior(to, from, savedPosition) {
+      // 引用由聊天室按 ID 读取小窗口后定位，不能先滚到旧列表里同名的节点。
+      if (to.path === '/cr' && /^#chatroom\d{1,32}$/.test(to.hash)) return false
       if (savedPosition) return savedPosition
       if (to.hash) {
         const navH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fp-nav-h')) || 58

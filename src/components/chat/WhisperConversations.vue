@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useChatScrollFollow } from '@/composables/useChatScrollFollow'
+import { useChatQuoteNavigation } from '@/composables/useChatQuoteNavigation'
 import {getAuthContextVersion} from '@/api/http'
 import { computed, nextTick, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
@@ -137,6 +138,9 @@ let navigationObserver: ResizeObserver | null = null
 function close() {
   emit('update:modelValue', false)
 }
+
+// 只在引用定位导航成功后收起，避免浮窗继续遮挡原消息。
+useChatQuoteNavigation(() => { if (props.modelValue) close() })
 
 function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.modelValue) close()

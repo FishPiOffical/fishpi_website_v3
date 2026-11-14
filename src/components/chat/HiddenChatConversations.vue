@@ -8,6 +8,7 @@ import ChatRedPacketCard from '@/components/chat/ChatRedPacketCard.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useChatFilterStore } from '@/stores/chatFilter'
+import { useChatQuoteNavigation } from '@/composables/useChatQuoteNavigation'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
@@ -65,6 +66,9 @@ const selectedMessages = computed(() => selectedConversation.value?.messages.sli
 function close() {
   emit('update:modelValue', false)
 }
+
+// 仅关闭已成功进入引用目标的覆盖层，失败导航仍保留当前阅读位置。
+useChatQuoteNavigation(() => { if (props.modelValue) close() })
 
 watch(
   () => props.modelValue,

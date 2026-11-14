@@ -6,6 +6,7 @@ import { RouterLink,useRoute,useRouter } from 'vue-router'
 import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
 import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
+import { useChatQuoteNavigation } from '@/composables/useChatQuoteNavigation'
 import ChatQuotePreview from '@/components/chat/ChatQuotePreview.vue'
 import { breezemoonQuoteMarkdown, chatMessageQuotePreview, createBreezemoonQuote, type ChatQuote, type BreezemoonQuoteSource } from '@/utils/chatQuote'
 import ChatRoomNotice from '@/components/chat/ChatRoomNotice.vue'
@@ -84,6 +85,11 @@ const {
 const visibleMessages = computed(() => messages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
 
 const route=useRoute(),router=useRouter(),contextId=ref('')
+const contextPanel = ref<InstanceType<typeof ChatContextPanel> | null>(null)
+useChatQuoteNavigation((id, duplicated) => {
+  // 编辑器预览、历史列表或浮窗点击同一引用时，路由不变也能再次定位。
+  if (duplicated && id === contextId.value) contextPanel.value?.reveal()
+})
 const classicHistoryEnd = ref<HTMLElement | null>(null)
 useScrollPagination(
   classicHistoryEnd,
@@ -138,8 +144,14 @@ const timelineEntries = computed(() => {
 
 function syncContextHash(){const match=/^#chatroom(\d{1,32})$/.exec(route.hash);contextId.value=accessToken.value&&account.value?.oId&&match?match[1]!:''}
 watch(()=>JSON.stringify([route.hash,!!accessToken.value,account.value?.oId||'']),syncContextHash,{immediate:true})
-function closeContext(){contextId.value='';if(/^#chatroom\d{1,32}$/.test(route.hash))void router.replace({hash:''})}
-async function latestFromContext(){closeContext();await chat.refreshMessages();await nextTick();if(chatStyle.value==='modern')scrollBottom()}
+async function closeContext(){contextId.value='';if(/^#chatroom\d{1,32}$/.test(route.hash))await router.replace({hash:''})}
+async function latestFromContext(){
+  await closeContext()
+  await nextTick()
+  // 实时连接与内存历史一直保留，返回时直接显示，不重新拉取整窗消息。
+  if(chatStyle.value==='modern')scrollBottom()
+  else document.querySelector('.cr-classic-list')?.scrollIntoView({block:'start'})
+}
 
 onMounted(() => {
   composerReady.value = true
@@ -338,7 +350,6 @@ function clearScreen() {
 
 <template>
   <div class="cr-page" :class="`theme-${chatStyle}`">
-    <ChatContextPanel :message-id="contextId" @close="closeContext" @latest="latestFromContext" />
     <p v-if="isLoggedIn" class="timeline-controls"><button type="button" :disabled="loading" @click="chat.refreshMessages">重读当前消息</button><span v-if="chat.topicError" role="alert">{{ chat.topicError }}</span></p>
     <p v-else>登录后可读取聊天室消息。</p>
     <p v-if="quoteErr" role="alert">{{ quoteErr }}</p>
@@ -409,7 +420,8 @@ function clearScreen() {
           </section>
 
           <!-- 2. 下方消息列表：与输入区在同一个卡片中，自上而下阅读，最新在最上方 -->
-          <section class="cr-classic-list">
+          <ChatContextPanel v-if="contextId" ref="contextPanel" :message-id="contextId" reverse @close="closeContext" @latest="latestFromContext" />
+          <section v-else class="cr-classic-list">
             <FpLoading v-if="(loading || chat.connecting) && !messages.length" />
             <p v-else-if="messages.length && !timelineEntries.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
             <p v-else-if="!timelineEntries.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
@@ -512,7 +524,8 @@ function clearScreen() {
         </header>
 
         <!-- 现代消息滚动展示区 -->
-        <div ref="scroller" class="chat-messages-scroll" tabindex="0" aria-label="聊天室消息">
+        <ChatContextPanel v-if="contextId" ref="contextPanel" :message-id="contextId" contained @close="closeContext" @latest="latestFromContext" />
+        <div v-else ref="scroller" class="chat-messages-scroll" tabindex="0" aria-label="聊天室消息">
           <button
             v-if="hasMore && messages.length"
             type="button"
@@ -576,7 +589,7 @@ function clearScreen() {
 
         <!-- 底部吸底输入与工具区 -->
         <div class="cr-composer-panel" @dragover.capture="onBreezemoonDragOver" @drop.capture="onBreezemoonDrop">
-          <button v-if="hasNewMessages" type="button" class="cr-top-btn jump-latest" @click="scrollBottom">↓ 查看新消息</button>
+          <button v-if="hasNewMessages && !contextId" type="button" class="cr-top-btn jump-latest" @click="scrollBottom">↓ 查看新消息</button>
           <div v-if="composerReady && isLoggedIn" class="composer-inner">
             <ChatPublicationRecovery @confirmed="acceptConfirmed" />
             <ChatRevokeRecovery />
@@ -793,6 +806,7 @@ function clearScreen() {
 
 /* 下方消息列表 */
 .cr-classic-list {
+  scroll-margin-top: calc(var(--fp-nav-h, 58px) + 12px);
   border-top: 1px solid var(--fp-border);
   padding: 16px 24px;
   display: flex;
