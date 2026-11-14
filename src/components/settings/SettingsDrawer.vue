@@ -326,7 +326,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
 
           <div v-else-if="section === 'pageSidebar'" class="content">
-            <p class="drag-hint">控制内页（清风明月、问答、优选、总榜、同城、领域等）右侧边栏模块的显示与排序。</p>
+            <p class="drag-hint">开启模块后，会在各内页侧栏添加对应标签。拖动 ⠿ 调整标签顺序，也可用右侧箭头微调。</p>
             <div class="chips">
               <button type="button" @click="pageSidebar.applyPreset('compact')">精简</button>
               <button type="button" @click="pageSidebar.applyPreset('all')">全部显示</button>
@@ -398,7 +398,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
 
           <div v-else-if="section === 'chatSidebar'" class="content">
-            <p class="drag-hint">拖动 ⠿ 调整侧栏模块顺序，也可用右侧箭头微调。</p>
+            <p class="drag-hint">开启模块后，会在聊天室侧栏添加对应标签。拖动 ⠿ 调整标签顺序，也可用右侧箭头微调。</p>
             <div class="chips">
               <button type="button" @click="sidebar.reset()">恢复默认</button>
             </div>
