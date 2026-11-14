@@ -20,6 +20,22 @@ const js = ts.transpileModule(compiled, {
   `from '${path.startsWith('vue') ? import.meta.resolve(path) : mocks}'`)
 const { default: SidebarTabs } = await import(moduleUrl(js))
 
+const { descriptor: layoutDescriptor } = parse(fs.readFileSync('src/components/sidebar/SidebarLayout.vue', 'utf8'))
+const layoutCompiled = compileScript(layoutDescriptor, { id: 'sidebar-layout-ssr', inlineTemplate: true, templateOptions: { ssr: true } }).content
+const presentation = moduleUrl(ts.transpileModule(fs.readFileSync('src/utils/sidebarPresentation.ts', 'utf8'), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+}).outputText)
+// 草稿作用域使用真实实现，确认 SSR 不会为侧栏读取或恢复私人草稿。
+const drafts = moduleUrl(ts.transpileModule(fs.readFileSync('src/composables/sidebarDrafts.ts', 'utf8'), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+}).outputText.replace(/from (['"])([^'"]+)\1/g, (_, quote, path) =>
+  `from '${path.startsWith('vue') ? import.meta.resolve(path) : mocks}'`))
+const layoutJs = ts.transpileModule(layoutCompiled, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+}).outputText.replace(/from (['"])([^'"]+)\1/g, (_, quote, path) =>
+  `from '${path.startsWith('vue') ? import.meta.resolve(path) : path === '@/utils/sidebarPresentation' ? presentation : path === '@/composables/sidebarDrafts' ? drafts : mocks}'`)
+const { default: SidebarLayout } = await import(moduleUrl(layoutJs))
+
 let mountedPanels = 0
 let mountedActions = 0
 // 模拟浏览器已保存其他标签；SSR 不能读取本机设置，更不能挂载本人模块。
@@ -40,9 +56,21 @@ try {
       assert.doesNotMatch(html, /private-data|private-owner|private-actions|role="tab"|role="tabpanel"|tab-scroll/)
     }
   }
+  for (const section of ['pageSidebar', 'chatSidebar']) {
+    for (const modules of [[], [{id:'profile',title:'我的资料'}], [{id:'profile',title:'我的资料'},{id:'income',title:'上下班时间'},{id:'checkin',title:'签到'}]]) {
+      const html = await renderToString(createSSRApp({ render: () => h(SidebarLayout, {
+        modules, section, ariaLabel: '混合侧栏', presentationOf: id => id === 'checkin' ? 'tabs' : 'card', isCollapsed: () => false,
+      }, {
+        default: () => { mountedPanels++; return h('p', 'private-data') },
+        'header-actions': () => { mountedActions++; return h('a', 'private-actions') },
+      }) }))
+      assert.match(html, /正在加载侧栏/)
+      assert.doesNotMatch(html, /private-data|private-owner|private-actions|data-sidebar-module|role="tab"/)
+    }
+  }
   assert.equal(mountedPanels, 0)
   assert.equal(mountedActions, 0)
-  console.log('PASS 侧栏 SSR：三种模块配置和三种齿轮配置均输出统一准备态，不读取存储或挂载私人面板、辅助操作')
+  console.log('PASS 侧栏 SSR：标签三种模块与齿轮配置、混合布局两种侧栏三种模块配置均输出准备态，不读取存储或挂载私人面板、辅助操作')
 } finally {
   delete globalThis.localStorage
 }

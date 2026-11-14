@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import DragGrip from '@/components/home/DragGrip.vue'
+import SidebarIcon from '@/chat/sidebar/SidebarIcon.vue'
+import type { ChatSidebarModuleId } from '@/chat/sidebar/meta'
+import SidebarModuleSettingsList from './SidebarModuleSettingsList.vue'
+import { useAppearanceShopStore } from '@/stores/appearanceShop'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
@@ -25,6 +29,7 @@ import WhisperConversations from '@/components/chat/WhisperConversations.vue'
 import ChatTailSettingsDialog from '@/components/chat/ChatTailSettingsDialog.vue'
 
 const drawer = useSettingsDrawerStore()
+const appearanceShop = useAppearanceShopStore()
 const feedbackPanel = useFeedbackPanelStore()
 const { open, section } = storeToRefs(drawer)
 const home = useHomeLayoutStore()
@@ -50,10 +55,6 @@ function openChatTail() {
 }
 const { isLoggedIn } = storeToRefs(auth)
 const { unreadTotal: whisperUnread,error: whisperUnreadError, inboxOpen: whisperInboxOpen } = storeToRefs(whispers)
-const draggedSidebarId = ref('')
-const overSidebarId = ref('')
-const draggedPageSidebarId = ref<PageSidebarModuleId | ''>('')
-const overPageSidebarId = ref<PageSidebarModuleId | ''>('')
 const blockForm = reactive({ match: 'nickname' as ChatBlockMatch, value: '', mode: 'block' as ChatBlockMode })
 const isChatroom = computed(() => route.path === '/cr')
 const isHome = computed(() => route.path === '/')
@@ -62,21 +63,33 @@ watch([showHiddenHandle], ([visible]) => {
   if (!visible) hiddenChatsOpen.value = false
 })
 
-const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
-  ...(feedbackEnabled ? [{ id: 'feedback' as const, label: '需求反馈', icon: '💡' }] : []),
-  { id: 'branding', label: '站点外观', icon: '🎨' },
-  { id: 'home', label: '首页模块', icon: '🏠' },
-  { id: 'pageSidebar', label: '内页侧栏', icon: '📑' },
-  { id: 'chatInput', label: '聊天室输入', icon: '⌨️' },
-  { id: 'emoji', label: '表情包', icon: '😊' },
-  { id: 'chatSidebar', label: '聊天室侧栏', icon: '💬' },
-  { id: 'chatBlock', label: '聊天室屏蔽', icon: '🚫' },
-  { id: 'income', label: '上下班时间', icon: '🕒' },
+type SettingsGroup = 'layout' | 'chat' | 'personal' | 'help'
+const SECTIONS: { id: SettingsSection; label: string; description: string; icon: ChatSidebarModuleId | 'settings'; group: SettingsGroup }[] = [
+  { id: 'home', label: '首页模块', description: '选择首页内容，调整模块的位置与排列。', icon: 'ad', group: 'layout' },
+  { id: 'pageSidebar', label: '内页侧栏', description: '常用模块独立展示，其余收进标签页。', icon: 'ad', group: 'layout' },
+  { id: 'chatSidebar', label: '聊天室侧栏', description: '为聊天保留常看的信息，按你的习惯排列。', icon: 'online', group: 'layout' },
+  { id: 'chatInput', label: '聊天室输入', description: '调整发送方式、小尾巴和聊天显示效果。', icon: 'topic', group: 'chat' },
+  { id: 'emoji', label: '表情包', description: '选择喜欢的表情包和收藏顺序。', icon: 'appearance', group: 'chat' },
+  { id: 'chatBlock', label: '聊天室屏蔽', description: '按昵称、UID 或关键词管理你想看到的消息。', icon: 'mutes', group: 'chat' },
+  { id: 'branding', label: '站点外观', description: '自定义本机的站点名称、Logo 和标签页图标。', icon: 'appearance', group: 'personal' },
+  { id: 'income', label: '上下班时间', description: '设置工作时间，让倒计时和收入展示更贴合你。', icon: 'income', group: 'personal' },
+  ...(feedbackEnabled ? [{ id: 'feedback' as const, label: '需求反馈', description: '分享建议、反馈问题，一起完善摸鱼派。', icon: 'topic' as const, group: 'help' as const }] : []),
 ]
+const visibleSections = computed(() => SECTIONS.filter(item => item.id !== 'income' || sidebar.isOn('income') || pageSidebar.isOn('income')))
+const groups = computed(() => [
+  { id: 'layout', label: '页面布局' },
+  { id: 'chat', label: '聊天体验' },
+  { id: 'personal', label: '个性化' },
+  { id: 'help', label: '帮助与反馈' },
+].map(group => ({ ...group, items: visibleSections.value.filter(item => item.group === group.id) })).filter(group => group.items.length))
+const currentSection = computed(() => visibleSections.value.find(item => item.id === section.value))
+function openAppearanceShop() {
+  drawer.hide()
+  appearanceShop.show()
+}
+const pageModuleOn = (id: string) => pageSidebar.isOn(id as PageSidebarModuleId)
+const pageModulePresentation = (id: string) => pageSidebar.presentationOf(id as PageSidebarModuleId)
 
-const visibleSections = computed(() =>
-  SECTIONS.filter((item) => item.id !== 'income' || sidebar.isOn('income') || pageSidebar.isOn('income')),
-)
 const homeCore = computed(() => home.orderedModules.filter((m) => !m.sidebarId))
 const homeSide = computed(() => home.orderedModules.filter((m) => m.sidebarId))
 
@@ -87,64 +100,6 @@ watch(
   },
   { immediate: true },
 )
-
-function startPageSidebarDrag(e: DragEvent, id: PageSidebarModuleId) {
-  draggedPageSidebarId.value = id
-  if (e.dataTransfer) {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', id)
-  }
-}
-
-function dragOverPageSidebarItem(e: DragEvent, id: PageSidebarModuleId) {
-  e.preventDefault()
-  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-  overPageSidebarId.value = id
-}
-
-function dropPageSidebarItem(e: DragEvent, id: PageSidebarModuleId) {
-  e.preventDefault()
-  const draggedId = (draggedPageSidebarId.value || e.dataTransfer?.getData('text/plain') || '') as PageSidebarModuleId
-  const row = e.currentTarget as HTMLElement
-  const after = e.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2
-  if (draggedId) pageSidebar.moveTo(draggedId, id, after)
-  draggedPageSidebarId.value = ''
-  overPageSidebarId.value = ''
-}
-
-function endPageSidebarDrag() {
-  draggedPageSidebarId.value = ''
-  overPageSidebarId.value = ''
-}
-
-function startSidebarDrag(e: DragEvent, id: string) {
-  draggedSidebarId.value = id
-  if (e.dataTransfer) {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', id)
-  }
-}
-
-function dragOverSidebarItem(e: DragEvent, id: string) {
-  e.preventDefault()
-  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-  overSidebarId.value = id
-}
-
-function dropSidebarItem(e: DragEvent, id: string) {
-  e.preventDefault()
-  const draggedId = draggedSidebarId.value || e.dataTransfer?.getData('text/plain') || ''
-  const row = e.currentTarget as HTMLElement
-  const after = e.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2
-  if (draggedId) sidebar.moveTo(draggedId, id, after)
-  draggedSidebarId.value = ''
-  overSidebarId.value = ''
-}
-
-function endSidebarDrag() {
-  draggedSidebarId.value = ''
-  overSidebarId.value = ''
-}
 
 function addChatBlockRule() {
   chatFilter.addRule(blockForm.match, blockForm.value, blockForm.mode)
@@ -267,33 +222,34 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 
     <Transition name="fp-set-panel">
       <aside v-if="open" class="fp-set-panel" role="dialog" aria-label="设置">
-        <nav class="nav">
-          <b class="brand">设置</b>
-          <button
-            v-for="s in visibleSections"
-            :key="s.id"
-            type="button"
-            class="nav-item"
-            :class="{ on: section === s.id }"
-            @click="section = s.id"
-          >
-            <span class="ico" aria-hidden="true">{{ s.icon }}</span>
-            <span>{{ s.label }}</span>
-          </button>
+        <nav class="nav" aria-label="设置分类">
+          <div class="brand"><b>设置</b><span>按你的习惯使用摸鱼派</span></div>
+          <div v-for="group in groups" :key="group.id" class="nav-group">
+            <p class="nav-group-title">{{ group.label }}</p>
+            <div class="nav-group-items">
+              <button
+                v-for="item in group.items" :key="item.id" type="button" class="nav-item"
+                :class="{ on: section === item.id }" :aria-current="section === item.id ? 'page' : undefined"
+                @click="section = item.id"
+              ><SidebarIcon :name="item.icon" /><span>{{ item.label }}</span></button>
+              <button v-if="group.id === 'personal'" type="button" class="nav-item nav-shop" @click="openAppearanceShop">
+                <SidebarIcon name="appearance" /><span>外观商城</span><span class="nav-external" aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </div>
         </nav>
 
         <div class="body">
           <header class="head">
-            <b>{{ visibleSections.find((s) => s.id === section)?.label }}</b>
+            <div><h2>{{ currentSection?.label }}</h2><p>{{ currentSection?.description }}</p></div>
             <button type="button" class="close" aria-label="关闭设置" @click="drawer.hide()">✕</button>
           </header>
 
           <div v-if="section === 'feedback'" class="content">
-            <p>分享建议、反馈问题，一起完善摸鱼派。</p>
             <button class="drag-entry" @click="drawer.hide(); feedbackPanel.show('/feedback/new')"><b>提需求</b><span>描述你的想法或遇到的问题</span></button>
             <button class="drag-entry" @click="drawer.hide(); feedbackPanel.show('/feedback')"><b>查看需求列表</b><span>查看处理进展，为感兴趣的需求投票</span></button>
           </div>
-          <div v-else-if="section === 'branding'" class="content"><LocalBrandingSettings /></div>
+          <div v-else-if="section === 'branding'" class="content"><LocalBrandingSettings /><button type="button" class="shop-entry" @click="openAppearanceShop"><SidebarIcon name="appearance" /><span><b>外观商城</b><small>挑选座驾、气泡和头像框</small></span><span aria-hidden="true">↗</span></button></div>
           <div v-else-if="section === 'home'" class="content">
             <fieldset class="setting-options"><legend>首页版本</legend><label :class="{ selected: home.mode === 'compact' }"><input type="radio" name="home-variant" value="compact" :checked="home.mode === 'compact'" @change="home.setMode('compact')" /><span><b>紧凑版</b><small>最新、长篇和聊天优先进入首屏</small></span></label><label :class="{ selected: home.mode === 'classic' }"><input type="radio" name="home-variant" value="classic" :checked="home.mode === 'classic'" @change="home.setMode('classic')" /><span><b>经典版</b><small>保留原来的双列最新与分行布局</small></span></label><p>两个版本分别保存模块位置与显隐，仅在此浏览器生效。</p></fieldset>
             <button type="button" class="drag-entry" @click="startHomeEdit">
@@ -325,45 +281,29 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
             </ul>
           </div>
 
-          <div v-else-if="section === 'pageSidebar'" class="content">
-            <p class="drag-hint">我的资料保持顶部独立卡片，可单独折叠，不随下方排序移动。其余已开启模块显示为标签，可拖动 ⠿ 或使用右侧箭头调整标签顺序。</p>
-            <div class="chips">
-              <button type="button" @click="pageSidebar.applyPreset('compact')">精简</button>
-              <button type="button" @click="pageSidebar.applyPreset('all')">全部显示</button>
-              <button type="button" @click="pageSidebar.reset()">恢复默认</button>
+          <div v-else-if="section === 'pageSidebar'" class="content sidebar-settings">
+            <div class="placement-guide"><p><b>独立卡片</b><span>直接可见，可以折叠</span></p><p><b>标签页</b><span>集中展示，点击切换</span></p></div>
+            <p class="drag-hint">标签集中在同一面板，独立卡片按顺序排列。</p>
+            <div class="sidebar-settings-toolbar">
+              <span>模块与顺序</span>
+              <div class="chips">
+                <button type="button" @click="pageSidebar.applyPreset('compact')">精简</button>
+                <button type="button" @click="pageSidebar.applyPreset('all')">全部显示</button>
+                <button type="button" @click="pageSidebar.reset()">恢复默认</button>
+              </div>
             </div>
-            <ul class="rows">
-              <li
-                v-for="m in pageSidebar.orderedModules"
-                :key="m.id"
-                :class="{ 'is-dragging': draggedPageSidebarId === m.id, 'is-drop-target': overPageSidebarId === m.id }"
-                @dragover="dragOverPageSidebarItem($event, m.id)"
-                @drop="dropPageSidebarItem($event, m.id)"
-              >
-                <label class="check">
-                  <input type="checkbox" :checked="pageSidebar.isOn(m.id)" @change="pageSidebar.toggle(m.id)" />
-                  <span>{{ m.title }}</span>
-                </label>
-                <span class="sort">
-                  <span
-                    class="drag-handle"
-                    draggable="true"
-                    role="button"
-                    :aria-label="`拖动排序：${m.title}`"
-                    title="按住拖动排序"
-                    @dragstart="startPageSidebarDrag($event, m.id)"
-                    @dragend="endPageSidebarDrag"
-                  >⠿</span>
-                  <button type="button" aria-label="上移" @click="pageSidebar.move(m.id, -1)">↑</button>
-                  <button type="button" aria-label="下移" @click="pageSidebar.move(m.id, 1)">↓</button>
-                </span>
-              </li>
-            </ul>
+            <SidebarModuleSettingsList
+              :modules="pageSidebar.orderedModules" :is-on="pageModuleOn" :presentation-of="pageModulePresentation"
+              @toggle="id => pageSidebar.toggle(id as PageSidebarModuleId)"
+              @presentation="(id, mode) => pageSidebar.setPresentation(id as PageSidebarModuleId, mode)"
+              @move-to="(id, target, after) => pageSidebar.moveTo(id as PageSidebarModuleId, target as PageSidebarModuleId, after)"
+            />
+            <p class="placement-note">我的资料固定置顶。拖动九点手柄或使用箭头排序；标签页会合并显示在首个标签模块的位置。设置自动保存在此浏览器。</p>
           </div>
 
           <div v-else-if="section === 'chatInput'" class="content">
-            <label class="setting-options"><input type="checkbox" :checked="chatPreferences.simpleMode" @change="chatPreferences.setSimpleMode(($event.target as HTMLInputElement).checked)"> 精简模式（隐藏头像框、气泡、小尾巴和进出场效果）</label>
-            <label class="setting-options"><input type="checkbox" :disabled="chatPreferences.simpleMode" :checked="chatPreferences.mountEffects" @change="chatPreferences.setMountEffects(($event.target as HTMLInputElement).checked)"> 显示座驾进场特效</label>
+            <label class="setting-toggle" :class="{ selected: chatPreferences.simpleMode }"><input type="checkbox" :checked="chatPreferences.simpleMode" @change="chatPreferences.setSimpleMode(($event.target as HTMLInputElement).checked)"><span><b>精简模式</b><small>隐藏头像框、气泡、小尾巴和进出场效果</small></span></label>
+            <label class="setting-toggle" :class="{ selected: chatPreferences.mountEffects, 'is-disabled': chatPreferences.simpleMode }"><input type="checkbox" :disabled="chatPreferences.simpleMode" :checked="chatPreferences.mountEffects" @change="chatPreferences.setMountEffects(($event.target as HTMLInputElement).checked)"><span><b>显示座驾进场特效</b></span></label>
             <div class="setting-options"><button type="button" class="fp-btn" :disabled="!isLoggedIn" @click="openChatTail">小尾巴设置</button><small v-if="!isLoggedIn">登录后可设置</small></div>
             <fieldset class="setting-options">
               <legend>发送快捷键</legend>
@@ -397,38 +337,22 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
             </fieldset>
           </div>
 
-          <div v-else-if="section === 'chatSidebar'" class="content">
-            <p class="drag-hint">我的资料保持顶部独立卡片，可单独折叠，不随下方排序移动。其余已开启模块显示为标签，可拖动 ⠿ 或使用右侧箭头调整标签顺序。</p>
-            <div class="chips">
-              <button type="button" @click="sidebar.reset()">恢复默认</button>
+          <div v-else-if="section === 'chatSidebar'" class="content sidebar-settings">
+            <div class="placement-guide"><p><b>独立卡片</b><span>直接可见，可以折叠</span></p><p><b>标签页</b><span>集中展示，点击切换</span></p></div>
+            <p class="drag-hint">标签集中在同一面板，独立卡片按顺序排列。</p>
+            <div class="sidebar-settings-toolbar">
+              <span>模块与顺序</span>
+              <div class="chips">
+                <button type="button" @click="sidebar.reset()">恢复默认</button>
+              </div>
             </div>
-            <ul class="rows">
-              <li
-                v-for="m in sidebar.orderedModules"
-                :key="m.id"
-                :class="{ 'is-dragging': draggedSidebarId === m.id, 'is-drop-target': overSidebarId === m.id }"
-                @dragover="dragOverSidebarItem($event, m.id)"
-                @drop="dropSidebarItem($event, m.id)"
-              >
-                <label class="check">
-                  <input type="checkbox" :checked="sidebar.isOn(m.id)" @change="sidebar.toggle(m.id)" />
-                  <span>{{ m.title }}</span>
-                </label>
-                <span class="sort">
-                  <span
-                    class="drag-handle"
-                    draggable="true"
-                    role="button"
-                    :aria-label="`拖动排序：${m.title}`"
-                    title="按住拖动排序"
-                    @dragstart="startSidebarDrag($event, m.id)"
-                    @dragend="endSidebarDrag"
-                  >⠿</span>
-                  <button type="button" aria-label="上移" @click="sidebar.move(m.id, -1)">↑</button>
-                  <button type="button" aria-label="下移" @click="sidebar.move(m.id, 1)">↓</button>
-                </span>
-              </li>
-            </ul>
+            <SidebarModuleSettingsList
+              :modules="sidebar.orderedModules" :is-on="sidebar.isOn" :presentation-of="sidebar.presentationOf"
+              @toggle="id => sidebar.toggle(id)"
+              @presentation="(id, mode) => sidebar.setPresentation(id, mode)"
+              @move-to="(id, target, after) => sidebar.moveTo(id, target, after)"
+            />
+            <p class="placement-note">我的资料固定置顶。拖动九点手柄或使用箭头排序；标签页会合并显示在首个标签模块的位置。设置自动保存在此浏览器。</p>
           </div>
 
           <div v-else-if="section === 'chatBlock'" class="content">
@@ -519,10 +443,16 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 <style scoped>
 .setting-options { display:flex; flex-direction:column; gap:8px; margin:0 0 16px; padding:0; border:0; }
 .setting-options legend { margin-bottom:8px; font-size:13px; font-weight:600; color:var(--fp-title); }
-.setting-options label { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--fp-border); border-radius:8px; cursor:pointer; }
-.setting-options label.selected { border-color:var(--fp-primary); background:color-mix(in srgb,var(--fp-primary) 6%,var(--fp-card)); }
+.setting-options label, .setting-toggle { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--fp-border); border-radius:8px; cursor:pointer; }
+.setting-options label.selected, .setting-toggle.selected { border-color:var(--fp-primary); background:color-mix(in srgb,var(--fp-primary) 6%,var(--fp-card)); }
 .setting-options span { display:flex; flex-direction:column; gap:4px; }.setting-options b { font-size:13px; color:var(--fp-title); }.setting-options small,.setting-options p { margin:0; font-size:11px; color:var(--fp-muted); line-height:1.6; }
 .setting-options input { accent-color:var(--fp-primary); }
+.setting-toggle { margin-bottom:12px; }
+.setting-toggle input { flex:none; width:15px; height:15px; margin:0; accent-color:var(--fp-primary); }
+.setting-toggle span { display:grid; gap:4px; min-width:0; }
+.setting-toggle b { font-size:13px; color:var(--fp-title); }
+.setting-toggle small { font-size:11px; color:var(--fp-muted); line-height:1.6; }
+.setting-toggle.is-disabled { opacity:.55; cursor:default; }
 </style>
 
 <style scoped>
@@ -664,15 +594,14 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   top: 50%;
   z-index: 1192;
   display: grid;
-  grid-template-columns: 128px 1fr;
-  width: min(500px, calc(100vw - 24px));
-  height: min(560px, calc(100vh - 96px));
+  grid-template-columns: 174px minmax(0, 1fr);
+  width: min(744px, calc(100vw - 24px));
+  height: min(720px, calc(100dvh - 48px));
   transform: translateY(-50%);
   border: 1px solid var(--fp-border);
   border-radius: var(--fp-panel-radius);
-  background: color-mix(in srgb, var(--fp-card) 88%, transparent);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+  background: var(--fp-card);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.18);
   overflow: hidden;
   color: var(--fp-text);
 }
@@ -680,40 +609,40 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 14px 8px;
+  gap: 19px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px 12px;
   border-right: 1px solid var(--fp-border);
-  background: color-mix(in srgb, var(--fp-hover) 60%, transparent);
+  background: color-mix(in srgb, var(--fp-hover) 65%, var(--fp-card));
 }
-.brand {
-  padding: 0 8px 10px;
-  font-size: 15px;
-  color: var(--fp-title);
-}
+.brand { display: grid; gap: 7px; padding: 0 10px 4px; }
+.brand b { font-size: 19px; color: var(--fp-title); }
+.brand span { color: var(--fp-muted); font-size: 10px; white-space: nowrap; }
+.nav-group-title { margin: 0 10px 7px; color: var(--fp-muted); font-size: 10px; }
+.nav-group-items { display: flex; flex-direction: column; gap: 3px; }
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px;
+  gap: 9px;
+  width: 100%;
+  padding: 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: transparent;
   color: var(--fp-text);
-  font-size: 13px;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
   text-align: left;
   cursor: pointer;
+  transition: color 150ms, background 150ms;
 }
-.nav-item:hover {
-  background: var(--fp-hover);
-}
-.nav-item.on {
-  background: var(--fp-hover);
-  color: var(--fp-link);
-  font-weight: 600;
-}
-.ico {
-  font-size: 14px;
-}
+.nav-item svg { flex: none; width: 16px; height: 16px; color: var(--fp-muted); }
+.nav-item:hover { background: var(--fp-hover); }
+.nav-item.on { background: color-mix(in srgb, var(--fp-primary) 10%, var(--fp-card)); color: var(--fp-primary); font-weight: 600; }
+.nav-item.on svg { color: inherit; }
+.nav-external { margin-left: auto; color: var(--fp-muted); }
 
 .body {
   display: flex;
@@ -723,27 +652,46 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 }
 .head {
   display: flex;
-  align-items: center;
+  flex: none;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 14px 16px 10px;
-  font-size: 14px;
-  color: var(--fp-title);
+  gap: 14px;
+  padding: 23px 24px 20px;
+  border-bottom: 1px solid var(--fp-border);
 }
+.head h2 { margin: 0; color: var(--fp-title); font-size: 18px; font-weight: 650; line-height: 1.5; }
+.head p { margin: 6px 0 0; color: var(--fp-muted); font-size: 12px; line-height: 1.7; }
 .close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
   border: 0;
-  background: transparent;
+  border-radius: 7px;
+  background: var(--fp-hover);
   color: var(--fp-muted);
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
 }
-.close:hover {
-  color: var(--fp-link);
-}
-.content {
-  flex: 1;
-  overflow: auto;
-  padding: 0 16px 16px;
-}
+.close:hover { color: var(--fp-title); }
+.content { flex: 1; min-height: 0; overflow: auto; padding: 22px 24px; overscroll-behavior: contain; }
+.placement-guide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px; }
+.placement-guide p { display: grid; gap: 5px; margin: 0; padding: 12px 14px; border-radius: 8px; background: var(--fp-hover); }
+.placement-guide b { color: var(--fp-title); font-size: 12px; font-weight: 550; }
+.placement-guide span { color: var(--fp-muted); font-size: 11px; }
+.sidebar-settings-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.sidebar-settings-toolbar > span { color: var(--fp-muted); font-size: 11px; }
+.sidebar-settings-toolbar .chips { margin-bottom: 0; gap: 4px; }
+.sidebar-settings-toolbar .chips button { padding: 4px 7px; font-size: 11px; }
+.placement-note { margin: 14px 0 0; color: var(--fp-muted); font-size: 11px; line-height: 1.8; }
+.shop-entry { display: flex; align-items: center; gap: 12px; width: 100%; padding: 15px; margin-top: 20px; border: 1px solid var(--fp-border); border-radius: 9px; background: var(--fp-card); color: var(--fp-text); text-align: left; cursor: pointer; }
+.shop-entry svg { width: 21px; height: 21px; color: var(--fp-primary); }
+.shop-entry span:first-of-type { display: grid; flex: 1; gap: 5px; }
+.shop-entry b { font-size: 13px; font-weight: 550; }
+.shop-entry small { font-size: 11px; color: var(--fp-muted); }
+.shop-entry:hover { background: var(--fp-hover); }
+.fp-set-panel button:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 2px; }
 
 .drag-entry {
   display: flex;
@@ -753,10 +701,10 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   width: 100%;
   margin-bottom: 12px;
   padding: 10px 12px;
-  border: 1px dashed var(--fp-link);
+  border: 1px solid var(--fp-border);
   border-radius: var(--fp-panel-radius);
-  background: color-mix(in srgb, var(--fp-link) 8%, transparent);
-  color: var(--fp-link);
+  background: var(--fp-hover);
+  color: var(--fp-title);
   text-align: left;
   cursor: pointer;
 }
@@ -768,15 +716,14 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   color: var(--fp-muted);
 }
 .drag-entry:hover {
-  background: color-mix(in srgb, var(--fp-link) 14%, transparent);
+  background: color-mix(in srgb, var(--fp-primary) 8%, var(--fp-card));
 }
 .chips {
   display: flex;
   gap: 6px;
   margin-bottom: 10px;
 }
-.chips button,
-.sort button {
+.chips button {
   border: 1px solid var(--fp-border);
   background: var(--fp-card);
   color: var(--fp-text);
@@ -787,8 +734,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   cursor: pointer;
   transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
 }
-.chips button:hover,
-.sort button:hover {
+.chips button:hover {
   border-color: var(--fp-border-strong, var(--fp-border));
   background: var(--fp-hover);
   color: var(--fp-primary);
@@ -839,25 +785,6 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   color: var(--fp-title);
   cursor: pointer;
   user-select: none;
-}
-.sort {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.sort button {
-  padding: 1px 7px;
-}
-.drag-handle {
-  padding: 0 3px;
-  color: var(--fp-muted);
-  font-size: 18px;
-  line-height: 1;
-  cursor: grab;
-  touch-action: none;
-}
-.drag-handle:active {
-  cursor: grabbing;
 }
 .drag-hint,
 .block-empty {
@@ -994,5 +921,28 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 .fp-set-panel-leave-to {
   opacity: 0;
   transform: translate(-24px, -50%);
+}
+
+@media (max-width: 620px) {
+  .fp-set-panel { left: 8px; width: calc(100vw - 16px); height: calc(100dvh - 24px); grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .nav { flex-direction: row; align-items: flex-start; gap: 18px; overflow-x: auto; overflow-y: hidden; padding: 13px 16px 12px; border-right: 0; border-bottom: 1px solid var(--fp-border); }
+  .brand { display: none; }
+  .nav-group { flex: none; }
+  .nav-group-title { margin: 0 5px 6px; }
+  .nav-group-items { flex-direction: row; gap: 3px; }
+  .nav-item { width: auto; padding: 8px; }
+  .nav-item svg { width: 14px; height: 14px; }
+  .head { padding: 16px 18px 14px; gap: 8px; }
+  .head h2 { font-size: 17px; }
+  .head p { font-size: 11px; }
+  .content { padding: 16px 18px 20px; }
+  .placement-guide { gap: 8px; margin-bottom: 17px; }
+  .placement-guide p { padding: 10px; }
+  .block-form { grid-template-columns: minmax(0, 1fr); }
+  .block-rules li { flex-wrap: wrap; }
+  .rule-target { flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-item, .fp-set-mask-enter-active, .fp-set-mask-leave-active, .fp-set-panel-enter-active, .fp-set-panel-leave-active { transition: none; }
 }
 </style>

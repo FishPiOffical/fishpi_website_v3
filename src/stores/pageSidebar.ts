@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { normalizeSidebarIds, normalizeSidebarPresentation, sidebarPresentationOf, type SidebarPresentation, type SidebarPresentationMap } from '@/utils/sidebarPresentation'
 
 export type PageSidebarModuleId =
   | 'profile'
@@ -34,6 +35,7 @@ interface PageSidebarPref {
   order: PageSidebarModuleId[]
   hidden: PageSidebarModuleId[]
   collapsed: PageSidebarModuleId[]
+  presentation: SidebarPresentationMap
 }
 
 function defaults(): PageSidebarPref {
@@ -41,30 +43,27 @@ function defaults(): PageSidebarPref {
     order: PAGE_SIDEBAR_META.map((m) => m.id),
     hidden: PAGE_SIDEBAR_META.filter((m) => !m.defaultOn).map((m) => m.id),
     collapsed: [],
+    presentation: {},
   }
 }
 
 function read(): PageSidebarPref {
-  if (typeof localStorage === 'undefined') return defaults()
   try {
+    if (typeof localStorage === 'undefined') return defaults()
     const raw = localStorage.getItem(STORAGE)
     if (!raw) return defaults()
-    const parsed = JSON.parse(raw) as Partial<PageSidebarPref>
-    const known = new Set(PAGE_SIDEBAR_META.map((m) => m.id))
-    const order = Array.isArray(parsed.order)
-      ? parsed.order.filter((id): id is PageSidebarModuleId => known.has(id as PageSidebarModuleId))
-      : []
+    const parsed = JSON.parse(raw) as Partial<PageSidebarPref> | null
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return defaults()
+    const known = PAGE_SIDEBAR_META.map(mod => mod.id)
+    const order = normalizeSidebarIds(parsed.order, known)
     PAGE_SIDEBAR_META.forEach((m, i) => {
       if (!order.includes(m.id)) order.splice(Math.min(i, order.length), 0, m.id)
     })
     return {
       order,
-      hidden: Array.isArray(parsed.hidden)
-        ? parsed.hidden.filter((id): id is PageSidebarModuleId => known.has(id as PageSidebarModuleId))
-        : defaults().hidden,
-      collapsed: Array.isArray(parsed.collapsed)
-        ? parsed.collapsed.filter((id): id is PageSidebarModuleId => known.has(id as PageSidebarModuleId))
-        : [],
+      hidden: Array.isArray(parsed.hidden) ? normalizeSidebarIds(parsed.hidden, known) : defaults().hidden,
+      collapsed: normalizeSidebarIds(parsed.collapsed, known),
+      presentation: normalizeSidebarPresentation(parsed.presentation, known),
     }
   } catch {
     return defaults()
@@ -85,8 +84,21 @@ export const usePageSidebarStore = defineStore('pageSidebar', () => {
   )
 
   function persist() {
-    if (typeof localStorage === 'undefined') return
-    localStorage.setItem(STORAGE, JSON.stringify(pref.value))
+    try {
+      if (typeof localStorage === 'undefined') return
+      localStorage.setItem(STORAGE, JSON.stringify(pref.value))
+    } catch { /* 存储不可用时仍保留本次页面内的调整。 */ }
+  }
+
+  function presentationOf(id: string): SidebarPresentation {
+    return sidebarPresentationOf(id, pref.value.presentation)
+  }
+
+  function setPresentation(id: string, mode: SidebarPresentation) {
+    if (id === 'profile' || !PAGE_SIDEBAR_META.some(mod => mod.id === id)) return
+    if (mode !== 'card' && mode !== 'tabs') return
+    pref.value.presentation = { ...pref.value.presentation, [id]: mode }
+    persist()
   }
 
   function isOn(id: PageSidebarModuleId) {
@@ -154,6 +166,8 @@ export const usePageSidebarStore = defineStore('pageSidebar', () => {
     pref,
     orderedModules,
     visibleModules,
+    presentationOf,
+    setPresentation,
     isOn,
     isCollapsed,
     toggle,

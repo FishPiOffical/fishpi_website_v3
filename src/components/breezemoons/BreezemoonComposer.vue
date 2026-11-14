@@ -6,18 +6,25 @@ import { getAuthContextVersion } from '@/api/http'
 import { trimBreezemoonInput } from '@/api/v3-breezemoons'
 import { useAuthStore } from '@/stores/auth'
 import { useV3BreezemoonStore } from '@/stores/v3Breezemoons'
+import { useSidebarDraftState } from '@/composables/sidebarDrafts'
 const props=defineProps<{target?:{id:string;content:string}|null}>(),emit=defineEmits<{cancel:[];saved:[]}>()
-const{accessToken,account}=storeToRefs(useAuthStore()),operations=useV3BreezemoonStore(),mounted=ref(false),draft=ref(props.target?.content||''),localError=ref('')
+function createDraftState() {
+  const state = { draft: ref(props.target?.content || ''), localError: ref(''), submitted: ref<{ key: string; draft: string } | null>(null) }
+  return { state, clear() { state.draft.value = ''; state.localError.value = ''; state.submitted.value = null } }
+}
+// 展示方式切换会重建模块，草稿及原命令关联由当前侧栏保留；未知写入仍由原 store 管理。
+const sharedDraft = useSidebarDraftState('breezemoons', createDraftState)
+const { draft, localError, submitted } = sharedDraft || createDraftState().state
+const{accessToken,account}=storeToRefs(useAuthStore()),operations=useV3BreezemoonStore(),mounted=ref(false)
 const ready=computed(()=>mounted.value&&!!accessToken.value&&!!account.value),locked=computed(()=>!!operations.pending||operations.busy||operations.confirming)
 const recovery=computed(()=>operations.pending?.operation==='delete'?'重试本次删除':operations.pending?.operation==='update'?'重试本次修改':'重试本次发布')
 let boundary=`${getAuthContextVersion()}:${account.value?.oId||''}`
-watch([accessToken,()=>account.value?.oId],()=>{const next=`${getAuthContextVersion()}:${account.value?.oId||''}`;if(!accessToken.value||next!==boundary){draft.value='';localError.value=''}boundary=next},{flush:'sync'})
+watch([accessToken,()=>account.value?.oId],()=>{const next=`${getAuthContextVersion()}:${account.value?.oId||''}`;if(!accessToken.value||next!==boundary){draft.value='';localError.value='';submitted.value=null}boundary=next},{flush:'sync'})
 watch(()=>props.target,()=>{draft.value=props.target?.content||'';localError.value=''})
-let submitted:{key:string;draft:string}|null=null
-watch(()=>operations.pending,command=>{if(command&&command.operation!=='delete'&&command.id===(props.target?.id||'')&&command.content===trimBreezemoonInput(draft.value))submitted={key:command.key,draft:draft.value}},{flush:'sync'})
-watch(()=>operations.completed,command=>{if(command&&submitted?.key===command.key){if(draft.value===submitted.draft)draft.value='';submitted=null;emit('saved')}},{flush:'sync'})
+watch(()=>operations.pending,command=>{if(command&&command.operation!=='delete'&&command.id===(props.target?.id||'')&&command.content===trimBreezemoonInput(draft.value))submitted.value={key:command.key,draft:draft.value}},{flush:'sync'})
+watch(()=>operations.completed,command=>{if(command&&submitted.value?.key===command.key){if(draft.value===submitted.value.draft)draft.value='';submitted.value=null;emit('saved')}},{flush:'sync',immediate:!!sharedDraft})
 async function submit(){if(!ready.value||locked.value)return;const valid=operations.capture();localError.value='';try{await operations.save(draft.value,props.target?.id||'')}catch(err){if(valid()&&mounted.value)localError.value=err instanceof Error?err.message:'输入不合法'}}
-onMounted(()=>{mounted.value=true});onBeforeUnmount(()=>{mounted.value=false;draft.value='';localError.value=''})
+onMounted(()=>{mounted.value=true});onBeforeUnmount(()=>{mounted.value=false;if(!sharedDraft){draft.value='';localError.value='';submitted.value=null}})
 </script>
 <template>
   <div class="moon-composer">

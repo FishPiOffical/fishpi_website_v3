@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { normalizeSidebarIds, normalizeSidebarPresentation, sidebarPresentationOf, type SidebarPresentation, type SidebarPresentationMap } from '@/utils/sidebarPresentation'
 import { CHAT_SIDEBAR_META, type ChatSidebarModuleMeta } from '@/chat/sidebar/meta'
 
 const STORAGE = 'fp.chatSidebar'
@@ -8,6 +9,7 @@ interface SidebarPref {
   order: string[]
   hidden: string[]
   collapsed: string[]
+  presentation: SidebarPresentationMap
 }
 
 function defaults(): SidebarPref {
@@ -15,26 +17,27 @@ function defaults(): SidebarPref {
     order: CHAT_SIDEBAR_META.map((m) => m.id),
     hidden: CHAT_SIDEBAR_META.filter((m) => !m.defaultOn).map((m) => m.id),
     collapsed: [],
+    presentation: {},
   }
 }
 
 function read(): SidebarPref {
-  if (typeof localStorage === 'undefined') return defaults()
   try {
+    if (typeof localStorage === 'undefined') return defaults()
     const raw = localStorage.getItem(STORAGE)
     if (!raw) return defaults()
-    const parsed = JSON.parse(raw) as SidebarPref
-    const known = new Set(CHAT_SIDEBAR_META.map((m) => m.id))
-    const order = parsed.order.filter((id) => known.has(id as ChatSidebarModuleMeta['id']))
+    const parsed = JSON.parse(raw) as Partial<SidebarPref> | null
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return defaults()
+    const known = CHAT_SIDEBAR_META.map(mod => mod.id)
+    const order = normalizeSidebarIds(parsed.order, known)
     CHAT_SIDEBAR_META.forEach((m, i) => {
       if (!order.includes(m.id)) order.splice(Math.min(i, order.length), 0, m.id)
     })
     return {
       order,
-      hidden: parsed.hidden.filter((id) => known.has(id as ChatSidebarModuleMeta['id'])),
-      collapsed: Array.isArray(parsed.collapsed)
-        ? parsed.collapsed.filter((id) => known.has(id as ChatSidebarModuleMeta['id']))
-        : [],
+      hidden: Array.isArray(parsed.hidden) ? normalizeSidebarIds(parsed.hidden, known) : defaults().hidden,
+      collapsed: normalizeSidebarIds(parsed.collapsed, known),
+      presentation: normalizeSidebarPresentation(parsed.presentation, known),
     }
   } catch {
     return defaults()
@@ -53,7 +56,21 @@ export const useChatSidebarStore = defineStore('chatSidebar', () => {
   const visibleModules = computed(() => orderedModules.value.filter((mod) => !pref.value.hidden.includes(mod.id)))
 
   function persist() {
-    localStorage.setItem(STORAGE, JSON.stringify(pref.value))
+    try {
+      if (typeof localStorage === 'undefined') return
+      localStorage.setItem(STORAGE, JSON.stringify(pref.value))
+    } catch { /* 存储不可用时仍保留本次页面内的调整。 */ }
+  }
+
+  function presentationOf(id: string): SidebarPresentation {
+    return sidebarPresentationOf(id, pref.value.presentation)
+  }
+
+  function setPresentation(id: string, mode: SidebarPresentation) {
+    if (id === 'profile' || !CHAT_SIDEBAR_META.some(mod => mod.id === id)) return
+    if (mode !== 'card' && mode !== 'tabs') return
+    pref.value.presentation = { ...pref.value.presentation, [id]: mode }
+    persist()
   }
 
   function isOn(id: string) {
@@ -104,5 +121,5 @@ export const useChatSidebarStore = defineStore('chatSidebar', () => {
     persist()
   }
 
-  return { pref, orderedModules, visibleModules, isOn, toggle, toggleCollapsed, move, moveTo, reset }
+  return { pref, orderedModules, visibleModules, presentationOf, setPresentation, isOn, toggle, toggleCollapsed, move, moveTo, reset }
 })
