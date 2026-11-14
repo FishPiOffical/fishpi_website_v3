@@ -370,7 +370,7 @@ function clearScreen() {
                 <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-expanded="toolOpen(tool.id)" aria-haspopup="dialog" @click="togglePanel(tool.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="tool.path" /></svg><span>{{ tool.label }}</span>
                 </button>
-                <ChatConnectionStatus compact />
+                <ChatConnectionStatus />
               </template>
               <template #inline-context>
                 <div class="classic-topic-pill" :title="discuss">
@@ -597,7 +597,7 @@ function clearScreen() {
                 <button v-for="tool in chatTools" :key="tool.id" type="button" class="composer-tool-btn" :class="{'is-active':toolOpen(tool.id)}" :title="tool.title" :aria-label="tool.title" :aria-expanded="toolOpen(tool.id)" aria-haspopup="dialog" @click="togglePanel(tool.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="tool.path" /></svg><span>{{ tool.label }}</span>
                 </button>
-                <ChatConnectionStatus compact />
+                <ChatConnectionStatus />
               </template>
               <template #inline-context>
                 <div class="classic-topic-pill" :title="discuss">
@@ -764,7 +764,7 @@ function clearScreen() {
   &.is-active { background: var(--fp-accent-soft,var(--fp-hover)); color: var(--fp-accent); }
 }
 .classic-topic-pill {
-  display: flex; align-items: center; gap: 2px; min-width: 0; width: fit-content; max-width: 100%; margin-inline: auto; box-sizing: border-box;
+  display: flex; align-items: center; gap: 2px; min-width: 0; width: fit-content; max-width: 100%; margin-inline: 0; box-sizing: border-box;
   padding: 2px 3px 2px 8px; border: 1px solid color-mix(in srgb, var(--fp-accent) 22%, var(--fp-border)); border-radius: 9px;
   background: color-mix(in srgb, var(--fp-accent) 5%, var(--fp-card)); font-size: 12px;
 }

@@ -175,7 +175,7 @@ defineExpose({
   cursor: not-allowed;
 }
 .composer-context { min-width: 0; }
-// 桌面工具收为图标，话题居中完整展示；手机让按钮与话题分行。
+// 桌面工具收为图标，话题靠左完整展示；手机让按钮与话题分行。
 .bar.has-inline-context {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) max-content;
