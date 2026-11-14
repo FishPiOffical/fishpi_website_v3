@@ -6,6 +6,8 @@ import ChatRepeatAction from './ChatRepeatAction.vue'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
 const props = defineProps<{ entries: T[]; reverse?: boolean; ownName?: string }>()
 defineSlots<{ default(props: { entry: T }): unknown }>()
+// 最多露出六张后层和一张完整前层，长复读仍可展开查看全部。
+const visibleBackLayers = 6
 const preferences = useChatPreferencesStore()
 const mounted = ref(false)
 const expanded = ref(new Set<string>())
@@ -55,10 +57,10 @@ function toggle(key: string) {
   <div v-for="group in groups" :key="group[0]!.key" :data-repeat-messages="group.map(entry => entry.message?.oId).filter(Boolean).join(' ')" class="repeat-group" :class="{ 'repeat-group--self': group[0]!.message?.userName === ownName }">
     <template v-if="group.length === 1"><slot :entry="group[0]!" /></template>
     <template v-else>
-      <div v-if="!expanded.has(group[0]!.key)" class="repeat-deck" :style="{ '--layers': Math.min(group.length - 1, 3) }">
-        <div v-for="(entry, index) in group.slice(1, 4)" :key="entry.key" class="fp-msg is-room repeat-layer-shell" data-appearance-snapshot="v1" :data-bubble="mounted && preferences.simpleMode ? 'none' : entry.message?.appearance?.bubbleId" :style="{ '--layer': index }">
+      <div v-if="!expanded.has(group[0]!.key)" class="repeat-deck" :style="{ '--layers': Math.min(group.length - 1, visibleBackLayers) }">
+        <div v-for="(entry, index) in group.slice(1, visibleBackLayers + 1)" :key="entry.key" class="fp-msg is-room repeat-layer-shell" data-appearance-snapshot="v1" :data-bubble="mounted && preferences.simpleMode ? 'none' : entry.message?.appearance?.bubbleId" :style="{ '--layer': index }">
         <button class="fp-bubble repeat-layer" type="button" aria-label="展开复读消息" @click="toggle(group[0]!.key)">
-          <img :src="avatarThumbnail(entry.message?.userAvatarURL, 20)" alt="" @error="fallbackAvatar" />
+          <img :src="avatarThumbnail(entry.message?.userAvatarURL, 20)" :alt="entry.message?.userNickname || entry.message?.userName" :data-user-card="entry.message?.userName" @error="fallbackAvatar" />
           <span>{{ entry.message?.userNickname || entry.message?.userName }}</span>
         </button>
         </div>
@@ -79,10 +81,12 @@ function toggle(key: string) {
 /* 后层沿用消息的外观包底色，只隐藏装饰，避免多个角标挤在一起。 */
 .repeat-layer-shell .repeat-layer::before, .repeat-layer-shell .repeat-layer::after { display: none !important; }
 .repeat-group { min-width: 0; flex-shrink: 0; }
-.repeat-deck { --step: 8px; position: relative; padding-top: calc(var(--layers) * 24px); padding-right: calc(var(--layers) * var(--step)); isolation: isolate; }
-.repeat-layer { position: absolute !important; top: calc(var(--layer) * 24px); left: calc(var(--card-left, 44px) + var(--layer) * var(--step)); width: var(--card-width, min(220px, calc(100% - 76px))); height: 64px; display: flex; align-items: flex-start; gap: 6px; padding: 3px 10px !important; border: 1px solid var(--fp-border, #dfe3e8); border-radius: 12px; background: var(--fp-card, #fff); color: var(--fp-text-muted, #77808d); font: inherit; font-size: 11px; cursor: pointer; box-shadow: 0 2px 3px #00000006; animation: repeat-arrive .22s ease-out; }
+.repeat-deck { --step: 8px; --layer-height: 28px; position: relative; padding-top: calc(var(--layers) * var(--layer-height)); padding-right: calc(var(--layers) * var(--step)); isolation: isolate; }
+.repeat-layer { position: absolute !important; top: calc(var(--layer) * var(--layer-height)); left: calc(var(--card-left, 44px) + var(--layer) * var(--step)); width: var(--card-width, min(220px, calc(100% - 76px))); height: 64px; display: flex; align-items: flex-start; gap: 6px; padding: 3px 10px !important; border: 1px solid var(--fp-border, #dfe3e8); border-radius: 12px; background: var(--fp-card, #fff); color: var(--fp-text-muted, #77808d); font: inherit; font-size: 11px; cursor: pointer; box-shadow: 0 2px 3px #00000006; animation: repeat-arrive .22s ease-out; }
 .repeat-layer-shell:nth-child(even) .repeat-layer { background: color-mix(in srgb, var(--fp-primary, #65ae42) 5%, var(--fp-card, #fff)); }
-.repeat-layer img { width: 20px; height: 20px; object-fit: cover; border-radius: 4px; flex: none; }
+/* 头像放在卡片外侧，每层独占一条头像行，不被下一层气泡盖住。 */
+.repeat-layer img { position: absolute; left: -28px; top: 2px; width: 20px; height: 20px; object-fit: cover; border-radius: 4px; flex: none; }
+.repeat-group--self .repeat-layer img { left: auto; right: -28px; }
 .repeat-layer span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 20px; }
 .repeat-front { position: relative; z-index: 2; transform: translateX(calc(var(--layers) * var(--step))); }
 .repeat-controls { display: flex; align-items: center; gap: 14px; margin: 2px 0 14px 44px; color: var(--fp-text-muted, #77808d); font-size: 12px; }
