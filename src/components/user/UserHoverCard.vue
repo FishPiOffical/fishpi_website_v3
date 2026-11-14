@@ -297,8 +297,8 @@ onUnmounted(() => {
           <RouterLink :to="`/member/${encodeURIComponent(currentUserName)}`">查看用户主页</RouterLink>
         </div>
 
-        <template v-else-if="profile">
-          <div v-if="profile.cardBg" class="card-cover" :style="coverStyle(profile.cardBg, 400)" aria-hidden="true" />
+        <div v-else-if="profile" class="card-profile" :class="{ 'card-profile--background': profile.cardBg }" :style="profile.cardBg ? coverStyle(profile.cardBg, 400) : undefined">
+          <div class="card-content">
           <div class="card-main">
             <RouterLink class="avatar-link" :to="`/member/${encodeURIComponent(profile.userName)}`">
               <img class="card-avatar" :src="avatarThumbnail(profile.userAvatarURL, 72)" @error="fallbackAvatar" :alt="profile.userName" referrerpolicy="no-referrer" />
@@ -344,7 +344,8 @@ onUnmounted(() => {
               </RouterLink>
             </div>
           </div>
-        </template>
+          </div>
+        </div>
       </aside>
     </Transition>
   </Teleport>
@@ -364,10 +365,21 @@ onUnmounted(() => {
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
   color: var(--fp-text);
 }
-.card-cover {
-  height: 96px;
+.card-profile {
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
+}
+.card-profile--background {
+  padding-top: 64px;
+}
+.card-profile--background .card-content {
+  // 背景贯穿整张卡片，只在资料与操作区域加遮罩，避免文字被花纹干扰。
+  background: color-mix(in srgb, var(--fp-card) 88%, transparent);
+  background: linear-gradient(110deg,
+    color-mix(in srgb, var(--fp-card) 82%, transparent),
+    color-mix(in srgb, var(--fp-card) 94%, transparent));
+  border-top: 1px solid color-mix(in srgb, var(--fp-card) 65%, transparent);
 }
 .card-main {
   display: flex;
