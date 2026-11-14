@@ -500,10 +500,10 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 @media (width > 960px) {
   .board { align-items: stretch; }
-  /* 列保持等高，剩余留白放在卡片外，避免复读机等模块被拉长。 */
+  /* 普通模块保持自然高度；等高行由每列末张卡片承接留白，不拉开列表条目。 */
   .board:not(.bare) .cell > .mod { flex: 0 0 auto; }
-  .board--aligned:not(.bare) .cell > .mod:only-child { flex: 1; display: flex; flex-direction: column; }
-  .board--aligned:not(.bare) .cell > .mod:only-child > .mod-body { flex: 1; }
+  .board--aligned:not(.bare) .cell > .mod:last-child { flex: 1; display: flex; flex-direction: column; }
+  .board--aligned:not(.bare) .cell > .mod:last-child > .mod-body { flex: 1; }
 }
 .is-classic .recent-continuation { visibility: visible; }
 @media (max-width: 960px) { .is-classic .recent-continuation { visibility: visible; } }
