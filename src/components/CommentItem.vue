@@ -7,6 +7,7 @@ import { avatarStyle } from '@/utils/avatar'
 import { RouterLink } from 'vue-router'
 import type { ArticleComment } from '@/api/fishpi'
 import ArticleInteraction from '@/components/articles/ArticleInteraction.vue'
+import RevisionHistory from '@/components/articles/RevisionHistory.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
 import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -98,7 +99,7 @@ function onBodyClick(e: MouseEvent) {
             <button v-if="commentingEnabled" type="button" class="op op-reply idle" @click="commentingEnabled && emit('reply')">回复</button>
             <button v-if="own && commentingEnabled" type="button" class="op op-edit idle" @click="commentingEnabled && emit('edit')">编辑</button>
             <button v-if="own" type="button" class="op op-del idle danger" @click="emit('remove')">删除</button>
-
+            <RevisionHistory kind="comment" :target-id="comment.oId" class="cmt-history" />
           </template>
           <template v-else>
             <span v-if="goodCnt" class="op static">👍{{ goodCnt }}</span>

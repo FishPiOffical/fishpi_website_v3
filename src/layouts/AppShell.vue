@@ -15,6 +15,7 @@ import AdSlot from '@/components/ads/AdSlot.vue'
 import { useLocalBrandingStore } from '@/stores/localBranding'
 import LogoMark from '@/components/LogoMark.vue'
 import NavIcon from '@/components/navigation/NavIcon.vue'
+import AdminConsoleLink from '@/components/navigation/AdminConsoleLink.vue'
 import FpConfirmHost from '@/components/FpConfirmHost.vue'
 import RiskCaptchaGate from '@/components/RiskCaptchaGate.vue'
 import SystemAlertDialog from '@/components/SystemAlertDialog.vue'
@@ -432,6 +433,7 @@ onUnmounted(() => {
               >
                 {{ item.label }}
               </RouterLink>
+              <AdminConsoleLink @navigate="menuOpen = false" />
               <button type="button" class="logout" role="menuitem" @click="logout">退出登录</button>
             </div>
           </div>

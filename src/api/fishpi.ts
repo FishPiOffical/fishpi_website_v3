@@ -6,6 +6,14 @@ import { v3Article } from './v3-content'
 
 export type { DomainItem }
 
+/** 由第一方 /me 返回的管理能力，展示角色名称不能作为授权依据。 */
+export interface AccountCapabilities {
+  chatRevokeOthers?: boolean
+  viewArticleHistory?: boolean
+  viewCommentHistory?: boolean
+  canAccessAdmin?: boolean
+}
+
 export interface AccountInfo {
   oId: string
   userName: string
@@ -20,7 +28,9 @@ export interface AccountInfo {
   userQQ?: string
   /** Rhythm 角色，如 adminRole / defaultRole */
   roleId?: string
+  userRoleId?: string
   isAdmin?: boolean
+  capabilities?: AccountCapabilities
   userRole?: string
   userAppRole?: number
   userArticleCount?: number
@@ -64,6 +74,7 @@ export interface AccountInfo {
 export interface V3AccountInfo {
   id: string
   isAdmin?: boolean
+  capabilities?: AccountCapabilities
   userRole?: string
   userRoleId?: string
   userNo?: string

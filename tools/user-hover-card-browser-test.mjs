@@ -23,8 +23,8 @@ export const auth=reactive({accessToken:'fixture-token',account:{oId:'viewer',us
 let version=1;export const useAuthStore=()=>auth;export const getAuthContextVersion=()=>version;export const storeToRefs=toRefs;
 export const route=reactive({path:'/',fullPath:'/'});export const useRoute=()=>route;
 export const RouterLink={inheritAttrs:false,props:['to'],setup(p,{attrs,slots}){return()=>h('a',{...attrs,href:typeof p.to==='string'?p.to:p.to.path+(p.to.hash||'')},slots.default?.())}};
-export const state=reactive({background:true,medalCount:10,name:'答辩姐',intro:'厦门的咕咕嘎嘎',website:'https://rylan.ma/',role:'成员',city:'厦门',failMedal:false,delayMedals:0,follow:false,calls:[]});
-export async function fetchPublicUser(name){state.calls.push('profile:'+name);return {id:name==='self'?'viewer':name,userName:name,userNickname:state.name,userIntro:state.intro,userRole:state.role,userNo:34363,userCity:state.city,userOnlineFlag:false,userPoint:17008,onlineMinute:15420,userURL:state.website,userAvatarURL:'https://file.fishpi.cn/fixture-avatar.png',...(state.background?{cardBg:'https://file.fishpi.cn/fixture-bg.png'}:{})}}
+export const state=reactive({background:true,medalCount:10,name:'答辩姐',intro:'厦门的咕咕嘎嘎',website:'https://rylan.ma/',role:'成员',roleId:undefined,city:'厦门',failMedal:false,delayMedals:0,follow:false,calls:[]});
+export async function fetchPublicUser(name){state.calls.push('profile:'+name);return {id:name==='self'?'viewer':name,userName:name,userNickname:state.name,userIntro:state.intro,userRole:state.role,userRoleId:state.roleId,userNo:34363,userCity:state.city,userOnlineFlag:false,userPoint:17008,onlineMinute:15420,userURL:state.website,userAvatarURL:'https://file.fishpi.cn/fixture-avatar.png',...(state.background?{cardBg:'https://file.fishpi.cn/fixture-bg.png'}:{})}}
 export async function fetchV3PublicMedals(name,p=1){state.calls.push('medals:'+name+':'+p);if(state.delayMedals)await new Promise(resolve=>setTimeout(resolve,state.delayMedals));if(state.failMedal)throw new Error('fixture read failure');const total=state.medalCount;return {list:Array.from({length:Math.min(20,Math.max(0,total-(p-1)*20))},(_,i)=>({id:String((p-1)*20+i),name:'功勋玩家α',description:'真实 SVG 渲染夹具',order:i})),p,total,pageCount:Math.ceil(total/20)}}
 export const cachedVipName=()=>null,loadVipName=async()=>{},vipNameClass=()=>'',vipNameStyle=()=>({}),vipNameRevision=ref(0);
 export const readV3UserFollow=async()=>({following:state.follow}),resolveV3NicknameUser=async name=>({id:name});
@@ -160,9 +160,30 @@ await check('窄桌面与短视口保持边界，长昵称省略，展开卡片�
 await page.setViewportSize({width:1100,height:900})
 await reopen({background:true,medalCount:10,name:'答辩姐',intro:'厦门的咕咕嘎嘎'})
 await check('深色背景卡适配主题变量',async()=>{
-  await page.evaluate(()=>document.body.classList.add('dark'))
+  await page.evaluate(()=>{document.body.classList.add('dark');document.documentElement.dataset.theme='classic-dark'})
   await card.screenshot({animations:'disabled',path:path.join(output,'dark-background.png')})
   assert.notEqual(await card.evaluate(el=>getComputedStyle(el).color),'rgb(41, 46, 54)')
+})
+await check('角色颜色区分管理员、OP和成员，深浅主题均清晰且长名不撑宽',async()=>{
+  for (const dark of [false,true]) {
+    await page.evaluate(dark=>{document.body.classList.toggle('dark',dark);document.documentElement.dataset.theme=dark?'classic-dark':'classic-light'},dark)
+    const colors=[]
+    for (const [role,roleId] of [['管理员','adminRole'],['OP','1630552921050'],['纪律委员','1630631382235'],['超级会员','1630553268292'],['成员','memberRole'],['新手','defaultRole'],['游客','visitorRole']]) {
+      await reopen({role,roleId,medalCount:1,background:dark})
+      const badge=page.locator('.user-role-badge')
+      assert.equal(await badge.innerText(),role)
+      colors.push(await badge.evaluate(el=>getComputedStyle(el).color))
+      await withinViewport()
+      if(role==='管理员')await card.screenshot({animations:'disabled',path:path.join(output,`role-admin-${dark?'dark':'light'}.png`)})
+    }
+    assert.equal(new Set(colors).size,7)
+    await reopen({role:'很长的自定义角色名称需要安全省略',roleId:'customRole'})
+    const size=await page.locator('.user-role-badge').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,overflow:getComputedStyle(el).textOverflow}))
+    assert.ok(size.scroll>size.width);assert.equal(size.overflow,'ellipsis')
+    assert.match(await page.locator('.user-role-badge').getAttribute('class'),/--neutral/)
+    await withinViewport()
+  }
+  await reopen({role:'成员',roleId:'memberRole'})
 })
 await reopen({background:false,medalCount:10,failMedal:true})
 await check('勋章失败重试期间保留按钮和焦点，成功移交焦点且不关闭浮层',async()=>{

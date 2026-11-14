@@ -18,6 +18,7 @@ import VipNickname from '@/components/user/VipNickname.vue'
 import {articleHeat} from '@/api/v3-article-heat'
 import {subscribeArticleChanges} from '@/api/v3-realtime'
 import ArticleOwnerActions from '@/components/articles/ArticleOwnerActions.vue'
+import RevisionHistory from '@/components/articles/RevisionHistory.vue'
 import { ApiError,getAuthContextVersion } from '@/api/http'
 import QuickReplyPanel from '@/components/articles/QuickReplyPanel.vue'
 import CommentComposer from '@/components/articles/CommentComposer.vue'
@@ -515,6 +516,7 @@ function itemHandlers(c: ArticleComment) {
     <button v-if="routeMounted && !isLong && commentingEnabled && commentsInView && !quickReplyOpen" class="quick-reply-floating" type="button" title="写回复" aria-label="写回复" @click="openQuickReply()"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/></svg></button>
     <DefineOwnerActions>
       <ArticleOwnerActions :article-id="article.oId" :author-id="article.articleAuthorId||''" :anonymous="Number(article.articleAnonymous)===1" :permanent="article.stick?.permanent||false" @changed="ownerChanged" @deleted="ownerDeleted" />
+      <RevisionHistory kind="article" :target-id="article.oId" />
       <p v-if="ownerRefreshError" role="alert">{{ ownerRefreshError }} <button type="button" @click="load(true,'owner')">重读文章状态</button></p>
     </DefineOwnerActions>
     <DefineReward>

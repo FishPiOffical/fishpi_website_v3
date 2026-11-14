@@ -2,13 +2,17 @@ import { nicknameFixtureURL, nicknameFixtureCalls, nicknameFixtureStyles } from 
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import ts from 'typescript'
-import { parse, compileScript } from '@vue/compiler-sfc'
+import { parse, compileScript, compileTemplate } from '@vue/compiler-sfc'
 import { createRenderer, createSSRApp, h, nextTick, ref, reactive, computed } from 'vue'
 import { createPinia, defineStore } from 'pinia'
 import { renderToString } from '@vue/server-renderer'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 const avatarStyleURL=url(compile(await fs.readFile('src/utils/avatar.ts','utf8')))
+const timeURL=url(compile(await fs.readFile('src/utils/time.ts','utf8')))
+// 使用当前可见性提示组件，避免源码新增依赖后父级交互测试在导入阶段中断。
+const visibilitySource=parse(await fs.readFile('src/components/comments/CommentVisibilityNotice.vue','utf8')).descriptor.template.content
+const visibilityURL=url(compileTemplate({source:visibilitySource,id:'comment-visibility-test'}).code.replaceAll('from "vue"',`from '${import.meta.resolve('vue')}'`)+ '\nexport default {render}')
 globalThis.__comments={context:1,requests:[],responses:[],dispatch:null,confirmations:[],confirmWork:async()=>true,balanceFails:false};const state=__comments
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__comments.context}export async function request(path,init){const s=globalThis.__comments;s.requests.push({path,init});if(s.dispatch)return s.dispatch(path,init);const value=s.responses.shift();if(value instanceof Error)throw value;return value}`)
 const replace=(source,pairs)=>{for(const [from,to]of pairs)source=source.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`);return source}
@@ -23,7 +27,7 @@ const storeSource=compile((await fs.readFile('src/stores/v3Comments.ts','utf8'))
 const {useV3CommentsStore}=await import(url(replace(storeSource,[['@/utils/avatar',avatarStyleURL],['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-comments',apiURL],['@/api/v3-profile',keys],['@/composables/useDialog',dialogURL],['@/stores/auth',authURL]])))
 globalThis.__commentsStore=useV3CommentsStore
 const storeURL=url('export const useV3CommentsStore=globalThis.__commentsStore'),noopURL=url('export default {render(){return null}}')
-function sfc(source,pairs){return url(replace(compile(compileScript(parse(source).descriptor,{id:'comments-test',inlineTemplate:true}).content),[['@/utils/avatar',avatarStyleURL],['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],...pairs]))}
+function sfc(source,pairs){return url(replace(compile(compileScript(parse(source).descriptor,{id:'comments-test',inlineTemplate:true}).content),[['@/utils/time',timeURL],['@/components/comments/CommentVisibilityNotice.vue',visibilityURL],['@/utils/avatar',avatarStyleURL],['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],...pairs]))}
 const markdownURL=url(`import {h} from '${import.meta.resolve('vue')}';export default{props:['modelValue'],emits:['update:modelValue','submit'],setup(props,{emit,expose}){expose({flush:()=>props.modelValue});return()=>h('textarea',{value:props.modelValue,'onUpdate:modelValue':v=>emit('update:modelValue',v)})}}`)
 const chatShortcutURL=url(compile(await fs.readFile('src/utils/chatSendShortcut.ts','utf8')))
 const chatURL=sfc(await fs.readFile('src/components/ChatComposer.vue','utf8'),[['@/components/EmojiPicker.vue',noopURL],['@/components/MarkdownEditor.vue',markdownURL],['@/utils/chatSendShortcut',chatShortcutURL]])
@@ -83,8 +87,13 @@ const reactionStoreURL=url('export function useV3ReactionsStore(){return {invali
 const articleRealtimeURL=url('export function subscribeArticleChanges(id,changed){globalThis.__articleSubscription={id,changed,closed:false};return()=>{globalThis.__articleSubscription.closed=true}}'),articleHeatURL=url('export async function articleHeat(){return 3}')
 const parentPairs=[['@/api/v3-realtime',articleRealtimeURL],['@/api/v3-article-heat',articleHeatURL],['@/api/http',http],['@/stores/v3Reactions',reactionStoreURL],['@/components/user/VipNickname.vue',nicknameFixtureURL],['vue-router',routerURL],['@/utils/text',textURL],['@/api/fishpi',fishpiURL],['@/stores/auth',authURL],['@/stores/v3Comments',storeURL],['@/seo/site',seoURL],['@/composables/usePageSeo',pageSeoURL],['@/seo/payload',payloadURL],['@/stores/layout',layoutURL],['@/utils/reusableTemplate',reusableURL],['@/utils/swr',cacheURL],['@/components/CommentItem.vue',itemURL],['@/components/articles/CommentComposer.vue',composerURL]]
 for(const name of ['articles/ArticleCommentLocation','discovery/RandomArticles','articles/ArticleOwnerActions','articles/RevisionHistory','articles/ContentRelationButton','articles/ArticleInteraction','medal/MedalList','V3ReactionBar','ReportDialog','FpLoading','ArticleSkeleton','ImageLightbox','articles/LongArticleReader'])parentPairs.push(['@/components/'+name+'.vue',noopURL])
+const quickReplyURL=sfc(await fs.readFile('src/components/articles/QuickReplyPanel.vue','utf8'),[])
+parentPairs.push(['@/components/articles/QuickReplyPanel.vue',quickReplyURL])
 const parent=(await import(sfc(parentSource,parentPairs))).default
 const actualWebSocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};globalThis.location={protocol:'http:',host:'local'}
+// 父页的快捷回复挂载会注册滚动事件，测试只补事件宿主，不伪造滚动目标。
+const actualWindow=globalThis.window
+globalThis.window={addEventListener(){},removeEventListener(){}}
 let records=[],parentReadFail=false,reads=0;globalThis.__parentFetch=async()=>{reads++;if(parentReadFail)throw Error('列表503');return{oId:'2',articleTitle:'实际文章页联动',articleCommentable:true,articleStatement:0,articleType:0,articleContent:'<p>正文</p>',articleTags:'',articleAuthorId:'9',articleAuthorName:'other',articleRewardPoint:0,articleCommentCount:records.length,articleComments:records.map(x=>({...x})),pagination:{paginationCurrentPageNum:1,paginationPageCount:1}}}
 state.confirmWork=async()=>true;writes=[];state.dispatch=async(path,init)=>{if(init?.method){writes.push({path,init});if(init.method==='POST'){records=[{oId:'3',commentAuthorId:'1',commentAuthorName:'owner',commentContent:'<p>已发布</p>',commentContentVisible:true}];parentReadFail=true;return env({id:'3',permalink:'/article/2#comment3'})}if(init.method==='PUT'){records[0].commentContent='<p>已编辑</p>';return env({id:'3',permalink:'/article/2#comment3'})}records=[];return env({id:'3',removed:true})}return env(comment)}
 function mountParent(){const root={children:[]},app=renderer.createApp(parent),pinia=createPinia();app.use(pinia);app.mount(root);return{root,app,user:auth(pinia),text:()=>text(root)}}
@@ -103,7 +112,7 @@ writes=[];state.dispatch=async(path,init)=>{writes.push({path,init});return env(
 console.log('PASS comments 15 changing the reply/paragraph target aborts the pending confirmation and cannot post to the prior target')
 state.dispatch=null;state.responses.push(env(page([{id:anchor,state:'active',commentCount:0}],1,50,2)));await assert.rejects(api.fetchV3ParagraphSummary('2'),e=>e.status===502)
 const fifty=Array.from({length:50},(_,i)=>({id:i.toString(16).padStart(64,'0'),state:'active',commentCount:0}));state.responses.push(env(page(fifty,1,50,51)),env(page([],2,50,50)));await assert.rejects(api.fetchV3ParagraphSummary('2'),e=>e.status===503)
-const itemComponent=(await import(itemURL)).default,privateSSR=createSSRApp(itemComponent,{comment:{oId:'3',commentAuthorName:'匿名用户',commentAuthorId:'',commentContent:'SECRET PRIVATE HTML',commentContentVisible:false}});const privateMarkup=await renderToString(privateSSR);assert.match(privateMarkup,/此评论正文当前不可见/);assert.ok(!privateMarkup.includes('SECRET'));assert.ok(!privateMarkup.includes('<a'))
+const itemComponent=(await import(itemURL)).default,privateSSR=createSSRApp(itemComponent,{comment:{oId:'3',commentAuthorName:'匿名用户',commentAuthorId:'',commentContent:'SECRET PRIVATE HTML',commentContentVisible:false}});const privateMarkup=await renderToString(privateSSR);assert.match(privateMarkup,/class="comment-visibility-notice" role="note" aria-label="系统提示：评论正文当前不可见"/);assert.match(privateMarkup,/>评论正文当前不可见<\/span>/);assert.ok(!privateMarkup.includes('SECRET'));assert.ok(!privateMarkup.includes('<a'))
 console.log('PASS comments 16 inconsistent/incomplete paragraph directories fail explicitly; actual anonymous/private CommentItem never emits hidden HTML or a fake member link')
 // User-facing ArticleView never exposes or fetches revision history, including after token rotation.
 const savedSocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};records=[];parentReadFail=false;reads=0;(await import(cacheURL)).clearCache();let historyRequests=0;state.dispatch=path=>{if(path.includes('/revisions'))historyRequests++;return env({})}
@@ -205,3 +214,5 @@ state.dispatch=async path=>{assert.equal(path,'/api/v3/comments/3/location');ret
 globalThis.__parentFetch=async(id,p)=>{targetedPages.push(p);return{...policyBase,articleCommentable:true,articleComments:p===locationPage?[{oId:'3',commentAuthorId:'1',commentAuthorName:'owner',commentContent:'<p>targeted actual comment</p>',commentContentVisible:true}]:[],articleCommentCount:41,pagination:{paginationCurrentPageNum:p,paginationPageCount:3}}};
 const targetRoot={children:[]},targetApp=renderer.createApp(locationParent);targetApp.use(createPinia());targetApp.mount(targetRoot);const targetView={root:targetRoot,text:()=>text(targetRoot)};await tick();assert.ok(targetedPages.includes(2));assert.ok(find(targetRoot,n=>n.props?.id==='comment3'));assert.ok(targetedScrolls.includes('comment3'));locationPage=3;click(targetView,'重新定位评论');await tick();assert.ok(targetedPages.includes(3));assert.match(targetView.text(),/3 \/ 3/);targetApp.unmount();globalThis.document=priorDocument;globalThis.WebSocket=locationSocket;delete route.query;delete route.hash;
 console.log('PASS comments 32 full production ArticleView + locator + comment DOM: current location selects page two, scrolls actual comment ID and GET-only re-location loads changed page three')
+
+globalThis.window=actualWindow

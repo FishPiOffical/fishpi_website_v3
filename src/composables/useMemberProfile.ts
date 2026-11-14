@@ -46,8 +46,9 @@ export function useMemberProfile(name: Ref<string>): MemberProfile {
       const result = await fetchPublicUser(target, 'omit')
       if (valid()) {
         const sameProfile = snapshotExpires > Date.now() && profile.value?.id === result.id
+        // 公开身份可能已调整，即使其余资料缓存仍有效，也要同步角色名称与配色依据。
         profile.value = sameProfile && profile.value
-          ? { ...profile.value, cardBg: result.cardBg, userPoint: result.userPoint, onlineMinute: result.onlineMinute }
+          ? { ...profile.value, cardBg: result.cardBg, userPoint: result.userPoint, onlineMinute: result.onlineMinute, userRole: result.userRole, userRoleId: result.userRoleId }
           : result
         profileFromCache.value = false
         if (!sameProfile) { snapshotExpires = 0; savePublicSnapshot(key, publicCard(result)) }

@@ -13,11 +13,13 @@ const {accessToken,account}=storeToRefs(useAuthStore())
 const heading=ref<HTMLElement|null>(null)
 const mounted=ref(false),opened=ref(false),page=ref(1),listing=ref<RevisionPage|null>(null),detail=ref<RevisionDetail|null>(null),selected=ref<RevisionMeta|null>(null)
 const loading=ref(false),busy=ref(false),listError=ref(''),detailError=ref('')
-const authenticated=computed(()=>mounted.value&&!!accessToken.value&&!!account.value)
+// 历史入口只按服务端返回的对应能力显示，不因作者身份或角色展示名扩大权限。
+const permitted=computed(()=>account.value?.capabilities?.[props.kind==='article'?'viewArticleHistory':'viewCommentHistory']===true)
+const authenticated=computed(()=>mounted.value&&!!accessToken.value&&!!account.value&&permitted.value)
 const title=computed(()=>detail.value?.title===undefined?'':decodeEntities(detail.value.title))
 const content=computed(()=>detail.value?decodeEntities(detail.value.content):'')
 let listSequence=0,detailSequence=0,boundary=''
-function identity(){return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${props.kind}:${props.targetId}`}
+function identity(){return `${getAuthContextVersion()}:${!!accessToken.value}:${account.value?.oId||''}:${props.kind}:${props.targetId}:${permitted.value}`}
 function clearDetail(){detailSequence++;detail.value=null;selected.value=null;detailError.value='';busy.value=false}
 function clear(){listSequence++;clearDetail();listing.value=null;loading.value=false;listError.value=''}
 function close(){opened.value=false;clear();emit('openChange',false)}
@@ -42,7 +44,7 @@ async function select(meta:RevisionMeta){
   finally{if(valid())busy.value=false}
 }
 function date(time:number|null){return formatDateTime(time,'修改时间未知')}
-watch([accessToken,()=>account.value?.oId,()=>props.kind,()=>props.targetId],()=>{const next=identity();if(next===boundary)return;boundary=next;close()},{flush:'sync'})
+watch(identity,()=>{const next=identity();if(next===boundary)return;boundary=next;close()},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity()})
 onBeforeUnmount(()=>{mounted.value=false;close()})
 defineExpose({toggle,opened})

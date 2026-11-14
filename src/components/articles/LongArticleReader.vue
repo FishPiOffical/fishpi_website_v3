@@ -22,6 +22,7 @@ import CommentComposer from './CommentComposer.vue'
 import { getAuthContextVersion } from '@/api/http'
 import ContentRelationButton from './ContentRelationButton.vue'
 import ArticleInteraction from './ArticleInteraction.vue'
+import RevisionHistory from './RevisionHistory.vue'
 import V3ReactionBar from '@/components/V3ReactionBar.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useAppearanceStore } from '@/stores/appearance'
@@ -705,6 +706,7 @@ function chapterTitle(c: LongArticleChapter) {
               <V3ReactionBar kind="comment" :target-id="comment.oId" :initial-read-started="comment.interactionReadStarted" :initial-state="comment.interactions === null ? null : comment.interactions?.reactions" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="vote" :article-id="comment.oId" :initial-read-started="comment.interactionReadStarted" :initial-state="comment.interactions === null ? null : comment.interactions?.vote" />
               <ArticleInteraction v-if="loggedIn" resource="comments" kind="thanks" :article-id="comment.oId" :initial-read-started="comment.interactionReadStarted" :initial-state="comment.interactions === null ? null : comment.interactions?.thanks" />
+              <RevisionHistory v-if="loggedIn" kind="comment" :target-id="comment.oId" />
               <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
               </div>
               <template v-if="ownParagraphComment(comment)">
@@ -717,6 +719,7 @@ function chapterTitle(c: LongArticleChapter) {
                 <span v-else>匿名用户</span><span class="reply-colon">：</span>
                 <CommentVisibilityNotice v-if="reply.commentContentVisible===false" />
                 <span v-else class="reply-content" v-html="reply.commentContent || ''" />
+                <RevisionHistory v-if="loggedIn" kind="comment" :target-id="reply.oId" />
                 <button v-if="loggedIn && commentingEnabled && paragraphState==='active'" type="button" class="la-paragraph-reply" @click="replyToParagraphComment(comment)">回复</button>
               <template v-if="ownParagraphComment(comment)">
                 <button v-if="commentingEnabled" type="button" :disabled="commentWrites.busy||commentWrites.confirming||!!commentWrites.pending" @click="commentingEnabled && (paragraphEditingId=comment.oId)">编辑</button>

@@ -6,6 +6,7 @@ export type PublicUser = RelationUser & {
   cardBg?: string
   userNo?: string
   userRole?: string
+  userRoleId?: string
   userCity?: string
   userOnlineFlag?: boolean
   userPoint?: number
@@ -25,6 +26,7 @@ export function decodePublicUser(value: unknown, expectedName: string): PublicUs
   if (user.userName.toLowerCase() !== expectedName.toLowerCase() || typeof row.userIntro !== 'string' || row.userIntro.length > 65536 || typeof row.userURL !== 'string' || row.userURL.length > 4096) throw new ApiError('用户资料响应格式不正确', 502)
   const profile: PublicUser = { ...user, userIntro: row.userIntro, userURL: safeWebsite(row.userURL) }
   if (typeof row.userNo === 'string' && /^[1-9][0-9]{0,18}$/.test(row.userNo)) profile.userNo = row.userNo
+  if (typeof row.userRoleId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(row.userRoleId)) profile.userRoleId = row.userRoleId
   for (const field of ['userRole', 'userCity'] as const) {
     const value = row[field]
     if (typeof value === 'string' && value.length <= 128 && value.trim()) profile[field] = value.trim()

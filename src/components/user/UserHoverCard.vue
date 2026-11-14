@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { coverStyle, avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 import VipNickname from '@/components/user/VipNickname.vue'
+import UserRoleBadge from '@/components/user/UserRoleBadge.vue'
 import UserFollowButton from '@/components/user/UserFollowButton.vue'
 import V3MedalImage from '@/components/medal/V3MedalImage.vue'
 import { getAuthContextVersion } from '@/api/http'
@@ -441,7 +442,7 @@ onUnmounted(() => {
               <div v-if="profile.userNo || profile.userCity || profile.userRole" class="card-facts">
                 <span v-if="profile.userNo" class="member-number" :aria-label="`成员序号 ${profile.userNo}`"># {{ profile.userNo }}</span>
                 <span v-if="profile.userCity" class="card-city" :title="`城市 ${profile.userCity}`"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></svg><span class="sr-only">城市</span><span class="detail-label">{{ profile.userCity }}</span></span>
-                <span v-if="profile.userRole" class="card-badge" :title="profile.userRole">{{ profile.userRole }}</span>
+                <UserRoleBadge v-if="profile.userRole" class="card-badge" :name="profile.userRole" :role-id="profile.userRoleId" />
               </div>
             </div>
           </div>
@@ -522,8 +523,7 @@ onUnmounted(() => {
 .intro { display: -webkit-box; margin: 5px 0 0; overflow: hidden; color: var(--fp-text); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .card-details { display: flex; align-items: center; gap: 10px; min-width: 0; margin-top: 10px; color: var(--card-secondary); font-size: 12px; line-height: 18px; }
 .card-facts { display: flex; align-items: center; gap: 8px; min-width: 0; margin-inline-start: auto; }
-.card-badge { max-width: 8em; padding: 1px 6px; border: 1px solid var(--fp-border); border-radius: 5px; background: var(--fp-hover); color: var(--fp-text); }
-.card-profile--background .card-badge { background: color-mix(in srgb, var(--fp-card) 44%, transparent); border-color: color-mix(in srgb, var(--fp-card) 60%, transparent); }
+.card-badge { max-width: 8em; }
 .member-number { flex-shrink: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .card-status { display: inline-flex; flex-shrink: 0; align-items: center; gap: 4px; }
 .card-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
