@@ -128,3 +128,10 @@ Caddy 主站改为 `new.fishpi.cn`，旧 `yui.fishpi.cn` 以 301 保留路径/�
 生产直连变量下类型检查、客户端与 SSR 构建通过，仅重启网站。网站、反馈均 active，反馈 PID 1209600 未变；未修改 Rhythm、数据库、环境或 Caddy 配置，发布包不含 `.host`、环境文件和本地数据库。公网首页、聊天室、反馈 health 均为 200；入口、SidebarTabs、SideBar 和 ChatroomView 的 7 项 JS/CSS 与本地产物字节一致。
 
 线上游客 `/recent` 浏览器冒烟通过：资料卡在 Tab 上方、标签不含资料、配置齿轮唯一，折叠及下载/签到切换正常；1440px 和 390px 均无横向溢出或 pageerror。验证浏览器将自动认证恢复 POST 在本地拦截为 401，实际只发出 GET/HEAD/OPTIONS；未登录、未执行生产业务写入，未重验登录态聊天室交互。
+
+
+## 2026-11-14 前端更新至 df3b93b
+
+发布至 `/opt/fishpi/releases/20261114-df3b93b`，保留前版 `20261114-e64b675` 和旧 assets。首页与内页列表、普通及长篇详情统一置顶标记：永久置顶暖橙、限时置顶绿色，列表使用轻量底色与侧线，窄屏长标题正常换行。
+
+生产直连变量下类型检查、客户端及 SSR 构建通过，仅重启网站；网站与反馈服务 active，反馈 PID 1209600 未变，未修改 Rhythm、数据库及环境配置，发布包不含 `.host`。公网首页、最新列表、聊天室和反馈 health 均返回 200；入口 JS、HomeView JS、ArticleFeed CSS 及 ArticlePinBadge CSS 与本地产物字节一致。深浅主题及 320–1440px 真实组件浏览器检查已在本地完成，上线仅做只读 HTTP 与资源核验。
