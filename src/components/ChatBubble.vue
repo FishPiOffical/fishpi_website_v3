@@ -149,7 +149,7 @@ function onBodyClick(e: MouseEvent) {
         </div>
         <MedalList :items="medals" variant="chat" />
       </div>
-      <div class="fp-bubble" @click="onBodyClick">
+      <div v-if="!display.quotes.length || display.html || $slots.default" class="fp-bubble" @click="onBodyClick">
         <div v-if="!chatroom" class="head">
           <RouterLink :to="`/member/${userName}`" class="name">
             <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>
@@ -160,9 +160,6 @@ function onBodyClick(e: MouseEvent) {
         </div>
         <slot>
           <div v-if="display.html" class="vditor-reset body" v-html="display.html" />
-          <div v-if="display.quotes.length" class="chat-quote-stack">
-            <ChatQuoteCard v-for="(quote, index) in display.quotes" :key="index" :quote="quote" />
-          </div>
         </slot>
         <p v-if="chatroom && tail && !simpleMode && !isStandalone" class="fp-chat-tail" data-chat-tail><svg class="tail-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="小尾巴"><title>小尾巴</title><path fill="currentColor" stroke="none" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"/></svg><span class="tail-content">{{ tail.text }}</span></p>
         <template v-if="!chatroom">
@@ -172,6 +169,9 @@ function onBodyClick(e: MouseEvent) {
             <time>{{ formatDisplayTime(time) }}</time>
           </div>
         </template>
+      </div>
+      <div v-if="display.quotes.length" class="chat-quote-stack">
+        <ChatQuoteCard v-for="(quote, index) in display.quotes" :key="index" :quote="quote" />
       </div>
       <div v-if="chatroom" class="foot">
         <time>{{ formatDisplayTime(time) }}</time>
@@ -522,13 +522,8 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
   font-size: 14px;
   line-height: 1.7;
 }
-.chat-quote-stack { display: grid; gap: 6px; }
-.body + .chat-quote-stack { margin-top: 7px; }
-.body + .chat-quote-stack :deep(.chat-quote-card) {
-  background: color-mix(in srgb, var(--fp-card) 46%, transparent);
-  border-color: color-mix(in srgb, var(--fp-muted) 20%, transparent);
-  border-inline-start-color: color-mix(in srgb, var(--fp-muted) 50%, transparent);
-}
+.chat-quote-stack { display: grid; gap: 6px; max-width: 100%; min-width: 0; }
+.fp-bubble + .chat-quote-stack { margin-top: 2px; }
 .is-room .body :deep(p + p) { margin-top: 6px; }
 .is-room .body :deep(.chat-image-frame) {
   display: inline-flex;
