@@ -978,9 +978,13 @@ onUnmounted(() => {
   .whisper-panel .conversation-avatar { width: 28px; height: 28px; }
   .whisper-panel .conversation-avatar img { width: 28px; height: 28px; }
   .whisper-panel .messages { gap: 7px; padding: 8px; }
-  .whisper-panel .messages :deep(.fp-msg) { gap: 5px; }
-  .whisper-panel .messages :deep(.fp-avatar-frame),
+  .whisper-panel .messages :deep(.fp-msg) { gap: 8px; }
+  /* 只缩头像，外框保留内边距自然撑开，避免角标挤到头像中央。 */
   .whisper-panel .messages :deep(.fp-avatar) { width: 24px; height: 24px; }
+  .whisper-panel .messages :deep(.fp-msg:is([data-frame="paipai-orange"], [data-frame="fishpond-blue"], [data-frame="paipai-stamp"], [data-frame="star-ring"]) .fp-avatar-frame::after) {
+    transform: scale(0.67);
+    transform-origin: bottom right;
+  }
   .whisper-panel .messages :deep(.fp-bubble) { padding: 4px 8px 3px; border-radius: 8px; transition: padding 180ms ease; }
   .whisper-panel .messages :deep(.fp-bubble .body) { font-size: 12px; }
   .whisper-panel .messages :deep(.fp-bubble .body blockquote) { font-size: 10px; }
