@@ -83,3 +83,9 @@ Caddy 主站改为 `new.fishpi.cn`，旧 `yui.fishpi.cn` 以 301 保留路径/�
 ### 旧域名退役
 
 2026-11-12 用户确认旧域名 DNS 已删除，随后从服务器和部署模板移除 `yui.fishpi.cn` 站点/301跳转块，仅保留 `new.fishpi.cn`。Caddy 配置验证及 reload 成功，新域名首页 200；未修改 DNS 平台记录。更改前配置备份为 `/etc/caddy/Caddyfile.before-remove-yui-20261112`。
+
+## 2026-11-14 前端更新至 af7af74
+
+已发布至 `/opt/fishpi/releases/20261114-af7af74`，前版 `20261113-9befe8b` 和旧 assets 保留。包含首页工具独立成行、下载推荐恢复右侧排行上方，以及头像按显示宽度请求二倍像素。按本文生产变量完整构建，仅重启 fishpi-website；反馈目录原样保留，反馈进程 PID 1209600 未变，未修改数据库、环境配置或 Rhythm。发布包只包含构建与运行文件，不含 .host。
+
+公网首页和反馈 health 均 200，抽查首页、下载推荐及排行榜 CSS 与本地产物一致。无登录 Chrome 验证首排最新两栏/下载与排行、第二行上下班时间和签到、第三行长篇；20px 头像实际 URL 为 /w/40，无横向溢出或 pageerror。未执行真实账号写入。
