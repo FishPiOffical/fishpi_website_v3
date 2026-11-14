@@ -519,7 +519,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home :deep(.fixed-heading) { padding: 10px 12px; }
 
 .board--aligned [data-home-module="side:income"] :deep(.home-side-widget),
-.board--aligned [data-home-module="side:profile"] :deep(.home-side-widget) { flex: 1; min-height: 120px; }
+.board--aligned [data-home-module="side:profile"] :deep(.home-side-widget) { flex: 1; min-height: 0; }
 .home-download-tool { display: flex; align-items: center; }
 .home-download-tool :deep(.client-download) { width: 100%; border: 0; padding: 0; background: transparent; }
 .home-checkin-tool :deep(.home-checkin), .home-checkin-tool :deep(.checkin-panel) { margin: 0; }
@@ -534,6 +534,30 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home [data-home-module="side:income"] :deep(.income) { display: grid; grid-template-columns: 1fr auto; align-items: center; text-align: left; }
 .home [data-home-module="side:income"] :deep(.time) { grid-column: 1; font-size: 24px; }
 .home [data-home-module="side:income"] :deep(.money) { grid-column: 2; grid-row: 1 / span 2; padding-left: 12px; border-left: 1px solid var(--fp-border); }
+/* 工具卡按自身宽度排版，拖到其他列后仍能自适应，不影响内页复用组件。 */
+.home [data-home-module="side:profile"].mod,
+.home [data-home-module="side:income"].mod,
+.home [data-home-module="checkin"].mod { container: home-tool / inline-size; }
+.home [data-home-module="side:profile"] :deep(.home-disclosure),
+.home [data-home-module="side:income"] :deep(.home-disclosure),
+.home .home-checkin-tool > .home-disclosure { display: flex; flex-direction: column; height: 100%; }
+.home [data-home-module="side:profile"] :deep(.disclosure-body),
+.home [data-home-module="side:income"] :deep(.disclosure-body),
+.home .home-checkin-tool :deep(.disclosure-body) { flex: 1; display: flex; align-items: center; padding: 4px 12px 12px; }
+.home [data-home-module="side:profile"] :deep(.person-card),
+.home [data-home-module="side:profile"] :deep(.guest-card),
+.home [data-home-module="side:income"] :deep(.schedule),
+.home .home-checkin-tool :deep(.checkin-panel) { width: 100%; min-width: 0; }
+.home [data-home-module="side:income"] :deep(.income) { column-gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--fp-hover); }
+.home [data-home-module="side:income"] :deep(.money) { max-width: 100%; font-size: 12px; overflow-wrap: anywhere; }
+.home .home-checkin-tool :deep(.checkin-head) { display: none; }
+.home .home-checkin-tool :deep(.checkin-footer) { margin-top: 8px; }
+@container home-tool (min-width: 360px) {
+  .home [data-home-module="side:profile"] :deep(.person-card) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 12px; }
+  .home [data-home-module="side:profile"] :deep(.person-head) { margin: 0; }
+  .home [data-home-module="side:profile"] :deep(.person-sub) { flex-wrap: wrap; }
+  .home [data-home-module="side:profile"] :deep(.person-stats) { grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 0; border-left: 1px solid var(--fp-border); padding: 0 0 0 12px; gap: 8px; }
+}
 .home-person { margin-bottom: 10px; }
 .home-person :deep(.person-head) { margin-bottom: 8px; gap: 8px; }
 .home-person :deep(.person-avatar) { width: 34px; height: 34px; }
