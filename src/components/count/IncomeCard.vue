@@ -20,6 +20,7 @@ function openSettings() {
     :title="sidebar.isOn('income') ? '点击设置上下班时间' : '请先在聊天室侧栏设置中启用上下班时间'"
     @click="openSettings"
   >
+    <span class="income-main">
     <template v-if="!loaded">
       <span class="label">上下班时间</span>
       <span class="time-placeholder" role="status" aria-label="正在准备上下班时间" />
@@ -35,17 +36,19 @@ function openSettings() {
     <template v-else-if="view.kind === 'work'">
       <span class="label">🧑‍💻 距离下班</span>
       <span class="time">{{ view.time }}</span>
-      <span v-if="view.earned" class="money">今日已赚 ￥{{ view.earned }}</span>
+      <span v-if="view.earned" class="money"><span class="money-label">今日已赚 </span><span class="money-value">￥{{ view.earned }}</span></span>
     </template>
     <template v-else>
       <span class="label">🎉 {{ view.salary ? '下班啦，今天赚了' : '下班时间到' }}</span>
       <span v-if="view.salary" class="money big">￥{{ view.salary }}</span>
     </template>
+    </span>
     <slot />
   </button>
 </template>
 
 <style scoped>
+.income-main { display: contents; }
 .income {
   display: flex;
   flex-direction: column;

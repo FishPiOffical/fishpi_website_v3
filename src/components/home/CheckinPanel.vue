@@ -6,6 +6,7 @@ import { useV3ActivityStore } from '@/stores/v3Activity'
 import { getAuthContextVersion } from '@/api/http'
 import { useActivityStatus } from '@/composables/useActivityStatus'
 import { fpConfirm } from '@/composables/useDialog'
+withDefaults(defineProps<{ dashboard?: boolean }>(), { dashboard: false })
 const emit = defineEmits<{ summary: [text: string] }>()
 const auth = useAuthStore(), writes = useV3ActivityStore(), { checkin, reward } = useActivityStatus(), mounted = ref(false), confirming = ref(false)
 const loggedIn = computed(() => mounted.value && !!auth.accessToken && !!auth.account?.oId)
@@ -48,7 +49,7 @@ onMounted(() => { mounted.value = true })
 onBeforeUnmount(() => { cancel(); clearNotice() })
 </script>
 <template>
-  <div v-if="loggedIn" class="checkin-panel">
+  <div v-if="loggedIn" class="checkin-panel" :class="{ 'checkin-panel--dashboard': dashboard }">
     <section class="checkin-section" aria-label="今日签到活跃状态">
       <div class="checkin-head">
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="3"/><path d="M8 4v4m8-4v4M4 10h16m-11 5 2 2 4-4"/></svg>每日签到</h3>
@@ -72,10 +73,12 @@ onBeforeUnmount(() => { cancel(); clearNotice() })
           <p v-if="!today.checkedIn" class="activity-target">达 {{ today.threshold }}% 自动签到</p>
           <p v-else class="activity-target">今日签到已完成</p>
         </div>
+        <div v-if="dashboard" class="activity-streak"><strong>{{ today.streak }}<small> 天</small></strong><span>连续签到</span></div>
       </div>
       <div v-if="today || reward.value.value?.claimable" class="checkin-footer">
         <span v-if="today" class="checkin-status" role="status" :class="{ 'is-done': today.checkedIn }">{{ today.checkedIn ? '已签到' : '待签到' }}</span>
-        <span v-if="today" class="checkin-streak">连续 <strong>{{ today.streak }}</strong> 天</span>
+        <span v-if="today && dashboard && !today.checkedIn" class="dashboard-goal">达 {{ today.threshold }}% 自动签到</span>
+        <span v-if="today && !dashboard" class="checkin-streak">连续 <strong>{{ today.streak }}</strong> 天</span>
         <button v-if="reward.value.value?.claimable" type="button" class="claim-reward-btn" aria-label="领取昨日活跃奖励" :disabled="writes.busy || !!writes.pending || confirming" @click="collect()">{{ writes.busy ? '领取中…' : confirming ? '待确认…' : '领昨日奖励' }}</button>
       </div>
       <div v-if="reward.error.value" role="alert"><p class="fp-retry-copy">{{ reward.error.value }}</p><button class="fp-retry-icon" type="button" @click="reward.read()" title="重试奖励状态">重试奖励状态</button></div>

@@ -238,7 +238,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             <section v-else-if="mod.id === 'checkin'" class="mod-body home-tool home-checkin-tool">
               <HomeModuleDisclosure v-if="homeReady && isLoggedIn" class="home-checkin" fixed-open module-key="rank:checkin" module-id="checkin" title="今日活跃与签到">
                 <template #default="{ reportSummary }">
-                  <CheckinPanel @summary="reportSummary" />
+                  <CheckinPanel dashboard @summary="reportSummary" />
                 </template>
               </HomeModuleDisclosure>
               <div v-else class="home-checkin-guest">
@@ -507,58 +507,82 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .is-classic .recent-continuation { visibility: visible; }
 @media (max-width: 960px) { .is-classic .recent-continuation { visibility: visible; } }
-/* 首页工具行共用紧凑间距，保留等高；不影响内页侧栏。 */
+/* 首页工具卡统一为标题、主信息、底部操作三段；内页仍使用原侧栏样式。 */
 .home-tool { min-height: 0; }
 .home .home-checkin-tool { padding: 0; }
-.home-checkin-tool :deep(.disclosure-body) { padding: 0 12px 10px; }
-.home-checkin-tool :deep(.disclosure-head) { margin-bottom: 0; }
-.home [data-home-module="side:profile"] :deep(.person-head) { gap: 8px; margin-bottom: 8px; }
-.home [data-home-module="side:profile"] :deep(.person-avatar) { width: 36px; height: 36px; }
-.home [data-home-module="side:profile"] :deep(.person-stats) { padding-top: 6px; }
-.home [data-home-module="side:profile"] :deep(.stat-col) { padding-block: 2px; }
-.home :deep(.fixed-heading) { padding: 10px 12px; }
-
-.board--aligned [data-home-module="side:income"] :deep(.home-side-widget),
-.board--aligned [data-home-module="side:profile"] :deep(.home-side-widget) { flex: 1; min-height: 0; }
-.home-download-tool { display: flex; align-items: center; }
-.home-download-tool :deep(.client-download) { width: 100%; border: 0; padding: 0; background: transparent; }
-.home-checkin-tool :deep(.home-checkin), .home-checkin-tool :deep(.checkin-panel) { margin: 0; }
-.home-checkin-tool :deep(.checkin-section) { border: 0; background: transparent; padding: 0; }
-.home-checkin-tool :deep(.activity-ring) { width: 40px; height: 40px; }
-
-.home-checkin-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.home-checkin-guest strong { width: 100%; font-size: 14px; }
-.home-checkin-guest p { flex: 1; color: var(--fp-muted); font-size: 12px; }
-.home-checkin-guest a { color: var(--fp-primary); font-size: 12px; }
-.home [data-home-module="side:income"] :deep(.hint) { display: none; }
-.home [data-home-module="side:income"] :deep(.income) { display: grid; grid-template-columns: 1fr auto; align-items: center; text-align: left; }
-.home [data-home-module="side:income"] :deep(.time) { grid-column: 1; font-size: 24px; }
-.home [data-home-module="side:income"] :deep(.money) { grid-column: 2; grid-row: 1 / span 2; padding-left: 12px; border-left: 1px solid var(--fp-border); }
-/* 工具卡按自身宽度排版，拖到其他列后仍能自适应，不影响内页复用组件。 */
 .home [data-home-module="side:profile"].mod,
 .home [data-home-module="side:income"].mod,
 .home [data-home-module="checkin"].mod { container: home-tool / inline-size; }
+.board--aligned [data-home-module="side:income"] :deep(.home-side-widget),
+.board--aligned [data-home-module="side:profile"] :deep(.home-side-widget) { flex: 1; min-height: 0; }
+.home [data-home-module="side:profile"] :deep(.home-side-widget),
+.home [data-home-module="side:income"] :deep(.home-side-widget) { border-radius: var(--fp-panel-radius); }
+.home :deep(.fixed-heading) { padding: 14px 16px 0; font-size: 13px; font-weight: 600; color: var(--fp-muted); }
 .home [data-home-module="side:profile"] :deep(.home-disclosure),
 .home [data-home-module="side:income"] :deep(.home-disclosure),
-.home .home-checkin-tool > .home-disclosure { display: flex; flex-direction: column; height: 100%; }
+.home .home-checkin-tool > .home-disclosure { display: flex; flex-direction: column; height: 100%; margin: 0; }
 .home [data-home-module="side:profile"] :deep(.disclosure-body),
 .home [data-home-module="side:income"] :deep(.disclosure-body),
-.home .home-checkin-tool :deep(.disclosure-body) { flex: 1; display: flex; align-items: center; padding: 4px 12px 12px; }
+.home .home-checkin-tool :deep(.disclosure-body) { flex: 1; display: flex; padding: 0 16px 6px; }
 .home [data-home-module="side:profile"] :deep(.person-card),
 .home [data-home-module="side:profile"] :deep(.guest-card),
 .home [data-home-module="side:income"] :deep(.schedule),
-.home .home-checkin-tool :deep(.checkin-panel) { width: 100%; min-width: 0; }
-.home [data-home-module="side:income"] :deep(.income) { column-gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--fp-hover); }
-.home [data-home-module="side:income"] :deep(.money) { max-width: 100%; font-size: 12px; overflow-wrap: anywhere; }
+.home .home-checkin-tool :deep(.checkin-panel) { width: 100%; min-width: 0; margin: 0; }
+/* 身份与积分占主信息区，关注、收藏、发帖保留为底部三个独立入口。 */
+.home [data-home-module="side:profile"] :deep(.person-card) { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: minmax(86px, 1fr) auto; padding: 0; }
+.home [data-home-module="side:profile"] :deep(.person-head) { grid-column: 1 / 5; margin: 0; padding-right: 12px; gap: 10px; }
+.home [data-home-module="side:profile"] :deep(.person-avatar) { width: 40px; height: 40px; }
+.home [data-home-module="side:profile"] :deep(.person-sub) { flex-wrap: wrap; gap: 4px; }
+.home [data-home-module="side:profile"] :deep(.person-stats) { display: contents; }
+.home [data-home-module="side:profile"] :deep(.stat-col) { grid-column: span 2; min-height: 38px; flex-direction: row; align-items: center; justify-content: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--fp-border); border-radius: 0; }
+.home [data-home-module="side:profile"] :deep(.stat-col:first-child) { grid-column: 5 / 7; grid-row: 1; flex-direction: column; align-items: flex-end; border: 0; gap: 3px; }
+.home [data-home-module="side:profile"] :deep(.stat-col:first-child strong) { max-width: 100%; font-size: 22px; font-variant-numeric: tabular-nums; }
+.home [data-home-module="side:profile"] :deep(.stat-col span) { font-size: 11px; }
+.home [data-home-module="side:profile"] :deep(.stat-col.action) { color: var(--fp-primary); }
+.home [data-home-module="side:profile"] :deep(.post-strong svg) { width: 15px; height: 15px; }
+/* 倒计时和收入共享同一基线，设置入口恢复到独立底栏。 */
+.home [data-home-module="side:income"] :deep(.schedule) { display: flex; }
+.home [data-home-module="side:income"] :deep(.income) { display: flex; flex-direction: column; align-items: stretch; gap: 0; text-align: left; }
+.home [data-home-module="side:income"] :deep(.income-main) { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; min-height: 86px; gap: 0 12px; }
+.home [data-home-module="side:income"] :deep(.label) { grid-column: 1; grid-row: 2; align-self: start; padding-top: 3px; }
+.home [data-home-module="side:income"] :deep(.time) { grid-column: 1; grid-row: 1; align-self: end; font-size: clamp(24px, 7cqi, 30px); line-height: 1.2; letter-spacing: -.5px; }
+.home [data-home-module="side:income"] :deep(.money) { grid-column: 2; grid-row: 1 / 3; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; margin: 0; }
+.home [data-home-module="side:income"] :deep(.money.big) { grid-column: 1 / -1; grid-row: 1; align-self: end; align-items: flex-start; font-size: 28px; }
+.home [data-home-module="side:income"] :deep(.time-placeholder),
+.home [data-home-module="side:income"] :deep(.sub) { grid-column: 1; grid-row: 1; align-self: end; }
+.home [data-home-module="side:income"] :deep(.money-label) { order: 1; color: var(--fp-muted); font-size: 11px; }
+.home [data-home-module="side:income"] :deep(.money-value) { font-size: 20px; font-weight: 650; }
+.home [data-home-module="side:income"] :deep(.hint) { display: flex; align-items: center; justify-content: space-between; min-height: 38px; margin: 0; padding: 6px 0; font-size: 11px; }
+/* 活跃度和连续天数都进入主信息区，底部只承载状态和领取操作。 */
+.home .home-checkin-tool :deep(.checkin-section) { display: flex; flex-direction: column; height: 100%; margin: 0; padding: 0; border: 0; background: transparent; }
 .home .home-checkin-tool :deep(.checkin-head) { display: none; }
-.home .home-checkin-tool :deep(.checkin-footer) { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; margin-top: 8px; }
-.home .home-checkin-tool :deep(.checkin-streak) { text-align: right; overflow-wrap: anywhere; }
-.home .home-checkin-tool :deep(.claim-reward-btn) { grid-column: 1 / -1; justify-self: end; margin-left: 0; }
-@container home-tool (min-width: 360px) {
-  .home [data-home-module="side:profile"] :deep(.person-card) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 12px; }
-  .home [data-home-module="side:profile"] :deep(.person-head) { margin: 0; }
-  .home [data-home-module="side:profile"] :deep(.person-sub) { flex-wrap: wrap; }
-  .home [data-home-module="side:profile"] :deep(.person-stats) { grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 0; border-left: 1px solid var(--fp-border); padding: 0 0 0 12px; gap: 8px; }
+.home .home-checkin-tool :deep(.activity-meter) { flex: 1; min-height: 86px; gap: 10px; padding: 12px 0; border-radius: 0; background: transparent; }
+.home .home-checkin-tool :deep(.activity-ring) { width: 40px; height: 40px; }
+.home .home-checkin-tool :deep(.activity-details) { flex: 1; }
+.home .home-checkin-tool :deep(.activity-value) { display: flex; flex-direction: column; gap: 3px; }
+.home .home-checkin-tool :deep(.activity-value strong) { font-size: 24px; }
+.home .home-checkin-tool :deep(.activity-target) { display: none; }
+.home .home-checkin-tool :deep(.activity-streak) { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; color: var(--fp-muted); font-size: 11px; }
+.home .home-checkin-tool :deep(.activity-streak strong) { color: var(--fp-title); font-size: 22px; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.home .home-checkin-tool :deep(.activity-streak small) { color: var(--fp-muted); font-size: 11px; font-weight: 400; }
+.home .home-checkin-tool :deep(.checkin-footer) { min-height: 38px; margin: 0; padding: 6px 0; border-top: 1px solid var(--fp-border); gap: 6px; }
+.home .home-checkin-tool :deep(.claim-reward-btn) { margin-left: auto; }
+.home .home-checkin-tool :deep(.dashboard-goal) { color: var(--fp-muted); font-size: 11px; }
+.home .home-checkin-tool :deep(.checkin-status) { padding: 2px 8px; }
+.home-checkin-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px; }
+.home-checkin-guest strong { width: 100%; font-size: 14px; }
+.home-checkin-guest p { flex: 1; color: var(--fp-muted); font-size: 12px; }
+.home-checkin-guest a { color: var(--fp-primary); font-size: 12px; }
+.home-download-tool { display: flex; align-items: center; }
+.home-download-tool :deep(.client-download) { width: 100%; border: 0; padding: 0; background: transparent; }
+@container home-tool (max-width: 310px) {
+  .home [data-home-module="side:profile"] :deep(.person-avatar) { width: 32px; height: 32px; }
+  .home [data-home-module="side:profile"] :deep(.person-head) { gap: 6px; }
+  .home [data-home-module="side:profile"] :deep(.stat-col:first-child strong),
+  .home .home-checkin-tool :deep(.activity-streak strong) { font-size: 18px; }
+  .home .home-checkin-tool :deep(.activity-ring) { width: 30px; height: 30px; }
+  .home .home-checkin-tool :deep(.activity-meter) { gap: 6px; }
+  .home [data-home-module="side:income"] :deep(.money-value) { font-size: 16px; }
 }
 .home-person { margin-bottom: 10px; }
 .home-person :deep(.person-head) { margin-bottom: 8px; gap: 8px; }
