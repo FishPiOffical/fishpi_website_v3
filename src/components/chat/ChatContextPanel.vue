@@ -47,7 +47,7 @@ watch(() => context.list.value, async () => {
       <ol ref="scrollArea" :aria-busy="context.busy.value">
         <li v-for="message in rows" :key="message.oId" :data-anchor="message.oId === messageId" :class="{ anchor: message.oId === messageId }">
           <p v-if="message.unavailable" class="context-state">这条消息暂时无法查看</p>
-          <ChatBubble v-else :user-id="message.userOId" :user-name="message.userName" :nickname="message.userNickname" :avatar="message.userAvatarURL" :time="message.time" :appearance="message.appearance" :tail="message.tail" :pet-status="message.petStatus" :message-id="message.oId" :html="message.html" :self="message.userOId === account?.oId" chatroom :standalone="!!message.redPacket || !!message.card">
+          <ChatBubble v-else :user-id="message.userOId" :user-name="message.userName" :nickname="message.userNickname" :avatar="message.userAvatarURL" :time="message.time" :appearance="message.appearance" :tail="message.tail" :pet-status="message.petStatus" :message-id="message.oId" :html="message.html" :source="message.content" :self="message.userOId === account?.oId" chatroom :standalone="!!message.redPacket || !!message.card">
             <template v-if="message.redPacket || message.card" #default>
             <ChatRedPacketCard v-if="message.redPacket" :packet="message.redPacket" :packet-id="message.oId" />
             <ChatCard v-else-if="message.card" :card="message.card" />

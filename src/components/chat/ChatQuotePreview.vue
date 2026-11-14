@@ -16,8 +16,8 @@ defineEmits<{ remove: [href: string] }>()
 </template>
 
 <style scoped>
-.chat-quote-preview { display: grid; gap: 5px; }
-.chat-quote-row { display: flex; align-items: flex-start; gap: 6px; }
+.chat-quote-preview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; min-width: 0; }
+.chat-quote-row { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
 .chat-quote-row :deep(.chat-quote-card) { min-width: 0; }
 .chat-quote-row button {
   flex: none;

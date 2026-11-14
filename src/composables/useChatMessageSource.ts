@@ -16,7 +16,8 @@ export function useChatMessageSource(){
  catch(e){if(valid())quoteErr.value=e instanceof Error?e.message:'消息读取失败'}finally{if(valid()){quoteBusy.value='';quoteAbort=null}}}
  async function showRaw(id:string){if(!active())return;closeRaw();const run=rawRun,reader=identity.value,abort=new AbortController();rawAbort=abort;rawOpen.value=true;rawLoading.value=true;const valid=()=>active()&&rawOpen.value&&run===rawRun&&reader===identity.value&&!abort.signal.aborted
  try{const value=await chatMessageDetail(id,abort.signal),content=chatSourceText(value);if(valid())rawText.value=content}catch(e){if(valid())rawError.value=e instanceof Error?e.message:'消息读取失败'}finally{if(valid()){rawLoading.value=false;rawAbort=null}}}
- function buildQuoteSuffix(){const q=quote.value;if(!q?.content)return '';const author=q.userName?`@${q.userName.replace(/[\\`*_[\]<>!#|]/g,'\\$&')} `:'';return `\n\n##### 引用 ${author}[↩](/cr#chatroom${q.messageId} "跳转至原消息")  \n> ${q.content.replace(/\r\n?/g,'\n').replace(/\n/g,'\n> ')}\n`}
+ // 服务端二次清洗没有 baseURI，相对链接会丢失 href；固定站点绝对链接可保留原消息定位。
+ function buildQuoteSuffix(){const q=quote.value;if(!q?.content)return '';const author=q.userName?`@${q.userName.replace(/[\\`*_[\]<>!#|]/g,'\\$&')} `:'';return `\n\n##### 引用 ${author}[↩](https://fishpi.cn/cr#chatroom${q.messageId} "跳转至原消息")  \n> ${q.content.replace(/\r\n?/g,'\n').replace(/\n/g,'\n> ')}\n`}
  const stop=watch(identity,()=>{clearQuote();closeRaw()},{flush:'sync'})
  onScopeDispose(()=>{disposed=true;stop();clearQuote();closeRaw()})
  return{quote,quoteBusy,quoteErr,rawText,rawError,rawLoading,rawOpen,quoteMessage,showRaw,clearQuote,closeRaw,buildQuoteSuffix}

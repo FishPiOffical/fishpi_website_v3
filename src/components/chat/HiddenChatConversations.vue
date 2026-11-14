@@ -141,6 +141,7 @@ function preview(line: (typeof messages.value)[number]) {
                   :medals="line.sysMetal"
                   :time="line.time"
                   :html="line.html || ''"
+                  :source="line.content"
                   :self="line.userName === account?.userName"
                   vip-nickname
                   chatroom

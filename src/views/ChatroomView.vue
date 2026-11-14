@@ -432,6 +432,7 @@ function clearScreen() {
                 :tail="entry.message.tail" :pet-status="entry.message.petStatus" :message-id="entry.message.oId"
                 :time="entry.message.time"
                 :html="entry.message.html || ''"
+                :source="entry.message.content"
                 :self="entry.message.userName === me"
               >
                 <ChatRedPacketCard v-if="entry.message.redPacket" :packet="entry.message.redPacket" :packet-id="entry.message.oId" />
@@ -545,6 +546,7 @@ function clearScreen() {
                 :tail="entry.message.tail" :pet-status="entry.message.petStatus" :message-id="entry.message.oId"
                 :time="entry.message.time"
                 :html="entry.message.html || ''"
+                :source="entry.message.content"
                 :self="entry.message.userName === me"
               >
                 <ChatRedPacketCard v-if="entry.message.redPacket" :packet="entry.message.redPacket" :packet-id="entry.message.oId" />

@@ -31,6 +31,8 @@ const props = withDefaults(
     avatarSize?: number
     time?: string
     html?: string
+    /** 当前可见消息的原文，仅用于恢复被清洗掉的引用来源，不作为 HTML 渲染。 */
+    source?: string
     self?: boolean
     medals?: unknown
     vipNickname?: boolean
@@ -38,7 +40,7 @@ const props = withDefaults(
     /** 红包、音乐和天气卡片由调用方标记为独立展示。 */
     standalone?: boolean
   }>(),
-  { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
+  { userId: '', nickname: '', avatar: '', avatarSize: 36, time: '', html: '', source: '', self: false, medals: undefined, vipNickname: false, chatroom: false, standalone: false },
 )
 
 const auth = useAuthStore()
@@ -63,14 +65,14 @@ onMounted(() => { mounted.value = true })
 const singleImage = computed(() => props.chatroom && isSingleImageMessage(props.html))
 const display = computed(() => {
   const hasImages = /<img\b/i.test(props.html)
-  const mayHaveQuotes = /<blockquote\b/i.test(props.html) && (props.html.includes('/breezemoons/') || props.html.includes('#chatroom'))
+  const mayHaveQuotes = /<blockquote\b/i.test(props.html) && (props.html.includes('/breezemoons/') || props.html.includes('#chatroom') || props.source.includes('#chatroom'))
   const plain = { html: props.html, quotes: [] as ChatQuote[] }
   if (!props.chatroom || (!hasImages && !mayHaveQuotes)) return plain
   if (!mounted.value) return hasImages ? { ...plain, html: '' } : plain
   // 先在惰性模板里提取引用、替换图片地址，再交给 Vue 插入页面。
   const template = document.createElement('template')
   template.innerHTML = props.html
-  const quotes = mayHaveQuotes ? extractChatQuotes(template.content, window.location.origin) : []
+  const quotes = mayHaveQuotes ? extractChatQuotes(template.content, window.location.origin, props.source) : []
   if (!hasImages && !quotes.length) return plain
   if (quotes.length && !hasChatQuoteBody(template.content)) return { html: '', quotes }
   for (const img of template.content.querySelectorAll('img:not(.emoji)')) {
@@ -522,7 +524,7 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
   font-size: 14px;
   line-height: 1.7;
 }
-.chat-quote-stack { display: grid; gap: 6px; max-width: 100%; min-width: 0; }
+.chat-quote-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-width: 100%; min-width: 0; }
 .fp-bubble + .chat-quote-stack { margin-top: 2px; }
 .is-room .body :deep(p + p) { margin-top: 6px; }
 .is-room .body :deep(.chat-image-frame) {
