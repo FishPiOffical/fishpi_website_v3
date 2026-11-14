@@ -52,7 +52,6 @@ onBeforeUnmount(() => { cancel(); clearNotice() })
     <section class="checkin-section" aria-label="今日签到活跃状态">
       <div class="checkin-head">
         <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="3"/><path d="M8 4v4m8-4v4M4 10h16m-11 5 2 2 4-4"/></svg>每日签到</h3>
-        <span v-if="today" class="checkin-status" role="status" :class="{ 'is-done': today.checkedIn }">{{ today.checkedIn ? '已签到' : '待签到' }}</span>
         <button type="button" class="refresh-btn" aria-label="刷新签到状态" title="刷新签到状态" :disabled="checkin.loading.value || reward.loading.value" @click="checkin.read(); reward.read()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg></button>
       </div>
       <p v-if="checkin.loading.value" role="status">读取中…</p>
@@ -75,6 +74,7 @@ onBeforeUnmount(() => { cancel(); clearNotice() })
         </div>
       </div>
       <div v-if="today || reward.value.value?.claimable" class="checkin-footer">
+        <span v-if="today" class="checkin-status" role="status" :class="{ 'is-done': today.checkedIn }">{{ today.checkedIn ? '已签到' : '待签到' }}</span>
         <span v-if="today" class="checkin-streak">连续 <strong>{{ today.streak }}</strong> 天</span>
         <button v-if="reward.value.value?.claimable" type="button" class="claim-reward-btn" aria-label="领取昨日活跃奖励" :disabled="writes.busy || !!writes.pending || confirming" @click="collect()">{{ writes.busy ? '领取中…' : confirming ? '待确认…' : '领昨日奖励' }}</button>
       </div>
@@ -124,7 +124,7 @@ p { margin:2px 0; color:var(--fp-muted); line-height:1.4; overflow-wrap:anywhere
   strong { color:var(--fp-title); font-size:20px; line-height:1.15; font-variant-numeric:tabular-nums; }
 }
 .activity-target { margin:3px 0 0; font-size:11px; }
-.checkin-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px 8px; min-height:20px; margin-top:5px; }
+.checkin-footer { display:flex; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:4px 8px; min-height:20px; margin-top:5px; }
 .checkin-streak { color:var(--fp-muted); font-size:11px; strong { color:var(--fp-title); font-variant-numeric:tabular-nums; } }
 @keyframes ring-enter { from { stroke-dashoffset:100; } }
 @keyframes check-enter { from { opacity:0; transform:scale(.65); } }

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, useId } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { usePageSidebarStore, type PageSidebarModuleId } from '@/stores/pageSidebar'
+import ClientDownloadCard from '@/components/sidebar/ClientDownloadCard.vue'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
 import PersonInfoCard from '@/components/sidebar/PersonInfoCard.vue'
 import BreezemoonFeed from '@/components/sidebar/BreezemoonFeed.vue'
@@ -13,7 +14,6 @@ import IncomeModule from '@/chat/sidebar/modules/IncomeModule.vue'
 import AppearanceModule from '@/chat/sidebar/modules/AppearanceModule.vue'
 import AdModule from '@/chat/sidebar/modules/AdModule.vue'
 
-const router = useRouter()
 const { isLoggedIn } = storeToRefs(useAuthStore())
 const pageSidebar = usePageSidebarStore()
 const { visibleModules } = storeToRefs(pageSidebar)
@@ -27,9 +27,6 @@ onMounted(() => { ready.value = true })
 
 const summaries = ref<Partial<Record<PageSidebarModuleId, string>>>({})
 
-function goDownload() {
-  void router.push('/download')
-}
 </script>
 
 <template>
@@ -63,16 +60,7 @@ function goDownload() {
         >
           <PersonInfoCard v-if="mod.id === 'profile'" />
           <CheckinPanel v-else-if="mod.id === 'checkin'" class="embedded-checkin" @summary="summaries.checkin = $event" />
-          <div v-else-if="mod.id === 'download'" class="app-download">
-            <div class="app-left">
-              <img src="https://file.fishpi.cn/logo_app.png" width="36" height="36" alt="摸鱼派客户端" />
-              <div class="app-text">
-                <b>随时随地摸鱼？</b>
-                <p>下载摸鱼派客户端，想摸就摸！</p>
-              </div>
-            </div>
-            <button type="button" class="btn green small" @click="goDownload">下载</button>
-          </div>
+          <ClientDownloadCard v-else-if="mod.id === 'download'" />
           <BreezemoonFeed v-else-if="mod.id === 'breezemoons'" @summary="summaries.breezemoons = $event" />
           <IncomeModule v-else-if="mod.id === 'income'" />
           <AppearanceModule v-else-if="mod.id === 'appearance'" />

@@ -22,6 +22,7 @@ import { useHomeLayoutStore, type HomeRowView } from '@/stores/homeLayout'
 import { useHomeDrag } from '@/home/useHomeDrag'
 import DragGrip from '@/components/home/DragGrip.vue'
 import PersonInfoCard from '@/components/sidebar/PersonInfoCard.vue'
+import ClientDownloadCard from '@/components/sidebar/ClientDownloadCard.vue'
 import CheckinPanel from '@/components/home/CheckinPanel.vue'
 import HomeSideWidgets from '@/components/home/HomeSideWidgets.vue'
 import HomeModuleDisclosure from '@/components/home/HomeModuleDisclosure.vue'
@@ -203,8 +204,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
             <section v-else-if="mod.id === 'recentB'" class="mod-body">
               <div class="index-head">
-                <b>{{ compactHome ? '更多最新' : '\u00a0' }}</b>
-                <RouterLink to="/recent">更多</RouterLink>
+                <b class="recent-continuation">{{ compactHome ? '更多最新' : '最新 · 续' }}</b>
               </div>
               <HomeReadStatus label="最新文章（续）" :loading="recentRead.loading" :error="recentRead.error" :ready="recentRead.data !== null" :empty="!right.length" :empty-text="left.length ? '本列暂无文章。' : '暂无可见文章。'" @retry="recentRead.read" />
               <ol class="module-list">
@@ -226,7 +226,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
             </section>
 
             <aside v-else-if="mod.id === 'rank'" class="mod-body">
-              <div v-if="!compactHome" class="download"><img src="https://file.fishpi.cn/logo_app.png" width="35" height="35" alt="" /><div><b>随时随地摸鱼？</b><p>下载摸鱼派客户端，想摸就摸！</p></div><RouterLink to="/download" class="green-link">下载</RouterLink></div>
+              <ClientDownloadCard v-if="!compactHome" class="home-download" />
               <HomeModuleDisclosure v-if="compactHome && homeReady" class="home-person" module-key="rank:profile" module-id="profile" title="我的资料">
                 <PersonInfoCard :avatar-size="34" />
               </HomeModuleDisclosure>
@@ -489,23 +489,24 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 @media (width > 960px) {
   .board { align-items: stretch; }
-  /* 只有列末的卡片吸收剩余高度，列内其他卡片和列表条目保持自然高度。 */
-  .board:not(.bare) .cell > .mod:last-child {
-    flex: 1 0 auto;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-  }
+  /* 列保持等高，剩余留白放在卡片外，避免复读机等模块被拉长。 */
+  .board:not(.bare) .cell > .mod { flex: 0 0 auto; }
 }
+.is-classic .recent-continuation { visibility: hidden; }
+@media (max-width: 960px) { .is-classic .recent-continuation { visibility: visible; } }
 .home-person { margin-bottom: 10px; }
 .home-person :deep(.person-head) { margin-bottom: 8px; gap: 8px; }
 .home-person :deep(.person-avatar) { width: 34px; height: 34px; }
 .home-person :deep(.person-stats) { padding-top: 6px; }
-.home-person :deep(.stat-col span) { display: none; }
+.home-person :deep(.stat-col span) { font-size: 10px; }
 .home-person :deep(.person-sub) { font-size: 10px; }
 .home-person :deep(.guest-slogan) { margin-bottom: 8px; }
 .home-person :deep(.role-tag) { display: none; }
 .home-checkin :deep(.checkin-head h3) { display: none; }
-.home-checkin :deep(.checkin-head) { justify-content: flex-end; }
+.home-download { margin-bottom: 12px; }
+.home-checkin { margin-bottom: 12px; }
+.home-checkin :deep(.checkin-head) { display: none; }
+.home-moons { margin-block: 12px; }
 .home-moons-more { flex: none; color: var(--fp-muted); font-size: 12px; text-decoration: none; }
 .home-moons-more:hover { text-decoration: underline; }
 .home :deep(.checkin-panel) { margin: 10px 0 12px; }

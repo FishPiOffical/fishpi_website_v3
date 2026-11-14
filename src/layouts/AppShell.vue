@@ -1081,7 +1081,8 @@ html[data-theme='classic-dark'] .partner {
 }
 .client-icons a:hover {
   border-color: var(--fp-accent);
-  text-decoration: underline;
+  background: var(--fp-hover);
+  text-decoration: none;
 }
 .foot-bottom {
   display: flex;

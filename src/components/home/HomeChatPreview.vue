@@ -47,12 +47,17 @@ const preview = computed(() => {
 </template>
 
 <style scoped>
-.home-chat-preview { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 38px; width: 100%; }
+.home-chat-preview { position: relative; border-radius: 6px; transition: background-color .15s ease; display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 38px; width: 100%; }
 .preview-avatar { width: 20px; height: 20px; flex: none; border-radius: 4px; background: var(--fp-border) center / cover no-repeat; }
 .preview-name { flex: 0 1 auto; max-width: 28%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--fp-muted); font-size: 12px; }
 .preview-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 20px; color: var(--fp-text); }
 .preview-name, .preview-text { text-decoration: none; }
-.preview-name:hover, .preview-text:hover { text-decoration: underline; text-underline-offset: 3px; }
+.home-chat-preview:hover, .home-chat-preview:focus-within { background: var(--fp-hover); }
+.preview-name:hover, .preview-text:hover { text-decoration: none; }
+.preview-text::after { content: ""; position: absolute; inset: 0; border-radius: 6px; }
+.preview-text:focus-visible::after { outline:2px solid var(--fp-primary); outline-offset:2px; }
+.preview-avatar, .preview-name, .preview-image { position: relative; z-index: 1; }
+@media (prefers-reduced-motion: reduce) { .home-chat-preview { transition: none; } }
 .preview-image { flex: none; width: 36px; height: 36px; padding: 0; overflow: hidden; border: 1px solid var(--fp-border); border-radius: 5px; background: var(--fp-bg); cursor: zoom-in; }
 .preview-image img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .preview-image img.blurred { filter: blur(5px); }

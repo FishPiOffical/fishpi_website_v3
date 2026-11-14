@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { onMounted, onBeforeUnmount } from 'vue'
+import { usePersonSummaryStore } from '@/stores/personSummary'
 import { storeToRefs } from 'pinia'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -7,6 +9,10 @@ import { avatarUrl, avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
 
 withDefaults(defineProps<{ avatarSize?: number }>(), { avatarSize: 44 })
 
+const summary = usePersonSummaryStore()
+let detach: (() => void) | undefined
+onMounted(() => { detach = summary.attach() })
+onBeforeUnmount(() => detach?.())
 const { account, isLoggedIn } = storeToRefs(useAuthStore())
 </script>
 
@@ -32,16 +38,16 @@ const { account, isLoggedIn } = storeToRefs(useAuthStore())
         <strong>{{ account.userPoint ?? 0 }}</strong>
         <span>积分</span>
       </RouterLink>
-      <RouterLink to="/following" class="stat-col">
-        <strong>关注</strong>
+      <RouterLink :to="`/member/${account.userName}/following/users`" class="stat-col">
+        <strong>{{ summary.following ?? '关注' }}</strong>
         <span>我的关注</span>
       </RouterLink>
       <RouterLink to="/stars" class="stat-col">
-        <strong>收藏</strong>
+        <strong>{{ summary.collections ?? '收藏' }}</strong>
         <span>我的收藏</span>
       </RouterLink>
-      <RouterLink to="/post" class="stat-col action">
-        <strong class="post-strong">＋发帖</strong>
+      <RouterLink to="/post" class="stat-col action" aria-label="发布帖子" title="发布帖子">
+        <strong class="post-strong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 3-7 18-4-7-7-4 18-7ZM10 14 21 3"/></svg></strong>
         <span>发新内容</span>
       </RouterLink>
     </div>
@@ -72,6 +78,7 @@ const { account, isLoggedIn } = storeToRefs(useAuthStore())
 .stat-col span { color: var(--fp-muted); font-size: 10px; }
 .stat-col { padding: 4px 2px; border-radius: 6px; transition: background 160ms ease; }
 .stat-col:hover { text-decoration: none; background: var(--fp-hover); }
+.post-strong svg { display:block; width:18px; height:18px; margin:auto; }
 .stat-col.action .post-strong { color: var(--fp-accent); }
 .guest-card { padding: 5px 0; text-align: center; }
 .guest-title { margin: 0 0 6px; color: var(--fp-title); font-size: 15px; font-weight: 600; }

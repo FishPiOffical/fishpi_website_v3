@@ -411,7 +411,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .username {
-  display: inline-block;
+  display: block;
   max-width: 100%;
   margin-top: 2px;
   overflow: hidden;
@@ -443,6 +443,8 @@ onUnmounted(() => {
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+.medal-link:hover { text-decoration: none; }
+.medal-link small { display: grid; place-items: center; min-width: 28px; height: 28px; padding-inline: 5px; border: 1px solid var(--fp-border); border-radius: 999px; background: var(--fp-hover); font-variant-numeric: tabular-nums; }
 .card-facts {
   display: flex;
   flex-wrap: wrap;
