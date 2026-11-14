@@ -14,12 +14,13 @@ const expanded = ref(new Set<string>())
 const root = ref<HTMLElement | null>(null)
 let observer: ResizeObserver | undefined
 let frame = 0
-// 叠层跟随实际气泡宽度，短消息和悬浮窄窗不会留下宽大的空卡片。
+// 只测量正文气泡，不把昵称、宠物状态或操作栏宽度带入后层。
+// 后层高度限制为各自占位，避免覆盖最新消息的作者信息。
 function measure() {
   cancelAnimationFrame(frame)
   frame = requestAnimationFrame(() => {
     root.value?.querySelectorAll<HTMLElement>('.repeat-deck').forEach(deck => {
-      const front = deck.querySelector<HTMLElement>('.repeat-front .message-stack') || deck.querySelector<HTMLElement>('.repeat-front')
+      const front = deck.querySelector<HTMLElement>('.repeat-front .fp-bubble') || deck.querySelector<HTMLElement>('.repeat-front')
       if (!front) return
       const bounds = deck.getBoundingClientRect()
       const step = bounds.width <= 520 ? 4 : 8
@@ -83,7 +84,7 @@ function toggle(key: string) {
 .repeat-layer-shell .repeat-layer::before, .repeat-layer-shell .repeat-layer::after { display: none !important; }
 .repeat-group { min-width: 0; flex-shrink: 0; }
 .repeat-deck { --step: 8px; --layer-height: 28px; position: relative; padding-top: calc(var(--layers) * var(--layer-height)); padding-right: calc(var(--layers) * var(--step)); isolation: isolate; }
-.repeat-layer { position: absolute !important; top: calc(var(--layer) * var(--layer-height)); left: calc(var(--card-left, 44px) + var(--layer) * var(--step)); width: var(--card-width, min(220px, calc(100% - 76px))); height: 64px; display: flex; align-items: flex-start; gap: 6px; padding: 3px 10px !important; border: 1px solid var(--fp-border, #dfe3e8); border-radius: 12px; background: var(--fp-card, #fff); color: var(--fp-text-muted, #77808d); font: inherit; font-size: 11px; cursor: pointer; box-shadow: 0 2px 3px #00000006; animation: repeat-arrive .22s ease-out; }
+.repeat-layer { position: absolute !important; top: calc(var(--layer) * var(--layer-height)); left: calc(var(--card-left, 44px) + var(--layer) * var(--step)); width: var(--card-width, min(220px, calc(100% - 76px))); height: var(--layer-height); display: flex; align-items: flex-start; gap: 6px; padding: 3px 10px !important; border: 1px solid var(--fp-border, #dfe3e8); border-radius: 12px; background: var(--fp-card, #fff); color: var(--fp-text-muted, #77808d); font: inherit; font-size: 11px; cursor: pointer; box-shadow: 0 2px 3px #00000006; animation: repeat-arrive .22s ease-out; }
 .repeat-layer-shell:nth-child(even) .repeat-layer { background: color-mix(in srgb, var(--fp-primary, #65ae42) 5%, var(--fp-card, #fff)); }
 /* 头像放在卡片外侧，每层独占一条头像行，不被下一层气泡盖住。 */
 .repeat-layer img { position: absolute; left: -28px; top: 2px; width: 20px; height: 20px; object-fit: cover; border-radius: 4px; flex: none; }
