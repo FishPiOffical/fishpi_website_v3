@@ -46,7 +46,11 @@ export function rhyPicThumbnail(url: string, width: number, height?: number): st
 }
 
 export function avatarThumbnail(raw: string | undefined | null, width: number): string {
-  return rhyPicThumbnail(raw || DEFAULT_AVATAR, width)
+  // 头像按显示宽度请求 2 倍像素；RhyPic 在原图尺寸处封顶，不放大小图。
+  // 不改通用缩图函数，避免文章图片、封面和表情一起翻倍。
+  const source = raw || DEFAULT_AVATAR
+  if (!Number.isInteger(width) || width < 1 || width > 1024) return source
+  return rhyPicThumbnail(source, Math.min(width * 2, 1024))
 }
 
 export function fallbackAvatar(event: Event) {
