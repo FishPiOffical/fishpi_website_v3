@@ -4,7 +4,8 @@ import type { ChatSidebarModuleId } from './meta'
 defineProps<{ name: ChatSidebarModuleId | 'settings' | 'chevron' | 'checkin' | 'download' }>()
 const paths = {
   profile: 'M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z',
-  breezemoons: 'M12 3v18M5.5 7.5c2.2 0 3.5 1.4 3.5 3.5M18.5 7.5c-2.2 0-3.5 1.4-3.5 3.5M5 16c2.4-1.3 4.7-1.3 7 0s4.6 1.3 7 0',
+  // 风绕月使用 20px 画布，月牙与两道风线留出间隙，避免小尺寸下粘连。
+  breezemoons: 'M11.6 2.2c3.8 0 6.6 2.7 6.6 6.1 0 3.3-3.3 6.6-8.3 4.3 3.6-.1 5.2-2.9 4.6-5.7-.3-2-1.5-3.6-2.9-4.7ZM1.8 14.6c3-2.1 5.2-.9 7.7.4M3 18c2.7-1.8 4.6.9 7.4-.2',
   income: 'M12 8v4l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
   topic: 'M5 9h14M4 15h14M11 3 7 21M17 3l-4 18',
   online: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
@@ -20,7 +21,7 @@ const paths = {
 </script>
 
 <template>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <svg :viewBox="name === 'breezemoons' ? '0 0 20 20' : '0 0 24 24'" :data-icon="name" :width="name === 'breezemoons' ? 20 : undefined" :height="name === 'breezemoons' ? 20 : undefined" fill="none" stroke="currentColor" :stroke-width="name === 'breezemoons' ? 1.5 : 1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
     <path :d="paths[name]" />
   </svg>
 </template>

@@ -111,6 +111,7 @@ const summaryText = computed(() => {
 .card-toggle:hover { color: var(--fp-title); background: var(--fp-hover); }
 .card-toggle[aria-expanded='false'] { min-height: 46px; }
 .module-icon { flex: none; width: 15px; height: 15px; color: var(--fp-muted); }
+.module-icon[data-icon='breezemoons'] { width: 20px; height: 20px; }
 .module-title { flex: none; }
 .card-toggle:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: -2px; }
 .chevron { flex: none; width: 14px; height: 14px; margin-left: auto; color: var(--fp-muted); transition: transform 160ms ease; }
