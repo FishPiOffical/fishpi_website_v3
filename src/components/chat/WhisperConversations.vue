@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useChatScrollFollow } from '@/composables/useChatScrollFollow'
 import {getAuthContextVersion} from '@/api/http'
 import { computed, nextTick, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
@@ -286,7 +287,7 @@ async function selectChatroom() {
   chat.floatingChatroomOpen = true
   if (!roomConnected.value && !roomConnecting.value && !roomLoading.value) await chat.connect()
   await nextTick()
-  if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
+  scrollFollow.jump()
 }
 
 function refreshInbox(){
@@ -294,23 +295,16 @@ function refreshInbox(){
  else void selectChatroom()
 }
 
-let stickToBottom = true
-function toBottom() {
-  if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
-}
-function onScroll() {
-  const el = scroller.value
-  if (el) stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-}
+const scrollFollow = useChatScrollFollow(scroller, '.repeat-list')
 watch(roomMessages, async () => {
   await nextTick()
-  if (stickToBottom) toBottom()
+  scrollFollow.refresh()
 }, { deep: true })
 
 async function loadOlder() {
   const el = scroller.value
   const fromBottom = el ? el.scrollHeight - el.scrollTop : 0
-  stickToBottom = false
+  scrollFollow.pause()
   await chat.loadMore()
   await nextTick()
   if (el) el.scrollTop = el.scrollHeight - fromBottom
@@ -465,7 +459,7 @@ onUnmounted(() => {
                 <ChatPublicationRecovery @confirmed="acceptRoomConfirmed" />
                 <ChatRevokeRecovery />
                 <p v-if="roomError" class="error">{{ roomError }}</p>
-                <div ref="scroller" class="messages" @scroll.passive="onScroll">
+                <div ref="scroller" class="messages" tabindex="0" aria-label="悬浮聊天室消息">
                   <button v-if="roomHasMore&&roomMessages.length" type="button" class="more" :disabled="roomLoadingMore" @click="loadOlder">{{ roomLoadingMore?'加载中…':'加载更早消息' }}</button>
                   <FpLoading v-if="roomLoading&&!roomMessages.length" />
                   <p v-else-if="!visibleRoomMessages.length" class="empty-content">聊天室暂时没有消息</p>
@@ -873,6 +867,8 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 12px;
   overflow: auto;
+  overflow-anchor: none;
+  scroll-behavior: auto;
   padding: 12px;
   transition: gap 180ms ease, padding 180ms ease;
 }

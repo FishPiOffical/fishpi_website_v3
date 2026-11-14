@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useChatScrollFollow } from '@/composables/useChatScrollFollow'
 import { useScrollPagination } from '@/composables/useScrollPagination'
 import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink,useRoute,useRouter } from 'vue-router'
@@ -151,14 +152,16 @@ onUnmounted(() => {
 
 const hasNewMessages = ref(false)
 const sentMessageId = ref('')
-let followingLatest = true
+const scrollFollow = useChatScrollFollow(scroller, '.messages-container', onModernScroll)
+const followingLatest = scrollFollow.following
+watch(followingLatest, value => { if (value) hasNewMessages.value = false })
 const firstVisibleId = computed(() => visibleMessages.value[0]?.oId)
 const latestVisibleKey = computed(() => timelineEntries.value.at(-1)?.key)
 const animatedEntryKeys = ref(new Set<string>())
 watch(timelineEntries, (entries, previous) => {
   animatedEntryKeys.value = new Set()
   if (!previous?.length || loading.value || loadingMore.value || contextId.value) return
-  if (chatStyle.value === 'modern' && !followingLatest) return
+  if (chatStyle.value === 'modern' && !followingLatest.value) return
   // 翻阅经典模式的历史记录时不扩张布局，避免阅读位置受到动画干扰。
   if (chatStyle.value === 'classic' && typeof document !== 'undefined') {
     const list = document.querySelector('.cr-classic-list')
@@ -171,46 +174,20 @@ watch(timelineEntries, (entries, previous) => {
     .slice(-10).map(entry => entry.key))
 })
 
-function nearLatest(el: HTMLElement) {
-  return el.scrollHeight - el.scrollTop - el.clientHeight < 100
-}
-
 watch(latestVisibleKey, async (key, previous) => {
   const el = scroller.value
   if (!el) return
   if (!key) { hasNewMessages.value = false; return }
   // Measure against the previous layout before Vue inserts the new message.
-  const follow = !previous || followingLatest
+  const follow = !previous || followingLatest.value
   await nextTick()
   if (el !== scroller.value || key !== latestVisibleKey.value) return
-  if (follow) scrollBottom()
+  if (follow && followingLatest.value) scrollFollow.refresh()
   else if (timelineEntries.value.some(entry => entry.key === previous)) hasNewMessages.value = true
 })
 
-watch(scroller, (el, _, onCleanup) => {
-  scrollBottom()
-  if (!el || typeof ResizeObserver === 'undefined') return
-  // Images and editor expansion can change the scroll range after the message DOM is patched.
-  let frame = 0
-  const observer = new ResizeObserver(() => {
-    if (frame || !followingLatest) return
-    frame = requestAnimationFrame(() => {
-      frame = 0
-      if (el === scroller.value && followingLatest) scrollBottom()
-    })
-  })
-  observer.observe(el)
-  const content = el.querySelector('.messages-container')
-  if (content) observer.observe(content)
-  onCleanup(() => {
-    observer.disconnect()
-    cancelAnimationFrame(frame)
-  })
-}, { flush: 'post' })
-
 function scrollBottom() {
-  followingLatest = true
-  if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
+  scrollFollow.jump()
   hasNewMessages.value = false
 }
 
@@ -315,14 +292,14 @@ async function openNodePicker() {
 function onModernScroll() {
   const el = scroller.value
   if (!el) return
-  followingLatest = nearLatest(el)
-  if (followingLatest) hasNewMessages.value = false
+  if (followingLatest.value) hasNewMessages.value = false
   else if (el.scrollTop <= 50) void loadOlder()
 }
 
 async function loadOlder() {
   const el = scroller.value
   if (!el || loading.value || loadingMore.value || !hasMore.value) return
+  scrollFollow.pause()
   const first = firstVisibleId.value
   const anchor = first && document.getElementById(`chatroom${first}`)
   const offset = anchor && anchor.getBoundingClientRect().top - el.getBoundingClientRect().top
@@ -529,7 +506,7 @@ function clearScreen() {
         </header>
 
         <!-- 现代消息滚动展示区 -->
-        <div ref="scroller" class="chat-messages-scroll" @scroll="onModernScroll">
+        <div ref="scroller" class="chat-messages-scroll" tabindex="0" aria-label="聊天室消息">
           <button
             v-if="hasMore && messages.length"
             type="button"
@@ -962,6 +939,8 @@ function clearScreen() {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-anchor: none;
+  scroll-behavior: auto;
   padding: 16px 24px;
   display: flex;
   flex-direction: column;
@@ -992,6 +971,7 @@ function clearScreen() {
 }
 
 .messages-container {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
