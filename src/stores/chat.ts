@@ -25,6 +25,7 @@ export interface ChatLine {
   userName: string
   userNickname?: string
   userAvatarURL?: string
+  content?: string
   html?: string
   time?: string
   redPacket?: RedPacketContent
@@ -44,7 +45,7 @@ export function asV3Line(message:ChatMessage):ChatLine{
  const card=message.card
  const redPacket:RedPacketContent|undefined=message.type==='redPacket'?{msgType:'redPacket',type:String(card.type),money:Number(card.money),count:Number(card.count),got:Number(card.got),msg:String(card.message),senderId:message.author.id}:undefined
  const publicCard:ChatCardData|undefined=message.type==='music'?{msgType:'music',title:String(card.title),source:String(card.source),coverURL:String(card.coverURL),from:String(card.from)}:message.type==='weather'?{msgType:'weather',date:String(card.date),weatherCode:String(card.weatherCode),max:String(card.max),min:String(card.min),t:String(card.t),st:String(card.st)}:undefined
- return{petStatus:message.petStatus,tail:message.tail,appearance:message.appearance,reactions:message.reactions,reactionsUnavailable:message.reactionsUnavailable,reactionReadStarted:message.reactionReadStarted,oId:message.id,userOId:message.author.id,userName:message.author.userName,userNickname:message.author.userNickname,userAvatarURL:message.author.userAvatarURL,html:message.type==='text'?message.contentHtml:message.type==='unavailable'?'<p>当前消息不可读取</p>':undefined,time:Number.isFinite(new Date(message.createdAt).getTime())?new Date(message.createdAt).toISOString():'',redPacket,card:publicCard}
+ return{content:message.type==='text'?message.content:undefined,petStatus:message.petStatus,tail:message.tail,appearance:message.appearance,reactions:message.reactions,reactionsUnavailable:message.reactionsUnavailable,reactionReadStarted:message.reactionReadStarted,oId:message.id,userOId:message.author.id,userName:message.author.userName,userNickname:message.author.userNickname,userAvatarURL:message.author.userAvatarURL,html:message.type==='text'?message.contentHtml:message.type==='unavailable'?'<p>当前消息不可读取</p>':undefined,time:Number.isFinite(new Date(message.createdAt).getTime())?new Date(message.createdAt).toISOString():'',redPacket,card:publicCard}
 }
 
 export const useChatStore = defineStore('chat', () => {

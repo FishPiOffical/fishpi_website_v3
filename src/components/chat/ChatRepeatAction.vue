@@ -4,7 +4,7 @@ import { getAuthContextVersion } from '@/api/http'
 import { chatMessageDetail } from '@/api/v3-chat-messages'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ChatPublicationStore } from '@/stores/v3ChatPublication'
-const props = defineProps<{id:string}>(), auth = useAuthStore(), publication = useV3ChatPublicationStore()
+const props = defineProps<{id:string;label?:string}>(), auth = useAuthStore(), publication = useV3ChatPublicationStore()
 const mounted = ref(false), reading = ref(false), error = ref('')
 let sequence = 0, abort: AbortController | null = null
 const identity = () => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || ''])
@@ -29,7 +29,7 @@ onScopeDispose(() => { mounted.value = false; cancel() })
 </script>
 <template>
   <span v-if="mounted && auth.accessToken && auth.account?.oId" class="chat-repeat">
-    <button type="button" title="复读这条消息" aria-label="复读这条消息" :disabled="reading || publication.busy || !!publication.pending" :aria-busy="reading" @click="repeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4M3 11V8a2 2 0 0 1 2-2h16M7 22l-4-4 4-4m14-1v3a2 2 0 0 1-2 2H3"/></svg><span>{{ reading ? '…' : '复读' }}</span></button>
+    <button type="button" title="复读这条消息" aria-label="复读这条消息" :disabled="reading || publication.busy || !!publication.pending" :aria-busy="reading" @click="repeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4M3 11V8a2 2 0 0 1 2-2h16M7 22l-4-4 4-4m14-1v3a2 2 0 0 1-2 2H3"/></svg><span>{{ reading ? '…' : (label || '复读') }}</span></button>
     <small v-if="error" role="alert">{{ error }}</small>
   </span>
 </template>

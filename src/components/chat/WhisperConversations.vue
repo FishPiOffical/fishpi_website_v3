@@ -4,6 +4,7 @@ import { computed, nextTick, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
+import ChatRepeatList from '@/components/chat/ChatRepeatList.vue'
 import ChatRepeatAction from '@/components/chat/ChatRepeatAction.vue'
 import ChatBubble from '@/components/ChatBubble.vue'
 import ChatRedPacketCard from '@/components/chat/ChatRedPacketCard.vue'
@@ -68,6 +69,7 @@ provide(CHAT_MENTION, {
   },
 })
 const isChatroomSelected = computed(() => selectedPeer.value === CHATROOM_PEER)
+const roomRepeatEntries = computed(() => visibleRoomMessages.value.map(message => ({ key: message.oId, message })))
 const visibleRoomMessages = computed(() => roomMessages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
 const canSend = computed(()=>Boolean(draft.value.trim())&&!roomSending.value&&!publication.pending)
 function onCompactComposerKeydown(event: KeyboardEvent) {
@@ -467,7 +469,7 @@ onUnmounted(() => {
                   <button v-if="roomHasMore&&roomMessages.length" type="button" class="more" :disabled="roomLoadingMore" @click="loadOlder">{{ roomLoadingMore?'加载中…':'加载更早消息' }}</button>
                   <FpLoading v-if="roomLoading&&!roomMessages.length" />
                   <p v-else-if="!visibleRoomMessages.length" class="empty-content">聊天室暂时没有消息</p>
-                  <ChatBubble v-for="line in visibleRoomMessages" :key="line.oId" :appearance="line.appearance" :tail="line.tail" :pet-status="line.petStatus" :message-id="line.oId" :user-id="line.userOId" :user-name="line.userName" :avatar="line.userAvatarURL" :avatar-size="isCompactPanel ? 24 : 36" :time="line.time" chatroom :standalone="Boolean(line.redPacket || line.card)" :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :self="line.userOId===account?.oId"><ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" /><ChatCard v-else-if="line.card" :card="line.card" /><template #actions><ChatRepeatAction v-if="!line.redPacket&&!line.card" :id="line.oId" /><ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" /></template></ChatBubble>
+                  <ChatRepeatList :entries="roomRepeatEntries" :own-name="account?.userName" v-slot="{ entry: { message: line } }"><ChatBubble :key="line.oId" :appearance="line.appearance" :tail="line.tail" :pet-status="line.petStatus" :message-id="line.oId" :user-id="line.userOId" :user-name="line.userName" :avatar="line.userAvatarURL" :avatar-size="isCompactPanel ? 24 : 36" :time="line.time" chatroom :standalone="Boolean(line.redPacket || line.card)" :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :self="line.userOId===account?.oId"><ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" /><ChatCard v-else-if="line.card" :card="line.card" /><template #actions><ChatRepeatAction v-if="!line.redPacket&&!line.card" :id="line.oId" /><ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" /></template></ChatBubble></ChatRepeatList>
                 </div>
                 <Transition name="composer-swap" mode="out-in">
                   <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit">
@@ -977,7 +979,7 @@ onUnmounted(() => {
   .whisper-panel .conversation-copy { max-width: 0; opacity: 0; }
   .whisper-panel .conversation-avatar { width: 28px; height: 28px; }
   .whisper-panel .conversation-avatar img { width: 28px; height: 28px; }
-  .whisper-panel .messages { gap: 7px; padding: 8px; }
+  .whisper-panel .messages { --repeat-gap: 7px; gap: 7px; padding: 8px; }
   .whisper-panel .messages :deep(.fp-msg) { gap: 8px; }
   /* 只缩头像，外框保留内边距自然撑开，避免角标挤到头像中央。 */
   .whisper-panel .messages :deep(.fp-avatar) { width: 24px; height: 24px; }

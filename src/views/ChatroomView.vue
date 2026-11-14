@@ -8,6 +8,7 @@ import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
 import ChatQuotePreview from '@/components/chat/ChatQuotePreview.vue'
 import { breezemoonQuoteMarkdown, chatMessageQuotePreview, createBreezemoonQuote, type ChatQuote, type BreezemoonQuoteSource } from '@/utils/chatQuote'
 import ChatRoomNotice from '@/components/chat/ChatRoomNotice.vue'
+import ChatRepeatList from '@/components/chat/ChatRepeatList.vue'
 import ChatMessageEntry from '@/components/chat/ChatMessageEntry.vue'
 import { useV3ChatTimelineStore } from '@/stores/v3ChatTimeline'
 import ChatConnectionStatus from '@/components/chat/ChatConnectionStatus.vue'
@@ -132,8 +133,7 @@ const timelineEntries = computed(() => {
   })
   return noticeEntries.length ? [...messageEntries, ...noticeEntries].sort((a, b) => a.time - b.time) : messageEntries
 })
-// 经典版最新消息在上，简约版最新消息在下。
-const classicEntries = computed(() => [...timelineEntries.value].reverse())
+// 消息按时间分组后，经典版反向显示各组，简约版保持正序。
 
 function syncContextHash(){const match=/^#chatroom(\d{1,32})$/.exec(route.hash);contextId.value=accessToken.value&&account.value?.oId&&match?match[1]!:''}
 watch(()=>JSON.stringify([route.hash,!!accessToken.value,account.value?.oId||'']),syncContextHash,{immediate:true})
@@ -220,7 +220,7 @@ watch(
     if (!id) return
     sentMessageId.value = ''
     if (chatStyle.value === 'modern') scrollBottom()
-    else document.getElementById(`chatroom${id}`)?.scrollIntoView({ block: 'nearest' })
+    else (document.getElementById(`chatroom${id}`) || document.querySelector(`[data-repeat-messages~="${id}"]`))?.scrollIntoView({ block: 'nearest' })
   },
   { flush: 'post' },
 )
@@ -432,7 +432,8 @@ function clearScreen() {
             <p v-else-if="messages.length && !timelineEntries.length" class="empty-hint">当前消息已被屏蔽或移入隐藏会话</p>
             <p v-else-if="!timelineEntries.length" class="empty-hint">暂无消息，打破宁静发一条吧！</p>
 
-            <ChatMessageEntry v-for="entry in classicEntries" :key="entry.key" :animate="animatedEntryKeys.has(entry.key)">
+            <ChatRepeatList :entries="timelineEntries" :own-name="me" reverse v-slot="{ entry }">
+            <ChatMessageEntry :key="entry.key" :animate="animatedEntryKeys.has(entry.key)">
               <ChatRoomNotice v-if="entry.notice" :notice="entry.notice" />
               <ChatBubble
                 v-else-if="entry.message"
@@ -468,6 +469,7 @@ function clearScreen() {
                 </template>
               </ChatBubble>
             </ChatMessageEntry>
+            </ChatRepeatList>
 
             <!-- 底部查看更早记录 -->
             <div class="classic-load-bottom">
@@ -543,7 +545,8 @@ function clearScreen() {
           <p v-else-if="!timelineEntries.length" class="empty-hint">暂无新消息，快来打破宁静吧！</p>
 
           <div class="messages-container">
-            <ChatMessageEntry v-for="entry in timelineEntries" :key="entry.key" :animate="animatedEntryKeys.has(entry.key)">
+            <ChatRepeatList :entries="timelineEntries" :own-name="me" v-slot="{ entry }">
+            <ChatMessageEntry :key="entry.key" :animate="animatedEntryKeys.has(entry.key)">
               <ChatRoomNotice v-if="entry.notice" :notice="entry.notice" />
               <ChatBubble
                 v-else-if="entry.message"
@@ -579,6 +582,7 @@ function clearScreen() {
                 </template>
               </ChatBubble>
             </ChatMessageEntry>
+            </ChatRepeatList>
           </div>
 
           <p v-if="!isLoggedIn && visibleMessages.length" class="guest-tip-bottom">
@@ -994,7 +998,7 @@ function clearScreen() {
 }
 
 /* 两种模式共用居中的阅读宽度，编辑器和消息滚动容器仍铺满主栏。 */
-.cr-classic-list > .chat-message-entry,
+.cr-classic-list > .repeat-list,
 .messages-container {
   width: 100%;
   max-width: 880px;
