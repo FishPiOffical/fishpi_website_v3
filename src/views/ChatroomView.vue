@@ -312,8 +312,11 @@ async function loadOlder() {
 
 function useTopic() {
   if (!syncComposer()) return
-  // 井号按普通文字插入，避免空草稿或换行后被 Markdown 识别成标题。
-  draft.value += ` \\#${discuss.value.trim()}\\# `
+  // 用斜体行内代码引用话题，动态分隔符兼容话题本身含反引号。
+  const topic = discuss.value.trim()
+  if (!topic) return
+  const fence = '`'.repeat(Math.max(0, ...(topic.match(/`+/g) || []).map(value => value.length)) + 1)
+  draft.value += ` *${fence}# ${topic} #${fence}* `
 }
 
 function syncComposer() {
@@ -371,9 +374,10 @@ function clearScreen() {
               </template>
               <template #inline-context>
                 <div class="classic-topic-pill" :title="discuss">
-                  <span class="topic-label">话题</span>
-                  <span class="topic-text">{{ discuss || '聊点什么？' }}</span>
-                  <button type="button" class="topic-action-btn" title="引用话题" aria-label="引用话题" @click="useTopic">#</button>
+                  <button type="button" class="topic-quote" title="引用话题" aria-label="引用话题" :disabled="!discuss" @click="useTopic">
+                    <span class="topic-hash" aria-hidden="true">#</span>
+                    <span class="topic-text">{{ discuss || '聊点什么？' }}</span>
+                  </button>
                   <button type="button" class="topic-action-btn" title="编辑话题" aria-label="编辑话题" :aria-expanded="editingTopic" @click="editingTopic = !editingTopic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 4 5 5 M4 20l5-1L21 7l-4-4L5 15l-1 5Z" /></svg></button>
                 </div>
               </template>
@@ -597,9 +601,10 @@ function clearScreen() {
               </template>
               <template #inline-context>
                 <div class="classic-topic-pill" :title="discuss">
-                  <span class="topic-label">话题</span>
-                  <span class="topic-text">{{ discuss || '聊点什么？' }}</span>
-                  <button type="button" class="topic-action-btn" title="引用话题" aria-label="引用话题" @click="useTopic">#</button>
+                  <button type="button" class="topic-quote" title="引用话题" aria-label="引用话题" :disabled="!discuss" @click="useTopic">
+                    <span class="topic-hash" aria-hidden="true">#</span>
+                    <span class="topic-text">{{ discuss || '聊点什么？' }}</span>
+                  </button>
                   <button type="button" class="topic-action-btn" title="编辑话题" aria-label="编辑话题" :aria-expanded="editingTopic" @click="editingTopic = !editingTopic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 4 5 5 M4 20l5-1L21 7l-4-4L5 15l-1 5Z" /></svg></button>
                 </div>
               </template>
@@ -759,11 +764,17 @@ function clearScreen() {
   &.is-active { background: var(--fp-accent-soft,var(--fp-hover)); color: var(--fp-accent); }
 }
 .classic-topic-pill {
-  display: flex; align-items: center; gap: 4px; min-width: 0; width: 100%; box-sizing: border-box;
-  padding: 5px 4px 5px 8px; border-left: 2px solid var(--fp-accent); border-radius: 0 7px 7px 0;
-  background: var(--fp-surface-subtle,var(--fp-bg)); font-size: 12px;
-  .topic-label { display: none; }
-  .topic-text { flex: 1; min-width: 0; color: var(--fp-text); white-space: nowrap; line-height: 1.6; }
+  display: flex; align-items: center; gap: 2px; min-width: 0; width: fit-content; max-width: 100%; margin-inline: auto; box-sizing: border-box;
+  padding: 2px 3px 2px 8px; border: 1px solid color-mix(in srgb, var(--fp-accent) 22%, var(--fp-border)); border-radius: 9px;
+  background: color-mix(in srgb, var(--fp-accent) 5%, var(--fp-card)); font-size: 12px;
+}
+.topic-quote {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 4px 2px; border: 0;
+  background: transparent; font: inherit; color: var(--fp-text); cursor: pointer; text-align: left;
+  .topic-hash { color: var(--fp-accent); font-size: 15px; font-weight: 600; flex: none; }
+  .topic-text { min-width: 0; white-space: nowrap; line-height: 1.6; }
+  &:hover { color: var(--fp-accent); }
+  &:disabled { cursor: default; }
 }
 .topic-action-btn {
   display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px;
