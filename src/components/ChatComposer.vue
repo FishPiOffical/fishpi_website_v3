@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { matchesChatSendShortcut, type ChatSendShortcut } from '@/utils/chatSendShortcut'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 
@@ -36,8 +36,10 @@ const sendError = ref('')
 const root = ref<HTMLElement | null>(null)
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const emojiOpen = ref(false)
+const hasContent = ref(Boolean(props.modelValue.trim()))
+watch(() => props.modelValue, value => { hasContent.value = Boolean(value.trim()) })
 const canSend = computed(
-  () => !props.sending && !props.disabled && (props.allowEmpty || Boolean(props.modelValue.trim())),
+  () => !props.sending && !props.disabled && (props.allowEmpty || hasContent.value),
 )
 
 function flush() {
@@ -98,6 +100,7 @@ defineExpose({
       :disable-submit-shortcut="Boolean(chatSendShortcut)"
       @submit="submit"
       @emoji-open="emojiOpen = $event"
+      @content-state="hasContent = $event"
     />
     <p v-if="sendError" role="alert">{{ sendError }}</p>
     <div v-if="$slots.context" class="composer-context"><slot name="context" /></div>

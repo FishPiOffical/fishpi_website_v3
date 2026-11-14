@@ -25,7 +25,7 @@ const props = withDefaults(
   }>(),
   { height: 500, placeholder: '', outline: false, mode: 'post', toolbarPreset: 'default', cacheId: '' },
 )
-const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: []; 'emoji-open': [open: boolean] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: []; 'emoji-open': [open: boolean]; 'content-state': [hasContent: boolean] }>()
 
 const VDITOR_CDN = 'https://file.fishpi.cn/vditor/latest/dist'
 
@@ -132,6 +132,27 @@ const preview = createMarkdownPreview(() => editor?.getValue() ?? props.modelVal
 const uploads = createEditorUpload(markdown => editor?.insertMD(markdown))
 const mentionError = ref('')
 const mentions = createMentionHints(message => { mentionError.value = message })
+let composing = false
+let disposed = false
+function reportContentState() {
+  if (disposed) return
+  const value = fallback.value ? fallbackInput.value?.value ?? props.modelValue : editor?.getValue() ?? props.modelValue
+  emit('content-state', !composing && Boolean(value.trim()))
+}
+function onImmediateInput(event: Event) {
+  const target = event.target
+  if (!(target instanceof HTMLElement) || !target.matches('[contenteditable], .md-fallback')) return
+  // 等当前输入事件完成 DOM 更新，只同步是否有内容，不触发预览、草稿或撤销栈写入。
+  queueMicrotask(reportContentState)
+}
+function onCompositionStart() {
+  composing = true
+  emit('content-state', false)
+}
+function onCompositionEnd() {
+  composing = false
+  queueMicrotask(reportContentState)
+}
 function clearMentions() {
   mentions.cancel()
   // Toolbar dropdowns also use .vditor-hint; only clear the editor's suggestion panel.
@@ -144,7 +165,7 @@ const dark = computed(() => appearance.state.theme.includes('dark'))
 const CONTENT_THEME_PATH = `${VDITOR_CDN}/css/content-theme`
 
 function insertEmoji(markdown: string) {
-  if (editor && ready.value) editor.insertMD(markdown)
+  if (editor && ready.value) { editor.insertMD(markdown); reportContentState() }
   else emit('update:modelValue', props.modelValue + markdown)
 }
 function toggleEmoji(anchor?: HTMLElement) {
@@ -207,6 +228,7 @@ onMounted(async () => {
       extend: [{ key: '@', hint: mentions.hint }],
     },
     input: (value: string) => {
+      reportContentState()
       preview.reset()
       lastEmitted = value
       lastRenderedValue = value
@@ -231,6 +253,7 @@ onMounted(async () => {
         emit('update:modelValue', cached)
       }
       lastRenderedValue = editor?.getValue()
+      reportContentState()
       if (dark.value) applyTheme()
     },
   })
@@ -248,10 +271,12 @@ watch(
     lastEmitted = value
     editor.setValue(value, true)
     lastRenderedValue = editor.getValue()
+    reportContentState()
   },
 )
 
 onBeforeUnmount(() => {
+  disposed = true
   stopPreviewAuth?.()
   preview.dispose()
   uploads.dispose()
@@ -280,7 +305,8 @@ defineExpose({
 </script>
 
 <template>
-  <div class="md-editor" :class="[`md-editor--${mode}`, { 'md-adaptive': adaptiveHeight }]" @input.capture="clearMentions">
+  <div class="md-editor" :class="[`md-editor--${mode}`, { 'md-adaptive': adaptiveHeight }]" @input.capture="clearMentions" @input="onImmediateInput"
+    @compositionstart="onCompositionStart" @compositionend="onCompositionEnd">
     <EmojiPicker ref="emojiPicker" :show-trigger="false" placement="below" :labels="nativeEmojis"
       @insert="insertEmoji" @open-change="emit('emoji-open', $event)" />
     <textarea
