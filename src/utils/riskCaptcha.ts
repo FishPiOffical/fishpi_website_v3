@@ -1,7 +1,7 @@
 /**
  * Rhythm 防漏扫验证码链路（见 rhythm AGENTS.md）：
- * BeforeRequestHandler 黑名单 → 302 /test
- * AnonymousViewCheckMidware 匿名首访/每 5 次 → 拉黑并跳 /test
+ * BeforeRequestHandler / AnonymousViewCheckMidware → V3 403 captcha_required
+ * 旧页面仍跳转 /test；V3 与旧页面共用同 IP 的持续待验证状态。
  * CaptchaProcessor#validateCaptcha（极验）→ 解封
  *
  * SPA 侧由 RiskCaptchaGate 注册 opener，request() 遇 captcha 时 await 解封后重试一次。
@@ -25,7 +25,8 @@ export function ensureRiskCaptcha(): Promise<void> {
   if (!opener) {
     return Promise.reject(new Error('访问过于频繁，请完成人机验证后再试'))
   }
-  inflight = opener().finally(() => {
+  const open = opener
+  inflight = Promise.resolve().then(open).finally(() => {
     inflight = null
   })
   return inflight

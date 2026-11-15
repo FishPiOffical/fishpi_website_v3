@@ -41,4 +41,25 @@ dispose=rt.subscribeChatChanges(()=>{},state=>{if(state==='ready')dispose()})
 await tick();let socket=Socket.all.at(-1);message(socket,'authentication.required');message(socket,'ready',{channel:'chat'});assert.equal(timers.size,0)
 dispose=rt.subscribeNotificationChanges(()=>{});await tick();socket=Socket.all.at(-1);message(socket,'authentication.required');message(socket,'ready',{channel:'notifications'});message(socket,'ready',{channel:'notifications'});assert.equal(intervals().length,0);assert.equal(socket.readyState,3);dispose();assert.equal(timers.size,0)
 console.log('PASS synchronous ready disposal and duplicate ready never leak/duplicate heartbeat')
+// 真实订阅状态机：显式验证码拒绝不能当作文章删除，解封事件须重新取票。
+const originalRequest=globalThis.__heartbeat.request
+let captchaBlocked=true, captchaTickets=0, unavailable=0
+globalThis.__heartbeat.request=async path=>{
+ captchaTickets++
+ if(captchaBlocked)throw Object.assign(new Error('captcha'),{status:403,code:'captcha_required'})
+ return originalRequest(path)
+}
+const captchaShim=url(`export class ApiError extends Error{static [Symbol.hasInstance](e){return typeof e?.status==='number'}};export const getAccessToken=()=>globalThis.__heartbeat.token;export const request=(...args)=>globalThis.__heartbeat.request(...args)`)
+const captchaRt=await import(url(source.replace(shim,captchaShim)))
+dispose=captchaRt.subscribeArticleChanges('2',()=>{},()=>unavailable++)
+await tick();assert.equal(captchaTickets,1);assert.equal(unavailable,0);assert.equal(timers.size,0)
+captchaBlocked=false
+const previousSockets=Socket.all.length
+window.dispatchEvent(new Event('fp:captcha-passed'));await tick()
+assert.equal(captchaTickets,2);assert.equal(Socket.all.length,previousSockets+1)
+socket=Socket.all.at(-1);message(socket,'authentication.required');message(socket,'ready',{channel:'article',articleId:'2'})
+assert.equal(intervals().length,1)
+window.dispatchEvent(new Event('fp:captcha-passed'));await tick();assert.equal(captchaTickets,2)
+dispose();window.dispatchEvent(new Event('fp:captcha-passed'));await tick();assert.equal(captchaTickets,2);assert.equal(timers.size,0)
+console.log('PASS captcha-blocked realtime: no unavailable callback, fresh ticket after proof, no duplicate connection and listener cleanup')
 Date.now=originalNow
