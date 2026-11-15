@@ -33,8 +33,6 @@
 - 用户能力只走既有v3认证；旧page-auth换Cookie桥接已退役，经典链接直接导航，由目标页面认证。
 - 浏览器验证默认只读；不要为测试随意发帖、转账或修改真实账号资料。
 
-- 全局验证码盾使用403 `captcha_required`，普通401不打开验证码；同页共享验证，首页队列内最多重试一次，校验提交不占业务/凭据队列，保留原请求体/幂等键和身份/取消边界。SSR受限须由浏览器核实自身来源，实时恢复重新取票；实现与验收见 `docs/v3-captcha-flow.md`。前端修改前先pull，远端交付须用户明确同意后推工作分支并创建PR，不直接推目标分支、不自动合并；与Rhythm独立提交。
-
 - v3 内容适配分别保留作者用户名与昵称：Name 字段用于主页链接/回复寻址，Nickname 字段仅展示；SSR 二次白名单投影同步保留昵称，匿名不从旧别名恢复身份。背景头像统一用 utils/avatar.ts 的 avatarStyle 做 CSS 字符串转义，不能给签名 URL 重新编码。 文章列表/详情/作者卡、普通评论及长篇作者/段评使用共享VipNickname，匿名分支不得挂载身份样式组件。
 
 - 响应头成功不代表正文完整；JSON/文本及私有SVG/ZIP统一处理正文断流，未确认命令保留原幂等键，不自动重发收费请求。
@@ -298,7 +296,7 @@
 - 客户端边界复核用website_v3的`tools/v3-client-boundary-audit.mjs`，仅AST字面量/静态导入，动态表达式单列，不当运行覆盖。DomainItem在content-types，catalog/gaps假数据已删；离线ping只用v3，须完整成功的captcha-options JSON才算恢复；502/504及非JSON 503触发离线，JSON资源503仍原页报错。
 
 - Rhythm注册/文档核对用`tools/api-v3-contract-audit.mjs`，从Router.requestMapping追本类辅助注册；条件/重载歧义需复核。通过仅证明固定源码形式与API.md一致，不当作IoC/HTTP或业务完成。
-- Rhythm联调目标以用户最新确认与实际监听为准，当前约定为localhost:8080；旧8081记录不覆盖当前约定。`.env.development.local`只保存本地目标。Vite对login/refresh/logout须保留浏览器Host/Origin/真实Referer，不可合成来源证明；真实代理回归用`tools/v3-credential-proxy-test.mjs`。实际首批证据见docs/api-v3-live-integration-work.md，不能用隔离测试替代业务验收。
+- 本机联调使用5173→Rhythm 8081，`.env.development.local`只保存本地目标，8080是其他项目。Vite对login/refresh/logout须保留浏览器Host/Origin/真实Referer，不可合成来源证明；真实代理回归用`tools/v3-credential-proxy-test.mjs`。实际首批证据见docs/api-v3-live-integration-work.md，不能用隔离测试替代业务验收。
 
 - MarkdownEditor输入回调可能延迟；PostView/ChatComposer冻结写命令、判断未保存内容、收起/切换布局或追加话题/涂鸦前须flush实时缓冲，未加载应拒绝；未修改的编辑器规范化值不能覆盖精确原文。
 
