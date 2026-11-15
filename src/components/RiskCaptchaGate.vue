@@ -43,7 +43,8 @@ async function openGate(): Promise<void> {
   if (turn !== generation) return pending
   destroyGt()
   try {
-    await mountGt('float')
+    // 浮动挑战会被 FpDialog 的滚动正文裁切，使用供应商独立弹层。
+    await mountGt('popup')
   } catch (e) {
     tip.value = e instanceof Error ? e.message : '验证码加载失败'
   }
@@ -69,7 +70,7 @@ async function onSuccess(captcha: unknown) {
     await nextTick()
     if (turn !== generation || !open.value) return
     try {
-      await mountGt('float')
+      await mountGt('popup')
     } catch {
       /* keep tip */
     }
