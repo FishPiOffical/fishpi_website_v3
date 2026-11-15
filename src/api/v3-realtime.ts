@@ -97,6 +97,13 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
   let deadline: ReturnType<typeof setTimeout> | null = null
   let heartbeat: ReturnType<typeof setInterval> | null = null
   let checkConnection: (() => void) | null = null
+  let captchaBlocked = false
+  const captchaPassed = () => {
+    if (current() && captchaBlocked) {
+      captchaBlocked = false
+      void connect()
+    }
+  }
   const resume = () => {
     if (typeof document === 'undefined' || document.visibilityState === 'visible') checkConnection?.()
   }
@@ -104,6 +111,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
   window.addEventListener?.('focus', resume)
   window.addEventListener?.('pageshow', resume)
   window.addEventListener?.('online', online)
+  window.addEventListener?.('fp:captcha-passed', captchaPassed)
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', resume)
   const current = () => !stopped && getAccessToken() === token
   function timers() {
@@ -243,15 +251,17 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
       transport.onclose = () => { if (valid()) reconnect() }
     } catch (error) {
       if (!current() || turn !== sequence) return
-      if (channel === 'article' && error instanceof ApiError && error.code !== 'captcha' && [403,404].includes(error.status)) {
+      const needsCaptcha = error instanceof ApiError && (error.code === 'captcha' || error.code === 'captcha_required')
+      if (channel === 'article' && error instanceof ApiError && !needsCaptcha && [403,404].includes(error.status)) {
         retire()
         unavailable?.()
         return
       }
-      if (error instanceof ApiError && ([401, 403, 429].includes(error.status) || error.code === 'captcha' || error.code === 'home_reads_paused')) {
+      if (error instanceof ApiError && ([401, 403, 429].includes(error.status) || needsCaptcha || error.code === 'home_reads_paused')) {
+        captchaBlocked = needsCaptcha
         retire()
         connectionState?.('blocked')
-        if (error.status === 403 && error.code !== 'captcha' && !hasConnected && !initialUnreadFallback) initialRead?.()
+        if (error.status === 403 && !needsCaptcha && !hasConnected && !initialUnreadFallback) initialRead?.()
         return
       }
       reconnect()
@@ -263,6 +273,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
     window.removeEventListener?.('focus', resume)
     window.removeEventListener?.('pageshow', resume)
     window.removeEventListener?.('online', online)
+    window.removeEventListener?.('fp:captcha-passed', captchaPassed)
     if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', resume)
     if (retry) clearTimeout(retry)
     retry = null; retire()

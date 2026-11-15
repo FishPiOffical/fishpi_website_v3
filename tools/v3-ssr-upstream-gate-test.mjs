@@ -47,3 +47,12 @@ await assert.rejects(run(unexpected), deferred)
 now++
 assert.equal(await run(async () => true), true)
 console.log('PASS SSR rate and concurrency budgets, Retry-After, late success isolation, transport backoff and single recovery probe')
+
+const captchaRun = createSsrUpstreamGate()
+await assert.rejects(captchaRun(async () => { throw { status: 403, code: 'captcha_required' } }), { code: 'captcha_required' })
+now += 500
+await assert.rejects(captchaRun(unexpected), { code: 'ssr_upstream_captcha' })
+now += 30_000
+assert.equal(await captchaRun(async () => 'upstream recovered'), 'upstream recovered')
+await assert.rejects(captchaRun(unexpected), { code: 'ssr_deferred' })
+console.log('PASS SSR captcha: deferred callers retain upstream-only cause, recovery clears cause without treating a visitor as verified')

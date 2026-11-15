@@ -77,12 +77,17 @@ async function prefetch(url: string): Promise<SsrPayload> {
     timer = setTimeout(() => reject(new Error('SSR prefetch deadline')), SSR_PREFETCH_BUDGET_MS)
   })
   const withinBudget: WithinBudget = task => Promise.race([task, deadline])
+  let upstreamCaptcha = false
+  const observed: WithinBudget = task => withinBudget(task).catch(error => {
+    if (['captcha', 'captcha_required', 'ssr_upstream_captcha'].includes(error?.code)) upstreamCaptcha = true
+    throw error
+  })
   try {
     // Each home resource shares the deadline but keeps its own successful result.
-    if (path === '/') return await prefetchHome(withinBudget)
-    return await withinBudget(prefetchPage(path))
+    const payload = path === '/' ? await prefetchHome(observed) : await observed(prefetchPage(path))
+    return { ...payload, ...(upstreamCaptcha ? { upstreamCaptcha: true } : {}) }
   } catch {
-    return {}
+    return upstreamCaptcha ? { upstreamCaptcha: true } : {}
   } finally {
     clearTimeout(timer)
   }

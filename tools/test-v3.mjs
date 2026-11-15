@@ -3,7 +3,7 @@ import { createWriteStream } from 'node:fs'
 import { mkdtemp, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 // Execute the actual protocol suites in separate processes: their fixture globals must not mix.
 const root = fileURLToPath(new URL('../', import.meta.url))
@@ -21,7 +21,7 @@ async function worker() {
     const started = Date.now()
     const result = await new Promise(resolve => {
       const output = createWriteStream(log)
-      const child = spawn(process.execPath, ['--import', join(root, 'tools/ui-test-imports.mjs'), join(root, 'tools', file)], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
+      const child = spawn(process.execPath, ['--import', pathToFileURL(join(root, 'tools/ui-test-imports.mjs')).href, join(root, 'tools', file)], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
       child.stdout.pipe(output, { end: false })
       child.stderr.pipe(output, { end: false })
       let expired = false, spawnError = ''

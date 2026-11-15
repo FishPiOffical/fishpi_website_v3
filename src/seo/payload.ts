@@ -20,6 +20,8 @@ import type {
 } from '@/api/fishpi'
 
 export interface SsrPayload {
+  /** 仅表示 SSR 上游受限，不代表当前浏览器来源也受限。 */
+  upstreamCaptcha?: boolean
   directoryPage?: unknown
   homeReads?: unknown
   homeReadExpires?: Partial<Record<HomeRead, number>>

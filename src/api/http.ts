@@ -5,7 +5,7 @@ export const FISHPI_UA =
 
 export class ApiError extends Error {
   status: number
-  /** captcha：Rhythm 风控要求人机验证（302 → /test） */
+  /** captcha_required：V3 明确挑战；captcha：旧 /test 重定向。 */
   code?: string
   retryAfter?: string
   readonly diagnosticMessage?: string
@@ -149,7 +149,7 @@ function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promi
       const petAccountLimit = /^\/api\/v3\/me\/pet(?:\/|\?|$)/.test(path) && error instanceof ApiError &&
         (error.code === 'pet_rate_limited' || error.code === 'pet_transport_limited')
       if (generation === homeReadGeneration && version === authVersion && !guestRefresh && !petAccountLimit &&
-        error instanceof ApiError && (error.status === 401 || error.status === 429 || error.code === 'offline' || isCaptchaRequired(error))) {
+        error instanceof ApiError && !isCaptchaRequired(error) && (error.status === 401 || error.status === 429 || error.code === 'offline')) {
         const now = Date.now()
         const header = error.retryAfter
         const retryAt = header && /^\d+$/.test(header) ? now + Number(header) * 1000 : Date.parse(header ?? '')
@@ -218,7 +218,29 @@ export async function refreshAccessToken(): Promise<boolean> {
 }
 
 export function isCaptchaRequired(e: unknown) {
-  return e instanceof ApiError && e.code === 'captcha'
+  return e instanceof ApiError && (e.code === 'captcha' || e.code === 'captcha_required')
+}
+
+let captchaRecovery: Promise<void> | null = null
+let captchaRevision = 0
+let captchaFailureRevision = 0
+let captchaFailure: ApiError | null = null
+
+/** 同一页面共用验证屏障；队列内原请求原地重试，不重新排队造成互等。 */
+function recoverCaptcha(): Promise<void> {
+  if (captchaRecovery) return captchaRecovery
+  const flight = Promise.resolve().then(ensureRiskCaptcha).then(() => {
+    captchaRevision++
+    window.dispatchEvent(new Event('fp:captcha-passed'))
+  }).catch((error: unknown) => {
+    captchaFailureRevision++
+    captchaFailure = new ApiError(error instanceof Error ? error.message : '人机验证未完成', 403, 'captcha_required')
+    throw captchaFailure
+  }).finally(() => {
+    if (captchaRecovery === flight) captchaRecovery = null
+  })
+  captchaRecovery = flight
+  return flight
 }
 
 export function isOfflineError(e: unknown) {
@@ -448,19 +470,43 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
   const identity = requestIdentity()
   const version = identity.version
   const sentToken = getAccessToken()
+  const failureRevision = captchaFailureRevision
   const explicitAuthorization = new Headers(init.headers).has('Authorization')
-  const run = () => {
+  const valid = () => {
+    if (!isRiskCaptchaPath(path) && failureRevision !== captchaFailureRevision && captchaFailure) throw captchaFailure
+    if (version !== authVersion || init.signal?.aborted) {
+      throw new ApiError('请求已取消', 0, 'aborted')
+    }
     if (init.__authVersion !== undefined && init.__authVersion !== authVersion) {
       throw new ApiError('登录状态已变更', 401, 'stale_session')
     }
-    return requestOnce<T>(path, init, identity)
+  }
+  const transport = () => !import.meta.env.SSR && isCredentialPath(path)
+    ? queueCredentialRequest(() => {
+      // Waiting behind another Cookie operation can cross logout/account boundaries.
+      valid()
+      return requestOnce<T>(path, init, identity)
+    }) : requestOnce<T>(path, init, identity)
+  const run = async () => {
+    if (!import.meta.env.SSR && !isRiskCaptchaPath(path) && captchaRecovery) await captchaRecovery
+    if (!import.meta.env.SSR) valid()
+    const revision = captchaRevision
+    try { return await transport() }
+    catch (error) {
+      if (import.meta.env.SSR || !isCaptchaRequired(error) || init.__captchaRetried || isRiskCaptchaPath(path)) throw error
+      valid()
+      // 验证前发出的迟到响应只重试，不再次打开已经完成的验证。
+      if (revision === captchaRevision) await recoverCaptcha()
+      valid()
+      return transport()
+    }
   }
   if (!import.meta.env.SSR && homeReadsActive && isV3Path(path)) {
     const method = (init.method || 'GET').toUpperCase()
     const refresh = path === '/api/v3/auth/refresh'
     const ticket = /\/(?:realtime-ticket|realtime\/tickets)$/.test(path)
     if (method === 'GET' || refresh || ticket) {
-      return queueHomeRead(path, init, refresh ? () => queueCredentialRequest(run) : run, refresh || (method === 'GET' && path === '/api/v3/me'))
+      return queueHomeRead(path, init, run, refresh || (method === 'GET' && path === '/api/v3/me'))
     }
   }
   try {
@@ -473,14 +519,9 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
         }
       })
     }
-    return await (!import.meta.env.SSR && isCredentialPath(path) ? queueCredentialRequest(run) : run())
+    return await run()
   } catch (e) {
-    if (!import.meta.env.SSR && isCaptchaRequired(e)) {
-      if (init.__captchaRetried || isRiskCaptchaPath(path) || version !== authVersion || init.signal?.aborted) throw e
-      await ensureRiskCaptcha()
-      if (version !== authVersion || init.signal?.aborted) throw e
-      return request<T>(path, { ...init, __captchaRetried: true })
-    }
+    if (isCaptchaRequired(e)) throw e
     // A guest 401 can come from the anonymous shield. Session restore owns refresh-cookie probing.
     if (!import.meta.env.SSR && isV3Path(path) && !isCredentialPath(path) && init.credentials !== 'omit' && !explicitAuthorization &&
       (sentToken || getAccessToken()) && e instanceof ApiError && e.status === 401 && !init.__v3Retried && version === authVersion) {
@@ -496,6 +537,12 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
 }
 
 export async function requestText(path: string, init: RequestInitExtra = {}): Promise<string> {
+  const version = authVersion
+  if (!import.meta.env.SSR && !isRiskCaptchaPath(path) && captchaRecovery) await captchaRecovery
+  if (!import.meta.env.SSR && (version !== authVersion || init.signal?.aborted)) {
+    throw new ApiError('请求已取消', 0, 'aborted')
+  }
+  const revision = captchaRevision
   try {
     return await requestTextOnce(path, init)
   } catch (e) {
@@ -503,9 +550,10 @@ export async function requestText(path: string, init: RequestInitExtra = {}): Pr
       !import.meta.env.SSR &&
       isCaptchaRequired(e) &&
       !init.__captchaRetried &&
-      !isRiskCaptchaPath(path)
+      !isRiskCaptchaPath(path) && version === authVersion && !init.signal?.aborted
     ) {
-      await ensureRiskCaptcha()
+      if (revision === captchaRevision) await recoverCaptcha()
+      if (version !== authVersion || init.signal?.aborted) throw e
       return requestTextOnce(path, { ...init, __captchaRetried: true })
     }
     throw e
@@ -537,6 +585,11 @@ async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
   }
   checkGateway(res, identity)
   const text = await readNetworkBody(() => res.text(), init.signal, identity)
+  if (!res.ok && isJsonContentType(res.headers.get('content-type'))) {
+    let code: unknown
+    try { code = JSON.parse(text)?.code } catch { /* 非 JSON 错误保留原状态。 */ }
+    if (code === 'captcha_required') throw new ApiError('请完成人机验证后重试', res.status, code)
+  }
   if (!res.ok) throw new ApiError('读取失败，请稍后重试', res.status)
   return text
 }
