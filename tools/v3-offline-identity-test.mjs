@@ -70,10 +70,10 @@ try{
  api.setAccessToken('synthetic-before-queue');const oldNoticeCount=events.length
  const loginStarted=new Promise(resolve=>requestWaiters.set('/api/v3/auth/login',resolve)),login=api.request('/api/v3/auth/login',{method:'POST',body:'{}'})
  await loginStarted
- const logout=api.request('/api/v3/auth/logout',{method:'POST'}),queuedFailure=assert.rejects(logout,e=>e instanceof api.ApiError&&e.code==='offline')
+ const logout=api.request('/api/v3/auth/logout',{method:'POST'}),queuedFailure=assert.rejects(logout,e=>e instanceof api.ApiError&&e.code==='aborted')
  api.setAccessToken('synthetic-after-queue')
  heldLoginResponse.writeHead(200,{'Content-Type':'application/json'});heldLoginResponse.end('{"code":0,"data":{}}');await login;await queuedFailure
  assert.equal(events.length,oldNoticeCount,'queued old credential request borrowed the new identity for its network notice')
- console.log('PASS offline identity 6 serialized credential request keeps caller identity while queued; late failure cannot borrow a newer login identity')
+ console.log('PASS offline identity 6 serialized credential request is cancelled after identity change before dispatch; it cannot borrow a newer login identity')
 
 }finally{globalThis.fetch=originalFetch;globalThis.window=oldWindow;server.closeAllConnections();await new Promise(resolve=>server.close(resolve))}

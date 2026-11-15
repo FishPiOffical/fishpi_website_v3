@@ -13,12 +13,13 @@ const risk = await import(riskUrl)
 const source = compile(await fs.readFile('src/api/http.ts', 'utf8')).replace("from '@/utils/riskCaptcha'", `from '${riskUrl}'`)
 const api = await import(url(source))
 const received = []
-let blocked = true, permanent = false, lateResponse = null
+let blocked = true, permanent = false, lateResponse = null, releaseCredential = null
 const server = http.createServer(async (req, res) => {
   const chunks = []
   for await (const chunk of req) chunks.push(chunk)
   received.push({ path: req.url, method: req.method, body: Buffer.concat(chunks).toString(), key: req.headers['idempotency-key'] })
   const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)) }
+  if (req.url === '/api/v3/auth/session') { releaseCredential = () => send(200, { code: 0, data: {} }); return }
   if (req.url === '/validateCaptcha') { blocked = false; send(200, { code: 0 }); return }
   if (req.url === '/api/v3/fixture/unauthorized') { send(401, { code: 'unauthorized' }); return }
   if (req.url === '/api/v3/fixture/late' && blocked) {
@@ -204,6 +205,20 @@ try {
   assert.equal(probes(), probeStart + 3)
   assert.equal(opens, startupOpens + 1)
   console.log('PASS SSR client recovery: no flag/no probe, server-only restriction never opens browser captcha, actual browser restriction verifies after mounting and resumes public reads')
+
+  api.setHomeReadsActive(false)
+  api.setAccessToken('fixture-old-identity')
+  const credentialStart = received.length
+  const heldCredential = api.request('/api/v3/auth/session', { method: 'POST' })
+  await until(() => releaseCredential)
+  const staleRefresh = api.refreshAccessToken()
+  await new Promise(resolve => setTimeout(resolve, 20))
+  api.setAccessToken(null)
+  releaseCredential()
+  await heldCredential
+  assert.equal(await staleRefresh, false)
+  assert.deepEqual(received.slice(credentialStart).map(x => x.path), ['/api/v3/auth/session'])
+  console.log('PASS queued refresh rechecks identity at credential dispatch: logout prevents any stale Cookie request')
 } finally {
   risk.registerRiskCaptchaOpener(null)
   globalThis.fetch = nativeFetch

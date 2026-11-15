@@ -482,7 +482,11 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
     }
   }
   const transport = () => !import.meta.env.SSR && isCredentialPath(path)
-    ? queueCredentialRequest(() => requestOnce<T>(path, init, identity)) : requestOnce<T>(path, init, identity)
+    ? queueCredentialRequest(() => {
+      // Waiting behind another Cookie operation can cross logout/account boundaries.
+      valid()
+      return requestOnce<T>(path, init, identity)
+    }) : requestOnce<T>(path, init, identity)
   const run = async () => {
     if (!import.meta.env.SSR && !isRiskCaptchaPath(path) && captchaRecovery) await captchaRecovery
     if (!import.meta.env.SSR) valid()
