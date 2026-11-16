@@ -104,7 +104,7 @@ onMounted(() => { ready.value = true })
 .card-actions { display: flex; align-items: center; flex: none; }
 .card-actions:empty { display: none; }
 .card-actions :deep(a) { margin-right: 12px; color: var(--fp-muted); font-size: 12px; white-space: nowrap; }
-.card-body { min-width: 0; padding: 14px 16px; font-size: 12px; line-height: 1.6; }
+.card-body { min-width: 0; padding: 14px var(--fp-module-inset); font-size: 12px; line-height: 1.6; }
 .sidebar-card > .card-body { padding-top: 0; }
 .empty-side { margin: 0; padding: 16px; border: 1px dashed var(--fp-border); border-radius: var(--fp-radius-lg, 10px); color: var(--fp-muted); font-size: 12px; line-height: 1.6; text-align: center; }
 </style>

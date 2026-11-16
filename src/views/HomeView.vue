@@ -471,7 +471,7 @@ function scrollShelf(id: string, dir: -1 | 1) {
   padding: 0;
 }
 .mod-body {
-  padding: clamp(12px, 1.1vw, 16px);
+  padding: var(--home-module-padding, clamp(12px, 1.1vw, 16px));
   background: var(--fp-card);
   border: 1px solid var(--fp-border);
   border-radius: var(--fp-panel-radius);
@@ -512,7 +512,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
 @media (max-width: 960px) { .is-classic .recent-continuation { visibility: visible; } }
 /* 首页只负责工具卡的等高与固定展开，共享内容排版见 tool-module.css。 */
 .home-tool { min-height: 0; }
-.home .home-checkin-tool { padding: 0; }
+/* 签到的标题和正文由同一个展开容器负责留白。 */
+.home-checkin-tool { --home-module-padding: 0px; }
 .home [data-home-module="side:profile"].mod,
 .home [data-home-module="side:income"].mod,
 .home [data-home-module="checkin"].mod { container: tool-module / inline-size; }
@@ -520,24 +521,19 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .board--aligned [data-home-module="side:profile"] :deep(.home-side-widget) { flex: 1; min-height: 0; }
 .home [data-home-module="side:profile"] :deep(.home-side-widget),
 .home [data-home-module="side:income"] :deep(.home-side-widget) { border-radius: var(--fp-panel-radius); }
-.home :deep(.fixed-heading) { padding: 14px 16px 0; font-size: 13px; font-weight: 600; color: var(--fp-muted); }
 .home [data-home-module="side:profile"] :deep(.home-disclosure),
 .home [data-home-module="side:income"] :deep(.home-disclosure),
 .home .home-checkin-tool > .home-disclosure { display: flex; flex-direction: column; height: 100%; margin: 0; }
 .home [data-home-module="side:profile"] :deep(.disclosure-body),
 .home [data-home-module="side:income"] :deep(.disclosure-body),
-.home .home-checkin-tool :deep(.disclosure-body) { flex: 1; display: flex; padding: 0 16px 6px; }
-.home [data-home-module="side:profile"] :deep(.person-card),
-.home [data-home-module="side:profile"] :deep(.guest-card),
-.home [data-home-module="side:income"] :deep(.schedule),
-.home .home-checkin-tool :deep(.checkin-panel) { width: 100%; min-width: 0; margin: 0; }
+.home .home-checkin-tool :deep(.disclosure-body) { flex: 1; display: flex; }
 .home .home-checkin-tool :deep(.checkin-section) { height: 100%; }
-.home-checkin-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px; }
+.home-checkin-guest { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: var(--fp-module-inset); }
 .home-checkin-guest strong { width: 100%; font-size: 14px; }
 .home-checkin-guest p { flex: 1; color: var(--fp-muted); font-size: 12px; }
 .home-checkin-guest a { color: var(--fp-primary); font-size: 12px; }
 .home-download-tool { display: flex; align-items: center; }
-.home-download-tool :deep(.client-download) { width: 100%; border: 0; padding: 0; background: transparent; }
+.home-person, .home-moons { --fp-module-inset: 0px; }
 .home-person { margin-bottom: 10px; }
 .home-person :deep(.person-head) { margin-bottom: 8px; gap: 8px; }
 .home-person :deep(.person-avatar) { width: 34px; height: 34px; }
@@ -546,15 +542,10 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home-person :deep(.person-sub) { font-size: 10px; }
 .home-person :deep(.guest-slogan) { margin-bottom: 8px; }
 .home-person :deep(.role-tag) { display: none; }
-.home-checkin :deep(.checkin-head h3) { display: none; }
 .home-download { margin-bottom: 12px; }
-.home-checkin { margin-bottom: 12px; }
-.home-checkin :deep(.checkin-head) { display: none; }
 .home-moons { margin-block: 12px; }
 .home-moons-more { flex: none; color: var(--fp-muted); font-size: 12px; text-decoration: none; }
 .home-moons-more:hover { text-decoration: underline; }
-.home :deep(.checkin-panel) { margin: 10px 0 12px; }
-.home :deep(.checkin-section) { padding: 7px 8px; }
 .home :deep(.breezemoon-list .moon-body) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 
 .home.editing .mod {
@@ -1099,10 +1090,10 @@ function scrollShelf(id: string, dir: -1 | 1) {
 
 .community-body { display:flex; flex-direction:column; }
 .is-classic {
+  --home-module-padding: 12px 12px 14px;
   gap:12px;
   .board { gap:12px; }
   .cell { gap:12px; order:initial; }
-  .mod-body { padding:12px 12px 14px; }
   .home-moons { order:1; }
   .module-list li { padding:5px 6px; min-height:30px; }
   .long-card { flex-basis:calc((100% - 36px) / 4); grid-template-columns:64px minmax(0,1fr); min-height:96px; }

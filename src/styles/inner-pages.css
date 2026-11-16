@@ -8,6 +8,7 @@
   --fp-page-auth: 440px;
   --fp-page-gap: clamp(14px, 1.5vw, 20px);
   --fp-panel-padding: clamp(16px, 2vw, 22px);
+  --fp-module-inset: 16px;
   --fp-panel-radius: var(--fp-radius-lg);
   --fp-control-height: 36px;
   --fp-control-radius: var(--fp-radius-md);

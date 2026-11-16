@@ -24,7 +24,7 @@ function reportSummary(text: string) {
 </script>
 
 <template>
-  <div class="home-disclosure">
+  <div class="home-disclosure" :class="{ 'is-fixed-open': fixedOpen }">
     <div class="disclosure-head">
       <h3 v-if="fixedOpen" class="fixed-heading"><SidebarIcon :name="moduleId" /><span>{{ title }}</span></h3>
       <SidebarModuleHeader v-else
@@ -45,8 +45,10 @@ function reportSummary(text: string) {
 </template>
 
 <style scoped>
-.fixed-heading { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px; font-size: 13px; color: var(--fp-text); }
+.fixed-heading { display: flex; align-items: center; gap: 8px; margin: 0; padding: 14px var(--fp-module-inset) 0; font-size: 13px; font-weight: 600; color: var(--fp-muted); }
 .fixed-heading :deep(svg) { width: 16px; height: 16px; color: var(--fp-muted); }
 .home-disclosure { min-width: 0; }
 .disclosure-head { display: flex; align-items: center; gap: 6px; }
+.disclosure-body { padding: var(--fp-disclosure-padding, 0); }
+.is-fixed-open > .disclosure-body { padding: 0 var(--fp-module-inset) 6px; }
 </style>

@@ -1,11 +1,10 @@
 /* 首页、内页和聊天室共用三段工具卡；折叠状态仍由各自布局管理。 */
 .tool-module { container: tool-module / inline-size; }
 .tool-module :deep(.person-card), .tool-module :deep(.guest-card), .tool-module :deep(.schedule), .tool-module :deep(.checkin-panel) { width: 100%; min-width: 0; margin: 0; }
-.tool-module :deep(.card-toggle[aria-expanded='true']) { min-height: 0; padding: 14px 16px 0; color: var(--fp-muted); font-size: 13px; }
+.tool-module :deep(.card-toggle[aria-expanded='true']) { min-height: 0; padding: 14px var(--fp-module-inset) 0; color: var(--fp-muted); font-size: 13px; }
 .tool-module :deep(.module-icon) { width: 16px; height: 16px; }
 .tool-module :deep(.card-toggle[aria-expanded='false']) { font-size: 13px; }
-.tool-module > .card-body, .tool-module > .side-module-body { padding: 0 16px 6px; }
-.tool-module > .side-module-head { border-bottom: 0; }
+.tool-module > .card-body { padding: 0 var(--fp-module-inset) 6px; }
 .tool-module--checkin :deep(.activity) { width: 100%; }
 /* 身份与积分占主信息区，关注、收藏、发帖保留为底部三个独立入口。 */
 .tool-module--profile :deep(.person-card) { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: minmax(86px, 1fr) auto; padding: 0; }

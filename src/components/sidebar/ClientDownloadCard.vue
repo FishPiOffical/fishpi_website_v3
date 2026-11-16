@@ -11,7 +11,7 @@ import { imageThumbnail } from '@/utils/avatar'
   </div>
 </template>
 <style scoped>
-.client-download { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:12px; border:1px solid var(--fp-border); border-radius:10px; background:var(--fp-surface-subtle); }
+.client-download { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; width: 100%; min-width: 0; }
 .client-download img { flex:none; border-radius:8px; }
 .download-copy { flex:1; min-width:120px; }
 .download-copy strong { font-size:13px; color:var(--fp-title); }

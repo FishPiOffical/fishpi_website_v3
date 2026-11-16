@@ -24,6 +24,7 @@ defineProps<{ modules: HomeModuleMeta[] }>()
 
 <style scoped>
 .home-side-widget {
+  --fp-disclosure-padding: 0 var(--fp-module-inset) 10px;
   border: 1px solid var(--fp-border);
   border-radius: 8px;
   background: var(--fp-card);
@@ -32,5 +33,4 @@ defineProps<{ modules: HomeModuleMeta[] }>()
 .home-side-widget + .home-side-widget {
   margin-top: 10px;
 }
-.home-side-widget :deep(.disclosure-body) { padding: 0 12px 10px; }
 </style>
