@@ -5,6 +5,7 @@ export interface ChatQuote {
   href: string
   author: string
   excerpt: string
+  fullText?: string
   image?: string
 }
 
@@ -29,11 +30,13 @@ export function createBreezemoonQuote(source: BreezemoonQuoteSource, origin: str
   const path = `/member/${source.userName}/breezemoons/${source.id}`
   if (!moonPath.test(path)) return null
   const excerpt = Array.from(source.excerpt.trim())
+  const preview = excerpt.length > 280 ? excerpt.slice(0, 279).join('') + '…' : excerpt.join('')
   return {
     kind: 'breezemoon',
     href: new URL(path, origin).href,
     author: Array.from(source.nickname.trim().replace(/\s+/g, ' ')).slice(0, 64).join('') || source.userName,
-    excerpt: excerpt.length > 280 ? excerpt.slice(0, 279).join('') + '…' : excerpt.join(''),
+    excerpt: preview,
+    fullText: source.excerpt.trim(),
   }
 }
 
@@ -57,12 +60,18 @@ function trustedSourceUrl(href: string, origin: string): URL | null {
   return [origin, 'https://fishpi.cn', 'https://yui.fishpi.cn', 'https://new.fishpi.cn'].includes(url.origin) ? url : null
 }
 
-function readExcerpt(content: Element | DocumentFragment, imageLabel: string) {
-  for (const lineBreak of content.querySelectorAll('br')) lineBreak.replaceWith(' ')
-  for (const emoji of content.querySelectorAll('img.emoji[alt]')) emoji.replaceWith(emoji.getAttribute('alt') ?? '')
-  return Array.from(content.childNodes, node => node.textContent?.trim())
-    .filter(Boolean).join(' ').replace(/\s+/g, ' ')
-    || (content.querySelector('img') ? imageLabel : '')
+const quoteTextBlocks = /^(ADDRESS|BLOCKQUOTE|DIV|H[1-6]|LI|P|PRE|SECTION|TR)$/
+
+function readQuoteText(node: Node): string {
+  if (node.nodeType === 3) return node.textContent ?? ''
+  if (node.nodeType === 1) {
+    const element = node as Element
+    if (element.tagName === 'BR') return '\n'
+    if (element.tagName === 'IMG') return element.matches('.emoji[alt]') ? element.getAttribute('alt') ?? '' : ''
+    if (element.matches('script, style, template')) return ''
+  }
+  const content = Array.from(node.childNodes, readQuoteText).join('')
+  return quoteTextBlocks.test(node.nodeName) && content.trim() ? `\n${content}\n` : content
 }
 
 function quoteImage(html: string, content: Element | DocumentFragment, origin: string): string | undefined {
@@ -76,10 +85,11 @@ function quoteImage(html: string, content: Element | DocumentFragment, origin: s
   } catch { /* 无效的图片地址保留文字摘要。 */ }
 }
 
-function quoteSummary(html: string, content: Element | DocumentFragment, origin: string, imageLabel: string) {
+function quoteSummary(html: string, content: Element | DocumentFragment, origin: string, imageLabel: string): Pick<ChatQuote, 'excerpt' | 'fullText' | 'image'> {
   const image = quoteImage(html, content, origin)
-  const excerpt = readExcerpt(content, imageLabel)
-  return image ? { excerpt, image } : { excerpt }
+  const fullText = readQuoteText(content).trim().replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n')
+  const excerpt = fullText.replace(/\s+/g, ' ') || (content.querySelector('img') ? imageLabel : '')
+  return image ? { excerpt, image } : { excerpt, ...(fullText ? { fullText } : {}) }
 }
 
 export function chatMessageQuotePreview(source: { messageId: string; userName: string; html: string; label: string }): ChatQuote {
@@ -91,6 +101,7 @@ export function chatMessageQuotePreview(source: { messageId: string; userName: s
   return {
     kind: 'message', href: `/cr#chatroom${source.messageId}`, author: source.userName,
     ...summary, excerpt: summary.excerpt || nested?.excerpt || (source.html ? '' : source.label.split('\n')[0] ?? ''),
+    fullText: summary.fullText || (!summary.excerpt ? nested?.fullText : undefined),
   }
 }
 

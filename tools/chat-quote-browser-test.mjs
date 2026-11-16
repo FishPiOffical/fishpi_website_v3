@@ -20,9 +20,11 @@ export const formatDisplayTime=()=> '2026-11-14 13:07';
 export const RouterLink={props:['to'],setup(p,{slots}){return()=>h('a',{href:p.to},slots.default?.())}};`)
 const modules = { vue, 'vue-router': mocks }
 for (const path of ['@/stores/auth', '@/stores/chatPreferences', '@/stores/functionPreferences', '@/chat/mention', '@/api/v3-chat-messages', '@/utils/time']) modules[path] = mocks
-for (const name of ['avatar', 'chatAppearance', 'chatMessage', 'chatQuote']) {
+for (const name of ['avatar', 'bubbleStyle', 'chatAppearance', 'chatMessage', 'chatQuote']) {
   const source = transpile(fs.readFileSync(`src/utils/${name}.ts`, 'utf8'))
-  modules['@/utils/' + name] = data(source.replace("'@/utils/chatMessage'", `'${modules['@/utils/chatMessage']}'`))
+  modules['@/utils/' + name] = data(source
+    .replaceAll("'@/utils/bubbleStyle'", `'${modules['@/utils/bubbleStyle']}'`)
+    .replace("'@/utils/chatMessage'", `'${modules['@/utils/chatMessage']}'`))
 }
 let css = ''
 function compile(file, id) {
@@ -136,9 +138,32 @@ try {
   await page.addStyleTag({ content: 'body{background:#222424;--fp-card:#282a2a;--fp-text:#cbc5ba;--fp-muted:#9e9689;--fp-border:#424545;--fp-hover:#343737;--fp-bg:#222424}.panel{background:var(--fp-card)}' })
   await page.screenshot({ path: '/tmp/chat-quotes-dark.png', fullPage: true })
   assert.equal(await page.locator('[data-case="own"] .chat-quote-excerpt').evaluate(el => getComputedStyle(el).color), 'rgb(158, 150, 137)')
+  const ownQuote = page.locator('[data-case="own"] .chat-quote-card')
+  const hint = page.getByRole('tooltip')
+  await ownQuote.locator('.chat-quote-excerpt').hover()
+  await hint.waitFor()
+  assert.equal(await hint.textContent(), excerpt + '\n第三行引用')
+  assert.ok(await hint.evaluate(el => {
+    const rect = el.getBoundingClientRect()
+    return rect.left >= 8 && rect.right <= innerWidth - 8 && rect.top >= 8 && rect.bottom <= innerHeight - 8
+  }))
+  await hint.hover()
+  await page.waitForTimeout(180)
+  assert.ok(await hint.isVisible(), '指针移到悬浮预览时应保持显示')
+  await page.keyboard.press('Escape')
+  await hint.waitFor({ state: 'hidden' })
+  const ownJump = ownQuote.getByRole('link', { name: '查看原消息' })
+  await ownJump.focus()
+  await hint.waitFor()
+  assert.equal(await ownJump.getAttribute('aria-describedby'), await hint.getAttribute('id'))
+  await page.keyboard.press('Escape')
+  await hint.waitFor({ state: 'hidden' })
   await page.locator('[data-case="own"] .chat-quote-excerpt').click()
   assert.equal(new URL(page.url()).hash, '')
   await page.evaluate(() => { prefs.blurChatImages = true })
+  await thumbnail.hover()
+  await hint.waitFor({ state: 'hidden' })
+  assert.equal(await hint.count(), 0)
   assert.equal(await thumbnail.locator('img').evaluate(img => getComputedStyle(img).filter), 'blur(8px)')
   await thumbnail.click()
   const lightbox = page.locator('.img-zoom')

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
@@ -12,6 +12,68 @@ const zoomed = ref('')
 const failed = ref(false)
 const jumpLabel = computed(() => props.quote.kind === 'message' ? '查看原消息' : '查看清风明月')
 const thumbnail = computed(() => props.quote.image ? imageThumbnail(props.quote.image, 40, 32) : '')
+const hintText = computed(() => thumbnail.value ? '' : props.quote.fullText || '')
+const hintId = useId()
+const card = ref<HTMLElement | null>(null)
+const excerpt = ref<HTMLElement | null>(null)
+const hint = ref<HTMLElement | null>(null)
+const hintPosition = ref<{ left: string; top?: string; bottom?: string; maxHeight: string } | null>(null)
+let closeTimer: ReturnType<typeof setTimeout> | undefined
+
+function closeHint() {
+  clearTimeout(closeTimer)
+  hintPosition.value = null
+}
+
+function showHint() {
+  clearTimeout(closeTimer)
+  if (hintPosition.value || !hintText.value || !card.value || !excerpt.value) return
+  if (excerpt.value.scrollWidth <= excerpt.value.clientWidth && !hintText.value.includes('\n')
+    && hintText.value === props.quote.excerpt) return
+  const rect = card.value.getBoundingClientRect()
+  const gutter = 8
+  const width = Math.min(360, window.innerWidth - gutter * 2)
+  const above = rect.top > window.innerHeight - rect.bottom
+  hintPosition.value = {
+    left: `${Math.max(gutter, Math.min(rect.left, window.innerWidth - width - gutter))}px`,
+    ...(above ? { bottom: `${window.innerHeight - rect.top + 3}px` } : { top: `${rect.bottom + 3}px` }),
+    maxHeight: `${Math.min(280, (above ? rect.top : window.innerHeight - rect.bottom) - gutter - 3)}px`,
+  }
+}
+
+function onPointerEnter(event: PointerEvent) {
+  if (event.pointerType !== 'touch') showHint()
+}
+
+function scheduleClose() {
+  clearTimeout(closeTimer)
+  if (!hintPosition.value) return
+  closeTimer = setTimeout(() => {
+    if (!card.value?.matches(':hover') && !card.value?.querySelector('.chat-quote-jump:focus-visible')
+      && !hint.value?.matches(':hover')) closeHint()
+  }, 150)
+}
+
+watch(hintPosition, (position, _, onCleanup) => {
+  if (!position) return
+  const dismissOnEscape = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') closeHint()
+  }
+  const dismissOnScroll = (event: Event) => {
+    if (event.target !== hint.value) closeHint()
+  }
+  window.addEventListener('keydown', dismissOnEscape)
+  window.addEventListener('scroll', dismissOnScroll, true)
+  window.addEventListener('resize', closeHint)
+  onCleanup(() => {
+    window.removeEventListener('keydown', dismissOnEscape)
+    window.removeEventListener('scroll', dismissOnScroll, true)
+    window.removeEventListener('resize', closeHint)
+  })
+})
+watch(() => [props.quote.href, hintText.value], closeHint)
+onBeforeUnmount(closeHint)
+
 watch(() => props.quote.image, () => {
   failed.value = false
   zoomed.value = ''
@@ -24,7 +86,7 @@ function openImage() {
 </script>
 
 <template>
-  <div class="chat-quote-card">
+  <div ref="card" class="chat-quote-card" @pointerenter="onPointerEnter" @pointerleave="scheduleClose">
     <span class="chat-quote-source">
       <span class="chat-quote-author">{{ quote.author || (quote.kind === 'message' ? '引用消息' : '清风明月') }}</span><span>：</span>
     </span>
@@ -32,7 +94,7 @@ function openImage() {
       <img v-if="!failed" :src="thumbnail" :class="{ blurred: preferences.blurChatImages }" alt="" loading="lazy" @error="failed = true" />
       <span v-else>图片</span>
     </button>
-    <span v-else class="chat-quote-excerpt" :title="quote.excerpt">{{ quote.excerpt }}</span>
+    <span v-else ref="excerpt" class="chat-quote-excerpt">{{ quote.excerpt }}</span>
     <component
       :is="quote.kind === 'message' ? RouterLink : 'a'"
       v-bind="quote.kind === 'message'
@@ -40,13 +102,21 @@ function openImage() {
         : { href: quote.href, target: '_blank', rel: 'noopener noreferrer' }"
       class="chat-quote-jump"
       :aria-label="jumpLabel"
+      :aria-describedby="hintPosition ? hintId : undefined"
       :title="jumpLabel"
+      @focus="showHint"
+      @blur="scheduleClose"
+      @click="closeHint"
     >
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="m5 11 6-6M6 5h5v5" />
       </svg>
     </component>
     <ImageLightbox v-if="quote.image" v-model="zoomed" :original-src="quote.image" />
+    <Teleport v-if="hintPosition" to="body">
+      <div :id="hintId" ref="hint" class="chat-quote-hint" role="tooltip" :style="hintPosition"
+        @pointerenter="onPointerEnter" @pointerleave="scheduleClose">{{ hintText }}</div>
+    </Teleport>
   </div>
 </template>
 
@@ -119,5 +189,23 @@ function openImage() {
   color: inherit;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.chat-quote-hint {
+  position: fixed;
+  z-index: 2000;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 16px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px 10px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  background: var(--fp-card);
+  box-shadow: var(--fp-float-shadow, 0 6px 18px #0002);
+  color: var(--fp-text);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 </style>

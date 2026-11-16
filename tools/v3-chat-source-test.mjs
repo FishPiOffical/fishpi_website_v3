@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import ts from 'typescript';import{effectScope,ref,nextTick}from'vue';import{createPinia,defineStore,setActivePinia}from'pinia'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`);return s}
-const state=globalThis.__chatSource={context:1,calls:[],dispatch:null};const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAuthContextVersion(){return globalThis.__chatSource.context}export async function request(path,init){globalThis.__chatSource.calls.push({path,init});return globalThis.__chatSource.dispatch(path,init)}`),{ApiError}=await import(http),apiURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replace("from '@/utils/chatAppearance'",`from '${url(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')))}'`).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'").replace("from './http'",`from '${http}'`)),api=await import(apiURL)
+const state=globalThis.__chatSource={context:1,calls:[],dispatch:null};const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAuthContextVersion(){return globalThis.__chatSource.context}export async function request(path,init){globalThis.__chatSource.calls.push({path,init});return globalThis.__chatSource.dispatch(path,init)}`),{ApiError}=await import(http),apiURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replace("from '@/utils/chatAppearance'",`from '${url(replace(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')), [['@/utils/bubbleStyle', url(compile(await fs.readFile('src/utils/bubbleStyle.ts','utf8')))]]))}'`).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'").replace("from './http'",`from '${http}'`)),api=await import(apiURL)
 const auth=defineStore('source-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__chatSourceAuth=auth;const authURL=url('export const useAuthStore=globalThis.__chatSourceAuth'),source=await fs.readFile('src/composables/useChatMessageSource.ts','utf8'),hookURL=ssr=>url(replace(compile(source.replaceAll('import.meta.env.SSR',String(ssr))),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-chat-messages',apiURL],['@/stores/auth',authURL]])),{useChatMessageSource}=await import(hookURL(false)),env=data=>({code:0,data}),tick=async()=>{for(let i=0;i<10;i++)await Promise.resolve();await nextTick()}
 const base={id:'2',createdAt:2,type:'text',content:'raw **Markdown**\nsecond line',contentHtml:'<p>current clean HTML</p>',author:{id:'8',userName:'other',userNickname:'public',userAvatarURL:''},client:'Web/Website',card:{}}
 function setup(){const pinia=createPinia();setActivePinia(pinia);const scope=effectScope();let model;scope.run(()=>model=useChatMessageSource());return{scope,model,user:auth(pinia)}}
@@ -51,7 +51,7 @@ quoteTemplate.innerHTML = [
   '<blockquote><p>外部链接保留原样</p></blockquote>',
 ].join('')
 assert.deepEqual(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn'),
-  { kind: 'message', href: '/cr#chatroom2', author: 'fish', excerpt: '第一行 第二行' })
+  { kind: 'message', href: '/cr#chatroom2', author: 'fish', excerpt: '第一行 第二行', fullText: '第一行\n第二行' })
 assert.equal(quoteTemplate.content.querySelectorAll('blockquote').length, 1)
 assert.match(quoteTemplate.innerHTML, /我的回复.*外部链接保留原样/)
 const moon = '<blockquote><p><a href="/member/fish/breezemoons/7">清风明月 · ?????</a></p><p>快点放假吧</p></blockquote>'
@@ -70,7 +70,7 @@ quoteTemplate.innerHTML = `<div><p>我的回复</p>
 <h5>引用 @evil <a href="https://fishpi.cn.evil.example/cr#chatroom12">↩</a></h5><blockquote><p>保留原文</p></blockquote>
 <blockquote><p>普通手写内容</p></blockquote></div>`
 assert.deepEqual(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn'),
-  { kind: 'message', href: '/cr#chatroom10', author: 'outer', excerpt: '外层正文 手写引用' })
+  { kind: 'message', href: '/cr#chatroom10', author: 'outer', excerpt: '外层正文 手写引用', fullText: '外层正文\n\n手写引用' })
 assert.match(quoteTemplate.innerHTML, /我的回复/)
 assert.match(quoteTemplate.innerHTML, /保留原文/)
 assert.match(quoteTemplate.innerHTML, /普通手写内容/)
@@ -81,7 +81,7 @@ const legacySource = '1\n\n##### 引用 @Yui [↩](/cr#chatroom123 "跳转至原
 const lostLinkHTML = '<p>1</p><h5>引用 @<a href="https://fishpi.cn/member/Yui">Yui</a> <a title="跳转至原消息">↩</a></h5><blockquote><p>第一行<br>第二行</p></blockquote>'
 quoteTemplate.innerHTML = lostLinkHTML
 assert.deepEqual(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource),
-  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '第一行 第二行' })
+  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '第一行 第二行', fullText: '第一行\n第二行' })
 assert.equal(quoteTemplate.innerHTML, '<p>1</p>')
 quoteTemplate.innerHTML = lostLinkHTML.replace('>↩</a>', '><img class="emoji" alt=":leftwards_arrow_with_hook:" src="/arrow.png"></a>')
 assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', legacySource).href, '/cr#chatroom123')
@@ -121,11 +121,11 @@ const nestedSource = '##### 引用 @Yui [↩](/cr#chatroom123 "跳转至原消�
 const nestedHTML = '<h5>引用 @Yui <a title="跳转至原消息">↩</a></h5><blockquote><p>外层</p><h5>引用 @Yui <a title="跳转至原消息">↩</a></h5><blockquote><p>内层</p></blockquote></blockquote>'
 quoteTemplate.innerHTML = nestedHTML
 assert.deepEqual(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', nestedSource),
-  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '外层' })
+  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '外层', fullText: '外层' })
 assert.equal(hasChatQuoteBody(quoteTemplate.content), false)
 quoteTemplate.innerHTML = '<h5>引用 @Yui <a title="跳转至原消息">↩</a></h5><blockquote><blockquote><p>手写引用</p></blockquote></blockquote>'
 assert.deepEqual(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', '##### 引用 @Yui [↩](/cr#chatroom123 "跳转至原消息")\n> > 手写引用'),
-  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '手写引用' })
+  { kind: 'message', href: '/cr#chatroom123', author: 'Yui', excerpt: '手写引用', fullText: '手写引用' })
 assert.equal(hasChatQuoteBody(quoteTemplate.content), false)
 quoteTemplate.innerHTML = nestedHTML
 assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn', nestedSource.replace('> #####', '#####').replace('> > 内层', '> 内层')), null)
