@@ -11,8 +11,7 @@ export const useFunctionPreferencesStore = defineStore('functionPreferences', ()
   const identity = () => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || ''])
   let generation = 0
   let pending: Promise<Values> | null = null
-  // 登录用户尚未读到偏好时先遮住图片，避免开启模糊后刷新仍短暂露出原图。
-  const blurChatImages = computed(() => !!auth.accessToken && values.value?.chatImageBlur !== false)
+  const blurChatImages = computed(() => !!auth.accessToken && values.value?.chatImageBlur === true)
   watch(identity, () => { generation++; pending = null; values.value = null }, { flush: 'sync' })
 
   function accept(value: Values) {
