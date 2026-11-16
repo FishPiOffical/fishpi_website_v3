@@ -366,6 +366,7 @@ function clearScreen() {
             <ChatRevokeRecovery />
             <ChatComposer
               :height="100"
+              resize-edge="bottom"
               v-if="composerReady && isLoggedIn"
               ref="composerRef"
               v-model="draft"
@@ -600,6 +601,7 @@ function clearScreen() {
             <ChatComposer
               adaptive-height
               :height="150"
+              resize-edge="top"
               ref="composerRef"
               v-model="draft"
               :cache-id="account?.oId?`chatContent:${account.oId}`:''"

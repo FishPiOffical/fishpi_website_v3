@@ -17,6 +17,7 @@ const props = withDefaults(
     /** 私信等场景只保留常用的格式、链接和图片工具 */
     compact?: boolean
     adaptiveHeight?: boolean
+    resizeEdge?: 'top' | 'bottom'
     chatSendShortcut?: ChatSendShortcut
   }>(),
   {
@@ -92,6 +93,7 @@ defineExpose({
       :model-value="modelValue"
       :height="height"
       :adaptive-height="adaptiveHeight"
+      :resize-edge="resizeEdge"
       mode="reply"
       :toolbar-preset="compact ? 'message' : 'default'"
       :cache-id="cacheId"

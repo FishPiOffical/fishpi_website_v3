@@ -13,6 +13,8 @@ const props = withDefaults(
     modelValue: string
     height?: number
     adaptiveHeight?: boolean
+    /** 聊天室编辑器拖动边缘，顶部和底部独立保存本机高度 */
+    resizeEdge?: 'top' | 'bottom'
     disableSubmitShortcut?: boolean
     placeholder?: string
     outline?: boolean
@@ -26,6 +28,59 @@ const props = withDefaults(
   { height: 500, placeholder: '', outline: false, mode: 'post', toolbarPreset: 'default', cacheId: '' },
 )
 const emit = defineEmits<{ 'update:modelValue': [value: string]; submit: []; 'emoji-open': [open: boolean]; 'content-state': [hasContent: boolean] }>()
+
+const minHeight = 100
+const desktopHeightLimit = 360
+const maxHeight = ref(desktopHeightLimit)
+const savedHeight = ref<number>()
+const draggedHeight = ref<number>()
+const resizeKey = computed(() => `fp.chat.editor-height.${props.resizeEdge}`)
+const displayedHeight = computed(() => clampHeight(draggedHeight.value ?? savedHeight.value ?? props.height))
+let resizeDrag: { pointerId: number; y: number; height: number } | undefined
+
+function clampHeight(height: number) {
+  return Math.round(Math.min(maxHeight.value, Math.max(minHeight, height)))
+}
+
+function updateHeightLimit() {
+  maxHeight.value = Math.round(Math.min(desktopHeightLimit, Math.max(120, window.innerHeight * 0.4)))
+}
+
+function saveHeight(height: number) {
+  savedHeight.value = height
+  try { localStorage.setItem(resizeKey.value, String(height)) } catch { /* 存储不可用时，本次打开仍可调整 */ }
+}
+
+function startResize(event: PointerEvent) {
+  if (!event.isPrimary || event.button !== 0 || resizeDrag) return
+  const handle = event.currentTarget as HTMLElement
+  event.preventDefault()
+  handle.focus({ preventScroll: true })
+  handle.setPointerCapture(event.pointerId)
+  resizeDrag = { pointerId: event.pointerId, y: event.clientY, height: displayedHeight.value }
+}
+
+function moveResize(event: PointerEvent) {
+  if (resizeDrag?.pointerId !== event.pointerId) return
+  const delta = event.clientY - resizeDrag.y
+  draggedHeight.value = clampHeight(resizeDrag.height + (props.resizeEdge === 'top' ? -delta : delta))
+}
+
+function endResize(event: PointerEvent) {
+  if (resizeDrag?.pointerId !== event.pointerId) return
+  if (event.type === 'pointerup' && displayedHeight.value !== resizeDrag.height) saveHeight(displayedHeight.value)
+  resizeDrag = undefined
+  draggedHeight.value = undefined
+}
+
+function resizeWithKeys(event: KeyboardEvent) {
+  if (resizeDrag) return
+  const increaseKey = props.resizeEdge === 'top' ? 'ArrowUp' : 'ArrowDown'
+  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+  event.preventDefault()
+  const nextHeight = clampHeight(displayedHeight.value + (event.key === increaseKey ? 12 : -12))
+  if (nextHeight !== displayedHeight.value) saveHeight(nextHeight)
+}
 
 const VDITOR_CDN = 'https://file.fishpi.cn/vditor/latest/dist'
 
@@ -183,6 +238,14 @@ function applyTheme() {
 }
 
 onMounted(async () => {
+  if (props.resizeEdge) {
+    updateHeightLimit()
+    window.addEventListener('resize', updateHeightLimit)
+    try {
+      const height = Number(localStorage.getItem(resizeKey.value))
+      if (Number.isInteger(height) && height >= minHeight && height <= desktopHeightLimit) savedHeight.value = height
+    } catch { /* 存储不可用时使用默认高度 */ }
+  }
   let version = getAuthContextVersion()
   stopPreviewAuth = onAccessTokenChange(token => {
     const next = getAuthContextVersion()
@@ -215,7 +278,7 @@ onMounted(async () => {
     lang: 'zh_CN',
     theme: dark.value ? 'dark' : 'classic',
     outline: { enable: props.outline, position: 'left' },
-    resize: { enable: props.adaptiveHeight || !narrow, position: 'bottom' },
+    resize: { enable: !props.resizeEdge && (props.adaptiveHeight || !narrow), position: 'bottom' },
     preview: { delay: 750, mode: inline ? 'editor' : 'both', transform: preview.transform, parse: preview.parse },
     counter: { enable: !inline },
     toolbar: resolvedToolbar,
@@ -281,6 +344,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  if (props.resizeEdge) window.removeEventListener('resize', updateHeightLimit)
   disposed = true
   stopPreviewAuth?.()
   preview.dispose()
@@ -314,17 +378,29 @@ defineExpose({
     @compositionstart="onCompositionStart" @compositionend="onCompositionEnd">
     <EmojiPicker ref="emojiPicker" :show-trigger="false" placement="below" :labels="nativeEmojis"
       @insert="insertEmoji" @open-change="emit('emoji-open', $event)" />
-    <textarea
-      v-if="fallback"
-      ref="fallbackInput"
-      class="md-fallback"
-      :value="modelValue"
-      :placeholder="placeholder"
-      :style="{ height: `${height}px` }"
-      @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
-    />
-    <template v-else>
-      <div ref="host" />
+    <div :class="resizeEdge && `md-resizable md-resizable--${resizeEdge}`" :style="resizeEdge ? { '--md-resize-height': `${displayedHeight}px` } : undefined">
+      <div v-if="resizeEdge && (ready || fallback)" class="md-resize-handle" role="separator" tabindex="0"
+        aria-label="调整编辑器高度" aria-orientation="horizontal" title="拖动或按上下方向键调整编辑器高度"
+        :aria-valuemin="minHeight" :aria-valuemax="maxHeight" :aria-valuenow="displayedHeight"
+        @pointerdown="startResize" @pointermove="moveResize" @pointerup="endResize"
+        @pointercancel="endResize" @lostpointercapture="endResize" @keydown="resizeWithKeys" />
+      <div>
+        <textarea
+          v-if="fallback"
+          ref="fallbackInput"
+          class="md-fallback"
+          :value="modelValue"
+          :placeholder="placeholder"
+          :style="{ height: `${height}px` }"
+          @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
+        />
+        <template v-else>
+          <div ref="host" />
+          <div v-if="!ready" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
+        </template>
+      </div>
+    </div>
+    <template v-if="!fallback">
       <div class="md-upload-status" role="status">
         <div v-if="uploadStatus" class="md-upload-feedback" :class="{ 'md-upload-error': !uploadStatus.pending }">
           <progress v-if="uploadStatus.pending" aria-hidden="true" />
@@ -332,7 +408,6 @@ defineExpose({
         </div>
       </div>
       <p v-if="mentionError" role="status">{{ mentionError }}</p>
-      <div v-if="!ready" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
     </template>
   </div>
 </template>
@@ -405,6 +480,37 @@ defineExpose({
   color: var(--fp-text);
   border-radius: 8px;
   padding: 8px 10px;
+}
+.md-resizable .md-fallback { resize: none; }
+.md-resize-handle { display: none; }
+
+@media (min-width: 768px) {
+  .md-resizable { display: grid; min-width: 0; }
+  .md-resizable > div { min-width: 0; }
+  .md-resizable :deep(.vditor:not(.vditor--fullscreen)),
+  .md-resizable :is(.md-loading, .md-fallback) { height: var(--md-resize-height) !important; }
+  .md-resizable :deep(.vditor-content) { min-height: 0; }
+  .md-resizable--bottom .md-resize-handle { order: 1; }
+  .md-resize-handle {
+    display: grid;
+    place-items: center;
+    height: 12px;
+    border-radius: 4px;
+    cursor: ns-resize;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .md-resize-handle::before {
+    content: '';
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--fp-muted);
+    opacity: 0.5;
+  }
+  .md-resize-handle:is(:hover, :focus-visible, :active) { background: var(--fp-hover); }
+  .md-resizable:has(:deep(.vditor--fullscreen)) .md-resize-handle { display: none; }
 }
 </style>
 
