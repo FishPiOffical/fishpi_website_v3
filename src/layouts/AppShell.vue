@@ -123,15 +123,15 @@ const exploreLinks = [
 ]
 
 const clientLinks = [
-  { href: '/article/1653059669471', label: 'iOS' },
-  { href: '/article/1662284317542', label: 'PC' },
-  { href: '/article/1638189205758', label: 'IDEA' },
-  { href: '/article/1639648815789', label: 'Chrome' },
-  { href: '/article/1745833503658', label: '安卓' },
-  { href: '/article/1642231999994', label: 'VSCode' },
-  { href: '/article/1641135630423', label: 'Python' },
-  { href: '/article/1641661864119', label: 'Golang' },
-  { href: '/article/1748939764736', label: 'uTools' },
+  { href: '/download#client-ios-retired', label: 'iOS' },
+  { href: '/download#client-windows', label: 'PC' },
+  { href: '/download#client-idea', label: 'IDEA' },
+  { href: '/download#client-chrome', label: 'Chrome' },
+  { href: '/download#client-android-recommended', label: '安卓' },
+  { href: '/download#client-vscode', label: 'VSCode' },
+  { href: '/download#client-python', label: 'Python' },
+  { href: '/download#client-golang-terminal', label: 'Golang' },
+  { href: '/download#client-utools', label: 'uTools' },
 ]
 
 const legalLinks = [

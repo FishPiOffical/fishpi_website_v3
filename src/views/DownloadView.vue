@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { fetchClientDownloads, type ClientGroup } from '@/api/v3-client-downloads'
+import { imageThumbnail } from '@/utils/avatar'
 import { usePageSeo } from '@/composables/usePageSeo'
 
 usePageSeo(() => ({
@@ -7,166 +11,37 @@ usePageSeo(() => ({
   description: '下载摸鱼派各端客户端，随时随地摸鱼。',
 }))
 
-interface ClientLink {
-  label: string
-  href: string
-}
-
-interface ClientApp {
-  id: string
-  name: string
-  icon: string
-  group: 'desktop' | 'mobile' | 'tools' | 'terminal' | 'more'
-  authors?: { name: string; userName: string }[]
-  links?: ClientLink[]
-  recommended?: boolean
-  retired?: boolean
-  comingSoon?: boolean
-}
-
+const route = useRoute()
 const clientIcon = (name: string) => `https://fishpi.cn/images/clients/${name}`
+const loading = ref(true)
+const error = ref('')
+const clients = ref<Awaited<ReturnType<typeof fetchClientDownloads>>>([])
+let read: AbortController | undefined
 
-const clients: ClientApp[] = [
-  {
-    id: 'windows',
-    name: 'Windows 客户端',
-    icon: clientIcon('windows.png'),
-    group: 'desktop',
-    authors: [{ name: 'imlinhanchao', userName: 'imlinhanchao' }],
-    links: [{ label: 'Github Releases', href: 'https://github.com/imlinhanchao/fishpi-desktop/releases' }],
-  },
-  {
-    id: 'macos',
-    name: 'macOS 客户端',
-    icon: clientIcon('macos.png'),
-    group: 'desktop',
-    authors: [{ name: 'imlinhanchao', userName: 'imlinhanchao' }],
-    links: [{ label: 'Github Releases', href: 'https://github.com/imlinhanchao/fishpi-desktop/releases' }],
-  },
-  {
-    id: 'android-recommended',
-    name: 'Android 客户端',
-    icon: clientIcon('android.png'),
-    group: 'mobile',
-    authors: [{ name: 'otis1026', userName: 'otis1026' }],
-    links: [{ label: '详细地址', href: '/article/1745833503658' }],
-    recommended: true,
-  },
-  {
-    id: 'android-native',
-    name: 'Android 客户端（原生）',
-    icon: clientIcon('android.png'),
-    group: 'mobile',
-    authors: [{ name: 'csfwff', userName: 'csfwff' }],
-    links: [{ label: '详细地址', href: '/article/1656144820684' }],
-  },
-  {
-    id: 'vscode',
-    name: 'VSCode 插件',
-    icon: clientIcon('vscode.png'),
-    group: 'tools',
-    authors: [{ name: 'imlinhanchao', userName: 'imlinhanchao' }],
-    links: [{ label: 'Visual Studio Marketplace', href: 'https://marketplace.visualstudio.com/items?itemName=hancel.pwl-chat' }],
-  },
-  {
-    id: 'utools',
-    name: 'uTools 插件',
-    icon: clientIcon('utools.png'),
-    group: 'tools',
-    authors: [{ name: 'otis1026', userName: 'otis1026' }],
-    links: [{ label: '立刻尝鲜', href: '/article/1748939764736' }],
-  },
-  {
-    id: 'chrome',
-    name: 'Chrome 插件',
-    icon: clientIcon('chrome.png'),
-    group: 'tools',
-    authors: [{ name: 'Lemon', userName: 'lemon' }],
-    links: [
-      { label: 'Github Releases', href: 'https://github.com/Lemon-cxh/pwl-chat-extension/releases' },
-      {
-        label: 'Microsoft Edge Addons',
-        href: 'https://microsoftedge.microsoft.com/addons/detail/%E6%91%B8%E9%B1%BC%E6%B4%BE%E8%81%8A%E5%A4%A9%E5%AE%A4/oldbilakhdpiamjbkocdcdnlnakainfm',
-      },
-      {
-        label: 'Chrome 网上应用店',
-        href: 'https://chrome.google.com/webstore/detail/%E6%91%B8%E9%B1%BC%E6%B4%BE%E8%81%8A%E5%A4%A9%E5%AE%A4/fkaomdjjdbglkbcmfhhlioejkpacbbpe',
-      },
-    ],
-  },
-  {
-    id: 'idea',
-    name: 'IDEA 插件',
-    icon: clientIcon('idea.jpg'),
-    group: 'tools',
-    authors: [{ name: 'Danbai', userName: 'Danbai' }],
-    links: [
-      { label: 'Github Releases', href: 'https://github.com/danbai225/pwl-chat/releases' },
-      { label: 'IntelliJ IDEs Plugin | Marketplace', href: 'https://plugins.jetbrains.com/plugin/18091-pwl-chat' },
-    ],
-  },
-  {
-    id: 'python',
-    name: 'Python 客户端',
-    icon: clientIcon('python.png'),
-    group: 'terminal',
-    authors: [{ name: 'Gakkiyomi', userName: 'Gakkiyomi' }],
-    links: [{ label: 'Github', href: 'https://github.com/gakkiyomi/pwl-chat-python' }],
-  },
-  {
-    id: 'golang-distributed',
-    name: 'Golang 分布式客户端',
-    icon: clientIcon('Golang.png'),
-    group: 'terminal',
-    authors: [{ name: 'bulabula', userName: 'bulabula' }],
-    links: [{ label: 'Github', href: 'https://github.com/New-arkssac/fishpi-Goclient' }],
-  },
-  {
-    id: 'golang-terminal',
-    name: 'Golang 终端客户端',
-    icon: clientIcon('Golang.png'),
-    group: 'terminal',
-    authors: [{ name: '8888', userName: '8888' }],
-    links: [{ label: 'Github Releases', href: 'https://github.com/fghwett/fishpi-golang/releases/' }],
-  },
-  {
-    id: 'coming-soon',
-    name: '更多平台开发中…',
-    icon: clientIcon('code.png'),
-    group: 'more',
-    comingSoon: true,
-  },
-  {
-    id: 'ios-retired',
-    name: 'iOS 客户端',
-    icon: clientIcon('ios.png'),
-    group: 'mobile',
-    authors: [
-      { name: 'Yui', userName: 'Yui' },
-      { name: 'iwpz', userName: 'iwpz' },
-    ],
-    retired: true,
-  },
-  {
-    id: 'android-retired',
-    name: 'Android 客户端',
-    icon: clientIcon('android.png'),
-    group: 'mobile',
-    authors: [
-      { name: 'Yui', userName: 'Yui' },
-      { name: 'iwpz', userName: 'iwpz' },
-    ],
-    retired: true,
-  },
-  {
-    id: 'android-flutter-retired',
-    name: 'Android 客户端（Flutter）',
-    icon: clientIcon('android.png'),
-    group: 'mobile',
-    authors: [{ name: 'iwpz', userName: 'iwpz' }],
-    retired: true,
-  },
-]
+async function load() {
+  read?.abort()
+  const controller = new AbortController()
+  read = controller
+  loading.value = true
+  error.value = ''
+  clients.value = []
+  try {
+    const list = await fetchClientDownloads(controller.signal)
+    if (!controller.signal.aborted) clients.value = list
+  } catch (cause) {
+    if (!controller.signal.aborted) error.value = cause instanceof Error ? cause.message : '客户端下载暂不可用'
+  } finally {
+    if (read === controller && !controller.signal.aborted) loading.value = false
+  }
+}
+
+onMounted(load)
+onScopeDispose(() => { read?.abort() })
+watch([() => route.hash, loading], async ([hash, pending]) => {
+  if (pending || !/^#client-[a-z0-9-]{1,48}$/.test(hash)) return
+  await nextTick()
+  document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
+}, { flush: 'post' })
 
 const clientGroups = [
   { id: 'desktop', title: '桌面客户端', subtitle: '在电脑上也能轻松连接摸鱼派' },
@@ -176,8 +51,11 @@ const clientGroups = [
   { id: 'more', title: '更多选择', subtitle: '新的客户端正在路上' },
 ] as const
 
-const availableClients = (group: ClientApp['group']) => clients.filter(client => client.group === group && !client.retired)
-const retiredClients = clients.filter(client => client.retired)
+const availableClients = (group: ClientGroup) => clients.value
+  .filter(client => client.group === group && client.status !== 'retired')
+  .sort((a, b) => Number(b.recommended) - Number(a.recommended))
+const visibleGroups = computed(() => clientGroups.filter(group => availableClients(group.id).length))
+const retiredClients = computed(() => clients.value.filter(client => client.status === 'retired'))
 </script>
 
 <template>
@@ -204,7 +82,10 @@ const retiredClients = clients.filter(client => client.retired)
     </header>
 
     <div class="section-list">
-      <section v-for="group in clientGroups" :key="group.id" class="client-section" :aria-labelledby="`section-${group.id}`">
+      <p v-if="loading" role="status">正在读取客户端下载…</p>
+      <p v-else-if="error" role="alert">{{ error }} <button class="fp-control" type="button" @click="load">重试</button></p>
+      <p v-else-if="!clients.length">暂无客户端。</p>
+      <section v-for="group in visibleGroups" :key="group.id" class="client-section" :aria-labelledby="`section-${group.id}`">
         <header class="section-heading">
           <div>
             <h2 :id="`section-${group.id}`">{{ group.title }}</h2>
@@ -213,14 +94,14 @@ const retiredClients = clients.filter(client => client.retired)
           <span class="section-count">{{ availableClients(group.id).length.toString().padStart(2, '0') }}</span>
         </header>
         <ul class="client-grid" :class="{ 'more-grid': group.id === 'more' }">
-          <li v-for="client in availableClients(group.id)" :key="client.id" class="client-card" :class="{ recommended: client.recommended, 'coming-soon': client.comingSoon }">
+          <li v-for="client in availableClients(group.id)" :id="`client-${client.id}`" :key="client.id" class="client-card" :class="{ recommended: client.recommended, 'coming-soon': client.status === 'comingSoon' }">
             <div class="client-main">
-              <div class="icon-wrap" :class="{ 'icon-muted': client.comingSoon }">
-                <img :src="client.icon" :alt="`${client.name}图标`" width="48" height="48" loading="lazy" />
+              <div class="icon-wrap" :class="{ 'icon-muted': client.status === 'comingSoon' }">
+                <img :src="imageThumbnail(client.icon || clientIcon('code.png'), 48, 48)" alt="" width="48" height="48" loading="lazy" />
               </div>
               <div class="client-title">
                 <span v-if="client.recommended" class="recommend-label">推荐</span>
-                <span v-if="client.comingSoon" class="recommend-label soon-label">即将推出</span>
+                <span v-if="client.status === 'comingSoon'" class="recommend-label soon-label">即将推出</span>
                 <h3>{{ client.name }}</h3>
                 <div v-if="client.authors?.length" class="authors">
                   <span>开发者</span>
@@ -257,8 +138,8 @@ const retiredClients = clients.filter(client => client.retired)
         <span class="retired-count">{{ retiredClients.length }} 个</span>
       </header>
       <ul class="retired-list">
-        <li v-for="client in retiredClients" :key="client.id" class="retired-card">
-          <img :src="client.icon" :alt="`${client.name}图标`" width="36" height="36" loading="lazy" />
+        <li v-for="client in retiredClients" :id="`client-${client.id}`" :key="client.id" class="retired-card">
+          <img :src="imageThumbnail(client.icon || clientIcon('code.png'), 36, 36)" alt="" width="36" height="36" loading="lazy" />
           <div class="retired-info">
             <div class="retired-title"><h3>{{ client.name }}</h3><span class="retired-tag">已下架</span></div>
             <div class="authors">
@@ -455,6 +336,7 @@ const retiredClients = clients.filter(client => client.retired)
   box-shadow: var(--fp-card-shadow);
   transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
 }
+.client-card, .retired-card { scroll-margin-top: 100px; }
 .client-card:hover {
   transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--download-accent) 38%, var(--fp-border));
@@ -630,17 +512,13 @@ const retiredClients = clients.filter(client => client.retired)
   .section-heading h2 { font-size: 18px; }
   .section-heading p { max-width: 255px; font-size: 11px; }
   .client-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .client-card { align-items: center; flex-direction: row; gap: 8px; padding: 12px; border-radius: 11px; }
+  .client-card { gap: 8px; padding: 12px; border-radius: 11px; }
   .client-main { gap: 11px; }
   .icon-wrap { flex-basis: 46px; width: 46px; height: 46px; border-radius: 10px; }
   .icon-wrap img { width: 35px; height: 35px; }
   .client-title h3 { font-size: 13px; }
   .authors { font-size: 10px; }
-  .client-links { justify-content: flex-end; }
   .client-links a { min-height: 28px; padding: 4px 7px; font-size: 10px; }
-  .client-links a:not(:first-child) { display: none; }
-  .client-links:has(a:only-child) a,
-  .client-links a.primary-link { display: inline-flex; }
   .coming-soon { align-items: flex-start; flex-direction: column; }
   .coming-note { padding-left: 57px; }
   .retired-section { margin-top: 32px; padding-top: 20px; }
