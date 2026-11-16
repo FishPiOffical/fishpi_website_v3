@@ -641,6 +641,7 @@ try {
   assert.equal(document.querySelectorAll('.shop-item').length, 1)
   assert.equal(document.querySelector('[aria-label="使用芦苇"]'), null)
   const quantityInput = document.querySelector('#pet-item-quantity-reed')
+  assert.deepEqual([...quantityInput.options].map(option => option.label), ['1', '5', '10'])
   quantityInput.value = '5'; quantityInput.dispatchEvent(new Event('change', { bubbles: true })); await settle()
   const beforePurchaseCoins = pets.coins
   await click(document.querySelector('[aria-label="购买芦苇"]'))

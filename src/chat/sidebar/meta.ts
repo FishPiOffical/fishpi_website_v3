@@ -10,7 +10,7 @@ export interface ChatSidebarModuleMeta {
   homeDefaultOn?: boolean
 }
 
-export const CHAT_SIDEBAR_META: ChatSidebarModuleMeta[] = [
+export const SIDEBAR_WIDGET_META: ChatSidebarModuleMeta[] = [
   { id: 'profile', title: '我的资料', defaultOn: true, portable: true },
   { id: 'breezemoons', title: '清风明月', defaultOn: true, portable: true },
   { id: 'income', title: '上下班时间', defaultOn: true, portable: true },
@@ -21,3 +21,5 @@ export const CHAT_SIDEBAR_META: ChatSidebarModuleMeta[] = [
   { id: 'ad', title: '广告', defaultOn: false, portable: true },
   { id: 'mutes', title: '思过崖', defaultOn: false, portable: false },
 ]
+
+export const CHAT_SIDEBAR_META = SIDEBAR_WIDGET_META.filter(module => module.id !== 'appearance')

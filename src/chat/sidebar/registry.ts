@@ -8,7 +8,7 @@ import MutesModule from './modules/MutesModule.vue'
 import OnlineModule from './modules/OnlineModule.vue'
 import ProfileModule from './modules/ProfileModule.vue'
 import TopicModule from './modules/TopicModule.vue'
-import { CHAT_SIDEBAR_META, type ChatSidebarModuleId, type ChatSidebarModuleMeta } from './meta'
+import { SIDEBAR_WIDGET_META, type ChatSidebarModuleId, type ChatSidebarModuleMeta } from './meta'
 
 export interface ChatSidebarModule extends ChatSidebarModuleMeta {
   component: Component
@@ -26,11 +26,11 @@ const COMPONENTS: Record<ChatSidebarModuleId, Component> = {
   mutes: MutesModule,
 }
 
-export const CHAT_SIDEBAR_MODULES: ChatSidebarModule[] = CHAT_SIDEBAR_META.map((m) => ({
+const SIDEBAR_WIDGETS: ChatSidebarModule[] = SIDEBAR_WIDGET_META.map((m) => ({
   ...m,
   component: COMPONENTS[m.id],
 }))
 
 export function sidebarModule(id: string): ChatSidebarModule | undefined {
-  return CHAT_SIDEBAR_MODULES.find((m) => m.id === id)
+  return SIDEBAR_WIDGETS.find((m) => m.id === id)
 }

@@ -23,6 +23,7 @@ function moduleUrl(file) {
 const { useChatSidebarStore } = await import(moduleUrl(path.resolve('src/stores/chatSidebar.ts')))
 const { usePageSidebarStore } = await import(moduleUrl(path.resolve('src/stores/pageSidebar.ts')))
 const { groupSidebarModules } = await import(moduleUrl(path.resolve('src/utils/sidebarPresentation.ts')))
+const { HOME_MODULE_IDS } = await import(moduleUrl(path.resolve('src/home/modules.ts')))
 const targets = [
   { useStore: useChatSidebarStore, key: 'fp.chatSidebar', first: 'breezemoons', last: 'mutes' },
   { useStore: usePageSidebarStore, key: 'fp.pageSidebar.v1', first: 'checkin', last: 'ad' },
@@ -56,10 +57,18 @@ try {
     checks++
 
     // 升级旧配置时保留启用、排序和折叠，只清理重复及失效模块。
-    memory.set(key, JSON.stringify({ order: [last, first, first, 'removed', 'profile'], hidden: [last, last, 'removed'], collapsed: [first, first, 'removed'] }))
+    memory.set(key, JSON.stringify({
+      order: [last, first, first, 'appearance', 'removed', 'profile'],
+      hidden: [last, last, 'removed'],
+      collapsed: [first, first, 'appearance', 'removed'],
+      presentation: { appearance: 'card' },
+    }))
     store = fresh(useStore)
     assert.equal(store.pref.order.filter(id => id === first).length, 1)
     assert.equal(store.pref.order.includes('removed'), false)
+    assert.equal(store.orderedModules.some(module => module.id === 'appearance'), false)
+    assert.equal(store.visibleModules.some(module => module.id === 'appearance'), false)
+    assert.equal(Object.hasOwn(store.pref.presentation, 'appearance'), false)
     assert.deepEqual([...store.pref.hidden], [last])
     assert.deepEqual([...store.pref.collapsed], [first])
     assert.equal(store.presentationOf(first), 'tabs')
@@ -113,6 +122,7 @@ try {
     assert.doesNotThrow(() => store.reset())
     checks++
   }
+  assert.ok(HOME_MODULE_IDS.has('side:appearance'))
 
   // 同组标签只生成一个面板，放在首个标签原位置；资料固定置顶。
   const modules = ['income', 'online', 'profile', 'topic', 'appearance', 'breezemoons'].map(id => ({ id }))

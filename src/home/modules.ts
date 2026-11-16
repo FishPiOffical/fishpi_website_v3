@@ -1,4 +1,4 @@
-import { CHAT_SIDEBAR_META, type ChatSidebarModuleId } from '@/chat/sidebar/meta'
+import { SIDEBAR_WIDGET_META, type ChatSidebarModuleId } from '@/chat/sidebar/meta'
 
 export type HomeCoreModuleId = 'recentA' | 'recentB' | 'rank' | 'long' | 'chat' | 'hotQna' | 'community' | 'checkin' | 'download' | 'onlineRank'
 
@@ -19,7 +19,7 @@ export interface HomeModuleMeta {
   sidebarId?: ChatSidebarModuleId
 }
 
-const SIDE_MODULES: HomeModuleMeta[] = CHAT_SIDEBAR_META.filter((m) => m.portable).map((m) => ({
+const SIDE_MODULES: HomeModuleMeta[] = SIDEBAR_WIDGET_META.filter((m) => m.portable).map((m) => ({
   id: `side:${m.id}` as HomeSideModuleId,
   title: m.title,
   width: 'narrow',

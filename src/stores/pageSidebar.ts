@@ -8,7 +8,6 @@ export type PageSidebarModuleId =
   | 'download'
   | 'breezemoons'
   | 'income'
-  | 'appearance'
   | 'ad'
 
 export interface PageSidebarModuleMeta {
@@ -25,7 +24,6 @@ export const PAGE_SIDEBAR_META: PageSidebarModuleMeta[] = [
   { id: 'download', title: '客户端下载', defaultOn: true },
   { id: 'breezemoons', title: '清风明月', defaultOn: true, core: true },
   { id: 'income', title: '上下班时间', defaultOn: false },
-  { id: 'appearance', title: '外观主题', defaultOn: false },
   { id: 'ad', title: '社区赞助', defaultOn: false },
 ]
 

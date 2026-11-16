@@ -9,7 +9,6 @@ import PersonInfoCard from '@/components/sidebar/PersonInfoCard.vue'
 import BreezemoonFeed from '@/components/sidebar/BreezemoonFeed.vue'
 import SidebarLayout from '@/components/sidebar/SidebarLayout.vue'
 import IncomeModule from '@/chat/sidebar/modules/IncomeModule.vue'
-import AppearanceModule from '@/chat/sidebar/modules/AppearanceModule.vue'
 import AdModule from '@/chat/sidebar/modules/AdModule.vue'
 
 const { isLoggedIn } = storeToRefs(useAuthStore())
@@ -39,7 +38,6 @@ const { visibleModules, pref } = storeToRefs(pageSidebar)
       <ClientDownloadCard v-else-if="module.id === 'download'" />
       <BreezemoonFeed v-else-if="module.id === 'breezemoons'" @summary="onSummary" />
       <IncomeModule v-else-if="module.id === 'income'" />
-      <AppearanceModule v-else-if="module.id === 'appearance'" />
       <AdModule v-else-if="module.id === 'ad'" />
     </template>
   </SidebarLayout>

@@ -32,7 +32,7 @@ const identity = computed(() => `${authVersion.value}:${auth.isLoggedIn ? auth.a
 const current = computed(() => props.modules.find(mod => mod.id === activeId.value))
 const storageKey = computed(() => `fp.sidebarTab.${props.section}.v1`)
 const labels: Partial<Record<ModuleId, string>> = {
-  activity: '活跃签到', checkin: '活跃签到', appearance: '外观', download: '客户端下载', ad: '社区赞助',
+  activity: '活跃签到', checkin: '活跃签到', download: '客户端下载', ad: '社区赞助',
 }
 
 function updateOverflow() {
