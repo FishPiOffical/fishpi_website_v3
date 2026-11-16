@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import ts from 'typescript';import{ref,nextTick}from'vue';import{createPinia,defineStore}from'pinia'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`);return s}
 const state=globalThis.__timeline={context:1,calls:[],dispatch:null,subscriptions:[],reactions:[]};const http=url(`export class ApiError extends Error{constructor(m,status=0,code){super(m);this.status=status;this.code=code}}export function getAccessToken(){return 'fixture-token'}export function getAuthContextVersion(){return globalThis.__timeline.context}export async function request(path,init){globalThis.__timeline.calls.push({path,init});return globalThis.__timeline.dispatch(path,init)}`),{ApiError}=await import(http)
-const appearanceURL=url(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')))
+const bubbleStyleURL=url(compile(await fs.readFile('src/utils/bubbleStyle.ts','utf8')))
+const appearanceURL=url(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')).replaceAll("'@/utils/bubbleStyle'",`'${bubbleStyleURL}'`))
 const apiURL=url(replace(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'"),[['./http',http],['@/utils/chatAppearance',appearanceURL]])),api=await import(apiURL)
 const auth=defineStore('timeline-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__timelineAuth=auth;const authURL=url('export const useAuthStore=globalThis.__timelineAuth'),rtURL=url('export function subscribeChatChanges(event,state){const sub={event,state,closed:false};globalThis.__timeline.subscriptions.push(sub);queueMicrotask(()=>{if(!sub.closed&&globalThis.__timeline.autoReady!==false)state("ready")});return()=>sub.closed=true}'),reactionURL=url('export function useV3ReactionsStore(){return{invalidate(kind,id){globalThis.__timeline.reactions.push([kind,id])}}}')
 const storeURL=url(replace(compile((await fs.readFile('src/stores/v3ChatTimeline.ts','utf8')).replaceAll('import.meta.env.SSR','false')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-chat-messages',apiURL],['@/api/v3-realtime',rtURL],['@/stores/auth',authURL],['@/stores/v3Reactions',reactionURL]])),{useV3ChatTimelineStore}=await import(storeURL),tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()},env=data=>({code:0,data})
@@ -84,7 +85,7 @@ frame('chat.message.created',payload)
 frame('chat.message.updated',{...payload,revision:'2',message:msg('99')})
 frame('chat.message.deleted',{...payload,revision:'3'})
 assert.deepEqual(delivered,[
-  {type:'message',id:'12',revision:'1',message:api.decodeChatMessage(payload.message)},
+  {type:'message',id:'12',revision:'1',created:true,message:api.decodeChatMessage(payload.message)},
   {type:'message',id:'12',revision:'2'},
   {type:'deleted',id:'12',revision:'3'},
 ])
@@ -196,3 +197,20 @@ console.log('PASS 重连补读失败保留内存消息，恢复后更新最新�
 
 latest=Array.from({length:20},(_,i)=>msg(String(100+i)));view=setup();await view.store.connect();const retainedSub=state.subscriptions.at(-1),retainedCalls=state.calls.length;view.store.clearVisible(10);assert.deepEqual(view.store.messages.map(m=>m.id),latest.slice(-10).map(m=>m.id));assert.equal(retainedSub.closed,false);assert.equal(state.calls.length,retainedCalls);assert.equal(view.store.hasMore,false);retainedSub.event({type:'message',id:'120',message:msg('120')});assert.equal(view.store.messages.length,11);view.store.clearVisible(10);assert.equal(view.store.messages.length,10);view.store.$dispose();latest=[msg('11'),msg('12')];view=setup();await view.store.connect();view.store.clearVisible(10);assert.equal(view.store.messages.length,2);view.store.$dispose()
 console.log('PASS 清屏保留最近十条，不足十条保留全部，不断连接不补读，后续新消息正常追加')
+
+const sakuraMessage = id => ({ ...msg(id), appearance: { version: 1, bubbleId: 'night-sakura', frameId: 'night-sakura' } })
+latest = [sakuraMessage('11'), sakuraMessage('12')]
+view = setup()
+await view.store.connect()
+assert.equal(view.store.sakuraArrival, null)
+const sakuraSubscription = state.subscriptions.at(-1)
+sakuraSubscription.event({ type: 'message', id: '14', message: sakuraMessage('14') })
+assert.equal(view.store.sakuraArrival, null)
+sakuraSubscription.event({ type: 'message', id: '15', message: sakuraMessage('15'), created: true })
+assert.equal(view.store.sakuraArrival, '15')
+sakuraSubscription.event({ type: 'message', id: '13', message: sakuraMessage('13'), created: true })
+assert.equal(view.store.sakuraArrival, '15')
+view.user.accessToken = null
+assert.equal(view.store.sakuraArrival, null)
+view.store.$dispose()
+console.log('PASS 夜樱雨入场仅标记最新新消息，不标记历史、更新和迟到的旧消息')

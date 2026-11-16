@@ -25,6 +25,7 @@ const props = withDefaults(
     petStatus?: ChatPetStatus
     messageId?: string
     appearance?: ChatAppearance
+    animateSakura?: boolean
     userId?: string
     userName: string
     nickname?: string
@@ -128,7 +129,7 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
+  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'has-sakura-arrival': animateSakura && !simpleMode, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
     <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`">
       <img class="fp-avatar" :src="avatarThumbnail(avatar, avatarSize)" alt="" loading="lazy" @error="onAvatarError" />
     </RouterLink>

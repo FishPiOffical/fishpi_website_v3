@@ -1,0 +1,8 @@
+{
+  "id": "night-sakura",
+  "kind": "frame",
+  "name": "夜樱雨头像框",
+  "vip": false,
+  "points": true,
+  "preview": "linear-gradient(135deg,#ffd2e5,#9e547d)"
+}

@@ -1,7 +1,7 @@
 import {defineStore,storeToRefs} from 'pinia'
 import {onScopeDispose,ref,watch} from 'vue'
 import {ApiError,getAuthContextVersion} from '@/api/http'
-import {chatMessagePage,chatTopic,type ChatMessage} from '@/api/v3-chat-messages'
+import {chatMessagePage,chatTopic,isNightSakuraMessage,type ChatMessage} from '@/api/v3-chat-messages'
 import {subscribeChatChanges,type ChatBarrageEvent,type ChatRealtimeEvent,type ChatRoomNotice} from '@/api/v3-realtime'
 import {useAuthStore} from '@/stores/auth'
 import {useV3ReactionsStore} from '@/stores/v3Reactions'
@@ -10,6 +10,7 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
  const barrage=ref<ChatBarrageEvent|null>(null)
  const notices=ref<ChatRoomNotice[]>([])
  const changeHint=ref<{id:string;version:number}|null>(null)
+ const sakuraArrival = ref<string | null>(null)
  const messages=ref<ChatMessage[]>([]),loading=ref(false),loadingMore=ref(false),hasMore=ref(false),error=ref(''),connected=ref(false),connecting=ref(false),topic=ref(''),topicError=ref('')
  let wanted=false,blocked=false,generation=0,latestRun=0,before='',oldestRun=0,version=0,boundary=getAuthContextVersion(),owner=account.value?.oId,stop:(()=>void)|null=null,latestAbort:AbortController|null=null,olderAbort:AbortController|null=null,topicAbort:AbortController|null=null,topicRun=0,topicBusy=false,topicDirty=false
  let cancelStartup: (() => void) | undefined
@@ -18,10 +19,20 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
  const localChanges=new Map<string,{version:number;message:ChatMessage|null}>()
  const active=()=>!blocked&&!import.meta.env.SSR&&!!accessToken.value&&!!account.value?.oId
  function proof(requireConsumer=true){const run=generation,context=getAuthContextVersion(),actor=account.value?.oId;return()=>(!requireConsumer||wanted)&&active()&&run===generation&&context===getAuthContextVersion()&&actor===account.value?.oId}
- function clear(){cancelStartup?.();barrage.value=null;notices.value=[];changeHint.value={id:'',version:++version};blocked=false;generation++;latestRun++;oldestRun++;topicRun++;latestAbort?.abort();olderAbort?.abort();topicAbort?.abort();latestAbort=olderAbort=topicAbort=null;cancelSnapshotRecovery();stop?.();stop=null;messages.value=[];before='';hasMore.value=false;loading.value=false;loadingMore.value=false;connected.value=false;connecting.value=false;topic.value='';topicError.value='';error.value='';localChanges.clear();removed.clear();version=0;topicBusy=false;topicDirty=false}
+ function clear(){cancelStartup?.();barrage.value=null;notices.value=[];sakuraArrival.value=null;changeHint.value={id:'',version:++version};blocked=false;generation++;latestRun++;oldestRun++;topicRun++;latestAbort?.abort();olderAbort?.abort();topicAbort?.abort();latestAbort=olderAbort=topicAbort=null;cancelSnapshotRecovery();stop?.();stop=null;messages.value=[];before='';hasMore.value=false;loading.value=false;loadingMore.value=false;connected.value=false;connecting.value=false;topic.value='';topicError.value='';error.value='';localChanges.clear();removed.clear();version=0;topicBusy=false;topicDirty=false}
  function deny(){clear();blocked=true;error.value='聊天室授权不可用，请重新登录或授权'}
  function merge(message:ChatMessage){const list=messages.value.filter(m=>m.id!==message.id);list.push(message);list.sort((a,b)=>BigInt(a.id)<BigInt(b.id)?-1:1);messages.value=list}
- function upsertConfirmed(message:ChatMessage){if(!active()||removed.has(message.id))return;const seq=++version;changeHint.value={id:message.id,version:seq};localChanges.set(message.id,{version:seq,message});merge(message)}
+ function upsertConfirmed(message: ChatMessage, created = true) {
+   if (!active() || removed.has(message.id)) return
+   const isArrival = created && isNightSakuraMessage(message)
+     && !loading.value && !messages.value.some(item => item.id === message.id)
+     && (!messages.value.length || BigInt(message.id) > BigInt(messages.value.at(-1)!.id))
+   const seq = ++version
+   changeHint.value = { id: message.id, version: seq }
+   localChanges.set(message.id, { version: seq, message })
+   if (isArrival) sakuraArrival.value = message.id
+   merge(message)
+ }
  function removeConfirmed(id:string){if(!active())return;removed.add(id);const seq=++version;changeHint.value={id,version:seq};localChanges.set(id,{version:seq,message:null});messages.value=messages.value.filter(m=>m.id!==id);reactions.invalidate('chat',id)}
  async function readTopic(){const valid=proof(false);if(!valid())return;if(topicBusy){topicDirty=true;return}topicBusy=true;const run=++topicRun,abort=new AbortController();topicAbort=abort;topicError.value='';try{const value=await chatTopic(abort.signal);if(valid()&&run===topicRun)topic.value=value}catch(e){if(valid()&&run===topicRun&&!abort.signal.aborted){if(e instanceof ApiError&&[401,403].includes(e.status))deny();else topicError.value=e instanceof Error?e.message:'话题读取失败'}}finally{if(valid()&&run===topicRun){topicBusy=false;topicAbort=null;if(topicDirty){topicDirty=false;void readTopic()}}}}
  async function readLatest(){const valid=proof();if(!valid())return;latestAbort?.abort();olderAbort?.abort();oldestRun++;loadingMore.value=false;const run=++latestRun,start=version,abort=new AbortController();latestAbort=abort;loading.value=true;error.value='';try{const page=await chatMessagePage({size:20},abort.signal);if(!valid()||run!==latestRun||abort.signal.aborted)return;messages.value=page.list.filter(m=>!removed.has(m.id));for(const [id,change] of localChanges)if(change.version>start){if(change.message)merge(change.message);else messages.value=messages.value.filter(m=>m.id!==id)};before=page.nextBefore;hasMore.value=page.hasMore;for(const [id,change]of localChanges)if(change.version<=start)localChanges.delete(id)}catch(e){if(valid()&&run===latestRun&&!abort.signal.aborted){error.value=e instanceof Error?e.message:'历史读取失败';if(e instanceof ApiError&&[401,403].includes(e.status))deny()}}finally{if(valid()&&run===latestRun){loading.value=false;latestAbort=null}}}
@@ -68,7 +79,7 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
      return
    }
    if(value.type==='deleted'){removeConfirmed(value.id);return}
-   if(value.message)upsertConfirmed(value.message)
+   if(value.message)upsertConfirmed(value.message, value.created === true)
    else {
      changeHint.value={id:value.id,version:++version}
      reconcileMissingSnapshot()
@@ -128,5 +139,5 @@ export const useV3ChatTimelineStore=defineStore('v3-chat-timeline',()=>{
  }
  const stopAuth=watch([accessToken,()=>account.value?.oId],()=>{blocked=false;const next=getAuthContextVersion(),actor=account.value?.oId,changed=next!==boundary||actor!==owner||!accessToken.value;if(changed)clear();else{cancelStartup?.();generation++;latestRun++;oldestRun++;topicRun++;latestAbort?.abort();olderAbort?.abort();topicAbort?.abort();cancelSnapshotRecovery();stop?.();stop=null;loading.value=false;loadingMore.value=false;topicBusy=false;topicDirty=false}boundary=next;owner=actor;if(wanted&&active())void bind()},{flush:'sync'})
  onScopeDispose(()=>{stopAuth();wanted=false;clear()})
- return{barrage,notices,changeHint,messages,loading,loadingMore,hasMore,error,connected,connecting,topic,topicError,connect,disconnect,loadMore,readLatest,readTopic,sync,clearVisible,upsertConfirmed,removeConfirmed}
+ return{barrage,notices,changeHint,sakuraArrival,messages,loading,loadingMore,hasMore,error,connected,connecting,topic,topicError,connect,disconnect,loadMore,readLatest,readTopic,sync,clearVisible,upsertConfirmed,removeConfirmed}
 })

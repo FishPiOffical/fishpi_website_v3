@@ -6,6 +6,7 @@ export interface ShopProduct {
   id: string; kind: AppearanceKind; styleId: string; name: string
   version: number; price7: number; price30: number; enabled: boolean; revision: number
   bubbleStyle?: BubbleStyle
+  vipIncluded?: boolean
 }
 export interface ShopInventory {
   list: { productId: string; expiresAt: number }[]
@@ -28,18 +29,20 @@ function text(value: unknown): string {
   return value
 }
 export async function readShop(signal?: AbortSignal): Promise<ShopProduct[]> {
-  const response = await request<{ code: number; data: unknown }>('/api/v3/appearance-shop', { signal })
+  const response = await request<{ code: number; data: unknown }>('/api/v3/appearance-shop?includeVipWeekly=1', { signal })
   if (response.code !== 0) throw invalid()
   const data = object(response.data)
   if (!Array.isArray(data.list) || data.list.length > 100) throw invalid()
   return data.list.map(value => {
     const row = object(value)
     if (!['mount', 'bubble', 'frame'].includes(String(row.kind)) || typeof row.enabled !== 'boolean') throw invalid()
+    const vipIncluded = row.kind !== 'mount' && row.vipIncluded === true
     const bubbleStyle = row.kind === 'bubble' ? decodeBubbleStyle(row.bubbleStyle) : undefined
     return {
       id: text(row.id), kind: row.kind as AppearanceKind, styleId: text(row.styleId), name: text(row.name),
-      version: number(row.version, 1), price7: number(row.price7, 1), price30: number(row.price30, row.kind === 'bubble' && isCustomBubbleId(row.styleId) ? 0 : 1),
+      version: number(row.version, 1), price7: number(row.price7, 1), price30: number(row.price30, vipIncluded || row.kind === 'bubble' && isCustomBubbleId(row.styleId) ? 0 : 1),
       enabled: row.enabled, revision: number(row.revision, 1),
+      ...(vipIncluded ? { vipIncluded } : {}),
       ...(bubbleStyle ? { bubbleStyle } : {}),
     }
   })

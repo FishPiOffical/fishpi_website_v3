@@ -1,0 +1,120 @@
+/* 夜樱雨 v1。历史只显示静态外观，实时到达或商城主动预览才播放。 */
+.fp-msg[data-appearance-snapshot="v1"].is-room:is([data-bubble="night-sakura"], [data-frame="night-sakura"]) {
+  --sakura-fill: #fce7ef;
+  --sakura-own-fill: #f8d7e6;
+  --sakura-ink: #572a43;
+  --sakura-border: #d595b1;
+  --sakura-reflection: #fff5fa;
+  --sakura-glow: #db7daa3b;
+  --sakura-petal: #e08cb0;
+  --sakura-side: 1;
+  --sakura-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23ec9dbd' stroke='%23fff1f8' stroke-width='.8'%3E%3Cpath id='p' d='M12 11.5C7 10 8.2 3 10.5 2.2L12 4l1.5-1.8C15.8 3 17 10 12 11.5Z'/%3E%3Cuse href='%23p' transform='rotate(72 12 12)'/%3E%3Cuse href='%23p' transform='rotate(144 12 12)'/%3E%3Cuse href='%23p' transform='rotate(216 12 12)'/%3E%3Cuse href='%23p' transform='rotate(288 12 12)'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2' fill='%23ffedcb'/%3E%3C/svg%3E");
+}
+
+html[data-theme="classic-dark"] .fp-msg[data-appearance-snapshot="v1"].is-room:is([data-bubble="night-sakura"], [data-frame="night-sakura"]) {
+  --sakura-fill: #4d2e45;
+  --sakura-own-fill: #61364f;
+  --sakura-ink: #ffe8f3;
+  --sakura-border: #a86a8a;
+  --sakura-reflection: #fbd0e7;
+  --sakura-glow: #f798c24a;
+  --sakura-petal: #f4a9c7;
+}
+
+.fp-msg[data-appearance-snapshot="v1"][data-bubble="night-sakura"].is-room:not(.is-standalone) .fp-bubble {
+  position: relative;
+  padding: 8px 13px;
+  color: var(--sakura-ink);
+  border: 1px solid var(--sakura-border);
+  border-radius: 5px 15px 15px 15px;
+  background: linear-gradient(165deg, color-mix(in srgb, var(--sakura-reflection) 11%, transparent), transparent 74%), var(--sakura-fill);
+  box-shadow: inset 0 1px color-mix(in srgb, var(--sakura-reflection) 55%, transparent), 0 2px 9px var(--sakura-glow);
+}
+
+.fp-msg[data-appearance-snapshot="v1"][data-bubble="night-sakura"].is-room.is-self:not(.is-standalone) .fp-bubble {
+  border-radius: 15px 5px 15px 15px;
+  background-color: var(--sakura-own-fill);
+}
+
+.fp-msg[data-appearance-snapshot="v1"][data-frame="night-sakura"].is-room .fp-avatar-frame {
+  position: relative;
+  padding: 2px;
+  border: 1px solid var(--sakura-border);
+  border-radius: 11px;
+  background: var(--sakura-fill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sakura-reflection) 65%, transparent), 0 0 9px var(--sakura-glow);
+}
+
+.fp-msg[data-appearance-snapshot="v1"][data-frame="night-sakura"].is-room .fp-avatar-frame .fp-avatar {
+  border-radius: 8px;
+}
+
+.fp-msg[data-appearance-snapshot="v1"].is-room.is-self:is([data-bubble="night-sakura"], [data-frame="night-sakura"]) { --sakura-side: -1; }
+
+.fp-msg[data-appearance-snapshot="v1"][data-bubble="night-sakura"].is-room:not(.is-standalone) .fp-bubble::after,
+.fp-msg[data-appearance-snapshot="v1"][data-frame="night-sakura"].is-room .fp-avatar-frame::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: -5px;
+  bottom: -5px;
+  width: 14px;
+  height: 14px;
+  background: var(--sakura-mark) center / contain no-repeat;
+  pointer-events: none;
+}
+
+.fp-msg[data-appearance-snapshot="v1"][data-frame="night-sakura"].is-room .fp-avatar-frame::after {
+  width: 12px;
+  height: 12px;
+  bottom: -4px;
+}
+
+.fp-msg[data-appearance-snapshot="v1"][data-bubble="night-sakura"].is-room.is-self:not(.is-standalone) .fp-bubble::after,
+.fp-msg[data-appearance-snapshot="v1"][data-frame="night-sakura"].is-room.is-self .fp-avatar-frame::after {
+  inset-inline: -5px auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fp-msg[data-appearance-snapshot="v1"][data-bubble="night-sakura"].is-room.has-sakura-arrival:not(.is-standalone) .fp-bubble::before,
+  .fp-msg[data-appearance-snapshot="v1"][data-frame="night-sakura"].is-room.has-sakura-arrival .fp-avatar-frame::before {
+    content: "";
+    position: absolute;
+    inset-inline-end: -3px;
+    bottom: 0;
+    width: 7px;
+    height: 5px;
+    border-radius: 77% 23% 70% 30%;
+    background: linear-gradient(155deg,var(--sakura-reflection),var(--sakura-petal));
+    box-shadow: 0 0 6px var(--sakura-glow);
+    opacity: 0;
+    pointer-events: none;
+    animation: fp-sakura-petals 950ms cubic-bezier(.2,.55,.44,1) 140ms both;
+  }
+
+  .fp-msg[data-appearance-snapshot="v1"][data-bubble="night-sakura"].is-room.has-sakura-arrival.is-self:not(.is-standalone) .fp-bubble::before,
+  .fp-msg[data-appearance-snapshot="v1"][data-frame="night-sakura"].is-room.has-sakura-arrival.is-self .fp-avatar-frame::before {
+    inset-inline: -3px auto;
+  }
+
+  .fp-msg[data-appearance-snapshot="v1"][data-frame="night-sakura"].is-room.has-sakura-arrival .fp-avatar-frame::before {
+    animation-delay: 210ms;
+  }
+
+  .fp-msg[data-appearance-snapshot="v1"][data-bubble="night-sakura"].is-room.has-sakura-arrival:not(.is-standalone) .fp-bubble::after,
+  .fp-msg[data-appearance-snapshot="v1"][data-frame="night-sakura"].is-room.has-sakura-arrival .fp-avatar-frame::after {
+    animation: fp-sakura-bloom 720ms ease-out both;
+    transform-origin: center;
+  }
+}
+
+@keyframes fp-sakura-petals {
+  0% { opacity: 0; transform: translate(0,-8px) rotate(-35deg); }
+  25% { opacity: .94; }
+  60% { opacity: .76; }
+  100% { opacity: 0; transform: translate(calc(17px * var(--sakura-side)), 16px) rotate(92deg) scale(.7); }
+}
+
+@keyframes fp-sakura-bloom {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  42% { opacity: .88; transform: scale(1.19); }
+}

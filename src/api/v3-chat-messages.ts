@@ -1,4 +1,4 @@
-import {chatAppearanceSnapshot,type ChatAppearance} from '@/utils/chatAppearance'
+import {chatAppearanceSnapshot,NIGHT_SAKURA,type ChatAppearance} from '@/utils/chatAppearance'
 import {ApiError,request} from './http'
 import {decodeReactionSnapshot,type ReactionState} from './v3-reactions'
 import type { PetSpeciesId } from './v3-pets'
@@ -35,6 +35,9 @@ function decodeChatMedals(value: unknown): ChatMedal[] {
 }
 
 export interface ChatMessage{medals?:ChatMedal[];petStatus?:ChatPetStatus;tail?:ChatTail;appearance?:ChatAppearance;reactions?:ReactionState|null;reactionsUnavailable?:boolean;reactionReadStarted?:number;id:string;createdAt:number;type:ChatMessageType;content:string;contentHtml:string;author:{id:string;userName:string;userNickname:string;userAvatarURL:string};client:string;card:Record<string,string|number>}
+export function isNightSakuraMessage(message: ChatMessage) {
+  return message.appearance?.bubbleId === NIGHT_SAKURA || message.appearance?.frameId === NIGHT_SAKURA
+}
 export {decodeReactionSnapshot}
 const invalid=()=>new ApiError('聊天室消息响应不正确',502)
 function row(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw invalid();return v as Record<string,unknown>}

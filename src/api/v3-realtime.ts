@@ -28,7 +28,7 @@ export type ChatRoomNotice = { id: string; createdAt: number; actor: ChatNoticeU
 export type ChatRealtimeEvent =
   | { type: 'sync' }
   | { type: 'topic'; revision: string }
-  | { type: 'message'; id: string; revision: string; message?: ChatMessage }
+  | { type: 'message'; id: string; revision: string; message?: ChatMessage; created?: true }
   | { type: 'deleted'; id: string; revision: string }
   | { type: 'reactions'; id: string; revision: string; snapshot?: import('./v3-reactions').ReactionState; reactionsUnavailable?: boolean }
   | { type: 'barrage'; barrage: ChatBarrageEvent }
@@ -242,7 +242,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
                 const decoded = chatMessages.decodeChatMessage(message.data?.message)
                 if (decoded.id === id) snapshot = decoded
               } catch { /* Older servers and invalid snapshots require history reconciliation. */ }
-              chatEvent?.({type:'message',id,revision,...(snapshot ? {message:snapshot} : {})})
+              chatEvent?.({type:'message',id,revision,...(snapshot ? {message:snapshot, ...(message.type==='chat.message.created' ? {created:true as const} : {})} : {})})
             }
           } else if (authenticated && (channel==='article'?message.type==='article.changed'&&message.data?.articleId===articleId:message.type===`${channel}.changed`)) changed()
         } catch { if (valid()) reconnect() }

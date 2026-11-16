@@ -1,0 +1,8 @@
+{
+  "id": "night-sakura",
+  "kind": "bubble",
+  "name": "夜樱雨气泡",
+  "vip": false,
+  "points": true,
+  "preview": "linear-gradient(135deg,#fae5ef,#da9bb9)"
+}

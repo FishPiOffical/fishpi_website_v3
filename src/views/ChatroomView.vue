@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useChatScrollFollow } from '@/composables/useChatScrollFollow'
 import { useScrollPagination } from '@/composables/useScrollPagination'
+import { useSakuraArrivals } from '@/composables/useSakuraArrivals'
 import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink,useRoute,useRouter } from 'vue-router'
 import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
@@ -172,6 +173,7 @@ watch(followingLatest, value => { if (value) hasNewMessages.value = false })
 const firstVisibleId = computed(() => visibleMessages.value[0]?.oId)
 const latestVisibleKey = computed(() => timelineEntries.value.at(-1)?.key)
 const animatedEntryKeys = ref(new Set<string>())
+const sakuraArrivals = useSakuraArrivals(() => isLoggedIn.value && !simpleMode.value && !contextId.value)
 watch([timelineEntries, simpleMode], ([entries, simple], [previous, wasSimple]) => {
   animatedEntryKeys.value = new Set()
   if (simple !== wasSimple || !previous?.length || loading.value || loadingMore.value || contextId.value) return
@@ -444,6 +446,7 @@ function clearScreen() {
                 :avatar="entry.message.userAvatarURL"
                 :medals="entry.message.sysMetal"
                 :appearance="entry.message.appearance"
+                :animate-sakura="sakuraArrivals.has(entry.message.oId)"
                 :tail="entry.message.tail" :pet-status="entry.message.petStatus" :message-id="entry.message.oId"
                 :time="entry.message.time"
                 :html="entry.message.html || ''"
@@ -560,6 +563,7 @@ function clearScreen() {
                 :avatar="entry.message.userAvatarURL"
                 :medals="entry.message.sysMetal"
                 :appearance="entry.message.appearance"
+                :animate-sakura="sakuraArrivals.has(entry.message.oId)"
                 :tail="entry.message.tail" :pet-status="entry.message.petStatus" :message-id="entry.message.oId"
                 :time="entry.message.time"
                 :html="entry.message.html || ''"
