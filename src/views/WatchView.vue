@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FpListState from '@/components/FpListState.vue'
+import FpPagination from '@/components/FpPagination.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -53,13 +55,22 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
       <p v-if="!mounted" class="message">正在准备关注动态…</p>
       <p v-else-if="!ready" class="message"><RouterLink :to="{path:'/login',query:{redirect:route.fullPath}}">登录后查看关注动态</RouterLink></p>
       <template v-else>
-        <p v-if="loading" class="message" role="status">正在读取…</p>
-        <div v-else-if="error" class="message"><p role="alert">{{ error }}</p><button class="fp-control" v-if="page>1" type="button" @click="home">返回第一页</button></div>
+        <FpListState v-if="loading" kind="loading" message="正在读取…" />
+        <FpListState v-else-if="error" kind="error" :message="error">
+          <template #actions>
+            <button class="fp-control" type="button" :disabled="loading" @click="load">重试当前页</button>
+            <button v-if="page > 1" class="fp-control" type="button" @click="home">返回第一页</button>
+          </template>
+        </FpListState>
         <template v-else-if="result">
-          <p v-if="!result.list.length" class="message">{{ result.total?'本页没有动态，可返回第一页重新读取。':'暂无当前可展示的关注动态' }}<button class="fp-control" v-if="page>1" type="button" @click="home">返回第一页</button></p>
+          <FpListState v-if="!result.list.length" :message="result.total ? '本页没有动态，可返回第一页重新读取。' : '暂无当前可展示的关注动态'">
+            <template v-if="page > 1" #actions>
+              <button class="fp-control" type="button" @click="home">返回第一页</button>
+            </template>
+          </FpListState>
           <BreezemoonList class="watch-moons" v-else-if="result.source==='breezemoons'" :items="result.list" />
           <ArticleFeed v-else :items="result.list" />
-          <nav v-if="result.total||page>1" class="fp-pagination" aria-label="关注动态分页"><button class="fp-control" type="button" :disabled="page<=1||loading" @click="move(page-1)">上一页</button><span>{{ page }} / {{ result.pageCount }}</span><button class="fp-control" type="button" :disabled="page>=Math.min(result.pageCount,42949672)||loading" @click="move(page+1)">下一页</button></nav>
+          <FpPagination v-if="result.total || page > 1" label="关注动态分页" :page="page" :page-count="result.pageCount" :busy="loading" :page-limit="42949672" @change="move" />
         </template>
       </template>
     </section></main>

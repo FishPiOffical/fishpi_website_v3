@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FpListState from '@/components/FpListState.vue'
+import FpPagination from '@/components/FpPagination.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -38,18 +40,26 @@ usePageSeo(() => ({ title: title.value, path: route.path, robots: 'noindex' }))
     <p v-if="!mounted">正在准备用户列表…</p>
     <template v-else>
       <button type="button" class="refresh-rel-btn fp-control" :disabled="loading" @click="load">重新读取列表</button>
-      <p class="fp-state" v-if="loading" role="status">正在读取…</p>
-      <div v-else-if="error" class="fp-state"><p role="alert">{{ error }}</p><div class="fp-state-actions"><button class="fp-control" type="button" :disabled="loading" @click="load">重试当前页</button><button class="fp-control" v-if="page > 1" type="button" @click="home">返回第一页</button></div></div>
+      <FpListState v-if="loading" kind="loading" message="正在读取…" />
+      <FpListState v-else-if="error" kind="error" :message="error">
+        <template #actions>
+          <button class="fp-control" type="button" :disabled="loading" @click="load">重试当前页</button>
+          <button v-if="page > 1" class="fp-control" type="button" @click="home">返回第一页</button>
+        </template>
+      </FpListState>
       <template v-else-if="total !== null">
         <p>共 {{ total }} 位用户</p>
-        <p class="fp-state" v-if="!list.length">{{ total ? '本页没有用户，可返回第一页重新读取。' : '暂无用户' }}</p>
-        <button class="fp-control" v-if="!list.length && page > 1" type="button" @click="home">返回第一页</button>
+        <FpListState v-if="!list.length" :message="total ? '本页没有用户，可返回第一页重新读取。' : '暂无用户'">
+          <template v-if="page > 1" #actions>
+            <button class="fp-control" type="button" @click="home">返回第一页</button>
+          </template>
+        </FpListState>
         <ul><li v-for="user in list" :key="user.id"><RouterLink :to="`/member/${encodeURIComponent(user.userName)}`" :data-user-card="user.userName"><img :src="avatarThumbnail(avatarUrl(user), 40)" :data-user-card="user.userName" alt="" loading="lazy" @error="fallback" /><VipNickname :user-id="user.id" :user-name="user.userName" :text="user.userNickname || user.userName" /></RouterLink><span>@{{ user.userName }}</span></li></ul>
-        <nav v-if="total || page > 1" aria-label="用户列表分页"><button class="fp-control" type="button" :disabled="page <= 1 || loading" @click="move(page - 1)">上一页</button><span>{{ page }} / {{ pageCount }}</span><button class="fp-control" type="button" :disabled="page >= Math.min(pageCount, 42949672) || loading" @click="move(page + 1)">下一页</button></nav>
+        <FpPagination v-if="total || page > 1" label="用户列表分页" :page="page" :page-count="pageCount" :busy="loading" :page-limit="42949672" @change="move" />
       </template>
     </template>
   </section>
 </template>
 <style scoped lang="scss">
-.user-relations {    .refresh-rel-btn { display: none; } } h1 { font-size: 22px; overflow-wrap: anywhere; } nav { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 16px 0; } a { color: var(--fp-link); } ul { list-style: none; padding: 0; } li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; border-top: 1px solid var(--fp-border); overflow-wrap: anywhere; } li a { display: flex; align-items: center; gap: 12px; min-width: 0; } img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--fp-avatar-radius); flex-shrink: 0; } li span { overflow-wrap: anywhere; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; background: transparent; color: var(--fp-text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; } [role='alert'] { color: var(--fp-danger); }
+.user-relations {    .refresh-rel-btn { display: none; } } h1 { font-size: 22px; overflow-wrap: anywhere; } a { color: var(--fp-link); } ul { list-style: none; padding: 0; } li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; border-top: 1px solid var(--fp-border); overflow-wrap: anywhere; } li a { display: flex; align-items: center; gap: 12px; min-width: 0; } img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--fp-avatar-radius); flex-shrink: 0; } li span { overflow-wrap: anywhere; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; background: transparent; color: var(--fp-text); cursor: pointer; } button:disabled { opacity: .5; cursor: default; } [role='alert'] { color: var(--fp-danger); }
 </style>

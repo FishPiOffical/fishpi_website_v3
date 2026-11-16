@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FpListState from '@/components/FpListState.vue'
+import FpPagination from '@/components/FpPagination.vue'
 import { formatDateTime } from '@/utils/time'
 
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -43,20 +45,28 @@ const date = formatDateTime
 
       <p>这里只显示概要。正文需进入文章，按当前阅读权限查看。</p>
       <button type="button" class="refresh-anon-btn fp-control" :disabled="loading" @click="load">重新读取列表</button>
-      <p class="fp-state" v-if="loading" role="status">正在读取…</p>
-      <div v-else-if="error" class="fp-state"><p role="alert" class="error">{{ error }}</p><div class="fp-state-actions"><button class="fp-control" type="button" :disabled="loading" @click="load">重试当前页</button><button class="fp-control" v-if="page > 1" type="button" @click="home">返回第一页</button></div></div>
+      <FpListState v-if="loading" kind="loading" message="正在读取…" />
+      <FpListState v-else-if="error" kind="error" :message="error">
+        <template #actions>
+          <button class="fp-control" type="button" :disabled="loading" @click="load">重试当前页</button>
+          <button v-if="page > 1" class="fp-control" type="button" @click="home">返回第一页</button>
+        </template>
+      </FpListState>
       <template v-else>
-        <p>共 {{ total }} 条</p><p class="fp-state" v-if="!list.length">{{ total ? '本页没有记录，可返回第一页重新读取。' : '暂无当前可列出的匿名内容' }}</p>
-        <button class="fp-control" v-if="!list.length && page > 1" type="button" @click="home">返回第一页</button>
+        <p>共 {{ total }} 条</p><FpListState v-if="!list.length" :message="total ? '本页没有记录，可返回第一页重新读取。' : '暂无当前可列出的匿名内容'">
+          <template v-if="page > 1" #actions>
+            <button class="fp-control" type="button" @click="home">返回第一页</button>
+          </template>
+        </FpListState>
         <ul><li v-for="item in list" :key="item.id">
           <template v-if="'title' in item"><RouterLink :to="`/article/${item.id}`">{{ item.title || '无标题文章' }}</RouterLink><p>文章 ID：{{ item.id }}</p><p>创建：{{ date(item.createdAt) }} · 更新：{{ date(item.updatedAt) }}</p></template>
           <template v-else><RouterLink :to="`/article/${item.articleId}`">{{ item.articleTitle || '无标题文章' }}</RouterLink><p>评论 ID：{{ item.id }} · {{ item.visibility === 1 ? '私密评论' : '普通评论' }}</p><p>评论创建：{{ date(item.createdAt) }}</p></template>
         </li></ul>
-        <nav v-if="total || page > 1" aria-label="匿名内容分页"><button class="fp-control" type="button" :disabled="page <= 1 || loading" @click="move(page - 1)">上一页</button><span>{{ page }} / {{ pageCount }}</span><button class="fp-control" type="button" :disabled="page >= Math.min(pageCount, 42949672) || loading" @click="move(page + 1)">下一页</button></nav>
+        <FpPagination v-if="total || page > 1" label="匿名内容分页" :page="page" :page-count="pageCount" :busy="loading" :page-limit="42949672" @change="move" />
       </template>
     </template>
   </section>
 </template>
 <style scoped lang="scss">
-.anonymous-content {    .refresh-anon-btn { display: none; } } h1 { font-size: 22px; } nav { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 16px 0; } a { color: var(--fp-link); } p { line-height: 1.7; overflow-wrap: anywhere; } ul { list-style: none; padding: 0; } li { border-top: 1px solid var(--fp-border); padding: 16px 0; overflow-wrap: anywhere; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } .error { color: var(--fp-danger); }
+.anonymous-content {    .refresh-anon-btn { display: none; } } h1 { font-size: 22px; } a { color: var(--fp-link); } p { line-height: 1.7; overflow-wrap: anywhere; } ul { list-style: none; padding: 0; } li { border-top: 1px solid var(--fp-border); padding: 16px 0; overflow-wrap: anywhere; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } .error { color: var(--fp-danger); }
 </style>

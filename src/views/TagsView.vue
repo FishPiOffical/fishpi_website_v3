@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FpListState from '@/components/FpListState.vue'
+import FpPagination from '@/components/FpPagination.vue'
 import ListPageHeading from '@/components/articles/ListPageHeading.vue'
 import { imageThumbnail } from '@/utils/avatar'
 import { computed } from 'vue'
@@ -26,16 +28,19 @@ async function page(next: number) { await read(next, true); document.getElementB
       />
       <button type="button" class="btn refresh-dir-btn fp-control" :disabled="loading" @click="read()">刷新目录</button>
       <FpLoading v-if="loading" :rows="6" />
-      <div v-if="error" class="err fp-state" role="alert">{{ error }} <button type="button" class="btn fp-control" @click="read()">重试当前页</button></div>
+      <FpListState v-if="error" kind="error" :message="error">
+        <template #actions>
+          <button class="fp-control" type="button" :disabled="loading" @click="read()">重试当前页</button>
+        </template>
+      </FpListState>
       <template v-if="value">
-        <p v-if="!value.list.length" class="err fp-state">本页暂无{{ label }}</p>
+        <FpListState v-if="!value.list.length" :message="`本页暂无${label}`" />
         <ul v-if="tags.length" class="tag-grid"><li v-for="tag in tags" :key="tag.tagURI"><RouterLink :to="'/tag/' + tag.tagURI" class="tag-card"><img v-if="tag.tagIconPath" :src="imageThumbnail(tag.tagIconPath, 18, 18)" alt="" /><strong>{{ tag.tagTitle }}</strong><em>{{ tag.tagReferenceCount }}</em></RouterLink></li></ul>
-        <div class="pagination-bar fp-pagination">
-          <button type="button" class="btn page-btn fp-control" :disabled="p <= 1" @click="page(p - 1)">‹ 上一页</button>
-          <span class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span>
-          <button type="button" class="btn page-btn fp-control" :disabled="p >= value.pageCount" @click="page(p + 1)">下一页 ›</button>
-          <button class="fp-control btn" v-if="p > 1 && p > value.pageCount" type="button"  @click="page(1)">返回第一页</button>
-        </div>
+        <FpPagination label="目录分页" :page="p" :page-count="value.pageCount" :busy="loading" @change="page">
+          <template v-if="p > value.pageCount && p > 1" #actions>
+            <button class="fp-control" type="button" @click="page(1)">返回第一页</button>
+          </template>
+        </FpPagination>
       </template>
     </div>
     <div class="side"><SideBar /></div>
@@ -44,14 +49,6 @@ async function page(next: number) { await read(next, true); document.getElementB
 <style scoped lang="scss">
 .refresh-dir-btn {
   display: none;
-}
-
-.err {
-  padding: 36px 18px;
-  margin: 0;
-  text-align: center;
-  color: var(--fp-danger, #e07a5f);
-  font-size: 14px;
 }
 
 .tag-grid {
@@ -104,26 +101,5 @@ async function page(next: number) { await read(next, true); document.getElementB
   font-size: 12px;
 }
 
-.pagination-bar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 18px 0;
-  border-top: 1px solid var(--fp-border);
-}
-
-.page-btn {
-  min-width: 80px;
-}
-
-.current-page-num {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--fp-title);
-  min-width: 24px;
-  text-align: center;
-}
 .directory-content { scroll-margin-top: 80px;  }
-.pagination-bar { flex-wrap:wrap; }
 </style>

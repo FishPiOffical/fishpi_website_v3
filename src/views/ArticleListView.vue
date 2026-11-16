@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FpListState from '@/components/FpListState.vue'
+import FpPagination from '@/components/FpPagination.vue'
 import ListPageHeading from '@/components/articles/ListPageHeading.vue'
 import { computed, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
 import { RouterLink, useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
@@ -73,7 +75,12 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
         </div>
         <button type="button" class="btn refresh-list fp-control" :disabled="loading" @click="read()">刷新列表</button>
         <FpLoading v-if="loading && !value" :rows="8" />
-        <div v-if="error" class="err fp-state" role="alert"><p>{{ error }}</p><button type="button" class="btn fp-control" @click="read()">重试当前页</button><button class="fp-control btn" v-if="p > 1" type="button"  @click="read(1)">返回第一页</button></div>
+        <FpListState v-if="error" kind="error" :message="error">
+          <template #actions>
+            <button class="fp-control" type="button" :disabled="loading" @click="read()">重试当前页</button>
+            <button v-if="p > 1" class="fp-control" type="button" @click="read(1)">返回第一页</button>
+          </template>
+        </FpListState>
         <template v-if="value">
           <div v-if="value.resource === 'columns'" class="column-grid">
             <article v-for="column in columns" :key="column.id" class="column-card">
@@ -88,12 +95,26 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
                 <div class="column-links"><RouterLink class="read-column" :to="`/column/${column.id}`">章节目录 →</RouterLink><RouterLink v-if="column.chapters.length" class="read-column" :to="`/article/${column.chapters[column.chapters.length-1]!.id}`">试读 ↗</RouterLink></div>
               </div>
             </article>
-            <p v-if="!columns.length" class="column-empty">本页暂无可见专栏。</p>
+            <FpListState v-if="!columns.length" class="column-empty" message="本页暂无可见专栏。" />
           </div>
-          <template v-else><ArticleFeed :items="items" :empty="kind==='search' ? '没有找到相关帖子，试试缩短关键词或更换说法。' : '该分类下暂无内容'" /><nav v-if="kind==='search' && !items.length" class="search-empty-links" aria-label="继续探索"><RouterLink to="/recent">浏览最新</RouterLink><RouterLink to="/tags">按标签查找</RouterLink></nav></template>
-          <nav class="pagination-bar fp-pagination" aria-label="列表分页"><button type="button" class="btn page-btn fp-control" :disabled="p <= 1" @click="read(p - 1, true)">‹ 上一页</button><span v-if="value.pageCount" class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span><span v-else>暂无分页</span><button type="button" class="btn page-btn fp-control" :disabled="p >= value.pageCount" @click="read(p + 1, true)">下一页 ›</button><button class="fp-control btn" v-if="p > value.pageCount && p > 1" type="button"  @click="read(1)">返回第一页</button></nav>
+          <template v-else>
+            <ArticleFeed v-if="items.length" :items="items" />
+            <FpListState v-else :message="kind === 'search' ? '没有找到相关帖子，试试缩短关键词或更换说法。' : '该分类下暂无内容'">
+              <template v-if="kind === 'search'" #actions>
+                <nav class="search-empty-links" aria-label="继续探索">
+                  <RouterLink to="/recent">浏览最新</RouterLink>
+                  <RouterLink to="/tags">按标签查找</RouterLink>
+                </nav>
+              </template>
+            </FpListState>
+          </template>
+          <FpPagination label="列表分页" :page="p" :page-count="value.pageCount" :busy="loading" @change="read($event, true)">
+            <template v-if="p > value.pageCount && p > 1" #actions>
+              <button class="fp-control" type="button" @click="read(1)">返回第一页</button>
+            </template>
+          </FpPagination>
         </template>
-        <p v-else-if="!loading && !error" role="status">列表尚未读取。</p>
+        <FpListState v-else-if="!loading && !error" kind="loading" message="列表尚未读取。" />
       </div>
     </div>
     <div class="side"><SideBar v-if="active" /></div>
@@ -118,42 +139,6 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
   text-align: center;
   color: var(--fp-muted);
   font-size: 14px;
-}
-
-.err {
-  padding: 30px 18px;
-  text-align: center;
-  color: var(--fp-danger);
-  font-size: 14px;
-}
-
-.pagination-bar {
-  flex-wrap: wrap;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 18px 0;
-  border-top: 1px solid var(--fp-border);
-}
-
-.page-btn {
-  min-width: 80px;
-}
-
-.page-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-.current-page-num {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--fp-title);
-  min-width: 24px;
-  text-align: center;
 }
 
 .column-intro {
@@ -221,7 +206,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 .latest-chapter a { color: var(--fp-title); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .read-column { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 11px; color: var(--fp-accent); font-size: 12px; text-decoration: none; }
 .read-column:hover { text-decoration: underline; }
-.column-empty { grid-column: 1 / -1; margin: 0; padding: 50px 12px; text-align: center; color: var(--fp-muted); }
+.column-empty { grid-column: 1 / -1; }
 
 @media (max-width: 900px) { .column-grid { grid-template-columns: 1fr; } }
 @media (max-width: 560px) {
@@ -235,6 +220,6 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
   .column-title { font-size: 14px; }
   .column-preview { margin: 5px 0 7px; min-height: 34px; font-size: 11px; }
 }
-.column-links{display:flex;justify-content:space-between;gap:12px;margin-top:auto}.column-author-row time{font-size:10px}.search-empty-links{display:flex;justify-content:center;gap:18px;padding:0 16px 24px;font-size:13px}
+.column-links{display:flex;justify-content:space-between;gap:12px;margin-top:auto}.column-author-row time{font-size:10px}.search-empty-links{display:flex;justify-content:center;gap:18px;font-size:13px}
 @media(min-width:1600px){.column-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>

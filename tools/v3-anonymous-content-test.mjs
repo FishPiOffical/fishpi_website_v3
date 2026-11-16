@@ -1,3 +1,4 @@
+import { listUiImports } from './fixtures/list-ui.mjs'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import ts from 'typescript'
@@ -20,9 +21,10 @@ state.responses.push(env(page([{...comment,visibility:2}])));await assert.reject
 console.log('PASS anonymous 1 owner-only fixed paths, exact pagination/metadata projection, invalid responses and parameters rejected')
 const auth=defineStore('anonymous-auth',()=>({accessToken:ref('A'),account:ref({oId:'1',userName:'owner'})}));globalThis.__anonymousAuth=auth;globalThis.__anonymousAPI={...api};globalThis.__anonymousRoute=reactive({fullPath:'/member/owner/articles/anonymous',path:'/member/owner/articles/anonymous',params:{userName:'owner'},meta:{memberTab:'articlesAnonymous'}})
 const apiURL=url(`export const fetchV3AnonymousContent=(...args)=>globalThis.__anonymousAPI.fetchV3AnonymousContent(...args)`),authURL=url('export const useAuthStore=globalThis.__anonymousAuth'),seoURL=url('export function usePageSeo(){}'),routerURL=url(`import{h}from'${import.meta.resolve('vue')}';export function useRoute(){return globalThis.__anonymousRoute};export const RouterLink={props:['to'],setup:(p,{slots})=>()=>h('a',{href:typeof p.to==='string'?p.to:p.to.path},slots.default?.())}`)
+const timeURL = url(compile(await fs.readFile('src/utils/time.ts','utf8')))
 const source=await fs.readFile('src/views/AnonymousContentView.vue','utf8'),descriptor=parse(source).descriptor
 let code=compile(compileScript(descriptor,{id:'anonymous-test',inlineTemplate:true}).content)
-for(const [from,to]of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['vue-router',routerURL],['@/api/http',http],['@/api/v3-anonymous-content',apiURL],['@/stores/auth',authURL],['@/composables/usePageSeo',seoURL]])code=code.replace(new RegExp(`from ['"]${from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}['"]`,'g'),`from '${to}'`)
+for(const [from,to]of [...(await listUiImports()),['vue',import.meta.resolve('vue')],['@/utils/time',timeURL],['pinia',import.meta.resolve('pinia')],['vue-router',routerURL],['@/api/http',http],['@/api/v3-anonymous-content',apiURL],['@/stores/auth',authURL],['@/composables/usePageSeo',seoURL]])code=code.replace(new RegExp(`from ['"]${from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}['"]`,'g'),`from '${to}'`)
 const component=(await import(url(code))).default
 const insert=(node,parent,anchor)=>{if(node.parent){const i=node.parent.children.indexOf(node);if(i>=0)node.parent.children.splice(i,1)}const i=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(i<0?parent.children.length:i,0,node);node.parent=parent}
 const renderer=createRenderer({patchProp(el,k,old,v){el.props[k]=v},insert,remove(node){if(node.parent){const i=node.parent.children.indexOf(node);if(i>=0)node.parent.children.splice(i,1)}},createElement(tag){return{tag,children:[],props:{}}},createText(text){return{text,children:[]}},createComment(){return{children:[]}},setText(n,t){n.text=t},setElementText(n,t){n.children=[{text:t,children:[]}]},parentNode:n=>n.parent,nextSibling(n){const s=n.parent?.children||[];return s[s.indexOf(n)+1]||null},insertStaticContent(text,parent,anchor){const n={text,children:[]};insert(n,parent,anchor);return[n,n]}})

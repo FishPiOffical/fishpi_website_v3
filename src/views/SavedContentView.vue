@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FpListState from '@/components/FpListState.vue'
+import FpPagination from '@/components/FpPagination.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -43,19 +45,27 @@ usePageSeo(()=>({title:title.value,path:route.path,robots:'noindex'}))
       <nav v-if="privatePage" class="fp-tabs" aria-label="用户关注内容"><RouterLink :to="`${base}/following/tags`">关注标签</RouterLink><RouterLink :to="`${base}/following/articles`">收藏文章</RouterLink><RouterLink :to="`${base}/watching/articles`">订阅文章</RouterLink><RouterLink :to="base">用户主页</RouterLink></nav>
       <p v-if="owner && kind!=='tags'">本人记录保留当前不可读的条目，正文仍按当前阅读权限判断。</p>
       <button type="button" class="refresh-saved-btn fp-control" :disabled="loading" @click="load">重新读取列表</button>
-      <p class="fp-state" v-if="loading" role="status">正在读取…</p>
-      <div v-else-if="error" class="fp-state"><p role="alert">{{ error }}</p><div class="fp-state-actions"><button class="fp-control" type="button" :disabled="loading" @click="load">重试当前页</button><button class="fp-control" v-if="page>1" type="button" @click="home">返回第一页</button></div></div>
+      <FpListState v-if="loading" kind="loading" message="正在读取…" />
+      <FpListState v-else-if="error" kind="error" :message="error">
+        <template #actions>
+          <button class="fp-control" type="button" :disabled="loading" @click="load">重试当前页</button>
+          <button v-if="page > 1" class="fp-control" type="button" @click="home">返回第一页</button>
+        </template>
+      </FpListState>
       <template v-else-if="result">
         <p>共 {{ result.total }} 条</p>
-        <p class="fp-state" v-if="!result.list.length">{{ result.total?'本页没有记录，可返回第一页重新读取。':'暂无记录' }}</p>
-        <button class="fp-control" v-if="!result.list.length && page>1" type="button" @click="home">返回第一页</button>
+        <FpListState v-if="!result.list.length" :message="result.total?'本页没有记录，可返回第一页重新读取。':'暂无记录'">
+          <template v-if="page > 1" #actions>
+            <button class="fp-control" type="button" @click="home">返回第一页</button>
+          </template>
+        </FpListState>
         <ul v-if="result.kind==='tags'" class="tags"><li v-for="tag in result.list" :key="tag.id"><RouterLink :to="`/tag/${tag.id}`">{{ tag.title }}</RouterLink><p v-if="tag.description">{{ tag.description }}</p><p>{{ tag.articleCount }} 篇文章 · {{ tag.followerCount }} 人关注</p></li></ul>
         <template v-else><template v-for="item in result.list" :key="item.id"><ArticleFeed v-if="item.available" :items="[item.article]" /><p v-else class="unavailable">该条目当前不可查看 · 文章 ID：{{ item.id }}</p></template></template>
-        <nav v-if="result.total||page>1" aria-label="关注内容分页"><button class="fp-control" type="button" :disabled="page<=1||loading" @click="move(page-1)">上一页</button><span>{{ page }} / {{ result.pageCount }}</span><button class="fp-control" type="button" :disabled="page>=Math.min(result.pageCount,42949672)||loading" @click="move(page+1)">下一页</button></nav>
+        <FpPagination v-if="result.total || page > 1" label="关注内容分页" :page="page" :page-count="result.pageCount" :busy="loading" :page-limit="42949672" @change="move" />
       </template>
     </template>
   </section>
 </template>
 <style scoped lang="scss">
-.saved-content {    .refresh-saved-btn { display: none; } } h1 { font-size: 22px; overflow-wrap: anywhere; } nav { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 16px 0; } a { color: var(--fp-link); } p { line-height: 1.7; overflow-wrap: anywhere; } .tags { list-style: none; padding: 0; } .tags li, .unavailable { border-top: 1px solid var(--fp-border); padding: 16px 0; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } [role='alert'] { color: var(--fp-danger); }
+.saved-content {    .refresh-saved-btn { display: none; } } h1 { font-size: 22px; overflow-wrap: anywhere; } a { color: var(--fp-link); } p { line-height: 1.7; overflow-wrap: anywhere; } .tags { list-style: none; padding: 0; } .tags li, .unavailable { border-top: 1px solid var(--fp-border); padding: 16px 0; } button { padding: 8px 12px; border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; cursor: pointer; } button:disabled { opacity: .5; cursor: default; } [role='alert'] { color: var(--fp-danger); }
 </style>
