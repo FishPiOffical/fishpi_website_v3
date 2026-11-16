@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, type Ref } from 'vue'
+import { inject, onMounted, onUnmounted, ref, useId, useTemplateRef, watch, type Ref } from 'vue'
 import { timeISO } from '@/utils/time'
 
 import { formatDateTime } from '@/utils/time'
@@ -9,10 +9,55 @@ import type { BreezemoonQuoteSource } from '@/utils/chatQuote'
 import type { FollowingMoon } from '@/api/v3-following-feed'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
-defineProps<{items:FollowingMoon[];compact?:boolean;avatarOnly?:boolean;hideAuthor?:boolean}>()
+const props = defineProps<{items:FollowingMoon[];compact?:boolean;avatarOnly?:boolean;hideAuthor?:boolean;collapsible?:boolean}>()
 function fallback(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 const date = formatDateTime
 const chatQuote = inject<{ enabled: Ref<boolean>; insert: (source: BreezemoonQuoteSource) => void } | null>('quoteBreezemoonInChat', null)
+const bodyPrefix = useId()
+const bodies = useTemplateRef<HTMLElement[]>('moonBodies')
+const expanded = ref(new Set<string>())
+const clipped = ref(new Set<string>())
+let observer: ResizeObserver | undefined
+
+function measureOverflow() {
+  if (!props.collapsible) return
+  const next = new Set<string>()
+  for (const body of bodies.value ?? []) {
+    const id = body.dataset.moonId
+    if (!id || !body.clientHeight) continue
+    // 展开时保留收起入口，折叠时按实际排版判断是否超出三行。
+    if (expanded.value.has(id) || body.scrollHeight > body.clientHeight) next.add(id)
+  }
+  clipped.value = next
+}
+
+function observeBodies() {
+  observer?.disconnect()
+  if (!props.collapsible) return
+  for (const body of bodies.value ?? []) observer?.observe(body)
+  measureOverflow()
+}
+
+onMounted(() => {
+  if (typeof ResizeObserver !== 'undefined') observer = new ResizeObserver(measureOverflow)
+  observeBodies()
+})
+watch([() => props.items, () => props.collapsible], observeBodies, { flush: 'post' })
+watch(expanded, measureOverflow, { deep: true, flush: 'post' })
+onUnmounted(() => observer?.disconnect())
+
+function toggle(id: string) {
+  if (expanded.value.has(id)) expanded.value.delete(id)
+  else expanded.value.add(id)
+}
+
+function revealFocusedLink(id: string, event: FocusEvent) {
+  const body = event.currentTarget as HTMLElement
+  const target = event.target as HTMLElement
+  if (clipped.value.has(id) && !expanded.value.has(id)
+    && target.getBoundingClientRect().bottom > body.getBoundingClientRect().bottom) expanded.value.add(id)
+}
+
 function share(item: FollowingMoon, event: MouseEvent | DragEvent) {
   const target = event.currentTarget as HTMLElement
   const body = target.closest('li')?.querySelector<HTMLElement>('.moon-body')
@@ -34,7 +79,24 @@ function share(item: FollowingMoon, event: MouseEvent | DragEvent) {
 <template>
   <ul class="breezemoon-list" :class="{compact,'avatar-only':avatarOnly,'author-hidden':hideAuthor}"><li v-for="item in items" :key="item.id" :class="{ 'can-quote': chatQuote?.enabled.value }">
     <header><RouterLink v-if="!hideAuthor" :to="`/member/${encodeURIComponent(item.author.userName)}`" :data-user-card="item.author.userName" :aria-label="`查看 ${item.author.userNickname||item.author.userName} 的主页`"><img :src="avatarThumbnail(avatarUrl(item.author), avatarOnly || compact ? 20 : 28)" :data-user-card="item.author.userName" alt="" loading="lazy" @error="fallback" /><VipNickname v-if="!avatarOnly" :user-id="item.author.id" :user-name="item.author.userName" :text="item.author.userNickname||item.author.userName" /></RouterLink><time v-if="!avatarOnly" :datetime="timeISO(item.createdAt)">{{ date(item.createdAt) }}</time><slot name="actions" :item="item" /></header>
-    <div class="moon-body" :draggable="chatQuote?.enabled.value" @dragstart="chatQuote?.enabled.value && share(item, $event)" v-html="item.contentHtml" />
+    <div class="moon-content">
+      <div
+        ref="moonBodies"
+        class="moon-body"
+        :id="collapsible ? `${bodyPrefix}-${item.id}` : undefined"
+        :data-moon-id="collapsible ? item.id : undefined"
+        :class="{ 'moon-body--clamped': collapsible && !expanded.has(item.id) }"
+        :draggable="chatQuote?.enabled.value"
+        @dragstart="chatQuote?.enabled.value && share(item, $event)"
+        @load.capture="measureOverflow"
+        @focusin="collapsible && revealFocusedLink(item.id, $event)"
+        v-html="item.contentHtml"
+      />
+      <button v-if="collapsible && clipped.has(item.id)" class="moon-expand" type="button"
+        :aria-expanded="expanded.has(item.id)" :aria-controls="`${bodyPrefix}-${item.id}`" @click="toggle(item.id)">
+        {{ expanded.has(item.id) ? '收起' : '展开全文' }}
+      </button>
+    </div>
     <button v-if="chatQuote?.enabled.value" type="button" class="moon-share" draggable="true"
       aria-label="引用到聊天室" title="引用到聊天室" @dragstart="share(item, $event)" @click="share(item, $event)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -104,6 +166,7 @@ time {
   font-variant-numeric: tabular-nums;
 }
 
+.moon-content { min-width: 0; }
 .moon-body {
   margin-top: 8px;
   padding-left: 44px;
@@ -130,6 +193,26 @@ time {
   :deep(pre) {
     overflow: auto;
   }
+}
+.moon-body--clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  max-block-size: 3lh;
+  overflow: hidden;
+
+  :deep(p) { margin-block: 0; }
+}
+.moon-expand {
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fp-link);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover { text-decoration: underline; }
+  &:focus-visible { outline: 2px solid var(--fp-link); outline-offset: 2px; }
 }
 
 .compact {
@@ -181,7 +264,8 @@ time {
   header { grid-column: 1; grid-row: 1; margin-top: 1px; }
   header a { display: block; }
   header img { display: block; width: 20px; height: 20px; border-radius: var(--fp-avatar-radius-small); }
-  .moon-body { grid-column: 2; grid-row: 1; margin: 0; padding: 0; font-size: 12px; line-height: 1.45; }
+  .moon-content { grid-column: 2; grid-row: 1; }
+  .moon-body { margin: 0; padding: 0; font-size: 12px; line-height: 1.45; }
 }
 .moon-share {
   display: grid;
