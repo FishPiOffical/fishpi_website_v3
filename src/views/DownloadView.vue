@@ -2,6 +2,8 @@
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { fetchClientDownloads, type ClientGroup } from '@/api/v3-client-downloads'
+import { ApiError } from '@/api/http'
+import { bundledClientDownloads } from '@/api/client-downloads-bundled'
 import { imageThumbnail } from '@/utils/avatar'
 import { usePageSeo } from '@/composables/usePageSeo'
 
@@ -15,6 +17,7 @@ const route = useRoute()
 const clientIcon = (name: string) => `https://fishpi.cn/images/clients/${name}`
 const loading = ref(true)
 const error = ref('')
+const usingBundledDirectory = ref(false)
 const clients = ref<Awaited<ReturnType<typeof fetchClientDownloads>>>([])
 let read: AbortController | undefined
 
@@ -24,12 +27,18 @@ async function load() {
   read = controller
   loading.value = true
   error.value = ''
+  usingBundledDirectory.value = false
   clients.value = []
   try {
     const list = await fetchClientDownloads(controller.signal)
     if (!controller.signal.aborted) clients.value = list
   } catch (cause) {
-    if (!controller.signal.aborted) error.value = cause instanceof Error ? cause.message : '客户端下载暂不可用'
+    if (controller.signal.aborted) return
+    error.value = cause instanceof Error ? cause.message : '客户端下载暂不可用'
+    if (cause instanceof ApiError && (cause.status === 404 || cause.status === 500)) {
+      clients.value = bundledClientDownloads
+      usingBundledDirectory.value = true
+    }
   } finally {
     if (read === controller && !controller.signal.aborted) loading.value = false
   }
@@ -83,6 +92,7 @@ const retiredClients = computed(() => clients.value.filter(client => client.stat
 
     <div class="section-list">
       <p v-if="loading" role="status">正在读取客户端下载…</p>
+      <p v-else-if="usingBundledDirectory" role="status">实时目录暂不可用，当前显示上版下载列表。 <button class="fp-control" type="button" @click="load">重试</button></p>
       <p v-else-if="error" role="alert">{{ error }} <button class="fp-control" type="button" @click="load">重试</button></p>
       <p v-else-if="!clients.length">暂无客户端。</p>
       <section v-for="group in visibleGroups" :key="group.id" class="client-section" :aria-labelledby="`section-${group.id}`">
