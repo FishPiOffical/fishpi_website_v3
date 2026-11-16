@@ -7,6 +7,8 @@ import { useV3ChatAppearanceStore } from '@/stores/v3ChatAppearance'
 import { storeToRefs } from 'pinia'
 import { DEFAULT_BUBBLE, DEFAULT_FRAME, packsOf, type PackKind } from '@/packs'
 import { useAppearanceStore } from '@/stores/appearance'
+import { useChatBubbleCatalog } from '@/stores/chatBubbleCatalog'
+import { bubbleAttributes } from '@/utils/bubbleStyle'
 
 defineProps<{ compact?: boolean }>()
 
@@ -14,7 +16,8 @@ const shop = useAppearanceShopStore()
 const appearance = useAppearanceStore()
 const chatAppearance = useV3ChatAppearanceStore()
 const auth = useAuthStore()
-onMounted(() => chatAppearance.ensure())
+const bubbleCatalog = useChatBubbleCatalog()
+onMounted(() => { chatAppearance.ensure(); void bubbleCatalog.load() })
 const blocked = computed(() => !auth.accessToken || !chatAppearance.current || chatAppearance.loading || chatAppearance.busy || !!chatAppearance.pending)
 function choose(kind:PackKind,id:string){ if(kind==='theme')appearance.apply(kind,id);else if(!blocked.value)void chatAppearance.choose(kind,id) }
 const { state, notice } = storeToRefs(appearance)
@@ -24,12 +27,14 @@ const groupDefinitions: { kind: PackKind; title: string; defaultId?: string }[] 
   { kind: 'bubble', title: '对话框', defaultId: DEFAULT_BUBBLE },
   { kind: 'frame', title: '头像框', defaultId: DEFAULT_FRAME },
 ]
-const groups = groupDefinitions.map(group => ({
+const groups = computed(() => groupDefinitions.map(group => ({
   ...group,
-  packs: packsOf(group.kind).filter(pack => !pack.points).sort((a, b) =>
+  packs: [...packsOf(group.kind).filter(pack => !pack.points).sort((a, b) =>
     Number(b.id === group.defaultId) - Number(a.id === group.defaultId) || Number(a.vip) - Number(b.vip),
-  ),
-}))
+  ), ...(group.kind === 'bubble' ? bubbleCatalog.items.map(item => ({
+    id: item.id, name: item.name, vip: item.access === 'vip', preview: item.style.light.ownBackground,
+  })) : [])],
+})))
 
 function selected(kind: PackKind) {
   if (kind === 'theme') return state.value.theme
@@ -67,9 +72,10 @@ function selected(kind: PackKind) {
     <p v-if="!auth.accessToken" class="hint">登录后设置个人聊天外观。</p>
     <p v-else-if="chatAppearance.loading" class="hint" role="status">正在读取个人外观…</p>
     <p v-if="chatAppearance.error" class="notice" role="alert">{{ chatAppearance.error }} <button type="button" :disabled="chatAppearance.loading" @click="chatAppearance.load">重新读取外观</button></p>
+    <p v-if="bubbleCatalog.error" class="notice" role="alert">{{ bubbleCatalog.error }} <button type="button" @click="bubbleCatalog.load(true)">重新读取气泡目录</button></p>
     <p v-if="chatAppearance.writeError" class="notice" role="alert">{{ chatAppearance.writeError }}</p>
     <button v-if="chatAppearance.pending" type="button" :disabled="chatAppearance.busy" @click="chatAppearance.retry">{{ chatAppearance.busy ? '保存中…' : '恢复原外观保存' }}</button>
-    <div v-if="chatAppearance.current" class="appearance-preview"><div class="fp-msg is-room" data-appearance-snapshot="v1" :data-bubble="chatAppearance.current.bubbleId" :data-frame="chatAppearance.current.frameId"><span class="fp-avatar-frame"><img class="fp-avatar" src="/logo.png" alt="" /></span><div class="fp-bubble">新消息预览</div></div></div>
+    <div v-if="chatAppearance.current" class="appearance-preview"><div class="fp-msg is-room" data-appearance-snapshot="v1" :data-bubble="chatAppearance.current.bubbleId" :data-frame="chatAppearance.current.frameId"><span class="fp-avatar-frame"><img class="fp-avatar" src="/logo.png" alt="" /></span><div class="fp-bubble" v-bind="bubbleAttributes(chatAppearance.current.bubbleStyle)">新消息预览<img v-if="chatAppearance.current.bubbleStyle?.image" class="managed-bubble-mark" :src="chatAppearance.current.bubbleStyle.image" alt=""></div></div></div>
     <p v-if="notice" class="notice">{{ notice }}</p>
   </div>
 </template>

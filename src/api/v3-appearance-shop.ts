@@ -1,9 +1,11 @@
 import { ApiError, request } from './http'
+import { decodeBubbleStyle, type BubbleStyle } from '@/utils/bubbleStyle'
 
 export type AppearanceKind = 'mount' | 'bubble' | 'frame'
 export interface ShopProduct {
   id: string; kind: AppearanceKind; styleId: string; name: string
   version: number; price7: number; price30: number; enabled: boolean; revision: number
+  bubbleStyle?: BubbleStyle
 }
 export interface ShopInventory {
   list: { productId: string; expiresAt: number }[]
@@ -33,10 +35,12 @@ export async function readShop(signal?: AbortSignal): Promise<ShopProduct[]> {
   return data.list.map(value => {
     const row = object(value)
     if (!['mount', 'bubble', 'frame'].includes(String(row.kind)) || typeof row.enabled !== 'boolean') throw invalid()
+    const bubbleStyle = row.kind === 'bubble' ? decodeBubbleStyle(row.bubbleStyle) : undefined
     return {
       id: text(row.id), kind: row.kind as AppearanceKind, styleId: text(row.styleId), name: text(row.name),
       version: number(row.version, 1), price7: number(row.price7, 1), price30: number(row.price30, 1),
       enabled: row.enabled, revision: number(row.revision, 1),
+      ...(bubbleStyle ? { bubbleStyle } : {}),
     }
   })
 }

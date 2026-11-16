@@ -8,6 +8,7 @@ import { getAuthContextVersion } from '@/api/http'
 import type { AppearanceKind, ShopProduct } from '@/api/v3-appearance-shop'
 import { mountAssets } from '@/utils/mounts'
 import { findPack } from '@/packs'
+import { bubbleAttributes, isCustomBubbleId } from '@/utils/bubbleStyle'
 
 const shop = useAppearanceShopStore(), appearance = useV3ChatAppearanceStore(), auth = useAuthStore()
 const category = ref<AppearanceKind>('mount'), ownedOnly = ref(false), days = ref<7 | 30>(7)
@@ -24,7 +25,10 @@ watch(() => `${getAuthContextVersion()}:${auth.account?.oId}:${!!auth.accessToke
 onBeforeUnmount(() => clearInterval(timer))
 const expiration = (id: string) => shop.inventory?.list.find(item => item.productId === id)?.expiresAt || 0
 const owned = (id: string) => expiration(id) > clock.value
-const supported = (product: ShopProduct) => product.version === 1 && (product.kind === 'mount' ? !!mountAssets[product.styleId] : !!findPack(product.kind, product.styleId))
+const supported = (product: ShopProduct) => product.version === 1 && (
+  product.kind === 'mount' ? !!mountAssets[product.styleId]
+    : !!findPack(product.kind, product.styleId) || product.kind === 'bubble' && isCustomBubbleId(product.styleId) && !!product.bubbleStyle
+)
 const products = computed(() => shop.products.filter(product => supported(product) && product.kind === category.value && (ownedOnly.value ? expiration(product.id) > 0 : product.enabled || owned(product.id))))
 const blocked = computed(() => shop.busy || shop.loading || !!shop.pending || appearance.busy || !!appearance.pending || !shop.inventory)
 const price = (product: ShopProduct, duration = days.value) => duration === 7 ? product.price7 : product.price30
@@ -71,7 +75,7 @@ async function confirmPurchase() {
       <article v-for="product in products" :key="product.id" class="product">
         <div class="product-art fp-msg is-room" data-appearance-snapshot="v1" :data-bubble="product.kind === 'bubble' ? product.styleId : 'classic'" :data-frame="product.kind === 'frame' ? product.styleId : 'none'">
           <img v-if="product.kind === 'mount'" class="mount-image" :src="mountAssets[product.styleId]" :alt="product.name" loading="lazy">
-          <div v-else-if="product.kind === 'bubble'" class="fp-bubble">今天也要开心摸鱼。</div>
+          <div v-else-if="product.kind === 'bubble'" class="fp-bubble" v-bind="bubbleAttributes(product.bubbleStyle)">今天也要开心摸鱼。<img v-if="product.bubbleStyle?.image" class="managed-bubble-mark" :src="product.bubbleStyle.image" alt=""></div>
           <span v-else class="fp-avatar-frame"><img class="fp-avatar" src="/logo.png" :alt="product.name"></span>
         </div>
         <div class="product-info">

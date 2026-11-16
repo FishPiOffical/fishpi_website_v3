@@ -1,9 +1,11 @@
 import { ApiError, request } from './http'
-import { isChatAppearance, type ChatAppearance } from '@/utils/chatAppearance'
+import { chatAppearanceSnapshot, isChatAppearance, type ChatAppearance } from '@/utils/chatAppearance'
 export interface AppearanceCommand { bubbleId: string; frameId: string; key: string }
 function decode(value: unknown): ChatAppearance {
   if (!isChatAppearance(value)) throw new ApiError('聊天外观响应不正确', 502)
-  return { bubbleId: value.bubbleId, frameId: value.frameId, version: value.version }
+  const snapshot = chatAppearanceSnapshot(value)
+  if (snapshot.bubbleId !== value.bubbleId) throw new ApiError('聊天外观响应不正确', 502)
+  return snapshot
 }
 export async function readChatAppearance(signal?: AbortSignal) {
   const response = await request<{code: number; data: unknown}>('/api/v3/me/chat-appearance', {signal, cache: 'no-store'})

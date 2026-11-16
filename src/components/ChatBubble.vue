@@ -14,7 +14,7 @@ import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { DEFAULT_AVATAR, avatarThumbnail, imageThumbnail, rhyPicThumbnail } from '@/utils/avatar'
-import { chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
+import { bubbleAttributes, chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
 import { isSingleImageMessage } from '@/utils/chatMessage'
 import { extractLatestChatQuote, hasChatQuoteBody, type ChatQuote } from '@/utils/chatQuote'
 
@@ -58,6 +58,7 @@ const functionPreferences = useFunctionPreferencesStore()
 const previewLimit = 1024
 
 const snapshot = computed(() => chatAppearanceSnapshot(props.appearance))
+const managedStyle = computed(() => props.chatroom && !simpleMode.value && !isStandalone.value ? snapshot.value.bubbleStyle : undefined)
 const zoomed = ref('')
 const originalImage = ref('')
 const mounted = ref(false)
@@ -154,7 +155,8 @@ function onBodyClick(e: MouseEvent) {
         </div>
         <MedalList class="chat-medals" :items="medals" variant="mini" />
       </div>
-      <div v-if="!display.quote || display.html || $slots.default" class="fp-bubble" @click="onBodyClick">
+      <div v-if="!display.quote || display.html || $slots.default" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick">
+        <img v-if="managedStyle?.image" class="managed-bubble-mark" :src="managedStyle.image" alt="" loading="lazy">
         <div v-if="!chatroom" class="head">
           <RouterLink :to="`/member/${userName}`" class="name">
             <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>
