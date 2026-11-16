@@ -108,7 +108,9 @@ const summaryText = computed(() => {
 <style scoped>
 .sidebar-module-heading { flex: 1; min-width: 0; margin: 0; font-size: 12px; }
 .card-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px var(--fp-module-inset); border: 0; border-radius: 8px; background: transparent; color: var(--fp-head); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
-.card-toggle:hover { color: var(--fp-title); background: var(--fp-hover); }
+@media (hover: hover) {
+  .card-toggle:hover { color: var(--fp-title); background: var(--fp-hover); }
+}
 .card-toggle[aria-expanded='false'] { min-height: 46px; }
 .module-icon { flex: none; width: 15px; height: 15px; color: var(--fp-muted); }
 .module-icon[data-icon='breezemoons'] { width: 20px; height: 20px; }
