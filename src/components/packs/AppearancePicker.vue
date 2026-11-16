@@ -2,6 +2,7 @@
 import ManagedBubbleShape from '@/components/packs/ManagedBubbleShape.vue'
 import { useAppearanceShopStore } from '@/stores/appearanceShop'
 import ChatAppearanceRecovery from '@/components/chat/ChatAppearanceRecovery.vue'
+import SidebarIcon from '@/chat/sidebar/SidebarIcon.vue'
 import { computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ChatAppearanceStore } from '@/stores/v3ChatAppearance'
@@ -65,7 +66,9 @@ function selected(kind: PackKind) {
           <i :style="{ background: pack.preview }" />
           <span>{{ pack.name }}</span>
           <em v-if="pack.vip">VIP</em>
-          <em v-else-if="group.kind !== 'theme' && pack.id !== 'classic' && pack.id !== 'none'" class="free">免费</em>
+          <em v-else-if="group.defaultId && pack.id !== group.defaultId" class="limited-free">
+            <SidebarIcon name="income" />限免
+          </em>
         </button>
       </div>
     </section>
@@ -176,7 +179,15 @@ em {
   border-radius: 4px;
   padding: 0 4px;
 }
-.free { background: var(--fp-primary-soft); color: var(--fp-primary); }
+.limited-free {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--fp-primary-soft);
+  color: var(--fp-primary-ink);
+  white-space: nowrap;
+}
+.limited-free svg { flex: none; width: 11px; height: 11px; }
 .hint { margin:0; color:var(--fp-muted); font-size:11px; line-height:1.6; }
 button[aria-disabled='true'] { opacity:.5; cursor:default; }
 .appearance-preview { padding:10px 5px; }.appearance-preview .fp-msg { display:flex; gap:10px; align-items:center; }.appearance-preview .fp-avatar { display:block; width:28px; height:28px; border-radius:var(--fp-avatar-radius); }.appearance-preview .fp-avatar-frame { flex:none; }.appearance-preview .fp-bubble { position:relative; font-size:11px; padding:8px 12px; background:var(--fp-hover); border-radius:8px; }
