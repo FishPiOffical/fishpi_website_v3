@@ -512,7 +512,7 @@ export const usePetsStore = defineStore('pets', () => {
     return execute({ kind: 'activities/claim', petId: pet.value.id, activityId: activity.id, key: profileOperationKey() })
   }
   function executeBrawl(command: BrawlCommand) {
-    if (pending.value || !command.petId) return Promise.resolve(false)
+    if (pending.value || (command.kind !== 'brawl-season-claim' && !command.petId)) return Promise.resolve(false)
     return execute({ ...command, key: profileOperationKey() })
   }
   function retryPending(): Promise<boolean> {

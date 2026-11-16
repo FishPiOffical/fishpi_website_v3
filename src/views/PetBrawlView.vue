@@ -6,6 +6,7 @@ import { brawlSkills, brawlWeapons, readBrawlHistory, readBrawlReport, readBrawl
 import { petPortrait } from '@/components/pets/animations'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetBrawlCheckout from '@/components/pets/PetBrawlCheckout.vue'
+import PetBrawlSeason from '@/components/pets/PetBrawlSeason.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
@@ -208,6 +209,7 @@ watch(() => pets.confirmedEvent, event => {
     status.value = '镶嵌配置已保存'
     void refresh()
   }
+  if (event.kind === 'brawl-season-claim') void refresh()
   if (event.kind === 'brawl-upgrade' || event.kind === 'brawl-confirm') {
     status.value = '强化完成'
     void refresh()
@@ -290,6 +292,7 @@ onUnmounted(() => { mounted = false; clear() })
         <template v-if="state.pvp">
           <hr />
           <h2>实装对战</h2>
+          <a href="#brawl-season">查看赛季排行榜</a>
           <p class="subtle">报名后可在离线时接受挑战。对局使用报名武器及其开战时的强化等级。</p>
           <p class="subtle" role="status">{{ state.pvp.enabled ? '已报名' : '未报名' }} · 今日还可主动挑战 {{ state.pvp.remaining }} 场 · 被挑战 {{ state.pvp.received }} / {{ state.pvp.receivedLimit }}</p>
           <p v-if="pvpDirty" class="subtle">保存当前配置后即可匹配。</p>
@@ -308,6 +311,7 @@ onUnmounted(() => { mounted = false; clear() })
       </section>
       <section class="panel battle" aria-labelledby="battle-heading">
         <h2 id="battle-heading">对局回放</h2>
+        <p v-if="report?.season" class="subtle">第 {{ report.season }} 赛季 · 实装 PvP</p>
         <p v-if="reportLoading" role="status">正在读取战报…</p>
         <template v-if="report">
           <div class="fighters">
@@ -339,6 +343,9 @@ onUnmounted(() => { mounted = false; clear() })
       </section>
     </div>
     <p class="sr-only" role="status">{{ status }}</p>
+    <section v-if="state" class="panel" aria-labelledby="brawl-season">
+      <PetBrawlSeason />
+    </section>
     <section v-if="state" class="panel history">
       <div class="history-heading"><h2>我的战报</h2><button type="button" :disabled="historyLoading" @click="refresh(); loadHistory()">刷新</button></div>
       <p v-if="reportError" role="alert">{{ reportError }} <button v-if="retryReport" type="button" @click="openReport(retryReport)">重读战报</button></p>
