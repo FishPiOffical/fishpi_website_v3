@@ -30,6 +30,7 @@ function toggle(src: string) {
 </script>
 
 <script setup lang="ts">
+import { imageThumbnail } from '@/utils/avatar'
 import { computed } from 'vue'
 import {musicDestination} from '@/api/v3-chat-music'
 import { SITE_ORIGIN } from '@/seo/site'
@@ -91,7 +92,7 @@ const weather = computed(() => {
 
 <template>
   <div v-if="music" class="card music">
-    <img class="cover" :src="music.coverURL || `${SITE_ORIGIN}/images/music/cat.gif`" alt="" />
+    <img class="cover" :src="imageThumbnail(music.coverURL || '', 56, 56) || `${SITE_ORIGIN}/images/music/cat.gif`" alt="" />
     <div class="info">
       <div class="title" :title="music.title">{{ music.title || '未知歌曲' }}</div>
       <div v-if="music.from" class="from">{{ music.from }}</div>

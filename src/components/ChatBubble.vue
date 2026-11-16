@@ -13,7 +13,7 @@ import ChatQuoteCard from '@/components/chat/ChatQuoteCard.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
-import { DEFAULT_AVATAR, avatarThumbnail, rhyPicThumbnail } from '@/utils/avatar'
+import { DEFAULT_AVATAR, avatarThumbnail, imageThumbnail, rhyPicThumbnail } from '@/utils/avatar'
 import { chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
 import { isSingleImageMessage } from '@/utils/chatMessage'
 import { extractLatestChatQuote, hasChatQuoteBody, type ChatQuote } from '@/utils/chatQuote'
@@ -55,8 +55,6 @@ const canMention = computed(() => props.chatroom && !props.self && !!chatMention
 const chatPreferences = useChatPreferencesStore()
 const simpleMode = computed(() => mounted.value && props.chatroom && chatPreferences.simpleMode)
 const functionPreferences = useFunctionPreferencesStore()
-const thumbnailWidth = 400
-const thumbnailHeight = 360
 const previewLimit = 1024
 
 const snapshot = computed(() => chatAppearanceSnapshot(props.appearance))
@@ -65,6 +63,9 @@ const originalImage = ref('')
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
 const singleImage = computed(() => props.chatroom && isSingleImageMessage(props.html))
+function messageThumbnail(original: string) {
+  return singleImage.value ? imageThumbnail(original, 200, 180) : imageThumbnail(original, 180, 160)
+}
 const display = computed(() => {
   const hasImages = /<img\b/i.test(props.html)
   const mayHaveQuotes = /<blockquote\b/i.test(props.html) && (props.html.includes('/breezemoons/') || props.html.includes('#chatroom') || props.source.includes('#chatroom'))
@@ -88,7 +89,7 @@ const display = computed(() => {
     }
     const original = img.getAttribute('src')
     if (!original) continue
-    const thumbnail = rhyPicThumbnail(original, thumbnailWidth, thumbnailHeight)
+    const thumbnail = messageThumbnail(original)
     if (thumbnail === original) continue
     img.setAttribute('src', thumbnail)
     img.setAttribute('data-chat-original', original)
@@ -114,7 +115,7 @@ function onBodyClick(e: MouseEvent) {
   const displayed = img.currentSrc || img.src
   const original = img.getAttribute('data-chat-original')
   const source = img.getAttribute('src')
-  if (props.chatroom && original && source !== original && source === rhyPicThumbnail(original, thumbnailWidth, thumbnailHeight)) {
+  if (props.chatroom && original && source !== original && source === messageThumbnail(original)) {
     originalImage.value = original
     zoomed.value = rhyPicThumbnail(original, previewLimit, previewLimit)
   } else {

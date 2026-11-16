@@ -4,7 +4,7 @@ import { formatDisplayTime } from '@/utils/time'
 
 import RandomArticles from '@/components/discovery/RandomArticles.vue'
 import { articleTitle } from '@/utils/text'
-import { avatarStyle } from '@/utils/avatar'
+import { avatarStyle, imagePreviewSource, withImageThumbnailSrcset } from '@/utils/avatar'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -53,6 +53,7 @@ const commentWrites=useV3CommentsStore(),commandOrigin=Symbol('article-comment-d
 const { accessToken, isLoggedIn, account } = storeToRefs(auth)
 
 const article = ref<ArticleDetail | null>(null)
+const displayArticleHtml = computed(() => withImageThumbnailSrcset(article.value?.articleContent || '', 720, 520))
 const loading = ref(true), articleReading = ref(false)
 const error = ref('')
 const actionMsg = ref('')
@@ -473,7 +474,7 @@ function startReply(c: ArticleComment) {
 function onContentClick(e: MouseEvent) {
   const img = (e.target as HTMLElement | null)?.closest('img')
   if (!img || img.classList.contains('emoji') || img.closest('a')) return
-  zoomed.value = img.currentSrc || img.src
+  zoomed.value = imagePreviewSource(img, 720, 520)
 }
 
 function itemProps(c: ArticleComment) {
@@ -665,7 +666,7 @@ function itemHandlers(c: ArticleComment) {
 
         <audio v-if="article.articleAudioURL" class="article-audio" :src="article.articleAudioURL" controls preload="none" />
 
-        <div ref="bodyEl" class="body" @click="onContentClick" v-html="article.articleContent || ''" />
+        <div ref="bodyEl" class="body" @click="onContentClick" v-html="displayArticleHtml" />
 
         <ReuseReward />
 

@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
-import { rhyPicThumbnail } from '@/utils/avatar'
+import { imageThumbnail, rhyPicThumbnail } from '@/utils/avatar'
 import type { ChatQuote } from '@/utils/chatQuote'
 
 const props = defineProps<{ quote: ChatQuote }>()
@@ -11,7 +11,7 @@ const preferences = useFunctionPreferencesStore()
 const zoomed = ref('')
 const failed = ref(false)
 const jumpLabel = computed(() => props.quote.kind === 'message' ? '查看原消息' : '查看清风明月')
-const thumbnail = computed(() => props.quote.image ? rhyPicThumbnail(props.quote.image, 80, 64) : '')
+const thumbnail = computed(() => props.quote.image ? imageThumbnail(props.quote.image, 40, 32) : '')
 watch(() => props.quote.image, () => {
   failed.value = false
   zoomed.value = ''

@@ -53,7 +53,7 @@ const replacements = {
   '@/stores/functionPreferences': moduleUrl('export const useFunctionPreferencesStore=()=>({blurChatImages:false})'),
   '@/utils/time': moduleUrl('export const formatDisplayTime=()=>""'),
   '@/chat/mention': moduleUrl('export const CHAT_MENTION=Symbol();export const chatMentionText=x=>x'),
-  '@/utils/avatar': moduleUrl('export const DEFAULT_AVATAR="";export const avatarThumbnail=x=>x;export const rhyPicThumbnail=x=>x'),
+  '@/utils/avatar': moduleUrl('export const DEFAULT_AVATAR="";export const avatarThumbnail=x=>x;export const rhyPicThumbnail=x=>x;export const imageThumbnail=x=>x'),
   '@/utils/chatAppearance': appearances,
   '@/utils/chatMessage': imageModule,
   '@/utils/chatQuote': quoteModule,

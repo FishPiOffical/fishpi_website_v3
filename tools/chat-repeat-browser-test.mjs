@@ -136,7 +136,7 @@ try {
  await page.evaluate(()=>ownName.value=undefined);await page.waitForTimeout(40)
  await direction(false)
  await page.evaluate(()=>{entries.value=[make('4','小羊'),make('5','冰岚')];for(const e of entries.value){e.message.content='图片一起摸鱼';e.message.html='<p><img src="https://file.fishpi.cn/fish.png">一起摸鱼</p>'}})
- await page.waitForSelector('.repeat-picture');assert.ok((await page.locator('.repeat-picture').getAttribute('src')).includes('80'))
+ await page.waitForSelector('.repeat-picture');assert.ok((await page.locator('.repeat-picture').getAttribute('src')).endsWith('?imageView2/1/w/96/h/48'))
  assert.equal(await page.locator('.repeat-preview').innerText(),'一起摸鱼')
  await page.evaluate(()=>prefs.blurChatImages=true);await page.waitForTimeout(40)
  assert.equal(await page.locator('.repeat-picture').evaluate(el=>getComputedStyle(el).filter),'blur(6px)')

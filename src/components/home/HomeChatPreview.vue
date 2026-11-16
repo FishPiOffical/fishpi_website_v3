@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { ChatLine } from '@/stores/chat'
-import { avatarStyle, avatarUrl, rhyPicThumbnail } from '@/utils/avatar'
+import { avatarStyle, avatarUrl, imageThumbnail } from '@/utils/avatar'
 import VipNickname from '@/components/user/VipNickname.vue'
 
 const props = defineProps<{ message: ChatLine; blurImages?: boolean }>()
@@ -41,7 +41,7 @@ const preview = computed(() => {
     </RouterLink>
     <RouterLink class="preview-text" :to="`/cr#chatroom${message.oId}`">{{ preview.text }}</RouterLink>
     <button v-if="preview.image" type="button" class="preview-image" aria-label="查看消息图片" @click="emit('preview', preview.image)">
-      <img :src="rhyPicThumbnail(preview.image, 36, 36)" :class="{ blurred: blurImages }" alt="消息图片" loading="lazy" />
+      <img :src="imageThumbnail(preview.image, 36, 36)" :class="{ blurred: blurImages }" alt="消息图片" loading="lazy" />
     </button>
   </div>
 </template>

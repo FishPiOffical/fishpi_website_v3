@@ -31,7 +31,7 @@ export function avatarStyle(url: string | undefined | null, width?: number) {
 }
 
 export function coverStyle(url: string, width: number) {
-  return { backgroundImage: cssImage(rhyPicThumbnail(url, width)) }
+  return { backgroundImage: cssImage(imageThumbnail(url, width)) }
 }
 
 /** 只缩放 RhyPic 公开原图，保留带签名或已有处理参数的地址。 */
@@ -45,12 +45,38 @@ export function rhyPicThumbnail(url: string, width: number, height?: number): st
   return `${url}?imageView2/2/w/${width}`
 }
 
+/** 普通图片按 CSS 显示尺寸请求二倍图，最多 1024px。全屏预览可直接指定请求尺寸。 */
+export function imageThumbnail(url: string, width: number, height?: number): string {
+  if (!Number.isInteger(width) || width < 1 || width > 1024) return url
+  const scaledHeight = height !== undefined && Number.isInteger(height) && height > 0
+    ? Math.min(height * 2, 1024)
+    : undefined
+  return rhyPicThumbnail(url, Math.min(width * 2, 1024), scaledHeight)
+}
+
 export function avatarThumbnail(raw: string | undefined | null, width: number): string {
-  // 头像按显示宽度请求 2 倍像素；RhyPic 在原图尺寸处封顶，不放大小图。
-  // 不改通用缩图函数，避免文章图片、封面和表情一起翻倍。
-  const source = raw || DEFAULT_AVATAR
-  if (!Number.isInteger(width) || width < 1 || width > 1024) return source
-  return rhyPicThumbnail(source, Math.min(width * 2, 1024))
+  return imageThumbnail(raw || DEFAULT_AVATAR, width)
+}
+
+/** 为已经过服务端清洗的 Markdown 图片补同一份 SSR/客户端缩图标记，保留 src 作为原图。 */
+export function withImageThumbnailSrcset(html: string, width: number, height: number): string {
+  return html.replace(/<!--[\s\S]*?-->|<(?:[^>"']|"[^"]*"|'[^']*')*>/g, tag => {
+    if (!/^<img\s/i.test(tag)) return tag
+    const attrs = new Map(Array.from(tag.matchAll(/\s+([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>\x60]+)))?/g),
+      ([, key, double, single, bare]) => [key!.toLowerCase(), double ?? single ?? bare ?? '']))
+    if (attrs.has('srcset') || attrs.get('class')?.split(/\s+/).includes('emoji')) return tag
+    const source = attrs.get('src')
+    if (!source || source.includes('&')) return tag
+    const thumbnail = imageThumbnail(source, width, height)
+    return thumbnail === source ? tag : tag.replace(/^<img/i, name => `${name} srcset="${thumbnail}"`)
+  })
+}
+
+export function imagePreviewSource(image: HTMLImageElement, width: number, height: number): string {
+  const source = image.getAttribute('src') || ''
+  const thumbnail = imageThumbnail(source, width, height)
+  if (thumbnail !== source && thumbnail === image.getAttribute('srcset')) return image.src
+  return image.currentSrc || image.src
 }
 
 export function fallbackAvatar(event: Event) {

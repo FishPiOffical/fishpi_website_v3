@@ -2,6 +2,7 @@
 import { computed, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
 import { RouterLink, useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
 import type { ArticleFeedKind } from '@/api/fishpi'
+import { imageThumbnail } from '@/utils/avatar'
 import type { ColumnOrder } from '@/api/v3-article-list'
 import ContentRelationButton from '@/components/articles/ContentRelationButton.vue'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
@@ -71,7 +72,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
           <div v-if="value.resource === 'columns'" class="column-grid">
             <article v-for="column in columns" :key="column.id" class="column-card">
               <RouterLink class="column-cover-link" :to="`/column/${column.id}`" :aria-label="`阅读《${decodeEntities(column.title)}》`">
-                <img v-if="column.coverURL && !failedCovers.has(column.id)" :src="column.coverURL" alt="" loading="lazy" @error="failedCovers.add(column.id)"><span v-else class="cover-placeholder" aria-hidden="true" :style="{background:`hsl(${Number.parseInt(column.id.slice(-5),36)%360} 24% 38%)`}">{{ decodeEntities(column.title).slice(0,1) || '卷' }}</span>
+                <img v-if="column.coverURL && !failedCovers.has(column.id)" :src="imageThumbnail(column.coverURL, 88, 118)" alt="" loading="lazy" @error="failedCovers.add(column.id)"><span v-else class="cover-placeholder" aria-hidden="true" :style="{background:`hsl(${Number.parseInt(column.id.slice(-5),36)%360} 24% 38%)`}">{{ decodeEntities(column.title).slice(0,1) || '卷' }}</span>
               </RouterLink>
               <div class="column-card-copy">
                 <RouterLink class="column-title" :to="`/column/${column.id}`">{{ decodeEntities(column.title) }}</RouterLink>

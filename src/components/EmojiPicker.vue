@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { imageThumbnail } from '@/utils/avatar'
 import { fish001 } from '@/emoji/fish001'
 import { useEmojiPreferencesStore } from '@/stores/emojiPreferences'
 import { useScrollPagination } from '@/composables/useScrollPagination'
@@ -41,7 +42,7 @@ function showPreview(item: EmojiItem, event: PointerEvent | FocusEvent) {
     y = above >= below ? rect.top - gap - height : rect.bottom + gap
   }
   hoverPreview.value = {
-    url,
+    url: imageThumbnail(url, size, Math.floor(height)),
     style: {
       left: `${Math.max(margin, Math.min(x, window.innerWidth - size - margin))}px`,
       top: `${Math.max(margin, Math.min(y, window.innerHeight - height - margin))}px`,
@@ -253,7 +254,7 @@ defineExpose({ toggle })
           <button v-for="(item, index) in items" :key="item.oId || `${item.name}:${index}`"
             :disabled="Boolean(item.oId && !item.url)" type="button" :title="item.name" :aria-label="item.name" @pointerenter="showPreview(item, $event)" @pointerleave="clearPreview"
             @focus="showPreview(item, $event)" @blur="clearPreview" @click="pick(item)">
-            <img v-if="previewImage(item)" :src="previewImage(item)" alt="" />
+            <img v-if="previewImage(item)" :src="imageThumbnail(previewImage(item), groupId ? 50 : 20, groupId ? 50 : 20)" alt="" />
             <span v-else>{{ props.labels[item.name] || '⋯' }}</span>
           </button>
           <p v-if="!items.length && !error" class="hint">暂无表情</p>

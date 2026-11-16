@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, onMounted, onUnmounted, ref, useId, useTemplateRef, watch, type Ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, useId, useTemplateRef, watch, type Ref } from 'vue'
 import { timeISO } from '@/utils/time'
 
 import { formatDateTime } from '@/utils/time'
@@ -9,7 +9,7 @@ import type { BreezemoonQuoteSource } from '@/utils/chatQuote'
 import type { FollowingMoon } from '@/api/v3-following-feed'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
-import { avatarUrl, DEFAULT_AVATAR, avatarThumbnail, rhyPicThumbnail } from '@/utils/avatar'
+import { avatarUrl, DEFAULT_AVATAR, avatarThumbnail, imagePreviewSource, rhyPicThumbnail, withImageThumbnailSrcset } from '@/utils/avatar'
 const props = defineProps<{items:FollowingMoon[];compact?:boolean;avatarOnly?:boolean;hideAuthor?:boolean;collapsible?:boolean}>()
 function fallback(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 const date = formatDateTime
@@ -20,6 +20,10 @@ const expanded = ref(new Set<string>())
 const clipped = ref(new Set<string>())
 const zoomed = ref('')
 const originalImage = ref('')
+const previewHtml = computed(() => {
+  const [width, height] = props.compact ? [20, 20] as const : [320, 220] as const
+  return new Map(props.items.map(item => [item.id, withImageThumbnailSrcset(item.contentHtml, width, height)]))
+})
 let observer: ResizeObserver | undefined
 
 function prepareImageButtons() {
@@ -48,7 +52,7 @@ function previewImage(event: MouseEvent) {
   let image = target.closest('img:not(.emoji)')
   if (!image && action && !action.textContent?.trim()) image = action.querySelector('img:not(.emoji)')
   if (!(image instanceof HTMLImageElement)) return
-  const source = image.currentSrc || image.src
+  const source = imagePreviewSource(image, 20, 20)
   if (!/^https?:\/\//i.test(source)) return
   event.preventDefault()
   event.stopPropagation()
@@ -129,7 +133,7 @@ function share(item: FollowingMoon, event: MouseEvent | DragEvent) {
         @load.capture="measureOverflow"
         @focusin="collapsible && revealFocusedLink(item.id, $event)"
         @click="previewImage"
-        v-html="item.contentHtml"
+        v-html="previewHtml.get(item.id) ?? item.contentHtml"
       />
       <button v-if="collapsible && clipped.has(item.id)" class="moon-expand" type="button"
         :aria-expanded="expanded.has(item.id)" :aria-controls="`${bodyPrefix}-${item.id}`" @click="toggle(item.id)">

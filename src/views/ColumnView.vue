@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {readChapterProgress} from '@/utils/readingProgress'
+import { imageThumbnail } from '@/utils/avatar'
 import { timeISO } from '@/utils/time'
 
 import { formatDateTime } from '@/utils/time'
@@ -25,7 +26,7 @@ usePageSeo(() => ({ title: title.value, path: `/column/${encodeURIComponent(colu
     <p class="crumb"><RouterLink to="/column">长篇专栏</RouterLink><span>/</span>{{ title }}</p>
     <div v-if="metaError" role="alert"><p>专栏暂时无法打开。</p><button class="fp-control" type="button" @click="readMeta">重试专栏资料</button></div>
     <section v-if="meta" class="book-hero">
-      <div class="cover-wrap"><img v-if="meta.column.coverURL && !coverFailed" :src="meta.column.coverURL" alt="" class="book-cover" @error="coverFailed = true" /><div v-else class="cover-placeholder" role="img" aria-label="未设置专栏封面">专栏</div><span class="cover-shine" /></div>
+      <div class="cover-wrap"><img v-if="meta.column.coverURL && !coverFailed" :src="imageThumbnail(meta.column.coverURL, 172, 230)" alt="" class="book-cover" @error="coverFailed = true" /><div v-else class="cover-placeholder" role="img" aria-label="未设置专栏封面">专栏</div><span class="cover-shine" /></div>
       <div class="book-info">
         <div class="book-kicker"><span>摸鱼派 · 长篇专栏</span></div>
         <h1 class="fp-page-title">{{ title }}</h1><p class="synopsis">按章节序号查看当前公开目录。</p>

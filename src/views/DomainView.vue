@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { imageThumbnail } from '@/utils/avatar'
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useDirectory } from '@/composables/useDirectory'
@@ -26,7 +27,7 @@ async function page(next: number) { await read(next, true); document.getElementB
       <div v-if="error" class="err fp-state" role="alert">{{ error }} <button type="button" class="btn fp-control" @click="read()">重试当前页</button></div>
       <template v-if="value">
         <p v-if="!value.list.length" class="err fp-state">本页暂无{{ label }}</p>
-        <ul v-if="domains.length" class="domain-list"><li v-for="item in domains" :key="item.uri"><RouterLink :to="'/domain/' + item.uri" class="domain-item"><img v-if="item.domainIconPath" :src="item.domainIconPath" alt="" /><span v-else class="domain-fallback">{{ (item.domainTitle || '域').slice(0, 1) }}</span><div class="domain-info"><strong>{{ item.domainTitle }}</strong><span v-if="item.domainDescription">{{ item.domainDescription }}</span></div></RouterLink></li></ul>
+        <ul v-if="domains.length" class="domain-list"><li v-for="item in domains" :key="item.uri"><RouterLink :to="'/domain/' + item.uri" class="domain-item"><img v-if="item.domainIconPath" :src="imageThumbnail(item.domainIconPath, 40, 40)" alt="" /><span v-else class="domain-fallback">{{ (item.domainTitle || '域').slice(0, 1) }}</span><div class="domain-info"><strong>{{ item.domainTitle }}</strong><span v-if="item.domainDescription">{{ item.domainDescription }}</span></div></RouterLink></li></ul>
         <div class="pagination-bar fp-pagination">
           <button type="button" class="btn page-btn fp-control" :disabled="p <= 1" @click="page(p - 1)">‹ 上一页</button>
           <span class="current-page-num">第 {{ p }} 页 / 共 {{ value.pageCount }} 页</span>

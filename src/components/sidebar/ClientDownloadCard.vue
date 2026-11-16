@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { imageThumbnail } from '@/utils/avatar'
 </script>
+
 <template>
   <div class="client-download">
-    <img src="https://file.fishpi.cn/logo_app.png" width="36" height="36" alt="" />
+    <img :src="imageThumbnail('https://file.fishpi.cn/logo_app.png', 36, 36)" width="36" height="36" alt="" />
     <div class="download-copy"><strong>随时随地摸鱼</strong><p>下载摸鱼派客户端，想摸就摸！</p></div>
     <RouterLink to="/download" class="download-action">下载 <span aria-hidden="true">↗</span></RouterLink>
   </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="T extends RepeatEntry">
 import { computed, ref, watch, onMounted, onUpdated, onBeforeUnmount } from 'vue'
 import { groupChatRepeats, chatRepeatPreview, type RepeatEntry } from '@/utils/chatRepeatGroups'
-import { avatarThumbnail, fallbackAvatar, rhyPicThumbnail } from '@/utils/avatar'
+import { avatarThumbnail, fallbackAvatar, imageThumbnail } from '@/utils/avatar'
 import ChatRepeatAction from './ChatRepeatAction.vue'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
@@ -72,7 +72,7 @@ function toggle(key: string) {
         <button class="repeat-layer" type="button" aria-label="展开复读消息" @click="toggle(group[0]!.key)">
           <img class="repeat-avatar" :src="avatarThumbnail(entry.message?.userAvatarURL, 20)" :alt="entry.message?.userNickname || entry.message?.userName" :data-user-card="entry.message?.userName" @error="fallbackAvatar" />
           <span class="fp-bubble repeat-sheet" :class="{ 'repeat-sheet--blur': mounted && functions.blurChatImages }">
-            <span class="repeat-preview"><template v-for="(part, partIndex) in previews.get(entry.key)" :key="partIndex"><img v-if="'image' in part" class="repeat-picture" :src="rhyPicThumbnail(part.image, 80, 64)" :alt="part.alt" loading="lazy" /><span v-else>{{ part.text }}</span></template></span>
+            <span class="repeat-preview"><template v-for="(part, partIndex) in previews.get(entry.key)" :key="partIndex"><img v-if="'image' in part" class="repeat-picture" :src="imageThumbnail(part.image, 48, 24)" :alt="part.alt" loading="lazy" /><span v-else>{{ part.text }}</span></template></span>
           </span>
         </button>
         </div>

@@ -7,7 +7,7 @@ const start=source.indexOf('const avatarUrl ='),end=source.indexOf('const displa
 assert.ok(start>=0&&end>start)
 const code=ts.transpileModule(source.slice(start,end),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 const avatarCode=ts.transpileModule(await fs.readFile('src/utils/avatar.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
-const {avatarThumbnail,rhyPicThumbnail,avatarStyle,coverStyle}=await import('data:text/javascript;base64,'+Buffer.from(avatarCode).toString('base64'))
+const {avatarThumbnail,rhyPicThumbnail,avatarStyle,coverStyle,imageThumbnail,withImageThumbnailSrcset}=await import('data:text/javascript;base64,'+Buffer.from(avatarCode).toString('base64'))
 const scope=effectScope(),account=ref({oId:'1',userAvatarURL:"https://example.test/a'b.png?sig=a%2Bb+c&x=1&x=2#literal"})
 const model=scope.run(()=>new Function('account','computed','ref','watch','avatarThumbnail',`${code};return {avatarUrl,visibleAvatarUrl,onAvatarError}`)(account,computed,ref,watch,avatarThumbnail))
 const original=account.value.userAvatarURL
@@ -38,7 +38,18 @@ assert.equal(avatarThumbnail(rhypic,80),rhypic+'?imageView2/2/w/160')
 assert.equal(avatarThumbnail(rhypic,800),rhypic+'?imageView2/2/w/1024')
 for (const width of [0, -1, 1.5, NaN, Infinity, 1025]) assert.equal(avatarThumbnail(rhypic,width),rhypic)
 assert.ok(avatarStyle(rhypic,20).backgroundImage.includes('/w/40'))
-assert.ok(coverStyle(rhypic,20).backgroundImage.includes('/w/20'))
+assert.ok(coverStyle(rhypic,20).backgroundImage.includes('/w/40'))
+assert.equal(imageThumbnail(rhypic,20,20),rhypic+'?imageView2/1/w/40/h/40')
+assert.equal(imageThumbnail(rhypic,720,520),rhypic+'?imageView2/1/w/1024/h/1024')
+const imageMarkup = `<p><img alt="src=example" src='${rhypic}'></p>`
+assert.equal(withImageThumbnailSrcset(imageMarkup,20,20), imageMarkup.replace('<img ', `<img srcset="${imageThumbnail(rhypic,20,20)}" `))
+for (const markup of [
+  `<!-- <img src="${rhypic}"> -->`,
+  `<img class="emoji" src="${gif}">`,
+  `<img src="${rhypic}?sig=a%2Bb&amp;x=2">`,
+  `<img src="${rhypic}" srcset="existing.png 2x">`,
+  '<img src="https://example.test/a.png">',
+]) assert.equal(withImageThumbnailSrcset(markup,20,20),markup)
 assert.equal(rhyPicThumbnail(rhypic,20,20),rhypic+'?imageView2/1/w/20/h/20')
 assert.equal(avatarThumbnail('/images/user-thumbnail.png',20),'/images/user-thumbnail.png')
 model.onAvatarError(error(avatarThumbnail(rhypic,34)))

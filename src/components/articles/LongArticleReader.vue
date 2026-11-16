@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { withImageThumbnailSrcset } from '@/utils/avatar'
 import ArticlePinBadge from '@/components/articles/ArticlePinBadge.vue'
 import CommentVisibilityNotice from '@/components/comments/CommentVisibilityNotice.vue'
 import { rememberChapter } from '@/utils/readingProgress'
@@ -40,6 +41,7 @@ const props = defineProps<{
   targetLocation?: CommentLocation | null
 }>()
 
+const displayArticleHtml = computed(() => withImageThumbnailSrcset(props.article.articleContent || '', 720, 520))
 const commentingEnabled = computed(() => props.article.articleCommentable === true)
 
 const emit = defineEmits<{
@@ -598,7 +600,7 @@ function chapterTitle(c: LongArticleChapter) {
           ref="contentEl"
           class="la-content"
           @click="handleContentClick"
-          v-html="article.articleContent || ''"
+          v-html="displayArticleHtml"
         />
 
         <ArticleReadRegistration v-if="article.articleContent" :key="article.oId" :article-id="article.oId" :author-id="article.articleAuthorId || ''" />
