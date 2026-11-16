@@ -11,13 +11,15 @@ const props = withDefaults(
     tone?: 'default' | 'danger'
     /** 为 true 时点遮罩、按 Esc 都不关闭，只能点按钮 */
     persistent?: boolean
+    /** 为 false 时点遮罩不关闭，Esc 和关闭按钮仍按原规则处理。 */
+    closeOnBackdrop?: boolean
     closable?: boolean
     /** 内容区域自带间距，保留统一的标题、滚动容器与遮罩。 */
     flush?: boolean
     /** top：人机验证等必须压在其它弹窗之上的层 */
     layer?: 'base' | 'top'
   }>(),
-  { title: '', width: 420, tone: 'default', persistent: false, closable: true, layer: 'base' },
+  { title: '', width: 420, tone: 'default', persistent: false, closeOnBackdrop: true, closable: true, layer: 'base' },
 )
 
 const emit = defineEmits<{ 'update:open': [value: boolean]; close: [] }>()
@@ -45,7 +47,7 @@ function onPointerUp(event: PointerEvent) {
 function onMask() {
   const shouldClose = pointerStartedOnMask
   pointerStartedOnMask = false
-  if (shouldClose && !props.persistent) close()
+  if (shouldClose && props.closeOnBackdrop && !props.persistent) close()
 }
 
 function onKey(e: KeyboardEvent) {

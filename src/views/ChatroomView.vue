@@ -287,9 +287,9 @@ function onBreezemoonDrop(event: DragEvent) {
 }
 
 function insertPaint(md: string) {
-  if (!syncComposer()) return
+  if (!syncComposer()) return false
   draft.value += (draft.value && !draft.value.endsWith('\n') ? '\n' : '') + md
-  activeTool.value = ''
+  return true
 }
 
 async function pickNode(opt: ChatNodeOption) {
@@ -664,7 +664,7 @@ function clearScreen() {
 
     <!-- ==================== 浮层与弹窗 ==================== -->
     <!-- 大区节点选择弹层 -->
-    <ChatToolDialog v-if="isLoggedIn" :tool="activeTool" @close="activeTool=''" @insert="insertPaint" />
+    <ChatToolDialog v-if="isLoggedIn" :tool="activeTool" :insert-paint="insertPaint" @close="activeTool=''" />
     <FpDialog :open="showNodes && isLoggedIn" title="切换聊天室大区节点" :width="520" @close="showNodes = false">
       <div class="node-grid">
         <button

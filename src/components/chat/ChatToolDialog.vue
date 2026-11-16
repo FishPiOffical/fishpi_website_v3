@@ -7,10 +7,10 @@ import { activeDialogState } from '@/composables/useDialog'
 import ChatRedPacketEditor from './ChatRedPacketEditor.vue'
 import ChatBarrageEditor from './ChatBarrageEditor.vue'
 import PaintPanel from './PaintPanel.vue'
-const props = defineProps<{tool:''|'packet'|'barrage'|'paint'}>()
-const emit = defineEmits<{close:[];insert:[md:string]}>()
+const props = defineProps<{tool:''|'packet'|'barrage'|'paint';insertPaint:(md:string)=>boolean}>()
+const emit = defineEmits<{close:[]}>()
 const content = ref<HTMLElement|null>(null)
-const info = computed(() => ({packet:{title:'发红包'},barrage:{title:'发送弹幕'},paint:{title:'涂鸦画板',hint:'画好后插入输入框，编辑完成再发送。'}})[props.tool || 'packet'])
+const info = computed(() => ({packet:{title:'发红包'},barrage:{title:'发送弹幕'},paint:{title:'涂鸦画板',hint:'草稿会在当前标签页自动保存。画好后可插入输入框。'}})[props.tool || 'packet'])
 let trigger:HTMLElement|null=null, confirmFocus:HTMLElement|null=null, previousOverflow:string|null=null, sequence=0, disposed=false
 function dialog() { return activeDialogState.value ? document.querySelector<HTMLElement>('.fp-dialog-mask.layer-top [role=dialog]') : content.value?.closest<HTMLElement>('[role=dialog]') }
 function focusables() { return Array.from(dialog()?.querySelectorAll<HTMLElement>('button:enabled,input:enabled,select:enabled,textarea:enabled,a[href],[tabindex="0"]') || []).filter(node=>node.getClientRects().length) }
@@ -47,7 +47,7 @@ watch(activeDialogState,async value=>{
 onBeforeUnmount(()=>{disposed=true;sequence++;unlock();if(trigger?.isConnected)trigger.focus()})
 </script>
 <template>
-  <FpDialog :open="!!tool" :title="info.title" :width="tool==='paint'?620:tool==='packet'?500:480" :persistent="Boolean(activeDialogState)" :closable="!activeDialogState" @close="emit('close')">
+  <FpDialog :open="!!tool" :title="info.title" :width="tool==='paint'?620:tool==='packet'?500:480" :close-on-backdrop="tool !== 'paint'" :persistent="Boolean(activeDialogState)" :closable="!activeDialogState" @close="emit('close')">
     <template v-if="tool==='packet'" #title>
       <span class="packet-title">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 3h14v18H5z M5 8l7 4 7-4 M9 15h6" /></svg>
@@ -60,7 +60,7 @@ onBeforeUnmount(()=>{disposed=true;sequence++;unlock();if(trigger?.isConnected)t
         <template #recovery><ChatRedPacketRecovery kind="create" /></template>
       </ChatRedPacketEditor>
       <ChatBarrageEditor v-else-if="tool==='barrage'" @close="emit('close')" />
-      <PaintPanel v-else @insert="md=>emit('insert',md)" @close="emit('close')" />
+      <PaintPanel v-else :insert="insertPaint" @close="emit('close')" />
       <ChatBarrageRecovery v-if="tool==='barrage'" />
     </div>
   </FpDialog>

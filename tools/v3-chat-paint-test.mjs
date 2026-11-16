@@ -9,7 +9,7 @@ const png=()=>new Blob([new Uint8Array([137,80,78,71,13,10,26,10])],{type:'image
 const remote=async(path,init)=>{state.fetches.push({path,init});return state.remote?state.remote(path,init):new Response(JSON.stringify(result()))};globalThis.fetch=remote
 const insert=(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}const i=a?p.children.indexOf(a):-1;p.children.splice(i<0?p.children.length:i,0,n);n.parent=p},renderer=createRenderer({patchProp(n,k,o,v){n.props[k]=v},insert,remove(n){if(n.parent)n.parent.children=n.parent.children.filter(c=>c!==n)},createElement(tag){return{tag,tagName:tag.toUpperCase(),props:{},children:[],value:'',addEventListener(){},removeEventListener(){},getRootNode(){return{activeElement:null}},width:500,height:320,getContext(){return new Proxy({},{get:()=>()=>{}})},getBoundingClientRect(){return{left:0,top:0,width:250,height:160}},setPointerCapture(){},toBlob(callback,type){assert.equal(type,'image/png');if(state.export)state.export(callback);else callback(png())}}},createText(text){return{text,children:[]}},createComment(){return{children:[]}},setText(n,t){n.text=t},setElementText(n,t){n.children=[{text:t,children:[]}]},parentNode:n=>n.parent,nextSibling(n){const c=n.parent?.children||[];return c[c.indexOf(n)+1]||null},insertStaticContent(t,p,a){const n={text:t,children:[]};insert(n,p,a);return[n,n]}}),text=n=>[n.text||'',...(n.children||[]).map(text)].join(' '),find=(n,f)=>f(n)?n:(n.children||[]).map(c=>find(c,f)).find(Boolean),tick=async()=>{for(let i=0;i<35;i++)await Promise.resolve();await nextTick()}
 globalThis.document={createElement(tag){assert.equal(tag,'canvas');const canvas={width:0,height:0,getContext(){return{drawImage(...args){state.crop=args.slice(1)}}},toBlob(callback,type){assert.equal(type,'image/png');if(state.export)state.export(callback);else callback(png())}};return canvas}}
-function mount(pinia=createPinia()){const root={children:[]},events=[],app=renderer.createApp({setup(){return()=>h(Component,{onInsert:md=>events.push(['insert',md]),onClose:()=>events.push(['close'])})}});app.use(pinia);app.mount(root);return{app,pinia,root,events,user:auth(pinia),text:()=>text(root)}}
+function mount(pinia=createPinia(), acceptInsert=true){const root={children:[]},events=[],app=renderer.createApp({setup(){return()=>h(Component,{insert:md=>{if(!acceptInsert)return false;events.push(['insert',md]);return true},onClose:()=>events.push(['close'])})}});app.use(pinia);app.mount(root);return{app,pinia,root,events,user:auth(pinia),text:()=>text(root)}}
 const button=(v,label)=>{const b=find(v.root,n=>n.tag==='button'&&text(n).trim()===label);assert.ok(b,'Missing '+label);return b},click=(v,label)=>{const b=button(v,label);assert.ok(!b.props.disabled);return b.props.onClick()},draw=v=>{const c=find(v.root,n=>n.tag==='canvas');c.props.onPointerdown({pointerId:1,clientX:10,clientY:20});c.props.onPointermove({pointerId:1,clientX:20,clientY:30});c.props.onPointerup()}
 let v=mount();draw(v);await tick();await click(v,'插入涂鸦');await tick();assert.deepEqual(state.crop,[6,26,48,48,0,0,48,48]);assert.equal(v.events.length,2);assert.deepEqual(v.events,[['insert','![涂鸦](https://file.fishpi.cn/paint\\(a\\).png?sig=1&x=2)'],['close']]);assert.equal(state.calls.at(-1).path,'/api/v3/uploads/tickets');const transfer=state.fetches.at(-1);assert.equal(transfer.path,'/rhypic-upload/api/v1/files');assert.deepEqual(transfer.init.headers,{Authorization:'Bearer upload-only'});assert.equal(transfer.init.credentials,'omit');assert.equal(transfer.init.redirect,'error');assert.equal(transfer.init.body.get('file').name,'upload-1.png');assert.equal(transfer.init.body.get('file').type,'image/png');assert.ok(button(v,'插入涂鸦').props.disabled);v.app.unmount()
 console.log('PASS paint 1 actual pointer canvas export -> v3 ticket -> named PNG multipart -> escaped Markdown insert/close, no legacy apiKey or upload Cookie')
@@ -34,8 +34,55 @@ console.log('PASS paint 10 normal same-owner token rotation preserves current dr
 const pinia=createPinia();auth(pinia).accessToken=null;v=mount(pinia);before=state.calls.length;draw(v);await tick();button(v,'插入涂鸦').props.onClick();await tick();assert.equal(state.calls.length,before);assert.equal(v.events.length,0);v.app.unmount()
 v=mount();draw(v);await tick();await click(v,'撤销');await tick();assert.ok(button(v,'插入涂鸦').props.disabled);draw(v);await tick();await click(v,'清空');await tick();assert.ok(button(v,'插入涂鸦').props.disabled);v.app.unmount()
 console.log('PASS paint 11 guest gate and existing undo/clear controls operate without upload')
-const parent=await fs.readFile('src/views/ChatroomView.vue','utf8'),legacy=await fs.readFile('src/api/fishpi.ts','utf8');assert.ok(parent.includes('<ChatToolDialog ')&&parent.includes('@insert="insertPaint"'));assert.equal((parent.match(/<PaintPanel /g)||[]).length,0);const handler=parent.match(/function insertPaint\([^]*?\n}/)[0];assert.ok(handler.includes('draft.value +=')&&!handler.includes('.send('));assert.ok(!legacy.includes('/api/rhypic/upload-ticket')&&!legacy.includes('function uploadFiles'))
+const parent=await fs.readFile('src/views/ChatroomView.vue','utf8'),legacy=await fs.readFile('src/api/fishpi.ts','utf8');assert.ok(parent.includes('<ChatToolDialog ')&&parent.includes(':insert-paint="insertPaint"'));assert.equal((parent.match(/<PaintPanel /g)||[]).length,0);const handler=parent.match(/function insertPaint\([^]*?\n}/)[0];assert.ok(handler.includes('draft.value +=')&&!handler.includes('.send('));assert.ok(!legacy.includes('/api/rhypic/upload-ticket')&&!legacy.includes('function uploadFiles'))
 console.log('PASS paint 12 both layouts insert into current draft without automatic publication and unused legacy upload adapter removed')
 
-const ssrPinia=createPinia(),ssr=createSSRApp(Component);ssr.use(ssrPinia);before=state.calls.length;const html=await renderToString(ssr);assert.ok(html.includes('<canvas'));assert.equal(state.calls.length,before)
+const ssrPinia=createPinia(),ssr=createSSRApp(Component,{insert:()=>false});ssr.use(ssrPinia);before=state.calls.length;const html=await renderToString(ssr);assert.ok(html.includes('<canvas'));assert.equal(state.calls.length,before)
 console.log('PASS paint 13 actual SSR produces an inert canvas shell with no upload/ticket or automatic publication')
+
+
+const cache = new Map()
+globalThis.window = {
+  sessionStorage: {
+    getItem: key => cache.get(key) ?? null,
+    setItem: (key, value) => cache.set(key, value),
+    removeItem: key => cache.delete(key),
+  },
+  addEventListener() {},
+  removeEventListener() {},
+}
+const owner = createPinia()
+v = mount(owner)
+draw(v)
+draw(v)
+await tick()
+assert.equal(JSON.parse(cache.get('fp.chat.paint-draft.v1.1')).length, 2)
+await click(v, '撤销')
+v.app.unmount()
+v = mount(owner, false)
+await tick()
+assert.equal(button(v, '插入涂鸦').props.disabled, false)
+assert.equal(JSON.parse(cache.get('fp.chat.paint-draft.v1.1')).length, 1)
+await click(v, '插入涂鸦')
+await tick()
+assert.match(v.text(), /涂鸦草稿已保留/)
+assert.equal(cache.size, 1)
+assert.deepEqual(v.events, [])
+v.user.account = { oId: '2' }
+await tick()
+assert.ok(button(v, '插入涂鸦').props.disabled)
+v.user.account = { oId: '1' }
+await tick()
+assert.equal(button(v, '插入涂鸦').props.disabled, false)
+v.app.unmount()
+v = mount(owner)
+await tick()
+await click(v, '清空')
+assert.equal(cache.size, 0)
+draw(v)
+await tick()
+await click(v, '插入涂鸦')
+assert.equal(cache.size, 0)
+v.app.unmount()
+delete globalThis.window
+console.log('PASS paint draft survives reopen and rejected insertion, isolates accounts, and clears after explicit clear or accepted insertion')

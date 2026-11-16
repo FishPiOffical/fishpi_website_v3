@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getAuthContextVersion } from '@/api/http'
 import { uploadV3Files, uploadedMarkdown } from '@/api/v3-uploads'
 import { useAuthStore } from '@/stores/auth'
 
-const emit = defineEmits<{ insert: [md: string]; close: [] }>()
+const props = defineProps<{ insert: (md: string) => boolean }>()
+const emit = defineEmits<{ close: [] }>()
 
 const auth = useAuthStore()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -12,14 +13,47 @@ const color = ref('#222222')
 const size = ref(3)
 const busy = ref(false)
 const err = ref('')
+const draftError = ref(false)
 const loggedIn = computed(() => !!auth.accessToken && !!auth.account?.oId)
+const draftKey = computed(() => loggedIn.value ? `fp.chat.paint-draft.v1.${auth.account!.oId}` : '')
 let upload: AbortController | null = null, disposed = false
 function cancelUpload() { upload?.abort(); upload = null; busy.value = false }
 
 type Stroke = { color: string; size: number; points: { x: number; y: number }[] }
 const strokes = ref<Stroke[]>([])
-let drawing = false
 let current: Stroke | null = null
+
+function saveDraft() {
+  const key = draftKey.value
+  if (!key || typeof window === 'undefined') return
+  try {
+    if (strokes.value.length) window.sessionStorage.setItem(key, JSON.stringify(strokes.value))
+    else window.sessionStorage.removeItem(key)
+    draftError.value = false
+  } catch {
+    draftError.value = true
+  }
+}
+
+function restoreDraft() {
+  strokes.value = []
+  draftError.value = false
+  const key = draftKey.value
+  if (!key || typeof window === 'undefined') return
+  try {
+    const saved: unknown = JSON.parse(window.sessionStorage.getItem(key) || '[]')
+    if (Array.isArray(saved) && saved.every((stroke: Stroke | null) => stroke && /^#[0-9a-f]{6}$/i.test(stroke.color)
+      && Number.isInteger(stroke.size) && stroke.size >= 1 && stroke.size <= 16
+      && Array.isArray(stroke.points) && stroke.points.length > 0
+      && stroke.points.every(point => point && Number.isFinite(point.x) && Number.isFinite(point.y)))) {
+      strokes.value = saved
+    }
+  } catch { /* 缓存不可读时仍可创建新涂鸦。 */ }
+}
+
+function saveActiveStroke() {
+  if (current) saveDraft()
+}
 
 function ctx() {
   return canvasRef.value?.getContext('2d') || null
@@ -49,39 +83,44 @@ function pos(e: PointerEvent) {
   const r = c.getBoundingClientRect()
   const sx = c.width / r.width
   const sy = c.height / r.height
-  return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sy }
+  return { x: Math.round((e.clientX - r.left) * sx * 10) / 10, y: Math.round((e.clientY - r.top) * sy * 10) / 10 }
 }
 
 function onDown(e: PointerEvent) {
   const c = canvasRef.value
-  if (!c || busy.value || !loggedIn.value) return
+  if (!c || current || busy.value || !loggedIn.value) return
   c.setPointerCapture(e.pointerId)
-  drawing = true
   current = { color: color.value, size: size.value, points: [pos(e)] }
   strokes.value.push(current)
 }
 
 function onMove(e: PointerEvent) {
-  if (!drawing || !current || busy.value || !loggedIn.value) return
-  current.points.push(pos(e))
+  if (!current || busy.value || !loggedIn.value) return
+  const point = pos(e)
+  const last = current.points.at(-1)
+  if (last?.x === point.x && last.y === point.y) return
+  current.points.push(point)
   redraw()
 }
 
 function onUp() {
-  drawing = false
+  saveActiveStroke()
   current = null
 }
 
 function undo() {
   if (busy.value) return
+  current = null
   strokes.value.pop()
+  saveDraft()
   redraw()
 }
 
 function clearAll() {
   if (busy.value) return
-  onUp()
+  current = null
   strokes.value = []
+  saveDraft()
   redraw()
 }
 
@@ -121,7 +160,7 @@ async function submit() {
     const result = results[0]
     if (results.length !== 1 || !result?.url || !result.image) throw new Error('图片上传未返回地址，请保留画布后重试')
     const markdown = uploadedMarkdown({ ...result, name: '涂鸦' })
-    emit('insert', markdown)
+    if (!props.insert(markdown)) throw new Error('聊天输入框尚未就绪，涂鸦草稿已保留。')
     // Upload is complete before clearing; failure always preserves the drawing.
     busy.value = false
     clearAll()
@@ -134,23 +173,20 @@ async function submit() {
 }
 
 watch(() => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || '']), () => {
-  cancelUpload(); onUp(); strokes.value = []; err.value = ''; redraw()
+  cancelUpload(); current = null; err.value = ''; restoreDraft(); redraw()
 }, { flush: 'sync' })
 
 onMounted(() => {
-  const c = canvasRef.value
-  if (!c) return
-  const g = c.getContext('2d')
-  if (g) {
-    g.fillStyle = '#ffffff'
-    g.fillRect(0, 0, c.width, c.height)
-  }
+  restoreDraft()
+  redraw()
+  if (typeof window !== 'undefined') window.addEventListener('pagehide', saveActiveStroke)
 })
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
   disposed = true
   cancelUpload()
   onUp()
+  if (typeof window !== 'undefined') window.removeEventListener('pagehide', saveActiveStroke)
 })
 </script>
 
@@ -174,9 +210,11 @@ onUnmounted(() => {
       @pointermove="onMove"
       @pointerup="onUp"
       @pointercancel="onUp"
+      @lostpointercapture="onUp"
     />
     <p v-if="!loggedIn">登录后可上传涂鸦。</p>
     <p v-if="err" class="err" role="alert">{{ err }}</p>
+    <p v-if="draftError" class="err" role="status">浏览器暂时无法保存草稿，请保留画板。</p>
   </div>
 </template>
 
