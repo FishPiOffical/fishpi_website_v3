@@ -4,7 +4,7 @@ import { useAppearanceStore } from '@/stores/appearance'
 import FpLoading from '@/components/FpLoading.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import { createMarkdownPreview } from '@/utils/markdownPreview'
-import { createEditorUpload } from '@/utils/editorUpload'
+import { createEditorUpload, type EditorUploadStatus } from '@/utils/editorUpload'
 import { createMentionHints } from '@/utils/mentionHints'
 import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
 
@@ -129,7 +129,11 @@ let editor: VditorInstance | null = null
 let lastEmitted = props.modelValue
 let lastRenderedValue: string | undefined
 const preview = createMarkdownPreview(() => editor?.getValue() ?? props.modelValue)
-const uploads = createEditorUpload(markdown => editor?.insertMD(markdown))
+const uploadStatus = ref<EditorUploadStatus>(null)
+const uploads = createEditorUpload(markdown => {
+  editor?.insertMD(markdown)
+  reportContentState()
+}, status => { uploadStatus.value = status })
 const mentionError = ref('')
 const mentions = createMentionHints(message => { mentionError.value = message })
 let composing = false
@@ -219,7 +223,8 @@ onMounted(async () => {
     ctrlEnter: props.disableSubmitShortcut ? undefined : () => emit('submit'),
     upload: {
       accept: 'image/*,.zip,.rar,.7z,.mp3,.mp4,.webm,.mov',
-      handler: uploads.handler,
+      // 自定义上传由编辑器统一展示状态，避免 Vditor 再弹一次相同错误。
+      handler: async (files: File[]) => { await uploads.handler(files) },
     },
     hint: {
       parse: false,
@@ -320,6 +325,12 @@ defineExpose({
     />
     <template v-else>
       <div ref="host" />
+      <div class="md-upload-status" role="status">
+        <div v-if="uploadStatus" class="md-upload-feedback" :class="{ 'md-upload-error': !uploadStatus.pending }">
+          <progress v-if="uploadStatus.pending" aria-hidden="true" />
+          <span>{{ uploadStatus.text }}</span>
+        </div>
+      </div>
       <p v-if="mentionError" role="status">{{ mentionError }}</p>
       <div v-if="!ready" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
     </template>
@@ -329,6 +340,27 @@ defineExpose({
 <style scoped>
 .md-editor {
   position: relative;
+}
+.md-upload-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  color: var(--fp-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.md-upload-feedback progress { width: 44px; flex: none; accent-color: var(--fp-primary); }
+.md-upload-error { color: var(--fp-danger); }
+.md-editor:has(:deep(.vditor--fullscreen)) .md-upload-feedback {
+  position: fixed;
+  z-index: 1000;
+  inset-inline: 8px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  border-radius: 6px;
+  background: var(--fp-card);
 }
 .md-loading {
   display: flex;
