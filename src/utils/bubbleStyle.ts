@@ -1,5 +1,7 @@
 export const bubbleMotifs = ['none', 'paw', 'leaf', 'bell', 'fish'] as const
 export type BubbleMotif = typeof bubbleMotifs[number]
+export const bubbleShapes = ['memo-v1', 'lotus-v1', 'cat-v1', 'fish-v1'] as const
+export type BubbleShape = typeof bubbleShapes[number]
 const colors = ['background', 'ownBackground', 'border', 'ink', 'text'] as const
 export type BubblePalette = Record<typeof colors[number], string>
 export interface BubbleStyle {
@@ -10,6 +12,7 @@ export interface BubbleStyle {
   shadow: boolean
   motif: BubbleMotif
   image: string
+  shape?: BubbleShape
 }
 
 export function isCustomBubbleId(value: unknown): value is string {
@@ -38,11 +41,14 @@ export function decodeBubbleStyle(value: unknown): BubbleStyle | undefined {
   const row = record(value)
   if (!row) return
   const light = palette(row.light), dark = palette(row.dark)
-  const { radius, borderWidth, shadow, motif, image } = row
+  const { radius, borderWidth, shadow, motif, image, shape } = row
   if (!light || !dark || typeof radius !== 'number' || !Number.isInteger(radius) || radius < 6 || radius > 24
       || typeof borderWidth !== 'number' || !Number.isInteger(borderWidth) || borderWidth < 0 || borderWidth > 2
       || typeof shadow !== 'boolean' || !bubbleMotifs.some(item => item === motif) || !isBubbleImage(image)) return
-  return { light, dark, radius, borderWidth, shadow, motif: motif as BubbleMotif, image }
+  if (shape !== undefined && !bubbleShapes.some(item => item === shape)) return
+  return { light, dark, radius, borderWidth, shadow, motif: motif as BubbleMotif, image,
+    ...(shape ? { shape: shape as BubbleShape } : {}),
+  }
 }
 
 export function bubbleAttributes(value: BubbleStyle | undefined, own = false) {
@@ -52,6 +58,7 @@ export function bubbleAttributes(value: BubbleStyle | undefined, own = false) {
     'data-motif': value.image ? 'image' : value.motif,
     'data-own': own,
     'data-shadow': value.shadow,
+    'data-shape': value.shape,
     style: {
       '--bubble-fill': own ? value.light.ownBackground : value.light.background,
       '--bubble-fill-dark': own ? value.dark.ownBackground : value.dark.background,

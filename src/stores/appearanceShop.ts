@@ -55,7 +55,7 @@ export const useAppearanceShopStore = defineStore('appearance-shop', () => {
     } finally { if (captured === current()) busy.value = false }
   }
   function buy(product: ShopProduct, days: 7 | 30) {
-    if (pending.value || busy.value || !inventory.value || !product.enabled) return
+    if (pending.value || busy.value || !inventory.value || !product.enabled || (days === 30 && !product.price30)) return
     return execute({ kind: 'buy', productId: product.id, days, revision: product.revision, key: profileOperationKey() })
   }
   function equip(productId: string) {

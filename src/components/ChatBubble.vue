@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ManagedBubbleShape from '@/components/packs/ManagedBubbleShape.vue'
 import { chatPetStatusLabels, type ChatPetStatus, type ChatTail } from '@/api/v3-chat-messages'
 import { useAuthStore } from '@/stores/auth'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
@@ -156,7 +157,8 @@ function onBodyClick(e: MouseEvent) {
         <MedalList class="chat-medals" :items="medals" variant="mini" />
       </div>
       <div v-if="!display.quote || display.html || $slots.default" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick">
-        <img v-if="managedStyle?.image" class="managed-bubble-mark" :src="managedStyle.image" alt="" loading="lazy">
+        <ManagedBubbleShape v-if="managedStyle?.shape" :shape="managedStyle.shape" />
+        <img v-if="managedStyle?.image" class="managed-bubble-mark" :src="managedStyle.shape ? imageThumbnail(managedStyle.image, 34, 34) : managedStyle.image" alt="" loading="lazy">
         <div v-if="!chatroom" class="head">
           <RouterLink :to="`/member/${userName}`" class="name">
             <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>

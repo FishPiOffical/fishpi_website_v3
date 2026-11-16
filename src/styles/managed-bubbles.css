@@ -10,6 +10,7 @@
 }
 :is(html[data-theme='classic-dark'], [data-bubble-preview='dark']) .managed-bubble {
   --fill: var(--bubble-fill-dark);
+  --bubble-highlight: var(--bubble-border-dark);
   --edge: var(--bubble-border-dark);
   --ink: var(--bubble-ink-dark);
   --text: var(--bubble-text-dark);
@@ -63,4 +64,118 @@
   content: '';
   background: var(--mark-color);
   clip-path: polygon(3% 48%, 15% 29%, 38% 18%, 55% 22%, 71% 42%, 97% 25%, 87% 52%, 97% 78%, 72% 62%, 54% 81%, 34% 84%, 14% 71%);
+}
+
+
+/* 异形只在快照声明轮廓时生效，文字和旧圆角气泡保留原来的布局。 */
+.fp-bubble.managed-bubble[data-shape][data-own][data-motif] {
+  --border-color: var(--edge, var(--bubble-border));
+  isolation: isolate;
+  min-width: 82px;
+  padding: var(--shape-padding, 10px 16px);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.fp-bubble.managed-bubble[data-shape][data-own='true'][data-motif] {
+  padding: var(--mirrored-padding, var(--shape-padding, 10px 16px));
+}
+.managed-bubble-shape {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.managed-bubble-vector { display: block; width: 100%; height: 100%; overflow: visible; }
+.managed-bubble-highlight {
+  stop-color: color-mix(in srgb, var(--fill, var(--bubble-fill)) 72%, var(--bubble-highlight, #fff));
+}
+.managed-bubble-fill { stop-color: var(--fill, var(--bubble-fill)); }
+.managed-bubble-contour {
+  stroke: var(--border-color);
+  stroke-width: var(--bubble-border-width);
+}
+.managed-bubble-paper-line {
+  stroke: var(--border-color);
+  stroke-opacity: .18;
+}
+.managed-bubble-shape::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+.managed-bubble[data-own='true'] .managed-bubble-shape { transform: scaleX(-1); }
+.managed-bubble[data-shape][data-shadow='true'] .managed-bubble-vector {
+  filter: drop-shadow(0 2px 0 color-mix(in srgb, var(--border-color) 27%, transparent));
+}
+.managed-bubble[data-shape][data-motif]::after { content: none; }
+.managed-bubble[data-shape] .managed-bubble-mark {
+  width: 34px;
+  height: 34px;
+  inset-inline-end: 9px;
+  inset-block-end: 1px;
+}
+.managed-bubble[data-shape][data-own='true'] .managed-bubble-mark {
+  inset-inline-start: 9px;
+  inset-inline-end: auto;
+}
+.managed-bubble[data-shape="memo-v1"] {
+  --shape-padding: 11px 46px 10px 30px;
+  --mirrored-padding: 11px 30px 10px 46px;
+}
+.managed-bubble[data-shape="lotus-v1"] {
+  --shape-padding: 12px 49px 13px 17px;
+  --mirrored-padding: 12px 17px 13px 49px;
+}
+.managed-bubble[data-shape="cat-v1"] {
+  --shape-padding: 16px 46px 9px 17px;
+  --mirrored-padding: 16px 17px 9px 46px;
+}
+.managed-bubble[data-shape="fish-v1"] {
+  --shape-padding: 11px 35px 10px 44px;
+  --mirrored-padding: 11px 44px 10px 35px;
+}
+[data-shape="memo-v1"] .managed-bubble-shape::after {
+  inset: 8px auto 10px 8px;
+  width: 8px;
+  background: radial-gradient(circle at 4px 4px, var(--border-color) 1.5px, transparent 2px) 0 0 / 8px 12px repeat-y;
+}
+[data-shape="lotus-v1"] .managed-bubble-shape::after {
+  right: 6px;
+  top: 3px;
+  width: 12px;
+  height: 15px;
+  border-left: 1px solid var(--border-color);
+  transform: rotate(31deg);
+  opacity: .56;
+}
+.managed-bubble[data-shape="lotus-v1"] .managed-bubble-mark { inset-inline-end: 12px; }
+.managed-bubble[data-shape="lotus-v1"][data-own='true'] .managed-bubble-mark {
+  inset-inline-start: 12px;
+  inset-inline-end: auto;
+}
+[data-shape="cat-v1"] .managed-bubble-shape::after {
+  top: 5px;
+  left: 9px;
+  width: 36px;
+  height: 5px;
+  border-inline: 5px solid color-mix(in srgb, var(--border-color) 38%, transparent);
+  border-radius: 6px;
+}
+[data-shape="fish-v1"] .managed-bubble-shape::after {
+  right: 12px;
+  top: 50%;
+  width: 6px;
+  height: 17px;
+  border-right: 1px solid var(--border-color);
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+.managed-bubble[data-shape="fish-v1"] .managed-bubble-mark {
+  inset-inline-start: 7px;
+  inset-inline-end: auto;
+}
+.managed-bubble[data-shape="fish-v1"][data-own='true'] .managed-bubble-mark {
+  inset-inline-end: 7px;
+  inset-inline-start: auto;
 }

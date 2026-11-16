@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ManagedBubbleShape from '@/components/packs/ManagedBubbleShape.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import FpDialog from '@/components/FpDialog.vue'
 import { useAppearanceShopStore } from '@/stores/appearanceShop'
@@ -75,15 +76,15 @@ async function confirmPurchase() {
       <article v-for="product in products" :key="product.id" class="product">
         <div class="product-art fp-msg is-room" data-appearance-snapshot="v1" :data-bubble="product.kind === 'bubble' ? product.styleId : 'classic'" :data-frame="product.kind === 'frame' ? product.styleId : 'none'">
           <img v-if="product.kind === 'mount'" class="mount-image" :src="mountAssets[product.styleId]" :alt="product.name" loading="lazy">
-          <div v-else-if="product.kind === 'bubble'" class="fp-bubble" v-bind="bubbleAttributes(product.bubbleStyle)">今天也要开心摸鱼。<img v-if="product.bubbleStyle?.image" class="managed-bubble-mark" :src="product.bubbleStyle.image" alt=""></div>
+          <div v-else-if="product.kind === 'bubble'" class="fp-bubble" v-bind="bubbleAttributes(product.bubbleStyle)">今天也要开心摸鱼。<ManagedBubbleShape v-if="product.bubbleStyle?.shape" :shape="product.bubbleStyle.shape" /><img v-if="product.bubbleStyle?.image" class="managed-bubble-mark" :src="product.bubbleStyle.image" alt=""></div>
           <span v-else class="fp-avatar-frame"><img class="fp-avatar" src="/logo.png" :alt="product.name"></span>
         </div>
         <div class="product-info">
           <h3>{{ product.name }} <span v-if="selected(product) && owned(product.id)">已装备</span></h3>
           <p class="expiry">{{ expiryText(product) || '购买后可随时装备' }}</p>
           <div class="product-actions">
-            <button v-if="product.enabled" class="purchase" :disabled="blocked || (shop.inventory?.balance ?? 0) < price(product)" @click="confirmation = { product: { ...product }, days }">{{ expiration(product.id) ? '续期' : '购买' }} · {{ price(product) }} 积分</button>
-            <span v-else class="muted">已下架</span>
+            <button v-if="product.enabled && price(product) > 0" class="purchase" :disabled="blocked || (shop.inventory?.balance ?? 0) < price(product)" @click="confirmation = { product: { ...product }, days }">{{ expiration(product.id) ? '续期' : '购买' }} · {{ price(product) }} 积分</button>
+            <span v-else class="muted">{{ product.enabled ? '仅提供 7 天档' : '已下架' }}</span>
             <button v-if="owned(product.id)" class="equip" :disabled="blocked || (product.kind !== 'mount' && (!appearance.current || appearance.loading))" @click="equip(product)">{{ selected(product) ? '卸下' : '装备' }}</button>
           </div>
         </div>

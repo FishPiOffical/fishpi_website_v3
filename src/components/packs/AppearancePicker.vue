@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ManagedBubbleShape from '@/components/packs/ManagedBubbleShape.vue'
 import { useAppearanceShopStore } from '@/stores/appearanceShop'
 import ChatAppearanceRecovery from '@/components/chat/ChatAppearanceRecovery.vue'
 import { computed, onMounted } from 'vue'
@@ -75,7 +76,7 @@ function selected(kind: PackKind) {
     <p v-if="bubbleCatalog.error" class="notice" role="alert">{{ bubbleCatalog.error }} <button type="button" @click="bubbleCatalog.load(true)">重新读取气泡目录</button></p>
     <p v-if="chatAppearance.writeError" class="notice" role="alert">{{ chatAppearance.writeError }}</p>
     <button v-if="chatAppearance.pending" type="button" :disabled="chatAppearance.busy" @click="chatAppearance.retry">{{ chatAppearance.busy ? '保存中…' : '恢复原外观保存' }}</button>
-    <div v-if="chatAppearance.current" class="appearance-preview"><div class="fp-msg is-room" data-appearance-snapshot="v1" :data-bubble="chatAppearance.current.bubbleId" :data-frame="chatAppearance.current.frameId"><span class="fp-avatar-frame"><img class="fp-avatar" src="/logo.png" alt="" /></span><div class="fp-bubble" v-bind="bubbleAttributes(chatAppearance.current.bubbleStyle)">新消息预览<img v-if="chatAppearance.current.bubbleStyle?.image" class="managed-bubble-mark" :src="chatAppearance.current.bubbleStyle.image" alt=""></div></div></div>
+    <div v-if="chatAppearance.current" class="appearance-preview"><div class="fp-msg is-room" data-appearance-snapshot="v1" :data-bubble="chatAppearance.current.bubbleId" :data-frame="chatAppearance.current.frameId"><span class="fp-avatar-frame"><img class="fp-avatar" src="/logo.png" alt="" /></span><div class="fp-bubble" v-bind="bubbleAttributes(chatAppearance.current.bubbleStyle)">新消息预览<ManagedBubbleShape v-if="chatAppearance.current.bubbleStyle?.shape" :shape="chatAppearance.current.bubbleStyle.shape" /><img v-if="chatAppearance.current.bubbleStyle?.image" class="managed-bubble-mark" :src="chatAppearance.current.bubbleStyle.image" alt=""></div></div></div>
     <p v-if="notice" class="notice">{{ notice }}</p>
   </div>
 </template>

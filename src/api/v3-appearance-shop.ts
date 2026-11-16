@@ -1,5 +1,5 @@
 import { ApiError, request } from './http'
-import { decodeBubbleStyle, type BubbleStyle } from '@/utils/bubbleStyle'
+import { decodeBubbleStyle, isCustomBubbleId, type BubbleStyle } from '@/utils/bubbleStyle'
 
 export type AppearanceKind = 'mount' | 'bubble' | 'frame'
 export interface ShopProduct {
@@ -38,7 +38,7 @@ export async function readShop(signal?: AbortSignal): Promise<ShopProduct[]> {
     const bubbleStyle = row.kind === 'bubble' ? decodeBubbleStyle(row.bubbleStyle) : undefined
     return {
       id: text(row.id), kind: row.kind as AppearanceKind, styleId: text(row.styleId), name: text(row.name),
-      version: number(row.version, 1), price7: number(row.price7, 1), price30: number(row.price30, 1),
+      version: number(row.version, 1), price7: number(row.price7, 1), price30: number(row.price30, row.kind === 'bubble' && isCustomBubbleId(row.styleId) ? 0 : 1),
       enabled: row.enabled, revision: number(row.revision, 1),
       ...(bubbleStyle ? { bubbleStyle } : {}),
     }
