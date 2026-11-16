@@ -4,7 +4,7 @@ import { ApiError, getAuthContextVersion } from '@/api/http'
 import { profileOperationKey } from '@/api/v3-profile'
 import {
   createPetRiskChallenge, executePetCommand, normalizePetName, readPetCatalog, readPetRisk, readPetState, verifyPetRiskChallenge,
-  type PetAction, type PetActivityKind, type PetCatalog, type PetCommand, type PetSpeciesId, type PetState,
+  type BrawlCommand, type PetAction, type PetActivityKind, type PetCatalog, type PetCommand, type PetSpeciesId, type PetState,
   type PetRiskChallenge,
 } from '@/api/v3-pets'
 import { useAuthStore } from '@/stores/auth'
@@ -357,7 +357,7 @@ export const usePetsStore = defineStore('pets', () => {
       pending.value = null
       pendingUncertain.value = false
       resetRisk()
-      if (command.kind === 'brawl-fight' || command.kind === 'brawl-upgrade') {
+      if (command.kind.startsWith('brawl-')) {
         confirmedEvent.value = { sequence: ++confirmationSequence, petId: receipt.petId,
           kind: command.kind, matchId: receipt.matchId }
         return true
@@ -510,8 +510,7 @@ export const usePetsStore = defineStore('pets', () => {
     if (activity.status !== 'claimable' && now < activity.endsAt) return Promise.resolve(false)
     return execute({ kind: 'activities/claim', petId: pet.value.id, activityId: activity.id, key: profileOperationKey() })
   }
-  function executeBrawl(command: Omit<Extract<PetCommand, { kind: 'brawl-fight' }>, 'key'>
-    | Omit<Extract<PetCommand, { kind: 'brawl-upgrade' }>, 'key'>) {
+  function executeBrawl(command: BrawlCommand) {
     if (pending.value || !command.petId) return Promise.resolve(false)
     return execute({ ...command, key: profileOperationKey() })
   }

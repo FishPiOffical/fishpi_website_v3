@@ -156,14 +156,17 @@ export const brawlWeapons = ['SPOON', 'GUARD', 'FAN'] as const
 export const brawlSkills = ['SPLASH', 'CURL', 'BREATHE'] as const
 export type BrawlWeapon = typeof brawlWeapons[number]
 export type BrawlSkill = typeof brawlSkills[number]
-type BrawlCommand = { petId: string; weapon: BrawlWeapon; version: number } & (
-  | { kind: 'brawl-fight'; skill: BrawlSkill; stage: number; practice: boolean }
-  | { kind: 'brawl-upgrade'; level: number }
+export type BrawlCommand = { petId: string; version: number } & (
+  | { kind: 'brawl-fight'; weapon: BrawlWeapon; skill: BrawlSkill; stage: number; practice: boolean }
+  | { kind: 'brawl-upgrade'; weapon: BrawlWeapon; level: number }
+  | { kind: 'brawl-enroll'; weapon: BrawlWeapon; skill: BrawlSkill; enabled: boolean; revision: string }
+  | { kind: 'brawl-match'; revision: string }
 )
 export interface BrawlSummary {
   id: string
   createdAt: number
   stage: number
+  mode: 'npc' | 'pvp'
   practice: boolean
   winner: number
   reward: number
@@ -542,8 +545,26 @@ function brawlSetup(value: unknown) {
 
 function brawlSummary(value: unknown): BrawlSummary {
   const row = object(value)
-  return { id: brawlId(row.id), createdAt: integer(row.createdAt), stage: integer(row.stage, 1, 3),
-    practice: flag(row.practice), winner: integer(row.winner, -1, 1), reward: integer(row.reward, 0, 20) }
+  const mode = row.mode ?? 'npc'
+  if (mode !== 'npc' && mode !== 'pvp') throw invalid()
+  const practice = flag(row.practice), reward = integer(row.reward, 0, 20)
+  if (mode === 'pvp' && (practice || reward !== 0)) throw invalid()
+  return { id: brawlId(row.id), createdAt: integer(row.createdAt), mode,
+    stage: mode === 'pvp' ? integer(row.stage, 0, 0) : integer(row.stage, 1, 3),
+    practice, winner: integer(row.winner, -1, 1), reward }
+}
+
+function brawlPvp(value: unknown) {
+  if (value === undefined) return null
+  const row = object(value)
+  const enabled = flag(row.enabled)
+  const revision = row.revision === '' ? '' : brawlId(row.revision)
+  const weapon = brawlWeapons.find(item => item === row.weapon)
+  const skill = brawlSkills.find(item => item === row.skill)
+  if (enabled && (!weapon || !skill || !revision) || !enabled && (row.weapon !== null || row.skill !== null)) throw invalid()
+  const receivedLimit = integer(row.receivedLimit, 1, 6)
+  return { enabled, revision, weapon, skill, remaining: integer(row.remaining, 0, 3),
+    received: integer(row.received, 0, receivedLimit), receivedLimit }
 }
 
 export const readBrawlState = (signal?: AbortSignal) => read(brawlPath, value => {
@@ -562,12 +583,12 @@ export const readBrawlState = (signal?: AbortSignal) => read(brawlPath, value =>
     species: row.species === null ? null : ([...speciesIds].find(id => id === row.species) as PetSpeciesId | undefined),
     level: integer(row.level, 0, 30), minLevel: integer(row.minLevel, 1, 30), version: integer(row.version, 1),
     materials: integer(row.materials), stages, unlocked: integer(row.unlocked, 1, stages), cleared: integer(row.cleared, 0, stages), costs, rewards, growth,
-    rewardCount: integer(row.rewardCount, 0, rewards.length),
+    rewardCount: integer(row.rewardCount, 0, rewards.length), pvp: brawlPvp(row.pvp),
     levels: { SPOON: integer(levels.SPOON, 0, 5), GUARD: integer(levels.GUARD, 0, 5), FAN: integer(levels.FAN, 0, 5) } }
 }, signal)
 
 export const readBrawlHistory = (before?: string, signal?: AbortSignal) => read(
-  before ? `${brawlPath}/matches?before=${brawlId(before)}` : `${brawlPath}/matches`, value => {
+  `${brawlPath}/matches?includePvp=1${before ? `&before=${brawlId(before)}` : ''}`, value => {
     const row = object(value)
     return { list: unique(list(row.list, 20).map(brawlSummary), entry => entry.id),
       next: row.next === null ? null : brawlId(row.next) }
@@ -586,7 +607,9 @@ export const readBrawlReport = (id: string, signal?: AbortSignal) => read(
     })
     const species = [...speciesIds].find(candidate => candidate === row.species) as PetSpeciesId | undefined
     if (report.id !== id || !turns.length || !species) throw invalid()
-    return { ...report, species, player, opponent, turns, petId: brawlId(row.petId), version: integer(row.version, 1) }
+    const opponentSpecies = [...speciesIds].find(candidate => candidate === row.opponentSpecies) as PetSpeciesId | undefined
+    if (report.mode === 'pvp' && !opponentSpecies) throw invalid()
+    return { ...report, species, opponentSpecies, player, opponent, turns, petId: brawlId(row.petId), version: integer(row.version, 1) }
   }, signal)
 
 export interface PetRiskState { retryAt: number; verificationRequired: boolean; serverNow: number }
@@ -657,9 +680,13 @@ export async function executePetCommand(command: PetCommand, signal?: AbortSigna
   const body = command.kind === 'activities'
     ? { petId: command.petId, kind: command.activityKind, entryId: command.entryId, activityVersion: command.activityVersion }
     : input
-  const path = kind === 'brawl-fight' ? `${brawlPath}/matches` : kind === 'brawl-upgrade' ? `${brawlPath}/upgrade` : `/api/v3/me/pet/${kind}`
+  const routes: Partial<Record<PetCommand['kind'], string>> = {
+    'brawl-fight': `${brawlPath}/matches`, 'brawl-upgrade': `${brawlPath}/upgrade`,
+    'brawl-enroll': `${brawlPath}/profile`, 'brawl-match': `${brawlPath}/pvp`,
+  }
+  const path = routes[kind] ?? `/api/v3/me/pet/${kind}`
   const response = await petRequest<{ code: number; data: unknown }>(path, {
-    method: kind === 'name' ? 'PUT' : 'POST',
+    method: kind === 'name' || kind === 'brawl-enroll' ? 'PUT' : 'POST',
     headers: { 'Idempotency-Key': key }, body: JSON.stringify(body), signal,
   })
   if (response?.code !== 0) throw invalid()
@@ -680,5 +707,5 @@ export async function executePetCommand(command: PetCommand, signal?: AbortSigna
     if (command.kind === 'activities/claim' && receipt.activityId !== command.activityId) throw invalid()
   }
   // 仅返回已校验的目标标识，供动画核对当前宠物；养成状态仍只采用后续聚合读取。
-  return { petId: receipt.petId as string, ...(kind === 'brawl-fight' ? { matchId: brawlId(receipt.matchId) } : {}) }
+  return { petId: receipt.petId as string, ...(kind === 'brawl-fight' || kind === 'brawl-match' ? { matchId: brawlId(receipt.matchId) } : {}) }
 }

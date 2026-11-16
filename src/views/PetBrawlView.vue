@@ -39,6 +39,8 @@ const opponents = ['水花练习生', '护腕学徒', '折扇教练']
 const dateTime = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Shanghai' })
 const eligible = computed(() => !!state.value?.petId && state.value.level >= state.value.minLevel)
 const locked = computed(() => loading.value || !!error.value || pets.busy || !!pets.pending || pets.offline)
+const pvpDirty = computed(() => !!state.value?.pvp?.enabled &&
+  (state.value.pvp.weapon !== weapon.value || state.value.pvp.skill !== skill.value))
 const level = computed(() => state.value?.levels[weapon.value] ?? 0)
 const growth = computed(() => state.value?.growth[level.value])
 const nextGrowth = computed(() => state.value?.growth[level.value + 1])
@@ -65,7 +67,12 @@ async function refresh() {
       report.value = undefined
       stage.value = 1
     }
+    const changedPet = state.value?.petId !== result.petId
     state.value = result
+    if (changedPet && result.pvp?.weapon && result.pvp.skill) {
+      weapon.value = result.pvp.weapon
+      skill.value = result.pvp.skill
+    }
   } catch (reason) {
     if (!request.signal.aborted) error.value = describe(reason)
   } finally {
@@ -151,12 +158,28 @@ async function upgrade() {
   if (!confirmed && mounted && state.value?.petId === id && !pets.pending && pets.error) void refresh()
 }
 
+async function pvpAction(action: 'enroll' | 'withdraw' | 'match') {
+  const current = state.value
+  if (locked.value || !eligible.value || !current?.petId || !current.pvp) return
+  if (action === 'match' && (!current.pvp.enabled || !current.pvp.remaining || pvpDirty.value)) return
+  const input = { petId: current.petId, version: current.version, revision: current.pvp.revision }
+  status.value = ''
+  const ok = await pets.executeBrawl(action === 'match' ? { ...input, kind: 'brawl-match' } : {
+    ...input, kind: 'brawl-enroll', enabled: action === 'enroll', weapon: weapon.value, skill: skill.value,
+  })
+  if (!ok && mounted && state.value?.petId === input.petId && !pets.pending && pets.error) void refresh()
+}
+
 watch(() => pets.confirmedEvent, event => {
   if (!mounted || !event) return
-  if (event.kind === 'brawl-fight' && event.matchId) {
+  if ((event.kind === 'brawl-fight' || event.kind === 'brawl-match') && event.matchId) {
     void refresh()
     void loadHistory()
     void openReport(event.matchId, true)
+  }
+  if (event.kind === 'brawl-enroll') {
+    status.value = '对战报名已更新'
+    void refresh()
   }
   if (event.kind === 'brawl-upgrade') {
     status.value = '强化完成'
@@ -221,6 +244,18 @@ onUnmounted(() => { mounted = false; clear() })
         <div class="actions">
           <button type="button" :disabled="locked || !cost || state.materials < cost" @click="upgrade()">{{ cost ? `强化至 +${level + 1} · ${cost} 材料` : '已达最高等级' }}</button>
         </div>
+        <template v-if="state.pvp">
+          <hr />
+          <h2>实装对战</h2>
+          <p class="subtle">报名后可在离线时接受挑战。对局使用报名武器及其开战时的强化等级。</p>
+          <p class="subtle" role="status">{{ state.pvp.enabled ? '已报名' : '未报名' }} · 今日还可主动挑战 {{ state.pvp.remaining }} 场 · 被挑战 {{ state.pvp.received }} / {{ state.pvp.receivedLimit }}</p>
+          <p v-if="pvpDirty" class="subtle">保存当前配置后即可匹配。</p>
+          <div class="actions">
+            <button v-if="!state.pvp.enabled || pvpDirty" type="button" :disabled="locked" @click="pvpAction('enroll')">{{ state.pvp.enabled ? '保存对战配置' : '报名接受匹配' }}</button>
+            <button v-if="state.pvp.enabled" type="button" :disabled="locked" @click="pvpAction('withdraw')">退出报名</button>
+            <button type="button" class="primary" :disabled="locked || !state.pvp.enabled || !state.pvp.remaining || pvpDirty" @click="pvpAction('match')">寻找对手</button>
+          </div>
+        </template>
         <hr />
         <p class="subtle">今日闯关奖励 {{ state.rewardCount }} / {{ state.rewards.length }} 场。{{ state.rewards[state.rewardCount] ? `下场可得 ${state.rewards[state.rewardCount]} 材料。` : '今日材料已领完。' }}</p>
         <div class="actions">
@@ -240,13 +275,13 @@ onUnmounted(() => { mounted = false; clear() })
               <span>{{ hp(turn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
             </div>
             <div>
-              <img :src="petPortrait('momota')" alt="" width="86" height="86">
-              <strong>{{ opponents[report.stage - 1] }}</strong><span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
+              <img :src="petPortrait(report.opponentSpecies ?? 'momota')" alt="" width="86" height="86">
+              <strong>{{ report.mode === 'pvp' ? '对手宠物' : opponents[report.stage - 1] }}</strong><span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
               <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="turn?.opponentHp ?? report.opponent.maxHp" />
               <span>{{ hp(turn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
             </div>
           </div>
-          <p class="turn">{{ ended ? `${resultLabel(report.winner)} · 获得 ${report.reward} 材料` : turn ? `第 ${turn.round} 回合 · ${turn.actor === 0 ? '我方' : '对手'}造成 ${hp(turn.damage)} 伤害${turn.healing ? `，回复 ${hp(turn.healing)} 生命` : ''}` : '准备开战' }}</p>
+          <p class="turn">{{ ended ? `${resultLabel(report.winner)}${report.mode === 'pvp' ? '' : ` · 获得 ${report.reward} 材料`}` : turn ? `第 ${turn.round} 回合 · ${turn.actor === 0 ? '我方' : '对手'}造成 ${hp(turn.damage)} 伤害${turn.healing ? `，回复 ${hp(turn.healing)} 生命` : ''}` : '准备开战' }}</p>
           <div class="actions">
             <button type="button" @click="playing ? stop() : play()">{{ playing ? '暂停' : ended ? '重播' : '继续' }}</button>
             <button type="button" :disabled="ended" @click="skip()">跳过</button>
@@ -260,12 +295,12 @@ onUnmounted(() => { mounted = false; clear() })
     </div>
     <p class="sr-only" role="status">{{ status }}</p>
     <section v-if="state" class="panel history">
-      <div class="history-heading"><h2>我的战报</h2><button type="button" :disabled="historyLoading" @click="loadHistory()">刷新</button></div>
+      <div class="history-heading"><h2>我的战报</h2><button type="button" :disabled="historyLoading" @click="refresh(); loadHistory()">刷新</button></div>
       <p v-if="reportError" role="alert">{{ reportError }} <button v-if="retryReport" type="button" @click="openReport(retryReport)">重读战报</button></p>
       <p v-if="!matches.length && !historyLoading && !reportError" class="subtle">还没有战报。</p>
       <ul v-if="matches.length">
         <li v-for="match in matches" :key="match.id"><button type="button"  :disabled="reportLoading" @click="openReport(match.id)">
-          <span>{{ match.practice ? '陪练' : '闯关' }} · 第 {{ match.stage }} 关 · {{ resultLabel(match.winner) }}</span>
+          <span>{{ match.mode === 'pvp' ? '实装对战' : `${match.practice ? '陪练' : '闯关'} · 第 ${match.stage} 关` }} · {{ resultLabel(match.winner) }}</span>
           <time :datetime="new Date(match.createdAt).toISOString()">{{ dateTime.format(match.createdAt) }}</time>
         </button></li>
       </ul>
