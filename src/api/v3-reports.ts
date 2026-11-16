@@ -7,7 +7,10 @@ const invalid=()=>new ApiError('举报响应不正确',502)
 const unicode=(s:string)=>!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(s)
 const object=(v:unknown):Record<string,unknown>=>{if(!v||typeof v!=='object'||Array.isArray(v))throw invalid();return v as Record<string,unknown>}
 const validReason=(reason:unknown):reason is number=>typeof reason==='number'&&Number.isInteger(reason)&&reason>=0&&reason<=49
-export function reportTarget(type:number,id:string){if(!Number.isInteger(type)||type<0||type>3||typeof id!=='string'||!/^[1-9][0-9]{0,18}$/.test(id))throw new ApiError('举报目标不合法',422);return{targetType:type,targetId:id}}
+const requiredTargetTypes=[0,1,2,3]
+const supportedTargetTypes=[...requiredTargetTypes,4]
+const validTargetType=(type:unknown):type is number=>typeof type==='number'&&supportedTargetTypes.includes(type)
+export function reportTarget(type:number,id:string){if(!validTargetType(type)||typeof id!=='string'||!/^[1-9][0-9]{0,18}$/.test(id))throw new ApiError('举报目标不合法',422);return{targetType:type,targetId:id}}
 export function reportInput(value:ReportInput):ReportInput{
  const target=reportTarget(value.targetType,value.targetId)
  if(!validReason(value.reason)||typeof value.memo!=='string'||value.memo.length>10240||!unicode(value.memo)||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/u.test(value.memo))throw new ApiError('举报理由或备注不合法',422)
@@ -16,10 +19,12 @@ export function reportInput(value:ReportInput):ReportInput{
 }
 export async function reportOptions(signal?:AbortSignal):Promise<ReportTarget[]>{
  const r=object(await request('/api/v3/report/options',{cache:'no-store',signal})),d=object(r.data)
- if(r.code!==0||!Array.isArray(d.targets)||d.targets.length!==4)throw invalid()
+ if(r.code!==0||!Array.isArray(d.targets)||d.targets.length<requiredTargetTypes.length||d.targets.length>supportedTargetTypes.length)throw invalid()
  const label=(v:unknown)=>{if(typeof v!=='string'||!v.trim()||v.length>128||!unicode(v)||/[\u0000-\u001f\u007f-\u009f]/u.test(v))throw invalid();return v}
- const targets=d.targets.map(v=>{const t=object(v),type=t.targetType;if(typeof type!=='number'||!Number.isInteger(type)||type<0||type>3||!Array.isArray(t.reasons)||!t.reasons.length||t.reasons.length>50)throw invalid();const reasons=t.reasons.map(v=>{const r=object(v),reason=r.reason;if(!validReason(reason))throw invalid();return{reason,label:label(r.label)}});if(new Set(reasons.map(r=>r.reason)).size!==reasons.length)throw invalid();return{targetType:type,label:label(t.label),reasons}})
- if(new Set(targets.map(t=>t.targetType)).size!==4)throw invalid();return targets
+ const targets=d.targets.map(v=>{const t=object(v),type=t.targetType;if(!validTargetType(type)||!Array.isArray(t.reasons)||!t.reasons.length||t.reasons.length>50)throw invalid();const reasons=t.reasons.map(v=>{const r=object(v),reason=r.reason;if(!validReason(reason))throw invalid();return{reason,label:label(r.label)}});if(new Set(reasons.map(r=>r.reason)).size!==reasons.length)throw invalid();return{targetType:type,label:label(t.label),reasons}})
+ const targetTypes=new Set(targets.map(t=>t.targetType))
+ if(targetTypes.size!==targets.length||!requiredTargetTypes.every(type=>targetTypes.has(type)))throw invalid()
+ return targets
 }
 export async function publishReport(command:ReportCommand):Promise<ReportReceipt>{
  const input=reportInput(command.input)
