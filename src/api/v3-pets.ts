@@ -152,7 +152,24 @@ export interface PetState {
   dailySupply: { claimed: boolean; coins: number; food: number }
   pet: Pet | null
 }
+export const brawlWeapons = ['SPOON', 'GUARD', 'FAN'] as const
+export const brawlSkills = ['SPLASH', 'CURL', 'BREATHE'] as const
+export type BrawlWeapon = typeof brawlWeapons[number]
+export type BrawlSkill = typeof brawlSkills[number]
+type BrawlCommand = { petId: string; weapon: BrawlWeapon; version: number } & (
+  | { kind: 'brawl-fight'; skill: BrawlSkill; stage: number; practice: boolean }
+  | { kind: 'brawl-upgrade'; level: number }
+)
+export interface BrawlSummary {
+  id: string
+  createdAt: number
+  stage: number
+  practice: boolean
+  winner: number
+  reward: number
+}
 export type PetCommand = (
+  | BrawlCommand
   | { kind: 'adoption'; speciesId: PetSpeciesId; name: string }
   | { kind: 'name'; petId: string; name: string }
   | { kind: 'actions'; petId: string; action: PetAction; itemId?: string }
@@ -508,6 +525,70 @@ async function read<T>(path: string, decode: (value: unknown) => T, signal?: Abo
 export const readPetCatalog = (signal?: AbortSignal) => read('/api/v3/pets/catalog', decodePetCatalog, signal)
 export const readPetState = (signal?: AbortSignal) => read('/api/v3/me/pet', decodePetState, signal)
 
+const brawlPath = '/api/v3/me/pet/brawl'
+function brawlId(value: unknown): string {
+  if (typeof value !== 'string' || !/^[1-9][0-9]{0,18}$/.test(value)) throw invalid()
+  return value
+}
+
+function brawlSetup(value: unknown) {
+  const row = object(value)
+  const weapon = brawlWeapons.find(option => option === row.weapon)
+  const skill = brawlSkills.find(option => option === row.skill)
+  if (!weapon || !skill) throw invalid()
+  return { weapon, skill, level: integer(row.level, 0, 5),
+    maxHp: integer(row.maxHp, 1), attack: integer(row.attack, 1) }
+}
+
+function brawlSummary(value: unknown): BrawlSummary {
+  const row = object(value)
+  return { id: brawlId(row.id), createdAt: integer(row.createdAt), stage: integer(row.stage, 1, 3),
+    practice: flag(row.practice), winner: integer(row.winner, -1, 1), reward: integer(row.reward, 0, 20) }
+}
+
+export const readBrawlState = (signal?: AbortSignal) => read(brawlPath, value => {
+  const row = object(value)
+  const levels = object(row.levels)
+  const stages = integer(row.stages, 1, 3)
+  const costs = list(row.costs, 5).map(value => integer(value, 1))
+  const rewards = list(row.rewards, 3).map(value => integer(value, 1))
+  const growth = list(row.growth, 6).map((item, index) => {
+    const entry = brawlSetup(item)
+    if (entry.level !== index) throw invalid()
+    return { maxHp: entry.maxHp, attack: entry.attack }
+  })
+  if (costs.length !== 5 || rewards.length !== 3 || growth.length !== costs.length + 1) throw invalid()
+  return { petId: row.petId === null ? null : brawlId(row.petId),
+    species: row.species === null ? null : ([...speciesIds].find(id => id === row.species) as PetSpeciesId | undefined),
+    level: integer(row.level, 0, 30), minLevel: integer(row.minLevel, 1, 30), version: integer(row.version, 1),
+    materials: integer(row.materials), stages, unlocked: integer(row.unlocked, 1, stages), cleared: integer(row.cleared, 0, stages), costs, rewards, growth,
+    rewardCount: integer(row.rewardCount, 0, rewards.length),
+    levels: { SPOON: integer(levels.SPOON, 0, 5), GUARD: integer(levels.GUARD, 0, 5), FAN: integer(levels.FAN, 0, 5) } }
+}, signal)
+
+export const readBrawlHistory = (before?: string, signal?: AbortSignal) => read(
+  before ? `${brawlPath}/matches?before=${brawlId(before)}` : `${brawlPath}/matches`, value => {
+    const row = object(value)
+    return { list: unique(list(row.list, 20).map(brawlSummary), entry => entry.id),
+      next: row.next === null ? null : brawlId(row.next) }
+  }, signal)
+
+export const readBrawlReport = (id: string, signal?: AbortSignal) => read(
+  `${brawlPath}/matches/${brawlId(id)}`, value => {
+    const row = object(value)
+    const report = brawlSummary(row)
+    const player = brawlSetup(row.player), opponent = brawlSetup(row.opponent)
+    const turns = list(row.turns, 24).map(value => {
+      const turn = object(value)
+      return { round: integer(turn.round, 1, 12), actor: integer(turn.actor, 0, 1),
+        damage: integer(turn.damage, 1), healing: integer(turn.healing),
+        playerHp: integer(turn.playerHp, 0, player.maxHp), opponentHp: integer(turn.opponentHp, 0, opponent.maxHp) }
+    })
+    const species = [...speciesIds].find(candidate => candidate === row.species) as PetSpeciesId | undefined
+    if (report.id !== id || !turns.length || !species) throw invalid()
+    return { ...report, species, player, opponent, turns, petId: brawlId(row.petId), version: integer(row.version, 1) }
+  }, signal)
+
 export interface PetRiskState { retryAt: number; verificationRequired: boolean; serverNow: number }
 export interface PetRiskChallenge {
   challengeId: string; operation: string; idempotencyKey: string; expiresAt: number
@@ -569,14 +650,15 @@ export async function readPetJournal(kind: PetHistoryKind, page: number, signal?
   return result
 }
 
-export async function executePetCommand(command: PetCommand, signal?: AbortSignal): Promise<{ petId: string }> {
+export async function executePetCommand(command: PetCommand, signal?: AbortSignal): Promise<{ petId: string; matchId?: string }> {
   if (!/^[A-Za-z0-9._:-]{1,128}$/.test(command.key)) throw new ApiError('操作标识不合法', 422)
   const { kind, key, ...input } = command
   // 命令的本地路由标识与服务端活动类型分开，原键恢复始终发送冻结的活动类型。
   const body = command.kind === 'activities'
     ? { petId: command.petId, kind: command.activityKind, entryId: command.entryId, activityVersion: command.activityVersion }
     : input
-  const response = await petRequest<{ code: number; data: unknown }>(`/api/v3/me/pet/${kind}`, {
+  const path = kind === 'brawl-fight' ? `${brawlPath}/matches` : kind === 'brawl-upgrade' ? `${brawlPath}/upgrade` : `/api/v3/me/pet/${kind}`
+  const response = await petRequest<{ code: number; data: unknown }>(path, {
     method: kind === 'name' ? 'PUT' : 'POST',
     headers: { 'Idempotency-Key': key }, body: JSON.stringify(body), signal,
   })
@@ -598,5 +680,5 @@ export async function executePetCommand(command: PetCommand, signal?: AbortSigna
     if (command.kind === 'activities/claim' && receipt.activityId !== command.activityId) throw invalid()
   }
   // 仅返回已校验的目标标识，供动画核对当前宠物；养成状态仍只采用后续聚合读取。
-  return { petId: receipt.petId as string }
+  return { petId: receipt.petId as string, ...(kind === 'brawl-fight' ? { matchId: brawlId(receipt.matchId) } : {}) }
 }

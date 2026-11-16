@@ -14,6 +14,7 @@ export interface PetConfirmedEvent {
   petId: string
   kind: PetCommand['kind']
   action?: PetAction
+  matchId?: string
 }
 
 export const usePetsStore = defineStore('pets', () => {
@@ -356,6 +357,11 @@ export const usePetsStore = defineStore('pets', () => {
       pending.value = null
       pendingUncertain.value = false
       resetRisk()
+      if (command.kind === 'brawl-fight' || command.kind === 'brawl-upgrade') {
+        confirmedEvent.value = { sequence: ++confirmationSequence, petId: receipt.petId,
+          kind: command.kind, matchId: receipt.matchId }
+        return true
+      }
       // 确认后的读取期间保留画面，refreshNeeded 阻止旧余额继续操作，避免桌宠闪烁。
       refreshNeeded.value = true
       try { channel?.postMessage({ type: 'changed', owner: account.value?.oId }) } catch { /* 本页照常重读。 */ }
@@ -504,6 +510,11 @@ export const usePetsStore = defineStore('pets', () => {
     if (activity.status !== 'claimable' && now < activity.endsAt) return Promise.resolve(false)
     return execute({ kind: 'activities/claim', petId: pet.value.id, activityId: activity.id, key: profileOperationKey() })
   }
+  function executeBrawl(command: Omit<Extract<PetCommand, { kind: 'brawl-fight' }>, 'key'>
+    | Omit<Extract<PetCommand, { kind: 'brawl-upgrade' }>, 'key'>) {
+    if (pending.value || !command.petId) return Promise.resolve(false)
+    return execute({ ...command, key: profileOperationKey() })
+  }
   function retryPending(): Promise<boolean> {
     if (!pending.value) return Promise.resolve(false)
     if (riskStage.value === 'verification' || riskStage.value === 'cooldown') {
@@ -535,6 +546,6 @@ export const usePetsStore = defineStore('pets', () => {
     loading, catalogLoading, error, catalogError, busy, pending, pendingError, refreshNeeded, offline,
     riskStage, riskOpen, riskBusy, riskError, riskUntil, riskChallenge, pendingUncertain,
     prepareRisk, submitRiskProof, closeRisk, cancelRejectedOperation,
-    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, craft, claimStory, readopt, startActivity, claimActivity, retryPending,
+    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, craft, claimStory, readopt, startActivity, claimActivity, retryPending, executeBrawl,
   }
 })

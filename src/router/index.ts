@@ -388,6 +388,12 @@ const routes = [
     meta: { auth: true, robots: 'noindex' },
   },
   {
+    path: '/pets/brawl',
+    name: 'pet-brawl',
+    component: () => import('@/views/PetBrawlView.vue'),
+    meta: { auth: true, robots: 'noindex' },
+  },
+  {
     path: '/pets',
     name: 'pets',
     component: () => import('@/views/PetsView.vue'),

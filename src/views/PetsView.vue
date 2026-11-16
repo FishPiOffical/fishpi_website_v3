@@ -152,6 +152,7 @@ onMounted(() => {
   <div ref="page" class="pets-page fp-page fp-page--wide fp-ui">
     <header class="page-heading">
       <div><RouterLink to="/games" class="back-link">游戏 / 鱼游</RouterLink><h1>宠物家园</h1></div>
+      <RouterLink v-if="loggedIn && pets.pet" class="pet-secondary" to="/pets/brawl">宠物乱斗</RouterLink>
       <div v-if="loggedIn && pets.state" class="pet-wallet" title="仅用于宠物家园"><PetIcon name="coin" /><strong>{{ pets.coins?.toLocaleString() }}</strong><span>宠物币</span></div>
     </header>
 
