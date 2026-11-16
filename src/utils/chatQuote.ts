@@ -1,8 +1,11 @@
+import { isSingleImageMessage } from '@/utils/chatMessage'
+
 export interface ChatQuote {
   kind: 'message' | 'breezemoon'
   href: string
   author: string
   excerpt: string
+  image?: string
 }
 
 export interface BreezemoonQuoteSource {
@@ -62,14 +65,33 @@ function readExcerpt(content: Element | DocumentFragment, imageLabel: string) {
     || (content.querySelector('img') ? imageLabel : '')
 }
 
+function quoteImage(html: string, content: Element | DocumentFragment, origin: string): string | undefined {
+  if (!isSingleImageMessage(html)) return
+  const img = content.querySelector('img')
+  const src = img?.getAttribute('src')?.trim() || img?.getAttribute('data-src')?.trim()
+  if (!src) return
+  try {
+    const url = new URL(src, origin)
+    if ((url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password) return url.href
+  } catch { /* 无效的图片地址保留文字摘要。 */ }
+}
+
+function quoteSummary(html: string, content: Element | DocumentFragment, origin: string, imageLabel: string) {
+  const image = quoteImage(html, content, origin)
+  const excerpt = readExcerpt(content, imageLabel)
+  return image ? { excerpt, image } : { excerpt }
+}
+
 export function chatMessageQuotePreview(source: { messageId: string; userName: string; html: string; label: string }): ChatQuote {
   const template = document.createElement('template')
   template.innerHTML = source.html
-  const nested = extractLatestChatQuote(template.content, window.location.origin, source.label)
-  const excerpt = readExcerpt(template.content, '图片消息')
-    || nested?.excerpt
-    || (source.html ? '' : source.label.split('\n')[0] ?? '')
-  return { kind: 'message', href: `/cr#chatroom${source.messageId}`, author: source.userName, excerpt }
+  const origin = window.location.origin
+  const nested = extractLatestChatQuote(template.content, origin, source.label)
+  const summary = quoteSummary(template.innerHTML, template.content, origin, '图片消息')
+  return {
+    kind: 'message', href: `/cr#chatroom${source.messageId}`, author: source.userName,
+    ...summary, excerpt: summary.excerpt || nested?.excerpt || (source.html ? '' : source.label.split('\n')[0] ?? ''),
+  }
 }
 
 function messageQuoteHeading(block: Element) {
@@ -167,9 +189,9 @@ function extractMessageQuote(block: Element, origin: string, recoveredHref?: str
   const href = url && originalMessageUrl(url.href, origin) || recoveredHref
   if (!href) return null
 
-  const excerpt = readExcerpt(block, '图片消息')
+  const summary = quoteSummary(block.innerHTML, block, origin, '图片消息')
   heading.remove()
-  return { kind: 'message', href, author, excerpt }
+  return { kind: 'message', href, author, ...summary }
 }
 
 function extractBreezemoonQuote(block: Element, origin: string): ChatQuote | null {
@@ -189,7 +211,7 @@ function extractBreezemoonQuote(block: Element, origin: string): ChatQuote | nul
     kind: 'breezemoon',
     href: url.href,
     author: label.slice(authorPrefix.length).trim() || match[1]!,
-    excerpt: readExcerpt(block, '图片动态'),
+    ...quoteSummary(block.innerHTML, block, origin, '图片动态'),
   }
 }
 

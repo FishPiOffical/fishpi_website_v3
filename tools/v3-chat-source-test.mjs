@@ -38,7 +38,9 @@ const chatCode=compile((await fs.readFile('src/stores/chat.ts','utf8')).replaceA
 console.log('PASS chat source 13 actual appearance/chat stores share SSR defaults and defer saved layout/theme reads until mounted shell restoration')
 
 const { JSDOM } = await import('jsdom')
-const { extractLatestChatQuote, hasChatQuoteBody, chatMessageQuotePreview } = await import(url(compile(await fs.readFile('src/utils/chatQuote.ts','utf8'))))
+const chatMessageModule = url(compile(await fs.readFile('src/utils/chatMessage.ts', 'utf8')))
+const quoteModule = url(replace(compile(await fs.readFile('src/utils/chatQuote.ts', 'utf8')), [['@/utils/chatMessage', chatMessageModule]]))
+const { extractLatestChatQuote, hasChatQuoteBody, chatMessageQuotePreview } = await import(quoteModule)
 const quoteDOM = new JSDOM()
 const quoteTemplate = quoteDOM.window.document.createElement('template')
 quoteTemplate.innerHTML = [
@@ -148,6 +150,20 @@ for (const name of ['Y&#117;i', '<b>Yui</b>', 'Yui &amp; other']) {
 globalThis.document = quoteDOM.window.document
 globalThis.window = { location: { origin: 'https://yui.fishpi.cn' } }
 assert.equal(chatMessageQuotePreview({ messageId: '789', userName: 'Yui', html: lostLinkHTML, label: legacySource }).excerpt, '1')
+const imageUrl = 'https://file.fishpi.cn/example.png?signature=a%2Bb'
+const singleImage = `<p><a href="https://example.test/"><img src="${imageUrl}" alt="图片"></a></p>`
+for (const [html, expected] of [
+  [singleImage, imageUrl],
+  [`<p><img data-src="${imageUrl}"></p>`, imageUrl],
+  [`<p>说明</p>${singleImage}`, undefined],
+  [singleImage + singleImage, undefined],
+  [`<p><img class="emoji" src="${imageUrl}" alt="表情"></p>`, undefined],
+  ['<p><img src="data:image/png;base64,aGVsbG8="></p>', undefined],
+]) {
+  quoteTemplate.innerHTML = `<p>回复</p><h5>引用 @Yui <a href="/cr#chatroom789">↩</a></h5><blockquote>${html}</blockquote>`
+  assert.equal(extractLatestChatQuote(quoteTemplate.content, 'https://yui.fishpi.cn').image, expected)
+  assert.equal(chatMessageQuotePreview({ messageId: '789', userName: 'Yui', html, label: '' }).image, expected)
+}
 quoteDOM.window.close()
 console.log('PASS chat source 14 compact quote requires a trusted original-message link and preserves surrounding content')
 console.log('PASS chat source 15 generated absolute links survive chat cleaning; missing legacy links recover only from matching trusted Markdown markers')

@@ -17,7 +17,10 @@ export const chatPetStatusLabels={idle:'空闲'},formatDisplayTime=()=> '12:30';
 export const chatMessageDetail=async()=>{window.reads=(window.reads||0)+1;await new Promise(r=>setTimeout(r,80));return {type:'text',content:'一起摸鱼'}};`)
 const modules = {vue, '@/utils/chatRepeatGroups':data(transpile(fs.readFileSync('src/utils/chatRepeatGroups.ts','utf8'))), '@/utils/avatar':data(transpile(fs.readFileSync('src/utils/avatar.ts','utf8')))}
 for (const name of ['@/stores/chatPreferences','@/stores/functionPreferences','@/stores/auth','@/stores/v3ChatPublication','@/api/http','@/api/v3-chat-messages','@/utils/time']) modules[name]=mocks
-for (const name of ['chatAppearance','chatMessage','chatQuote']) modules['@/utils/'+name]=data(transpile(fs.readFileSync('src/utils/'+name+'.ts','utf8')))
+for (const name of ['chatAppearance','chatMessage','chatQuote']) {
+  const source = transpile(fs.readFileSync('src/utils/' + name + '.ts', 'utf8'))
+  modules['@/utils/' + name] = data(source.replace("'@/utils/chatMessage'", `'${modules['@/utils/chatMessage']}'`))
+}
 modules['@/chat/mention']=data(transpile(fs.readFileSync('src/chat/mention.ts','utf8')))
 // 路由导航和外围服务隔离；实际气泡仍负责昵称、@ 行为、身份及方向。
 modules['vue-router']=data(`import {h} from '${vue}';export const RouterLink={props:['to'],setup(p,{slots}){return()=>h('a',{href:typeof p.to==='string'?p.to:JSON.stringify(p.to)},slots.default?.())}}`)

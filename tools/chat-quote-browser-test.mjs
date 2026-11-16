@@ -21,7 +21,8 @@ export const RouterLink={props:['to'],setup(p,{slots}){return()=>h('a',{href:p.t
 const modules = { vue, 'vue-router': mocks }
 for (const path of ['@/stores/auth', '@/stores/chatPreferences', '@/stores/functionPreferences', '@/chat/mention', '@/api/v3-chat-messages', '@/utils/time']) modules[path] = mocks
 for (const name of ['avatar', 'chatAppearance', 'chatMessage', 'chatQuote']) {
-  modules['@/utils/' + name] = data(transpile(fs.readFileSync(`src/utils/${name}.ts`, 'utf8')))
+  const source = transpile(fs.readFileSync(`src/utils/${name}.ts`, 'utf8'))
+  modules['@/utils/' + name] = data(source.replace("'@/utils/chatMessage'", `'${modules['@/utils/chatMessage']}'`))
 }
 let css = ''
 function compile(file, id) {
@@ -32,6 +33,7 @@ function compile(file, id) {
   css += descriptor.styles.map(style => compileStyle({ source: style.content, filename: file, id, scoped: true }).code).join('\n')
   return data(script + `;component.__scopeId='${id}';export default component;`)
 }
+modules['@/components/ImageLightbox.vue'] = compile('src/components/ImageLightbox.vue', 'data-v-lightbox')
 modules['@/components/chat/ChatQuoteCard.vue'] = compile('src/components/chat/ChatQuoteCard.vue', 'data-v-quote-card')
 modules['./ChatQuoteCard.vue'] = modules['@/components/chat/ChatQuoteCard.vue']
 const preview = compile('src/components/chat/ChatQuotePreview.vue', 'data-v-quote-preview')
@@ -75,6 +77,9 @@ try {
   page.on('pageerror', e => errors.push(e.message))
   page.on('request', r => requests.push(r.url()))
   await page.route('http://quotes.test/**', r => r.fulfill({ contentType: 'text/html', body: html }))
+  await page.route(url => url.origin === 'https://file.fishpi.cn' && url.pathname === '/test.png', r => r.fulfill({
+    contentType: 'image/png', body: fs.readFileSync('public/images/user-thumbnail.png'),
+  }))
   await page.goto('http://quotes.test/cr')
   await page.waitForSelector('[data-case="own"] .chat-quote-card')
   for (const id of ['own', 'other', 'classic', 'image', 'only', 'moon', 'own-multi', 'nested']) {
@@ -83,12 +88,14 @@ try {
     assert.equal(await section.locator('.fp-bubble .chat-quote-card, .fp-bubble h5').count(), 0, id)
   }
   assert.equal(await page.locator('[data-case="own"] .body').innerText(), '1')
-  assert.equal(await page.locator('[data-case="image"] .chat-quote-excerpt').innerText(), '图片消息')
+  const imageQuote = page.locator('[data-case="image"]')
+  const thumbnail = imageQuote.getByRole('button', { name: '查看引用大图' })
+  assert.equal(await thumbnail.locator('img').getAttribute('src'), 'https://file.fishpi.cn/test.png?imageView2/1/w/80/h/64')
   assert.equal(await page.locator('[data-case="only"] .fp-bubble').count(), 0)
   assert.equal(await page.locator('[data-case="hand"] .body blockquote').innerText(), '没有来源的普通引用')
   for (const [id, excerpt] of [['own-multi', '好'], ['nested', '直接引用的内容']]) {
     const section = page.locator(`[data-case="${id}"]`)
-    assert.equal(await section.locator('.chat-quote-card').getAttribute('href'), '/cr#chatroom321')
+    assert.equal(await section.locator('.chat-quote-jump').getAttribute('href'), '/cr#chatroom321')
     assert.equal(await section.locator('.chat-quote-excerpt').innerText(), excerpt)
     assert.doesNotMatch(await section.innerText(), /普通引用内容/)
   }
@@ -101,7 +108,7 @@ try {
       .filter(el => el.getBoundingClientRect().right > innerWidth || el.getBoundingClientRect().left < 0)
       .map(el => ({ element: el.className, case: el.closest('[data-case]')?.getAttribute('data-case'), left: el.getBoundingClientRect().left, right: el.getBoundingClientRect().right })))
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `页面横向溢出：${width} ${JSON.stringify(overflow)}`)
-    for (const id of ['own', 'other', 'classic', 'image', 'short']) {
+    for (const id of ['own', 'other', 'classic', 'short']) {
       const layout = await page.locator(`[data-case="${id}"] .chat-quote-card`).evaluate(el => {
         const preview = el.querySelector('.chat-quote-excerpt'), style = getComputedStyle(preview)
         const body = el.closest('.message-stack').querySelector('.fp-bubble').getBoundingClientRect()
@@ -129,9 +136,23 @@ try {
   await page.addStyleTag({ content: 'body{background:#222424;--fp-card:#282a2a;--fp-text:#cbc5ba;--fp-muted:#9e9689;--fp-border:#424545;--fp-hover:#343737;--fp-bg:#222424}.panel{background:var(--fp-card)}' })
   await page.screenshot({ path: '/tmp/chat-quotes-dark.png', fullPage: true })
   assert.equal(await page.locator('[data-case="own"] .chat-quote-excerpt').evaluate(el => getComputedStyle(el).color), 'rgb(158, 150, 137)')
-  await page.locator('[data-case="own"] .chat-quote-card').click()
+  await page.locator('[data-case="own"] .chat-quote-excerpt').click()
+  assert.equal(new URL(page.url()).hash, '')
+  await page.evaluate(() => { prefs.blurChatImages = true })
+  assert.equal(await thumbnail.locator('img').evaluate(img => getComputedStyle(img).filter), 'blur(8px)')
+  await thumbnail.click()
+  const lightbox = page.locator('.img-zoom')
+  await lightbox.waitFor()
+  assert.equal(await lightbox.locator('img').getAttribute('src'), 'https://file.fishpi.cn/test.png?imageView2/1/w/1024/h/1024')
+  assert.equal(await lightbox.getByRole('link', { name: '原图' }).getAttribute('href'), 'https://file.fishpi.cn/test.png')
+  assert.equal(new URL(page.url()).hash, '')
+  await page.keyboard.press('Escape')
+  await lightbox.waitFor({ state: 'hidden' })
+  await imageQuote.getByRole('link', { name: '查看原消息' }).click()
+  assert.equal(new URL(page.url()).hash, '#chatroom789')
+  await page.locator('[data-case="own"] .chat-quote-jump').click()
   assert.equal(new URL(page.url()).hash, '#chatroom123')
-  await page.locator('[data-case="nested"] .chat-quote-card').click()
+  await page.locator('[data-case="nested"] .chat-quote-jump').click()
   assert.equal(new URL(page.url()).hash, '#chatroom321')
   await page.locator('[data-case="preview"] button').click()
   assert.equal(await page.evaluate(() => window.removed), true)
