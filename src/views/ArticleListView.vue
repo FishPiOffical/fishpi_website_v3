@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListPageHeading from '@/components/articles/ListPageHeading.vue'
 import { computed, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
 import { RouterLink, useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
 import type { ArticleFeedKind } from '@/api/fishpi'
@@ -56,11 +57,18 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
           <div class="column-intro-mark" aria-hidden="true"><span>卷</span><i></i><b></b></div>
           <div class="column-intro-footer"><span v-if="value">共 {{ value.total }} 部可见作品</span><span v-else>专栏目录</span><span>每一次更新，都是故事的新一页</span></div>
         </section>
-        <div v-else class="module-header list-page-head">
-          <div class="head-left"><h1 class="fp-page-title">{{ heading }}</h1><ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" /><span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span></div>
-          <div class="head-right"><nav v-if="showRecentTabs" class="sort-tabs"><RouterLink v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to" :class="{ current: route.path === tab.to }">{{ tab.label }}</RouterLink></nav><span v-if="value" class="total-count">共 {{ value.total }} 篇</span></div>
-        </div>
-        <p v-if="listingNote" class="listing-note">{{ listingNote }}</p>
+        <ListPageHeading
+          v-else
+          :title="heading"
+          :count="value ? `共 ${value.total.toLocaleString('zh-CN')} 篇` : undefined"
+          :description="listingNote"
+        >
+          <ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" />
+          <span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span>
+          <template v-if="showRecentTabs" #sort>
+            <RouterLink v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to">{{ tab.label }}</RouterLink>
+          </template>
+        </ListPageHeading>
         <div v-if="isColumnPage" class="column-shelf-head">
           <div><strong>专栏目录</strong><span>按当前可见章节统计</span></div>
           <div class="column-switch" role="tablist" aria-label="专栏排序"><button class="fp-control" type="button" role="tab" :aria-selected="columnShelf === 'recent'" :class="{ selected: columnShelf === 'recent' }" @click="columnShelf = 'recent'">最近更新</button><button class="fp-control" type="button" role="tab" :aria-selected="columnShelf === 'hot'" :class="{ selected: columnShelf === 'hot' }" @click="columnShelf = 'hot'">热门作品</button></div>
@@ -101,65 +109,14 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
   padding-top: 4px;
 }
 
-.list-page-head {
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 12px 18px;
-}
-
-.head-left {
-  min-width: 0;
-  flex-wrap: wrap;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.head-left h1 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--fp-title);
-}
-
 .search-tag {
   font-size: 12px;
   color: var(--fp-accent);
   background: var(--fp-hover);
   padding: 2px 8px;
   border-radius: 4px;
-}
-
-.head-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.sort-tabs {
-  display: flex;
-  gap: 4px;
-  font-size: 13px;
-}
-
-.sort-tabs a {
-  color: var(--fp-muted);
-  padding: 2px 6px;
-}
-
-.sort-tabs a + a::before {
-  content: '/';
-  margin-right: 8px;
-  color: var(--fp-border);
-}
-
-.sort-tabs a.current {
-  color: var(--fp-title);
-  font-weight: 600;
-}
-
-.total-count {
-  font-size: 12px;
-  color: var(--fp-muted);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .hint {
@@ -284,6 +241,6 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
   .column-title { font-size: 14px; }
   .column-preview { margin: 5px 0 7px; min-height: 34px; font-size: 11px; }
 }
-.listing-note{margin:0 16px 16px;color:var(--fp-muted);font-size:12px;line-height:1.7}.column-links{display:flex;justify-content:space-between;gap:12px;margin-top:auto}.column-author-row time{font-size:10px}.search-empty-links{display:flex;justify-content:center;gap:18px;padding:0 16px 24px;font-size:13px}
+.column-links{display:flex;justify-content:space-between;gap:12px;margin-top:auto}.column-author-row time{font-size:10px}.search-empty-links{display:flex;justify-content:center;gap:18px;padding:0 16px 24px;font-size:13px}
 @media(min-width:1600px){.column-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>

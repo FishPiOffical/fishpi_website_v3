@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListPageHeading from '@/components/articles/ListPageHeading.vue'
 import { imageThumbnail } from '@/utils/avatar'
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -19,10 +20,11 @@ async function page(next: number) { await read(next, true); document.getElementB
 <template>
   <div class="wrapper list-page-wrap fp-page fp-page--wide fp-ui fp-list-page">
     <div class="content directory-content" id="directory-list">
-      <div class="module-header list-page-head">
-        <div class="head-left"><h1 class="fp-page-title">{{ label }}目录</h1><span v-if="value" class="sub-tag">共 {{ value.total }} 个{{ label }}</span></div>
-        <button type="button" class="btn refresh-dir-btn fp-control" :disabled="loading" @click="read()">刷新目录</button>
-      </div>
+      <ListPageHeading
+        :title="label + '目录'"
+        :count="value ? `共 ${value.total.toLocaleString('zh-CN')} 个${label}` : undefined"
+      />
+      <button type="button" class="btn refresh-dir-btn fp-control" :disabled="loading" @click="read()">刷新目录</button>
       <FpLoading v-if="loading" :rows="6" />
       <div v-if="error" class="err fp-state" role="alert">{{ error }} <button type="button" class="btn fp-control" @click="read()">重试当前页</button></div>
       <template v-if="value">
@@ -44,39 +46,8 @@ async function page(next: number) { await read(next, true); document.getElementB
   padding-top: 4px;
 }
 
-.list-page-head {
-  padding: 12px 18px;
-}
 .refresh-dir-btn {
   display: none;
-}
-
-.head-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.head-left h2 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--fp-title);
-}
-
-.sub-tag {
-  font-size: 12px;
-  color: var(--fp-muted);
-}
-
-.head-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.total-count {
-  font-size: 12px;
-  color: var(--fp-muted);
 }
 
 .err {
