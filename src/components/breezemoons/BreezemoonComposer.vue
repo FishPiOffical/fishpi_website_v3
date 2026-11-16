@@ -33,7 +33,7 @@ onMounted(()=>{mounted.value=true});onBeforeUnmount(()=>{mounted.value=false;if(
     <template v-else>
       <template v-if="operations.pending"><p>上次{{ operations.pending.operation==='delete'?'删除':operations.pending.operation==='update'?'修改':'发布' }}结果待确认，请恢复同一次操作。</p><p v-if="operations.pending.content" class="pending-content">{{ operations.pending.content }}</p><button type="button" :disabled="operations.busy" @click="operations.retry()">{{ operations.busy?'正在确认…':recovery }}</button></template>
       <form v-else @submit.prevent="submit"><label>{{ target?'修改动态':'写一条动态' }}<textarea v-model="draft" :disabled="locked" rows="2" placeholder="与清风明月为伴，记录当下…" @keydown.ctrl.enter.prevent="submit" @keydown.meta.enter.prevent="submit" /></label><span>{{ trimBreezemoonInput(draft).length }} / 512</span><button type="submit" :disabled="locked||!trimBreezemoonInput(draft)">{{ operations.busy?'提交中…':target?'保存修改':'发布' }}</button><button v-if="target" type="button" :disabled="locked" @click="emit('cancel')">取消编辑</button></form>
-      <p v-if="localError||operations.error" role="alert">{{ localError||operations.error }}</p><p v-if="operations.message" role="status">{{ operations.message }}</p>
+      <p v-if="localError||operations.error" role="alert">{{ localError||operations.error }}</p>
     </template>
   </div>
 </template>

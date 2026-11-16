@@ -2,6 +2,7 @@
 defineProps<{
   title: string
   count?: string
+  sortLabel?: string
 }>()
 </script>
 
@@ -12,7 +13,7 @@ defineProps<{
         <h1 class="fp-page-title">{{ title }}</h1>
         <slot />
       </div>
-      <nav v-if="$slots.sort" class="heading-sort fp-tabs" aria-label="帖子排序">
+      <nav v-if="$slots.sort" class="heading-sort fp-tabs" :aria-label="sortLabel ?? '帖子排序'">
         <slot name="sort" />
       </nav>
       <span v-if="count" class="heading-count">{{ count }}</span>

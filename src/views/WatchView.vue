@@ -8,6 +8,7 @@ import { ApiError, getAuthContextVersion } from '@/api/http'
 import { fetchV3FollowingFeed, type FollowingSource, type FollowingFeedPage } from '@/api/v3-following-feed'
 import { useAuthStore } from '@/stores/auth'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
+import ListPageHeading from '@/components/articles/ListPageHeading.vue'
 import BreezemoonList from '@/components/breezemoons/BreezemoonList.vue'
 import SideBar from '@/components/SideBar.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
@@ -38,20 +39,18 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
 <template>
   <div class="fp-page fp-page--wide fp-ui fp-list-page">
     <main class="content"><section class="module">
-      <header class="watch-head">
-        <div class="watch-heading-row">
-          <div class="watch-title-group">
-            <h1>关注动态</h1>
-            <span v-if="result" class="watch-count">{{ result.total }} 条动态</span>
-          </div>
-          <button v-if="ready" class="watch-refresh" type="button" :disabled="loading" :aria-busy="loading" aria-label="刷新关注动态" title="刷新动态" @click="load">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3A7 7 0 0 0 17.9 17"/></svg>
-          </button>
-        </div>
-        <nav class="watch-tabs fp-tabs" aria-label="关注动态类型">
-          <RouterLink v-for="tab in TABS" :key="tab.tab" :to="tab.to" class="fp-tab" :aria-current="current.tab===tab.tab ? 'page' : undefined">{{ tab.label }}</RouterLink>
-        </nav>
-      </header>
+      <ListPageHeading
+        title="关注动态"
+        :count="result ? `共 ${result.total.toLocaleString('zh-CN')} 条` : undefined"
+        sort-label="关注动态类型"
+      >
+        <button v-if="ready" class="watch-refresh" type="button" :disabled="loading" :aria-busy="loading" aria-label="刷新关注动态" title="刷新动态" @click="load">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3A7 7 0 0 0 17.9 17"/></svg>
+        </button>
+        <template #sort>
+          <RouterLink v-for="tab in TABS" :key="tab.tab" :to="tab.to" class="fp-tab" :aria-current="current.tab === tab.tab ? 'page' : undefined">{{ tab.label }}</RouterLink>
+        </template>
+      </ListPageHeading>
       <p v-if="!mounted" class="message">正在准备关注动态…</p>
       <p v-else-if="!ready" class="message"><RouterLink :to="{path:'/login',query:{redirect:route.fullPath}}">登录后查看关注动态</RouterLink></p>
       <template v-else>
@@ -68,7 +67,9 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
               <button class="fp-control" type="button" @click="home">返回第一页</button>
             </template>
           </FpListState>
-          <BreezemoonList class="watch-moons" v-else-if="result.source==='breezemoons'" :items="result.list" />
+          <div v-else-if="result.source === 'breezemoons'" class="watch-moons">
+            <BreezemoonList :items="result.list" />
+          </div>
           <ArticleFeed v-else :items="result.list" />
           <FpPagination v-if="result.total || page > 1" label="关注动态分页" :page="page" :page-count="result.pageCount" :busy="loading" :page-limit="42949672" @change="move" />
         </template>
@@ -78,26 +79,15 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
   </div>
 </template>
 <style scoped lang="scss">
-.watch-head {
-  padding: 14px var(--fp-panel-padding) 0;
-  border-bottom: 1px solid var(--fp-divider);
-}
-.watch-heading-row,
-.watch-title-group { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.watch-heading-row { justify-content: space-between; margin-bottom: 12px; min-height: 32px; }
-.watch-title-group { flex-wrap: wrap; gap: 6px 12px; }
-.watch-head h1 { margin: 0; font-size: 20px; line-height: 1.4; font-weight: 650; color: var(--fp-title); }
-.watch-count { color: var(--fp-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.watch-head .watch-refresh {
+.watch-refresh {
   display: grid; place-items: center; flex: none; width: 32px; height: 32px;
   padding: 0; border: 0; border-radius: 8px; color: var(--fp-muted); background: transparent;
   transition: background 160ms ease;
 }
 .watch-refresh:hover:not(:disabled) { background: var(--fp-hover); }
-.watch-tabs { padding-block-end: 8px; }
 .watch-refresh:focus-visible { outline: 2px solid var(--fp-accent); outline-offset: -2px; }
-@media (max-width: 600px) {
-  .watch-head h1 { font-size: 18px; }
+@media (pointer: coarse) {
+  .watch-refresh { width: 44px; height: 44px; }
 }
 .watch-moons { margin: 0 var(--fp-panel-padding); }
 .message {
