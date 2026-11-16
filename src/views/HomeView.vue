@@ -359,13 +359,11 @@ function scrollShelf(id: string, dir: -1 | 1) {
             </section>
 
             <aside v-else-if="mod.id === 'community'" class="mod-body community-body">
-              <HomeModuleDisclosure class="home-moons" module-key="community:breezemoons" module-id="breezemoons" title="清风明月">
+              <HomeModuleDisclosure class="home-moons" fixed-open module-key="community:breezemoons" module-id="breezemoons" title="清风明月">
                 <template #action>
                   <RouterLink to="/breezemoons" title="清风明月是什么？" class="home-moons-more">更多</RouterLink>
                 </template>
-                <template #default="{ reportSummary }">
-                  <BreezemoonPanel :size="8" :preview-limit="compactHome ? 3 : undefined" compact avatar-only ssr-scope="home" @summary="reportSummary" />
-                </template>
+                <BreezemoonPanel :size="8" :preview-limit="compactHome ? 3 : undefined" compact avatar-only ssr-scope="home" />
               </HomeModuleDisclosure>
               <HomeRepeaterStation :initial="repeaterItems" />
 
@@ -378,7 +376,8 @@ function scrollShelf(id: string, dir: -1 | 1) {
               <HomeReadStatus label="标签" :loading="tagsRead.loading" :error="tagsRead.error" :ready="tagsRead.data !== null" :empty="!tags.length" empty-text="暂无标签。" @retry="tagsRead.read" />
               <div class="tags">
                 <RouterLink v-for="t in tags" :key="t.tagURI || t.tagTitle" :to="tagPath(t)">
-                  {{ t.tagTitle }}
+                  <span class="tag-mark" aria-hidden="true">#</span>
+                  <span class="tag-name">{{ t.tagTitle }}</span>
                 </RouterLink>
               </div>
 
@@ -544,6 +543,9 @@ function scrollShelf(id: string, dir: -1 | 1) {
 .home-person :deep(.role-tag) { display: none; }
 .home-download { margin-bottom: 12px; }
 .home-moons { margin-block: 12px; }
+.home-moons :deep(.disclosure-head) { justify-content: space-between; margin-bottom: 8px; }
+.home-moons :deep(.fixed-heading) { padding: 0; }
+.home-moons :deep(.fixed-heading svg) { width: 20px; height: 20px; }
 .home-moons-more { flex: none; color: var(--fp-muted); font-size: 12px; text-decoration: none; }
 .home-moons-more:hover { text-decoration: underline; }
 .home :deep(.breezemoon-list .moon-body) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
@@ -752,8 +754,16 @@ function scrollShelf(id: string, dir: -1 | 1) {
 }
 .module-list .article-pin-row[data-pin] {
   --pin-tint: var(--fp-primary);
+  border-radius: 0 4px 4px 0;
   background-color: color-mix(in srgb, var(--pin-tint) 5%, var(--fp-card));
-  box-shadow: inset 2px 0 color-mix(in srgb, var(--pin-tint) 40%, transparent);
+}
+.module-list .article-pin-row[data-pin]::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: color-mix(in srgb, var(--pin-tint) 40%, transparent);
+  pointer-events: none;
 }
 .module-list .article-pin-row[data-pin="permanent"] { --pin-tint: var(--fp-accent); }
 .module-list .article-pin-row[data-pin]:hover {
@@ -838,16 +848,27 @@ function scrollShelf(id: string, dir: -1 | 1) {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 2px 4px;
+  padding: 4px 4px 2px;
 }
 .tags a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-height: 26px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--fp-elevated);
+  color: var(--fp-head);
   font-size: 12px;
-  color: var(--fp-link);
+  line-height: 1.5;
   text-decoration: none;
-  border: 1px solid var(--fp-border);
-  border-radius: 999px;
-  padding: 2px 8px;
 }
+.tag-mark { flex: none; color: var(--fp-primary-ink); font-weight: 600; }
+.tag-name { min-width: 0; overflow-wrap: anywhere; }
+.tags a:is(:hover, :focus-visible) { background: var(--fp-primary-soft); color: var(--fp-primary-ink); }
+.tags a:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 1px; }
+@media (pointer: coarse) { .tags a { min-height: 44px; } }
 .moons li {
   flex-direction: column;
   align-items: flex-start;
