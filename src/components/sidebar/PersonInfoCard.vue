@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { usePersonSummaryStore } from '@/stores/personSummary'
 import { storeToRefs } from 'pinia'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { avatarUrl, avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
+import { formatDateTime, timeISO } from '@/utils/time'
 
 withDefaults(defineProps<{ avatarSize?: number }>(), { avatarSize: 44 })
 
@@ -14,6 +15,19 @@ let detach: (() => void) | undefined
 onMounted(() => { detach = summary.attach() })
 onBeforeUnmount(() => detach?.())
 const { account, isLoggedIn } = storeToRefs(useAuthStore())
+
+const accountDates = computed(() => {
+  const user = account.value
+  if (!user) return []
+  // 旧站以用户 ID 中的毫秒时间戳作为加入时间。
+  return [
+    { label: '加入时间', value: /^\d{13}$/.test(user.oId) ? Number(user.oId) : undefined },
+    { label: '最后登录', value: user.userLatestLoginTime },
+  ].flatMap(({ label, value }) => {
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1_000_000_000_000 || value > 9_999_999_999_999) return []
+    return [{ label, datetime: timeISO(value), text: formatDateTime(value).slice(0, 16) }]
+  })
+})
 </script>
 
 <template>
@@ -32,6 +46,13 @@ const { account, isLoggedIn } = storeToRefs(useAuthStore())
         </div>
       </div>
     </div>
+
+    <dl v-if="accountDates.length" class="person-dates">
+      <div v-for="date in accountDates" :key="date.label">
+        <dt>{{ date.label }}</dt>
+        <dd><time :datetime="date.datetime">{{ date.text }}</time></dd>
+      </div>
+    </dl>
 
     <div class="person-stats">
       <RouterLink :to="`/member/${account.userName}`" class="stat-col">
@@ -72,6 +93,10 @@ const { account, isLoggedIn } = storeToRefs(useAuthStore())
 .person-sub { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 12px; }
 .uname { overflow: hidden; color: var(--fp-muted); text-overflow: ellipsis; white-space: nowrap; }
 .role-tag { flex: none; padding: 1px 5px; border-radius: 4px; background: var(--fp-hover); color: var(--fp-head); font-size: 11px; }
+.person-dates { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin: 0 0 8px; font-size: 11px; line-height: 1.5; }
+.person-dates > div { display: flex; flex-wrap: wrap; gap: 0 6px; }
+.person-dates dt { color: var(--fp-muted); }
+.person-dates dd { margin: 0; color: var(--fp-text); font-variant-numeric: tabular-nums; }
 .person-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 6px; padding-top: 10px; border-top: 1px solid var(--fp-border); text-align: center; }
 .stat-col { display: flex; min-width: 0; flex-direction: column; gap: 2px; text-decoration: none; }
 .stat-col strong { overflow: hidden; color: var(--fp-title); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }

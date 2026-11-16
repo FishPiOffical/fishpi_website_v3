@@ -33,6 +33,7 @@ export interface AccountInfo {
   capabilities?: AccountCapabilities
   userRole?: string
   userAppRole?: number
+  userLatestLoginTime?: number
   userArticleCount?: number
   userCommentCount?: number
   userPhone?: string
@@ -82,6 +83,7 @@ export interface V3AccountInfo {
   userCity?: string
   userOnlineFlag?: boolean
   onlineMinute?: number
+  userLatestLoginTime?: number
   userName: string
   userNickname?: string
   userAvatarURL?: string
