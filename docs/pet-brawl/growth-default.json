@@ -1,0 +1,528 @@
+{
+  "seed": 20261116,
+  "independent_seeds": 10000,
+  "trials_per_config": 20000,
+  "total_battles": 1260000,
+  "growth": "一方最大 HP 和基础攻击同时增加指定百分比，固定附加伤害和治疗量保持相同。",
+  "note": "配装及交换局共享随机样本；总局数不代表独立统计样本数。",
+  "results": {
+    "0": [
+      {
+        "loadout": "木勺水花",
+        "battles": 20000,
+        "win_pct": 50.0,
+        "lose_pct": 50.0,
+        "win_score_pct": 50.0,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺卷团",
+        "battles": 20000,
+        "win_pct": 50.0,
+        "lose_pct": 50.0,
+        "win_score_pct": 50.0,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺呼吸",
+        "battles": 20000,
+        "win_pct": 50.0,
+        "lose_pct": 50.0,
+        "win_score_pct": 50.0,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕水花",
+        "battles": 20000,
+        "win_pct": 50.0,
+        "lose_pct": 50.0,
+        "win_score_pct": 50.0,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕卷团",
+        "battles": 20000,
+        "win_pct": 49.05,
+        "lose_pct": 49.05,
+        "win_score_pct": 50.0,
+        "draw_pct": 1.9
+      },
+      {
+        "loadout": "护腕呼吸",
+        "battles": 20000,
+        "win_pct": 49.005,
+        "lose_pct": 49.005,
+        "win_score_pct": 50.0,
+        "draw_pct": 1.99
+      },
+      {
+        "loadout": "折扇水花",
+        "battles": 20000,
+        "win_pct": 50.0,
+        "lose_pct": 50.0,
+        "win_score_pct": 50.0,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇卷团",
+        "battles": 20000,
+        "win_pct": 50.0,
+        "lose_pct": 50.0,
+        "win_score_pct": 50.0,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇呼吸",
+        "battles": 20000,
+        "win_pct": 50.0,
+        "lose_pct": 50.0,
+        "win_score_pct": 50.0,
+        "draw_pct": 0.0
+      }
+    ],
+    "1": [
+      {
+        "loadout": "木勺水花",
+        "battles": 20000,
+        "win_pct": 55.12,
+        "lose_pct": 44.88,
+        "win_score_pct": 55.12,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺卷团",
+        "battles": 20000,
+        "win_pct": 55.835,
+        "lose_pct": 44.165,
+        "win_score_pct": 55.835,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺呼吸",
+        "battles": 20000,
+        "win_pct": 55.84,
+        "lose_pct": 44.16,
+        "win_score_pct": 55.84,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕水花",
+        "battles": 20000,
+        "win_pct": 55.84,
+        "lose_pct": 44.16,
+        "win_score_pct": 55.84,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕卷团",
+        "battles": 20000,
+        "win_pct": 58.59,
+        "lose_pct": 41.41,
+        "win_score_pct": 58.59,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕呼吸",
+        "battles": 20000,
+        "win_pct": 59.005,
+        "lose_pct": 40.995,
+        "win_score_pct": 59.005,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇水花",
+        "battles": 20000,
+        "win_pct": 55.115,
+        "lose_pct": 44.885,
+        "win_score_pct": 55.115,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇卷团",
+        "battles": 20000,
+        "win_pct": 55.635,
+        "lose_pct": 44.365,
+        "win_score_pct": 55.635,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇呼吸",
+        "battles": 20000,
+        "win_pct": 55.84,
+        "lose_pct": 44.16,
+        "win_score_pct": 55.84,
+        "draw_pct": 0.0
+      }
+    ],
+    "2": [
+      {
+        "loadout": "木勺水花",
+        "battles": 20000,
+        "win_pct": 62.78,
+        "lose_pct": 37.22,
+        "win_score_pct": 62.78,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺卷团",
+        "battles": 20000,
+        "win_pct": 63.085,
+        "lose_pct": 36.915,
+        "win_score_pct": 63.085,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺呼吸",
+        "battles": 20000,
+        "win_pct": 63.085,
+        "lose_pct": 36.915,
+        "win_score_pct": 63.085,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕水花",
+        "battles": 20000,
+        "win_pct": 63.085,
+        "lose_pct": 36.915,
+        "win_score_pct": 63.085,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕卷团",
+        "battles": 20000,
+        "win_pct": 66.88,
+        "lose_pct": 33.12,
+        "win_score_pct": 66.88,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕呼吸",
+        "battles": 20000,
+        "win_pct": 66.85,
+        "lose_pct": 33.15,
+        "win_score_pct": 66.85,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇水花",
+        "battles": 20000,
+        "win_pct": 62.78,
+        "lose_pct": 37.22,
+        "win_score_pct": 62.78,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇卷团",
+        "battles": 20000,
+        "win_pct": 63.045,
+        "lose_pct": 36.955,
+        "win_score_pct": 63.045,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇呼吸",
+        "battles": 20000,
+        "win_pct": 63.085,
+        "lose_pct": 36.915,
+        "win_score_pct": 63.085,
+        "draw_pct": 0.0
+      }
+    ],
+    "3": [
+      {
+        "loadout": "木勺水花",
+        "battles": 20000,
+        "win_pct": 69.985,
+        "lose_pct": 30.015,
+        "win_score_pct": 69.985,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺卷团",
+        "battles": 20000,
+        "win_pct": 69.785,
+        "lose_pct": 30.215,
+        "win_score_pct": 69.785,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺呼吸",
+        "battles": 20000,
+        "win_pct": 69.795,
+        "lose_pct": 30.205,
+        "win_score_pct": 69.795,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕水花",
+        "battles": 20000,
+        "win_pct": 69.795,
+        "lose_pct": 30.205,
+        "win_score_pct": 69.795,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕卷团",
+        "battles": 20000,
+        "win_pct": 74.1,
+        "lose_pct": 25.9,
+        "win_score_pct": 74.1,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕呼吸",
+        "battles": 20000,
+        "win_pct": 74.31,
+        "lose_pct": 25.69,
+        "win_score_pct": 74.31,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇水花",
+        "battles": 20000,
+        "win_pct": 69.985,
+        "lose_pct": 30.015,
+        "win_score_pct": 69.985,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇卷团",
+        "battles": 20000,
+        "win_pct": 69.845,
+        "lose_pct": 30.155,
+        "win_score_pct": 69.845,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇呼吸",
+        "battles": 20000,
+        "win_pct": 69.795,
+        "lose_pct": 30.205,
+        "win_score_pct": 69.795,
+        "draw_pct": 0.0
+      }
+    ],
+    "5": [
+      {
+        "loadout": "木勺水花",
+        "battles": 20000,
+        "win_pct": 82.175,
+        "lose_pct": 17.825,
+        "win_score_pct": 82.175,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺卷团",
+        "battles": 20000,
+        "win_pct": 81.37,
+        "lose_pct": 18.63,
+        "win_score_pct": 81.37,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺呼吸",
+        "battles": 20000,
+        "win_pct": 81.375,
+        "lose_pct": 18.625,
+        "win_score_pct": 81.375,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕水花",
+        "battles": 20000,
+        "win_pct": 81.375,
+        "lose_pct": 18.625,
+        "win_score_pct": 81.375,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕卷团",
+        "battles": 20000,
+        "win_pct": 85.8,
+        "lose_pct": 14.2,
+        "win_score_pct": 85.8,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕呼吸",
+        "battles": 20000,
+        "win_pct": 85.865,
+        "lose_pct": 14.135,
+        "win_score_pct": 85.865,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇水花",
+        "battles": 20000,
+        "win_pct": 82.18,
+        "lose_pct": 17.82,
+        "win_score_pct": 82.18,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇卷团",
+        "battles": 20000,
+        "win_pct": 81.595,
+        "lose_pct": 18.405,
+        "win_score_pct": 81.595,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇呼吸",
+        "battles": 20000,
+        "win_pct": 81.375,
+        "lose_pct": 18.625,
+        "win_score_pct": 81.375,
+        "draw_pct": 0.0
+      }
+    ],
+    "10": [
+      {
+        "loadout": "木勺水花",
+        "battles": 20000,
+        "win_pct": 97.115,
+        "lose_pct": 2.885,
+        "win_score_pct": 97.115,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺卷团",
+        "battles": 20000,
+        "win_pct": 96.79,
+        "lose_pct": 3.21,
+        "win_score_pct": 96.79,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺呼吸",
+        "battles": 20000,
+        "win_pct": 96.73,
+        "lose_pct": 3.27,
+        "win_score_pct": 96.73,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕水花",
+        "battles": 20000,
+        "win_pct": 96.73,
+        "lose_pct": 3.27,
+        "win_score_pct": 96.73,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕卷团",
+        "battles": 20000,
+        "win_pct": 98.09,
+        "lose_pct": 1.91,
+        "win_score_pct": 98.09,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕呼吸",
+        "battles": 20000,
+        "win_pct": 98.185,
+        "lose_pct": 1.815,
+        "win_score_pct": 98.185,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇水花",
+        "battles": 20000,
+        "win_pct": 97.115,
+        "lose_pct": 2.885,
+        "win_score_pct": 97.115,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇卷团",
+        "battles": 20000,
+        "win_pct": 96.675,
+        "lose_pct": 3.325,
+        "win_score_pct": 96.675,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇呼吸",
+        "battles": 20000,
+        "win_pct": 96.73,
+        "lose_pct": 3.27,
+        "win_score_pct": 96.73,
+        "draw_pct": 0.0
+      }
+    ],
+    "15": [
+      {
+        "loadout": "木勺水花",
+        "battles": 20000,
+        "win_pct": 99.74,
+        "lose_pct": 0.26,
+        "win_score_pct": 99.74,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺卷团",
+        "battles": 20000,
+        "win_pct": 99.76,
+        "lose_pct": 0.24,
+        "win_score_pct": 99.76,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺呼吸",
+        "battles": 20000,
+        "win_pct": 99.77,
+        "lose_pct": 0.23,
+        "win_score_pct": 99.77,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕水花",
+        "battles": 20000,
+        "win_pct": 99.77,
+        "lose_pct": 0.23,
+        "win_score_pct": 99.77,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕卷团",
+        "battles": 20000,
+        "win_pct": 99.805,
+        "lose_pct": 0.195,
+        "win_score_pct": 99.805,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕呼吸",
+        "battles": 20000,
+        "win_pct": 99.83,
+        "lose_pct": 0.17,
+        "win_score_pct": 99.83,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇水花",
+        "battles": 20000,
+        "win_pct": 99.74,
+        "lose_pct": 0.26,
+        "win_score_pct": 99.74,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇卷团",
+        "battles": 20000,
+        "win_pct": 99.775,
+        "lose_pct": 0.225,
+        "win_score_pct": 99.775,
+        "draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇呼吸",
+        "battles": 20000,
+        "win_pct": 99.77,
+        "lose_pct": 0.23,
+        "win_score_pct": 99.77,
+        "draw_pct": 0.0
+      }
+    ]
+  }
+}

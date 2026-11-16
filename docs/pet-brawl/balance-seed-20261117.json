@@ -1,0 +1,111 @@
+{
+  "independent_seeds": 1000,
+  "trials_per_ordered_pair": 2000,
+  "battles_per_mode": 162000,
+  "total_battles": 162000,
+  "seed": 20261117,
+  "note": "配装及交换局共享随机样本；总局数不代表独立统计样本数。",
+  "results": {
+    "balanced": [
+      {
+        "loadout": "木勺水花",
+        "battles": 18000,
+        "win_pct": 50.306,
+        "lose_pct": 49.694,
+        "win_score_pct": 50.306,
+        "draw_pct": 0.0,
+        "avg_rounds": 9.946,
+        "mirror_initial_first_win_pct": 49.5,
+        "mirror_draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺卷团",
+        "battles": 18000,
+        "win_pct": 48.506,
+        "lose_pct": 51.433,
+        "win_score_pct": 48.536,
+        "draw_pct": 0.061,
+        "avg_rounds": 10.762,
+        "mirror_initial_first_win_pct": 48.4,
+        "mirror_draw_pct": 0.0
+      },
+      {
+        "loadout": "木勺呼吸",
+        "battles": 18000,
+        "win_pct": 50.244,
+        "lose_pct": 49.667,
+        "win_score_pct": 50.289,
+        "draw_pct": 0.089,
+        "avg_rounds": 10.781,
+        "mirror_initial_first_win_pct": 48.0,
+        "mirror_draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕水花",
+        "battles": 18000,
+        "win_pct": 50.644,
+        "lose_pct": 49.256,
+        "win_score_pct": 50.694,
+        "draw_pct": 0.1,
+        "avg_rounds": 10.776,
+        "mirror_initial_first_win_pct": 48.0,
+        "mirror_draw_pct": 0.0
+      },
+      {
+        "loadout": "护腕卷团",
+        "battles": 18000,
+        "win_pct": 48.578,
+        "lose_pct": 50.494,
+        "win_score_pct": 49.042,
+        "draw_pct": 0.928,
+        "avg_rounds": 11.469,
+        "mirror_initial_first_win_pct": 48.7,
+        "mirror_draw_pct": 3.9
+      },
+      {
+        "loadout": "护腕呼吸",
+        "battles": 18000,
+        "win_pct": 50.183,
+        "lose_pct": 48.839,
+        "win_score_pct": 50.672,
+        "draw_pct": 0.978,
+        "avg_rounds": 11.481,
+        "mirror_initial_first_win_pct": 48.9,
+        "mirror_draw_pct": 3.4
+      },
+      {
+        "loadout": "折扇水花",
+        "battles": 18000,
+        "win_pct": 50.811,
+        "lose_pct": 49.189,
+        "win_score_pct": 50.811,
+        "draw_pct": 0.0,
+        "avg_rounds": 9.941,
+        "mirror_initial_first_win_pct": 49.5,
+        "mirror_draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇卷团",
+        "battles": 18000,
+        "win_pct": 48.917,
+        "lose_pct": 51.006,
+        "win_score_pct": 48.956,
+        "draw_pct": 0.078,
+        "avg_rounds": 10.757,
+        "mirror_initial_first_win_pct": 47.7,
+        "mirror_draw_pct": 0.0
+      },
+      {
+        "loadout": "折扇呼吸",
+        "battles": 18000,
+        "win_pct": 50.644,
+        "lose_pct": 49.256,
+        "win_score_pct": 50.694,
+        "draw_pct": 0.1,
+        "avg_rounds": 10.776,
+        "mirror_initial_first_win_pct": 48.0,
+        "mirror_draw_pct": 0.0
+      }
+    ]
+  }
+}
