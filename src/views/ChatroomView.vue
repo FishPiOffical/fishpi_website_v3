@@ -847,8 +847,8 @@ function clearScreen() {
 
 .classic-sidebar {
   position: sticky;
-  top: calc(var(--fp-nav-h) + 12px);
-  max-height: calc(100dvh - var(--fp-nav-h) - 24px);
+  top: calc(var(--fp-nav-h) + var(--fp-page-top));
+  max-height: calc(100dvh - var(--fp-nav-h) - 2 * var(--fp-page-top));
   overflow-y: auto;
   scrollbar-width: thin;
   overflow-anchor: none;
