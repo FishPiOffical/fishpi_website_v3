@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getAuthContextVersion } from '@/api/http'
-import { brawlSkills, brawlWeapons, readBrawlHistory, readBrawlReport, readBrawlState, type BrawlSkill, type BrawlSummary, type BrawlWeapon } from '@/api/v3-pets'
+import { brawlSkills, brawlWeapons, readBrawlHistory, readBrawlReport, readBrawlState, type BrawlProduct, type BrawlSkill, type BrawlSlot, type BrawlSummary, type BrawlWeapon } from '@/api/v3-pets'
 import { petPortrait } from '@/components/pets/animations'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetBrawlCheckout from '@/components/pets/PetBrawlCheckout.vue'
@@ -45,6 +45,28 @@ const pvpDirty = computed(() => !!state.value?.pvp?.enabled &&
 const level = computed(() => state.value?.levels[weapon.value] ?? 0)
 const growth = computed(() => state.value?.growth[level.value])
 const nextGrowth = computed(() => state.value?.growth[level.value + 1])
+const selectedGear = computed(() => state.value?.gear?.weapons[weapon.value])
+const gearOptions = computed(() => {
+  if (!selectedGear.value || !state.value?.gear) return []
+  const current = selectedGear.value
+  return state.value.gear.catalog.map(item => {
+    const rank = item.id === 'ARTIFACT' ? current.artifact : item.id === 'SLOT' ? current.slot : item.rank
+    const cost = item.id === 'ARTIFACT' && level.value < 5 ? undefined : item.costs[rank]
+    return { id: item.id, name: item.name, level: rank, cost, hp: item.hp, attack: item.attack }
+  })
+})
+const socketDraft = ref<Record<BrawlSlot, BrawlProduct | ''>>({ soul: '', rune: '' })
+watch(selectedGear, set => { socketDraft.value = { soul: set?.soul ?? '', rune: set?.rune ?? '' } }, { immediate: true })
+const ownedSocketItems = (slot: BrawlSlot) => state.value?.gear?.catalog.filter(item =>
+  item.rank > 0 && item.id.startsWith(slot === 'soul' ? 'SOUL_' : 'RUNE_')) ?? []
+async function socket(slot: BrawlSlot) {
+  const current = state.value
+  if (locked.value || !current?.petId || !current.gear || !selectedGear.value ||
+      (slot === 'rune' && !selectedGear.value.slot) || socketDraft.value[slot] === selectedGear.value[slot]) return
+  const confirmed = await pets.executeBrawl({ kind: 'brawl-socket', petId: current.petId, version: current.version,
+    revision: current.gear.revision, weapon: weapon.value, slot, item: socketDraft.value[slot] })
+  if (!confirmed && !pets.pending && mounted && state.value?.petId === current.petId && pets.error) void refresh()
+}
 const cost = computed(() => state.value?.costs[level.value])
 const turn = computed(() => report.value?.turns[frame.value - 1])
 const ended = computed(() => !!report.value && frame.value >= report.value.turns.length)
@@ -182,6 +204,10 @@ watch(() => pets.confirmedEvent, event => {
     status.value = '对战报名已更新'
     void refresh()
   }
+  if (event.kind === 'brawl-socket') {
+    status.value = '镶嵌配置已保存'
+    void refresh()
+  }
   if (event.kind === 'brawl-upgrade' || event.kind === 'brawl-confirm') {
     status.value = '强化完成'
     void refresh()
@@ -240,13 +266,27 @@ onUnmounted(() => { mounted = false; clear() })
           <label>招式<select v-model="skill" :disabled="locked"><option v-for="item in brawlSkills" :key="item" :value="item">{{ skills[item] }}</option></select></label>
           <label>对手<select v-model.number="stage" :disabled="locked"><option v-for="item in state.stages" :key="item" :value="item">第 {{ item }} 关 · {{ opponents[item - 1] }}{{ item <= state.cleared ? '（已通关）' : item > state.unlocked ? '（仅陪练）' : '' }}</option></select></label>
         </div>
-        <p v-if="growth" class="subtle">生命 {{ hp(growth.maxHp) }} · 基础伤害 {{ hp(growth.attack) }}</p>
-        <p v-if="nextGrowth" class="subtle">下一级 · 生命 {{ hp(nextGrowth.maxHp) }} · 基础伤害 {{ hp(nextGrowth.attack) }}</p>
+        <p v-if="growth" class="subtle">生命 {{ hp(growth.maxHp + (selectedGear?.hp ?? 0)) }} · 基础伤害 {{ hp(growth.attack + (selectedGear?.attack ?? 0)) }}</p>
+        <p v-if="nextGrowth" class="subtle">下一级 · 生命 {{ hp(nextGrowth.maxHp + (selectedGear?.hp ?? 0)) }} · 基础伤害 {{ hp(nextGrowth.attack + (selectedGear?.attack ?? 0)) }}</p>
         <div class="actions">
           <button type="button" :disabled="locked || !cost || state.materials < cost" @click="upgrade()">{{ cost ? `强化至 +${level + 1} · ${cost} 材料` : '已达最高等级' }}</button>
           <PetBrawlCheckout v-if="state.petId" :pet-id="state.petId" :weapon="weapon" :level="level"
-            :version="state.version" :materials="state.materials" :cost="cost" :disabled="locked" />
+            :version="state.version" :materials="state.materials" :cost="cost" :disabled="locked" :gear-options="gearOptions" />
         </div>
+        <template v-if="selectedGear">
+          <hr />
+          <h2>进阶配装</h2>
+          <p class="subtle">{{ selectedGear.artifact ? '已进阶神器' : level === 5 ? '可在积分强化与订单中进阶神器' : '武器 +5 后可进阶神器' }} · 装备增益 生命 +{{ hp(selectedGear.hp) }}，基础伤害 +{{ hp(selectedGear.attack) }}</p>
+          <div v-for="slot in (['soul', 'rune'] as const)" :key="slot" class="socket-row">
+            <label :for="`brawl-slot-${slot}`">{{ slot === 'soul' ? '魂珠槽' : '符石槽' }}</label>
+            <select :id="`brawl-slot-${slot}`" v-model="socketDraft[slot]" :disabled="locked || slot === 'rune' && !selectedGear.slot">
+              <option value="">{{ slot === 'rune' && !selectedGear.slot ? '第二槽未解锁' : '空槽（可拆卸）' }}</option>
+              <option v-for="item in ownedSocketItems(slot)" :key="item.id" :value="item.id">{{ item.name }} Lv.{{ item.rank }}</option>
+            </select>
+            <button type="button" :disabled="locked || socketDraft[slot] === selectedGear[slot] || slot === 'rune' && !selectedGear.slot"
+              @click="socket(slot)">{{ socketDraft[slot] ? '保存镶嵌' : '拆卸' }}</button>
+          </div>
+        </template>
         <template v-if="state.pvp">
           <hr />
           <h2>实装对战</h2>
@@ -274,12 +314,14 @@ onUnmounted(() => { mounted = false; clear() })
             <div>
               <img :src="petPortrait(report.species)" alt="" width="86" height="86">
               <strong>我的宠物</strong><span>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</span>
+              <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ hp(report.player.gearHp) }} · 伤害 +{{ hp(report.player.gearAttack) }}</span>
               <progress aria-label="我的宠物生命" :max="report.player.maxHp" :value="turn?.playerHp ?? report.player.maxHp" />
               <span>{{ hp(turn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
             </div>
             <div>
               <img :src="petPortrait(report.opponentSpecies ?? 'momota')" alt="" width="86" height="86">
               <strong>{{ report.mode === 'pvp' ? '对手宠物' : opponents[report.stage - 1] }}</strong><span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
+              <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
               <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="turn?.opponentHp ?? report.opponent.maxHp" />
               <span>{{ hp(turn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
             </div>
@@ -330,6 +372,7 @@ button:not(:disabled) { cursor: pointer; }
 button:not(:disabled):hover { background: var(--fp-hover); }
 button.primary:not(:disabled) { background: var(--fp-primary-soft); color: var(--fp-primary); }
 button:disabled { opacity: .55; }
+.socket-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-top: 8px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .subtle, time { color: var(--fp-muted); font-size: .875rem; }
 hr { border: 0; border-top: 1px solid var(--fp-border); margin: 16px 0; }

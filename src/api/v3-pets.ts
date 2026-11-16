@@ -156,12 +156,16 @@ export const brawlWeapons = ['SPOON', 'GUARD', 'FAN'] as const
 export const brawlSkills = ['SPLASH', 'CURL', 'BREATHE'] as const
 export type BrawlWeapon = typeof brawlWeapons[number]
 export type BrawlSkill = typeof brawlSkills[number]
+export const brawlProducts = ['ARTIFACT', 'SLOT', 'SOUL_VITAL', 'SOUL_EDGE', 'RUNE_GUARD', 'RUNE_SPARK'] as const
+export type BrawlProduct = typeof brawlProducts[number]
+export type BrawlSlot = 'soul' | 'rune'
 export type BrawlCommand = { petId: string; version: number } & (
   | { kind: 'brawl-fight'; weapon: BrawlWeapon; skill: BrawlSkill; stage: number; practice: boolean }
   | { kind: 'brawl-upgrade'; weapon: BrawlWeapon; level: number }
   | { kind: 'brawl-enroll'; weapon: BrawlWeapon; skill: BrawlSkill; enabled: boolean; revision: string }
   | { kind: 'brawl-match'; revision: string }
-  | { kind: 'brawl-quote'; weapon: BrawlWeapon; level: number; materials: number }
+  | { kind: 'brawl-quote'; weapon: BrawlWeapon; level: number; materials: number; product?: BrawlProduct }
+  | { kind: 'brawl-socket'; weapon: BrawlWeapon; slot: BrawlSlot; item: BrawlProduct | ''; revision: number }
   | { kind: 'brawl-confirm'; orderId: string }
 )
 export interface BrawlSummary {
@@ -542,7 +546,8 @@ function brawlSetup(value: unknown) {
   const skill = brawlSkills.find(option => option === row.skill)
   if (!weapon || !skill) throw invalid()
   return { weapon, skill, level: integer(row.level, 0, 5),
-    maxHp: integer(row.maxHp, 1), attack: integer(row.attack, 1) }
+    maxHp: integer(row.maxHp, 1), attack: integer(row.attack, 1), gearHp: integer(row.gearHp ?? 0, 0, 40),
+    gearAttack: integer(row.gearAttack ?? 0, 0, 10) }
 }
 
 function brawlSummary(value: unknown): BrawlSummary {
@@ -569,6 +574,34 @@ function brawlPvp(value: unknown) {
     received: integer(row.received, 0, receivedLimit), receivedLimit }
 }
 
+function brawlProduct(value: unknown): BrawlProduct {
+  const product = brawlProducts.find(item => item === value)
+  if (!product) throw invalid()
+  return product
+}
+function brawlGear(value: unknown) {
+  if (value === undefined) return null
+  const row = object(value), ranks = object(row.ranks), weapons = object(row.weapons), bonuses = object(row.bonuses)
+  const details = (weapon: BrawlWeapon) => {
+    const entry = object(weapons[weapon]), bonus = object(bonuses[weapon])
+    const soul = entry.soul === '' ? '' : brawlProduct(entry.soul)
+    const rune = entry.rune === '' ? '' : brawlProduct(entry.rune)
+    if (soul && !soul.startsWith('SOUL_') || rune && !rune.startsWith('RUNE_')) throw invalid()
+    return { artifact: integer(entry.artifact, 0, 1), slot: integer(entry.slot, 0, 1), soul, rune,
+      hp: integer(bonus.hp, 0, 40), attack: integer(bonus.attack, 0, 10) } as const
+  }
+  const catalog = unique(list(row.catalog, 6).map(value => {
+    const item = object(value)
+    const id = brawlProduct(item.id)
+    const costs = list(item.costs, 3).map(cost => integer(cost, 1, 220))
+    if (costs.length !== (id === 'ARTIFACT' || id === 'SLOT' ? 1 : 3)) throw invalid()
+    return { id, name: text(item.name, 24), hp: integer(item.hp, 0, 40), attack: integer(item.attack, 0, 10),
+      costs, rank: integer(ranks[id] ?? 0, 0, 3) }
+  }), item => item.id)
+  if (catalog.length !== 6) throw invalid()
+  return { revision: integer(row.revision), catalog, weapons: { SPOON: details('SPOON'), GUARD: details('GUARD'), FAN: details('FAN') } }
+}
+
 export const readBrawlState = (signal?: AbortSignal) => read(brawlPath, value => {
   const row = object(value)
   const levels = object(row.levels)
@@ -585,7 +618,7 @@ export const readBrawlState = (signal?: AbortSignal) => read(brawlPath, value =>
     species: row.species === null ? null : ([...speciesIds].find(id => id === row.species) as PetSpeciesId | undefined),
     level: integer(row.level, 0, 30), minLevel: integer(row.minLevel, 1, 30), version: integer(row.version, 1),
     materials: integer(row.materials), stages, unlocked: integer(row.unlocked, 1, stages), cleared: integer(row.cleared, 0, stages), costs, rewards, growth,
-    rewardCount: integer(row.rewardCount, 0, rewards.length), pvp: brawlPvp(row.pvp),
+    rewardCount: integer(row.rewardCount, 0, rewards.length), pvp: brawlPvp(row.pvp), gear: brawlGear(row.gear),
     levels: { SPOON: integer(levels.SPOON, 0, 5), GUARD: integer(levels.GUARD, 0, 5), FAN: integer(levels.FAN, 0, 5) } }
 }, signal)
 
@@ -622,7 +655,7 @@ function brawlOrder(value: unknown) {
   const level = integer(row.level, 0, 4), createdAt = integer(row.createdAt), expiresAt = integer(row.expiresAt)
   if (expiresAt <= createdAt || (status === 'completed' && integer(row.completedAt) >= expiresAt)) throw invalid()
   return { id: brawlId(row.id), petId: brawlId(row.petId), weapon, status, level, createdAt, expiresAt,
-    materials: integer(row.materials, 0, 220), points: integer(row.points, 0, 2200), version: integer(row.version, 1) } as const
+    product: row.product === undefined ? undefined : brawlProduct(row.product), materials: integer(row.materials, 0, 220), points: integer(row.points, 0, 2200), version: integer(row.version, 1) } as const
 }
 export type BrawlOrder = ReturnType<typeof brawlOrder>
 export const readBrawlOrders = (before?: string, signal?: AbortSignal) => read(
@@ -708,11 +741,11 @@ export async function executePetCommand(command: PetCommand, signal?: AbortSigna
     : command.kind === 'brawl-confirm' ? { petId: command.petId } : input
   const routes: Partial<Record<PetCommand['kind'], string>> = {
     'brawl-fight': `${brawlPath}/matches`, 'brawl-upgrade': `${brawlPath}/upgrade`,
-    'brawl-enroll': `${brawlPath}/profile`, 'brawl-match': `${brawlPath}/pvp`, 'brawl-quote': `${brawlPath}/orders`,
+    'brawl-enroll': `${brawlPath}/profile`, 'brawl-match': `${brawlPath}/pvp`, 'brawl-quote': `${brawlPath}/orders`, 'brawl-socket': `${brawlPath}/socket`,
   }
   const path = command.kind === 'brawl-confirm' ? `${brawlPath}/orders/${brawlId(command.orderId)}/confirm` : routes[kind] ?? `/api/v3/me/pet/${kind}`
   const response = await petRequest<{ code: number; data: unknown }>(path, {
-    method: kind === 'name' || kind === 'brawl-enroll' ? 'PUT' : 'POST',
+    method: kind === 'name' || kind === 'brawl-enroll' || kind === 'brawl-socket' ? 'PUT' : 'POST',
     headers: { 'Idempotency-Key': key }, body: JSON.stringify(body), signal,
   })
   if (response?.code !== 0) throw invalid()

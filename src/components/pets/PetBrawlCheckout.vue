@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, useId, watch } from 'vue'
 import FpDialog from '@/components/FpDialog.vue'
 import { getAuthContextVersion } from '@/api/http'
-import { readBrawlOrder, readBrawlOrders, type BrawlOrder, type BrawlWeapon } from '@/api/v3-pets'
+import { readBrawlOrder, readBrawlOrders, type BrawlOrder, type BrawlProduct, type BrawlWeapon } from '@/api/v3-pets'
 import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
 
-const props = defineProps<{ petId: string; weapon: BrawlWeapon; level: number; version: number; cost?: number; materials: number; disabled: boolean }>()
+const props = defineProps<{ petId: string; weapon: BrawlWeapon; level: number; version: number; cost?: number; materials: number; disabled: boolean;
+  gearOptions: { id: BrawlProduct; name: string; level: number; cost?: number; hp: number; attack: number }[] }>()
 const pets = usePetsStore()
 const auth = useAuthStore()
 const names = { SPOON: '小木勺', GUARD: '软垫护腕', FAN: '折纸扇' }
@@ -18,8 +19,12 @@ const loading = ref(false)
 const next = ref<string | null>(null)
 const balance = ref<number>()
 const deduction = ref(0)
+const selectionId = useId()
+const product = ref<BrawlProduct | ''>('')
+const target = computed(() => props.gearOptions.find(option => option.id === product.value))
+const costToQuote = computed(() => target.value ? target.value.cost : props.cost)
 const problem = ref('')
-const maximum = computed(() => Math.min(props.cost ?? 0, props.materials))
+const maximum = computed(() => Math.min(costToQuote.value ?? 0, props.materials))
 const blocked = computed(() => loading.value || pets.busy || !!pets.pending || pets.offline)
 const pendingHere = computed(() => pets.pending?.kind === 'brawl-quote' || pets.pending?.kind === 'brawl-confirm')
 const affordable = computed(() => !!selected.value && (selected.value.points === 0 || (balance.value ?? -1) >= selected.value.points))
@@ -58,6 +63,7 @@ async function show(id: string) {
   } catch (reason) { fail(reason, signal) } finally { if (!signal.aborted) loading.value = false }
 }
 function open() {
+  product.value = props.cost ? '' : props.gearOptions.find(option => option.cost)?.id ?? ''
   opened.value = true
   selected.value = undefined
   followUpOrder = undefined
@@ -78,10 +84,11 @@ function back() {
   void readList()
 }
 function quote() {
-  if (blocked.value || props.disabled || !props.cost || !Number.isInteger(deduction.value)
+  if (blocked.value || props.disabled || !costToQuote.value || !Number.isInteger(deduction.value)
       || deduction.value < 0 || deduction.value > maximum.value) return
   void pets.executeBrawl({ kind: 'brawl-quote', petId: props.petId, weapon: props.weapon,
-    level: props.level, version: props.version, materials: deduction.value })
+    level: target.value?.level ?? props.level, version: props.version, materials: deduction.value,
+    ...(target.value ? { product: target.value.id } : {}) })
 }
 async function confirm() {
   const current = selected.value
@@ -89,6 +96,13 @@ async function confirm() {
   const confirmed = await pets.executeBrawl({ kind: 'brawl-confirm', petId: current.petId, version: current.version, orderId: current.id })
   if (!confirmed && !pets.pending && opened.value && selected.value?.id === current.id) void show(current.id)
 }
+function orderLabel(order: BrawlOrder) {
+  if (!order.product) return `${names[order.weapon]} +${order.level + 1}`
+  const label = props.gearOptions.find(item => item.id === order.product)?.name ?? order.product
+  return order.product === 'ARTIFACT' || order.product === 'SLOT'
+    ? `${names[order.weapon]} · ${label}` : `${label} Lv.${order.level + 1}`
+}
+watch(product, () => { deduction.value = maximum.value })
 watch(() => pets.confirmedEvent, event => {
   if (!opened.value || !event?.orderId) return
   void show(event.orderId)
@@ -120,7 +134,7 @@ onUnmounted(() => request?.abort())
       <p v-else-if="pets.error && !pets.busy" role="alert">{{ pets.error }}</p>
       <button v-if="pendingHere" type="button" :disabled="pets.busy || pets.offline" @click="pets.retryPending()">继续原操作</button>
       <template v-if="selected">
-        <h3>{{ names[selected.weapon] }}强化至 +{{ selected.level + 1 }}</h3>
+        <h3>{{ orderLabel(selected) }}</h3>
         <dl>
           <div><dt>订单</dt><dd>{{ selected.id }}</dd></div>
           <div><dt>状态</dt><dd role="status">{{ labels[selected.status] }}</dd></div>
@@ -135,15 +149,23 @@ onUnmounted(() => request?.abort())
         </div>
       </template>
       <template v-else>
-        <form v-if="cost" class="quote-form" @submit.prevent="quote()">
+        <form v-if="cost || gearOptions.some(item => item.cost)" class="quote-form" @submit.prevent="quote()">
+          <template v-if="gearOptions.length">
+            <label :for="selectionId">打造项目</label>
+            <select :id="selectionId" v-model="product" :disabled="blocked">
+              <option value="" :disabled="!cost">{{ names[weapon] }}强化</option>
+              <option v-for="option in gearOptions" :key="option.id" :value="option.id" :disabled="!option.cost">{{ option.name }}{{ option.cost ? '' : '（暂不可用）' }}</option>
+            </select>
+          </template>
+          <p v-if="target && (target.hp || target.attack)">本次提升生命 {{ (target.hp / 100).toFixed(2) }} · 基础伤害 {{ (target.attack / 100).toFixed(2) }}</p>
           <label>抵扣材料<input v-model.number="deduction" type="number" min="0" :max="maximum" step="1" required :disabled="blocked"></label>
           <small>最多可用 {{ maximum }}，每份抵扣 10 积分。</small>
-          <button type="submit" :disabled="blocked || disabled || typeof deduction !== 'number'">获取 {{ names[weapon] }} +{{ level + 1 }} 报价</button>
+          <button type="submit" :disabled="blocked || disabled || !costToQuote || typeof deduction !== 'number'">获取{{ target ? ` ${target.name}` : ` ${names[weapon]} +${level + 1}` }}报价</button>
         </form>
         <h3>最近订单</h3>
         <p v-if="!orders.length && !loading && !problem">暂无订单</p>
         <ul v-else>
-          <li v-for="order in orders" :key="order.id"><button type="button" :disabled="loading || pets.busy" @click="show(order.id)">{{ names[order.weapon] }} +{{ order.level + 1 }} · {{ labels[order.status] }} · {{ order.points }} 积分</button></li>
+          <li v-for="order in orders" :key="order.id"><button type="button" :disabled="loading || pets.busy" @click="show(order.id)">{{ orderLabel(order) }} · {{ labels[order.status] }} · {{ order.points }} 积分</button></li>
         </ul>
         <button v-if="next" type="button" :disabled="loading" @click="readList(next)">更早订单</button>
       </template>
@@ -160,7 +182,7 @@ onUnmounted(() => request?.abort())
 dl { display: grid; gap: 6px; }
 dl div { display: flex; justify-content: space-between; gap: 12px; }
 dd { margin: 0; overflow-wrap: anywhere; }
-input, button { min-height: 40px; border: 1px solid var(--fp-border); border-radius: 8px; padding: 6px 12px; background: var(--fp-card); color: var(--fp-text); font: inherit; }
+input, select, button { min-height: 40px; border: 1px solid var(--fp-border); border-radius: 8px; padding: 6px 12px; background: var(--fp-card); color: var(--fp-text); font: inherit; }
 button:not(:disabled) { cursor: pointer; }
 button:disabled { opacity: .55; }
 .quote-form, .quote-form label { display: grid; gap: 8px; }
