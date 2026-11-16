@@ -12,6 +12,8 @@ const props = withDefaults(
     /** 为 true 时点遮罩、按 Esc 都不关闭，只能点按钮 */
     persistent?: boolean
     closable?: boolean
+    /** 内容区域自带间距，保留统一的标题、滚动容器与遮罩。 */
+    flush?: boolean
     /** top：人机验证等必须压在其它弹窗之上的层 */
     layer?: 'base' | 'top'
   }>(),
@@ -47,8 +49,15 @@ function onMask() {
 }
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape' && !props.persistent && props.closable) close()
+  if (e.key !== 'Escape' || e.defaultPrevented || !props.open) return
+  const dialogs = Array.from(document.querySelectorAll('.fp-dialog-mask:not(.fp-dialog-leave-active)'))
+  const top = dialogs.filter(node => node.classList.contains('layer-top')).at(-1) ?? dialogs.at(-1)
+  if (top !== mask.value) return
+  if (!props.persistent && props.closable) close()
+  e.preventDefault()
 }
+
+const mask = ref<HTMLElement | null>(null)
 
 watch(
   () => props.open,
@@ -69,19 +78,19 @@ onBeforeUnmount(() => {
 <template>
   <Teleport v-if="mounted" to="body">
     <Transition name="fp-dialog">
-      <div v-if="open" class="fp-dialog-mask" :class="`layer-${layer}`" @pointerdown="onPointerDown" @pointerup="onPointerUp" @pointercancel="pointerStartedOnMask = false" @click.self="onMask">
+      <div v-if="open" ref="mask" class="fp-dialog-mask" :class="`layer-${layer}`" @pointerdown="onPointerDown" @pointerup="onPointerUp" @pointercancel="pointerStartedOnMask = false" @click.self="onMask">
         <div
           class="fp-dialog"
-          :class="`tone-${tone}`"
+          :class="[`tone-${tone}`, { 'fp-dialog--flush': flush }]"
           :style="{ maxWidth: `${width}px` }"
           role="dialog"
           aria-modal="true"
           :aria-labelledby="title || $slots.title ? titleId : undefined"
         >
           <header v-if="title || $slots.title || closable" class="fp-dialog-head">
-            <strong :id="titleId" class="fp-dialog-title">
+            <h2 :id="titleId" class="fp-dialog-title">
               <slot name="title">{{ title }}</slot>
-            </strong>
+            </h2>
             <button v-if="closable" type="button" class="fp-dialog-x" aria-label="关闭" @click="close">✕</button>
           </header>
           <div class="fp-dialog-body">
@@ -98,13 +107,17 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .fp-dialog-mask {
+  --dialog-edge: 20px;
+  --dialog-top: max(var(--dialog-edge), env(safe-area-inset-top));
+  --dialog-bottom: max(var(--dialog-edge), env(safe-area-inset-bottom));
   position: fixed;
   inset: 0;
   z-index: 1300;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: var(--dialog-top) max(var(--dialog-edge), env(safe-area-inset-right))
+    var(--dialog-bottom) max(var(--dialog-edge), env(safe-area-inset-left));
   background: var(--fp-mask-bg, rgba(0, 0, 0, 0.55));
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -113,11 +126,13 @@ onBeforeUnmount(() => {
   z-index: 1400;
 }
 .fp-dialog {
+  --dialog-inset: var(--fp-panel-padding, 20px);
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-height: calc(100vh - 40px);
-  background: color-mix(in srgb, var(--fp-card) 96%, transparent);
+  max-height: calc(100vh - var(--dialog-top) - var(--dialog-bottom));
+  max-height: calc(100dvh - var(--dialog-top) - var(--dialog-bottom));
+  background: var(--fp-card);
   color: var(--fp-text);
   border: 1px solid var(--fp-border-strong, var(--fp-border));
   border-radius: var(--fp-radius-xl, 14px);
@@ -128,17 +143,21 @@ onBeforeUnmount(() => {
   border-top: 3px solid var(--fp-danger, var(--fp-accent));
 }
 .fp-dialog-head {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 15px 20px 13px;
+  padding: 10px var(--dialog-inset);
   border-bottom: 1px solid var(--fp-border);
 }
 .fp-dialog-title {
   flex: 1;
   min-width: 0;
-  font-size: 15px;
-  font-weight: 600;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
   color: var(--fp-title);
 }
 .fp-dialog-x {
@@ -146,8 +165,8 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   border: 0;
   border-radius: var(--fp-radius-sm, 6px);
@@ -162,21 +181,39 @@ onBeforeUnmount(() => {
   background: var(--fp-hover);
   color: var(--fp-title);
 }
+.fp-dialog-x:focus-visible {
+  outline: 2px solid var(--fp-primary);
+  outline-offset: -2px;
+}
 .fp-dialog-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 18px 20px;
+  overscroll-behavior: contain;
+  padding: 16px var(--dialog-inset);
   font-size: 14px;
   line-height: 1.6;
 }
+.fp-dialog--flush .fp-dialog-body {
+  padding: 0;
+}
 .fp-dialog-foot {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  padding: 0 20px 18px;
+  padding: 12px var(--dialog-inset);
+  border-top: 1px solid var(--fp-border);
+}
+@media (max-width: 640px) {
+  .fp-dialog-mask { --dialog-edge: 12px; }
+  .fp-dialog-head { padding-block: 6px; }
+}
+@media (pointer: coarse) {
+  .fp-dialog-x { width: 44px; height: 44px; }
+  .fp-dialog-foot :deep(:is(button, a)) { min-height: 44px; }
 }
 
 .fp-dialog-enter-active,
@@ -194,5 +231,11 @@ onBeforeUnmount(() => {
 .fp-dialog-enter-from .fp-dialog,
 .fp-dialog-leave-to .fp-dialog {
   transform: translateY(10px) scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fp-dialog-enter-active, .fp-dialog-leave-active,
+  .fp-dialog-enter-active .fp-dialog, .fp-dialog-leave-active .fp-dialog {
+    transition: none;
+  }
 }
 </style>

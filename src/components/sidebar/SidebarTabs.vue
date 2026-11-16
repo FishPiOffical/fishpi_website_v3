@@ -155,14 +155,14 @@ onMounted(() => {
     <template v-else>
       <header class="sidebar-tabs-heading">
         <button v-if="overflow" type="button" class="tab-scroll tab-scroll-back" aria-label="向前滚动标签" :disabled="!canScrollBack" @click="scrollTabs(-1)"><SidebarIcon name="chevron" /></button>
-        <div v-if="modules.length" ref="tablist" class="sidebar-tablist" role="tablist" :aria-label="ariaLabel" @scroll.passive="updateOverflow">
+        <div v-if="modules.length" ref="tablist" class="sidebar-tablist fp-tabs" role="tablist" :aria-label="ariaLabel" @scroll.passive="updateOverflow">
           <button
             v-for="mod in modules"
             :id="`${uid}-tab-${mod.id}`"
             :key="mod.id"
             type="button"
             role="tab"
-            class="sidebar-tab"
+            class="sidebar-tab fp-tab"
             :aria-selected="activeId === mod.id"
             :aria-controls="`${uid}-panel-${mod.id}`"
             :tabindex="(focusedId || activeId) === mod.id ? 0 : -1"
@@ -209,15 +209,11 @@ onMounted(() => {
   box-shadow: 0 2px 5px rgb(20 30 45 / 4%);
   container: sidebar-tabs / inline-size;
 }
-.sidebar-tabs-heading { display: flex; flex: none; align-items: center; gap: 2px; min-height: 50px; padding: 0 10px; border-bottom: 1px solid var(--fp-border); }
+.sidebar-tabs-heading { display: flex; flex: none; align-items: center; gap: 2px; min-height: 50px; padding: 3px 10px; border-bottom: 1px solid var(--fp-border); }
 .sidebar-tablist { display: flex; flex: 1; align-self: stretch; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
 .sidebar-tablist::-webkit-scrollbar { display: none; }
-.sidebar-tab { position: relative; flex: none; min-height: 49px; padding: 0 12px; border: 0; border-radius: 0; background: transparent; color: var(--fp-muted); font: inherit; font-size: 13px; line-height: 1.5; white-space: nowrap; cursor: pointer; transition: color .15s; }
-.sidebar-tab::after { content: ''; position: absolute; inset-inline: 12px; bottom: 0; height: 2px; border-radius: 2px; background: var(--fp-primary); transform: scaleX(0); transition: transform .15s; }
-.sidebar-tab:hover { color: var(--fp-title); }
-.sidebar-tab[aria-selected='true'] { color: var(--fp-title); font-weight: 650; }
-.sidebar-tab[aria-selected='true']::after { transform: scaleX(1); }
-.sidebar-tab:focus-visible, .sidebar-panel:focus-visible, .tab-scroll:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: -3px; }
+.sidebar-tab { --fp-tab-inline: 9px; }
+.sidebar-panel:focus-visible, .tab-scroll:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: -3px; }
 .tab-scroll { display: grid; flex: none; place-items: center; width: 24px; height: 36px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--fp-muted); cursor: pointer; transition: background .15s, color .15s; }
 .tab-scroll:hover:not(:disabled) { background: var(--fp-hover); color: var(--fp-title); }
 .tab-scroll:disabled { opacity: .25; cursor: default; }
@@ -236,5 +232,5 @@ onMounted(() => {
 .sidebar-placeholder span:first-child { width: 50%; }
 @media (pointer: coarse) { .tab-scroll { width: 32px; height: 44px; } }
 @keyframes sidebar-tab-enter { from { opacity: .6; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .sidebar-panel.is-active { animation: none; } .sidebar-tab, .sidebar-tab::after, .tab-scroll { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .sidebar-panel.is-active { animation: none; } .tab-scroll { transition: none; } }
 </style>

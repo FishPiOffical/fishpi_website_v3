@@ -66,12 +66,12 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
           <ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" />
           <span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span>
           <template v-if="showRecentTabs" #sort>
-            <RouterLink v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to">{{ tab.label }}</RouterLink>
+            <RouterLink class="fp-tab" v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to">{{ tab.label }}</RouterLink>
           </template>
         </ListPageHeading>
         <div v-if="isColumnPage" class="column-shelf-head">
           <div><strong>专栏目录</strong><span>按当前可见章节统计</span></div>
-          <div class="column-switch" role="tablist" aria-label="专栏排序"><button class="fp-control" type="button" role="tab" :aria-selected="columnShelf === 'recent'" :class="{ selected: columnShelf === 'recent' }" @click="columnShelf = 'recent'">最近更新</button><button class="fp-control" type="button" role="tab" :aria-selected="columnShelf === 'hot'" :class="{ selected: columnShelf === 'hot' }" @click="columnShelf = 'hot'">热门作品</button></div>
+          <div class="column-switch fp-tabs" role="group" aria-label="专栏排序"><button class="fp-tab" type="button" :aria-pressed="columnShelf === 'recent'" @click="columnShelf = 'recent'">最近更新</button><button class="fp-tab" type="button" :aria-pressed="columnShelf === 'hot'" @click="columnShelf = 'hot'">热门作品</button></div>
         </div>
         <button type="button" class="btn refresh-list fp-control" :disabled="loading" @click="read()">刷新列表</button>
         <FpLoading v-if="loading && !value" :rows="8" />
@@ -181,8 +181,6 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 .column-shelf-head strong { color: var(--fp-title); font-size: 17px; }
 .column-shelf-head span { color: var(--fp-muted); font-size: 12px; }
 .column-switch { display: flex; padding: 3px; gap: 3px; border-radius: 9px; background: var(--fp-hover); }
-.column-switch button { border: 0; padding: 6px 11px; border-radius: 7px; background: transparent; color: var(--fp-muted); font: inherit; font-size: 12px; cursor: pointer; }
-.column-switch button.selected { color: var(--fp-title); background: var(--fp-card); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 .column-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; padding: 0 16px 20px; }
 .column-card { min-width: 0; display: grid; grid-template-columns: 88px minmax(0,1fr); gap: 12px; padding: 12px; border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); background: var(--fp-card); transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
 .column-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--fp-accent) 40%, var(--fp-border)); box-shadow: 0 8px 24px rgba(60,45,30,.08); }

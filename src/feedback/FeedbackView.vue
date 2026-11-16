@@ -242,9 +242,9 @@ onUnmounted(()=>{adminSequence++;sequence++;personalSequence++;controller?.abort
 
         <template v-else>
           <div v-if="mode==='list'" class="toolbar-card fp-card">
-            <div class="cat-tabs" role="tablist" aria-label="按分类筛选">
-              <button type="button" class="cat-tab" :class="{active: filter.category===''}" @click="selectCategory('')">全部</button>
-              <button v-for="(name,key) in categories" :key="key" type="button" class="cat-tab" :class="{active: filter.category===key}" @click="selectCategory(String(key))">
+            <div class="cat-tabs fp-tabs" role="group" aria-label="按分类筛选">
+              <button type="button" class="fp-tab" :aria-pressed="filter.category === ''" @click="selectCategory('')">全部</button>
+              <button v-for="(name,key) in categories" :key="key" type="button" class="fp-tab" :aria-pressed="filter.category === key" @click="selectCategory(String(key))">
                 <span aria-hidden="true">{{ categoryIcons[key] }}</span>
                 <span>{{ name }}</span>
               </button>
@@ -586,43 +586,13 @@ button:disabled {
 }
 
 .cat-tabs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
   padding-bottom: 12px;
   margin-bottom: 12px;
   border-bottom: 1px solid var(--fp-border);
 }
 
-.cat-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--fp-muted);
-  font-size: 12.5px;
-  font-weight: 500;
-  transition: all 0.15s ease;
-}
-
-.cat-tab:hover {
-  background: var(--fp-hover);
-  color: var(--fp-text);
-}
-
-.cat-tab.active {
-  background: var(--fp-primary-soft);
-  border-color: color-mix(in srgb, var(--fp-primary) 35%, transparent);
-  color: var(--fp-primary);
-  font-weight: 600;
-}
-
 .total-badge {
+  flex: none;
   margin-left: auto;
   font-size: 12px;
   color: var(--fp-muted);

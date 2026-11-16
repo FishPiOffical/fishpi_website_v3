@@ -42,7 +42,7 @@ usePageSeo(()=>({title:title.value,path:route.path,robots:'noindex'}))
     <p v-if="!mounted">正在准备列表…</p>
     <p v-else-if="privatePage && !owner"><RouterLink :to="{path:'/login',query:{redirect:route.fullPath}}">登录后查看我的收藏</RouterLink></p>
     <template v-else>
-      <nav v-if="privatePage" class="fp-tabs" aria-label="用户关注内容"><RouterLink :to="`${base}/following/tags`">关注标签</RouterLink><RouterLink :to="`${base}/following/articles`">收藏文章</RouterLink><RouterLink :to="`${base}/watching/articles`">订阅文章</RouterLink><RouterLink :to="base">用户主页</RouterLink></nav>
+      <nav v-if="privatePage" class="fp-tabs" aria-label="用户关注内容"><RouterLink class="fp-tab" :to="`${base}/following/tags`">关注标签</RouterLink><RouterLink class="fp-tab" :to="`${base}/following/articles`">收藏文章</RouterLink><RouterLink class="fp-tab" :to="`${base}/watching/articles`">订阅文章</RouterLink><RouterLink class="fp-tab" :to="base">用户主页</RouterLink></nav>
       <p v-if="owner && kind!=='tags'">本人记录保留当前不可读的条目，正文仍按当前阅读权限判断。</p>
       <button type="button" class="refresh-saved-btn fp-control" :disabled="loading" @click="load">重新读取列表</button>
       <FpListState v-if="loading" kind="loading" message="正在读取…" />

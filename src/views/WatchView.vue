@@ -48,8 +48,8 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3A7 7 0 0 0 17.9 17"/></svg>
           </button>
         </div>
-        <nav class="watch-tabs" aria-label="关注动态类型">
-          <RouterLink v-for="tab in TABS" :key="tab.tab" :to="tab.to" :class="{current:current.tab===tab.tab}" :aria-current="current.tab===tab.tab ? 'page' : undefined">{{ tab.label }}</RouterLink>
+        <nav class="watch-tabs fp-tabs" aria-label="关注动态类型">
+          <RouterLink v-for="tab in TABS" :key="tab.tab" :to="tab.to" class="fp-tab" :aria-current="current.tab===tab.tab ? 'page' : undefined">{{ tab.label }}</RouterLink>
         </nav>
       </header>
       <p v-if="!mounted" class="message">正在准备关注动态…</p>
@@ -94,19 +94,10 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
   transition: background 160ms ease;
 }
 .watch-refresh:hover:not(:disabled) { background: var(--fp-hover); }
-.watch-tabs { display: flex; gap: 26px; overflow-x: auto; }
-.watch-tabs a {
-  position: relative; flex: none; padding: 10px 0 13px; font-size: 14px; line-height: 20px;
-  color: var(--fp-muted); text-decoration: none; white-space: nowrap;
-}
-.watch-tabs a:hover { text-decoration: none; background: var(--fp-hover); }
-.watch-tabs a.current { color: var(--fp-text); font-weight: 600; }
-.watch-tabs a.current::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--fp-accent); }
-.watch-tabs a:focus-visible,
+.watch-tabs { padding-block-end: 8px; }
 .watch-refresh:focus-visible { outline: 2px solid var(--fp-accent); outline-offset: -2px; }
 @media (max-width: 600px) {
   .watch-head h1 { font-size: 18px; }
-  .watch-tabs { gap: 22px; }
 }
 .watch-moons { margin: 0 var(--fp-panel-padding); }
 .message {

@@ -12,7 +12,7 @@ defineProps<{
         <h1 class="fp-page-title">{{ title }}</h1>
         <slot />
       </div>
-      <nav v-if="$slots.sort" class="heading-sort" aria-label="帖子排序">
+      <nav v-if="$slots.sort" class="heading-sort fp-tabs" aria-label="帖子排序">
         <slot name="sort" />
       </nav>
       <span v-if="count" class="heading-count">{{ count }}</span>
@@ -51,42 +51,13 @@ defineProps<{
 }
 
 .heading-sort {
-  display: flex;
-  flex-wrap: wrap;
+  --fp-tab-height: 28px;
+  --fp-tab-inline: 8px;
   gap: 2px;
-  max-width: 100%;
   margin-inline-start: auto;
   padding: 3px;
   border-radius: 8px;
   background: var(--fp-hover);
-}
-
-.heading-sort :slotted(a) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  min-height: 28px;
-  border-radius: 5px;
-  color: var(--fp-muted);
-  font-size: .8125rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.heading-sort :slotted(a:hover) {
-  color: var(--fp-title);
-  text-decoration: none;
-}
-
-.heading-sort :slotted(a[aria-current='page']) {
-  background: var(--fp-card);
-  color: var(--fp-primary-ink, var(--fp-primary));
-  box-shadow: var(--fp-card-shadow);
-}
-
-.heading-sort :slotted(a:focus-visible) {
-  outline-offset: -2px;
 }
 
 .heading-count {
@@ -113,9 +84,4 @@ defineProps<{
   }
 }
 
-@media (pointer: coarse) {
-  .heading-sort :slotted(a) {
-    min-height: 44px;
-  }
-}
 </style>

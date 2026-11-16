@@ -106,39 +106,60 @@
 }
 .fp-ui .fp-pagination button.fp-control { margin: 0; }
 .fp-ui .fp-pagination :where(.page-btn, .pager-btn) { min-width: 76px; }
-.fp-ui :is(nav, div).fp-tabs {
+.fp-tabs {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
-  margin: 0 0 20px;
-  padding: 4px;
-  border: 1px solid var(--fp-border);
-  border-radius: var(--fp-panel-radius);
-  background: var(--fp-card);
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
 }
-.fp-ui :is(nav, div).fp-tabs a, .fp-ui :is(nav, div).fp-tabs button.fp-control {
+.fp-tab {
+  position: relative;
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 7px 12px;
+  min-height: var(--fp-tab-height, 34px);
+  padding: 4px var(--fp-tab-inline, 10px);
   margin: 0;
   border: 0;
   border-radius: var(--fp-control-radius);
   color: var(--fp-muted);
   background: transparent;
-  font-size: 13px;
+  font-family: inherit;
+  font-size: .8125rem;
+  font-weight: 600;
   line-height: 1.5;
   text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
 }
-.fp-ui :is(nav, div).fp-tabs :is(a, button.fp-control):hover { background: var(--fp-hover); text-decoration: none; }
-.fp-ui :is(nav, div).fp-tabs a:is(.router-link-exact-active, .current),
-.fp-ui :is(nav, div).fp-tabs button.fp-control:is([aria-selected='true'], [aria-pressed='true']) {
-  color: var(--fp-primary-ink);
+.fp-tab:hover {
+  color: var(--fp-title);
+  background: var(--fp-hover);
+  text-decoration: none;
+}
+.fp-tab:is([aria-current='page'], [aria-selected='true'], [aria-pressed='true']) {
+  color: var(--fp-primary-ink, var(--fp-primary));
   background: var(--fp-primary-soft);
-  font-weight: 600;
 }
+.fp-tab:is([aria-current='page'], [aria-selected='true'], [aria-pressed='true'])::after {
+  content: '';
+  position: absolute;
+  inset: auto 8px 2px;
+  border-block-end: 2px solid currentColor;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.fp-tab:focus-visible {
+  outline: 2px solid var(--fp-primary);
+  outline-offset: -2px;
+}
+.fp-tab:disabled { opacity: .5; cursor: default; }
 .fp-ui .fp-state {
   display: flex;
   flex-direction: column;
@@ -238,13 +259,11 @@
   .fp-page--auth { margin: 12px auto; }
   .fp-ui .fp-page-heading { margin-bottom: 16px; }
   .fp-ui .fp-pagination { gap: 8px; }
-  .fp-ui :is(nav, div).fp-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
-  .fp-ui :is(nav, div).fp-tabs :is(a, button) { flex: none; white-space: nowrap; }
   .fp-ui .fp-state { min-height: 144px; padding: 24px 16px; }
 }
 @media (pointer: coarse) {
   .fp-ui .fp-pagination button.fp-control,
-  .fp-ui .fp-tabs :is(a, button.fp-control),
+  .fp-tab,
   .fp-page--auth .fp-control { min-height: 44px; }
   .fp-ui :is(input, textarea, select).fp-control { font-size: 16px; }
 }
@@ -256,7 +275,6 @@
 .fp-page.fp-ui:is(.activity-page, .milestones-page, .member-page) { gap: var(--fp-page-gap); }
 .fp-ui .fp-card > :first-child { margin-top: 0; }
 .fp-ui .fp-card > :last-child { margin-bottom: 0; }
-.fp-ui :is(nav, div).fp-tabs button.fp-control.on { color: var(--fp-primary-ink); background: var(--fp-primary-soft); }
 .fp-ui .fp-state-actions .fp-control { margin: 0; }
 
 .fp-ui a.fp-link-action { display: inline-flex; align-items: center; justify-content: center; min-height: var(--fp-control-height); padding: 7px 12px; font-size: 13px; border-radius: var(--fp-control-radius); text-decoration: none; }
