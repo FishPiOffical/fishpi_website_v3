@@ -21,7 +21,7 @@
 redir /manage /manage/ 308
 handle_path /manage/* {
     root * /opt/fishpi/current/manage
-    @assets path /assets/*
+    @assets path_regexp adminStatic ^/assets/.*[.][A-Za-z0-9]+$
     handle @assets {
         header Cache-Control "public, max-age=31536000, immutable"
         file_server
@@ -36,6 +36,8 @@ handle_path /manage/* {
 
 管理 API 继续浏览器直连 fishpi.cn，由原后端验证身份和权限；本站 `/api/v3/*` 仍返回410。上线静态页面不意味着授予管理权限。
 
+后台业务页也使用 `/assets/` 前缀。静态规则只匹配带扩展名的请求，确保 `/manage/assets/appearance` 等深链接回退到入口，缺失的 JS、CSS 等资源返回 404。
+
 ## 验证与限制
 
 - 前后台构建通过；后台 configuration、asset-recovery 两项测试通过。
@@ -48,3 +50,9 @@ handle_path /manage/* {
 ## 回滚
 
 上一发布 `/opt/fishpi/releases/20261114-df3b93b`，Caddy备份 `/etc/caddy/Caddyfile.before-combined-20261115`。将 current 原子切回上一目录、恢复该Caddy备份并校验、重启 fishpi-website、reload caddy。首次部署后台的回滚会撤下 /manage/；不重启或改写反馈数据。
+
+## 2026-11-16 联合更新
+
+前台 `d417587`、管理后台 `edfd0e1` 发布至 `/opt/fishpi/releases/20261116-d417587-admin-edfd0e1`，上一发布 `20261116-cab9a54-admin-2ef4c38` 可用于回滚。保留两端旧哈希资源；重启网站进程并加载 Caddy 的后台静态匹配修正，反馈进程保持运行。Caddy 备份为 `/etc/caddy/Caddyfile.before-admin-assets-20261116-d417587`。
+
+公网首页、聊天室、下载页、后台登录及外观、客户端、宠物管理深链接均返回 200，核对前后台入口和七个业务模块的资源 SHA-256 一致。上线时 Rhythm 公开下载目录返回 500，Chrome 确认仍能从前台下载页使用上一版公开列表。新增管理 API 的游客探测返回 401，登录后的管理读取和写入待验。
