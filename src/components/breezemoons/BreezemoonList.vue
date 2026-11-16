@@ -168,6 +168,8 @@ time {
 
 .moon-content { min-width: 0; }
 .moon-body {
+  --moon-image-width: 320px;
+  --moon-image-height: 220px;
   margin-top: 8px;
   padding-left: 44px;
   font-size: 14px;
@@ -190,6 +192,14 @@ time {
     border-radius: 6px;
   }
 
+  :deep(img:not(.emoji)) {
+    display: block;
+    width: auto;
+    max-inline-size: min(100%, var(--moon-image-width));
+    max-block-size: var(--moon-image-height);
+    object-fit: contain;
+  }
+
   :deep(pre) {
     overflow: auto;
   }
@@ -202,6 +212,8 @@ time {
   overflow: hidden;
 
   :deep(p) { margin-block: 0; }
+  // 折叠时让单图完整缩进三行预览区域，避免只露出图片的上半截。
+  :deep(img:not(.emoji)) { max-block-size: min(3lh, var(--moon-image-height)); }
 }
 .moon-expand {
   padding: 3px 0;
@@ -250,6 +262,8 @@ time {
   }
 
   .moon-body {
+    --moon-image-width: 180px;
+    --moon-image-height: 110px;
     margin-top: 4px;
     padding-left: 0;
     font-size: 12.5px;
