@@ -4,18 +4,19 @@ import { getAuthContextVersion } from '@/api/http'
 import { decodeArticleListing, fetchArticleListing, type ArticleListing, type ColumnOrder } from '@/api/v3-article-list'
 import type { ArticleFeedKind } from '@/api/fishpi'
 import { PUBLIC_LIST_TTL, readPublicSnapshot, removePublicSnapshot, savePublicSnapshot, shouldInvalidatePublicSnapshot } from '@/utils/publicSnapshots'
-export function useArticleListing(kind: Ref<ArticleFeedKind>, extra: Ref<string>, order: Ref<ColumnOrder>, initial: unknown = null) {
+export function useArticleListing(kind: Ref<ArticleFeedKind>, extra: Ref<string>, order: Ref<ColumnOrder>, initial: unknown = null, active = ref(true)) {
   const auth = useAuthStore(), value = ref<ArticleListing | null>(null), p = ref(1), loading = ref(false), error = ref('')
   if (initial) { try { value.value = decodeArticleListing(initial, kind.value, extra.value, order.value) } catch { /* Read a current page after mount. */ } }
   let mounted = false, seq = 0, fromSnapshot = false, readerContext=getAuthContextVersion()
   function clear() { fromSnapshot = false; seq++; value.value = null; loading.value = false; error.value = '' }
   async function read(next = p.value, restore = false) {
+    if (!active.value) return
     const previous = value.value && value.value.kind===kind.value && value.value.extra===extra.value && value.value.order===order.value && value.value.p===next ? value.value : null
     const previousFromSnapshot = fromSnapshot
     clear(); value.value=previous; fromSnapshot = !!previous && previousFromSnapshot; p.value = next
     if (!mounted || import.meta.env.SSR) return
     const run = seq, context = getAuthContextVersion(), token = auth.accessToken, actor = auth.account?.oId, currentKind = kind.value, target = extra.value, sort = order.value
-    const valid = () => mounted && run === seq && context === getAuthContextVersion() && token === auth.accessToken && actor === auth.account?.oId && currentKind === kind.value && target === extra.value && sort === order.value
+    const valid = () => mounted && active.value && run === seq && context === getAuthContextVersion() && token === auth.accessToken && actor === auth.account?.oId && currentKind === kind.value && target === extra.value && sort === order.value
     const cacheKey = currentKind === 'search' ? null : JSON.stringify(['listing', currentKind, target, sort, next])
     if (cacheKey && restore && !value.value) {
       const snapshot = await readPublicSnapshot(cacheKey, PUBLIC_LIST_TTL, raw => decodeArticleListing(raw, currentKind, target, sort, next))
@@ -41,7 +42,16 @@ export function useArticleListing(kind: Ref<ArticleFeedKind>, extra: Ref<string>
     const sameActor = readerContext===getAuthContextVersion() && auth.account?.oId === old[1] && !!auth.accessToken === !!old[0]
     readerContext=getAuthContextVersion()
     if(!sameActor)clear()
-    void read(sameActor ? p.value : 1, true)
+    if (active.value) void read(sameActor ? p.value : 1, true)
+  }, { flush: 'sync' })
+  watch(active, visible => {
+    if (!visible) {
+      // 保留已显示的列表，离页前发出的请求不能改写缓存。
+      seq++
+      loading.value = false
+    } else if (mounted && !value.value && !error.value) {
+      void read(p.value, true)
+    }
   }, { flush: 'sync' })
   onMounted(() => { mounted = true; if (!value.value || auth.accessToken) void read(1, true) })
   const retryPublic=()=>{void read()}

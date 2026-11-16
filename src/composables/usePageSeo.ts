@@ -13,7 +13,7 @@ export interface PageSeoInput {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[] | null
 }
 
-export function usePageSeo(input: MaybeRefOrGetter<PageSeoInput>) {
+export function usePageSeo(input: MaybeRefOrGetter<PageSeoInput>, active: MaybeRefOrGetter<boolean> = true) {
   const branding = useLocalBrandingStore()
   const resolved = computed(() => toValue(input))
 
@@ -54,7 +54,7 @@ export function usePageSeo(input: MaybeRefOrGetter<PageSeoInput>) {
 
   // Keep document title in sync for CSR navigations without SSR.
   watchEffect(() => {
-    if (typeof document === 'undefined') return
+    if (typeof document === 'undefined' || !toValue(active)) return
     document.title = branding.name || pageTitle(resolved.value.title)
   })
 }

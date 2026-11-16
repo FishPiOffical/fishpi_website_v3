@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { computed, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
+import { RouterLink, useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
 import type { ArticleFeedKind } from '@/api/fishpi'
 import type { ColumnOrder } from '@/api/v3-article-list'
 import ContentRelationButton from '@/components/articles/ContentRelationButton.vue'
@@ -13,31 +13,37 @@ import { SITE_DEFAULT_DESC } from '@/seo/site'
 import FpLoading from '@/components/FpLoading.vue'
 import { formatDate } from '@/utils/time'
 import { decodeEntities } from '@/utils/text'
-const route = useRoute()
-const kind = computed(() => (route.meta.list as ArticleFeedKind) || 'recent')
-const title = computed(() => String(route.meta.title || '帖子'))
-const keyword = computed(() => typeof route.query.q === 'string' ? route.query.q : '')
+const props = defineProps<{ listingRoute?: RouteLocationNormalizedLoaded }>()
+const currentRoute = useRoute()
+// 缓存中的实例继续使用自己的参数，不跟随当前打开的路由。
+const route = computed(() => props.listingRoute ?? currentRoute)
+const active = ref(true)
+onActivated(() => { active.value = true })
+onDeactivated(() => { active.value = false })
+const kind = computed(() => (route.value.meta.list as ArticleFeedKind) || 'recent')
+const title = computed(() => String(route.value.meta.title || '帖子'))
+const keyword = computed(() => typeof route.value.query.q === 'string' ? route.value.query.q : '')
 // Vue Router already decoded path parameters. API resolution performs its own single encoding.
-const extra = computed(() => kind.value === 'domain' ? String(route.params.uri || '') : kind.value === 'tag' ? String(route.params.tag || '') : kind.value === 'search' ? keyword.value : '')
+const extra = computed(() => kind.value === 'domain' ? String(route.value.params.uri || '') : kind.value === 'tag' ? String(route.value.params.tag || '') : kind.value === 'search' ? keyword.value : '')
 const columnShelf = ref<ColumnOrder>('recent')
-const { value, p, loading, error, read } = useArticleListing(kind, extra, columnShelf, consumeArticleListingPayload(kind.value, extra.value, columnShelf.value))
+const { value, p, loading, error, read } = useArticleListing(kind, extra, columnShelf, consumeArticleListingPayload(kind.value, extra.value, columnShelf.value), active)
 const items = computed(() => value.value?.resource === 'articles' ? value.value.list : [])
 const columns = computed(() => value.value?.resource === 'columns' ? value.value.list : [])
 const listingNote=computed(()=>kind.value==='hot'?'按近月回帖排序，发布时间较早的文章也可能上榜。':kind.value==='perfect'?'这里汇集站点收录的优选文章，按发布时间展示；热门反映讨论，优选用于内容精选。':'')
 const isColumnPage = computed(() => kind.value === 'long')
 const heading = computed(() => kind.value === 'tag' ? `#${extra.value}` : title.value)
 const RECENT_TABS = [{ to: '/recent', label: '默认' }, { to: '/recent/hot', label: '热议' }, { to: '/recent/good', label: '👍 好评' }, { to: '/recent/reply', label: '最近回帖' }]
-const showRecentTabs = computed(() => RECENT_TABS.some(tab => tab.to === route.path))
+const showRecentTabs = computed(() => RECENT_TABS.some(tab => tab.to === route.value.path))
 const failedCovers = ref(new Set<string>()), panel = ref<HTMLElement | null>(null)
 let lastPage = 1
 watch(value, data => {
   failedCovers.value = new Set()
   if (!data) return
   const moved = lastPage !== data.p; lastPage = data.p
-  if (moved) void nextTick(() => { if (value.value === data) panel.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) })
+  if (moved) void nextTick(() => { if (active.value && value.value === data) panel.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) })
 })
-watch(error, message => { if (message) void nextTick(() => { if (error.value === message) panel.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }) })
-usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' && keyword.value ? `搜索「${keyword.value}」相关帖子` : `${heading.value} · ${SITE_DEFAULT_DESC}`, path: route.path, robots: String(route.meta.robots || 'index,follow') }))
+watch(error, message => { if (message) void nextTick(() => { if (active.value && error.value === message) panel.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }) })
+usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' && keyword.value ? `搜索「${keyword.value}」相关帖子` : `${heading.value} · ${SITE_DEFAULT_DESC}`, path: route.value.path, robots: String(route.value.meta.robots || 'index,follow') }), active)
 </script>
 
 <template>
@@ -83,7 +89,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
         <p v-else-if="!loading && !error" role="status">列表尚未读取。</p>
       </div>
     </div>
-    <div class="side"><SideBar /></div>
+    <div class="side"><SideBar v-if="active" /></div>
   </div>
 </template>
 

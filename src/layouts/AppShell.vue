@@ -285,6 +285,9 @@ function onDocClick(e: MouseEvent) {
 const pageHost = ref<HTMLElement | null>(null)
 const routeView = ref<ComponentPublicInstance | null>(null)
 const pageRevision = useRouteDomBoundary(pageHost, routeView, () => route.fullPath, () => route.path === '/')
+const listingCacheIdentity = computed(() => JSON.stringify([
+  getAuthContextVersion(), Boolean(auth.accessToken), auth.account?.oId,
+]))
 
 const apiOffline = ref(false)
 let offlineBoundary = getAuthContextVersion(), offlineActor = auth.account?.oId, offlineHasToken = Boolean(auth.accessToken)
@@ -462,19 +465,22 @@ onUnmounted(() => {
       'main--cr-modern': isModernChat,
       'main--immersive': immersive,
     }">
-      <div v-if="ssrAuthShell" class="auth-shell">
-        <template v-if="startup.error">
-          <p role="alert">{{ startup.error }}</p>
-          <button type="button" :disabled="startup.pending" @click="startup.start(router)">重试恢复登录</button>
-        </template>
-        <p v-else role="status">正在恢复登录状态…</p>
-      </div>
-      <template v-else>
-        <MemberLayout v-if="route.path.startsWith('/member/') && typeof route.params.userName === 'string'">
-          <RouterView ref="routeView" />
+      <RouterView v-slot="{ Component, route: viewRoute }">
+        <div v-if="ssrAuthShell" class="auth-shell">
+          <template v-if="startup.error">
+            <p role="alert">{{ startup.error }}</p>
+            <button type="button" :disabled="startup.pending" @click="startup.start(router)">重试恢复登录</button>
+          </template>
+          <p v-else role="status">正在恢复登录状态…</p>
+        </div>
+        <MemberLayout v-else-if="viewRoute.path.startsWith('/member/') && typeof viewRoute.params.userName === 'string'">
+          <component :is="Component" ref="routeView" />
         </MemberLayout>
-        <RouterView v-else ref="routeView" />
-      </template>
+        <component v-else-if="!viewRoute.meta.list" :is="Component" ref="routeView" />
+        <KeepAlive :key="listingCacheIdentity" :max="6">
+          <component v-if="!ssrAuthShell && viewRoute.meta.list" :is="Component" :key="viewRoute.fullPath" :listing-route="viewRoute" />
+        </KeepAlive>
+      </RouterView>
     </main>
     <footer v-if="!isModernChat && !immersive" class="foot">
       <div class="foot-inner">

@@ -107,7 +107,7 @@ function root() {
   return { components: { RouterView, MemberLayout: { render: () => null } }, setup() {
     const pageHost = ref(null), routeView = ref(null)
     return { pageHost, routeView, pageRevision: useRouteDomBoundary(pageHost, routeView, () => currentRouter.currentRoute.value.fullPath), route: currentRouter.currentRoute,
-      ssrAuthShell: false, isModernChat: false, immersive: false }
+      listingCacheIdentity: 'guest', ssrAuthShell: false, isChatroom: false, isModernChat: false, immersive: false }
   }, render }
 }
 currentRouter = router(); await currentRouter.push('/')
