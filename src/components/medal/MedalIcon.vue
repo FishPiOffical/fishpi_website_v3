@@ -12,6 +12,7 @@ const props = withDefaults(
     mini?: boolean
     /** 悬停显示「[稀有度] 名称 - 描述」 */
     tooltip?: boolean
+    quiet?: boolean
   }>(),
   { mini: false, tooltip: true },
 )
@@ -50,7 +51,7 @@ const label = computed(() => (props.medal.type ? `[${props.medal.type}] ${tipTex
     @mouseenter="showTip"
     @mouseleave="tipPos = null"
   >
-    <V3MedalImage :id="medal.id || ''" :name="medal.name || ''" :owner="owner" :user-name="userName" :mini="mini" />
+    <V3MedalImage :id="medal.id || ''" :name="medal.name || ''" :owner="owner" :user-name="userName" :mini="mini" :quiet="quiet" />
     <Teleport v-if="tipPos" to="body">
       <span class="medal-tip" role="tooltip" :style="{ left: `${tipPos.left}px`, top: `${tipPos.top}px` }">
         <span v-if="medal.type" class="medal-type" :class="`medal-type--${typeClass}`">[{{ medal.type }}]</span>

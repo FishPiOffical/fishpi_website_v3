@@ -19,7 +19,7 @@ onMounted(() => { mounted.value = true })
 </script>
 <template>
   <span v-if="ready" class="v3-medal-image">
-    <img v-if="!failed && (id || name)" :key="source" :src="source" :alt="name || '勋章'" :class="{ mini }" @load="loaded" @error="failed=true" />
+    <img v-if="!failed && (id || name)" :key="source" :src="source" :alt="name || '勋章'" :class="{ mini }" :loading="mini ? 'lazy' : undefined" @load="loaded" @error="failed=true" />
     <span v-else-if="showName" :title="quiet ? '需登录旧站后查看勋章图片' : undefined">{{ name }}</span>
     <small v-if="failed && !quiet">需登录旧站后查看勋章图片</small>
   </span>

@@ -27,7 +27,7 @@ function isMini(name?: string) {
 
 <template>
   <span v-if="mounted && auth.isLoggedIn && medals.length" class="medal-list">
-    <MedalIcon v-for="(m, i) in medals" :key="(m.id || m.name || '') + i" :medal="m" :mini="isMini(m.name)" />
+    <MedalIcon v-for="(m, i) in medals" :key="(m.id || m.name || '') + i" :medal="m" :mini="isMini(m.name)" :quiet="variant === 'mini'" />
   </span>
 </template>
 

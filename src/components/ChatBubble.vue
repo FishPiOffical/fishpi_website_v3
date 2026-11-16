@@ -152,7 +152,7 @@ function onBodyClick(e: MouseEvent) {
             <span v-if="petStatus.level" class="fp-chat-pet-level" :data-tier="Math.floor(petStatus.level / 10)">Lv.{{ petStatus.level }}</span>
           </RouterLink>
         </div>
-        <MedalList :items="medals" variant="chat" />
+        <MedalList class="chat-medals" :items="medals" variant="mini" />
       </div>
       <div v-if="!display.quote || display.html || $slots.default" class="fp-bubble" @click="onBodyClick">
         <div v-if="!chatroom" class="head">
@@ -498,10 +498,14 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
   align-items: flex-end;
 }
 .is-room .head {
-  gap: 4px 8px;
+  gap: 3px 5px;
   min-height: 20px;
   max-width: 100%;
 }
+.is-room.is-self .head { flex-direction: row; justify-content: flex-end; }
+.is-room .head .chat-medals { display: contents; }
+.chat-medals :deep(.medal) { max-width: 100%; font-size: 11px; }
+.chat-medals :deep(.v3-medal-image img.mini) { width: 16px; height: 16px; }
 .is-room .name {
   font-size: 12px;
   font-weight: 500;

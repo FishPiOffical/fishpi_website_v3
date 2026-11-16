@@ -4,6 +4,7 @@ import {decodeReactionSnapshot,type ReactionState} from './v3-reactions'
 import type { PetSpeciesId } from './v3-pets'
 export type ChatMessageType='text'|'music'|'weather'|'redPacket'|'unavailable'
 export interface ChatTail{text:string}
+interface ChatMedal { id?: string; name: string; type?: string; description?: string }
 export const chatPetStatusLabels = { idle: '空闲', rest: '休息中', outing: '外出中', course: '上课中', work: '兼职中', claimable: '待领取' } as const
 export interface ChatPetStatus { name: string; state: keyof typeof chatPetStatusLabels; level?: number; speciesId?: PetSpeciesId }
 const chatPetSpeciesIds = new Set<unknown>(['momota', 'hexiaotun', 'yubingmiao', 'paixiaoyu'] satisfies PetSpeciesId[])
@@ -18,7 +19,22 @@ function decodeChatPetStatus(value: unknown): ChatPetStatus | undefined {
     ...(typeof level === 'number' && Number.isInteger(level) && level >= 1 && level <= 30 ? { level } : {}) }
 }
 
-export interface ChatMessage{petStatus?:ChatPetStatus;tail?:ChatTail;appearance?:ChatAppearance;reactions?:ReactionState|null;reactionsUnavailable?:boolean;reactionReadStarted?:number;id:string;createdAt:number;type:ChatMessageType;content:string;contentHtml:string;author:{id:string;userName:string;userNickname:string;userAvatarURL:string};client:string;card:Record<string,string|number>}
+function decodeChatMedals(value: unknown): ChatMedal[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap<ChatMedal>(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return []
+    const { id, name, type, description } = item as Record<string, unknown>
+    if (typeof name !== 'string' || !name.trim() || name.length > 128) return []
+    return [{
+      name,
+      id: typeof id === 'string' && /^[0-9]{1,19}$/.test(id) ? id : undefined,
+      type: typeof type === 'string' && type.length <= 128 ? type : undefined,
+      description: typeof description === 'string' && description.length <= 1024 ? description : undefined,
+    }]
+  })
+}
+
+export interface ChatMessage{medals?:ChatMedal[];petStatus?:ChatPetStatus;tail?:ChatTail;appearance?:ChatAppearance;reactions?:ReactionState|null;reactionsUnavailable?:boolean;reactionReadStarted?:number;id:string;createdAt:number;type:ChatMessageType;content:string;contentHtml:string;author:{id:string;userName:string;userNickname:string;userAvatarURL:string};client:string;card:Record<string,string|number>}
 export {decodeReactionSnapshot}
 const invalid=()=>new ApiError('聊天室消息响应不正确',502)
 function row(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw invalid();return v as Record<string,unknown>}
@@ -39,10 +55,11 @@ export function decodeChatMessage(value:unknown):ChatMessage{const r=row(value),
  const a=row(r.author),authorId=text(a.id);if(authorId&&!/^\d{1,32}$/.test(authorId))throw invalid();const author={id:authorId,userName:text(a.userName),userNickname:text(a.userNickname),userAvatarURL:text(a.userAvatarURL)},client=text(r.client),card:Record<string,string|number>={}
  if(type!=='text'){const c=row(r.card);for(const field of type==='music'?['title','source','coverURL','from']:type==='weather'?['date','weatherCode','max','min','t','st']:['type','message'])card[field]=text(c[field]);if(type==='redPacket')for(const field of ['money','count','got'])card[field]=integer(c[field])}
  const petStatus = type === 'text' && authorId ? decodeChatPetStatus(r.petStatus) : undefined
+ const medals = authorId ? decodeChatMedals(r.medals) : []
  const tail = type === 'text' ? decodeChatTail(r.tail) : undefined
  const reactionsUnavailable = r.reactionsUnavailable === true
  const reactions = reactionsUnavailable || r.reactions === undefined ? undefined : decodeReactionSnapshot(r.reactions, 'chat', id)
- return{...(petStatus ? {petStatus} : {}),...(tail ? {tail} : {}),...(reactionsUnavailable ? {reactionsUnavailable:true} : {}),...(reactions ? {reactions,reactionReadStarted:performance.now()} : {}),...(r.appearance===undefined?{}:{appearance:chatAppearanceSnapshot(r.appearance)}),id,createdAt,type,author,client,content:type==='text'?text(r.content):'',contentHtml:type==='text'?text(r.contentHtml):'',card}}
+ return{...(medals.length ? {medals} : {}),...(petStatus ? {petStatus} : {}),...(tail ? {tail} : {}),...(reactionsUnavailable ? {reactionsUnavailable:true} : {}),...(reactions ? {reactions,reactionReadStarted:performance.now()} : {}),...(r.appearance===undefined?{}:{appearance:chatAppearanceSnapshot(r.appearance)}),id,createdAt,type,author,client,content:type==='text'?text(r.content):'',contentHtml:type==='text'?text(r.contentHtml):'',card}}
 export async function chatMessageDetail(id:string,signal?:AbortSignal):Promise<ChatMessage>{chatMessageId(id);const started=performance.now();const r=row(await request(`/api/v3/chat/messages/${id}`,{signal,cache:'no-store'}));if(r.code!==0)throw invalid();const message=decodeChatMessage(r.data);if(message.id!==id)throw invalid();return message.reactions ? {...message,reactionReadStarted:started} : message}
 /** Card summaries are projected public fields, never the stored transport envelope. */
 export function chatSourceText(message:ChatMessage){if(message.type==='unavailable')throw new ApiError('当前消息不可读取',404);return message.type==='text'?message.content:`【${message.type==='music'?'音乐':message.type==='weather'?'天气':'红包'}卡片公开摘要】\n${JSON.stringify(message.card,null,2)}`}
