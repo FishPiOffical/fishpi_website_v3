@@ -39,12 +39,13 @@ watch([accessToken,()=>account.value?.oId],()=>{const next=`${getAuthContextVers
     <template v-else-if="result">
       <BreezemoonList v-if="result.list.length" :items="previewLimit ? result.list.slice(0, previewLimit) : result.list" :compact="compact" :avatar-only="avatarOnly" :collapsible="collapsible"><template #actions="{item}"><template v-if="canManage&&item.author.id===account?.oId"><button type="button" :disabled="editLoading||!!operations.pending||operations.busy||operations.confirming" @click="edit(item.id)">编辑</button><button type="button" :disabled="editLoading||!!operations.pending||operations.busy||operations.confirming" @click="remove(item.id)">删除</button></template></template></BreezemoonList>
       <p v-else>{{ result.total?'本页没有动态，可返回第一页。':'暂无清风明月动态' }}<button v-if="page>1" type="button" @click="home">返回第一页</button></p>
-      <nav v-if="!compact&&(result.total||page>1)" aria-label="清风明月分页"><button type="button" :disabled="page<=1" @click="move(page-1)">上一页</button><span>{{ page }} / {{ result.pageCount }}</span><button type="button" :disabled="page>=Math.min(result.pageCount,42949672)" @click="move(page+1)">下一页</button></nav>
+      <nav v-if="!compact&&(result.total||page>1)" class="fp-pagination" aria-label="清风明月分页"><button type="button" :disabled="page<=1" @click="move(page-1)">上一页</button><span>{{ page }} / {{ result.pageCount }}</span><button type="button" :disabled="page>=Math.min(result.pageCount,42949672)" @click="move(page+1)">下一页</button></nav>
     </template>
   </div>
 </template>
 <style scoped lang="scss">
-.moon-panel { min-width: 0; padding: 0 18px 18px; }
+.moon-panel { min-width: 0; padding: 0 var(--fp-panel-padding) 18px; }
+.moon-panel .fp-pagination { margin-inline: 0; }
 .compact {
   padding: 0;
   font-size: 12px;

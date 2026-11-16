@@ -13,7 +13,7 @@ const {value:users,loading:usersLoading,error:usersError,p:usersPage}=feed.users
 usePageSeo(()=>({title:`${cityName.value} · 同城`,path:route.path,description:`${cityName.value}的公开同城用户与文章`,robots:'noindex'}))
 function fallback(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 </script>
-<template><div class="wrapper list-page-wrap fp-page fp-page--wide fp-ui fp-list-page"><div class="content">
+<template><div class="fp-page fp-page--wide fp-ui fp-list-page"><div class="content">
 <section class="module">
   <ListPageHeading :title="cityName || '同城'" description="按公开位置展示同城用户和署名文章；不包含匿名文章或讨论帖。" />
 </section>
@@ -21,12 +21,7 @@ function fallback(event:Event){const image=event.target as HTMLImageElement;if(i
 <section class="module"><header class="module-header list-page-head"><h2>同城文章</h2><label>排序<select class="fp-control" v-model="sort"><option value="latest">最新发布</option><option value="active">最近活跃</option><option value="hot">热度</option><option value="comments">评论数</option></select></label><button class="fp-control" type="button" :disabled="articlesLoading" @click="feed.articles.read()">刷新文章</button></header><p v-if="articlesLoading" role="status" class="empty-hint">正在读取同城文章…</p><p v-if="articlesError" role="alert" class="err fp-state">{{ articlesError }} <button class="fp-control" type="button" @click="feed.articles.read()">重试文章</button></p><template v-if="articles"><p class="scope-hint">共{{ articles.total }}篇公开署名文章</p><ArticleFeed :items="articles.list" empty="本页没有同城文章。"/><nav class="fp-pagination" aria-label="同城文章分页"><button class="fp-control" type="button" :disabled="articlesLoading||articles.p<=1" @click="feed.articles.read(articles.p-1)">上一页文章</button><span>第{{ articles.p }}页 / {{ articles.pageCount }}页</span><button class="fp-control" type="button" :disabled="articlesLoading||articles.p>=Math.min(articles.pageCount,42949672)" @click="feed.articles.read(articles.p+1)">下一页文章</button></nav></template><button class="fp-control" v-if="!articlesLoading&&articlesPage>1&&(!articles||!articles.list.length)" type="button" @click="feed.articles.read(1)">返回文章第一页</button></section>
 </div><aside class="side"><SideBar/></aside></div></template>
 <style scoped lang="scss">
-.list-page-wrap {
-  padding-top: 4px;
-}
-
 .list-page-head {
-  padding: 12px 18px;
   > button {
     display: none;
   }
@@ -61,7 +56,7 @@ function fallback(event:Event){const image=event.target as HTMLImageElement;if(i
 }
 
 .scope-hint {
-  padding: 10px 18px;
+  padding: 10px var(--fp-panel-padding);
   margin: 0;
   background: var(--fp-hover);
   color: var(--fp-muted);
@@ -71,7 +66,7 @@ function fallback(event:Event){const image=event.target as HTMLImageElement;if(i
 
 .empty-hint,
 .err {
-  padding: 36px 18px;
+  padding: 36px var(--fp-panel-padding);
   margin: 0;
   text-align: center;
   color: var(--fp-muted);
@@ -91,7 +86,7 @@ function fallback(event:Event){const image=event.target as HTMLImageElement;if(i
 .city-item {
   display: flex;
   gap: 12px;
-  padding: 14px 18px;
+  padding: 14px var(--fp-panel-padding);
   border-bottom: 1px solid var(--fp-border);
   transition: background-color 0.15s ease;
 }
@@ -180,5 +175,5 @@ function fallback(event:Event){const image=event.target as HTMLImageElement;if(i
   word-break: break-all;
   overflow-wrap: anywhere;
 }
-nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 18px}.module{margin-bottom:16px}.list-page-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px}h1,h2{margin:0;font-size:18px}button,select{font:inherit;padding:6px;border:1px solid var(--fp-border);border-radius:5px;background:var(--fp-bg);color:var(--fp-text)}.city-main p{margin:6px 0;overflow-wrap:anywhere}
+nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 0}.module{margin-bottom:16px}.list-page-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px}h1,h2{margin:0;font-size:18px}button,select{font:inherit;padding:6px;border:1px solid var(--fp-border);border-radius:5px;background:var(--fp-bg);color:var(--fp-text)}.city-main p{margin:6px 0;overflow-wrap:anywhere}
 </style>

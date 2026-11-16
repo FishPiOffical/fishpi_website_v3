@@ -2,7 +2,8 @@
    windows deliberately keep their own layout. Theme colors come from the active pack. */
 :root {
   --fp-page-standard: 1040px;
-  --fp-page-wide: 1200px;
+  --fp-page-wide: 1260px;
+  --fp-page-top: 18px;
   --fp-page-reading: 760px;
   --fp-page-auth: 440px;
   --fp-page-gap: clamp(14px, 1.5vw, 20px);
@@ -156,15 +157,17 @@
 .fp-ui .fp-state p { margin: 0; }
 .fp-ui .fp-state[role='alert'] { color: var(--fp-danger-ink); }
 .fp-ui .fp-state-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
-/* Primary list panes share the same surface as their sidebar modules. */
-.fp-list-page {
+/* Shared main and sidebar grid for lists and the full chatroom. */
+:is(.fp-list-page, .fp-sidebar-layout) {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
   gap: var(--fp-page-gap);
   align-items: start;
 }
-.fp-list-page > .content, .fp-list-page > .city-main {
-  margin-right: 0;
+.fp-list-page { --fp-feed-row-gutter: var(--fp-panel-padding); }
+/* The grid owns the gap, including when it stacks on narrow screens. */
+.fp-list-page > .content {
+  margin: 0;
   min-width: 0;
   width: 100%;
   background: var(--fp-card);
@@ -198,7 +201,7 @@
   overflow: visible;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--fp-page-gap);
 }
 .fp-list-page > .content:has(> .module + .module) > .module {
   margin-bottom: 0;
@@ -215,7 +218,7 @@
   border-bottom: 1px solid var(--fp-border);
 }
 .fp-list-page .list-page-head :is(h1, h2) { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.4; color: var(--fp-title); }
-.fp-list-page .fp-pagination { margin: 0 20px; padding: 16px 0; }
+.fp-list-page .fp-pagination { margin: 0 var(--fp-panel-padding); padding: 16px 0; }
 .fp-settings .card { padding: var(--fp-panel-padding); border-radius: var(--fp-panel-radius); }
 .fp-settings .fp-page-title { margin-bottom: 16px; }
 .fp-settings :is(h2, .owner-membership h2) { font-size: 17px; line-height: 1.5; }
@@ -223,9 +226,8 @@
 .fp-settings :where(fieldset) { min-width: 0; }
 /* Text links keep their resting color; action buttons/tabs retain their interaction treatment. */
 .fp-ui :is(.city-meta, .member-content, .user-relations, .prose) a:hover { text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 900px) {
-  .fp-page--wide { width: 100%; }
-  .fp-list-page {
+@media (max-width: 960px) {
+  :is(.fp-list-page, .fp-sidebar-layout) {
     grid-template-columns: minmax(0, 1fr);
   }
   .fp-list-page > .side {
@@ -235,7 +237,6 @@
 @media (max-width: 640px) {
   .fp-page--auth { margin: 12px auto; }
   .fp-ui .fp-page-heading { margin-bottom: 16px; }
-  .fp-list-page .list-page-head { padding: 16px; }
   .fp-ui .fp-pagination { gap: 8px; }
   .fp-ui :is(nav, div).fp-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
   .fp-ui :is(nav, div).fp-tabs :is(a, button) { flex: none; white-space: nowrap; }

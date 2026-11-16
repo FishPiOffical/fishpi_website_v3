@@ -461,7 +461,6 @@ onUnmounted(() => {
     <UserHoverCard />
     <AdSlot v-if="!immersive" slot-key="home.top" />
     <main :key="pageRevision" ref="pageHost" :class="{
-      'main--chatroom': isChatroom,
       'main--cr-modern': isModernChat,
       'main--immersive': immersive,
     }">
@@ -943,20 +942,16 @@ onUnmounted(() => {
   color: #c45c4a;
 }
 .shell > main {
-  max-width: var(--fp-wrap);
+  max-width: calc(var(--fp-page-wide) + 2 * var(--fp-page-gutter));
   margin: 0 auto;
-  padding: 18px var(--fp-page-gutter) 24px;
+  padding: var(--fp-page-top) var(--fp-page-gutter) 24px;
 }
 main.main--immersive {
   max-width: none;
   padding: 0;
 }
-main.main--chatroom {
-  max-width: 1440px;
-  padding-inline: var(--fp-page-gutter);
-}
 main.main--cr-modern {
-  padding-block: 8px 0;
+  padding-block-end: 0;
 }
 .foot {
   background: var(--fp-footer);

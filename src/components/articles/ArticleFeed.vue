@@ -185,7 +185,7 @@ function avatarOf(a: ArticleSummary) {
 /* 完整模式列表 (对齐现网 Rhythm common/list-item.ftl) */
 .feed.full .feed-item {
   position: relative;
-  padding: 14px 18px;
+  padding: 14px var(--fp-feed-row-gutter, 18px);
   border-bottom: 1px solid var(--fp-border);
   transition: background-color 0.15s ease;
 }

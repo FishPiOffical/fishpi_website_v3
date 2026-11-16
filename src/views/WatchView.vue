@@ -34,7 +34,7 @@ onBeforeUnmount(()=>{mounted.value=false;clear()})
 usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots:'noindex'}))
 </script>
 <template>
-  <div class="wrapper watch-wrap fp-page fp-page--wide fp-ui fp-list-page">
+  <div class="fp-page fp-page--wide fp-ui fp-list-page">
     <main class="content"><section class="module">
       <header class="watch-head">
         <div class="watch-heading-row">
@@ -57,9 +57,9 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
         <div v-else-if="error" class="message"><p role="alert">{{ error }}</p><button class="fp-control" v-if="page>1" type="button" @click="home">返回第一页</button></div>
         <template v-else-if="result">
           <p v-if="!result.list.length" class="message">{{ result.total?'本页没有动态，可返回第一页重新读取。':'暂无当前可展示的关注动态' }}<button class="fp-control" v-if="page>1" type="button" @click="home">返回第一页</button></p>
-          <BreezemoonList v-else-if="result.source==='breezemoons'" :items="result.list" />
+          <BreezemoonList class="watch-moons" v-else-if="result.source==='breezemoons'" :items="result.list" />
           <ArticleFeed v-else :items="result.list" />
-          <nav v-if="result.total||page>1" class="pager" aria-label="关注动态分页"><button class="fp-control" type="button" :disabled="page<=1||loading" @click="move(page-1)">上一页</button><span>{{ page }} / {{ result.pageCount }}</span><button class="fp-control" type="button" :disabled="page>=Math.min(result.pageCount,42949672)||loading" @click="move(page+1)">下一页</button></nav>
+          <nav v-if="result.total||page>1" class="fp-pagination" aria-label="关注动态分页"><button class="fp-control" type="button" :disabled="page<=1||loading" @click="move(page-1)">上一页</button><span>{{ page }} / {{ result.pageCount }}</span><button class="fp-control" type="button" :disabled="page>=Math.min(result.pageCount,42949672)||loading" @click="move(page+1)">下一页</button></nav>
         </template>
       </template>
     </section></main>
@@ -68,7 +68,7 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
 </template>
 <style scoped lang="scss">
 .watch-head {
-  padding: 20px 22px 0;
+  padding: 14px var(--fp-panel-padding) 0;
   border-bottom: 1px solid var(--fp-divider);
 }
 .watch-heading-row,
@@ -94,18 +94,12 @@ usePageSeo(()=>({title:`关注 · ${current.value.label}`,path:route.path,robots
 .watch-tabs a:focus-visible,
 .watch-refresh:focus-visible { outline: 2px solid var(--fp-accent); outline-offset: -2px; }
 @media (max-width: 600px) {
-  .watch-head { padding: 16px 16px 0; }
   .watch-head h1 { font-size: 18px; }
   .watch-tabs { gap: 22px; }
 }
-.pager {
-  display: flex;
-  justify-content: center;
-  padding: 14px 18px;
-  border-top: 1px solid var(--fp-divider);
-}
+.watch-moons { margin: 0 var(--fp-panel-padding); }
 .message {
-  padding: 20px 18px;
+  padding: 20px var(--fp-panel-padding);
   line-height: 1.7;
   overflow-wrap: anywhere;
   color: var(--fp-muted);

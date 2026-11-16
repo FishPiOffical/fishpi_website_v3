@@ -18,7 +18,7 @@ async function page(next: number) { await read(next, true); document.getElementB
 </script>
 
 <template>
-  <div class="wrapper list-page-wrap fp-page fp-page--wide fp-ui fp-list-page">
+  <div class="fp-page fp-page--wide fp-ui fp-list-page">
     <div class="content directory-content" id="directory-list">
       <ListPageHeading
         :title="label + '目录'"
@@ -42,10 +42,6 @@ async function page(next: number) { await read(next, true); document.getElementB
   </div>
 </template>
 <style scoped lang="scss">
-.list-page-wrap {
-  padding-top: 4px;
-}
-
 .refresh-dir-btn {
   display: none;
 }
@@ -60,7 +56,7 @@ async function page(next: number) { await read(next, true); document.getElementB
 
 .domain-list {
   list-style: none;
-  padding: 16px 18px;
+  padding: 16px var(--fp-panel-padding);
   margin: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

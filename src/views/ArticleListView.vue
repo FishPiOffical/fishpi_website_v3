@@ -49,7 +49,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 </script>
 
 <template>
-  <div :data-public-content="value ? 'ready' : undefined" class="wrapper list-page-wrap fp-page fp-page--wide fp-ui fp-list-page">
+  <div :data-public-content="value ? 'ready' : undefined" class="fp-page fp-page--wide fp-ui fp-list-page">
     <div class="content">
       <div ref="panel" class="list-content">
         <section v-if="isColumnPage" class="column-intro">
@@ -105,10 +105,6 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 <style scoped lang="scss">
 .list-content { min-width: 0; scroll-margin-top: 80px; }
 .refresh-list { display: none; margin: 8px 16px 16px; }
-.list-page-wrap {
-  padding-top: 4px;
-}
-
 .search-tag {
   font-size: 12px;
   color: var(--fp-accent);
@@ -120,7 +116,7 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 }
 
 .hint {
-  padding: 30px 18px;
+  padding: 30px var(--fp-panel-padding);
   text-align: center;
   color: var(--fp-muted);
   font-size: 14px;

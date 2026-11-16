@@ -351,10 +351,10 @@ function clearScreen() {
 <template>
   <div class="cr-page" :class="`theme-${chatStyle}`">
     <p v-if="isLoggedIn" class="timeline-controls"><button type="button" :disabled="loading" @click="chat.refreshMessages">重读当前消息</button><span v-if="chat.topicError" role="alert">{{ chat.topicError }}</span></p>
-    <p v-else>登录后可读取聊天室消息。</p>
+    <p v-else class="chat-login-hint">登录后可读取聊天室消息。</p>
     <p v-if="quoteErr" role="alert">{{ quoteErr }}</p>
     <!-- ==================== 版本 A: 经典版本 (Classic，对齐现网 chat-room.ftl) ==================== -->
-    <div v-if="chatStyle === 'classic'" class="cr-classic-layout">
+    <div v-if="chatStyle === 'classic'" class="cr-classic-layout fp-sidebar-layout">
       <main class="cr-classic-main">
         <!-- 整合在一个白色大卡片内，输入框在上，消息在下 -->
         <div class="cr-classic-card">
@@ -492,7 +492,7 @@ function clearScreen() {
     </div>
 
     <!-- ==================== 版本 B: 现代气泡版本 (Modern，对齐现网 chat-room-2.ftl) ==================== -->
-    <div v-else class="cr-modern-layout">
+    <div v-else class="cr-modern-layout fp-sidebar-layout">
       <section class="cr-modern-main">
         <!-- 顶部操作栏 -->
         <header class="cr-header">
@@ -688,6 +688,10 @@ function clearScreen() {
   margin: 0;
 }
 
+.chat-login-hint {
+  margin: 0 0 var(--fp-page-gap);
+}
+
 .timeline-controls > button {
   display: none !important;
 }
@@ -710,20 +714,9 @@ function clearScreen() {
   font-size: 12px;
 }
 
-:is(.cr-classic-layout, .cr-modern-layout) {
-  display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
-  gap: var(--fp-page-gap);
-}
-
 /* =========================================================
    版本 A：经典版本（Classic，对齐现网 chat-room.ftl）
    ========================================================= */
-.cr-classic-layout {
-  align-items: start;
-  padding: 10px 0 30px;
-}
-
 .cr-classic-main {
   min-width: 0;
 }
@@ -864,8 +857,16 @@ function clearScreen() {
 /* =========================================================
    版本 B：现代气泡版本 (Modern，对齐现网 chat-room-2.ftl)
    ========================================================= */
+.cr-page.theme-modern {
+  --cr-viewport-space: calc(100dvh - var(--fp-nav-h) - var(--fp-page-top));
+  display: flex;
+  flex-direction: column;
+  height: calc(var(--cr-viewport-space) - 16px);
+}
+
 .cr-modern-layout {
-  height: calc(100dvh - var(--fp-nav-h) - 24px);
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   padding-bottom: 8px;
 }
@@ -1207,22 +1208,27 @@ function clearScreen() {
 
 /* 响应式适配 */
 @media (max-width: 960px) {
-  :is(.cr-classic-layout, .cr-modern-layout) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .classic-sidebar {
     position: static;
     max-height: none;
     overflow: visible;
   }
 
-  .cr-modern-layout {
+  .cr-page.theme-modern {
+    display: block;
     height: auto;
   }
 
+  .cr-page.theme-modern:has(> .chat-login-hint) {
+    --cr-guest-hint-space: calc(1lh + var(--fp-page-gap));
+  }
+
+  .cr-modern-layout {
+    grid-template-rows: none;
+  }
+
   .cr-modern-main {
-    height: calc(100dvh - var(--fp-nav-h) - 20px);
+    height: calc(var(--cr-viewport-space) - var(--cr-guest-hint-space, 0px) - 12px);
   }
 
   .cr-composer-panel :deep(.bar) {
