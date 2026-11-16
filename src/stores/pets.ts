@@ -15,6 +15,7 @@ export interface PetConfirmedEvent {
   kind: PetCommand['kind']
   action?: PetAction
   matchId?: string
+  orderId?: string
 }
 
 export const usePetsStore = defineStore('pets', () => {
@@ -359,7 +360,7 @@ export const usePetsStore = defineStore('pets', () => {
       resetRisk()
       if (command.kind.startsWith('brawl-')) {
         confirmedEvent.value = { sequence: ++confirmationSequence, petId: receipt.petId,
-          kind: command.kind, matchId: receipt.matchId }
+          kind: command.kind, matchId: receipt.matchId, orderId: receipt.orderId }
         return true
       }
       // 确认后的读取期间保留画面，refreshNeeded 阻止旧余额继续操作，避免桌宠闪烁。

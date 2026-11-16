@@ -305,6 +305,8 @@ function onApiOffline() {
   apiOffline.value = true
   // Only already-rendered public content can stay; authentication/permission cleanup remains local.
   if (pageHost.value?.querySelector('[data-public-content="ready"]')) return
+  // 已打开的乱斗页保留订单和原命令，网络恢复后可以在本页核对原结果。
+  if (route.name === 'pet-brawl' && pageHost.value?.querySelector('[data-brawl-ready="true"]')) return
   offlineNavigation = true
   // Keep a banner if navigation is rejected; never retry the failed API command.
   void router.replace({ path: '/offline', query: { from: route.fullPath } })

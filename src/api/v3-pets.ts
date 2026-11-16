@@ -161,6 +161,8 @@ export type BrawlCommand = { petId: string; version: number } & (
   | { kind: 'brawl-upgrade'; weapon: BrawlWeapon; level: number }
   | { kind: 'brawl-enroll'; weapon: BrawlWeapon; skill: BrawlSkill; enabled: boolean; revision: string }
   | { kind: 'brawl-match'; revision: string }
+  | { kind: 'brawl-quote'; weapon: BrawlWeapon; level: number; materials: number }
+  | { kind: 'brawl-confirm'; orderId: string }
 )
 export interface BrawlSummary {
   id: string
@@ -612,6 +614,30 @@ export const readBrawlReport = (id: string, signal?: AbortSignal) => read(
     return { ...report, species, opponentSpecies, player, opponent, turns, petId: brawlId(row.petId), version: integer(row.version, 1) }
   }, signal)
 
+function brawlOrder(value: unknown) {
+  const row = object(value)
+  const weapon = brawlWeapons.find(item => item === row.weapon)
+  const status = row.status
+  if (!weapon || (status !== 'pending' && status !== 'expired' && status !== 'completed')) throw invalid()
+  const level = integer(row.level, 0, 4), createdAt = integer(row.createdAt), expiresAt = integer(row.expiresAt)
+  if (expiresAt <= createdAt || (status === 'completed' && integer(row.completedAt) >= expiresAt)) throw invalid()
+  return { id: brawlId(row.id), petId: brawlId(row.petId), weapon, status, level, createdAt, expiresAt,
+    materials: integer(row.materials, 0, 220), points: integer(row.points, 0, 2200), version: integer(row.version, 1) } as const
+}
+export type BrawlOrder = ReturnType<typeof brawlOrder>
+export const readBrawlOrders = (before?: string, signal?: AbortSignal) => read(
+  before ? `${brawlPath}/orders?before=${brawlId(before)}` : `${brawlPath}/orders`, value => {
+    const row = object(value)
+    return { list: unique(list(row.list, 20).map(brawlOrder), item => item.id),
+      balance: integer(row.balance, -2147483648), next: row.next === null ? null : brawlId(row.next) }
+  }, signal)
+export const readBrawlOrder = (id: string, signal?: AbortSignal) => read(
+  `${brawlPath}/orders/${brawlId(id)}`, value => {
+    const order = brawlOrder(value)
+    if (order.id !== id) throw invalid()
+    return { order, balance: integer(object(value).balance, -2147483648) }
+  }, signal)
+
 export interface PetRiskState { retryAt: number; verificationRequired: boolean; serverNow: number }
 export interface PetRiskChallenge {
   challengeId: string; operation: string; idempotencyKey: string; expiresAt: number
@@ -673,18 +699,18 @@ export async function readPetJournal(kind: PetHistoryKind, page: number, signal?
   return result
 }
 
-export async function executePetCommand(command: PetCommand, signal?: AbortSignal): Promise<{ petId: string; matchId?: string }> {
+export async function executePetCommand(command: PetCommand, signal?: AbortSignal): Promise<{ petId: string; matchId?: string; orderId?: string }> {
   if (!/^[A-Za-z0-9._:-]{1,128}$/.test(command.key)) throw new ApiError('操作标识不合法', 422)
   const { kind, key, ...input } = command
   // 命令的本地路由标识与服务端活动类型分开，原键恢复始终发送冻结的活动类型。
   const body = command.kind === 'activities'
     ? { petId: command.petId, kind: command.activityKind, entryId: command.entryId, activityVersion: command.activityVersion }
-    : input
+    : command.kind === 'brawl-confirm' ? { petId: command.petId } : input
   const routes: Partial<Record<PetCommand['kind'], string>> = {
     'brawl-fight': `${brawlPath}/matches`, 'brawl-upgrade': `${brawlPath}/upgrade`,
-    'brawl-enroll': `${brawlPath}/profile`, 'brawl-match': `${brawlPath}/pvp`,
+    'brawl-enroll': `${brawlPath}/profile`, 'brawl-match': `${brawlPath}/pvp`, 'brawl-quote': `${brawlPath}/orders`,
   }
-  const path = routes[kind] ?? `/api/v3/me/pet/${kind}`
+  const path = command.kind === 'brawl-confirm' ? `${brawlPath}/orders/${brawlId(command.orderId)}/confirm` : routes[kind] ?? `/api/v3/me/pet/${kind}`
   const response = await petRequest<{ code: number; data: unknown }>(path, {
     method: kind === 'name' || kind === 'brawl-enroll' ? 'PUT' : 'POST',
     headers: { 'Idempotency-Key': key }, body: JSON.stringify(body), signal,
@@ -707,5 +733,8 @@ export async function executePetCommand(command: PetCommand, signal?: AbortSigna
     if (command.kind === 'activities/claim' && receipt.activityId !== command.activityId) throw invalid()
   }
   // 仅返回已校验的目标标识，供动画核对当前宠物；养成状态仍只采用后续聚合读取。
-  return { petId: receipt.petId as string, ...(kind === 'brawl-fight' || kind === 'brawl-match' ? { matchId: brawlId(receipt.matchId) } : {}) }
+  const orderId = kind === 'brawl-quote' || kind === 'brawl-confirm' ? brawlId(receipt.orderId) : undefined
+  if (command.kind === 'brawl-confirm' && orderId !== command.orderId) throw invalid()
+  return { petId: receipt.petId as string, orderId,
+    ...(kind === 'brawl-fight' || kind === 'brawl-match' ? { matchId: brawlId(receipt.matchId) } : {}) }
 }

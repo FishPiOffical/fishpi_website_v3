@@ -5,6 +5,7 @@ import { getAuthContextVersion } from '@/api/http'
 import { brawlSkills, brawlWeapons, readBrawlHistory, readBrawlReport, readBrawlState, type BrawlSkill, type BrawlSummary, type BrawlWeapon } from '@/api/v3-pets'
 import { petPortrait } from '@/components/pets/animations'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
+import PetBrawlCheckout from '@/components/pets/PetBrawlCheckout.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
@@ -181,7 +182,7 @@ watch(() => pets.confirmedEvent, event => {
     status.value = '对战报名已更新'
     void refresh()
   }
-  if (event.kind === 'brawl-upgrade') {
+  if (event.kind === 'brawl-upgrade' || event.kind === 'brawl-confirm') {
     status.value = '强化完成'
     void refresh()
   }
@@ -218,7 +219,7 @@ onUnmounted(() => { mounted = false; clear() })
 </script>
 
 <template>
-  <main class="fp-page fp-page--wide fp-ui brawl-page">
+  <main class="fp-page fp-page--wide fp-ui brawl-page" :data-brawl-ready="state ? 'true' : undefined">
     <header class="heading">
       <div><RouterLink to="/pets">宠物家园</RouterLink><h1>宠物乱斗</h1></div>
       <div v-if="state" class="materials"><strong>{{ state.materials.toLocaleString() }}</strong><span>历练材料</span></div>
@@ -243,6 +244,8 @@ onUnmounted(() => { mounted = false; clear() })
         <p v-if="nextGrowth" class="subtle">下一级 · 生命 {{ hp(nextGrowth.maxHp) }} · 基础伤害 {{ hp(nextGrowth.attack) }}</p>
         <div class="actions">
           <button type="button" :disabled="locked || !cost || state.materials < cost" @click="upgrade()">{{ cost ? `强化至 +${level + 1} · ${cost} 材料` : '已达最高等级' }}</button>
+          <PetBrawlCheckout v-if="state.petId" :pet-id="state.petId" :weapon="weapon" :level="level"
+            :version="state.version" :materials="state.materials" :cost="cost" :disabled="locked" />
         </div>
         <template v-if="state.pvp">
           <hr />
