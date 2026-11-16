@@ -1,7 +1,7 @@
 /* 首页、内页和聊天室共用三段工具卡；折叠状态仍由各自布局管理。 */
 .tool-module { container: tool-module / inline-size; }
 .tool-module :deep(.person-card), .tool-module :deep(.guest-card), .tool-module :deep(.schedule), .tool-module :deep(.checkin-panel) { width: 100%; min-width: 0; margin: 0; }
-.tool-module :deep(.card-toggle[aria-expanded='true']) { min-height: 0; padding: 10px var(--fp-module-inset) 4px; color: var(--fp-muted); font-size: 13px; }
+.tool-module :deep(.card-toggle[aria-expanded='true']) { min-height: 0; padding-block: 7px; padding-inline: var(--fp-module-inset); color: var(--fp-muted); font-size: 13px; }
 .tool-module :deep(.module-icon) { width: 16px; height: 16px; }
 .tool-module :deep(.card-toggle[aria-expanded='false']) { font-size: 13px; }
 .tool-module > .card-body { padding: 0 var(--fp-module-inset) 6px; }
