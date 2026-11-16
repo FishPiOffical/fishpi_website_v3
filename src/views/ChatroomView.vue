@@ -45,6 +45,7 @@ const chat = useChatStore(),publication=useV3ChatPublicationStore()
 const chatFilter = useChatFilterStore()
 const { notices } = storeToRefs(useV3ChatTimelineStore())
 const chatPreferences = useChatPreferencesStore()
+const { simpleMode } = storeToRefs(chatPreferences)
 const { account, isLoggedIn, accessToken } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 provide(CHAT_MENTION, {
@@ -133,6 +134,7 @@ const timelineEntries = computed(() => {
     notice: null,
   }))
   const noticeEntries = notices.value.flatMap(notice => {
+    if (simpleMode.value && notice.kind !== 'claim') return []
     const participants = notice.kind === 'claim' ? [notice.actor, notice.sender] : [notice.actor]
     const card = notice.kind === 'claim' ? undefined : { text: notice.text }
     if (participants.some(user => chatFilter.modeFor({ ...user, userOId: user.id, card }) !== 'show')) return []
@@ -170,9 +172,9 @@ watch(followingLatest, value => { if (value) hasNewMessages.value = false })
 const firstVisibleId = computed(() => visibleMessages.value[0]?.oId)
 const latestVisibleKey = computed(() => timelineEntries.value.at(-1)?.key)
 const animatedEntryKeys = ref(new Set<string>())
-watch(timelineEntries, (entries, previous) => {
+watch([timelineEntries, simpleMode], ([entries, simple], [previous, wasSimple]) => {
   animatedEntryKeys.value = new Set()
-  if (!previous?.length || loading.value || loadingMore.value || contextId.value) return
+  if (simple !== wasSimple || !previous?.length || loading.value || loadingMore.value || contextId.value) return
   if (chatStyle.value === 'modern' && !followingLatest.value) return
   // 翻阅经典模式的历史记录时不扩张布局，避免阅读位置受到动画干扰。
   if (chatStyle.value === 'classic' && typeof document !== 'undefined') {
@@ -186,9 +188,9 @@ watch(timelineEntries, (entries, previous) => {
     .slice(-10).map(entry => entry.key))
 })
 
-watch(latestVisibleKey, async (key, previous) => {
+watch([latestVisibleKey, simpleMode], async ([key, simple], [previous, wasSimple]) => {
   const el = scroller.value
-  if (!el) return
+  if (!el || simple !== wasSimple) return
   if (!key) { hasNewMessages.value = false; return }
   // Measure against the previous layout before Vue inserts the new message.
   const follow = !previous || followingLatest.value
