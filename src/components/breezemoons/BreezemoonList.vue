@@ -7,8 +7,9 @@ import { formatDateTime } from '@/utils/time'
 import { RouterLink } from 'vue-router'
 import type { BreezemoonQuoteSource } from '@/utils/chatQuote'
 import type { FollowingMoon } from '@/api/v3-following-feed'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
-import { avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
+import { avatarUrl, DEFAULT_AVATAR, avatarThumbnail, rhyPicThumbnail } from '@/utils/avatar'
 const props = defineProps<{items:FollowingMoon[];compact?:boolean;avatarOnly?:boolean;hideAuthor?:boolean;collapsible?:boolean}>()
 function fallback(event:Event){const image=event.target as HTMLImageElement;if(image.getAttribute('src')!==DEFAULT_AVATAR)image.src=DEFAULT_AVATAR}
 const date = formatDateTime
@@ -17,7 +18,43 @@ const bodyPrefix = useId()
 const bodies = useTemplateRef<HTMLElement[]>('moonBodies')
 const expanded = ref(new Set<string>())
 const clipped = ref(new Set<string>())
+const zoomed = ref('')
+const originalImage = ref('')
 let observer: ResizeObserver | undefined
+
+function prepareImageButtons() {
+  if (!props.compact) return
+  for (const body of bodies.value ?? []) {
+    for (const image of body.querySelectorAll('img:not(.emoji)')) {
+      const media = image.closest('picture') ?? image
+      if (media.closest('a, button')) continue
+      // 正文由 v-html 渲染，挂载后给独立图片补原生按钮，已有链接不套按钮。
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'moon-image-button'
+      button.setAttribute('aria-label', '查看大图')
+      button.title = '查看大图'
+      media.before(button)
+      button.append(media)
+    }
+  }
+}
+
+function previewImage(event: MouseEvent) {
+  if (!props.compact || !(event.target instanceof Element)
+    || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  const target = event.target
+  const action = target.closest('.moon-image-button, a')
+  let image = target.closest('img:not(.emoji)')
+  if (!image && action && !action.textContent?.trim()) image = action.querySelector('img:not(.emoji)')
+  if (!(image instanceof HTMLImageElement)) return
+  const source = image.currentSrc || image.src
+  if (!/^https?:\/\//i.test(source)) return
+  event.preventDefault()
+  event.stopPropagation()
+  originalImage.value = source
+  zoomed.value = rhyPicThumbnail(source, 1024, 1024)
+}
 
 function measureOverflow() {
   if (!props.collapsible) return
@@ -32,6 +69,7 @@ function measureOverflow() {
 }
 
 function observeBodies() {
+  prepareImageButtons()
   observer?.disconnect()
   if (!props.collapsible) return
   for (const body of bodies.value ?? []) observer?.observe(body)
@@ -90,6 +128,7 @@ function share(item: FollowingMoon, event: MouseEvent | DragEvent) {
         @dragstart="chatQuote?.enabled.value && share(item, $event)"
         @load.capture="measureOverflow"
         @focusin="collapsible && revealFocusedLink(item.id, $event)"
+        @click="previewImage"
         v-html="item.contentHtml"
       />
       <button v-if="collapsible && clipped.has(item.id)" class="moon-expand" type="button"
@@ -104,6 +143,7 @@ function share(item: FollowingMoon, event: MouseEvent | DragEvent) {
       </svg>
     </button>
   </li></ul>
+  <ImageLightbox v-if="compact" v-model="zoomed" :original-src="originalImage" />
 </template>
 <style scoped lang="scss">
 .breezemoon-list {
@@ -212,8 +252,6 @@ time {
   overflow: hidden;
 
   :deep(p) { margin-block: 0; }
-  // 折叠时让单图完整缩进三行预览区域，避免只露出图片的上半截。
-  :deep(img:not(.emoji)) { max-block-size: min(3lh, var(--moon-image-height)); }
 }
 .moon-expand {
   padding: 3px 0;
@@ -262,13 +300,36 @@ time {
   }
 
   .moon-body {
-    --moon-image-width: 180px;
-    --moon-image-height: 110px;
     margin-top: 4px;
     padding-left: 0;
     font-size: 12.5px;
     line-height: 1.45;
     color: var(--fp-text);
+  }
+
+  .moon-body :deep(img:not(.emoji)) {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    max-inline-size: min(100%, 20px);
+    max-block-size: 20px;
+    border-radius: 3px;
+    vertical-align: middle;
+    cursor: zoom-in;
+  }
+
+  .moon-body :deep(.moon-image-button) {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    cursor: zoom-in;
+
+    &:focus-visible { outline: 2px solid var(--fp-link); }
   }
 }
 .avatar-only {
