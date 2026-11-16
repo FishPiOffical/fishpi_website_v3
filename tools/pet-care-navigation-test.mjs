@@ -43,7 +43,8 @@ const snapshot = extra => ({ serverNow: time, today: '2026-11-13', pet: pet(extr
 const auth = reactive({ accessToken: 'token-a', account: { oId: 'A' }, isLoggedIn: true })
 const route = reactive({ path: '/pets', hash: '', fullPath: '/pets' })
 let refreshHandler = () => { pets.state = snapshot({ hunger: 99, water: 98 }); pets.receivedAt = time }
-const pets = reactive({ state: snapshot(), catalog: { species: [], rules: {}, places: [], courses: [], jobs: [], skills: [] },
+const pets = reactive({ state: snapshot(), catalog: { species: [], rules: {}, places: [], courses: [], jobs: [], skills: [],
+  items: [{ id: 'food', category: 'food', effects: { hunger: 35, water: 0, mood: 0, energy: 0 } }] },
   receivedAt: time, loading: false, busy: false, pending: null, refreshNeeded: false, offline: false, catalogError: '', catalogLoading: false,
   get pet() { return this.state?.pet }, get coins() { return this.state?.wallet.coins }, foodQuantity: 6,
   refresh() { reads++; return Promise.resolve(refreshHandler()) }, ensureLoaded() {}, act() { writes++ }, claimActivity() { writes++ },
@@ -99,6 +100,7 @@ try {
   pets.state = snapshot({ careAvailableAt: { feed: time + 2000, water: time + 1000 } })
   mount({ setup: () => () => h('div', [h(Actions, { active: active.value }), h(Actions, { compact: true, active: active.value })]) })
   await flush(); assert(button('喂食').disabled && button('饮水').disabled)
+  assert.deepEqual([...document.querySelectorAll('.pet-actions .feed-gain')].map(node => node.textContent), ['饱食 +35', '饱食 +35'])
   await advance(999); assert.equal(reads, 0); assert.equal(pets.pet.hunger, 100, '不能客户端模拟衰减')
   await advance(1); assert.equal(reads, 1, '家园与桌宠只共用一次核验'); assert(!button('喂食').disabled && !button('饮水').disabled)
   button('喂食').click(); await flush(); assert.equal(writes, 1)

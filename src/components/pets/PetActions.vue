@@ -8,6 +8,8 @@ import { usePetCareAvailability } from './usePetCareAvailability'
 
 const props = defineProps<{ compact?: boolean; active?: boolean }>()
 const pets = usePetsStore()
+const quickFeedItemId = 'food'
+const feedGain = computed(() => pets.catalog?.items.find(item => item.id === quickFeedItemId)?.effects.hunger)
 const { now } = usePetClock()
 usePetCareAvailability(() => props.active !== false)
 const occupied = computed(() => !!pets.pet?.activity)
@@ -30,13 +32,17 @@ const actions = computed<{ id: PetAction; label: string; hint: string; blocked: 
 })
 function run(action: PetAction, blocked: boolean) {
   if (blocked || pets.loading || pets.busy || pets.pending || pets.refreshNeeded) return
-  void pets.act(action, action === 'feed' ? 'food' : undefined)
+  void pets.act(action, action === 'feed' ? quickFeedItemId : undefined)
 }
 </script>
 <template>
   <div class="pet-actions" :class="{ compact }" aria-label="照顾宠物">
     <button v-for="action in actions" :key="action.id" type="button" :disabled="action.blocked || pets.loading || pets.busy || !!pets.pending || pets.refreshNeeded" :title="occupied && action.id !== 'wake' ? occupiedHint : action.hint" @click="run(action.id, action.blocked)">
-      <PetIcon :name="action.id" /><span>{{ action.label }}</span><small v-if="!compact">{{ action.hint }}</small>
+      <PetIcon :name="action.id" /><span>{{ action.label }}</span>
+      <small v-if="!compact || (action.id === 'feed' && feedGain !== undefined)">
+        <span v-if="action.id === 'feed' && feedGain !== undefined" class="feed-gain">饱食 +{{ feedGain }}</span>
+        <span v-if="!compact">{{ action.hint }}</span>
+      </small>
     </button>
   </div>
 </template>
@@ -46,6 +52,7 @@ function run(action: PetAction, blocked: boolean) {
 .pet-actions button > svg { width: 23px; height: 23px; color: var(--fp-primary); }
 .pet-actions button > span { font-size: 14px; font-weight: 600; }
 .pet-actions button > small { color: var(--fp-muted); font-size: 11px; line-height: 1.4; text-align: center; }
+.feed-gain { display: block; color: var(--fp-primary-ink, var(--fp-primary)); font-variant-numeric: tabular-nums; }
 .pet-actions button:not(:disabled):hover { transform: translateY(-2px); background: var(--fp-primary-soft); border-color: color-mix(in srgb, var(--fp-primary) 40%, var(--fp-border)); }
 .pet-actions button:active { transform: translateY(0); }
 .pet-actions button:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 2px; }
