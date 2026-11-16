@@ -2,7 +2,6 @@
 defineProps<{
   title: string
   count?: string
-  description?: string
 }>()
 </script>
 
@@ -18,7 +17,6 @@ defineProps<{
       </nav>
       <span v-if="count" class="heading-count">{{ count }}</span>
     </div>
-    <p v-if="description" class="heading-description">{{ description }}</p>
   </header>
 </template>
 
@@ -101,14 +99,6 @@ defineProps<{
 
 .heading-sort + .heading-count {
   margin-inline-start: 0;
-}
-
-.heading-description {
-  margin: 0;
-  padding: 0 var(--fp-panel-padding) 10px;
-  color: var(--fp-muted);
-  font-size: .75rem;
-  line-height: 1.65;
 }
 
 @container list-heading (max-width: 28rem) {

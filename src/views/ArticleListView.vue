@@ -31,7 +31,6 @@ const columnShelf = ref<ColumnOrder>('recent')
 const { value, p, loading, error, read } = useArticleListing(kind, extra, columnShelf, consumeArticleListingPayload(kind.value, extra.value, columnShelf.value), active)
 const items = computed(() => value.value?.resource === 'articles' ? value.value.list : [])
 const columns = computed(() => value.value?.resource === 'columns' ? value.value.list : [])
-const listingNote=computed(()=>kind.value==='hot'?'按近月回帖排序，发布时间较早的文章也可能上榜。':kind.value==='perfect'?'这里汇集站点收录的优选文章，按发布时间展示；热门反映讨论，优选用于内容精选。':'')
 const isColumnPage = computed(() => kind.value === 'long')
 const heading = computed(() => kind.value === 'tag' ? `#${extra.value}` : title.value)
 const RECENT_TABS = [{ to: '/recent', label: '默认' }, { to: '/recent/hot', label: '热议' }, { to: '/recent/good', label: '👍 好评' }, { to: '/recent/reply', label: '最近回帖' }]
@@ -61,7 +60,6 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
           v-else
           :title="heading"
           :count="value ? `共 ${value.total.toLocaleString('zh-CN')} 篇` : undefined"
-          :description="listingNote"
         >
           <ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" />
           <span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span>
