@@ -17,7 +17,8 @@ let source = compile(await fs.readFile('src/stores/appearanceShop.ts', 'utf8'))
 for (const [a,b] of replacements) source = source.replaceAll(`from '${a}'`, `from '${b}'`)
 const { useAppearanceShopStore } = await import(url(source))
 const product = { id: 'mount-paper-plane', kind: 'mount', styleId: 'paper-plane', name: '纸飞机', version: 1, price7: 1024, price30: 3584, enabled: true, revision: 1 }
-const sakuraFrame = { ...product, id: 'frame-night-sakura', kind: 'frame', styleId: 'night-sakura', price7: 128, price30: 0, vipIncluded: true }
+const sakuraFrame = { ...product, id: 'frame-night-sakura', kind: 'frame', styleId: 'sakura-letter', name: '花瓣折笺头像框', price7: 128, price30: 0, vipIncluded: true }
+const moonBubble = { ...sakuraFrame, id: 'bubble-sakura-moon', kind: 'bubble', styleId: 'sakura-moon', name: '月弧夜樱气泡', price7: 256 }
 const inventory = { list: [], mountId: '', serverNow: Date.now(), balance: 10000 }
 const envelope = data => ({ code: 0, data })
 let losesResponse = false, readFails = false, deductions = 0
@@ -29,14 +30,14 @@ state.dispatch = async (path, init) => {
     if (losesResponse) { losesResponse = false; throw Error('响应丢失') }
     return envelope(receipts.get(key))
   }
-  if (path === '/api/v3/appearance-shop?includeVipWeekly=1') return envelope({ list: [product, sakuraFrame] })
+  if (path === '/api/v3/appearance-shop?includeVipWeekly=1') return envelope({ list: [product, sakuraFrame, moonBubble] })
   if (readFails) throw Error('读取失败')
   return envelope(inventory)
 }
 const pinia = createPinia(), store = useAppearanceShopStore(pinia), user = auth(pinia)
 assert.equal(state.calls.length, 0)
-await store.load(); assert.equal(store.products.length, 2)
-assert.deepEqual(store.products[1], sakuraFrame)
+await store.load(); assert.deepEqual(store.products, [product, sakuraFrame, moonBubble])
+await store.buy(moonBubble, 30); assert.equal(deductions, 0)
 losesResponse = true; await store.buy(product, 7)
 assert.equal(deductions, 1); const key = store.pending.key
 user.accessToken = 'rotated'; await nextTick(); assert.equal(store.pending.key, key)
@@ -57,4 +58,9 @@ assert.equal(appearance.chatAppearanceSnapshot({ version: 1, bubbleId: 'sea-soda
 assert.equal(appearance.chatAppearanceSnapshot({ version: 99, bubbleId: 'sea-soda', frameId: 'tide' }).bubbleId, 'classic')
 const nightSakura = { version: 1, bubbleId: 'night-sakura', frameId: 'night-sakura' }
 assert.deepEqual(appearance.chatAppearanceSnapshot(nightSakura), nightSakura)
+assert.equal(appearance.isLoopingSakura(nightSakura.bubbleId), false)
+const sakuraDuo = { version: 1, bubbleId: 'sakura-letter', frameId: 'sakura-moon' }
+assert.deepEqual(appearance.chatAppearanceSnapshot(sakuraDuo), sakuraDuo)
+assert.equal(appearance.isLoopingSakura(sakuraDuo.bubbleId), true)
+assert.equal(appearance.isLoopingSakura(sakuraDuo.frameId), true)
 console.log('PASS 身份切换拒迟到库存、新样式快照白名单及未知版本回退')

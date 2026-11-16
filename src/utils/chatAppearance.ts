@@ -3,8 +3,12 @@ export { bubbleAttributes, isCustomBubbleId } from '@/utils/bubbleStyle'
 
 export interface ChatAppearance { bubbleId: string; frameId: string; version: number; bubbleRevision?: number; bubbleStyle?: BubbleStyle }
 export const NIGHT_SAKURA = 'night-sakura'
-export const CHAT_BUBBLES = ['classic', 'candy', 'paipai-orange', 'fishpond-blue', 'sea-soda', 'sunset-letter', 'star-route', NIGHT_SAKURA] as const
-export const CHAT_FRAMES = ['none', 'gold', 'paipai-orange', 'fishpond-blue', 'tide', 'paipai-stamp', 'star-ring', NIGHT_SAKURA] as const
+const SAKURA_STYLES = ['sakura-letter', 'sakura-moon'] as const
+export function isLoopingSakura(id: string): id is typeof SAKURA_STYLES[number] {
+  return SAKURA_STYLES.some(style => style === id)
+}
+export const CHAT_BUBBLES = ['classic', 'candy', 'paipai-orange', 'fishpond-blue', 'sea-soda', 'sunset-letter', 'star-route', NIGHT_SAKURA, ...SAKURA_STYLES] as const
+export const CHAT_FRAMES = ['none', 'gold', 'paipai-orange', 'fishpond-blue', 'tide', 'paipai-stamp', 'star-ring', NIGHT_SAKURA, ...SAKURA_STYLES] as const
 export function defaultChatAppearance(): ChatAppearance { return { bubbleId: 'classic', frameId: 'none', version: 1 } }
 export function isChatAppearance(value: unknown): value is ChatAppearance {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false

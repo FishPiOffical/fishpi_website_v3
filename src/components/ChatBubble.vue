@@ -15,7 +15,8 @@ import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
 import { DEFAULT_AVATAR, avatarThumbnail, imageThumbnail, rhyPicThumbnail } from '@/utils/avatar'
-import { bubbleAttributes, chatAppearanceSnapshot, type ChatAppearance } from '@/utils/chatAppearance'
+import { bubbleAttributes, chatAppearanceSnapshot, isLoopingSakura, type ChatAppearance } from '@/utils/chatAppearance'
+import SakuraDecoration from '@/components/packs/SakuraDecoration.vue'
 import { isSingleImageMessage } from '@/utils/chatMessage'
 import { extractLatestChatQuote, hasChatQuoteBody, type ChatQuote } from '@/utils/chatQuote'
 
@@ -60,6 +61,8 @@ const functionPreferences = useFunctionPreferencesStore()
 const previewLimit = 1024
 
 const snapshot = computed(() => chatAppearanceSnapshot(props.appearance))
+const sakuraBubble = computed(() => props.chatroom && !simpleMode.value && !isStandalone.value && isLoopingSakura(snapshot.value.bubbleId) ? snapshot.value.bubbleId : null)
+const sakuraFrame = computed(() => props.chatroom && !simpleMode.value && isLoopingSakura(snapshot.value.frameId) ? snapshot.value.frameId : null)
 const managedStyle = computed(() => props.chatroom && !simpleMode.value && !isStandalone.value ? snapshot.value.bubbleStyle : undefined)
 const zoomed = ref('')
 const originalImage = ref('')
@@ -129,9 +132,10 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'has-sakura-arrival': animateSakura && !simpleMode, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
+  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'has-sakura-arrival': animateSakura && mounted && chatPreferences.showSakuraEffects, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
     <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`">
       <img class="fp-avatar" :src="avatarThumbnail(avatar, avatarSize)" alt="" loading="lazy" @error="onAvatarError" />
+      <SakuraDecoration v-if="sakuraFrame" :style-id="sakuraFrame" kind="frame" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
     </RouterLink>
     <div class="message-stack">
       <div v-if="chatroom" class="head">
@@ -158,6 +162,7 @@ function onBodyClick(e: MouseEvent) {
         <MedalList class="chat-medals" :items="medals" variant="mini" />
       </div>
       <div v-if="!display.quote || display.html || $slots.default" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick">
+        <SakuraDecoration v-if="sakuraBubble" :style-id="sakuraBubble" kind="bubble" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
         <ManagedBubbleShape v-if="managedStyle?.shape" :shape="managedStyle.shape" />
         <img v-if="managedStyle?.image" class="managed-bubble-mark" :src="managedStyle.shape ? imageThumbnail(managedStyle.image, 34, 34) : managedStyle.image" alt="" loading="lazy">
         <div v-if="!chatroom" class="head">

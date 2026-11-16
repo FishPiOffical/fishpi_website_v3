@@ -1,0 +1,8 @@
+{
+  "id": "sakura-letter",
+  "kind": "frame",
+  "name": "花瓣折笺头像框",
+  "vip": false,
+  "points": true,
+  "preview": "linear-gradient(135deg,#ffe7ef,#ce7d9f)"
+}

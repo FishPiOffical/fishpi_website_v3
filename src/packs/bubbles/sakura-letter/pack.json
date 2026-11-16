@@ -1,0 +1,8 @@
+{
+  "id": "sakura-letter",
+  "kind": "bubble",
+  "name": "花瓣折笺气泡",
+  "vip": false,
+  "points": true,
+  "preview": "linear-gradient(135deg,#ffe7ef,#ce7d9f)"
+}

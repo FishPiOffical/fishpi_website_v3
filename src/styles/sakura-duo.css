@@ -1,0 +1,171 @@
+.fp-msg[data-appearance-snapshot="v1"].is-room:is([data-bubble="sakura-letter"], [data-bubble="sakura-moon"], [data-frame="sakura-letter"], [data-frame="sakura-moon"]) {
+  --sakura-ink: #492842;
+  --sakura-frame: linear-gradient(155deg,#f9dae5,#b75f80 61%,#ffd2a3);
+}
+html[data-theme="classic-dark"] .fp-msg[data-appearance-snapshot="v1"].is-room:is([data-bubble="sakura-letter"], [data-bubble="sakura-moon"], [data-frame="sakura-letter"], [data-frame="sakura-moon"]) {
+  --sakura-ink: #ffecf9;
+  --sakura-frame: linear-gradient(155deg,#ffe4db,#d6689f 61%,#ffd2a3);
+}
+
+.sakura-decoration[data-sakura="sakura-letter"] {
+  --edge: #cb789a;
+  --wash: linear-gradient(146deg,#fff7f2 2%,#fbe6ed 65%,#f4bfd4);
+  --flower-color: linear-gradient(145deg,#ffe3dc 4%,#da709f 48%,#cf597c 78%);
+  --petal: #d9689c; --petal-tip: #ffd9e7;
+  --trim-shadow: #edb1c5; --trim-light: #ffe8ef;
+  --fallback-radius:7px 15px 15px 15px;
+  --contour:shape(
+    from 7px 0, line to calc(100% - 13px) 0,
+    curve to 100% 12px with calc(100% - 6px) 0 / 100% 6px,
+    line to 100% calc(100% - 12px),
+    curve to calc(100% - 15px) 100% with 100% calc(100% - 5px) / calc(100% - 6px) 100%,
+    line to 15px 100%, curve to 1px calc(100% - 14px) with 7px 100% / 1px calc(100% - 5px),
+    line to 1px 15px, curve to 0 6px with 1px 11px / 0 9px,
+    curve to 7px 0 with 0 2px / 3px 0, close);
+}
+html[data-theme="classic-dark"] .sakura-decoration[data-sakura="sakura-letter"] {
+  --edge: #d08aa7;
+  --wash: linear-gradient(145deg,#6a354e,#50283f 55%,#733750);
+  --flower-color: linear-gradient(145deg,#ffe2d3,#ff9ac6 65%,#e66b9e);
+  --petal: #ff9ec7; --petal-tip: #ffe4ef;
+  --trim-shadow: #9c5a7b; --trim-light: #d38fb2;
+}
+.sakura-decoration[data-sakura="sakura-moon"] {
+  --edge: linear-gradient(169deg,#ca8ea8,#9465a1 73%,#e9b67e);
+  --wash: linear-gradient(154deg,#f8eaf6,#e8d5ef 65%,#e6c4e6);
+  --flower-color: linear-gradient(155deg,#fce1d9,#bd5b91 60%,#9d507c);
+  --petal: #b23079; --petal-tip: #f4beda;
+  --trim-shadow: #b273a0; --trim-light: #d6aac7;
+  --arc-start: #9c649c; --arc-end: #d0939f;
+  --fallback-radius:8px 26px 26px 14px;
+  --contour:shape(
+    from 8px 0, line to calc(100% - 23px) 0,
+    curve to 100% 50% with calc(100% - 10px) 0 / 100% 23%,
+    curve to calc(100% - 23px) 100% with 100% 77% / calc(100% - 10px) 100%,
+    line to 14px 100%, curve to 0 calc(100% - 14px) with 6px 100% / 0 calc(100% - 6px),
+    line to 0 8px, curve to 8px 0 with 0 3px / 3px 0, close);
+}
+html[data-theme="classic-dark"] .sakura-decoration[data-sakura="sakura-moon"] {
+  --edge: linear-gradient(165deg,#e5a9ce,#9067aa 72%,#eec5a0);
+  --wash: linear-gradient(145deg,#552e4b,#3b2747 60%,#29263f);
+  --flower-color: linear-gradient(155deg,#ffe3d1,#f3a6d4 70%,#c57bbb);
+  --petal: #ff98d2; --petal-tip: #fff0d3;
+  --trim-shadow: #efb4d5; --trim-light: #ca8db8;
+  --arc-start: #f0bce8; --arc-end: #ffcfb1;
+}
+
+.fp-msg[data-appearance-snapshot="v1"].is-room:not(.is-standalone):is([data-bubble="sakura-letter"], [data-bubble="sakura-moon"]) .fp-bubble {
+  position: relative;
+  isolation: isolate;
+  padding: 8px 20px 10px 15px;
+  border: 0;
+  background: transparent;
+  color: var(--sakura-ink);
+}
+.fp-msg[data-appearance-snapshot="v1"][data-bubble="sakura-moon"].is-room:not(.is-standalone) .fp-bubble { padding-inline-end: 24px; }
+.fp-msg[data-appearance-snapshot="v1"].is-room.is-self:not(.is-standalone):is([data-bubble="sakura-letter"], [data-bubble="sakura-moon"]) .fp-bubble { padding-inline: 22px 15px; }
+.fp-msg[data-appearance-snapshot="v1"].is-room:not(.is-standalone):is([data-bubble="sakura-letter"], [data-bubble="sakura-moon"]) .body { color: inherit; }
+
+.fp-msg[data-appearance-snapshot="v1"].is-room:is([data-frame="sakura-letter"], [data-frame="sakura-moon"]) .fp-avatar-frame {
+  position: relative;
+  isolation: isolate;
+  padding: 3px;
+  border: 0;
+  border-radius: 48% 39% 48% 35%;
+  background: var(--sakura-frame);
+  box-shadow: 0 0 0 1px #b1668657, 0 2px 5px #ab587e45;
+}
+.fp-msg[data-appearance-snapshot="v1"][data-frame="sakura-moon"].is-room .fp-avatar-frame {
+  border-radius: 13% 46% 22% 44%;
+  background: conic-gradient(from -50deg,#af679d,#fbd6d9 23%,#775f8d 55%,#fdc995 75%,#af679d);
+  box-shadow: 0 2px 6px #7d4d8a57;
+}
+.fp-msg[data-appearance-snapshot="v1"].is-room:is([data-frame="sakura-letter"], [data-frame="sakura-moon"]) .fp-avatar-frame .fp-avatar { border-radius: inherit; }
+
+.sakura-decoration, .sakura-decoration i, .sakura-canvas, .sakura-flight { position: absolute; pointer-events: none; }
+.sakura-decoration { inset: -42px -7px -14px; overflow: clip; }
+.sakura-canvas { inset: 42px 7px 14px; }
+.sakura-decoration[data-part="bubble"] { z-index: -1; filter: drop-shadow(0 3px 4px #87426730); }
+.sakura-paper { inset: 0; border-radius: var(--fallback-radius); clip-path: var(--contour); }
+.sakura-rim { background: var(--edge); }
+.sakura-fill { inset: 1px; background: var(--wash); }
+.sakura-decoration.is-mirrored .sakura-paper { transform: scaleX(-1); }
+.sakura-decoration .sakura-seal {
+  right: -6px; bottom: -7px; width: 19px; height: 19px;
+  background: var(--flower-color);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cg fill='white' transform='translate(15 15)'%3E%3Cpath id='p' d='M0 -1C-5 -3 -6 -8 -3.4 -13Q-2.3 -14 -1.5 -12.6L0 -11 1.5 -12.6Q2.3 -14 3.4 -13C6 -8 5 -3 0 -1Z'/%3E%3Cuse href='%23p' transform='rotate(72)'/%3E%3Cuse href='%23p' transform='rotate(144)'/%3E%3Cuse href='%23p' transform='rotate(216)'/%3E%3Cuse href='%23p' transform='rotate(288)'/%3E%3Ccircle r='1.4'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cg fill='white' transform='translate(15 15)'%3E%3Cpath id='p' d='M0 -1C-5 -3 -6 -8 -3.4 -13Q-2.3 -14 -1.5 -12.6L0 -11 1.5 -12.6Q2.3 -14 3.4 -13C6 -8 5 -3 0 -1Z'/%3E%3Cuse href='%23p' transform='rotate(72)'/%3E%3Cuse href='%23p' transform='rotate(144)'/%3E%3Cuse href='%23p' transform='rotate(216)'/%3E%3Cuse href='%23p' transform='rotate(288)'/%3E%3Ccircle r='1.4'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
+}
+.sakura-decoration[data-part="frame"] .sakura-seal { width: 18px; height: 18px; }
+.sakura-decoration.is-mirrored .sakura-seal { right: auto; left: -6px; }
+.sakura-decoration[data-sakura="sakura-letter"] .sakura-trim {
+  inset: 1px 1px auto auto;
+  width: 15px; height: 14px;
+  background: linear-gradient(145deg,transparent 50%,var(--trim-shadow) 52%,var(--trim-light));
+  clip-path: polygon(0 0,45% 0,100% 57%,100% 100%,35% 76%);
+}
+.sakura-decoration[data-sakura="sakura-moon"] .sakura-trim {
+  inset: 4px 5px 4px auto; width: 18px;
+  border-radius: 0 100% 100% 0;
+  border-inline-end: 2px solid var(--trim-shadow);
+  border-block: 1px solid var(--trim-light);
+  opacity: .78;
+}
+.sakura-decoration[data-sakura="sakura-letter"].is-mirrored .sakura-trim { right: auto; left: 1px; transform: scaleX(-1); }
+.sakura-decoration[data-sakura="sakura-moon"].is-mirrored .sakura-trim { right: auto; left: 5px; transform: scaleX(-1); }
+.sakura-decoration[data-sakura="sakura-moon"][data-part="frame"] .sakura-canvas::after {
+  position: absolute; content: "";
+  inset: -4px -4px -3px;
+  border: 1px solid transparent;
+  border-top-color: var(--arc-start);
+  border-right-color: var(--arc-end);
+  border-radius: 45% 55% 30% 55%;
+  transform: rotate(18deg);
+}
+.sakura-decoration[data-part="frame"].is-mirrored .sakura-canvas::after { transform: scaleX(-1) rotate(18deg); }
+
+.sakura-flight { width: 1px; height: 1px; right: 9px; bottom: 9px; }
+.sakura-decoration.is-mirrored .sakura-flight { left: 9px; right: auto; }
+.sakura-decoration[data-part="frame"] .sakura-flight { left: 50%; top: 50%; }
+.sakura-petal {
+  width: var(--petal-size); aspect-ratio: 1.45;
+  background: linear-gradient(135deg,var(--petal-tip) 4%,var(--petal) 78%);
+  clip-path: polygon(0 48%,12% 22%,38% 4%,71% 0,100% 20%,86% 39%,98% 53%,76% 81%,45% 99%,21% 82%);
+  border-radius: 75% 34% 82% 29%; opacity: 0;
+}
+.sakura-decoration[data-sakura="sakura-moon"] .sakura-petal:nth-child(3n) {
+  aspect-ratio: 1;
+  clip-path: polygon(50% 0,60% 39%,100% 50%,60% 61%,50% 100%,39% 61%,0 50%,39% 39%);
+  border-radius: 0;
+}
+.sakura-decoration[data-sakura="sakura-moon"][data-part="bubble"] .sakura-flight::before {
+  content: ""; position: absolute; width: 116px; height: 29px; right: -5px; bottom: -7px; opacity: 0;
+  border-radius: 50%; border-bottom: 1px solid var(--petal); border-right: 1px solid var(--petal-tip);
+  box-shadow: 0 3px 7px color-mix(in srgb,var(--petal) 55%,transparent);
+  transform-origin: right center;
+}
+.sakura-decoration[data-sakura="sakura-moon"].is-mirrored .sakura-flight::before {
+  left: -5px; right: auto; transform-origin: left center; border-right: 0; border-left: 1px solid var(--petal-tip);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sakura-decoration.is-playing .sakura-petal { animation: fp-sakura-duo-drift 5s cubic-bezier(.18,.51,.54,1) var(--petal-delay) infinite both; }
+  .sakura-decoration.is-playing .sakura-seal { animation: fp-sakura-duo-bloom 5s ease-out infinite both; }
+  .sakura-decoration.is-playing[data-sakura="sakura-moon"][data-part="bubble"] .sakura-flight::before { animation: fp-sakura-duo-arc 5s ease-out 90ms infinite both; }
+  .sakura-decoration.is-playing.is-mirrored .sakura-seal,
+  .sakura-decoration.is-playing.is-mirrored .sakura-flight::before { animation-delay: 240ms; }
+}
+@keyframes fp-sakura-duo-drift {
+  0% { transform: translate(0,-3px) rotate(0) scale(.4); opacity: 0; }
+  6% { opacity: .9; }
+  14% { transform: translate(var(--x1),var(--y1)) rotate(103deg) scale(1); opacity: .86; }
+  28%, 100% { transform: translate(var(--x2),var(--y2)) rotate(var(--petal-turn)) scale(.63); opacity: 0; }
+}
+@keyframes fp-sakura-duo-bloom {
+  0%, 16%, 100% { transform: scale(1) rotate(0); }
+  6% { transform: scale(1.34) rotate(16deg); }
+}
+@keyframes fp-sakura-duo-arc {
+  0% { opacity: 0; transform: scale(.25,.65) rotate(-8deg); }
+  8% { opacity: .74; }
+  22%, 100% { opacity: 0; transform: scale(1.08,1.18) rotate(3deg) translateY(6px); }
+}

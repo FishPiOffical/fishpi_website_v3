@@ -304,6 +304,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           <div v-else-if="section === 'chatInput'" class="content">
             <label class="setting-toggle" :class="{ selected: chatPreferences.simpleMode }"><input type="checkbox" :checked="chatPreferences.simpleMode" @change="chatPreferences.setSimpleMode(($event.target as HTMLInputElement).checked)"><span><b>精简模式</b><small>隐藏头像框、气泡、小尾巴和进出场效果</small></span></label>
             <label class="setting-toggle" :class="{ selected: chatPreferences.mountEffects, 'is-disabled': chatPreferences.simpleMode }"><input type="checkbox" :disabled="chatPreferences.simpleMode" :checked="chatPreferences.mountEffects" @change="chatPreferences.setMountEffects(($event.target as HTMLInputElement).checked)"><span><b>显示座驾进场特效</b></span></label>
+            <label class="setting-toggle" :class="{ selected: chatPreferences.sakuraEffects, 'is-disabled': chatPreferences.simpleMode }"><input type="checkbox" :disabled="chatPreferences.simpleMode" :checked="chatPreferences.sakuraEffects" @change="chatPreferences.setSakuraEffects(($event.target as HTMLInputElement).checked)"><span><b>播放樱花外观动效</b></span></label>
             <div class="setting-options"><button type="button" class="fp-btn" :disabled="!isLoggedIn" @click="openChatTail">小尾巴设置</button><small v-if="!isLoggedIn">登录后可设置</small></div>
             <fieldset class="setting-options">
               <legend>发送快捷键</legend>

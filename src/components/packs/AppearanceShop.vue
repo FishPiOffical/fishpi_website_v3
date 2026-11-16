@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ManagedBubbleShape from '@/components/packs/ManagedBubbleShape.vue'
+import SakuraDecoration from '@/components/packs/SakuraDecoration.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import FpDialog from '@/components/FpDialog.vue'
 import { useAppearanceShopStore } from '@/stores/appearanceShop'
@@ -10,7 +11,7 @@ import type { AppearanceKind, ShopProduct } from '@/api/v3-appearance-shop'
 import { mountAssets } from '@/utils/mounts'
 import { findPack } from '@/packs'
 import { bubbleAttributes, isCustomBubbleId } from '@/utils/bubbleStyle'
-import { NIGHT_SAKURA } from '@/utils/chatAppearance'
+import { isLoopingSakura, NIGHT_SAKURA } from '@/utils/chatAppearance'
 
 const shop = useAppearanceShopStore(), appearance = useV3ChatAppearanceStore(), auth = useAuthStore()
 const category = ref<AppearanceKind>('mount'), ownedOnly = ref(false), days = ref<7 | 30>(7)
@@ -35,11 +36,13 @@ watch([() => shop.open, category], resetPreview)
 onBeforeUnmount(resetPreview)
 async function preview(product: ShopProduct) {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const stopping = isLoopingSakura(product.styleId) && previewId.value === product.id
   resetPreview()
+  if (stopping) return
   await nextTick()
   if (!shop.open || category.value !== product.kind) return
   previewId.value = product.id
-  previewTimer = setTimeout(resetPreview, 1250)
+  if (!isLoopingSakura(product.styleId)) previewTimer = setTimeout(resetPreview, 1250)
 }
 const expiration = (id: string) => shop.inventory?.list.find(item => item.productId === id)?.expiresAt || 0
 const owned = (id: string) => expiration(id) > clock.value
@@ -96,8 +99,8 @@ async function confirmPurchase() {
       <article v-for="product in products" :key="product.id" class="product">
         <div class="product-art fp-msg is-room" :class="{ 'has-sakura-arrival': previewId === product.id }" data-appearance-snapshot="v1" :data-bubble="product.kind === 'bubble' ? product.styleId : 'classic'" :data-frame="product.kind === 'frame' ? product.styleId : 'none'">
           <img v-if="product.kind === 'mount'" class="mount-image" :src="mountAssets[product.styleId]" :alt="product.name" loading="lazy">
-          <div v-else-if="product.kind === 'bubble'" class="fp-bubble" v-bind="bubbleAttributes(product.bubbleStyle)">今天也要开心摸鱼。<ManagedBubbleShape v-if="product.bubbleStyle?.shape" :shape="product.bubbleStyle.shape" /><img v-if="product.bubbleStyle?.image" class="managed-bubble-mark" :src="product.bubbleStyle.image" alt=""></div>
-          <span v-else class="fp-avatar-frame"><img class="fp-avatar" src="/logo.png" :alt="product.name"></span>
+          <div v-else-if="product.kind === 'bubble'" class="fp-bubble" v-bind="bubbleAttributes(product.bubbleStyle)">今天也要开心摸鱼。<SakuraDecoration v-if="isLoopingSakura(product.styleId)" :style-id="product.styleId" kind="bubble" :enabled="previewId === product.id" /><ManagedBubbleShape v-if="product.bubbleStyle?.shape" :shape="product.bubbleStyle.shape" /><img v-if="product.bubbleStyle?.image" class="managed-bubble-mark" :src="product.bubbleStyle.image" alt=""></div>
+          <span v-else class="fp-avatar-frame"><img class="fp-avatar" src="/logo.png" :alt="product.name"><SakuraDecoration v-if="isLoopingSakura(product.styleId)" :style-id="product.styleId" kind="frame" :enabled="previewId === product.id" /></span>
         </div>
         <div class="product-info">
           <h3>{{ product.name }} <span v-if="selected(product) && canEquip(product)">已装备</span></h3>
@@ -106,7 +109,7 @@ async function confirmPurchase() {
             <button v-if="!included(product) && product.enabled && price(product) > 0" class="purchase" :disabled="blocked || (shop.inventory?.balance ?? 0) < price(product)" @click="confirmation = { product: { ...product }, days }">{{ expiration(product.id) ? '续期' : '购买' }} · {{ price(product) }} 积分</button>
             <span v-else-if="!included(product) || !product.enabled" class="muted">{{ product.enabled ? '仅提供 7 天档' : '已下架' }}</span>
             <button v-if="canEquip(product)" class="equip" :disabled="blocked || (product.kind !== 'mount' && (!appearance.current || appearance.loading))" @click="equip(product)">{{ selected(product) ? '卸下' : '装备' }}</button>
-            <button v-if="product.styleId === NIGHT_SAKURA" class="motion-preview" type="button" @click="preview(product)">预览动效</button>
+            <button v-if="product.styleId === NIGHT_SAKURA || isLoopingSakura(product.styleId)" class="motion-preview" type="button" @click="preview(product)">{{ isLoopingSakura(product.styleId) && previewId === product.id ? '停止预览' : '预览动效' }}</button>
           </div>
         </div>
       </article>

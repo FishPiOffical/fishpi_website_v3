@@ -7,13 +7,16 @@ const storageKey = 'fp.chat.sendShortcut'
 export const useChatPreferencesStore = defineStore('chatPreferences', () => {
   const simpleMode = ref(false)
   const mountEffects = ref(true)
+  const sakuraEffects = ref(true)
   const showMountEffects = computed(() => mountEffects.value && !simpleMode.value)
+  const showSakuraEffects = computed(() => sakuraEffects.value && !simpleMode.value)
   const sendShortcut = ref<ChatSendShortcut>('mod-enter')
 
   function restore() {
     try {
       simpleMode.value = localStorage.getItem('fp.chat.simpleMode') === 'true'
       mountEffects.value = localStorage.getItem('fp.chat.mountEffects') !== 'false'
+      sakuraEffects.value = localStorage.getItem('fp.chat.sakuraEffects') !== 'false'
       const saved = localStorage.getItem(storageKey)
       if (saved === 'ctrl-enter') sendShortcut.value = 'mod-enter'
       else if (saved === 'mod-enter' || saved === 'enter') sendShortcut.value = saved
@@ -40,5 +43,11 @@ export const useChatPreferencesStore = defineStore('chatPreferences', () => {
     mountEffects.value = enabled
     try { localStorage.setItem('fp.chat.mountEffects', String(enabled)) } catch { /* 本机存储不可用时保留当前选择。 */ }
   }
-  return { simpleMode, showMountEffects, setSimpleMode, sendShortcut, mountEffects, restore, setSendShortcut, setMountEffects }
+  function setSakuraEffects(enabled: boolean) {
+    sakuraEffects.value = enabled
+    try { localStorage.setItem('fp.chat.sakuraEffects', String(enabled)) } catch { /* 存储不可用时保留当前选择。 */ }
+  }
+
+  return { simpleMode, showMountEffects, setSimpleMode, sendShortcut, mountEffects, restore, setSendShortcut, setMountEffects,
+    sakuraEffects, showSakuraEffects, setSakuraEffects }
 })
