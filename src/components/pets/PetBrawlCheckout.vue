@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, useId, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 import FpDialog from '@/components/FpDialog.vue'
 import { getAuthContextVersion } from '@/api/http'
 import { readBrawlOrder, readBrawlOrders, type BrawlOrder, type BrawlProduct, type BrawlWeapon } from '@/api/v3-pets'
@@ -13,6 +13,10 @@ const auth = useAuthStore()
 const names = { SPOON: '小木勺', GUARD: '软垫护腕', FAN: '折纸扇' }
 const labels = { pending: '待确认', completed: '已完成', expired: '已过期' }
 const opened = ref(false)
+const detailOpen = ref(false)
+const confirmationPanel = ref<HTMLElement | null>(null)
+const cancelButton = ref<HTMLButtonElement | null>(null)
+const strengthenButton = ref<HTMLButtonElement | null>(null)
 const selected = ref<BrawlOrder>()
 const orders = ref<BrawlOrder[]>([])
 const loading = ref(false)
@@ -31,6 +35,8 @@ const affordable = computed(() => !!selected.value && (selected.value.points ===
 let request: AbortController | undefined
 let followUpOrder: string | undefined
 let boundary = getAuthContextVersion()
+let returnFocus: HTMLElement | null = null
+let focusSequence = 0
 
 function startRead() {
   request?.abort()
@@ -52,7 +58,11 @@ async function readList(before?: string) {
     next.value = result.next
   } catch (reason) { fail(reason, signal) } finally { if (!signal.aborted) loading.value = false }
 }
-async function show(id: string) {
+async function show(id: string, trigger?: HTMLElement | null) {
+  if (!opened.value) return
+  if (!detailOpen.value) returnFocus = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
+  detailOpen.value = true
+  selected.value = undefined
   followUpOrder = id
   const signal = startRead()
   try {
@@ -65,6 +75,7 @@ async function show(id: string) {
 function open() {
   product.value = props.cost ? '' : props.gearOptions.find(option => option.cost)?.id ?? ''
   opened.value = true
+  detailOpen.value = false
   selected.value = undefined
   followUpOrder = undefined
   deduction.value = maximum.value
@@ -74,17 +85,20 @@ function open() {
 function close() {
   if (pets.busy) return
   opened.value = false
+  detailOpen.value = false
   request?.abort()
   loading.value = false
 }
 function back() {
+  if (pets.busy) return
+  detailOpen.value = false
+  request?.abort()
+  loading.value = false
   selected.value = undefined
   followUpOrder = undefined
-  deduction.value = maximum.value
-  void readList()
 }
 function quote() {
-  if (blocked.value || props.disabled || !costToQuote.value || !Number.isInteger(deduction.value)
+  if (!opened.value || detailOpen.value || blocked.value || props.disabled || !costToQuote.value || !Number.isInteger(deduction.value)
       || deduction.value < 0 || deduction.value > maximum.value) return
   void pets.executeBrawl({ kind: 'brawl-quote', petId: props.petId, weapon: props.weapon,
     level: target.value?.level ?? props.level, version: props.version, materials: deduction.value,
@@ -92,7 +106,7 @@ function quote() {
 }
 async function confirm() {
   const current = selected.value
-  if (blocked.value || !affordable.value || current?.status !== 'pending' || current.petId !== props.petId) return
+  if (!opened.value || !detailOpen.value || blocked.value || !affordable.value || current?.status !== 'pending' || current.petId !== props.petId) return
   const confirmed = await pets.executeBrawl({ kind: 'brawl-confirm', petId: current.petId, version: current.version, orderId: current.id })
   if (!confirmed && !pets.pending && opened.value && selected.value?.id === current.id) void show(current.id)
 }
@@ -104,14 +118,37 @@ function orderLabel(order: BrawlOrder) {
 }
 watch(product, () => { deduction.value = maximum.value })
 watch(() => pets.confirmedEvent, event => {
-  if (!opened.value || !event?.orderId) return
-  void show(event.orderId)
+  if (!opened.value || !event?.orderId || event.petId !== props.petId
+      || (event.kind !== 'brawl-quote' && event.kind !== 'brawl-confirm')) return
+  void show(event.orderId, strengthenButton.value)
+})
+function trapConfirmation(event: KeyboardEvent) {
+  if (!detailOpen.value || event.key !== 'Tab') return
+  const dialog = confirmationPanel.value?.closest<HTMLElement>('[role="dialog"]')
+  const masks = [...document.querySelectorAll('.fp-dialog-mask:not(.fp-dialog-leave-active)')]
+  const top = masks.filter(node => node.classList.contains('layer-top')).at(-1) ?? masks.at(-1)
+  if (!dialog || dialog.closest('.fp-dialog-mask') !== top) return
+  const controls = [...dialog.querySelectorAll<HTMLElement>('button:not(:disabled),[tabindex="0"]')].filter(node => node.getClientRects().length)
+  const first = controls[0], last = controls.at(-1)
+  if (!first) { event.preventDefault(); confirmationPanel.value?.focus(); return }
+  if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) { event.preventDefault(); last?.focus() }
+  else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) { event.preventDefault(); first.focus() }
+}
+watch(detailOpen, async value => {
+  const run = ++focusSequence
+  if (value) document.addEventListener('keydown', trapConfirmation)
+  else document.removeEventListener('keydown', trapConfirmation)
+  if (!value && opened.value) await readList()
+  await nextTick()
+  if (run !== focusSequence) return
+  if (value) (cancelButton.value ?? confirmationPanel.value)?.focus({ preventScroll: true })
+  else if (opened.value) (returnFocus?.isConnected ? returnFocus : strengthenButton.value)?.focus({ preventScroll: true })
 })
 watch([() => auth.account?.oId, () => auth.accessToken, () => props.petId], ([owner, token, id], [previous, , previousId]) => {
   const context = getAuthContextVersion()
   if (!token || owner !== previous || id !== previousId || context !== boundary) {
     request?.abort()
-    opened.value = loading.value = false
+    opened.value = detailOpen.value = loading.value = false
     selected.value = undefined
     followUpOrder = undefined
     balance.value = undefined
@@ -121,13 +158,17 @@ watch([() => auth.account?.oId, () => auth.accessToken, () => props.petId], ([ow
   }
   boundary = context
 }, { flush: 'sync' })
-onUnmounted(() => request?.abort())
+onUnmounted(() => {
+  focusSequence++
+  request?.abort()
+  document.removeEventListener('keydown', trapConfirmation)
+})
 </script>
 
 <template>
   <button type="button" class="checkout-trigger" @click="open()"><span>积分与材料商店</span><span aria-hidden="true">↗</span></button>
-  <FpDialog :open="opened" title="积分与材料商店" :width="560" :persistent="pets.busy" :closable="!pets.busy" @close="close()">
-    <div class="checkout" :aria-busy="loading || pets.busy">
+  <FpDialog :open="opened" title="积分与材料商店" :width="560" :persistent="pets.busy || detailOpen" :closable="!pets.busy && !detailOpen" @close="close()">
+    <div class="checkout" :inert="detailOpen" :aria-busy="loading || pets.busy">
       <div class="wallet-summary">
         <div><span>积分余额</span><strong>{{ balance !== undefined ? balance.toLocaleString() : '—' }}</strong></div>
         <div><span>历练材料</span><strong>{{ materials.toLocaleString() }}</strong></div>
@@ -136,21 +177,6 @@ onUnmounted(() => request?.abort())
       <p v-if="pendingHere && pets.pendingError" class="checkout-notice" role="status">{{ pets.pendingError }}</p>
       <p v-else-if="pets.error && !pets.busy" class="checkout-notice" role="alert">{{ pets.error }}</p>
       <button v-if="pendingHere" type="button" :disabled="pets.busy || pets.offline" @click="pets.retryPending()">继续原操作</button>
-      <template v-if="selected">
-        <div class="order-heading"><h3>{{ orderLabel(selected) }}</h3><span class="order-status" :class="selected.status" role="status">{{ labels[selected.status] }}</span></div>
-        <dl class="order-details">
-          <div><dt>订单编号</dt><dd>{{ selected.id }}</dd></div>
-          <div><dt>抵扣材料</dt><dd>{{ selected.materials.toLocaleString() }}</dd></div>
-          <div class="order-total"><dt>实扣积分</dt><dd><strong>{{ selected.points.toLocaleString() }}</strong> 积分</dd></div>
-        </dl>
-        <p v-if="selected.status === 'pending' && balance !== undefined && !affordable" class="checkout-notice" role="status">积分余额不足，可返回调整材料抵扣。</p>
-        <p v-else-if="selected.status === 'pending' && balance !== undefined && selected.points" class="secondary remaining-balance">确认后余额 <strong>{{ (balance - selected.points).toLocaleString() }}</strong></p>
-        <div class="actions">
-          <button type="button" :disabled="loading || pets.busy" @click="back()">返回订单</button>
-          <button v-if="selected.status === 'pending'" type="button" class="primary" :disabled="blocked || !affordable || selected.petId !== petId" @click="confirm()">确认强化</button>
-        </div>
-      </template>
-      <template v-else>
         <form v-if="cost || gearOptions.some(item => item.cost)" class="quote-form" @submit.prevent="quote()">
           <div class="form-heading"><h3>打造与强化</h3><span class="secondary">{{ names[weapon] }} +{{ level }}</span></div>
           <div v-if="gearOptions.length" class="field">
@@ -165,7 +191,7 @@ onUnmounted(() => request?.abort())
             <label :for="`${selectionId}-deduction`">抵扣材料<small>最多 {{ maximum }}，每份抵扣 10 积分</small></label>
             <input :id="`${selectionId}-deduction`" v-model.number="deduction" type="number" min="0" :max="maximum" step="1" required :disabled="blocked">
           </div>
-          <button type="submit" class="primary quote-action" :disabled="blocked || disabled || !costToQuote || typeof deduction !== 'number'">获取{{ target ? ` ${target.name}` : ` ${names[weapon]} +${level + 1}` }}报价</button>
+          <button ref="strengthenButton" type="submit" class="primary quote-action" :disabled="detailOpen || blocked || disabled || !costToQuote || typeof deduction !== 'number'">强化</button>
         </form>
         <section class="order-history" aria-label="最近订单">
           <div class="form-heading"><h3>最近订单</h3><span v-if="loading" class="secondary" role="status">读取中…</span></div>
@@ -181,13 +207,38 @@ onUnmounted(() => request?.abort())
           </ul>
           <button v-if="next" type="button" class="older-orders" :disabled="loading" @click="readList(next)">更早订单</button>
         </section>
+    </div>
+  </FpDialog>
+  <FpDialog :open="opened && detailOpen" :title="selected?.status === 'completed' ? '强化完成' : selected?.status === 'expired' ? '订单已过期' : '确认强化'"
+    :width="420" :persistent="pets.busy" :closable="!pets.busy" :close-on-backdrop="false" @close="back()">
+    <div ref="confirmationPanel" class="checkout checkout-confirm" tabindex="-1" :aria-busy="loading || pets.busy">
+      <p v-if="loading" class="secondary" role="status">正在核对强化费用…</p>
+      <p v-if="problem" class="checkout-notice" role="alert">{{ problem }} <button v-if="followUpOrder" type="button" :disabled="loading || pets.busy" @click="show(followUpOrder)">重新读取费用</button></p>
+      <p v-if="pendingHere && pets.pendingError" class="checkout-notice" role="status">{{ pets.pendingError }}</p>
+      <p v-else-if="pets.error && !pets.busy" class="checkout-notice" role="alert">{{ pets.error }}</p>
+      <button v-if="pendingHere" type="button" :disabled="pets.busy || pets.offline" @click="pets.retryPending()">继续原操作</button>
+      <template v-if="selected">
+        <div class="order-heading"><h3>{{ orderLabel(selected) }}</h3><span class="order-status" :class="selected.status" role="status">{{ labels[selected.status] }}</span></div>
+        <dl class="order-details">
+          <div><dt>{{ selected.status === 'completed' ? '已消耗材料' : '消耗材料' }}</dt><dd>{{ selected.materials.toLocaleString() }}</dd></div>
+          <div class="order-total"><dt>{{ selected.status === 'completed' ? '实扣积分' : '扣除积分' }}</dt><dd><strong>{{ selected.points.toLocaleString() }}</strong> 积分</dd></div>
+        </dl>
+        <p v-if="selected.status === 'pending' && balance !== undefined && !affordable" class="checkout-notice" role="status">积分余额不足，可返回调整材料抵扣。</p>
+        <p v-else-if="selected.status === 'pending' && balance !== undefined" class="secondary remaining-balance">确认后余额 <strong>{{ (balance - selected.points).toLocaleString() }}</strong></p>
+        <p v-if="selected.status === 'expired'" class="checkout-notice" role="status">本次费用已过期，请返回重新选择强化。</p>
+        <p v-else-if="selected.status === 'pending'" class="secondary">确认后扣除以上积分和材料，完成本次强化。</p>
       </template>
+      <div class="actions">
+        <button ref="cancelButton" type="button" :disabled="pets.busy" @click="back()">{{ selected?.status === 'completed' ? '完成' : selected?.status === 'expired' ? '返回选择' : '取消' }}</button>
+        <button v-if="selected?.status === 'pending'" type="button" class="primary" :disabled="blocked || !affordable || selected.petId !== petId" @click="confirm()">{{ selected.points ? '确认扣费并强化' : '确认消耗材料并强化' }}</button>
+      </div>
     </div>
   </FpDialog>
 </template>
 
 <style scoped>
 .checkout { display: grid; gap: 20px; color: var(--fp-text); }
+.checkout-confirm { outline: none; }
 .checkout p, h3, dl, dd { margin: 0; }
 .checkout h3 { font-size: .95rem; font-weight: 650; }
 .secondary, small { color: var(--fp-muted); font-size: .75rem; }
