@@ -547,9 +547,12 @@ function brawlSetup(value: unknown) {
   const weapon = brawlWeapons.find(option => option === row.weapon)
   const skill = brawlSkills.find(option => option === row.skill)
   if (!weapon || !skill) throw invalid()
+  const displayName = (name: unknown) =>
+    typeof name === 'string' && name.length <= 256 && name.trim() ? name : undefined
   return { weapon, skill, level: integer(row.level, 0, 5),
     maxHp: integer(row.maxHp, 1), attack: integer(row.attack, 1), gearHp: integer(row.gearHp ?? 0, 0, 40),
-    gearAttack: integer(row.gearAttack ?? 0, 0, 10) }
+    gearAttack: integer(row.gearAttack ?? 0, 0, 10),
+    petName: displayName(row.petName), ownerNickname: displayName(row.ownerNickname) }
 }
 
 function brawlSummary(value: unknown): BrawlSummary {

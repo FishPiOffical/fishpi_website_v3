@@ -402,7 +402,11 @@ onUnmounted(() => {
                         :loop="false" hold-frame :width="160" :height="160" />
                       <img v-else :src="petBattlePoster(report.species)" alt="" width="160" height="160" />
                     </div>
-                    <strong>我的宠物</strong><span>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</span>
+                    <div class="fighter-names">
+                      <strong>{{ report.player.petName ?? '我的宠物' }}</strong>
+                      <span v-if="report.player.ownerNickname">{{ report.player.ownerNickname }}</span>
+                    </div>
+                    <span>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</span>
                     <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ hp(report.player.gearHp) }} · 伤害 +{{ hp(report.player.gearAttack) }}</span>
                     <progress aria-label="我的宠物生命" :max="report.player.maxHp" :value="turn?.playerHp ?? report.player.maxHp" />
                     <span>{{ hp(turn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
@@ -416,7 +420,11 @@ onUnmounted(() => {
                         :loop="false" hold-frame :width="160" :height="160" />
                       <img v-else :src="petBattlePoster(report.opponentSpecies ?? 'momota')" alt="" width="160" height="160" />
                     </div>
-                    <strong>{{ report.mode === 'pvp' ? '对手宠物' : opponents[report.stage - 1] }}</strong><span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
+                    <div class="fighter-names">
+                      <strong>{{ report.mode === 'pvp' ? report.opponent.petName ?? '对手宠物' : opponents[report.stage - 1] }}</strong>
+                      <span v-if="report.opponent.ownerNickname">{{ report.opponent.ownerNickname }}</span>
+                    </div>
+                    <span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
                     <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
                     <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="turn?.opponentHp ?? report.opponent.maxHp" />
                     <span>{{ hp(turn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
@@ -558,7 +566,9 @@ button.button-wide, .button-link { text-decoration: none; color: var(--brawl-ink
 .battle-stage { background: linear-gradient(180deg, var(--fp-bg), var(--fp-card)); border: 1px solid var(--fp-border); border-radius: 12px; padding: 24px 16px 16px; }
 .fighters { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 8px; align-items: start; }
 .fighter { display: grid; justify-items: center; gap: 7px; text-align: center; min-inline-size: 0; }
-.fighter strong { font-size: .9rem; overflow-wrap: anywhere; }
+.fighter-names { display: grid; gap: 2px; max-inline-size: 100%; min-inline-size: 0; line-height: 1.3; overflow-wrap: anywhere; }
+.fighter-names strong { font-size: .9rem; }
+.fighter-names span { color: var(--fp-muted); font-size: .75rem; }
 .fighter > span { color: var(--fp-muted); font-size: .73rem; }
 .fighter-side { padding: 3px 10px; border-radius: 6px; background: var(--fp-primary-soft); color: var(--brawl-ink) !important; }
 .fighter-side.opponent { background: var(--fp-bg); color: var(--fp-muted) !important; }
