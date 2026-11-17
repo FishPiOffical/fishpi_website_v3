@@ -79,7 +79,7 @@ v=mount();readFails=true;await v.store.create(input);await tick();assert.match(v
 console.log('PASS packets 7 post-confirmation current-message failure retries GET only, never repays principal')
 v=mount();resetDetail();before=writes.length;await v.store.open('3');await tick();assert.equal(writes.length,before);assert.equal(v.store.detail.id,'3');claimAmount=0;state.confirm=async()=>{throw Error('Unexpected extra confirmation')};await click(v,'领取一份');await tick();assert.deepEqual(JSON.parse(writes.at(-1).init.body),{});assert.equal(v.store.receipt.data.amount,0);assert.equal(v.store.detail.currentUserClaim.amount,0);assert.ok(!find(v.root,n=>n.props?.class==='packet-recovery'),'A successful receipt must not create a top recovery banner');assert.ok(!find(v.root,n=>n.tag==='button'&&text(n).trim()==='领取一份'));v.app.unmount();v.store.$dispose();v.timeline.$dispose()
 console.log('PASS packets 8 detail GET never claims, explicit safe claim preserves real zero and current refresh disables repeat claim')
-v=mount();resetDetail({type:'heartbeat',money:100,count:5,message:'heart',riskAccepted:true});await v.store.open('3');await tick();claimAmount=-20;assert.match(v.text(),/负积分/);assert.match(v.text(),/97 积分/);before=writes.length;await click(v,'接受扣分风险并领取');await tick();assert.deepEqual(JSON.parse(writes.at(-1).init.body),{riskAccepted:true});assert.match(v.text(),/-20.*扣款/);v.app.unmount();v.store.$dispose();v.timeline.$dispose()
+v=mount();resetDetail({type:'heartbeat',money:100,count:5,message:'heart',riskAccepted:true});await v.store.open('3');await tick();claimAmount=-20;assert.match(v.text(),/负积分/);assert.match(v.text(),/97 积分/);before=writes.length;await click(v,'领取一份');await tick();assert.deepEqual(JSON.parse(writes.at(-1).init.body),{riskAccepted:true});assert.match(v.text(),/-20.*扣款/);v.app.unmount();v.store.$dispose();v.timeline.$dispose()
 console.log('PASS packets 9 heartbeat claim risk/required balance is explicit, direct submission and negative receipt is shown as debit')
 v=mount();resetDetail({type:'rockPaperScissors',money:256,message:'rps',riskAccepted:true,gesture:0});await v.store.open('3');await tick();assert.equal(v.store.detail.senderGesture,undefined);before=writes.length;assert.ok(!find(v.root,n=>n.tag==='button'&&text(n).trim()==='领取一份'));claimAmount=-217;await click(v,'剪刀 · 领取');await tick();assert.deepEqual(JSON.parse(writes.at(-1).init.body),{riskAccepted:true,gesture:1});assert.equal(v.store.receipt.data.outcome,'lose');assert.equal(v.store.detail.senderGesture,0);assert.equal(v.store.receipt.data.senderRefundPoints,434);v.app.unmount();v.store.$dispose();v.timeline.$dispose()
 console.log('PASS packets 10 RPS requires chosen hand and risk decision, hides sender hand before settlement, reports debit/outcome/refund afterward')
@@ -95,16 +95,16 @@ v=mount();resetDetail();await v.store.open('3');await v.store.open('bad');assert
 console.log('PASS packets 15 invalid next detail clears previous target, cannot leave a stale claimable packet under an error')
 state.ssr=true;v=mount();before=state.calls.length;await v.store.create(input);await v.store.open('3');assert.equal(state.calls.length,before);v.app.unmount();v.store.$dispose();v.timeline.$dispose();state.ssr=false;state.guest=true;v=mount();before=state.calls.length;await v.store.claim('3','average',{});await v.store.open('3');assert.equal(state.calls.length,before);v.app.unmount();v.store.$dispose();v.timeline.$dispose();state.guest=false
 const main=await fs.readFile('src/views/ChatroomView.vue','utf8'),floating=await fs.readFile('src/components/chat/WhisperConversations.vue','utf8'),hidden=await fs.readFile('src/components/chat/HiddenChatConversations.vue','utf8'),facade=await fs.readFile('src/stores/chat.ts','utf8'),shell=await fs.readFile('src/layouts/AppShell.vue','utf8');assert.ok(main.includes('<ChatToolDialog '));assert.equal(main.split('<ChatRedPacketEditor ').length-1,0);assert.equal(main.split('<ChatRedPacketCard ').length-1,2);assert.ok(floating.includes('<ChatRedPacketCard ')&&hidden.includes('<ChatRedPacketCard '));assert.equal(shell.split('<ChatRedPacketDialog />').length-1,1);assert.ok(!shell.includes('<ChatRedPacketRecovery'));assert.ok((await fs.readFile('src/components/chat/ChatRedPacketDialog.vue','utf8')).includes('<ChatRedPacketRecovery '));assert.ok(!facade.includes('sendLegacySpecial')&&!facade.includes('openRedPacket'))
-console.log('PASS packets 16 guest/SSR performs no packet work; both layouts/floating/hidden use details-first cards with one global dialog with local recovery and no legacy writes')
+console.log('PASS packets 16 guest/SSR performs no packet work; both layouts/floating/hidden share direct-claim cards with one global dialog with local recovery and no legacy writes')
 
 const Hongbao=await component('src/components/chat/HongbaoCard.vue')
 globalThis.__hongbao=Hongbao
 hongbaoURL=url('export default globalThis.__hongbao')
 const Card=await component('src/components/chat/ChatRedPacketCard.vue')
 const duel={type:'rockPaperScissors',money:256,message:'rps',riskAccepted:true,gesture:0}
-function mountCard(senderId='2'){
+function mountCard(senderId='2', packet={type:duel.type,count:1,got:0,money:256,msg:'rps'}){
   const pinia=createPinia(),root={children:[]}
-  const app=renderer.createApp({setup(){return()=>h(Card,{packetId:'3',packet:{type:duel.type,count:1,got:0,money:256,msg:'rps',senderId}})}})
+  const app=renderer.createApp({setup(){return()=>h(Card,{packetId:'3',packet:{...packet,senderId}})}})
   app.use(pinia)
   app.mount(root)
   const store=useV3ChatRedPacketsStore(pinia)
@@ -124,11 +124,14 @@ assert.deepEqual(state.calls.slice(before).map(c=>c.path),['/api/v3/chat/red-pac
 card.store.close()
 before=writes.length
 claimAmount=-217
+const rpsRequestStart = state.calls.length
 cardButton(card,'剪刀').props.onClick()
 await tick()
 assert.equal(writes.length,before+1)
+assert.equal(state.calls[rpsRequestStart].path,'/api/v3/chat/red-packets/3/claims')
+assert.equal(state.calls[rpsRequestStart].init.method,'POST')
 assert.deepEqual(JSON.parse(writes.at(-1).init.body),{gesture:1,riskAccepted:true})
-assert.equal(card.store.selectedId,'')
+assert.equal(card.store.selectedId,'3')
 assert.match(text(card.root),/惜败.*-217 积分/)
 assert.ok(!cardButton(card,'剪刀'))
 card.close()
@@ -137,22 +140,58 @@ card=mountCard('1')
 assert.ok(!cardButton(card,'剪刀'))
 card.close()
 
-state.dispatch=async()=>env({legacy:true,id:'3',type:duel.type,message:'旧猜拳',money:256,count:1,got:0,sender:user('2'),claims:[],currentUserClaim:null})
+state.dispatch=async(path,init)=>{if(init?.method==='POST')throw new ApiError('legacy packet',404);return env({legacy:true,id:'3',type:duel.type,message:'旧猜拳',money:256,count:1,got:0,sender:user('2'),claims:[],currentUserClaim:null})}
 card=mountCard()
 before=writes.length
 cardButton(card,'石头').props.onClick()
 await tick()
 assert.equal(writes.length,before)
-assert.match(text(card.root),/此红包当前无法出拳/)
+assert.equal(card.store.detail.legacy,true)
 card.close()
 state.dispatch=dispatch
-console.log('PASS packets 17 inline gestures require no mount reads, submit once without a dialog, keep details read-only, and block legacy or self claims')
+console.log('PASS packets 17 inline gestures submit before detail reads, show settled details, preserve legacy read-only fallback and self protection')
 v=mount();resetDetail({type:'rockPaperScissors',money:256,message:'own',riskAccepted:true,gesture:2},'1');await v.store.open('3');await tick();assert.equal(v.store.detail.senderGesture,2);assert.ok(!find(v.root,n=>n.tag==='button'&&text(n).trim()==='确认风险后领取'));resetDetail({type:'specify',money:32,message:'private recipients',recipientIds:['2','3']},'1');await v.store.open('3');await tick();assert.deepEqual(v.store.detail.recipientIds,['2','3']);v.app.unmount();v.store.$dispose();v.timeline.$dispose()
 console.log('PASS packets 18 sender ID prevents self RPS claim and only owner detail exposes designated recipient list')
-v=mount();resetDetail();let resolveClosed;const closedDetail=copy(detailData);state.dispatch=path=>path.endsWith('/3')?new Promise(r=>resolveClosed=r):dispatch(path);before=writes.length;const closedRun=v.store.open('3',true);await tick();v.store.close();resolveClosed(env(closedDetail));await closedRun;assert.equal(writes.length,before);assert.equal(v.store.detail,null);v.app.unmount();v.store.$dispose();v.timeline.$dispose();state.dispatch=dispatch;state.confirm=async()=>true
-console.log('PASS packets 19 closing while click-to-claim detail loads cancels automatic claim')
-v=mount();resetDetail();before=writes.length;await v.store.open('3',true);await tick();assert.equal(writes.length,before+1);await v.store.open('3',true);await tick();assert.equal(writes.length,before+1);v.app.unmount();v.store.$dispose();v.timeline.$dispose()
-console.log('PASS packets 20 ordinary card click claims once and current claimed detail prevents resubmission')
+v = mount()
+resetDetail()
+claimAmount = 0
+let resolveClosed
+state.dispatch = (path, init) => init?.method === 'POST'
+  ? new Promise(resolve => { resolveClosed = () => dispatch(path, init).then(resolve) })
+  : dispatch(path, init)
+before = state.calls.length
+const closedRun = v.store.claimFromCard('3', 'average', {})
+await tick()
+assert.deepEqual(state.calls.slice(before).map(call => call.path), ['/api/v3/chat/red-packets/3/claims'])
+v.store.close()
+resolveClosed()
+await closedRun
+await tick()
+assert.equal(v.store.selectedId, '')
+assert.equal(v.store.detail, null)
+assert.ok(!state.calls.slice(before).some(call => call.path === '/api/v3/chat/red-packets/3'))
+v.app.unmount()
+v.store.$dispose()
+v.timeline.$dispose()
+state.dispatch = dispatch
+console.log('PASS packets 19 close during direct claim keeps receipt and never reopens details')
+
+v = mount()
+resetDetail()
+before = state.calls.length
+await v.store.claimFromCard('3', 'average', {})
+await tick()
+assert.equal(state.calls[before].path, '/api/v3/chat/red-packets/3/claims')
+assert.equal(state.calls[before].init.method, 'POST')
+assert.equal(state.calls.slice(before).filter(call => call.path === '/api/v3/chat/red-packets/3').length, 1)
+before = writes.length
+await v.store.claimFromCard('3', 'average', {})
+await tick()
+assert.equal(writes.length, before)
+v.app.unmount()
+v.store.$dispose()
+v.timeline.$dispose()
+console.log('PASS packets 20 direct claim starts with POST, reads details once and remembers settlement')
 v=mount();resetDetail();const earlier=copy(detailData);let resolveOld;state.dispatch=path=>path.endsWith('/3')?new Promise(r=>resolveOld=r):Promise.resolve(env({...copy(earlier),id:'4'}));const oldOpen=v.store.open('3');await tick();await v.store.open('4');assert.equal(v.store.detail.id,'4');resolveOld(env(earlier));await oldOpen;assert.equal(v.store.detail.id,'4');v.app.unmount();v.store.$dispose();v.timeline.$dispose();state.dispatch=dispatch
 console.log('PASS packets 21 delayed prior detail cannot overwrite a later selected packet')
 v=mount();resetDetail();await v.store.open('3');claimAmount=0;readFails=true;await v.store.claim('3','average',{});await tick();assert.equal(v.store.receipt.data.amount,0);assert.equal(v.store.detail,null);assert.match(v.store.detailError,/current503/);before=writes.length;readFails=false;await v.store.open();await v.store.readCurrent();await tick();assert.equal(writes.length,before);assert.equal(v.store.detail.currentUserClaim.amount,0);lose=true;await v.store.create(input);assert.ok(v.store.pending);assert.equal(v.store.receipt,null);v.app.unmount();v.store.$dispose();v.timeline.$dispose()
@@ -169,7 +208,7 @@ const classic={legacy:true,id:'3',type:'average',message:'经典红包示例',co
   claims:[{user:user('9'),amount:32,claimedAt:5}],currentUserClaim:null}
 state.dispatch=async()=>env(classic)
 before=state.calls.length
-await v.store.open('3',true)
+await v.store.open('3')
 await tick()
 assert.deepEqual(state.calls.slice(before).map(call=>call.path),['/api/v3/chat/red-packets/3'])
 assert.match(v.text(),/经典红包示例/)
@@ -231,3 +270,54 @@ v.store.$dispose()
 v.timeline.$dispose()
 state.dispatch = dispatch
 console.log('PASS claim labels follow classic completed-only, first positive maximum, zero-amount and legacy rules')
+
+// 卡片真实入口的第一条请求必须是领取，详情与消息刷新均在提交之后。
+for (const [packet, label, amount] of [
+  [{ type: 'average', money: 100, count: 2, message: '普通' }, '普通红包', 32],
+  [{ type: 'random', money: 100, count: 2, message: '随机' }, '拼手气红包', 32],
+  [{ type: 'specify', money: 32, recipientIds: ['1'], message: '专属' }, '专属红包', 32],
+  [{ type: 'heartbeat', money: 100, count: 5, message: '心跳', riskAccepted: true }, '心跳红包 (慎抢)', -20],
+]) {
+  resetDetail(packet)
+  claimAmount = amount
+  card = mountCard('2', { ...packet, got: 0, count: detailData.count })
+  const firstCall = state.calls.length
+  before = writes.length
+  const button = cardButton(card, label + '：打开红包')
+  button.props.onClick()
+  button.props.onClick()
+  assert.equal(state.calls[firstCall].init.method, 'POST')
+  assert.equal(state.calls[firstCall].path, '/api/v3/chat/red-packets/3/claims')
+  await tick()
+  assert.equal(writes.length, before + 1)
+  assert.deepEqual(JSON.parse(writes.at(-1).init.body), packet.type === 'heartbeat' ? { riskAccepted: true } : {})
+  assert.equal(card.store.detail.currentUserClaim.amount, amount)
+  assert.equal(state.calls.slice(firstCall).filter(call => call.path === '/api/v3/chat/red-packets/3').length, 1)
+  card.close()
+}
+console.log('PASS direct card clicks for ordinary/random/designated/heartbeat POST first, prevent double clicks and then read details')
+
+v = mount()
+resetDetail()
+claimAmount = 0
+lose = true
+before = state.calls.length
+const acceptedBefore = applied
+await v.store.claimFromCard('3', 'average', {})
+await tick()
+assert.deepEqual(state.calls.slice(before).map(call => call.path), ['/api/v3/chat/red-packets/3/claims'])
+const directUnknown = writes.at(-1)
+assert.ok(v.store.pending)
+assert.equal(v.store.loading, false)
+await v.store.claimFromCard('3', 'average', {})
+assert.equal(state.calls.length, before + 1)
+await v.store.retry()
+await tick()
+assert.equal(applied, acceptedBefore + 1)
+assert.equal(writes.at(-1).init.headers['Idempotency-Key'], directUnknown.init.headers['Idempotency-Key'])
+assert.equal(writes.at(-1).init.body, directUnknown.init.body)
+assert.equal(v.store.detail.currentUserClaim.amount, 0)
+v.app.unmount()
+v.store.$dispose()
+v.timeline.$dispose()
+console.log('PASS lost direct claim receipt freezes original command; repeated clicks never write and explicit recovery settles once')

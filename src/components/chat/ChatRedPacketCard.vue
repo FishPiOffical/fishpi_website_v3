@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import HongbaoCard from './HongbaoCard.vue'
 import type { RedPacketContent } from '@/api/fishpi'
 import { getAuthContextVersion } from '@/api/http'
+import { PACKET_TYPES, packetRisk, type ClaimInput, type PacketType } from '@/api/v3-chat-red-packets'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ChatRedPacketsStore } from '@/stores/v3ChatRedPackets'
 
@@ -35,8 +36,13 @@ function hasPendingClaim() {
 }
 
 async function open(gesture?: number) {
-  if (gesture === undefined) {
-    void store.open(props.packetId, true)
+  const type = props.packet.type as PacketType
+  const packetComplete = Number(props.packet.count) > 0 && Number(props.packet.got) >= Number(props.packet.count)
+  const selfRestricted = props.packet.senderId === userId.value && (type === 'specify' || type === 'rockPaperScissors')
+  if (!auth.accessToken || !userId.value || !PACKET_TYPES.includes(type) || packetComplete
+      || detailsOnly.value || outcome.value || selfRestricted
+      || type === 'rockPaperScissors' && gesture === undefined) {
+    void store.open(props.packetId)
     return
   }
   if (checking.value || store.pending || store.busy) return
@@ -45,22 +51,20 @@ async function open(gesture?: number) {
   checking.value = true
   notice.value = ''
   try {
-    const result = await store.claimDuelFromCard(props.packetId, gesture, controller.signal)
+    const input: ClaimInput = {}
+    if (packetRisk(type)) input.riskAccepted = true
+    if (type === 'rockPaperScissors') input.gesture = gesture
+    const result = await store.claimFromCard(props.packetId, type, input)
     if (controller.signal.aborted) return
-    if (result === 'details') {
-      detailsOnly.value = true
-      notice.value = '此红包当前无法出拳，可查看详情'
-    } else if (result === 'busy') {
-      notice.value = '请先完成当前红包操作'
-    } else if (result?.kind === 'claim') {
+    if (result?.kind === 'claim') {
       detailsOnly.value = true
     } else if (hasPendingClaim()) {
-      notice.value = '暂未确认出拳结果，请打开此红包查看'
+      notice.value = '领取结果尚未确认，请打开此红包恢复原操作'
     } else if (store.error) {
       notice.value = store.error
     }
   } catch {
-    if (!controller.signal.aborted) notice.value = '暂时无法核对红包，请重试'
+    if (!controller.signal.aborted) notice.value = '暂时无法领取红包，请重试'
   } finally {
     if (check === controller) cancelCheck()
   }
@@ -83,7 +87,7 @@ onBeforeUnmount(cancelCheck)
     :gestures-disabled="checking || store.busy || !!store.pending"
     @open="open"
   />
-  <div v-if="checking || notice || outcome" class="packet-status" role="status">{{ checking ? '正在核对红包…' : notice || outcome }}</div>
+  <div v-if="checking || notice || outcome" class="packet-status" role="status">{{ checking ? '正在领取…' : notice || outcome }}</div>
 </template>
 
 <style scoped>

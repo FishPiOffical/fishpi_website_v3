@@ -118,7 +118,7 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
       </section>
       <p v-else-if="canClaim&&detail.type==='heartbeat'" class="risk-note">心跳红包可能领取负积分并扣款，领取前余额需至少 {{ detail.poolPoints }} 积分。</p>
 
-      <div v-if="canClaim && !isDuel" class="claim-action"><button type="button" class="claim-button" :disabled="store.busy||!!store.pending||confirming" @click="claim">{{ store.busy?'正在领取…':confirming?'等待确认…':detail.type==='heartbeat'?'接受扣分风险并领取':'领取一份' }}</button></div>
+      <div v-if="canClaim && !isDuel" class="claim-action"><button type="button" class="claim-button" :disabled="store.busy||!!store.pending||confirming" @click="claim">{{ store.busy?'正在领取…':confirming?'等待确认…':'领取一份' }}</button></div>
       <p v-if="localError" class="inline-error" role="alert">{{ localError }}</p>
 
       <section class="claim-records" aria-label="红包领取记录">
