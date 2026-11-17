@@ -116,7 +116,7 @@ export async function fetchChatPetProfile(id: string, signal: AbortSignal) {
   const name = string(data.name), state = string(data.state)
   const level = data.level === undefined ? undefined : number(data.level)
   const experience = data.experience === undefined ? undefined : number(data.experience)
-  if (!name.trim() || name.length > 256 || (level !== undefined && (level < 1 || level > 30)) ||
+  if (!name.trim() || name.length > 256 || (level !== undefined && (level < 1 || level > 40)) ||
     (experience !== undefined && experience < 0)) throw bad()
   return {
     name, state, level, experience, archived: data.archived === true,

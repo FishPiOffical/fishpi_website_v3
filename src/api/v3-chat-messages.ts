@@ -16,7 +16,7 @@ function decodeChatPetStatus(value: unknown): ChatPetStatus | undefined {
       typeof state !== 'string' || !Object.hasOwn(chatPetStatusLabels, state)) return
   return { name, state: state as ChatPetStatus['state'],
     ...(chatPetSpeciesIds.has(speciesId) ? { speciesId: speciesId as PetSpeciesId } : {}),
-    ...(typeof level === 'number' && Number.isInteger(level) && level >= 1 && level <= 30 ? { level } : {}) }
+    ...(typeof level === 'number' && Number.isInteger(level) && level >= 1 && level <= 40 ? { level } : {}) }
 }
 
 function decodeChatMedals(value: unknown): ChatMedal[] {

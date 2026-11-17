@@ -110,7 +110,7 @@ function fixture(options = {}) {
       const now = Date.now(), id = String(1000 + data.rows.length)
       const order = { id, petId: input.petId, weapon: input.weapon, level: input.level, version: input.version,
         status: data.quoteStatus, createdAt: now, expiresAt: now + 600000,
-        materials: input.materials, points: 200 - input.materials * 10,
+        materials: input.materials, points: (data.fullPrice ?? 200) - input.materials * 10,
         ...(input.product ? { product: input.product } : {}) }
       data.rows.unshift(order)
       const receipt = { operation: 'brawl-quote', petId: input.petId, orderId: id, committedAt: now }
@@ -143,7 +143,7 @@ async function mount(options = {}) {
   server = fixture(options)
   const pinia = createPinia(); setActivePinia(pinia)
   auth = useAuthStore(); pets = usePetsStore()
-  props = reactive({ petId: '1', weapon: 'SPOON', level: 0, version: 1, cost: 20, materials: 5, disabled: false, gearOptions: [] })
+  props = reactive({ petId: '1', weapon: 'SPOON', level: 0, version: 1, cost: 20, materials: 5, disabled: false, gearOptions: [], ...options.props })
   app = createApp({ setup: () => () => h(Component, props) }); app.use(pinia); app.mount('#app'); await flush()
   document.querySelector('.checkout-trigger').click(); await flush()
   assert.ok(dialog('积分与材料商店'))
@@ -249,6 +249,18 @@ try {
   assert.equal(dialog('确认强化'), undefined); assert.ok(dialog('积分与材料商店'))
   assert.equal(confirms().length, 0)
   pass('Escape 只退出顶层扣费确认，不误关商店或提交扣款')
+
+  await mount({ fullPrice: 640, props: { level: 19, version: 2, cost: 64, materials: 0 } })
+  await click('强化')
+  const finalUpgrade = dialog('确认强化')
+  assert.ok(finalUpgrade)
+  assert.match(finalUpgrade.textContent, /小木勺 \+20/)
+  assert.match(finalUpgrade.textContent, /640/)
+  assert.equal(server.charges, 0)
+  await click('确认扣费并强化', finalUpgrade)
+  assert.equal(server.balance, 360)
+  assert.equal(server.charges, 1)
+  pass('版本 2 的 +19 至 +20 能正常报价、确认和读取已完成订单')
   console.log(`PASS pet-brawl-checkout ${count} 组（真实 Vue / store / API；HTTP 夹具，无真实消费）`)
 } finally {
   app?.unmount(); pets?.$dispose(); auth?.$dispose(); await flush()

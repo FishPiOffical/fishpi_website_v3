@@ -835,7 +835,8 @@ const newRecoveryStore = () => { setActivePinia(createPinia()); context++; retur
 const growthRules = { experiencePerLevel: 100, maxLevel: 30, careExperience: 10, careFriendship: 2 }
 assert.equal(api.decodePetCatalog(catalog).growthRules, undefined)
 assert.deepEqual(api.decodePetCatalog({ ...catalog, growthRules }).growthRules, growthRules)
-for (const invalidGrowth of [null, {}, { ...growthRules, experiencePerLevel: 0 }, { ...growthRules, maxLevel: 31 }, { ...growthRules, careFriendship: -1 }]) {
+assert.equal(api.decodePetCatalog({ ...catalog, growthRules: { ...growthRules, maxLevel: 40 } }).growthRules.maxLevel, 40)
+for (const invalidGrowth of [null, {}, { ...growthRules, experiencePerLevel: 0 }, { ...growthRules, maxLevel: 41 }, { ...growthRules, careFriendship: -1 }]) {
   assert.throws(() => api.decodePetCatalog({ ...catalog, growthRules: invalidGrowth }))
 }
 console.log('PASS 可选成长规则保留旧目录兼容，缺失不编造，非法规则明确拒绝')

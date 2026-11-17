@@ -1,6 +1,7 @@
 import { ApiError, request } from './http'
 
 export type PetSpeciesId = 'momota' | 'hexiaotun' | 'yubingmiao' | 'paixiaoyu'
+const MAX_PET_LEVEL = 40
 export type PetAction = 'feed' | 'water' | 'pet' | 'play' | 'rest' | 'wake'
 export type PetActivityKind = 'outing' | 'course' | 'work'
 export type PetHistoryKind = PetActivityKind | 'care' | 'craft' | 'purchase' | 'story' | 'readoption' | 'all'
@@ -390,7 +391,7 @@ export function decodePetCatalog(value: unknown): PetCatalog {
   // 旧目录缺失时保持未知，不在客户端补造成长规则。
   if (row.growthRules !== undefined) {
     const growth = object(row.growthRules)
-    catalog.growthRules = { experiencePerLevel: integer(growth.experiencePerLevel, 1), maxLevel: integer(growth.maxLevel, 1, 30),
+    catalog.growthRules = { experiencePerLevel: integer(growth.experiencePerLevel, 1), maxLevel: integer(growth.maxLevel, 1, MAX_PET_LEVEL),
       careExperience: integer(growth.careExperience), careFriendship: integer(growth.careFriendship, 0, 100) }
   }
   if (catalog.items.some(item => item.hunger !== item.effects.hunger)
@@ -422,7 +423,7 @@ export function decodePetState(value: unknown): PetState {
       id: text(data.id, 64), speciesId: decodePetSpecies(data.speciesId), name: text(data.name),
       hunger: integer(data.hunger, 0, 100), water: integer(data.water, 0, 100),
       mood: integer(data.mood, 0, 100), energy: integer(data.energy, 0, 100),
-      experience: integer(data.experience), level: integer(data.level, 1, 30),
+      experience: integer(data.experience), level: integer(data.level, 1, MAX_PET_LEVEL),
       friendship: integer(data.friendship, 0, 100), adoptedAt: integer(data.adoptedAt), activity,
       skills: unique(list(data.skills, 6).map(value => {
         const entry = object(value)
@@ -560,12 +561,16 @@ function brawlDisplayName(value: unknown): string | undefined {
   return typeof value === 'string' && value.length <= 256 && value.trim() ? value : undefined
 }
 
-function brawlSetup(value: unknown) {
+function brawlMaxUpgrade(version: number): number {
+  return version === 1 ? 5 : 20
+}
+
+function brawlSetup(value: unknown, maxUpgrade: number) {
   const row = object(value)
   const weapon = brawlWeapons.find(option => option === row.weapon)
   const skill = brawlSkills.find(option => option === row.skill)
   if (!weapon || !skill) throw invalid()
-  return { weapon, skill, level: integer(row.level, 0, 5),
+  return { weapon, skill, level: integer(row.level, 0, maxUpgrade),
     maxHp: integer(row.maxHp, 1), attack: integer(row.attack, 1), gearHp: integer(row.gearHp ?? 0, 0, 40),
     gearAttack: integer(row.gearAttack ?? 0, 0, 10),
     petName: brawlDisplayName(row.petName), ownerNickname: brawlDisplayName(row.ownerNickname) }
@@ -657,22 +662,24 @@ function brawlGear(value: unknown, availableWeapons: readonly BrawlWeapon[]) {
 export const readBrawlState = (signal?: AbortSignal) => read(brawlPath, value => {
   const row = object(value)
   const levels = object(row.levels)
+  const version = integer(row.version, 1, 2)
+  const maxUpgrade = brawlMaxUpgrade(version)
   const equipmentCatalog = brawlCatalog(row.equipmentCatalog)
   const availableWeapons = equipmentCatalog.weapons.map(entry => entry.id)
   const decodedLevels: Partial<Record<BrawlWeapon, number>> = {}
-  for (const weapon of availableWeapons) decodedLevels[weapon] = integer(levels[weapon], 0, 5)
+  for (const weapon of availableWeapons) decodedLevels[weapon] = integer(levels[weapon], 0, maxUpgrade)
   const stages = integer(row.stages, 1, 3)
-  const costs = list(row.costs, 5).map(value => integer(value, 1))
+  const costs = list(row.costs, maxUpgrade).map(value => integer(value, 1))
   const rewards = list(row.rewards, 3).map(value => integer(value, 1))
-  const growth = list(row.growth, 6).map((item, index) => {
-    const entry = brawlSetup(item)
+  const growth = list(row.growth, maxUpgrade + 1).map((item, index) => {
+    const entry = brawlSetup(item, maxUpgrade)
     if (entry.level !== index) throw invalid()
     return { maxHp: entry.maxHp, attack: entry.attack }
   })
-  if (costs.length !== 5 || rewards.length !== 3 || growth.length !== costs.length + 1) throw invalid()
+  if (costs.length !== maxUpgrade || rewards.length !== 3 || growth.length !== costs.length + 1) throw invalid()
   return { petId: row.petId === null ? null : brawlId(row.petId),
     species: row.species === null ? null : ([...speciesIds].find(id => id === row.species) as PetSpeciesId | undefined),
-    level: integer(row.level, 0, 30), minLevel: integer(row.minLevel, 1, 30), version: integer(row.version, 1),
+    level: integer(row.level, 0, MAX_PET_LEVEL), minLevel: integer(row.minLevel, 1, MAX_PET_LEVEL), version, maxUpgrade,
     materials: integer(row.materials), stages, unlocked: integer(row.unlocked, 1, stages), cleared: integer(row.cleared, 0, stages), costs, rewards, growth,
     rewardCount: integer(row.rewardCount, 0, rewards.length), pvp: brawlPvp(row.pvp), gear: brawlGear(row.gear, availableWeapons),
     levels: decodedLevels, equipmentCatalog }
@@ -713,7 +720,9 @@ export const readBrawlReport = (id: string, signal?: AbortSignal) => read(
   `${brawlPath}/matches/${brawlId(id)}`, value => {
     const row = object(value)
     const report = brawlSummary(row)
-    const player = brawlSetup(row.player), opponent = brawlSetup(row.opponent)
+    const version = integer(row.version, 1, 2)
+    const maxUpgrade = brawlMaxUpgrade(version)
+    const player = brawlSetup(row.player, maxUpgrade), opponent = brawlSetup(row.opponent, maxUpgrade)
     const turns = list(row.turns, 24).map(value => {
       const turn = object(value)
       return { round: integer(turn.round, 1, 12), actor: integer(turn.actor, 0, 1),
@@ -724,7 +733,7 @@ export const readBrawlReport = (id: string, signal?: AbortSignal) => read(
     if (report.id !== id || !turns.length || !species) throw invalid()
     const opponentSpecies = [...speciesIds].find(candidate => candidate === row.opponentSpecies) as PetSpeciesId | undefined
     if (report.mode === 'pvp' && !opponentSpecies) throw invalid()
-    return { ...report, species, opponentSpecies, player, opponent, turns, petId: brawlId(row.petId), version: integer(row.version, 1) }
+    return { ...report, species, opponentSpecies, player, opponent, turns, petId: brawlId(row.petId), version }
   }, signal)
 
 function brawlOrder(value: unknown) {
@@ -732,10 +741,13 @@ function brawlOrder(value: unknown) {
   const weapon = brawlWeapons.find(item => item === row.weapon)
   const status = row.status
   if (!weapon || (status !== 'pending' && status !== 'expired' && status !== 'completed')) throw invalid()
-  const level = integer(row.level, 0, 4), createdAt = integer(row.createdAt), expiresAt = integer(row.expiresAt)
+  const version = integer(row.version, 1, 2)
+  const product = row.product === undefined ? undefined : brawlProduct(row.product)
+  const maxLevel = product ? (product === 'ARTIFACT' || product === 'SLOT' ? 0 : 2) : brawlMaxUpgrade(version) - 1
+  const level = integer(row.level, 0, maxLevel), createdAt = integer(row.createdAt), expiresAt = integer(row.expiresAt)
   if (expiresAt <= createdAt || (status === 'completed' && integer(row.completedAt) >= expiresAt)) throw invalid()
   return { id: brawlId(row.id), petId: brawlId(row.petId), weapon, status, level, createdAt, expiresAt,
-    product: row.product === undefined ? undefined : brawlProduct(row.product), materials: integer(row.materials, 0, 220), points: integer(row.points, 0, 2200), version: integer(row.version, 1) } as const
+    product, materials: integer(row.materials, 0, 220), points: integer(row.points, 0, 2200), version } as const
 }
 export type BrawlOrder = ReturnType<typeof brawlOrder>
 export const readBrawlOrders = (before?: string, signal?: AbortSignal) => read(

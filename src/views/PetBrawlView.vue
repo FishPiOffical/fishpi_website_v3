@@ -74,6 +74,8 @@ const locked = computed(() => loading.value || !!error.value || pets.busy || !!p
 const pvpDirty = computed(() => !!state.value?.pvp?.enabled &&
   (state.value.pvp.weapon !== weapon.value || state.value.pvp.skill !== skill.value))
 const level = computed(() => state.value?.levels[weapon.value] ?? 0)
+const maxUpgrade = computed(() => state.value?.maxUpgrade ?? 20)
+const milestones = computed(() => Array.from({ length: 6 }, (_, index) => index * maxUpgrade.value / 5))
 const growth = computed(() => state.value?.growth[level.value])
 const nextGrowth = computed(() => state.value?.growth[level.value + 1])
 const selectedGear = computed(() => state.value?.gear?.weapons[weapon.value])
@@ -82,7 +84,7 @@ const gearOptions = computed(() => {
   const current = selectedGear.value
   return state.value.gear.catalog.map(item => {
     const rank = item.id === 'ARTIFACT' ? current.artifact : item.id === 'SLOT' ? current.slot : item.rank
-    const cost = item.id === 'ARTIFACT' && level.value < 5 ? undefined : item.costs[rank]
+    const cost = item.id === 'ARTIFACT' && level.value < maxUpgrade.value ? undefined : item.costs[rank]
     return { id: item.id, name: item.name, level: rank, cost, hp: item.hp, attack: item.attack }
   })
 })
@@ -568,15 +570,24 @@ onUnmounted(() => {
           <div class="equipment-column" data-floating-obstacle>
             <section class="panel" aria-labelledby="upgrade-heading">
               <div class="panel-heading"><h2 id="upgrade-heading"><PetIcon name="growth" />武器强化</h2><span class="level-tag">{{ weapons[weapon] }} +{{ level }}</span></div>
-              <div class="upgrade-track" aria-label="强化等级"><span v-for="n in 6" :key="n" :class="{ reached: level >= n - 1, current: level === n - 1 }">+{{ n - 1 }}</span></div>
-              <div v-if="nextGrowth" class="upgrade-preview"><span>强化至 +{{ level + 1 }}</span><span>生命 <strong>{{ hp(nextGrowth.maxHp + (selectedGear?.hp ?? 0)) }}</strong></span><span>基础伤害 <strong>{{ hp(nextGrowth.attack + (selectedGear?.attack ?? 0)) }}</strong></span></div>
+              <div class="upgrade-track">
+                <progress :value="level" :max="maxUpgrade" aria-label="武器强化进度" :aria-valuetext="`+${level} / +${maxUpgrade}`" />
+                <div class="upgrade-milestones" aria-hidden="true">
+                  <span v-for="milestone in milestones" :key="milestone" :class="{ reached: level >= milestone }">+{{ milestone }}</span>
+                </div>
+              </div>
+              <div v-if="growth && nextGrowth" class="upgrade-preview">
+                <span>强化至 +{{ level + 1 }}</span>
+                <span>生命 <strong>{{ hp(nextGrowth.maxHp + (selectedGear?.hp ?? 0)) }}</strong> <small>+{{ hp(nextGrowth.maxHp - growth.maxHp) }}</small></span>
+                <span>基础伤害 <strong>{{ hp(nextGrowth.attack + (selectedGear?.attack ?? 0)) }}</strong> <small>+{{ hp(nextGrowth.attack - growth.attack) }}</small></span>
+              </div>
               <p v-else class="subtle">武器已达最高强化等级。</p>
               <div class="forge-actions"><button type="button" class="primary" :disabled="locked || !cost || state.materials < cost" @click="upgrade()">{{ cost ? `材料强化 · ${cost} 材料` : '已达最高等级' }}</button><PetBrawlCheckout v-if="state.petId" :pet-id="state.petId" :weapon="weapon" :level="level" :version="state.version" :materials="state.materials" :cost="cost" :disabled="locked" :gear-options="gearOptions" /></div>
               <p v-if="cost && state.materials < cost" class="subtle">还差 {{ cost - state.materials }} 材料，可以通过闯关积累。</p>
             </section>
             <section v-if="selectedGear" class="panel" aria-labelledby="socket-heading">
               <div class="panel-heading"><h2 id="socket-heading"><PetIcon name="collection" />神器与镶嵌</h2><span class="subtle">{{ selectedGear.artifact ? '神器已进阶' : '神器未进阶' }}</span></div>
-              <p class="subtle">{{ selectedGear.artifact ? '当前装备增益' : level === 5 ? '可在积分与材料商店中进阶神器' : '武器 +5 后可进阶神器' }} · 生命 +{{ hp(selectedGear.hp) }}，基础伤害 +{{ hp(selectedGear.attack) }}</p>
+              <p class="subtle">{{ selectedGear.artifact ? '当前装备增益' : level === maxUpgrade ? '可在积分与材料商店中进阶神器' : `武器 +${maxUpgrade} 后可进阶神器` }} · 生命 +{{ hp(selectedGear.hp) }}，基础伤害 +{{ hp(selectedGear.attack) }}</p>
               <div v-for="slot in (['soul', 'rune'] as const)" :key="slot" class="socket-row"><span class="socket-symbol"><PetIcon :name="slot === 'soul' ? 'material' : 'collection'" /></span><label :for="`brawl-slot-${slot}`">{{ slot === 'soul' ? '魂珠槽' : '符石槽' }}<select :id="`brawl-slot-${slot}`" v-model="socketDraft[slot]" :disabled="locked || slot === 'rune' && !selectedGear.slot"><option value="">{{ slot === 'rune' && !selectedGear.slot ? '第二槽未解锁' : '空槽（可拆卸）' }}</option><option v-for="item in ownedSocketItems(slot)" :key="item.id" :value="item.id">{{ item.name }} Lv.{{ item.rank }}</option></select></label><button type="button" :disabled="locked || socketDraft[slot] === selectedGear[slot] || slot === 'rune' && !selectedGear.slot" @click="socket(slot)">{{ socketDraft[slot] ? '保存镶嵌' : '拆卸' }}</button></div>
             </section>
           </div>
@@ -730,12 +741,13 @@ select { min-inline-size: 0; inline-size: 100%; max-inline-size: 100%; }
 .weapon-options button strong { font-size: .85rem; }
 .weapon-options button > span:not(.weapon-symbol) { margin-left: auto; }
 .weapon-symbol { display: grid; place-items: center; width: 36px; height: 36px; background: var(--fp-bg); border-radius: 8px; }
-.upgrade-track { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-block: 24px; }
-.upgrade-track span { display: grid; place-items: center; padding-block: 10px; border-radius: 6px; background: var(--fp-bg); border: 1px solid var(--fp-border); font-size: .8rem; color: var(--fp-muted); }
-.upgrade-track span.reached { background: var(--fp-primary-soft); color: var(--brawl-ink); border-color: transparent; }
-.upgrade-track span.current { border-color: var(--fp-primary); font-weight: 700; }
+.upgrade-track { display: grid; gap: 8px; margin-block: 20px; }
+.upgrade-track progress { max-width: none; height: 8px; }
+.upgrade-milestones { display: flex; justify-content: space-between; color: var(--fp-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.upgrade-milestones .reached { color: var(--brawl-ink); font-weight: 600; }
 .upgrade-preview { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 20px; color: var(--fp-muted); font-size: .8rem; }
 .upgrade-preview strong { color: var(--fp-text); }
+.upgrade-preview small { color: var(--brawl-ink); font-weight: 600; }
 .forge-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .socket-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding-block: 16px; }
 .socket-row + .socket-row { border-top: 1px solid var(--fp-border); }
