@@ -55,6 +55,7 @@ const portrait = (species: string | null | undefined, size = 160) => {
 const petProfileRoute = (petId: string) => ({ name: 'ranked-pet-profile', params: { petId } })
 const frame = ref(0)
 const playing = ref(false)
+const contactReached = ref(false)
 const compact = ref(true)
 const saveData = ref(false)
 const stillReplay = computed(() => compact.value || saveData.value)
@@ -62,6 +63,7 @@ let connection: (EventTarget & { saveData?: boolean }) | undefined
 const fighters = ref<HTMLElement | null>(null)
 const playbackKey = ref(0)
 const stepDuration = 1000
+const contactTime = stepDuration / 2
 let deadline = 0
 let remaining = stepDuration
 let compactQuery: MediaQueryList | undefined
@@ -113,6 +115,16 @@ const turn = computed(() => {
   return turns?.[Math.min(frame.value, turns.length) - 1]
 })
 const ended = computed(() => !!report.value && frame.value > report.value.turns.length)
+const hp = (centi: number) => (centi / 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+const settled = computed(() => contactReached.value || stillReplay.value || ended.value)
+const hpTurn = computed(() => settled.value ? turn.value : report.value?.turns[frame.value - 2])
+const turnFeedback = computed(() => {
+  if (!turn.value || !settled.value || ended.value) return []
+  const { actor, damage, healing } = turn.value
+  const received = { kind: 'damage', text: `−${hp(damage)}` }
+  const restored = healing > 0 ? { kind: 'heal', text: `+${hp(healing)}` } : undefined
+  return actor === 0 ? [restored, received] : [received, restored]
+})
 const turnKey = computed(() => `${report.value?.id}:${playbackKey.value}:${frame.value}`)
 const attackingFighter = computed(() => {
   if (!turn.value || !report.value || ended.value) return
@@ -132,8 +144,19 @@ function battleAction(side: number): PetBattleAction | undefined {
   return turn.value ? turn.value.actor === side ? 'attack' : 'hit' : undefined
 }
 const resultLabel = (winner: number) => winner === 0 ? '胜利' : winner === 1 ? '落败' : '平局'
+const turnLabel = computed(() => {
+  if (ended.value && report.value) {
+    const result = resultLabel(report.value.winner)
+    return report.value.mode === 'pvp' ? result : `${result} · 获得 ${report.value.reward} 材料`
+  }
+  if (!turn.value) return '准备开战'
+  const { round, actor, damage, healing } = turn.value
+  const subject = `第 ${round} 回合 · ${actor === 0 ? '我方' : '对手'}`
+  if (!settled.value) return `${subject}出招`
+  const recovery = healing ? `，回复 ${hp(healing)} 生命` : ''
+  return `${subject}造成 ${hp(damage)} 伤害${recovery}`
+})
 const describe = (reason: unknown) => reason instanceof Error ? reason.message : '读取失败，请重试'
-const hp = (centi: number) => (centi / 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 
 async function refresh() {
   stateRequest?.abort()
@@ -225,6 +248,7 @@ function play() {
   if (frame.value === 0 || ended.value) {
     playbackKey.value++
     frame.value = 1
+    contactReached.value = false
     remaining = stepDuration
   }
   playing.value = true
@@ -237,23 +261,38 @@ function play() {
   })
   scheduleStep()
 }
+function finishStep() {
+  if (!report.value || !playing.value) return
+  if (ended.value) {
+    stop()
+    status.value = resultLabel(report.value.winner)
+    return
+  }
+  frame.value++
+  contactReached.value = false
+  if (ended.value && report.value.winner < 0) {
+    skip()
+    return
+  }
+  remaining = stepDuration
+  scheduleStep()
+}
 function scheduleStep() {
   deadline = performance.now() + remaining
-  timer = setTimeout(() => {
-    if (!report.value || !playing.value) return
-    if (ended.value) {
-      stop()
-      status.value = resultLabel(report.value.winner)
+  if (!ended.value && !contactReached.value) {
+    // 暂停和继续沿用本回合剩余时间，命中和生命值只在同一个时间点更新。
+    const untilContact = remaining - (stepDuration - contactTime)
+    if (untilContact > 0) {
+      timer = setTimeout(() => {
+        if (!playing.value) return
+        contactReached.value = true
+        timer = setTimeout(finishStep, Math.max(0, deadline - performance.now()))
+      }, untilContact)
       return
     }
-    frame.value++
-    if (ended.value && report.value.winner < 0) {
-      skip()
-      return
-    }
-    remaining = stepDuration
-    scheduleStep()
-  }, remaining)
+    contactReached.value = true
+  }
+  timer = setTimeout(finishStep, remaining)
 }
 function updateCompact() { compact.value = compactQuery?.matches ?? true }
 function updateSaveData() { saveData.value = connection?.saveData === true }
@@ -371,7 +410,7 @@ watch([() => auth.accessToken, () => auth.account?.oId], ([token, owner], [, old
 }, { flush: 'sync' })
 onMounted(() => {
   mounted = true
-  compactQuery = window.matchMedia('(max-width: 720px), (hover: none) and (pointer: coarse)')
+  compactQuery = window.matchMedia('(max-width: 720px), (hover: none) and (pointer: coarse), (prefers-reduced-motion: reduce)')
   compactQuery.addEventListener('change', updateCompact)
   connection = (navigator as Navigator & { connection?: EventTarget & { saveData?: boolean } }).connection
   connection?.addEventListener('change', updateSaveData)
@@ -438,6 +477,9 @@ onUnmounted(() => {
                           :weapon="(attackingFighter ?? report.player).weapon" :level="(attackingFighter ?? report.player).level"
                           :artifact="(attackingFighter ?? report.player).artifact" :max-level="report.maxUpgrade"
                           :turn-key="turnKey" :duration="stepDuration" :playing="playing" :still="stillReplay" />
+                        <span v-if="turnFeedback[0]" :key="turnKey" class="combat-number" :data-kind="turnFeedback[0].kind"
+                          :class="{ 'is-static': stillReplay }" :style="{ animationPlayState: playing ? 'running' : 'paused' }"
+                          aria-hidden="true">{{ turnFeedback[0].text }}</span>
                         <strong>{{ report.player.petName ?? '我的宠物' }}</strong>
                       </RouterLink>
                       <span v-if="report.player.ownerNickname">{{ report.player.ownerNickname }}</span>
@@ -447,8 +489,8 @@ onUnmounted(() => {
                       <span><strong>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</strong><small>{{ skills[report.player.skill] }}</small></span>
                     </span>
                     <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ hp(report.player.gearHp) }} · 伤害 +{{ hp(report.player.gearAttack) }}</span>
-                    <progress aria-label="我的宠物生命" :max="report.player.maxHp" :value="turn?.playerHp ?? report.player.maxHp" />
-                    <span>{{ hp(turn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
+                    <progress aria-label="我的宠物生命" :max="report.player.maxHp" :value="hpTurn?.playerHp ?? report.player.maxHp" />
+                    <span>{{ hp(hpTurn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
                   </div>
                   <span class="versus" aria-hidden="true">VS</span>
                   <div class="fighter">
@@ -460,6 +502,9 @@ onUnmounted(() => {
                           :weapon="(attackingFighter ?? report.opponent).weapon" :level="(attackingFighter ?? report.opponent).level"
                           :artifact="(attackingFighter ?? report.opponent).artifact" :max-level="report.maxUpgrade"
                           :turn-key="turnKey" :duration="stepDuration" :playing="playing" :still="stillReplay" mirrored />
+                        <span v-if="turnFeedback[1]" :key="turnKey" class="combat-number" :data-kind="turnFeedback[1].kind"
+                          :class="{ 'is-static': stillReplay }" :style="{ animationPlayState: playing ? 'running' : 'paused' }"
+                          aria-hidden="true">{{ turnFeedback[1].text }}</span>
                         <strong>{{ report.mode === 'pvp' ? report.opponent.petName ?? '对手宠物' : opponents[report.stage - 1] }}</strong>
                       </component>
                       <span v-if="report.opponent.ownerNickname">{{ report.opponent.ownerNickname }}</span>
@@ -469,8 +514,8 @@ onUnmounted(() => {
                       <span><strong>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</strong><small>{{ skills[report.opponent.skill] }}</small></span>
                     </span>
                     <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
-                    <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="turn?.opponentHp ?? report.opponent.maxHp" />
-                    <span>{{ hp(turn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
+                    <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="hpTurn?.opponentHp ?? report.opponent.maxHp" />
+                    <span>{{ hp(hpTurn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
                   </div>
                   <div v-if="projectile" :key="turnKey" class="projectile-lane" :class="{ reversed: turn?.actor === 1 }"
                     :data-projectile="projectile.art"
@@ -479,7 +524,7 @@ onUnmounted(() => {
                     <span><img v-if="projectile.art === 'pebble'" src="/images/pets/weapons/pebble.png" alt="" width="26" height="26" /></span>
                   </div>
                 </div>
-                <p class="turn" :class="{ 'is-ended': ended }">{{ ended ? `${resultLabel(report.winner)}${report.mode === 'pvp' ? '' : ` · 获得 ${report.reward} 材料`}` : turn ? `第 ${turn.round} 回合 · ${turn.actor === 0 ? '我方' : '对手'}造成 ${hp(turn.damage)} 伤害${turn.healing ? `，回复 ${hp(turn.healing)} 生命` : ''}` : '准备开战' }}</p>
+                <p class="turn" :class="{ 'is-ended': ended }">{{ turnLabel }}</p>
               </template>
               <div v-else class="stage-empty">
                 <img v-if="portrait(state.species)" :src="portrait(state.species)" width="160" height="160" alt="" />
@@ -704,8 +749,36 @@ button.button-wide, .button-link { text-decoration: none; color: var(--brawl-ink
 .fighter { display: grid; justify-items: center; gap: 7px; text-align: center; min-inline-size: 0; }
 .fighter-identity { display: grid; gap: 2px; max-inline-size: 100%; min-inline-size: 0; line-height: 1.3; overflow-wrap: anywhere; }
 .fighter-identity > span { color: var(--fp-muted); font-size: .75rem; }
-.fighter-pet { display: grid; justify-items: center; gap: 7px; min-inline-size: 0; color: inherit; text-decoration: none; border-radius: 8px; }
+.fighter-pet { position: relative; display: grid; justify-items: center; gap: 7px; min-inline-size: 0; color: inherit; text-decoration: none; border-radius: 8px; }
 .fighter-pet strong { font-size: .9rem; }
+.combat-number {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 7px;
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  padding: 2px 9px;
+  border: 1px solid color-mix(in oklab, currentColor 28%, transparent);
+  border-radius: 999px;
+  background: var(--fp-card);
+  font-size: clamp(.88rem, 1.4vw, 1.1rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.combat-number[data-kind='damage'] { color: var(--fp-danger-ink); }
+.combat-number[data-kind='heal'] { color: var(--brawl-ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .combat-number:not(.is-static) { animation: combat-number-rise .48s ease-out both; }
+}
+@keyframes combat-number-rise {
+  from { opacity: .65; transform: translateY(6px) scale(.94); }
+  22% { opacity: 1; transform: translateY(0); }
+  70% { opacity: 1; }
+  to { opacity: .55; transform: translateY(-6px); }
+}
 a.fighter-pet:hover { color: var(--brawl-ink); }
 a.fighter-pet:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
 .fighter > span { color: var(--fp-muted); font-size: .73rem; }
