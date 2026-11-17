@@ -338,14 +338,14 @@ function navigateSection(event: KeyboardEvent) {
   section.value = sections[next]!.id
   ;(event.currentTarget as HTMLElement).querySelector<HTMLButtonElement>(`#brawl-tab-${section.value}`)?.focus()
 }
-async function viewReport(id: string) {
+async function viewReport(id: string, autoplay = false) {
   const context = getAuthContextVersion()
   const owner = auth.account?.oId
   section.value = 'arena'
   await nextTick()
   if (!mounted || !auth.isLoggedIn || context !== getAuthContextVersion() || owner !== auth.account?.oId) return
   fighters.value?.closest('section')?.scrollIntoView({ block: 'start', behavior: 'instant' })
-  await openReport(id)
+  await openReport(id, autoplay)
 }
 function fight(practice: boolean) {
   if (locked.value || !eligible.value || !state.value?.petId || (!practice && stage.value > state.value.unlocked)) return
@@ -383,7 +383,7 @@ watch(() => pets.confirmedEvent, event => {
   }
   if (event.kind === 'brawl-invite-decision' && event.matchId) {
     void loadHistory()
-    if (section.value === 'friendly') void viewReport(event.matchId)
+    if (section.value === 'friendly') void viewReport(event.matchId, true)
   }
   if (event.kind === 'brawl-enroll') {
     status.value = '出战配装已保存'
