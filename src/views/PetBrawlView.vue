@@ -471,18 +471,25 @@ onUnmounted(() => {
           <p v-if="historyLoading" role="status" class="subtle">正在读取战报列表…</p>
           <p v-if="!matches.length && !historyLoading && !reportError" class="empty-history">还没有战报，完成对局后会记录在这里。</p>
           <ul v-if="matches.length">
-            <li v-for="match in matches" :key="match.id">
-              <button type="button" :class="{ selected: report?.id === match.id }" :disabled="reportLoading" @click="viewReport(match.id)">
-                <span class="result-mark" :class="{ win: match.winner === 0, loss: match.winner === 1 }">{{ resultLabel(match.winner) }}</span>
-                <span class="match-title">
-                  <strong v-if="match.opponentPetName">{{ match.opponentPetName }}</strong>
-                  <span v-else>{{ match.mode === 'pvp' ? '实装对战' : `${match.practice ? '陪练' : '闯关'} · 第 ${match.stage} 关` }}</span>
-                  <span v-if="match.opponentOwnerNickname" class="match-owner">{{ match.opponentOwnerNickname }}</span>
-                  <time :datetime="new Date(match.createdAt).toISOString()">{{ dateTime.format(match.createdAt) }}</time>
-                </span>
-                <span v-if="match.mode !== 'pvp'" class="match-reward">+{{ match.reward }}<small> 材料</small></span>
-                <PetIcon name="chevron" />
-              </button>
+            <li v-for="match in matches" :key="match.id" :class="{ selected: report?.id === match.id }">
+              <button type="button" class="match-replay" :disabled="reportLoading"
+                :aria-label="`查看回放 · ${resultLabel(match.winner)} · ${match.opponentPetName ?? dateTime.format(match.createdAt)}`"
+                @click="viewReport(match.id)" />
+              <span class="result-mark" :class="{ win: match.winner === 0, loss: match.winner === 1 }">{{ resultLabel(match.winner) }}</span>
+              <div class="match-title">
+                <RouterLink v-if="match.opponentPetId" class="match-pet"
+                  :to="{ name: 'ranked-pet-profile', params: { petId: match.opponentPetId } }">
+                  <img v-if="portrait(match.opponentSpecies, 36)" :src="portrait(match.opponentSpecies, 36)"
+                    alt="" width="36" height="36" loading="lazy" />
+                  <strong>{{ match.opponentPetName || speciesNames[match.opponentSpecies ?? ''] || '对手宠物' }}</strong>
+                </RouterLink>
+                <strong v-else-if="match.opponentPetName">{{ match.opponentPetName }}</strong>
+                <span v-else>{{ match.mode === 'pvp' ? '实装对战' : `${match.practice ? '陪练' : '闯关'} · 第 ${match.stage} 关` }}</span>
+                <span v-if="match.opponentOwnerNickname" class="match-owner">{{ match.opponentOwnerNickname }}</span>
+                <time :datetime="new Date(match.createdAt).toISOString()">{{ dateTime.format(match.createdAt) }}</time>
+              </div>
+              <span v-if="match.mode !== 'pvp'" class="match-reward">+{{ match.reward }}<small> 材料</small></span>
+              <PetIcon name="chevron" aria-hidden="true" />
             </li>
           </ul>
           <button v-if="next" type="button" class="more-history" :disabled="historyLoading" @click="loadHistory(next)">更早的战报</button>
@@ -628,9 +635,14 @@ select { min-inline-size: 0; inline-size: 100%; max-inline-size: 100%; }
 .stage-label { margin-block: 16px; }
 .reward-note { display: flex; align-items: center; gap: 8px; color: var(--brawl-ink); font-size: .8rem; }
 .history ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.history li { min-inline-size: 0; }
-.history li button { display: flex; align-items: center; gap: 14px; width: 100%; text-align: start; padding: 12px; }
-.history li button.selected { background: var(--fp-primary-soft); border-color: color-mix(in srgb, var(--fp-primary) 35%, var(--fp-border)); }
+.history li { position: relative; display: flex; align-items: center; gap: 14px; min-inline-size: 0; padding: 12px; border: 1px solid var(--fp-border); border-radius: 9px; font-size: .85rem; }
+.history li.selected { background: var(--fp-primary-soft); border-color: color-mix(in srgb, var(--fp-primary) 35%, var(--fp-border)); }
+.history li:has(.match-replay:hover:not(:disabled)) { background: var(--fp-hover); }
+.history .match-replay { position: absolute; inset: 0; z-index: 1; padding: 0; border: 0; background: transparent; }
+.match-pet { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 8px; justify-self: start; max-inline-size: 100%; color: var(--fp-title); text-decoration: none; border-radius: 6px; }
+.match-pet:hover { color: var(--brawl-ink); }
+.match-pet:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
+.match-pet img { flex: none; inline-size: 36px; block-size: 36px; border-radius: 8px; object-fit: contain; background: var(--fp-bg); }
 .result-mark { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 8px; background: var(--fp-bg); color: var(--fp-muted); font-size: .75rem; font-weight: 600; }
 .result-mark.win { color: var(--brawl-ink); background: var(--fp-primary-soft); }
 .result-mark.loss { color: var(--fp-muted); }

@@ -170,6 +170,8 @@ export type BrawlCommand = BrawlSeasonClaim | ({ petId: string; version: number 
 ))
 type BrawlSeasonClaim = { kind: 'brawl-season-claim'; season: number }
 export interface BrawlSummary {
+  opponentPetId?: string
+  opponentSpecies?: PetSpeciesId
   opponentPetName?: string
   opponentOwnerNickname?: string
   id: string
@@ -565,10 +567,13 @@ function brawlSummary(value: unknown): BrawlSummary {
   if (mode !== 'npc' && mode !== 'pvp') throw invalid()
   const practice = flag(row.practice), reward = integer(row.reward, 0, 20)
   if (mode === 'pvp' && (practice || reward !== 0)) throw invalid()
+  const opponentPetId = row.opponentPetId
   return { id: brawlId(row.id), createdAt: integer(row.createdAt), mode,
     season: mode === 'pvp' && row.season !== undefined ? integer(row.season, 1, 999999) : undefined,
     stage: mode === 'pvp' ? integer(row.stage, 0, 0) : integer(row.stage, 1, 3),
     practice, winner: integer(row.winner, -1, 1), reward,
+    opponentPetId: mode === 'pvp' && typeof opponentPetId === 'string' && /^[1-9][0-9]{0,18}$/.test(opponentPetId) ? opponentPetId : undefined,
+    opponentSpecies: mode === 'pvp' ? [...speciesIds].find(id => id === row.opponentSpecies) as PetSpeciesId | undefined : undefined,
     opponentPetName: mode === 'pvp' ? brawlDisplayName(row.opponentPetName) : undefined,
     opponentOwnerNickname: mode === 'pvp' ? brawlDisplayName(row.opponentOwnerNickname) : undefined }
 }
