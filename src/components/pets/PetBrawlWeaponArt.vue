@@ -12,8 +12,20 @@ const props = withDefaults(defineProps<{
   pulse?: number
 }>(), { maxLevel: 20, size: 'small' })
 
-const trialArt = { SPOON: 'spoon', LEAF: 'leaf', BUBBLE: 'bubble' } as const
-const art = computed(() => trialArt[props.weapon as keyof typeof trialArt])
+const weaponArt = {
+  SPOON: 'spoon',
+  GUARD: 'guard',
+  FAN: 'fan',
+  PEBBLE: 'pebble',
+  SHELL: 'shell',
+  LEAF: 'leaf',
+  LOTUS: 'lotus',
+  CLAW: 'claw',
+  SLING: 'sling',
+  FIN: 'fin',
+  BUBBLE: 'bubble',
+} as const satisfies Record<BrawlWeapon, string>
+const art = computed(() => weaponArt[props.weapon])
 const failedArt = ref<string>()
 const source = computed(() => art.value && failedArt.value !== art.value
   ? `/images/pets/weapons/${art.value}.png` : undefined)
@@ -25,7 +37,8 @@ const fallback = computed(() => props.weapon === 'SPOON' ? 'feed' : props.weapon
   <span class="weapon-art" :data-art="art" :data-size="size" :data-tier="tier">
     <span class="weapon-art-face" aria-hidden="true">
       <span class="weapon-art-halo" />
-      <img v-if="source" :key="source" :src="source" alt="" width="128" height="128" decoding="async" @error="failedArt = art">
+      <img v-if="source" :key="source" :src="source" alt="" width="128" height="128" decoding="async"
+        :loading="size === 'small' ? 'lazy' : undefined" @error="failedArt = art">
       <PetIcon v-else :name="fallback" class="weapon-art-fallback" />
       <span v-if="tier >= 3" class="weapon-art-sparks" />
       <span v-if="pulse" :key="pulse" class="weapon-art-pulse" />
@@ -58,7 +71,15 @@ const fallback = computed(() => props.weapon === 'SPOON' ? 'feed' : props.weapon
 .weapon-art[data-size='battle'] { --weapon-size: 36px; }
 .weapon-art[data-size='preview'] { --weapon-size: 72px; border-radius: 12px; }
 .weapon-art[data-art='spoon'] { --weapon-tone: #e2a03e; }
+.weapon-art[data-art='guard'] { --weapon-tone: #c49863; }
+.weapon-art[data-art='fan'] { --weapon-tone: #749cc9; }
+.weapon-art[data-art='pebble'] { --weapon-tone: #818eb8; }
+.weapon-art[data-art='shell'] { --weapon-tone: #d79091; }
 .weapon-art[data-art='leaf'] { --weapon-tone: #70ad54; }
+.weapon-art[data-art='lotus'] { --weapon-tone: #9aaa59; }
+.weapon-art[data-art='claw'] { --weapon-tone: #e78c6c; }
+.weapon-art[data-art='sling'] { --weapon-tone: #5eaba1; }
+.weapon-art[data-art='fin'] { --weapon-tone: #599dcc; }
 .weapon-art[data-art='bubble'] { --weapon-tone: #38a7bd; }
 .weapon-art[data-tier='1'] { --weapon-glow: 8%; --weapon-rim: 24%; }
 .weapon-art[data-tier='2'] { --weapon-glow: 12%; --weapon-rim: 35%; }
