@@ -470,7 +470,21 @@ onUnmounted(() => {
           <p v-if="reportError && !retryReport" role="alert">{{ reportError }}</p>
           <p v-if="historyLoading" role="status" class="subtle">正在读取战报列表…</p>
           <p v-if="!matches.length && !historyLoading && !reportError" class="empty-history">还没有战报，完成对局后会记录在这里。</p>
-          <ul v-if="matches.length"><li v-for="match in matches" :key="match.id"><button type="button" :class="{ selected: report?.id === match.id }" :disabled="reportLoading" @click="viewReport(match.id)"><span class="result-mark" :class="{ win: match.winner === 0, loss: match.winner === 1 }">{{ resultLabel(match.winner) }}</span><span class="match-title">{{ match.mode === 'pvp' ? '实装对战' : `${match.practice ? '陪练' : '闯关'} · 第 ${match.stage} 关` }}<time :datetime="new Date(match.createdAt).toISOString()">{{ dateTime.format(match.createdAt) }}</time></span><span v-if="match.mode !== 'pvp'" class="match-reward">+{{ match.reward }}<small> 材料</small></span><PetIcon name="chevron" /></button></li></ul>
+          <ul v-if="matches.length">
+            <li v-for="match in matches" :key="match.id">
+              <button type="button" :class="{ selected: report?.id === match.id }" :disabled="reportLoading" @click="viewReport(match.id)">
+                <span class="result-mark" :class="{ win: match.winner === 0, loss: match.winner === 1 }">{{ resultLabel(match.winner) }}</span>
+                <span class="match-title">
+                  <strong v-if="match.opponentPetName">{{ match.opponentPetName }}</strong>
+                  <span v-else>{{ match.mode === 'pvp' ? '实装对战' : `${match.practice ? '陪练' : '闯关'} · 第 ${match.stage} 关` }}</span>
+                  <span v-if="match.opponentOwnerNickname" class="match-owner">{{ match.opponentOwnerNickname }}</span>
+                  <time :datetime="new Date(match.createdAt).toISOString()">{{ dateTime.format(match.createdAt) }}</time>
+                </span>
+                <span v-if="match.mode !== 'pvp'" class="match-reward">+{{ match.reward }}<small> 材料</small></span>
+                <PetIcon name="chevron" />
+              </button>
+            </li>
+          </ul>
           <button v-if="next" type="button" class="more-history" :disabled="historyLoading" @click="loadHistory(next)">更早的战报</button>
         </section>
       </div>
@@ -620,11 +634,12 @@ select { min-inline-size: 0; inline-size: 100%; max-inline-size: 100%; }
 .result-mark { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 8px; background: var(--fp-bg); color: var(--fp-muted); font-size: .75rem; font-weight: 600; }
 .result-mark.win { color: var(--brawl-ink); background: var(--fp-primary-soft); }
 .result-mark.loss { color: var(--fp-muted); }
-.match-title { display: grid; gap: 5px; min-inline-size: 0; }
+.match-title { display: grid; gap: 4px; min-inline-size: 0; line-height: 1.3; overflow-wrap: anywhere; }
+.match-owner { color: var(--fp-muted); font-size: .75rem; }
 .match-title time { font-size: .72rem; }
 .match-reward { margin-left: auto; white-space: nowrap; color: var(--fp-muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .match-reward small { font-size: .72rem; }
-.history li svg { width: 16px; height: 16px; color: var(--fp-muted); margin-left: auto; }
+.history li svg { width: 16px; height: 16px; flex: none; color: var(--fp-muted); margin-left: auto; }
 .more-history { margin-top: 16px; width: 100%; }
 .empty-history { color: var(--fp-muted); text-align: center; padding-block: 24px; font-size: .85rem; }
 .workshop { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 1.6fr); gap: 20px; align-items: start; }

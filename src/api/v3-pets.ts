@@ -170,6 +170,8 @@ export type BrawlCommand = BrawlSeasonClaim | ({ petId: string; version: number 
 ))
 type BrawlSeasonClaim = { kind: 'brawl-season-claim'; season: number }
 export interface BrawlSummary {
+  opponentPetName?: string
+  opponentOwnerNickname?: string
   id: string
   createdAt: number
   stage: number
@@ -542,17 +544,19 @@ function brawlId(value: unknown): string {
   return value
 }
 
+function brawlDisplayName(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length <= 256 && value.trim() ? value : undefined
+}
+
 function brawlSetup(value: unknown) {
   const row = object(value)
   const weapon = brawlWeapons.find(option => option === row.weapon)
   const skill = brawlSkills.find(option => option === row.skill)
   if (!weapon || !skill) throw invalid()
-  const displayName = (name: unknown) =>
-    typeof name === 'string' && name.length <= 256 && name.trim() ? name : undefined
   return { weapon, skill, level: integer(row.level, 0, 5),
     maxHp: integer(row.maxHp, 1), attack: integer(row.attack, 1), gearHp: integer(row.gearHp ?? 0, 0, 40),
     gearAttack: integer(row.gearAttack ?? 0, 0, 10),
-    petName: displayName(row.petName), ownerNickname: displayName(row.ownerNickname) }
+    petName: brawlDisplayName(row.petName), ownerNickname: brawlDisplayName(row.ownerNickname) }
 }
 
 function brawlSummary(value: unknown): BrawlSummary {
@@ -564,7 +568,9 @@ function brawlSummary(value: unknown): BrawlSummary {
   return { id: brawlId(row.id), createdAt: integer(row.createdAt), mode,
     season: mode === 'pvp' && row.season !== undefined ? integer(row.season, 1, 999999) : undefined,
     stage: mode === 'pvp' ? integer(row.stage, 0, 0) : integer(row.stage, 1, 3),
-    practice, winner: integer(row.winner, -1, 1), reward }
+    practice, winner: integer(row.winner, -1, 1), reward,
+    opponentPetName: mode === 'pvp' ? brawlDisplayName(row.opponentPetName) : undefined,
+    opponentOwnerNickname: mode === 'pvp' ? brawlDisplayName(row.opponentOwnerNickname) : undefined }
 }
 
 function brawlPvp(value: unknown) {
