@@ -2,39 +2,28 @@
 import { computed, ref } from 'vue'
 import type { BrawlWeapon } from '@/api/v3-pets'
 import PetIcon from './PetIcon.vue'
+import { brawlWeaponTier, brawlWeaponVisuals } from './brawlWeaponArt'
 
 const props = withDefaults(defineProps<{
   weapon: BrawlWeapon
   level: number
   maxLevel?: number
   artifact?: boolean
-  size?: 'small' | 'battle' | 'preview'
+  size?: 'small' | 'battle' | 'preview' | 'action'
   pulse?: number
 }>(), { maxLevel: 20, size: 'small' })
 
-const weaponArt = {
-  SPOON: 'spoon',
-  GUARD: 'guard',
-  FAN: 'fan',
-  PEBBLE: 'pebble',
-  SHELL: 'shell',
-  LEAF: 'leaf',
-  LOTUS: 'lotus',
-  CLAW: 'claw',
-  SLING: 'sling',
-  FIN: 'fin',
-  BUBBLE: 'bubble',
-} as const satisfies Record<BrawlWeapon, string>
-const art = computed(() => weaponArt[props.weapon])
+const visual = computed(() => brawlWeaponVisuals[props.weapon])
+const art = computed(() => visual.value.art)
 const failedArt = ref<string>()
 const source = computed(() => art.value && failedArt.value !== art.value
   ? `/images/pets/weapons/${art.value}.png` : undefined)
-const tier = computed(() => Math.min(5, Math.floor(props.level * 5 / props.maxLevel)))
+const tier = computed(() => brawlWeaponTier(props.level, props.maxLevel))
 const fallback = computed(() => props.weapon === 'SPOON' ? 'feed' : props.weapon === 'GUARD' ? 'care' : 'outing')
 </script>
 
 <template>
-  <span class="weapon-art" :data-art="art" :data-size="size" :data-tier="tier">
+  <span class="weapon-art" :data-art="art" :data-size="size" :data-tier="tier" :style="{ '--weapon-tone': visual.tone }">
     <span class="weapon-art-face" aria-hidden="true">
       <span class="weapon-art-halo" />
       <img v-if="source" :key="source" :src="source" alt="" width="128" height="128" decoding="async"
@@ -43,7 +32,7 @@ const fallback = computed(() => props.weapon === 'SPOON' ? 'feed' : props.weapon
       <span v-if="tier >= 3" class="weapon-art-sparks" />
       <span v-if="pulse" :key="pulse" class="weapon-art-pulse" />
     </span>
-    <span v-if="artifact" class="weapon-art-artifact">
+    <span v-if="artifact && size !== 'action'" class="weapon-art-artifact">
       <PetIcon name="collection" aria-hidden="true" />
       <span class="sr-only">神器已进阶</span>
     </span>
@@ -70,17 +59,14 @@ const fallback = computed(() => props.weapon === 'SPOON' ? 'feed' : props.weapon
 }
 .weapon-art[data-size='battle'] { --weapon-size: 36px; }
 .weapon-art[data-size='preview'] { --weapon-size: 72px; border-radius: 12px; }
-.weapon-art[data-art='spoon'] { --weapon-tone: #e2a03e; }
-.weapon-art[data-art='guard'] { --weapon-tone: #c49863; }
-.weapon-art[data-art='fan'] { --weapon-tone: #749cc9; }
-.weapon-art[data-art='pebble'] { --weapon-tone: #818eb8; }
-.weapon-art[data-art='shell'] { --weapon-tone: #d79091; }
-.weapon-art[data-art='leaf'] { --weapon-tone: #70ad54; }
-.weapon-art[data-art='lotus'] { --weapon-tone: #9aaa59; }
-.weapon-art[data-art='claw'] { --weapon-tone: #e78c6c; }
-.weapon-art[data-art='sling'] { --weapon-tone: #5eaba1; }
-.weapon-art[data-art='fin'] { --weapon-tone: #599dcc; }
-.weapon-art[data-art='bubble'] { --weapon-tone: #38a7bd; }
+.weapon-art[data-size='action'] {
+  inline-size: 100%;
+  block-size: 100%;
+  color: var(--weapon-tone);
+  background: none;
+  box-shadow: none;
+}
+.weapon-art[data-size='action'] img { inline-size: 100%; block-size: 100%; }
 .weapon-art[data-tier='1'] { --weapon-glow: 8%; --weapon-rim: 24%; }
 .weapon-art[data-tier='2'] { --weapon-glow: 12%; --weapon-rim: 35%; }
 .weapon-art[data-tier='3'] { --weapon-glow: 17%; --weapon-rim: 43%; }

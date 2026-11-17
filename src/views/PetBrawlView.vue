@@ -3,8 +3,9 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getAuthContextVersion } from '@/api/http'
 import { brawlSkillNames as skills, brawlWeaponNames as weapons, readBrawlHistory, readBrawlReport, readBrawlState, type BrawlProduct, type BrawlSkill, type BrawlSlot, type BrawlSummary, type BrawlWeapon } from '@/api/v3-pets'
-import { petBattlePoster, petPortrait, type PetBattleAction } from '@/components/pets/animations'
-import PetAnimation from '@/components/pets/PetAnimation.vue'
+import { petPortrait, type PetBattleAction } from '@/components/pets/animations'
+import PetBrawlFighterVisual from '@/components/pets/PetBrawlFighterVisual.vue'
+import { brawlWeaponVisuals } from '@/components/pets/brawlWeaponArt'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetBrawlCheckout from '@/components/pets/PetBrawlCheckout.vue'
 import PetBrawlSeason from '@/components/pets/PetBrawlSeason.vue'
@@ -55,6 +56,9 @@ const petProfileRoute = (petId: string) => ({ name: 'ranked-pet-profile', params
 const frame = ref(0)
 const playing = ref(false)
 const compact = ref(true)
+const saveData = ref(false)
+const stillReplay = computed(() => compact.value || saveData.value)
+let connection: (EventTarget & { saveData?: boolean }) | undefined
 const fighters = ref<HTMLElement | null>(null)
 const playbackKey = ref(0)
 const stepDuration = 1000
@@ -109,6 +113,16 @@ const turn = computed(() => {
   return turns?.[Math.min(frame.value, turns.length) - 1]
 })
 const ended = computed(() => !!report.value && frame.value > report.value.turns.length)
+const turnKey = computed(() => `${report.value?.id}:${playbackKey.value}:${frame.value}`)
+const attackingFighter = computed(() => {
+  if (!turn.value || !report.value || ended.value) return
+  return turn.value.actor === 0 ? report.value.player : report.value.opponent
+})
+const projectile = computed(() => {
+  if (stillReplay.value || !attackingFighter.value) return
+  const visual = brawlWeaponVisuals[attackingFighter.value.weapon]
+  if (visual.motion === 'cast' || visual.motion === 'throw') return visual
+})
 function battleAction(side: number): PetBattleAction | undefined {
   if (ended.value) {
     const winner = report.value?.winner
@@ -242,6 +256,7 @@ function scheduleStep() {
   }, remaining)
 }
 function updateCompact() { compact.value = compactQuery?.matches ?? true }
+function updateSaveData() { saveData.value = connection?.saveData === true }
 function pauseWhenHidden() { if (document.hidden) stop() }
 watch(section, value => { if (value !== 'arena') stop() })
 async function selectSection(value: typeof section.value) {
@@ -358,6 +373,9 @@ onMounted(() => {
   mounted = true
   compactQuery = window.matchMedia('(max-width: 720px), (hover: none) and (pointer: coarse)')
   compactQuery.addEventListener('change', updateCompact)
+  connection = (navigator as Navigator & { connection?: EventTarget & { saveData?: boolean } }).connection
+  connection?.addEventListener('change', updateSaveData)
+  updateSaveData()
   document.addEventListener('visibilitychange', pauseWhenHidden)
   updateCompact()
   initialize()
@@ -365,6 +383,7 @@ onMounted(() => {
 onUnmounted(() => {
   mounted = false
   compactQuery?.removeEventListener('change', updateCompact)
+  connection?.removeEventListener('change', updateSaveData)
   document.removeEventListener('visibilitychange', pauseWhenHidden)
   clear()
 })
@@ -415,12 +434,10 @@ onUnmounted(() => {
                     <span class="fighter-side">我方</span>
                     <div class="fighter-identity">
                       <RouterLink class="fighter-pet" :to="petProfileRoute(report.petId)">
-                        <div class="fighter-avatar">
-                          <PetAnimation v-if="!compact && battleAction(0)" :species="report.species" alt=""
-                            :battle-action="battleAction(0)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing && section === 'arena'"
-                            :loop="false" hold-frame :width="160" :height="160" />
-                          <img v-else :src="petBattlePoster(report.species)" alt="" width="160" height="160" />
-                        </div>
+                        <PetBrawlFighterVisual :species="report.species" :action="battleAction(0)"
+                          :weapon="(attackingFighter ?? report.player).weapon" :level="(attackingFighter ?? report.player).level"
+                          :artifact="(attackingFighter ?? report.player).artifact" :max-level="report.maxUpgrade"
+                          :turn-key="turnKey" :duration="stepDuration" :playing="playing" :still="stillReplay" />
                         <strong>{{ report.player.petName ?? '我的宠物' }}</strong>
                       </RouterLink>
                       <span v-if="report.player.ownerNickname">{{ report.player.ownerNickname }}</span>
@@ -439,12 +456,10 @@ onUnmounted(() => {
                     <div class="fighter-identity">
                       <component :is="report.opponentPetId ? RouterLink : 'div'" class="fighter-pet"
                         :to="report.opponentPetId ? petProfileRoute(report.opponentPetId) : undefined">
-                        <div class="fighter-avatar fighter-avatar--opponent">
-                          <PetAnimation v-if="!compact && battleAction(1)" :species="report.opponentSpecies ?? 'momota'" alt=""
-                            :battle-action="battleAction(1)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing && section === 'arena'"
-                            :loop="false" hold-frame :width="160" :height="160" />
-                          <img v-else :src="petBattlePoster(report.opponentSpecies ?? 'momota')" alt="" width="160" height="160" />
-                        </div>
+                        <PetBrawlFighterVisual :species="report.opponentSpecies ?? 'momota'" :action="battleAction(1)"
+                          :weapon="(attackingFighter ?? report.opponent).weapon" :level="(attackingFighter ?? report.opponent).level"
+                          :artifact="(attackingFighter ?? report.opponent).artifact" :max-level="report.maxUpgrade"
+                          :turn-key="turnKey" :duration="stepDuration" :playing="playing" :still="stillReplay" mirrored />
                         <strong>{{ report.mode === 'pvp' ? report.opponent.petName ?? '对手宠物' : opponents[report.stage - 1] }}</strong>
                       </component>
                       <span v-if="report.opponent.ownerNickname">{{ report.opponent.ownerNickname }}</span>
@@ -456,6 +471,12 @@ onUnmounted(() => {
                     <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
                     <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="turn?.opponentHp ?? report.opponent.maxHp" />
                     <span>{{ hp(turn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
+                  </div>
+                  <div v-if="projectile" :key="turnKey" class="projectile-lane" :class="{ reversed: turn?.actor === 1 }"
+                    :data-projectile="projectile.art"
+                    :style="{ '--shot-tone': projectile.tone, '--shot-duration': `${stepDuration}ms`, '--shot-play-state': playing ? 'running' : 'paused' }"
+                    aria-hidden="true">
+                    <span><img v-if="projectile.art === 'pebble'" src="/images/pets/weapons/pebble.png" alt="" width="26" height="26" /></span>
                   </div>
                 </div>
                 <p class="turn" :class="{ 'is-ended': ended }">{{ ended ? `${resultLabel(report.winner)}${report.mode === 'pvp' ? '' : ` · 获得 ${report.reward} 材料`}` : turn ? `第 ${turn.round} 回合 · ${turn.actor === 0 ? '我方' : '对手'}造成 ${hp(turn.damage)} 伤害${turn.healing ? `，回复 ${hp(turn.healing)} 生命` : ''}` : '准备开战' }}</p>
@@ -679,7 +700,7 @@ button.button-wide, .button-link { text-decoration: none; color: var(--brawl-ink
 .arena.single { grid-template-columns: 1fr; }
 .battle { scroll-margin-top: 90px; }
 .battle-stage { background: linear-gradient(180deg, var(--fp-bg), var(--fp-card)); border: 1px solid var(--fp-border); border-radius: 12px; padding: 24px 16px 16px; }
-.fighters { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 8px; align-items: start; }
+.fighters { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 8px; align-items: start; }
 .fighter { display: grid; justify-items: center; gap: 7px; text-align: center; min-inline-size: 0; }
 .fighter-identity { display: grid; gap: 2px; max-inline-size: 100%; min-inline-size: 0; line-height: 1.3; overflow-wrap: anywhere; }
 .fighter-identity > span { color: var(--fp-muted); font-size: .75rem; }
@@ -694,9 +715,38 @@ a.fighter-pet:focus-visible { outline: 2px solid var(--fp-primary); outline-offs
 .fighter-weapon small { font-size: .7rem; }
 .fighter-side { padding: 3px 10px; border-radius: 6px; background: var(--fp-primary-soft); color: var(--brawl-ink) !important; }
 .fighter-side.opponent { background: var(--fp-bg); color: var(--fp-muted) !important; }
-.fighter-avatar { inline-size: 160px; max-inline-size: 100%; aspect-ratio: 1; }
-.fighter-avatar img { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
-.fighter-avatar--opponent { transform: scaleX(-1); }
+.projectile-lane { position: absolute; inset: 112px 0 auto; pointer-events: none; z-index: 1; }
+.projectile-lane.reversed { transform: scaleX(-1); }
+.projectile-lane > span {
+  position: absolute;
+  left: calc(25% + 26px);
+  inline-size: 14px;
+  aspect-ratio: 1;
+  border-radius: 48% 44% 53% 43%;
+  background: var(--shot-tone);
+  box-shadow: inset 2px 2px 0 #fff8, -5px 1px 5px color-mix(in oklab, var(--shot-tone) 65%, transparent);
+  opacity: 0;
+}
+.projectile-lane[data-projectile='pebble'] > span { inline-size: 26px; background: none; box-shadow: none; }
+.projectile-lane img { display: block; width: 100%; height: 100%; }
+.projectile-lane[data-projectile='lotus'] > span { border-radius: 80% 0 80% 35%; }
+.projectile-lane[data-projectile='bubble'] > span {
+  inline-size: 22px;
+  border: 2px solid var(--shot-tone);
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 26%, #fff 0 10%, transparent 30%),
+    color-mix(in oklab, var(--shot-tone) 35%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .projectile-lane > span { animation: weapon-shot var(--shot-duration) linear both; animation-play-state: var(--shot-play-state); }
+}
+@keyframes weapon-shot {
+  0%, 34% { left: calc(25% + 26px); opacity: 0; transform: translateY(4px) scale(.75); }
+  37% { opacity: 1; }
+  43% { transform: translateY(-12px) scale(1); }
+  49% { left: calc(75% - 38px); opacity: 1; transform: translateY(0) scale(1); }
+  52%, 100% { left: calc(75% - 38px); opacity: 0; transform: scale(.7); }
+}
 .versus { margin-top: 90px; color: var(--fp-muted); opacity: .5; font-size: 1.2rem; font-weight: 800; font-style: italic; }
 progress { appearance: none; width: 100%; max-width: 10rem; height: 6px; border: 0; border-radius: 10px; accent-color: var(--fp-primary); background: var(--fp-border); }
 progress::-webkit-progress-bar { background: var(--fp-border); border-radius: 10px; }
