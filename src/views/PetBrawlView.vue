@@ -8,6 +8,7 @@ import PetAnimation from '@/components/pets/PetAnimation.vue'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetBrawlCheckout from '@/components/pets/PetBrawlCheckout.vue'
 import PetBrawlSeason from '@/components/pets/PetBrawlSeason.vue'
+import PetBrawlWeaponArt from '@/components/pets/PetBrawlWeaponArt.vue'
 import PetIcon from '@/components/pets/PetIcon.vue'
 import { imageThumbnail } from '@/utils/avatar'
 import { usePageSeo } from '@/composables/usePageSeo'
@@ -30,6 +31,8 @@ const historyLoading = ref(false)
 const reportLoading = ref(false)
 const weapon = ref<BrawlWeapon>('SPOON')
 const skill = ref<BrawlSkill>('SPLASH')
+const weaponPulse = ref<number>()
+watch(weapon, () => { weaponPulse.value = undefined })
 const stage = ref(1)
 const section = ref<'arena' | 'equipment' | 'season'>('arena')
 const sectionTabs = ref<HTMLElement | null>(null)
@@ -142,6 +145,7 @@ async function refresh() {
     }
     if (!result.equipmentCatalog.weapons.some(item => item.id === weapon.value)) weapon.value = 'SPOON'
     if (!result.equipmentCatalog.skills.some(item => item.id === skill.value)) skill.value = 'SPLASH'
+    return state.value
   } catch (reason) {
     if (!request.signal.aborted) error.value = describe(reason)
   } finally {
@@ -309,7 +313,12 @@ watch(() => pets.confirmedEvent, event => {
   if (event.kind === 'brawl-season-claim') void refresh()
   if (event.kind === 'brawl-upgrade' || event.kind === 'brawl-confirm') {
     status.value = '强化完成'
-    void refresh()
+    void refresh().then(fresh => {
+      const upgrade = event.upgrade
+      if (upgrade && fresh && fresh.petId === event.petId && state.value === fresh &&
+          weapon.value === upgrade.weapon && fresh.levels[upgrade.weapon] === upgrade.previousLevel + 1)
+        weaponPulse.value = event.sequence
+    })
   }
 })
 function clear() {
@@ -322,6 +331,7 @@ function clear() {
   matches.value = []
   next.value = null
   status.value = error.value = reportError.value = ''
+  weaponPulse.value = undefined
   loading.value = historyLoading.value = reportLoading.value = false
   section.value = 'arena'
   battleMode.value = 'pvp'
@@ -415,7 +425,10 @@ onUnmounted(() => {
                       </RouterLink>
                       <span v-if="report.player.ownerNickname">{{ report.player.ownerNickname }}</span>
                     </div>
-                    <span>{{ weapons[report.player.weapon] }} +{{ report.player.level }} · {{ skills[report.player.skill] }}</span>
+                    <span class="fighter-weapon">
+                      <PetBrawlWeaponArt :weapon="report.player.weapon" :level="report.player.level" :max-level="report.maxUpgrade" :artifact="report.player.artifact" size="battle" />
+                      <span><strong>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</strong><small>{{ skills[report.player.skill] }}</small></span>
+                    </span>
                     <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ hp(report.player.gearHp) }} · 伤害 +{{ hp(report.player.gearAttack) }}</span>
                     <progress aria-label="我的宠物生命" :max="report.player.maxHp" :value="turn?.playerHp ?? report.player.maxHp" />
                     <span>{{ hp(turn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
@@ -436,7 +449,10 @@ onUnmounted(() => {
                       </component>
                       <span v-if="report.opponent.ownerNickname">{{ report.opponent.ownerNickname }}</span>
                     </div>
-                    <span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }} · {{ skills[report.opponent.skill] }}</span>
+                    <span class="fighter-weapon">
+                      <PetBrawlWeaponArt :weapon="report.opponent.weapon" :level="report.opponent.level" :max-level="report.maxUpgrade" :artifact="report.opponent.artifact" size="battle" />
+                      <span><strong>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</strong><small>{{ skills[report.opponent.skill] }}</small></span>
+                    </span>
                     <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
                     <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="turn?.opponentHp ?? report.opponent.maxHp" />
                     <span>{{ hp(turn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
@@ -544,7 +560,8 @@ onUnmounted(() => {
                 <p class="subtle weapon-group-title">{{ group.label }}武器</p>
                 <button v-for="item in equipment.weapons.filter(item => item.exclusive === group.exclusive)" :key="item.id"
                   type="button" :aria-pressed="weapon === item.id" :disabled="locked" @click="weapon = item.id">
-                  <span class="weapon-symbol"><PetIcon :name="item.id === 'SPOON' ? 'feed' : item.id === 'GUARD' ? 'care' : 'outing'" /></span>
+                  <PetBrawlWeaponArt :weapon="item.id" :level="state.levels[item.id] ?? 0" :max-level="maxUpgrade"
+                    :artifact="Boolean(state.gear?.weapons[item.id]?.artifact)" />
                   <span class="weapon-description"><strong>{{ item.name }}</strong><small v-if="item.effect">{{ item.effect }}</small></span>
                   <span>+{{ state.levels[item.id] }}</span>
                   <PetIcon v-if="weapon === item.id" name="check" />
@@ -569,7 +586,13 @@ onUnmounted(() => {
           </section>
           <div class="equipment-column" data-floating-obstacle>
             <section class="panel" aria-labelledby="upgrade-heading">
-              <div class="panel-heading"><h2 id="upgrade-heading"><PetIcon name="growth" />武器强化</h2><span class="level-tag">{{ weapons[weapon] }} +{{ level }}</span></div>
+              <div class="panel-heading">
+                <h2 id="upgrade-heading"><PetIcon name="growth" />武器强化</h2>
+                <span class="upgrade-weapon">
+                  <PetBrawlWeaponArt :weapon="weapon" :level="level" :max-level="maxUpgrade" :artifact="Boolean(selectedGear?.artifact)" :pulse="weaponPulse" />
+                  <span class="level-tag">{{ weapons[weapon] }} +{{ level }}</span>
+                </span>
+              </div>
               <div class="upgrade-track">
                 <progress :value="level" :max="maxUpgrade" aria-label="武器强化进度" :aria-valuetext="`+${level} / +${maxUpgrade}`" />
                 <div class="upgrade-milestones" aria-hidden="true">
@@ -665,6 +688,10 @@ button.button-wide, .button-link { text-decoration: none; color: var(--brawl-ink
 a.fighter-pet:hover { color: var(--brawl-ink); }
 a.fighter-pet:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
 .fighter > span { color: var(--fp-muted); font-size: .73rem; }
+.fighter-weapon { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 7px; min-inline-size: 0; }
+.fighter-weapon > span:last-child { display: grid; gap: 2px; min-inline-size: 0; overflow-wrap: anywhere; }
+.fighter-weapon strong { color: var(--fp-title); }
+.fighter-weapon small { font-size: .7rem; }
 .fighter-side { padding: 3px 10px; border-radius: 6px; background: var(--fp-primary-soft); color: var(--brawl-ink) !important; }
 .fighter-side.opponent { background: var(--fp-bg); color: var(--fp-muted) !important; }
 .fighter-avatar { inline-size: 160px; max-inline-size: 100%; aspect-ratio: 1; }
@@ -739,8 +766,8 @@ select { min-inline-size: 0; inline-size: 100%; max-inline-size: 100%; }
 .weapon-options button { display: flex; justify-content: start; padding: 12px; gap: 12px; }
 .weapon-options button[aria-pressed='true'] { background: var(--fp-primary-soft); border-color: var(--fp-primary); color: var(--brawl-ink); }
 .weapon-options button strong { font-size: .85rem; }
-.weapon-options button > span:not(.weapon-symbol) { margin-left: auto; }
-.weapon-symbol { display: grid; place-items: center; width: 36px; height: 36px; background: var(--fp-bg); border-radius: 8px; }
+.weapon-options button > span:nth-child(3) { margin-inline-start: auto; }
+.upgrade-weapon { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .upgrade-track { display: grid; gap: 8px; margin-block: 20px; }
 .upgrade-track progress { max-width: none; height: 8px; }
 .upgrade-milestones { display: flex; justify-content: space-between; color: var(--fp-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }

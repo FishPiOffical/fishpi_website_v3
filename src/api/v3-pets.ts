@@ -561,7 +561,7 @@ function brawlDisplayName(value: unknown): string | undefined {
   return typeof value === 'string' && value.length <= 256 && value.trim() ? value : undefined
 }
 
-function brawlMaxUpgrade(version: number): number {
+export function brawlMaxUpgrade(version: number): number {
   return version === 1 ? 5 : 20
 }
 
@@ -570,10 +570,11 @@ function brawlSetup(value: unknown, maxUpgrade: number) {
   const weapon = brawlWeapons.find(option => option === row.weapon)
   const skill = brawlSkills.find(option => option === row.skill)
   if (!weapon || !skill) throw invalid()
+  const artifact = typeof row.gear === 'object' && row.gear !== null && 'artifact' in row.gear && row.gear.artifact === 1
   return { weapon, skill, level: integer(row.level, 0, maxUpgrade),
     maxHp: integer(row.maxHp, 1), attack: integer(row.attack, 1), gearHp: integer(row.gearHp ?? 0, 0, 40),
     gearAttack: integer(row.gearAttack ?? 0, 0, 10),
-    petName: brawlDisplayName(row.petName), ownerNickname: brawlDisplayName(row.ownerNickname) }
+    petName: brawlDisplayName(row.petName), ownerNickname: brawlDisplayName(row.ownerNickname), artifact }
 }
 
 function brawlSummary(value: unknown): BrawlSummary {
@@ -733,7 +734,7 @@ export const readBrawlReport = (id: string, signal?: AbortSignal) => read(
     if (report.id !== id || !turns.length || !species) throw invalid()
     const opponentSpecies = [...speciesIds].find(candidate => candidate === row.opponentSpecies) as PetSpeciesId | undefined
     if (report.mode === 'pvp' && !opponentSpecies) throw invalid()
-    return { ...report, species, opponentSpecies, player, opponent, turns, petId: brawlId(row.petId), version }
+    return { ...report, species, opponentSpecies, player, opponent, turns, petId: brawlId(row.petId), version, maxUpgrade }
   }, signal)
 
 function brawlOrder(value: unknown) {

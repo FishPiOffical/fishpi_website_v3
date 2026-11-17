@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 import FpDialog from '@/components/FpDialog.vue'
+import PetBrawlWeaponArt from './PetBrawlWeaponArt.vue'
+import PetIcon from './PetIcon.vue'
 import { getAuthContextVersion } from '@/api/http'
-import { brawlWeaponNames as names, readBrawlOrder, readBrawlOrders, type BrawlOrder, type BrawlProduct, type BrawlWeapon } from '@/api/v3-pets'
+import { brawlMaxUpgrade, brawlWeaponNames as names, readBrawlOrder, readBrawlOrders, type BrawlOrder, type BrawlProduct, type BrawlWeapon } from '@/api/v3-pets'
 import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
 
@@ -17,6 +19,7 @@ const confirmationPanel = ref<HTMLElement | null>(null)
 const cancelButton = ref<HTMLButtonElement | null>(null)
 const strengthenButton = ref<HTMLButtonElement | null>(null)
 const selected = ref<BrawlOrder>()
+const visualPulse = ref<number>()
 const orders = ref<BrawlOrder[]>([])
 const loading = ref(false)
 const next = ref<string | null>(null)
@@ -31,6 +34,13 @@ const maximum = computed(() => Math.min(costToQuote.value ?? 0, props.materials)
 const blocked = computed(() => loading.value || pets.busy || !!pets.pending || pets.offline)
 const pendingHere = computed(() => pets.pending?.kind === 'brawl-quote' || pets.pending?.kind === 'brawl-confirm')
 const affordable = computed(() => !!selected.value && (selected.value.points === 0 || (balance.value ?? -1) >= selected.value.points))
+const appearance = computed(() => {
+  const order = selected.value
+  if (!order || (order.product && order.product !== 'ARTIFACT')) return
+  const max = brawlMaxUpgrade(order.version)
+  const artifact = order.product === 'ARTIFACT'
+  return { max, artifact, before: artifact ? max : order.level, after: artifact ? max : order.level + 1 }
+})
 let request: AbortController | undefined
 let followUpOrder: string | undefined
 let boundary = getAuthContextVersion()
@@ -57,17 +67,19 @@ async function readList(before?: string) {
     next.value = result.next
   } catch (reason) { fail(reason, signal) } finally { if (!signal.aborted) loading.value = false }
 }
-async function show(id: string, trigger?: HTMLElement | null) {
+async function show(id: string, trigger?: HTMLElement | null, pulse?: number) {
   if (!opened.value) return
   if (!detailOpen.value) returnFocus = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
   detailOpen.value = true
   selected.value = undefined
+  visualPulse.value = undefined
   followUpOrder = id
   const signal = startRead()
   try {
     const result = await readBrawlOrder(id, signal)
     if (signal.aborted) return
     selected.value = result.order
+    if (result.order.status === 'completed') visualPulse.value = pulse
     balance.value = result.balance
   } catch (reason) { fail(reason, signal) } finally { if (!signal.aborted) loading.value = false }
 }
@@ -119,7 +131,7 @@ watch(product, () => { deduction.value = maximum.value })
 watch(() => pets.confirmedEvent, event => {
   if (!opened.value || !event?.orderId || event.petId !== props.petId
       || (event.kind !== 'brawl-quote' && event.kind !== 'brawl-confirm')) return
-  void show(event.orderId, strengthenButton.value)
+  void show(event.orderId, strengthenButton.value, event.kind === 'brawl-confirm' ? event.sequence : undefined)
 })
 function trapConfirmation(event: KeyboardEvent) {
   if (!detailOpen.value || event.key !== 'Tab') return
@@ -218,6 +230,20 @@ onUnmounted(() => {
       <button v-if="pendingHere" type="button" :disabled="pets.busy || pets.offline" @click="pets.retryPending()">继续原操作</button>
       <template v-if="selected">
         <div class="order-heading"><h3>{{ orderLabel(selected) }}</h3><span class="order-status" :class="selected.status" role="status">{{ labels[selected.status] }}</span></div>
+        <div v-if="appearance && selected.status !== 'expired'" class="weapon-comparison" role="group" aria-label="武器外观预览">
+          <template v-if="selected.status === 'pending'">
+            <div>
+              <PetBrawlWeaponArt :weapon="selected.weapon" :level="appearance.before" :max-level="appearance.max" size="preview" />
+              <span>当前 +{{ appearance.before }}</span>
+            </div>
+            <PetIcon name="chevron" aria-hidden="true" />
+          </template>
+          <div>
+            <PetBrawlWeaponArt :weapon="selected.weapon" :level="appearance.after" :max-level="appearance.max"
+              :artifact="appearance.artifact" :pulse="visualPulse" size="preview" />
+            <span>{{ selected.status === 'completed' ? '已完成' : '强化后' }} +{{ appearance.after }}</span>
+          </div>
+        </div>
         <dl class="order-details">
           <div><dt>{{ selected.status === 'completed' ? '已消耗材料' : '消耗材料' }}</dt><dd>{{ selected.materials.toLocaleString() }}</dd></div>
           <div class="order-total"><dt>{{ selected.status === 'completed' ? '实扣积分' : '扣除积分' }}</dt><dd><strong>{{ selected.points.toLocaleString() }}</strong> 积分</dd></div>
@@ -249,6 +275,9 @@ onUnmounted(() => {
 .checkout-notice { padding: 12px; border-radius: var(--fp-radius-md, 8px); background: var(--fp-hover); font-size: .825rem; overflow-wrap: anywhere; }
 .checkout-notice button { margin-inline-start: 8px; }
 .form-heading, .order-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.weapon-comparison { display: flex; align-items: center; justify-content: center; gap: clamp(12px, 6vw, 28px); padding: 12px; border: 1px solid var(--fp-border); border-radius: 10px; }
+.weapon-comparison > div { display: grid; justify-items: center; gap: 8px; color: var(--fp-muted); font-size: .75rem; }
+.weapon-comparison > svg { inline-size: 16px; block-size: 16px; color: var(--fp-muted); }
 .order-details { display: grid; gap: 14px; padding-block: 4px 0; }
 .order-details > div { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; }
 .order-details dt { flex: none; color: var(--fp-muted); font-size: .825rem; }

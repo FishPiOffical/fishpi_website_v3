@@ -4,7 +4,7 @@ import { ApiError, getAuthContextVersion } from '@/api/http'
 import { profileOperationKey } from '@/api/v3-profile'
 import {
   createPetRiskChallenge, executePetCommand, normalizePetName, readPetCatalog, readPetRisk, readPetState, verifyPetRiskChallenge,
-  type BrawlCommand, type PetAction, type PetActivityKind, type PetCatalog, type PetCommand, type PetSpeciesId, type PetState,
+  type BrawlCommand, type BrawlWeapon, type PetAction, type PetActivityKind, type PetCatalog, type PetCommand, type PetSpeciesId, type PetState,
   type PetRiskChallenge,
 } from '@/api/v3-pets'
 import { useAuthStore } from '@/stores/auth'
@@ -16,6 +16,7 @@ export interface PetConfirmedEvent {
   action?: PetAction
   matchId?: string
   orderId?: string
+  upgrade?: { weapon: BrawlWeapon; previousLevel: number }
 }
 
 export const usePetsStore = defineStore('pets', () => {
@@ -360,7 +361,8 @@ export const usePetsStore = defineStore('pets', () => {
       resetRisk()
       if (command.kind.startsWith('brawl-')) {
         confirmedEvent.value = { sequence: ++confirmationSequence, petId: receipt.petId,
-          kind: command.kind, matchId: receipt.matchId, orderId: receipt.orderId }
+          kind: command.kind, matchId: receipt.matchId, orderId: receipt.orderId,
+          ...(command.kind === 'brawl-upgrade' ? { upgrade: { weapon: command.weapon, previousLevel: command.level } } : {}) }
         return true
       }
       // 确认后的读取期间保留画面，refreshNeeded 阻止旧余额继续操作，避免桌宠闪烁。
