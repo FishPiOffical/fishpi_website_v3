@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { petAnimationClip, petBattleVideo, petPortrait, type PetAnimationAction, type PetBattleAction } from './animations'
+import { petAnimationClip, petBattlePoster, petBattleVideo, petPortrait, type PetAnimationAction, type PetBattleAction } from './animations'
 
 const props = withDefaults(defineProps<{
   species: string
@@ -11,9 +11,10 @@ const props = withDefaults(defineProps<{
   loop?: boolean
   playbackKey?: string | number
   active?: boolean
+  holdFrame?: boolean
   width?: number
   height?: number
-}>(), { action: 'idle', loop: true, playbackKey: 0, active: true, width: 256, height: 256 })
+}>(), { action: 'idle', loop: true, playbackKey: 0, active: true, holdFrame: false, width: 256, height: 256 })
 const emit = defineEmits<{ ended: [playbackKey: string | number] }>()
 const element = ref<HTMLElement | null>(null)
 const video = ref<HTMLVideoElement | null>(null)
@@ -24,10 +25,12 @@ const source = computed(() => props.battleAction
   ? petBattleVideo(props.species, props.battleAction)
   : petAnimationClip(props.species, props.action)?.src)
 const mediaKey = computed(() => `${props.species}:${props.battleAction ?? props.action}:${typeof props.playbackKey}:${props.playbackKey}`)
-const staticImage = computed(() => props.image || petPortrait(props.species))
+const staticImage = computed(() => props.image || (props.battleAction ? petBattlePoster(props.species) : petPortrait(props.species)))
 const allowed = computed(() => mounted.value && capable.value && !!source.value && !reducedMotion.value && !saveData.value && !failed.value)
 const shouldPlay = computed(() => allowed.value && props.active && visible.value && intersecting.value)
 const showVideo = computed(() => allowed.value && loadedKey.value === mediaKey.value)
+// 战报暂停或结束保留当前帧；隐藏、离屏和减少动态仍使用静态回退。
+const showDecodedFrame = computed(() => decoded.value && showVideo.value && visible.value && intersecting.value && (props.active || props.holdFrame))
 let observer: IntersectionObserver | null = null
 let motionQuery: MediaQueryList | null = null
 let connection: (EventTarget & { saveData?: boolean }) | undefined
@@ -142,7 +145,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <span ref="element" class="pet-animation" :class="{ 'is-playing': shouldPlay && decoded }" :style="{ '--pet-animation-width': `${width}px`, '--pet-animation-ratio': `${width} / ${height}` }" :data-pet-action="battleAction ?? action">
+  <span ref="element" class="pet-animation" :class="{ 'is-playing': showDecodedFrame }" :style="{ '--pet-animation-width': `${width}px`, '--pet-animation-ratio': `${width} / ${height}` }" :data-pet-action="battleAction ?? action">
     <img :src="staticImage" :alt="alt" :width="width" :height="height" draggable="false" />
     <video v-if="showVideo && source" :key="mediaKey" ref="video" crossorigin="anonymous" :src="source" :data-media-key="mediaKey" :width="width" :height="height" :loop="loop" preload="none" muted playsinline disablepictureinpicture tabindex="-1" aria-hidden="true" @loadeddata="onData" @error="onError" @ended="onEnded" />
   </span>

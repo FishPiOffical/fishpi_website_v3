@@ -97,12 +97,27 @@ try {
   assert.equal(mapping.petBattleVideo('momota', '../attack'), undefined)
   pass('十六段轻量乱斗视频使用同源白名单')
 
+  for (const species of speciesIds) {
+    const poster = mapping.petBattlePoster(species)
+    assert.equal(poster, `/images/pets/animations/brawl-v1/${species}/idle.webp`)
+    const bytes = await fs.readFile('public' + poster)
+    assert.equal(bytes.toString('ascii', 0, 4), 'RIFF')
+    assert.equal(bytes.toString('ascii', 8, 12), 'WEBP')
+  }
+  for (const species of ['unlisted-species', '../momota', 'toString', '__proto__', 'https://example.invalid/pet']) {
+    assert.equal(mapping.petBattlePoster(species), undefined, '战斗海报不能用任意物种拼接路径')
+  }
+  pass('四物种战斗海报均为真实 WebP，且只允许目录白名单')
+
 
   for (const species of speciesIds) {
     const html = await renderToString(createSSRApp(Component, { species, alt: species }))
     assert.ok(html.includes(`src="${mapping.petPortrait(species)}"`)); assert.doesNotMatch(html, /<video|\.webm/)
+    const battleHtml = await renderToString(createSSRApp(Component, { species, alt: species, battleAction: 'victory', holdFrame: true }))
+    assert.ok(battleHtml.includes(`src="${mapping.petBattlePoster(species)}"`))
+    assert.doesNotMatch(battleHtml, /<video|\.webm/)
   }
-  pass('四物种 SSR 都只有静态图，不生成媒体下载地址')
+  pass('四物种家园及战斗 SSR 都只有各自静态图，不生成媒体下载地址')
 
   const instance = await mount({ active: false })
   assert.equal(instance.video(), null)
@@ -114,6 +129,13 @@ try {
   video.dispatchEvent(new Event('loadeddata')); await flush()
   assert.ok(instance.host.querySelector('.is-playing'))
   pass('只加载当前动作，未激活时零视频，透明解码后替换静态图')
+
+  instance.props.active = false; await flush()
+  assert.equal(instance.video(), video)
+  assert.equal(instance.host.querySelector('.is-playing'), null, '家园默认行为仍在不激活时回退静态图')
+  instance.props.active = true; await flush()
+  assert.equal(instance.video(), video); assert.ok(instance.host.querySelector('.is-playing'))
+  pass('未开启保帧时，家园暂停沿用静态回退行为')
 
   const beforeHidden = calls.pause
   hidden = true; document.dispatchEvent(new Event('visibilitychange')); await flush()
@@ -187,6 +209,81 @@ try {
   instance.destroy(); await flush()
   assert.ok(calls.pause > beforeDestroy); assert.equal(finalVideo.getAttribute('src'), null); assert.equal(instance.observer.disconnected, true)
   pass('卸载暂停并释放 src，清理观察器')
+
+  const battle = await mount({ battleAction: 'victory', loop: false, holdFrame: true })
+  assert.equal(battle.host.querySelector('img').getAttribute('src'), mapping.petBattlePoster('hexiaotun'))
+  assert.equal(battle.video(), null)
+  battle.observer.send(true); await flush()
+  let battleVideo = battle.video(); assert.ok(battleVideo)
+  assert.equal(battle.host.querySelector('.is-playing'), null)
+  battleVideo.dispatchEvent(new Event('loadeddata')); await flush()
+  assert.ok(battle.host.querySelector('.is-playing'))
+  battleVideo.dispatchEvent(new Event('ended')); await flush()
+  assert.deepEqual(battle.ended, [1])
+  const beforeBattlePause = calls.pause
+  battle.props.active = false; await flush()
+  assert.ok(calls.pause > beforeBattlePause)
+  assert.equal(battle.video(), battleVideo)
+  assert.ok(battle.host.querySelector('.is-playing'), '结束后父级停止播放仍保留已解码画面，不能闪回家园大图')
+  const pausedPlayCount = calls.play
+  hidden = true; document.dispatchEvent(new Event('visibilitychange')); await flush()
+  assert.equal(battle.host.querySelector('.is-playing'), null)
+  hidden = false; document.dispatchEvent(new Event('visibilitychange')); await flush()
+  assert.ok(battle.host.querySelector('.is-playing'))
+  battle.observer.send(false); await flush()
+  assert.equal(battle.host.querySelector('.is-playing'), null)
+  battle.observer.send(true); await flush()
+  assert.ok(battle.host.querySelector('.is-playing'))
+  assert.equal(calls.play, pausedPlayCount, '重新可见仅保留终帧，不重新播放已结束动作')
+  pass('战斗结束暂停保帧，隐藏和离屏仍回退，重新可见不重播已结束动作')
+
+  battle.props.playbackKey = 2; await flush()
+  assert.equal(battleVideo.getAttribute('src'), null)
+  assert.equal(battle.video(), null)
+  assert.equal(battle.host.querySelector('.is-playing'), null, '未激活的新播放键不能显示旧终帧')
+  battleVideo.dispatchEvent(new Event('loadeddata')); battleVideo.dispatchEvent(new Event('ended')); await flush()
+  assert.deepEqual(battle.ended, [1])
+  battle.props.active = true; await flush()
+  battleVideo = battle.video(); assert.ok(battleVideo)
+  assert.equal(battle.host.querySelector('.is-playing'), null)
+  battleVideo.dispatchEvent(new Event('loadeddata')); await flush()
+  assert.ok(battle.host.querySelector('.is-playing'))
+  for (const change of [{ battleAction: 'defeat' }, { species: 'momota' }]) {
+    const previous = battleVideo
+    Object.assign(battle.props, change); await flush()
+    battleVideo = battle.video()
+    assert.notEqual(battleVideo, previous)
+    assert.equal(previous.getAttribute('src'), null)
+    assert.equal(battle.host.querySelector('.is-playing'), null)
+    assert.equal(battle.host.querySelector('img').getAttribute('src'), mapping.petBattlePoster(battle.props.species))
+    previous.dispatchEvent(new Event('loadeddata')); await flush()
+    assert.equal(battle.host.querySelector('.is-playing'), null, '旧媒体迟到解码不能覆盖新动作')
+    battleVideo.dispatchEvent(new Event('loadeddata')); await flush()
+    assert.ok(battle.host.querySelector('.is-playing'))
+  }
+  pass('战斗保帧按物种、动作和播放键隔离，旧事件不能恢复旧终帧')
+
+  for (const [preference, property] of [[motion, 'matches'], [connection, 'saveData']]) {
+    battle.props.active = false; await flush()
+    assert.ok(battle.host.querySelector('.is-playing'))
+    preference[property] = true; preference.dispatchEvent(new Event('change')); await flush()
+    assert.equal(battle.video(), null)
+    assert.equal(battle.host.querySelector('.is-playing'), null)
+    assert.equal(battle.host.querySelector('img').getAttribute('src'), mapping.petBattlePoster('momota'))
+    preference[property] = false; preference.dispatchEvent(new Event('change')); await flush()
+    assert.equal(battle.host.querySelector('.is-playing'), null, '偏好恢复不能沿用已释放媒体的解码状态')
+    battle.props.active = true; await flush()
+    battleVideo = battle.video(); assert.ok(battleVideo)
+    assert.equal(battle.host.querySelector('.is-playing'), null)
+    battleVideo.dispatchEvent(new Event('loadeddata')); await flush()
+  }
+  battle.props.active = false; await flush()
+  battleVideo.dispatchEvent(new Event('error')); await flush()
+  assert.equal(battle.video(), null)
+  assert.equal(battle.host.querySelector('.is-playing'), null)
+  assert.equal(battle.host.querySelector('img').getAttribute('src'), mapping.petBattlePoster('momota'))
+  battle.destroy()
+  pass('战斗保帧遵守减少动态、省流和媒体错误的静态回退')
 
   support = ''
   const unsupported = await mount(); unsupported.observer.send(true); await flush(); assert.equal(unsupported.video(), null); unsupported.destroy()

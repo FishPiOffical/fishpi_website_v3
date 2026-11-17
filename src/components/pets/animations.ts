@@ -83,6 +83,12 @@ export function petAnimationClip(species: string, action: PetAnimationAction): P
 export type PetBattleAction = 'attack' | 'hit' | 'victory' | 'defeat'
 const battleActions: readonly PetBattleAction[] = ['attack', 'hit', 'victory', 'defeat']
 
+// 与乱斗视频共用画布、站位和比例，不使用尺寸不同的家园立绘过渡。
+export function petBattlePoster(species: string): string | undefined {
+  if (!petMedia.has(species)) return
+  return `/images/pets/animations/brawl-v1/${species}/idle.webp`
+}
+
 export function petBattleVideo(species: string, action: PetBattleAction): string | undefined {
   if (!petMedia.has(species) || !battleActions.includes(action)) return
   return `/images/pets/animations/brawl-v1/${species}/${action}.webm`

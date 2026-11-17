@@ -93,6 +93,10 @@ def main(ffmpeg):
                             "-i", "pipe:0", "-an", "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p",
                             "-crf", "36", "-b:v", "0", str(folder / f"{action}.webm")],
                            input=frames, check=True)
+        # 提取出招首帧作为同尺寸静态回退，保留透明通道，避免切换家园立绘时闪大图。
+        subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-c:v", "libvpx-vp9",
+                        "-i", str(folder / "attack.webm"), "-frames:v", "1", "-c:v", "libwebp", "-lossless", "1",
+                        str(folder / "idle.webp")], check=True)
 
 
 if __name__ == "__main__":

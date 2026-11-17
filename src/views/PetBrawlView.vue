@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getAuthContextVersion } from '@/api/http'
 import { brawlSkills, brawlWeapons, readBrawlHistory, readBrawlReport, readBrawlState, type BrawlProduct, type BrawlSkill, type BrawlSlot, type BrawlSummary, type BrawlWeapon } from '@/api/v3-pets'
-import { petPortrait, type PetBattleAction } from '@/components/pets/animations'
+import { petBattlePoster, petPortrait, type PetBattleAction } from '@/components/pets/animations'
 import PetAnimation from '@/components/pets/PetAnimation.vue'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetBrawlCheckout from '@/components/pets/PetBrawlCheckout.vue'
@@ -104,7 +104,7 @@ const ended = computed(() => !!report.value && frame.value > report.value.turns.
 function battleAction(side: number): PetBattleAction | undefined {
   if (ended.value) {
     const winner = report.value?.winner
-    if (!playing.value || winner == null || winner < 0) return
+    if (winner == null || winner < 0) return
     return winner === side ? 'victory' : 'defeat'
   }
   return turn.value ? turn.value.actor === side ? 'attack' : 'hit' : undefined
@@ -399,8 +399,8 @@ onUnmounted(() => {
                     <div class="fighter-avatar">
                       <PetAnimation v-if="!compact && battleAction(0)" :species="report.species" alt=""
                         :battle-action="battleAction(0)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing && section === 'arena'"
-                        :loop="false" :width="160" :height="160" />
-                      <img v-else :src="portrait(report.species, compact ? 96 : 160)" alt="" width="160" height="160" />
+                        :loop="false" hold-frame :width="160" :height="160" />
+                      <img v-else :src="petBattlePoster(report.species)" alt="" width="160" height="160" />
                     </div>
                     <strong>我的宠物</strong><span>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</span>
                     <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ hp(report.player.gearHp) }} · 伤害 +{{ hp(report.player.gearAttack) }}</span>
@@ -413,8 +413,8 @@ onUnmounted(() => {
                     <div class="fighter-avatar fighter-avatar--opponent">
                       <PetAnimation v-if="!compact && battleAction(1)" :species="report.opponentSpecies ?? 'momota'" alt=""
                         :battle-action="battleAction(1)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing && section === 'arena'"
-                        :loop="false" :width="160" :height="160" />
-                      <img v-else :src="portrait(report.opponentSpecies ?? 'momota', compact ? 96 : 160)" alt="" width="160" height="160" />
+                        :loop="false" hold-frame :width="160" :height="160" />
+                      <img v-else :src="petBattlePoster(report.opponentSpecies ?? 'momota')" alt="" width="160" height="160" />
                     </div>
                     <strong>{{ report.mode === 'pvp' ? '对手宠物' : opponents[report.stage - 1] }}</strong><span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
                     <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
