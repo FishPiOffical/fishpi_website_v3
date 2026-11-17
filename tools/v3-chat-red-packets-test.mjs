@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import ts from 'typescript';import{parse,compileScript}from'@vue/compiler-sfc';import{createRenderer,h,ref,reactive,nextTick,createCommentVNode}from'vue';import{createPinia,defineStore}from'pinia'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`).replaceAll(`from "${a}"`,`from '${b}'`);return s}
+const bubbleStyleURL = url(compile(await fs.readFile('src/utils/bubbleStyle.ts', 'utf8')))
+const appearanceSource = compile(await fs.readFile('src/utils/chatAppearance.ts', 'utf8'))
+const appearanceURL = url(appearanceSource.replaceAll("'@/utils/bubbleStyle'", "'" + bubbleStyleURL + "'"))
+const chatMessageURL = url(compile(await fs.readFile('src/utils/chatMessage.ts', 'utf8')))
+const chatQuoteURL = url(compile(await fs.readFile('src/utils/chatQuote.ts', 'utf8')).replace("'@/utils/chatMessage'", "'" + chatMessageURL + "'"))
 globalThis.Document=class{};globalThis.ShadowRoot=class{};const state=globalThis.__revoke={context:1,calls:[],dispatch:null,confirm:async()=>true,ssr:false};const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAuthContextVersion(){return globalThis.__revoke.context}export async function request(path,init){globalThis.__revoke.calls.push({path,init});return globalThis.__revoke.dispatch(path,init)}`),{ApiError}=await import(http),apiURL=url(compile(await fs.readFile('src/api/v3-chat-red-packets.ts','utf8')).replace("from './http'",`from '${http}'`)),api=await import(apiURL)
-const auth=defineStore('revoke-auth',()=>({accessToken:ref(state.guest?null:'A'),account:ref({oId:'1',userName:'renamed'})}));globalThis.__revokeAuth=auth;const authURL=url('export const useAuthStore=globalThis.__revokeAuth'),keyURL=url("let n=0;export function profileOperationKey(){return 'revoke-'+(++n)}"),msgURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'").replace("from './http'",`from '${http}'`).replace("from '@/utils/chatAppearance'",`from '${url(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')))}'`)),reactionURL=url('export function useV3ReactionsStore(){return{invalidate(){}}}'),rtURL=url('export function subscribeChatChanges(){return()=>{}}')
-const timelineURL=url(replace(compile((await fs.readFile('src/stores/v3ChatTimeline.ts','utf8')).replaceAll('import.meta.env.SSR','globalThis.__revoke.ssr')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-chat-messages',msgURL],['@/utils/chatAppearance',url(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')))],['@/api/v3-realtime',rtURL],['@/stores/auth',authURL],['@/stores/v3Reactions',reactionURL]])),{useV3ChatTimelineStore}=await import(timelineURL)
+const auth=defineStore('revoke-auth',()=>({accessToken:ref(state.guest?null:'A'),account:ref({oId:'1',userName:'renamed'})}));globalThis.__revokeAuth=auth;const authURL=url('export const useAuthStore=globalThis.__revokeAuth'),keyURL=url("let n=0;export function profileOperationKey(){return 'revoke-'+(++n)}"),msgURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'").replace("from './http'",`from '${http}'`).replace("from '@/utils/chatAppearance'",`from '${appearanceURL}'`)),reactionURL=url('export function useV3ReactionsStore(){return{invalidate(){}}}'),rtURL=url('export function subscribeChatChanges(){return()=>{}}')
+const timelineURL=url(replace(compile((await fs.readFile('src/stores/v3ChatTimeline.ts','utf8')).replaceAll('import.meta.env.SSR','globalThis.__revoke.ssr')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-chat-messages',msgURL],['@/utils/chatAppearance',appearanceURL],['@/api/v3-realtime',rtURL],['@/stores/auth',authURL],['@/stores/v3Reactions',reactionURL]])),{useV3ChatTimelineStore}=await import(timelineURL)
 const storeURL=url(replace(compile((await fs.readFile('src/stores/v3ChatRedPackets.ts','utf8')).replaceAll('import.meta.env.SSR','globalThis.__revoke.ssr')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-profile',keyURL],['@/api/v3-chat-red-packets',apiURL],['@/api/v3-chat-messages',msgURL],['@/stores/auth',authURL],['@/stores/v3ChatTimeline',timelineURL]])),{useV3ChatRedPacketsStore}=await import(storeURL),dialogURL=url('export async function fpConfirm(o){return globalThis.__revoke.confirm(o)}')
 const suggestionsURL=url(compile(await fs.readFile('src/api/v3-user-suggestions.ts','utf8')).replace("from './http'",`from '${http}'`))
 const musicURL=url(compile(await fs.readFile('src/api/v3-chat-music.ts','utf8')).replace("from './http'",`from '${http}'`))
@@ -155,7 +160,7 @@ console.log('PASS packets 22 claim receipt is independent of failed detail/messa
 
 const bubbleSource=compileScript(parse(await fs.readFile('src/components/ChatBubble.vue','utf8')).descriptor,{id:'bubble',inlineTemplate:true}).content
 const childStub=url('export default {render(){return null}}'),routerStub=url(`import{h}from '${import.meta.resolve('vue')}';export const RouterLink={setup(p,{slots}){return()=>h('a',slots.default?.())}}`)
-const Bubble=(await import(url(replace(compile(bubbleSource),[['vue',import.meta.resolve('vue')],['@/api/v3-chat-messages',msgURL],['@/stores/auth',authURL],['@/stores/chatPreferences',url('export const useChatPreferencesStore=()=>({simpleMode:false})')],['@/stores/functionPreferences',url('export const useFunctionPreferencesStore=()=>({})')],['@/chat/mention',url(compile(await fs.readFile('src/chat/mention.ts','utf8')))],['vue-router',routerStub],['@/utils/time',url(compile(await fs.readFile('src/utils/time.ts','utf8')))],['@/components/chat/CollectChatEmoji.vue',childStub],['@/components/chat/ChatQuoteCard.vue',childStub],['@/utils/chatQuote',url(compile(await fs.readFile('src/utils/chatQuote.ts','utf8')))],['@/components/ImageLightbox.vue',childStub],['@/components/medal/MedalList.vue',childStub],['@/components/user/VipNickname.vue',childStub],['@/utils/avatar',url(compile(await fs.readFile('src/utils/avatar.ts','utf8')))],['@/utils/chatAppearance',url(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')))],['@/utils/chatMessage',url('export function isSingleImageMessage(){return false}')]])))).default
+const Bubble=(await import(url(replace(compile(bubbleSource),[['vue',import.meta.resolve('vue')],['@/api/v3-chat-messages',msgURL],['@/stores/auth',authURL],['@/stores/chatPreferences',url('export const useChatPreferencesStore=()=>({simpleMode:false})')],['@/stores/functionPreferences',url('export const useFunctionPreferencesStore=()=>({})')],['@/chat/mention',url(compile(await fs.readFile('src/chat/mention.ts','utf8')))],['vue-router',routerStub],['@/utils/time',url(compile(await fs.readFile('src/utils/time.ts','utf8')))],['@/components/packs/ManagedBubbleShape.vue',childStub],['@/components/packs/SakuraDecoration.vue',childStub],['@/components/chat/CollectChatEmoji.vue',childStub],['@/components/chat/ChatQuoteCard.vue',childStub],['@/utils/chatQuote',chatQuoteURL],['@/components/ImageLightbox.vue',childStub],['@/components/medal/MedalList.vue',childStub],['@/components/user/VipNickname.vue',childStub],['@/utils/avatar',url(compile(await fs.readFile('src/utils/avatar.ts','utf8')))],['@/utils/chatAppearance',appearanceURL],['@/utils/chatMessage',url('export function isSingleImageMessage(){return false}')]])))).default
 const bodyRoot={children:[]},hasCard=ref(false),bodyApp=renderer.createApp({setup(){return()=>h(Bubble,{userName:'plain',html:'<p>ordinary body</p>',chatroom:true},{default:()=>hasCard.value?h('strong','packet body'):createCommentVNode('v-if')})}});bodyApp.use(createPinia());bodyApp.mount(bodyRoot);assert.equal(find(bodyRoot,n=>n.props?.innerHTML)?.props.innerHTML,'<p>ordinary body</p>');hasCard.value=true;await tick();assert.match(text(bodyRoot),/packet body/);assert.ok(!find(bodyRoot,n=>n.props?.innerHTML));bodyApp.unmount()
 console.log('PASS packets 23 actual ChatBubble falls back to ordinary HTML when conditional card slot is empty and replaces it for a card')
 
@@ -175,3 +180,54 @@ await v.store.claim('3','average',{})
 assert.equal(state.calls.length,before+1)
 v.app.unmount();v.store.$dispose();v.timeline.$dispose();state.dispatch=dispatch
 console.log('PASS classic packet opens read-only through the card auto-claim path')
+
+// 复用真实弹窗，核对领完才标记、并列取第一条及零额独立标记。
+v = mount()
+resetDetail({ type: 'random', money: 100, count: 4, message: '标识检查' })
+detailData.claims = [
+  { user: user('4'), amount: 40, claimedAt: 4 },
+  { user: user('5'), amount: 0, claimedAt: 5 },
+  { user: user('6'), amount: 40, claimedAt: 6 },
+]
+detailData.got = 3
+await v.store.open('3')
+await tick()
+const recordText = id => text(find(v.root, node => node.tag === 'li' && text(node).includes('user' + id)))
+assert.doesNotMatch(v.text(), /来自老王的认可/)
+assert.match(recordText('5'), /0溢事件/)
+detailData.claims.push({ user: user('7'), amount: 17, claimedAt: 7 })
+detailData.got = 4
+await v.store.open('3')
+await tick()
+assert.match(recordText('4'), /来自老王的认可/)
+assert.doesNotMatch(recordText('6'), /来自老王的认可/)
+assert.equal((v.text().match(/来自老王的认可/g) || []).length, 1)
+assert.match(recordText('5'), /0溢事件/)
+// 同一弹窗切换到旧版红包仍使用相同规则，零额或负额不能获最高标识。
+state.dispatch = async () => env({
+  ...classic, count: 2, got: 2,
+  claims: [
+    { user: user('8'), amount: 0, claimedAt: 8 },
+    { user: user('9'), amount: 0, claimedAt: 9 },
+  ],
+})
+await v.store.open('3')
+await tick()
+assert.doesNotMatch(v.text(), /来自老王的认可/)
+assert.equal((v.text().match(/0溢事件/g) || []).length, 2)
+state.dispatch = async () => env({
+  ...classic, count: 2, got: 2,
+  claims: [
+    { user: user('8'), amount: -10, claimedAt: 8 },
+    { user: user('9'), amount: 32, claimedAt: 9 },
+  ],
+})
+await v.store.open('3')
+await tick()
+assert.doesNotMatch(recordText('8'), /来自老王的认可|0溢事件/)
+assert.match(recordText('9'), /来自老王的认可/)
+v.app.unmount()
+v.store.$dispose()
+v.timeline.$dispose()
+state.dispatch = dispatch
+console.log('PASS claim labels follow classic completed-only, first positive maximum, zero-amount and legacy rules')
