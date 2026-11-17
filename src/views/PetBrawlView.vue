@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getAuthContextVersion } from '@/api/http'
-import { brawlSkills, brawlWeapons, readBrawlHistory, readBrawlReport, readBrawlState, type BrawlProduct, type BrawlSkill, type BrawlSlot, type BrawlSummary, type BrawlWeapon } from '@/api/v3-pets'
+import { brawlSkillNames as skills, brawlWeaponNames as weapons, readBrawlHistory, readBrawlReport, readBrawlState, type BrawlProduct, type BrawlSkill, type BrawlSlot, type BrawlSummary, type BrawlWeapon } from '@/api/v3-pets'
 import { petBattlePoster, petPortrait, type PetBattleAction } from '@/components/pets/animations'
 import PetAnimation from '@/components/pets/PetAnimation.vue'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
@@ -63,8 +63,10 @@ let timer: ReturnType<typeof setTimeout> | undefined
 let stateRequest: AbortController | undefined
 let historyRequest: AbortController | undefined
 let reportRequest: AbortController | undefined
-const weapons = { SPOON: '小木勺', GUARD: '软垫护腕', FAN: '折纸扇' }
-const skills = { SPLASH: '拍水花', CURL: '卷成一团', BREATHE: '深呼吸' }
+const equipmentGroups = [{ exclusive: false, label: '通用' }, { exclusive: true, label: '宠物专属' }] as const
+const equipment = computed(() => state.value?.equipmentCatalog)
+const selectedWeapon = computed(() => equipment.value?.weapons.find(item => item.id === weapon.value))
+const selectedSkill = computed(() => equipment.value?.skills.find(item => item.id === skill.value))
 const opponents = ['水花练习生', '护腕学徒', '折扇教练']
 const dateTime = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Shanghai' })
 const eligible = computed(() => !!state.value?.petId && state.value.level >= state.value.minLevel)
@@ -136,6 +138,8 @@ async function refresh() {
       weapon.value = result.pvp.weapon
       skill.value = result.pvp.skill
     }
+    if (!result.equipmentCatalog.weapons.some(item => item.id === weapon.value)) weapon.value = 'SPOON'
+    if (!result.equipmentCatalog.skills.some(item => item.id === skill.value)) skill.value = 'SPLASH'
   } catch (reason) {
     if (!request.signal.aborted) error.value = describe(reason)
   } finally {
@@ -409,7 +413,7 @@ onUnmounted(() => {
                       </RouterLink>
                       <span v-if="report.player.ownerNickname">{{ report.player.ownerNickname }}</span>
                     </div>
-                    <span>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</span>
+                    <span>{{ weapons[report.player.weapon] }} +{{ report.player.level }} · {{ skills[report.player.skill] }}</span>
                     <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ hp(report.player.gearHp) }} · 伤害 +{{ hp(report.player.gearAttack) }}</span>
                     <progress aria-label="我的宠物生命" :max="report.player.maxHp" :value="turn?.playerHp ?? report.player.maxHp" />
                     <span>{{ hp(turn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
@@ -430,7 +434,7 @@ onUnmounted(() => {
                       </component>
                       <span v-if="report.opponent.ownerNickname">{{ report.opponent.ownerNickname }}</span>
                     </div>
-                    <span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
+                    <span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }} · {{ skills[report.opponent.skill] }}</span>
                     <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
                     <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="turn?.opponentHp ?? report.opponent.maxHp" />
                     <span>{{ hp(turn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
@@ -451,7 +455,34 @@ onUnmounted(() => {
           <section v-if="eligible" class="panel battle-controls" data-floating-obstacle aria-label="出战操作">
             <div class="mode-switch" aria-label="对战方式"><button v-if="state.pvp" type="button" :aria-pressed="battleMode === 'pvp'" @click="battleMode = 'pvp'">玩家对战</button><button type="button" :aria-pressed="battleMode === 'npc' || !state.pvp" @click="battleMode = 'npc'">闯关陪练</button></div>
             <div class="loadout-heading"><h3>本次出战配置</h3><button type="button" class="text-button" @click="selectSection('equipment')">调整配装<PetIcon name="chevron" /></button></div>
-            <div class="fields quick-fields"><label>武器<select v-model="weapon" :disabled="locked"><option v-for="item in brawlWeapons" :key="item" :value="item">{{ weapons[item] }} +{{ state.levels[item] }}</option></select></label><label>招式<select v-model="skill" :disabled="locked"><option v-for="item in brawlSkills" :key="item" :value="item">{{ skills[item] }}</option></select></label></div>
+            <div class="fields quick-fields">
+              <div class="equipment-field">
+                <label for="brawl-arena-weapon">武器</label>
+                <select id="brawl-arena-weapon" v-model="weapon" :disabled="locked"
+                  :aria-describedby="selectedWeapon?.effect ? 'brawl-arena-weapon-effect' : undefined">
+                  <template v-for="group in equipmentGroups" :key="group.label">
+                    <optgroup v-if="equipment?.weapons.some(item => item.exclusive === group.exclusive)" :label="group.label">
+                      <option v-for="item in equipment.weapons.filter(item => item.exclusive === group.exclusive)" :key="item.id" :value="item.id">
+                        {{ item.name }} +{{ state.levels[item.id] }}
+                      </option>
+                    </optgroup>
+                  </template>
+                </select>
+                <small v-if="selectedWeapon?.effect" id="brawl-arena-weapon-effect">{{ selectedWeapon.effect }}</small>
+              </div>
+              <div class="equipment-field">
+                <label for="brawl-arena-skill">招式</label>
+                <select id="brawl-arena-skill" v-model="skill" :disabled="locked"
+                  :aria-describedby="selectedSkill?.effect ? 'brawl-arena-skill-effect' : undefined">
+                  <template v-for="group in equipmentGroups" :key="group.label">
+                    <optgroup v-if="equipment?.skills.some(item => item.exclusive === group.exclusive)" :label="group.label">
+                      <option v-for="item in equipment.skills.filter(item => item.exclusive === group.exclusive)" :key="item.id" :value="item.id">{{ item.name }}</option>
+                    </optgroup>
+                  </template>
+                </select>
+                <small v-if="selectedSkill?.effect" id="brawl-arena-skill-effect">{{ selectedSkill.effect }}</small>
+              </div>
+            </div>
             <dl v-if="growth" class="combat-stats"><div><dt>生命</dt><dd>{{ hp(growth.maxHp + (selectedGear?.hp ?? 0)) }}</dd></div><div><dt>基础伤害</dt><dd>{{ hp(growth.attack + (selectedGear?.attack ?? 0)) }}</dd></div></dl>
             <template v-if="state.pvp && battleMode === 'pvp'">
               <div class="pvp-summary"><span class="registration" :class="{ ready: state.pvp.enabled }">{{ state.pvp.enabled ? '已报名' : '未报名' }}</span><span>今日可挑战 <strong>{{ state.pvp.remaining }}</strong> 场</span></div>
@@ -505,8 +536,31 @@ onUnmounted(() => {
         <div v-if="eligible" class="workshop">
           <section class="panel weapon-panel" aria-labelledby="weapon-heading">
             <div class="panel-heading"><h2 id="weapon-heading"><PetIcon name="bag" />武器与招式</h2><span class="subtle">当前装备</span></div>
-            <div class="weapon-options" aria-label="选择武器"><button v-for="item in brawlWeapons" :key="item" type="button" :aria-pressed="weapon === item" :disabled="locked" @click="weapon = item"><span class="weapon-symbol"><PetIcon :name="item === 'SPOON' ? 'feed' : item === 'GUARD' ? 'care' : 'outing'" /></span><strong>{{ weapons[item] }}</strong><span>+{{ state.levels[item] }}</span><PetIcon v-if="weapon === item" name="check" /></button></div>
-            <label class="stage-label">出战招式<select v-model="skill" :disabled="locked"><option v-for="item in brawlSkills" :key="item" :value="item">{{ skills[item] }}</option></select></label>
+            <template v-for="group in equipmentGroups" :key="group.label">
+              <div v-if="equipment?.weapons.some(item => item.exclusive === group.exclusive)"
+                class="weapon-options" role="group" :aria-label="`${group.label}武器`">
+                <p class="subtle weapon-group-title">{{ group.label }}武器</p>
+                <button v-for="item in equipment.weapons.filter(item => item.exclusive === group.exclusive)" :key="item.id"
+                  type="button" :aria-pressed="weapon === item.id" :disabled="locked" @click="weapon = item.id">
+                  <span class="weapon-symbol"><PetIcon :name="item.id === 'SPOON' ? 'feed' : item.id === 'GUARD' ? 'care' : 'outing'" /></span>
+                  <span class="weapon-description"><strong>{{ item.name }}</strong><small v-if="item.effect">{{ item.effect }}</small></span>
+                  <span>+{{ state.levels[item.id] }}</span>
+                  <PetIcon v-if="weapon === item.id" name="check" />
+                </button>
+              </div>
+            </template>
+            <div class="stage-label equipment-field">
+              <label for="brawl-workshop-skill">出战招式</label>
+              <select id="brawl-workshop-skill" v-model="skill" :disabled="locked"
+                :aria-describedby="selectedSkill?.effect ? 'brawl-workshop-skill-effect' : undefined">
+                <template v-for="group in equipmentGroups" :key="group.label">
+                  <optgroup v-if="equipment?.skills.some(item => item.exclusive === group.exclusive)" :label="group.label">
+                    <option v-for="item in equipment.skills.filter(item => item.exclusive === group.exclusive)" :key="item.id" :value="item.id">{{ item.name }}</option>
+                  </optgroup>
+                </template>
+              </select>
+              <small v-if="selectedSkill?.effect" id="brawl-workshop-skill-effect">{{ selectedSkill.effect }}</small>
+            </div>
             <dl v-if="growth" class="combat-stats large"><div><dt>生命</dt><dd>{{ hp(growth.maxHp + (selectedGear?.hp ?? 0)) }}</dd></div><div><dt>基础伤害</dt><dd>{{ hp(growth.attack + (selectedGear?.attack ?? 0)) }}</dd></div></dl>
             <p v-if="pvpDirty" class="config-notice">报名配置待更新，请到对战大厅保存。</p>
             <button type="button" class="button-wide" @click="selectSection('arena')">返回对战大厅<PetIcon name="chevron" /></button>
@@ -666,6 +720,11 @@ select { min-inline-size: 0; inline-size: 100%; max-inline-size: 100%; }
 .workshop { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 1.6fr); gap: 20px; align-items: start; }
 .equipment-column { display: grid; gap: 20px; min-inline-size: 0; }
 .weapon-options { display: grid; gap: 10px; }
+.weapon-options + .weapon-options { margin-block-start: 16px; }
+.weapon-group-title { margin: 0; }
+.equipment-field { display: grid; align-content: start; gap: 8px; min-inline-size: 0; }
+.weapon-description { display: grid; gap: 3px; min-inline-size: 0; text-align: start; }
+.weapon-description small, .quick-fields small, .stage-label small { color: var(--fp-muted); font-size: .72rem; }
 .weapon-options button { display: flex; justify-content: start; padding: 12px; gap: 12px; }
 .weapon-options button[aria-pressed='true'] { background: var(--fp-primary-soft); border-color: var(--fp-primary); color: var(--brawl-ink); }
 .weapon-options button strong { font-size: .85rem; }

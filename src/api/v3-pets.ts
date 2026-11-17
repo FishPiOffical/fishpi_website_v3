@@ -152,10 +152,20 @@ export interface PetState {
   dailySupply: { claimed: boolean; coins: number; food: number }
   pet: Pet | null
 }
-export const brawlWeapons = ['SPOON', 'GUARD', 'FAN'] as const
-export const brawlSkills = ['SPLASH', 'CURL', 'BREATHE'] as const
-export type BrawlWeapon = typeof brawlWeapons[number]
-export type BrawlSkill = typeof brawlSkills[number]
+export const brawlWeaponNames = {
+  SPOON: '小木勺', GUARD: '软垫护腕', FAN: '折纸扇', PEBBLE: '卵石拍', SHELL: '贝壳盾',
+  LEAF: '荷叶伞', LOTUS: '莲蓬锤', CLAW: '鱼饼爪套', SLING: '小鱼弹弓', FIN: '浪花尾鳍', BUBBLE: '泡泡炮',
+} as const
+export const brawlSkillNames = {
+  SPLASH: '拍水花', CURL: '卷成一团', BREATHE: '深呼吸', COUNTER: '翻身拍浪', DIVE: '抱石潜水',
+  SHELTER: '荷叶挡雨', CHEW: '嚼叶回血', DOUBLE: '两连拍', RUSH: '叼鱼突袭', SLIDE: '摆尾滑步', BURST: '泡泡破阵',
+} as const
+export type BrawlWeapon = keyof typeof brawlWeaponNames
+export type BrawlSkill = keyof typeof brawlSkillNames
+export const brawlWeapons = Object.keys(brawlWeaponNames) as BrawlWeapon[]
+export const brawlSkills = Object.keys(brawlSkillNames) as BrawlSkill[]
+const commonWeapons = ['SPOON', 'GUARD', 'FAN'] as const
+const commonSkills = ['SPLASH', 'CURL', 'BREATHE'] as const
 export const brawlProducts = ['ARTIFACT', 'SLOT', 'SOUL_VITAL', 'SOUL_EDGE', 'RUNE_GUARD', 'RUNE_SPARK'] as const
 export type BrawlProduct = typeof brawlProducts[number]
 export type BrawlSlot = 'soul' | 'rune'
@@ -596,7 +606,30 @@ function brawlProduct(value: unknown): BrawlProduct {
   if (!product) throw invalid()
   return product
 }
-function brawlGear(value: unknown) {
+function brawlOptions<Id extends string>(value: unknown, ids: readonly Id[], common: readonly Id[]) {
+  const entries = unique(list(value, 5).map(input => {
+    const row = object(input)
+    const id = ids.find(id => id === row.id)
+    if (!id || flag(row.exclusive) === common.includes(id)) throw invalid()
+    return { id, name: text(row.name, 32), effect: text(row.effect, 128), exclusive: !common.includes(id) }
+  }), entry => entry.id)
+  if (!common.every(id => entries.some(entry => entry.id === id))) throw invalid()
+  return entries
+}
+
+function brawlCatalog(value: unknown) {
+  if (value === undefined) return {
+    weapons: commonWeapons.map(id => ({ id, name: brawlWeaponNames[id], effect: '', exclusive: false })),
+    skills: commonSkills.map(id => ({ id, name: brawlSkillNames[id], effect: '', exclusive: false })),
+  }
+  const row = object(value)
+  return {
+    weapons: brawlOptions(row.weapons, brawlWeapons, commonWeapons),
+    skills: brawlOptions(row.skills, brawlSkills, commonSkills),
+  }
+}
+
+function brawlGear(value: unknown, availableWeapons: readonly BrawlWeapon[]) {
   if (value === undefined) return null
   const row = object(value), ranks = object(row.ranks), weapons = object(row.weapons), bonuses = object(row.bonuses)
   const details = (weapon: BrawlWeapon) => {
@@ -616,12 +649,18 @@ function brawlGear(value: unknown) {
       costs, rank: integer(ranks[id] ?? 0, 0, 3) }
   }), item => item.id)
   if (catalog.length !== 6) throw invalid()
-  return { revision: integer(row.revision), catalog, weapons: { SPOON: details('SPOON'), GUARD: details('GUARD'), FAN: details('FAN') } }
+  const weaponDetails: Partial<Record<BrawlWeapon, ReturnType<typeof details>>> = {}
+  for (const weapon of availableWeapons) weaponDetails[weapon] = details(weapon)
+  return { revision: integer(row.revision), catalog, weapons: weaponDetails }
 }
 
 export const readBrawlState = (signal?: AbortSignal) => read(brawlPath, value => {
   const row = object(value)
   const levels = object(row.levels)
+  const equipmentCatalog = brawlCatalog(row.equipmentCatalog)
+  const availableWeapons = equipmentCatalog.weapons.map(entry => entry.id)
+  const decodedLevels: Partial<Record<BrawlWeapon, number>> = {}
+  for (const weapon of availableWeapons) decodedLevels[weapon] = integer(levels[weapon], 0, 5)
   const stages = integer(row.stages, 1, 3)
   const costs = list(row.costs, 5).map(value => integer(value, 1))
   const rewards = list(row.rewards, 3).map(value => integer(value, 1))
@@ -635,8 +674,8 @@ export const readBrawlState = (signal?: AbortSignal) => read(brawlPath, value =>
     species: row.species === null ? null : ([...speciesIds].find(id => id === row.species) as PetSpeciesId | undefined),
     level: integer(row.level, 0, 30), minLevel: integer(row.minLevel, 1, 30), version: integer(row.version, 1),
     materials: integer(row.materials), stages, unlocked: integer(row.unlocked, 1, stages), cleared: integer(row.cleared, 0, stages), costs, rewards, growth,
-    rewardCount: integer(row.rewardCount, 0, rewards.length), pvp: brawlPvp(row.pvp), gear: brawlGear(row.gear),
-    levels: { SPOON: integer(levels.SPOON, 0, 5), GUARD: integer(levels.GUARD, 0, 5), FAN: integer(levels.FAN, 0, 5) } }
+    rewardCount: integer(row.rewardCount, 0, rewards.length), pvp: brawlPvp(row.pvp), gear: brawlGear(row.gear, availableWeapons),
+    levels: decodedLevels, equipmentCatalog }
 }, signal)
 
 function seasonStats(value: unknown) {

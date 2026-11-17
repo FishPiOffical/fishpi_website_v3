@@ -2,7 +2,7 @@
 import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 import FpDialog from '@/components/FpDialog.vue'
 import { getAuthContextVersion } from '@/api/http'
-import { readBrawlOrder, readBrawlOrders, type BrawlOrder, type BrawlProduct, type BrawlWeapon } from '@/api/v3-pets'
+import { brawlWeaponNames as names, readBrawlOrder, readBrawlOrders, type BrawlOrder, type BrawlProduct, type BrawlWeapon } from '@/api/v3-pets'
 import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
 
@@ -10,7 +10,6 @@ const props = defineProps<{ petId: string; weapon: BrawlWeapon; level: number; v
   gearOptions: { id: BrawlProduct; name: string; level: number; cost?: number; hp: number; attack: number }[] }>()
 const pets = usePetsStore()
 const auth = useAuthStore()
-const names = { SPOON: '小木勺', GUARD: '软垫护腕', FAN: '折纸扇' }
 const labels = { pending: '待确认', completed: '已完成', expired: '已过期' }
 const opened = ref(false)
 const detailOpen = ref(false)
