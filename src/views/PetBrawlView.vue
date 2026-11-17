@@ -48,6 +48,7 @@ const portrait = (species: string | null | undefined, size = 160) => {
   const source = species ? petPortrait(species) : undefined
   return source ? imageThumbnail(source, size, size) : undefined
 }
+const petProfileRoute = (petId: string) => ({ name: 'ranked-pet-profile', params: { petId } })
 const frame = ref(0)
 const playing = ref(false)
 const compact = ref(true)
@@ -396,14 +397,16 @@ onUnmounted(() => {
                 <div class="fighters">
                   <div class="fighter">
                     <span class="fighter-side">我方</span>
-                    <div class="fighter-avatar">
-                      <PetAnimation v-if="!compact && battleAction(0)" :species="report.species" alt=""
-                        :battle-action="battleAction(0)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing && section === 'arena'"
-                        :loop="false" hold-frame :width="160" :height="160" />
-                      <img v-else :src="petBattlePoster(report.species)" alt="" width="160" height="160" />
-                    </div>
-                    <div class="fighter-names">
-                      <strong>{{ report.player.petName ?? '我的宠物' }}</strong>
+                    <div class="fighter-identity">
+                      <RouterLink class="fighter-pet" :to="petProfileRoute(report.petId)">
+                        <div class="fighter-avatar">
+                          <PetAnimation v-if="!compact && battleAction(0)" :species="report.species" alt=""
+                            :battle-action="battleAction(0)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing && section === 'arena'"
+                            :loop="false" hold-frame :width="160" :height="160" />
+                          <img v-else :src="petBattlePoster(report.species)" alt="" width="160" height="160" />
+                        </div>
+                        <strong>{{ report.player.petName ?? '我的宠物' }}</strong>
+                      </RouterLink>
                       <span v-if="report.player.ownerNickname">{{ report.player.ownerNickname }}</span>
                     </div>
                     <span>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</span>
@@ -414,14 +417,17 @@ onUnmounted(() => {
                   <span class="versus" aria-hidden="true">VS</span>
                   <div class="fighter">
                     <span class="fighter-side opponent">对手</span>
-                    <div class="fighter-avatar fighter-avatar--opponent">
-                      <PetAnimation v-if="!compact && battleAction(1)" :species="report.opponentSpecies ?? 'momota'" alt=""
-                        :battle-action="battleAction(1)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing && section === 'arena'"
-                        :loop="false" hold-frame :width="160" :height="160" />
-                      <img v-else :src="petBattlePoster(report.opponentSpecies ?? 'momota')" alt="" width="160" height="160" />
-                    </div>
-                    <div class="fighter-names">
-                      <strong>{{ report.mode === 'pvp' ? report.opponent.petName ?? '对手宠物' : opponents[report.stage - 1] }}</strong>
+                    <div class="fighter-identity">
+                      <component :is="report.opponentPetId ? RouterLink : 'div'" class="fighter-pet"
+                        :to="report.opponentPetId ? petProfileRoute(report.opponentPetId) : undefined">
+                        <div class="fighter-avatar fighter-avatar--opponent">
+                          <PetAnimation v-if="!compact && battleAction(1)" :species="report.opponentSpecies ?? 'momota'" alt=""
+                            :battle-action="battleAction(1)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing && section === 'arena'"
+                            :loop="false" hold-frame :width="160" :height="160" />
+                          <img v-else :src="petBattlePoster(report.opponentSpecies ?? 'momota')" alt="" width="160" height="160" />
+                        </div>
+                        <strong>{{ report.mode === 'pvp' ? report.opponent.petName ?? '对手宠物' : opponents[report.stage - 1] }}</strong>
+                      </component>
                       <span v-if="report.opponent.ownerNickname">{{ report.opponent.ownerNickname }}</span>
                     </div>
                     <span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
@@ -478,7 +484,7 @@ onUnmounted(() => {
               <span class="result-mark" :class="{ win: match.winner === 0, loss: match.winner === 1 }">{{ resultLabel(match.winner) }}</span>
               <div class="match-title">
                 <RouterLink v-if="match.opponentPetId" class="match-pet"
-                  :to="{ name: 'ranked-pet-profile', params: { petId: match.opponentPetId } }">
+                  :to="petProfileRoute(match.opponentPetId)">
                   <img v-if="portrait(match.opponentSpecies, 36)" :src="portrait(match.opponentSpecies, 36)"
                     alt="" width="36" height="36" loading="lazy" />
                   <strong>{{ match.opponentPetName || speciesNames[match.opponentSpecies ?? ''] || '对手宠物' }}</strong>
@@ -587,9 +593,12 @@ button.button-wide, .button-link { text-decoration: none; color: var(--brawl-ink
 .battle-stage { background: linear-gradient(180deg, var(--fp-bg), var(--fp-card)); border: 1px solid var(--fp-border); border-radius: 12px; padding: 24px 16px 16px; }
 .fighters { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 8px; align-items: start; }
 .fighter { display: grid; justify-items: center; gap: 7px; text-align: center; min-inline-size: 0; }
-.fighter-names { display: grid; gap: 2px; max-inline-size: 100%; min-inline-size: 0; line-height: 1.3; overflow-wrap: anywhere; }
-.fighter-names strong { font-size: .9rem; }
-.fighter-names span { color: var(--fp-muted); font-size: .75rem; }
+.fighter-identity { display: grid; gap: 2px; max-inline-size: 100%; min-inline-size: 0; line-height: 1.3; overflow-wrap: anywhere; }
+.fighter-identity > span { color: var(--fp-muted); font-size: .75rem; }
+.fighter-pet { display: grid; justify-items: center; gap: 7px; min-inline-size: 0; color: inherit; text-decoration: none; border-radius: 8px; }
+.fighter-pet strong { font-size: .9rem; }
+a.fighter-pet:hover { color: var(--brawl-ink); }
+a.fighter-pet:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
 .fighter > span { color: var(--fp-muted); font-size: .73rem; }
 .fighter-side { padding: 3px 10px; border-radius: 6px; background: var(--fp-primary-soft); color: var(--brawl-ink) !important; }
 .fighter-side.opponent { background: var(--fp-bg); color: var(--fp-muted) !important; }
