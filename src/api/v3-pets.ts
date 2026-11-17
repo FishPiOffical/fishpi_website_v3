@@ -170,7 +170,11 @@ const commonSkills = ['SPLASH', 'CURL', 'BREATHE'] as const
 export const brawlProducts = ['ARTIFACT', 'SLOT', 'SOUL_VITAL', 'SOUL_EDGE', 'RUNE_GUARD', 'RUNE_SPARK'] as const
 export type BrawlProduct = typeof brawlProducts[number]
 export type BrawlSlot = 'soul' | 'rune'
-export type BrawlCommand = BrawlSeasonClaim | ({ petId: string; version: number } & (
+export type BrawlInviteDecision = 'accept' | 'decline' | 'cancel'
+export type BrawlCommand = BrawlSeasonClaim
+  | { kind: 'brawl-invite'; targetPetId: string }
+  | { kind: 'brawl-invite-decision'; inviteId: string; decision: BrawlInviteDecision }
+  | ({ petId: string; version: number } & (
   | { kind: 'brawl-fight'; weapon: BrawlWeapon; skill: BrawlSkill; stage: number; practice: boolean }
   | { kind: 'brawl-upgrade'; weapon: BrawlWeapon; level: number }
   | { kind: 'brawl-enroll'; weapon: BrawlWeapon; skill: BrawlSkill; enabled: boolean; revision: string }
@@ -188,7 +192,7 @@ export interface BrawlSummary {
   id: string
   createdAt: number
   stage: number
-  mode: 'npc' | 'pvp'
+  mode: 'npc' | 'pvp' | 'friendly'
   season?: number
   practice: boolean
   winner: number
@@ -580,18 +584,18 @@ function brawlSetup(value: unknown, maxUpgrade: number) {
 function brawlSummary(value: unknown): BrawlSummary {
   const row = object(value)
   const mode = row.mode ?? 'npc'
-  if (mode !== 'npc' && mode !== 'pvp') throw invalid()
+  if (mode !== 'npc' && mode !== 'pvp' && mode !== 'friendly') throw invalid()
   const practice = flag(row.practice), reward = integer(row.reward, 0, 20)
-  if (mode === 'pvp' && (practice || reward !== 0)) throw invalid()
+  if (mode !== 'npc' && (practice || reward !== 0)) throw invalid()
   const opponentPetId = row.opponentPetId
   return { id: brawlId(row.id), createdAt: integer(row.createdAt), mode,
     season: mode === 'pvp' && row.season !== undefined ? integer(row.season, 1, 999999) : undefined,
-    stage: mode === 'pvp' ? integer(row.stage, 0, 0) : integer(row.stage, 1, 3),
+    stage: mode !== 'npc' ? integer(row.stage, 0, 0) : integer(row.stage, 1, 3),
     practice, winner: integer(row.winner, -1, 1), reward,
-    opponentPetId: mode === 'pvp' && typeof opponentPetId === 'string' && /^[1-9][0-9]{0,18}$/.test(opponentPetId) ? opponentPetId : undefined,
-    opponentSpecies: mode === 'pvp' ? [...speciesIds].find(id => id === row.opponentSpecies) as PetSpeciesId | undefined : undefined,
-    opponentPetName: mode === 'pvp' ? brawlDisplayName(row.opponentPetName) : undefined,
-    opponentOwnerNickname: mode === 'pvp' ? brawlDisplayName(row.opponentOwnerNickname) : undefined }
+    opponentPetId: mode !== 'npc' && typeof opponentPetId === 'string' && /^[1-9][0-9]{0,18}$/.test(opponentPetId) ? opponentPetId : undefined,
+    opponentSpecies: mode !== 'npc' ? [...speciesIds].find(id => id === row.opponentSpecies) as PetSpeciesId | undefined : undefined,
+    opponentPetName: mode !== 'npc' ? brawlDisplayName(row.opponentPetName) : undefined,
+    opponentOwnerNickname: mode !== 'npc' ? brawlDisplayName(row.opponentOwnerNickname) : undefined }
 }
 
 function brawlPvp(value: unknown) {
@@ -603,7 +607,9 @@ function brawlPvp(value: unknown) {
   const skill = brawlSkills.find(item => item === row.skill)
   if (enabled && (!weapon || !skill || !revision) || !enabled && (row.weapon !== null || row.skill !== null)) throw invalid()
   const receivedLimit = integer(row.receivedLimit, 1, 6)
-  return { enabled, revision, weapon, skill, remaining: integer(row.remaining, 0, 3),
+  const friendlyWeapon = brawlWeapons.find(item => item === row.friendlyWeapon)
+  const friendlySkill = brawlSkills.find(item => item === row.friendlySkill)
+  return { enabled, revision, weapon, skill, friendlyWeapon, friendlySkill, remaining: integer(row.remaining, 0, 3),
     received: integer(row.received, 0, receivedLimit), receivedLimit }
 }
 
@@ -711,11 +717,30 @@ export const readBrawlSeason = (season?: number, page = 1, signal?: AbortSignal)
 export type BrawlSeason = Awaited<ReturnType<typeof readBrawlSeason>>
 
 export const readBrawlHistory = (before?: string, signal?: AbortSignal) => read(
-  `${brawlPath}/matches?includePvp=1${before ? `&before=${brawlId(before)}` : ''}`, value => {
+  `${brawlPath}/matches?includePvp=1&includeFriendly=1${before ? `&before=${brawlId(before)}` : ''}`, value => {
     const row = object(value)
     return { list: unique(list(row.list, 20).map(brawlSummary), entry => entry.id),
       next: row.next === null ? null : brawlId(row.next) }
   }, signal)
+
+const inviteStatuses = ['pending', 'accepted', 'declined', 'cancelled', 'expired'] as const
+
+export const readBrawlInvitations = (before?: string, signal?: AbortSignal) => read(
+  `${brawlPath}/invitations${before ? `?before=${brawlId(before)}` : ''}`, value => {
+    const row = object(value)
+    const entries = list(row.list, 20).map(value => {
+      const entry = object(value)
+      const status = inviteStatuses.find(item => item === entry.status)
+      if (!status) throw invalid()
+      const createdAt = integer(entry.createdAt), expiresAt = integer(entry.expiresAt, createdAt + 1)
+      return { id: brawlId(entry.id), outgoing: flag(entry.outgoing), petId: brawlId(entry.petId),
+        petName: text(entry.petName, 256), status, createdAt, expiresAt,
+        matchId: status === 'accepted' ? brawlId(entry.matchId) : undefined }
+    })
+    return { list: unique(entries, entry => entry.id), serverNow: integer(row.serverNow),
+      next: row.next === null ? null : brawlId(row.next) }
+  }, signal)
+export type BrawlInvitation = Awaited<ReturnType<typeof readBrawlInvitations>>['list'][number]
 
 function brawlTurnEffects(value: unknown, damage: number) {
   if (value === undefined) return
@@ -756,7 +781,7 @@ export const readBrawlReport = (id: string, signal?: AbortSignal) => read(
     const species = [...speciesIds].find(candidate => candidate === row.species) as PetSpeciesId | undefined
     if (report.id !== id || !turns.length || !species) throw invalid()
     const opponentSpecies = [...speciesIds].find(candidate => candidate === row.opponentSpecies) as PetSpeciesId | undefined
-    if (report.mode === 'pvp' && !opponentSpecies) throw invalid()
+    if (report.mode !== 'npc' && !opponentSpecies) throw invalid()
     return { ...report, species, opponentSpecies, player, opponent, turns, petId: brawlId(row.petId), version, maxUpgrade }
   }, signal)
 
@@ -854,14 +879,17 @@ export async function executePetCommand(command: PetCommand, signal?: AbortSigna
   // 命令的本地路由标识与服务端活动类型分开，原键恢复始终发送冻结的活动类型。
   const body = command.kind === 'activities'
     ? { petId: command.petId, kind: command.activityKind, entryId: command.entryId, activityVersion: command.activityVersion }
-    : command.kind === 'brawl-confirm' ? { petId: command.petId } : command.kind === 'brawl-season-claim' ? {} : input
+    : command.kind === 'brawl-confirm' ? { petId: command.petId } : command.kind === 'brawl-season-claim' ? {}
+      : command.kind === 'brawl-invite-decision' ? { decision: command.decision } : input
   const routes: Partial<Record<PetCommand['kind'], string>> = {
     'brawl-fight': `${brawlPath}/matches`, 'brawl-upgrade': `${brawlPath}/upgrade`,
+    'brawl-invite': `${brawlPath}/invitations`,
     'brawl-enroll': `${brawlPath}/profile`, 'brawl-match': `${brawlPath}/pvp`, 'brawl-quote': `${brawlPath}/orders`, 'brawl-socket': `${brawlPath}/socket`,
   }
   const path = command.kind === 'brawl-confirm' ? `${brawlPath}/orders/${brawlId(command.orderId)}/confirm`
     : command.kind === 'brawl-season-claim' ? `${brawlPath}/season/${integer(command.season, 1, 999999)}/claim`
-      : routes[kind] ?? `/api/v3/me/pet/${kind}`
+      : command.kind === 'brawl-invite-decision' ? `${brawlPath}/invitations/${brawlId(command.inviteId)}/decision`
+        : routes[kind] ?? `/api/v3/me/pet/${kind}`
   const response = await petRequest<{ code: number; data: unknown }>(path, {
     method: kind === 'name' || kind === 'brawl-enroll' || kind === 'brawl-socket' ? 'PUT' : 'POST',
     headers: { 'Idempotency-Key': key }, body: JSON.stringify(body), signal,
@@ -881,6 +909,12 @@ export async function executePetCommand(command: PetCommand, signal?: AbortSigna
   }
   text(receipt.petId, 64)
   // 更换宠物回执必须同时证明旧目标与新身份，不能把历史回执当成当前宠物状态。
+  if (command.kind === 'brawl-invite') brawlId(receipt.inviteId)
+  if (command.kind === 'brawl-invite-decision') {
+    const expected = { accept: 'accepted', decline: 'declined', cancel: 'cancelled' }[command.decision]
+    if (brawlId(receipt.inviteId) !== command.inviteId || receipt.status !== expected) throw invalid()
+    if (command.decision === 'accept') return { petId: receipt.petId as string, matchId: brawlId(receipt.matchId) }
+  }
   if (command.kind === 'readoption') {
     if (text(receipt.previousPetId, 64) !== command.petId || receipt.petId === command.petId) throw invalid()
   } else if ('petId' in command && receipt.petId !== command.petId) throw invalid()

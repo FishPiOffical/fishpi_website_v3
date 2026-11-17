@@ -16,6 +16,7 @@ export interface PetConfirmedEvent {
   action?: PetAction
   matchId?: string
   orderId?: string
+  targetPetId?: string
   upgrade?: { weapon: BrawlWeapon; previousLevel: number }
 }
 
@@ -362,6 +363,7 @@ export const usePetsStore = defineStore('pets', () => {
       if (command.kind.startsWith('brawl-')) {
         confirmedEvent.value = { sequence: ++confirmationSequence, petId: receipt.petId,
           kind: command.kind, matchId: receipt.matchId, orderId: receipt.orderId,
+          ...(command.kind === 'brawl-invite' ? { targetPetId: command.targetPetId } : {}),
           ...(command.kind === 'brawl-upgrade' ? { upgrade: { weapon: command.weapon, previousLevel: command.level } } : {}) }
         return true
       }
@@ -514,7 +516,7 @@ export const usePetsStore = defineStore('pets', () => {
     return execute({ kind: 'activities/claim', petId: pet.value.id, activityId: activity.id, key: profileOperationKey() })
   }
   function executeBrawl(command: BrawlCommand) {
-    if (pending.value || (command.kind !== 'brawl-season-claim' && !command.petId)) return Promise.resolve(false)
+    if (pending.value || ('petId' in command && !command.petId)) return Promise.resolve(false)
     return execute({ ...command, key: profileOperationKey() })
   }
   function retryPending(): Promise<boolean> {

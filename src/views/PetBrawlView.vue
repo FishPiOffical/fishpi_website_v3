@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { getAuthContextVersion } from '@/api/http'
 import { brawlSkillNames as skills, brawlWeaponNames as weapons, readBrawlHistory, readBrawlReport, readBrawlState, type BrawlProduct, type BrawlSkill, type BrawlSlot, type BrawlSummary, type BrawlWeapon } from '@/api/v3-pets'
 import { petPortrait, type PetBattleAction } from '@/components/pets/animations'
@@ -9,6 +9,7 @@ import { brawlWeaponVisuals } from '@/components/pets/brawlWeaponArt'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetBrawlCheckout from '@/components/pets/PetBrawlCheckout.vue'
 import PetBrawlSeason from '@/components/pets/PetBrawlSeason.vue'
+import PetBrawlInvitations from '@/components/pets/PetBrawlInvitations.vue'
 import PetBrawlWeaponArt from '@/components/pets/PetBrawlWeaponArt.vue'
 import PetIcon from '@/components/pets/PetIcon.vue'
 import { imageThumbnail } from '@/utils/avatar'
@@ -17,6 +18,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
 
 usePageSeo(() => ({ title: '宠物乱斗', path: '/pets/brawl', robots: 'noindex' }))
+const route = useRoute()
 const auth = useAuthStore()
 const pets = usePetsStore()
 const state = ref<Awaited<ReturnType<typeof readBrawlState>>>()
@@ -35,11 +37,13 @@ const skill = ref<BrawlSkill>('SPLASH')
 const weaponPulse = ref<number>()
 watch(weapon, () => { weaponPulse.value = undefined })
 const stage = ref(1)
-const section = ref<'arena' | 'equipment' | 'season'>('arena')
+const section = ref<'arena' | 'friendly' | 'equipment' | 'season'>(route.query.tab === 'friendly' ? 'friendly' : 'arena')
+watch(() => route.query.tab, name => { if (name === 'friendly') section.value = 'friendly' })
 const sectionTabs = ref<HTMLElement | null>(null)
 const battleMode = ref<'pvp' | 'npc'>('pvp')
 const sections = [
   { id: 'arena', label: '对战大厅', icon: 'play' },
+  { id: 'friendly', label: '好友约战', icon: 'care' },
   { id: 'equipment', label: '配装工坊', icon: 'craft' },
   { id: 'season', label: '赛季榜单', icon: 'collection' },
 ] as const
@@ -168,7 +172,7 @@ const resultLabel = (winner: number) => winner === 0 ? '胜利' : winner === 1 ?
 const turnLabel = computed(() => {
   if (ended.value && report.value) {
     const result = resultLabel(report.value.winner)
-    return report.value.mode === 'pvp' ? result : `${result} · 获得 ${report.value.reward} 材料`
+    return report.value.mode !== 'npc' ? result : `${result} · 获得 ${report.value.reward} 材料`
   }
   if (!turn.value) return '准备开战'
   const { round, actor, damage, healing } = turn.value
@@ -197,9 +201,9 @@ async function refresh() {
     }
     const changedPet = state.value?.petId !== result.petId
     state.value = result
-    if (changedPet && result.pvp?.weapon && result.pvp.skill) {
-      weapon.value = result.pvp.weapon
-      skill.value = result.pvp.skill
+    if (changedPet && result.pvp) {
+      weapon.value = result.pvp.weapon ?? result.pvp.friendlyWeapon ?? 'SPOON'
+      skill.value = result.pvp.skill ?? result.pvp.friendlySkill ?? 'SPLASH'
     }
     if (!result.equipmentCatalog.weapons.some(item => item.id === weapon.value)) weapon.value = 'SPOON'
     if (!result.equipmentCatalog.skills.some(item => item.id === skill.value)) skill.value = 'SPLASH'
@@ -358,14 +362,14 @@ async function upgrade() {
   if (!confirmed && mounted && state.value?.petId === id && !pets.pending && pets.error) void refresh()
 }
 
-async function pvpAction(action: 'enroll' | 'withdraw' | 'match') {
+async function pvpAction(action: 'enroll' | 'withdraw' | 'match' | 'save') {
   const current = state.value
   if (locked.value || !eligible.value || !current?.petId || !current.pvp) return
   if (action === 'match' && (!current.pvp.enabled || !current.pvp.remaining || pvpDirty.value)) return
   const input = { petId: current.petId, version: current.version, revision: current.pvp.revision }
   status.value = ''
   const ok = await pets.executeBrawl(action === 'match' ? { ...input, kind: 'brawl-match' } : {
-    ...input, kind: 'brawl-enroll', enabled: action === 'enroll', weapon: weapon.value, skill: skill.value,
+    ...input, kind: 'brawl-enroll', enabled: action === 'enroll' || (action === 'save' && current.pvp.enabled), weapon: weapon.value, skill: skill.value,
   })
   if (!ok && mounted && state.value?.petId === input.petId && !pets.pending && pets.error) void refresh()
 }
@@ -377,8 +381,12 @@ watch(() => pets.confirmedEvent, event => {
     void loadHistory()
     void openReport(event.matchId, true)
   }
+  if (event.kind === 'brawl-invite-decision' && event.matchId) {
+    void loadHistory()
+    if (section.value === 'friendly') void viewReport(event.matchId)
+  }
   if (event.kind === 'brawl-enroll') {
-    status.value = '对战报名已更新'
+    status.value = '出战配装已保存'
     void refresh()
   }
   if (event.kind === 'brawl-socket') {
@@ -408,7 +416,7 @@ function clear() {
   status.value = error.value = reportError.value = ''
   weaponPulse.value = undefined
   loading.value = historyLoading.value = reportLoading.value = false
-  section.value = 'arena'
+  section.value = route.query.tab === 'friendly' ? 'friendly' : 'arena'
   battleMode.value = 'pvp'
   weapon.value = 'SPOON'
   skill.value = 'SPLASH'
@@ -484,7 +492,7 @@ onUnmounted(() => {
       <div id="brawl-panel-arena" v-show="section === 'arena'" class="section-content" role="tabpanel" aria-labelledby="brawl-tab-arena" tabindex="0">
         <div class="arena" :class="{ single: !eligible }">
           <section class="panel battle" aria-labelledby="battle-heading">
-            <div class="panel-heading"><h2 id="battle-heading"><PetIcon name="play" />对局回放</h2><span v-if="report" class="subtle">{{ report.mode === 'pvp' ? report.season ? `第 ${report.season} 赛季` : '实装对战' : report.practice ? '陪练' : `第 ${report.stage} 关` }}</span><span v-else class="subtle">等待开场</span></div>
+            <div class="panel-heading"><h2 id="battle-heading"><PetIcon name="play" />对局回放</h2><span v-if="report" class="subtle">{{ report.mode === 'friendly' ? '好友约战' : report.mode === 'pvp' ? report.season ? `第 ${report.season} 赛季` : '实装对战' : report.practice ? '陪练' : `第 ${report.stage} 关` }}</span><span v-else class="subtle">等待开场</span></div>
             <p v-if="reportLoading" role="status" class="subtle">正在读取战报…</p>
             <p v-if="reportError && retryReport" role="alert" class="error-state">{{ reportError }} <button type="button" @click="openReport(retryReport)">重读战报</button></p>
             <div ref="fighters" class="battle-stage">
@@ -526,7 +534,7 @@ onUnmounted(() => {
                         <span v-if="turnFeedback[1]" :key="turnKey" class="combat-number" :data-kind="turnFeedback[1].kind"
                           :class="{ 'is-static': stillReplay }" :style="{ animationPlayState: playing ? 'running' : 'paused' }"
                           aria-hidden="true">{{ turnFeedback[1].text }}</span>
-                        <strong>{{ report.mode === 'pvp' ? report.opponent.petName ?? '对手宠物' : opponents[report.stage - 1] }}</strong>
+                        <strong>{{ report.mode !== 'npc' ? report.opponent.petName ?? '对手宠物' : opponents[report.stage - 1] }}</strong>
                       </component>
                       <span v-if="report.opponent.ownerNickname">{{ report.opponent.ownerNickname }}</span>
                     </div>
@@ -641,15 +649,21 @@ onUnmounted(() => {
                   <strong>{{ match.opponentPetName || speciesNames[match.opponentSpecies ?? ''] || '对手宠物' }}</strong>
                 </RouterLink>
                 <strong v-else-if="match.opponentPetName">{{ match.opponentPetName }}</strong>
-                <span v-else>{{ match.mode === 'pvp' ? '实装对战' : `${match.practice ? '陪练' : '闯关'} · 第 ${match.stage} 关` }}</span>
+                <span v-else>{{ match.mode === 'friendly' ? '好友约战' : match.mode === 'pvp' ? '实装对战' : `${match.practice ? '陪练' : '闯关'} · 第 ${match.stage} 关` }}</span>
+                <small v-if="match.mode === 'friendly'" class="match-owner">好友约战</small>
                 <span v-if="match.opponentOwnerNickname" class="match-owner">{{ match.opponentOwnerNickname }}</span>
                 <time :datetime="new Date(match.createdAt).toISOString()">{{ dateTime.format(match.createdAt) }}</time>
               </div>
-              <span v-if="match.mode !== 'pvp'" class="match-reward">+{{ match.reward }}<small> 材料</small></span>
+              <span v-if="match.mode === 'npc'" class="match-reward">+{{ match.reward }}<small> 材料</small></span>
               <PetIcon name="chevron" aria-hidden="true" />
             </li>
           </ul>
           <button v-if="next" type="button" class="more-history" :disabled="historyLoading" @click="loadHistory(next)">更早的战报</button>
+        </section>
+      </div>
+      <div id="brawl-panel-friendly" v-show="section === 'friendly'" class="section-content" role="tabpanel" aria-labelledby="brawl-tab-friendly" tabindex="0">
+        <section class="panel">
+          <PetBrawlInvitations :active="section === 'friendly'" @replay="viewReport" />
         </section>
       </div>
       <div id="brawl-panel-equipment" v-show="section === 'equipment'" class="section-content" role="tabpanel" aria-labelledby="brawl-tab-equipment" tabindex="0">
@@ -683,7 +697,9 @@ onUnmounted(() => {
               <small v-if="selectedSkill?.effect" id="brawl-workshop-skill-effect">{{ selectedSkill.effect }}</small>
             </div>
             <dl v-if="growth" class="combat-stats large"><div><dt>生命</dt><dd>{{ hp(growth.maxHp + (selectedGear?.hp ?? 0)) }}</dd></div><div><dt>基础伤害</dt><dd>{{ hp(growth.attack + (selectedGear?.attack ?? 0)) }}</dd></div></dl>
-            <p v-if="pvpDirty" class="config-notice">报名配置待更新，请到对战大厅保存。</p>
+            <button v-if="state.pvp?.friendlyWeapon" type="button" class="button-wide"
+              :disabled="locked || (state.pvp.friendlyWeapon === weapon && state.pvp.friendlySkill === skill)"
+              @click="pvpAction('save')">保存出战配装<PetIcon name="check" /></button>
             <button type="button" class="button-wide" @click="selectSection('arena')">返回对战大厅<PetIcon name="chevron" /></button>
           </section>
           <div class="equipment-column" data-floating-obstacle>
@@ -994,4 +1010,7 @@ select { min-inline-size: 0; inline-size: 100%; max-inline-size: 100%; }
   .forge-actions > * { flex: 1 1 160px; }
 }
 @media (prefers-reduced-motion: reduce) { button, .button-link { transition: none; } }
+@media (max-width: 400px) {
+  .section-tabs svg { display: none; }
+}
 </style>

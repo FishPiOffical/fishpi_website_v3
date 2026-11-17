@@ -8,13 +8,31 @@ import { fetchChatPetProfile, fetchRankedPet } from '@/api/v3-rankings'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
 import PetIcon from '@/components/pets/PetIcon.vue'
+import PetFeedback from '@/components/pets/PetFeedback.vue'
+import { usePetsStore } from '@/stores/pets'
 
 type PetProfile = Awaited<ReturnType<typeof fetchChatPetProfile | typeof fetchRankedPet>>
 
 const route = useRoute()
 const auth = useAuthStore()
-const mounted = ref(false)
+const pets = usePetsStore()
 const profile = ref<PetProfile>()
+const inviteAttempt = ref<string>()
+const inviteTarget = computed(() => {
+  const target = profile.value
+  if (auth.isLoggedIn && target?.id && !target.archived && (target.level ?? 0) >= 10 && target.user.id !== auth.account?.oId)
+    return target.id
+})
+const inviteSent = computed(() => !!inviteTarget.value && inviteAttempt.value === inviteTarget.value && pets.confirmedEvent?.kind === 'brawl-invite'
+  && pets.confirmedEvent.targetPetId === inviteTarget.value)
+watch([inviteTarget, () => auth.account?.oId], () => { inviteAttempt.value = undefined }, { flush: 'sync' })
+function invite() {
+  const targetPetId = inviteTarget.value
+  if (!targetPetId || pets.pending || pets.busy || pets.offline || inviteSent.value) return
+  inviteAttempt.value = targetPetId
+  void pets.executeBrawl({ kind: 'brawl-invite', targetPetId })
+}
+const mounted = ref(false)
 const status = ref<'loading' | 'unavailable' | 'error' | 'ready'>('loading')
 const attempt = ref(0)
 const fromChat = computed(() => route.name === 'chat-pet-profile')
@@ -80,9 +98,17 @@ watch([id, fromChat, viewer, mounted, attempt], async ([target, chat, owner, rea
           </dl>
           <p v-if="profile.archived" class="snapshot-note">已归档 · 成长等级保留至重新领养前{{ fromChat && activity ? ' · 活动状态取自发言时' : '' }}</p>
           <p v-else-if="fromChat" class="snapshot-note">{{ profile.experience === undefined ? '发言时的宠物资料' : '活动状态取自发言时' }}</p>
+          <div v-if="inviteTarget" class="pet-invite">
+            <button type="button" class="fp-btn" :disabled="pets.busy || !!pets.pending || pets.offline || inviteSent" @click="invite">
+              {{ inviteSent ? '邀请已发出' : '发起约战' }}
+            </button>
+            <RouterLink :to="{ path: '/pets/brawl', query: { tab: 'friendly' } }">查看约战邀请</RouterLink>
+            <span v-if="inviteSent" class="pet-invite-status" role="status">等待对方接受</span>
+          </div>
         </div>
       </section>
 
+      <PetFeedback v-if="inviteTarget && (inviteAttempt === inviteTarget || (pets.pending?.kind === 'brawl-invite' && pets.pending.targetPetId === inviteTarget))" class="profile-feedback" />
       <div class="pet-profile-growth">
         <section v-for="group in progress" :key="group.title" class="pet-profile-progress">
           <h2><span class="progress-icon"><PetIcon :name="group.icon" /></span>{{ group.title }}</h2>
@@ -125,6 +151,9 @@ watch([id, fromChat, viewer, mounted, attempt], async ([target, chat, owner, rea
   font-size: 13px;
 }
 
+.pet-invite { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 14px; }
+.pet-invite a, .pet-invite-status { font-size: .82rem; color: var(--fp-muted); }
+.profile-feedback { margin-top: 12px; }
 .profile-back svg {
   width: 14px;
   height: 14px;
