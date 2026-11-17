@@ -717,6 +717,27 @@ export const readBrawlHistory = (before?: string, signal?: AbortSignal) => read(
       next: row.next === null ? null : brawlId(row.next) }
   }, signal)
 
+function brawlTurnEffects(value: unknown, damage: number) {
+  if (value === undefined) return
+  try {
+    const row = object(value)
+    const baseDamage = integer(row.baseDamage, 1, 10_000)
+    const criticalBonus = integer(row.criticalBonus, 0, 10_000)
+    const weaponBonus = integer(row.weaponBonus, 0, 10_000)
+    const skillBonus = integer(row.skillBonus, 0, 10_000)
+    const followUp = integer(row.followUp, 0, 10_000)
+    const weaponGuard = integer(row.weaponGuard, 0, 10_000)
+    const skillGuard = integer(row.skillGuard, 0, 10_000)
+    const penetrated = integer(row.penetrated, 0, weaponGuard + skillGuard)
+    const minimumBonus = integer(row.minimumBonus, 0, 10_000)
+    if (baseDamage + criticalBonus + weaponBonus + skillBonus + followUp - weaponGuard - skillGuard + penetrated + minimumBonus !== damage) return
+    return { baseDamage, criticalBonus, weaponBonus, skillBonus, followUp, weaponGuard, skillGuard, penetrated, minimumBonus }
+  } catch {
+    // 明细是可选投影，损坏时保留服务端已结算的回合结果。
+    return undefined
+  }
+}
+
 export const readBrawlReport = (id: string, signal?: AbortSignal) => read(
   `${brawlPath}/matches/${brawlId(id)}`, value => {
     const row = object(value)
@@ -726,9 +747,11 @@ export const readBrawlReport = (id: string, signal?: AbortSignal) => read(
     const player = brawlSetup(row.player, maxUpgrade), opponent = brawlSetup(row.opponent, maxUpgrade)
     const turns = list(row.turns, 24).map(value => {
       const turn = object(value)
+      const damage = integer(turn.damage, 1)
       return { round: integer(turn.round, 1, 12), actor: integer(turn.actor, 0, 1),
-        damage: integer(turn.damage, 1), healing: integer(turn.healing),
-        playerHp: integer(turn.playerHp, 0, player.maxHp), opponentHp: integer(turn.opponentHp, 0, opponent.maxHp) }
+        damage, healing: integer(turn.healing),
+        playerHp: integer(turn.playerHp, 0, player.maxHp), opponentHp: integer(turn.opponentHp, 0, opponent.maxHp),
+        effects: brawlTurnEffects(turn.effects, damage) }
     })
     const species = [...speciesIds].find(candidate => candidate === row.species) as PetSpeciesId | undefined
     if (report.id !== id || !turns.length || !species) throw invalid()

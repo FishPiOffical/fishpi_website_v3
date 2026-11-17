@@ -121,10 +121,31 @@ const hpTurn = computed(() => settled.value ? turn.value : report.value?.turns[f
 const turnFeedback = computed(() => {
   if (!turn.value || !settled.value || ended.value) return []
   const { actor, damage, healing } = turn.value
-  const received = { kind: 'damage', text: `−${hp(damage)}` }
+  const received = { kind: turn.value.effects?.criticalBonus ? 'critical' : 'damage', text: `−${hp(damage)}` }
   const restored = healing > 0 ? { kind: 'heal', text: `+${hp(healing)}` } : undefined
   return actor === 0 ? [restored, received] : [received, restored]
 })
+type BattleTurn = NonNullable<typeof turn.value>
+function effectNotes(event: BattleTurn, detail = false) {
+  const data = report.value
+  const effects = event.effects
+  if (!data || !effects) return []
+  const attacker = event.actor === 0 ? data.player : data.opponent
+  const defender = event.actor === 0 ? data.opponent : data.player
+  return [
+    { text: '基础伤害', amount: detail ? effects.baseDamage : 0, sign: '' },
+    { text: '暴击', amount: effects.criticalBonus, sign: '+' },
+    { text: weapons[attacker.weapon], amount: effects.weaponBonus, sign: '+' },
+    { text: skills[attacker.skill], amount: effects.skillBonus, sign: '+' },
+    { text: `${weapons[attacker.weapon]}追击`, amount: effects.followUp, sign: '+' },
+    { text: `${weapons[defender.weapon]}减伤`, amount: effects.weaponGuard, sign: '−' },
+    { text: `${skills[defender.skill]}减伤`, amount: effects.skillGuard, sign: '−' },
+    { text: '穿透减伤', amount: effects.penetrated, sign: '+' },
+    { text: '最低伤害补正', amount: effects.minimumBonus, sign: '+' },
+    { text: `${skills[attacker.skill]}回血`, amount: event.healing, sign: '+' },
+  ].filter(note => note.amount > 0)
+}
+const replayNotes = computed(() => turn.value && settled.value && !ended.value ? effectNotes(turn.value) : [])
 const turnKey = computed(() => `${report.value?.id}:${playbackKey.value}:${frame.value}`)
 const attackingFighter = computed(() => {
   if (!turn.value || !report.value || ended.value) return
@@ -524,7 +545,12 @@ onUnmounted(() => {
                     <span><img v-if="projectile.art === 'pebble'" src="/images/pets/weapons/pebble.png" alt="" width="26" height="26" /></span>
                   </div>
                 </div>
-                <p class="turn" :class="{ 'is-ended': ended }">{{ turnLabel }}</p>
+                <div class="turn-readout" :class="{ 'has-effects': !ended && !!turn?.effects }">
+                  <p class="turn" :class="{ 'is-ended': ended }">{{ turnLabel }}</p>
+                  <ul v-if="replayNotes.length" class="effect-notes" aria-label="本次行动效果">
+                    <li v-for="note in replayNotes" :key="note.text">{{ note.text }} <b>{{ note.sign }}{{ hp(note.amount) }}</b></li>
+                  </ul>
+                </div>
               </template>
               <div v-else class="stage-empty">
                 <img v-if="portrait(state.species)" :src="portrait(state.species)" width="160" height="160" alt="" />
@@ -534,7 +560,17 @@ onUnmounted(() => {
               </div>
             </div>
             <div v-if="report" class="replay-controls" data-floating-obstacle><span class="subtle">{{ ended ? '对局已结束' : `回合 ${turn?.round ?? 0} / ${report.turns[report.turns.length - 1]?.round}` }}</span><div class="actions"><button type="button" :disabled="reportLoading" @click="playing ? stop() : play()"><PetIcon :name="playing ? 'rest' : 'refresh'" />{{ playing ? '暂停' : ended ? '重播' : '继续' }}</button><button type="button" :disabled="reportLoading || (ended && !playing)" @click="skip()">跳过</button></div></div>
-            <details v-if="report && ended" class="turn-details"><summary>逐回合战报</summary><ol><li v-for="(event, index) in report.turns" :key="index">第 {{ event.round }} 回合 · {{ event.actor === 0 ? '我方' : '对手' }}造成 {{ hp(event.damage) }} 伤害<span v-if="event.healing">，回复 {{ hp(event.healing) }} 生命</span></li></ol></details>
+            <details v-if="report && ended" class="turn-details">
+              <summary>逐回合战报</summary>
+              <ol>
+                <li v-for="(event, index) in report.turns" :key="index">
+                  第 {{ event.round }} 回合 · {{ event.actor === 0 ? '我方' : '对手' }}造成 {{ hp(event.damage) }} 伤害<span v-if="event.healing">，回复 {{ hp(event.healing) }} 生命</span>
+                  <ul v-if="event.effects" class="effect-notes" aria-label="伤害与回血明细">
+                    <li v-for="note in effectNotes(event, true)" :key="note.text">{{ note.text }} <b>{{ note.sign }}{{ hp(note.amount) }}</b></li>
+                  </ul>
+                </li>
+              </ol>
+            </details>
           </section>
           <section v-if="eligible" class="panel battle-controls" data-floating-obstacle aria-label="出战操作">
             <div class="mode-switch" aria-label="对战方式"><button v-if="state.pvp" type="button" :aria-pressed="battleMode === 'pvp'" @click="battleMode = 'pvp'">玩家对战</button><button type="button" :aria-pressed="battleMode === 'npc' || !state.pvp" @click="battleMode = 'npc'">闯关陪练</button></div>
@@ -768,7 +804,8 @@ button.button-wide, .button-link { text-decoration: none; color: var(--brawl-ink
   white-space: nowrap;
   pointer-events: none;
 }
-.combat-number[data-kind='damage'] { color: var(--fp-danger-ink); }
+.combat-number[data-kind='damage'], .combat-number[data-kind='critical'] { color: var(--fp-danger-ink); }
+.combat-number[data-kind='critical'] { background: var(--fp-danger-soft); }
 .combat-number[data-kind='heal'] { color: var(--brawl-ink); }
 @media (prefers-reduced-motion: no-preference) {
   .combat-number:not(.is-static) { animation: combat-number-rise .48s ease-out both; }
@@ -825,7 +862,20 @@ progress { appearance: none; width: 100%; max-width: 10rem; height: 6px; border:
 progress::-webkit-progress-bar { background: var(--fp-border); border-radius: 10px; }
 progress::-webkit-progress-value { background: var(--fp-primary); border-radius: 10px; }
 progress::-moz-progress-bar { background: var(--fp-primary); border-radius: 10px; }
-.turn { min-block-size: 2.6em; margin: 24px 0 0; text-align: center; font-size: .82rem; color: var(--fp-muted); }
+.turn-readout { margin-block-start: 24px; }
+.turn-readout.has-effects { min-block-size: 5.5rem; }
+.turn { min-block-size: 2.6em; margin: 0; text-align: center; font-size: .82rem; color: var(--fp-muted); }
+.effect-notes { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; margin: 0; padding: 0; list-style: none; }
+.effect-notes > li {
+  padding: 2px 7px;
+  border: 1px solid var(--fp-border);
+  border-radius: 6px;
+  background: var(--fp-card);
+  color: var(--fp-muted);
+  font-size: .73rem;
+}
+.effect-notes b { color: var(--fp-title); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.turn-details .effect-notes { justify-content: flex-start; margin-block: 5px 9px; }
 .turn.is-ended { color: var(--brawl-ink); font-weight: 600; }
 .replay-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
