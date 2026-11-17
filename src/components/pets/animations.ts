@@ -79,3 +79,11 @@ export function petAnimationClip(species: string, action: PetAnimationAction): P
   if (!petAnimationActions.includes(action)) return null
   return petMedia.get(species)?.clips[action] ?? null
 }
+
+export type PetBattleAction = 'attack' | 'hit' | 'victory' | 'defeat'
+const battleActions: readonly PetBattleAction[] = ['attack', 'hit', 'victory', 'defeat']
+
+export function petBattleVideo(species: string, action: PetBattleAction): string | undefined {
+  if (!petMedia.has(species) || !battleActions.includes(action)) return
+  return `/images/pets/animations/brawl-v1/${species}/${action}.webm`
+}

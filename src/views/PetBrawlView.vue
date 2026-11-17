@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getAuthContextVersion } from '@/api/http'
 import { brawlSkills, brawlWeapons, readBrawlHistory, readBrawlReport, readBrawlState, type BrawlProduct, type BrawlSkill, type BrawlSlot, type BrawlSummary, type BrawlWeapon } from '@/api/v3-pets'
-import { petPortrait } from '@/components/pets/animations'
+import { petPortrait, type PetBattleAction } from '@/components/pets/animations'
+import PetAnimation from '@/components/pets/PetAnimation.vue'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetBrawlCheckout from '@/components/pets/PetBrawlCheckout.vue'
 import PetBrawlSeason from '@/components/pets/PetBrawlSeason.vue'
@@ -30,6 +31,13 @@ const skill = ref<BrawlSkill>('SPLASH')
 const stage = ref(1)
 const frame = ref(0)
 const playing = ref(false)
+const compact = ref(true)
+const fighters = ref<HTMLElement | null>(null)
+const playbackKey = ref(0)
+const stepDuration = 1000
+let deadline = 0
+let remaining = stepDuration
+let compactQuery: MediaQueryList | undefined
 let mounted = false
 let timer: ReturnType<typeof setTimeout> | undefined
 let stateRequest: AbortController | undefined
@@ -69,8 +77,19 @@ async function socket(slot: BrawlSlot) {
   if (!confirmed && !pets.pending && mounted && state.value?.petId === current.petId && pets.error) void refresh()
 }
 const cost = computed(() => state.value?.costs[level.value])
-const turn = computed(() => report.value?.turns[frame.value - 1])
-const ended = computed(() => !!report.value && frame.value >= report.value.turns.length)
+const turn = computed(() => {
+  const turns = report.value?.turns
+  return turns?.[Math.min(frame.value, turns.length) - 1]
+})
+const ended = computed(() => !!report.value && frame.value > report.value.turns.length)
+function battleAction(side: number): PetBattleAction | undefined {
+  if (ended.value) {
+    const winner = report.value?.winner
+    if (!playing.value || winner == null || winner < 0) return
+    return winner === side ? 'victory' : 'defeat'
+  }
+  return turn.value ? turn.value.actor === side ? 'attack' : 'hit' : undefined
+}
 const resultLabel = (winner: number) => winner === 0 ? '胜利' : winner === 1 ? '落败' : '平局'
 const describe = (reason: unknown) => reason instanceof Error ? reason.message : '读取失败，请重试'
 const hp = (centi: number) => (centi / 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
@@ -134,7 +153,8 @@ async function openReport(id: string, autoplay = false) {
     const result = await readBrawlReport(id, request.signal)
     if (request.signal.aborted) return
     report.value = result
-    frame.value = autoplay ? 0 : result.turns.length
+    frame.value = autoplay ? 0 : result.turns.length + 1
+    remaining = stepDuration
     retryReport.value = undefined
     if (autoplay && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) play()
     else skip()
@@ -147,26 +167,52 @@ async function openReport(id: string, autoplay = false) {
 
 function stop() {
   clearTimeout(timer)
+  if (playing.value) remaining = Math.max(0, deadline - performance.now())
   playing.value = false
 }
 function skip() {
   stop()
   if (!report.value) return
-  frame.value = report.value.turns.length
+  frame.value = report.value.turns.length + 1
   status.value = resultLabel(report.value.winner)
 }
 function play() {
   if (!report.value || playing.value) return
-  if (ended.value) frame.value = 0
-  playing.value = true
-  function tick() {
-    if (!report.value) return
-    frame.value++
-    if (ended.value) skip()
-    else timer = setTimeout(tick, 300)
+  if (frame.value === 0 || ended.value) {
+    playbackKey.value++
+    frame.value = 1
+    remaining = stepDuration
   }
-  timer = setTimeout(tick, 300)
+  playing.value = true
+  void nextTick(() => {
+    if (!playing.value) return
+    const bounds = fighters.value?.getBoundingClientRect()
+    if (bounds && (bounds.top < 64 || bounds.bottom > window.innerHeight)) {
+      fighters.value?.scrollIntoView({ block: 'center', behavior: 'instant' })
+    }
+  })
+  scheduleStep()
 }
+function scheduleStep() {
+  deadline = performance.now() + remaining
+  timer = setTimeout(() => {
+    if (!report.value || !playing.value) return
+    if (ended.value) {
+      stop()
+      status.value = resultLabel(report.value.winner)
+      return
+    }
+    frame.value++
+    if (ended.value && report.value.winner < 0) {
+      skip()
+      return
+    }
+    remaining = stepDuration
+    scheduleStep()
+  }, remaining)
+}
+function updateCompact() { compact.value = compactQuery?.matches ?? true }
+function pauseWhenHidden() { if (document.hidden) stop() }
 function fight(practice: boolean) {
   if (locked.value || !eligible.value || !state.value?.petId || (!practice && stage.value > state.value.unlocked)) return
   status.value = ''
@@ -242,8 +288,20 @@ watch([() => auth.accessToken, () => auth.account?.oId], ([token, owner], [, old
     if (mounted) initialize()
   }
 }, { flush: 'sync' })
-onMounted(() => { mounted = true; initialize() })
-onUnmounted(() => { mounted = false; clear() })
+onMounted(() => {
+  mounted = true
+  compactQuery = window.matchMedia('(max-width: 720px), (hover: none) and (pointer: coarse)')
+  compactQuery.addEventListener('change', updateCompact)
+  document.addEventListener('visibilitychange', pauseWhenHidden)
+  updateCompact()
+  initialize()
+})
+onUnmounted(() => {
+  mounted = false
+  compactQuery?.removeEventListener('change', updateCompact)
+  document.removeEventListener('visibilitychange', pauseWhenHidden)
+  clear()
+})
 </script>
 
 <template>
@@ -314,16 +372,26 @@ onUnmounted(() => { mounted = false; clear() })
         <p v-if="report?.season" class="subtle">第 {{ report.season }} 赛季 · 实装 PvP</p>
         <p v-if="reportLoading" role="status">正在读取战报…</p>
         <template v-if="report">
-          <div class="fighters">
+          <div ref="fighters" class="fighters">
             <div>
-              <img :src="petPortrait(report.species)" alt="" width="86" height="86">
+              <div class="fighter-avatar">
+                <PetAnimation v-if="!compact && battleAction(0)" :species="report.species" alt=""
+                  :battle-action="battleAction(0)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing"
+                  :loop="false" :width="160" :height="160" />
+                <img v-else :src="petPortrait(report.species)" alt="" width="160" height="160">
+              </div>
               <strong>我的宠物</strong><span>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</span>
               <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ hp(report.player.gearHp) }} · 伤害 +{{ hp(report.player.gearAttack) }}</span>
               <progress aria-label="我的宠物生命" :max="report.player.maxHp" :value="turn?.playerHp ?? report.player.maxHp" />
               <span>{{ hp(turn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
             </div>
             <div>
-              <img :src="petPortrait(report.opponentSpecies ?? 'momota')" alt="" width="86" height="86">
+              <div class="fighter-avatar fighter-avatar--opponent">
+                <PetAnimation v-if="!compact && battleAction(1)" :species="report.opponentSpecies ?? 'momota'" alt=""
+                  :battle-action="battleAction(1)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing"
+                  :loop="false" :width="160" :height="160" />
+                <img v-else :src="petPortrait(report.opponentSpecies ?? 'momota')" alt="" width="160" height="160">
+              </div>
               <strong>{{ report.mode === 'pvp' ? '对手宠物' : opponents[report.stage - 1] }}</strong><span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
               <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
               <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="turn?.opponentHp ?? report.opponent.maxHp" />
@@ -332,8 +400,8 @@ onUnmounted(() => { mounted = false; clear() })
           </div>
           <p class="turn">{{ ended ? `${resultLabel(report.winner)}${report.mode === 'pvp' ? '' : ` · 获得 ${report.reward} 材料`}` : turn ? `第 ${turn.round} 回合 · ${turn.actor === 0 ? '我方' : '对手'}造成 ${hp(turn.damage)} 伤害${turn.healing ? `，回复 ${hp(turn.healing)} 生命` : ''}` : '准备开战' }}</p>
           <div class="actions">
-            <button type="button" @click="playing ? stop() : play()">{{ playing ? '暂停' : ended ? '重播' : '继续' }}</button>
-            <button type="button" :disabled="ended" @click="skip()">跳过</button>
+            <button type="button" :disabled="reportLoading" @click="playing ? stop() : play()">{{ playing ? '暂停' : ended ? '重播' : '继续' }}</button>
+            <button type="button" :disabled="reportLoading || (ended && !playing)" @click="skip()">跳过</button>
           </div>
           <details v-if="ended"><summary>逐回合战报</summary><ol>
             <li v-for="(event, index) in report.turns" :key="index">第 {{ event.round }} 回合 · {{ event.actor === 0 ? '我方' : '对手' }}造成 {{ hp(event.damage) }} 伤害<span v-if="event.healing">，回复 {{ hp(event.healing) }} 生命</span></li>
@@ -386,7 +454,12 @@ hr { border: 0; border-top: 1px solid var(--fp-border); margin: 16px 0; }
 .fighters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
 .fighters > div { display: grid; justify-items: center; gap: 5px; text-align: center; }
 .fighters span { font-size: .82rem; color: var(--fp-muted); }
-.fighters img { object-fit: contain; }
+.fighter-avatar { inline-size: 160px; max-inline-size: 100%; aspect-ratio: 1; }
+.fighter-avatar > img { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
+.fighter-avatar--opponent { transform: scaleX(-1); }
+@media (max-width: 720px), (hover: none) and (pointer: coarse) {
+  .fighter-avatar { inline-size: 86px; }
+}
 progress { width: 100%; max-width: 10rem; accent-color: var(--fp-primary); }
 .turn { min-block-size: 2.6em; margin-bottom: 4px; }
 details { margin-top: 12px; }

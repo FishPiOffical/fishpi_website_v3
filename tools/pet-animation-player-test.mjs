@@ -87,6 +87,16 @@ try {
     assert.equal(mapping.petAnimationClip('hexiaotun', action), null)
   }
   pass('四物种四十项素材与实际 manifest 一致，未知物种和动作不能拼接视频地址')
+  for (const species of speciesIds) {
+    for (const action of ['attack', 'hit', 'victory', 'defeat']) {
+      const url = mapping.petBattleVideo(species, action)
+      assert.ok(url && (await fs.stat('public' + url)).size < 80 * 1024)
+    }
+  }
+  assert.equal(mapping.petBattleVideo('../momota', 'attack'), undefined)
+  assert.equal(mapping.petBattleVideo('momota', '../attack'), undefined)
+  pass('十六段轻量乱斗视频使用同源白名单')
+
 
   for (const species of speciesIds) {
     const html = await renderToString(createSSRApp(Component, { species, alt: species }))
