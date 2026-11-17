@@ -23,6 +23,7 @@ import { usePetAnimationState } from '@/components/pets/usePetAnimationState'
 import PetGrowthSummary from '@/components/pets/PetGrowthSummary.vue'
 import PetHomeNavigation from '@/components/pets/PetHomeNavigation.vue'
 import PetHomeGuide from '@/components/pets/PetHomeGuide.vue'
+import PetBrawlEntry from '@/components/pets/PetBrawlEntry.vue'
 import { PET_ACTIVITIES_NAVIGATION_EVENT, type PetHomeSection, type PetHomeTarget } from '@/components/pets/petNavigation'
 import { usePetClock } from '@/components/pets/usePetClock'
 import { petActivityStatus } from '@/components/pets/petActivityStatus'
@@ -152,7 +153,6 @@ onMounted(() => {
   <div ref="page" class="pets-page fp-page fp-page--wide fp-ui">
     <header class="page-heading">
       <div><RouterLink to="/games" class="back-link">游戏 / 鱼游</RouterLink><h1>宠物家园</h1></div>
-      <RouterLink v-if="loggedIn && pets.pet" class="pet-secondary" to="/pets/brawl">宠物乱斗</RouterLink>
       <div v-if="loggedIn && pets.state" class="pet-wallet" title="仅用于宠物家园"><PetIcon name="coin" /><strong>{{ pets.coins?.toLocaleString() }}</strong><span>宠物币</span></div>
     </header>
 
@@ -187,6 +187,7 @@ onMounted(() => {
       </section>
 
       <template v-if="pets.pet && pets.state">
+        <PetBrawlEntry :pet="pets.pet" />
         <PetHomeGuide @navigate="navigate" />
         <PetHomeNavigation :selected="section" :rewards="rewards" @select="navigate({ section: $event }, false)" />
         <div v-show="section === 'care'" id="pet-home-panel-care" class="pet-home-panel" data-pet-panel="care" role="tabpanel" aria-labelledby="pet-home-tab-care" tabindex="-1">

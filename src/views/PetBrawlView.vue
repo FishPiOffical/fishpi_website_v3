@@ -8,6 +8,8 @@ import PetAnimation from '@/components/pets/PetAnimation.vue'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetBrawlCheckout from '@/components/pets/PetBrawlCheckout.vue'
 import PetBrawlSeason from '@/components/pets/PetBrawlSeason.vue'
+import PetIcon from '@/components/pets/PetIcon.vue'
+import { imageThumbnail } from '@/utils/avatar'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
@@ -29,6 +31,23 @@ const reportLoading = ref(false)
 const weapon = ref<BrawlWeapon>('SPOON')
 const skill = ref<BrawlSkill>('SPLASH')
 const stage = ref(1)
+const section = ref<'arena' | 'equipment' | 'season'>('arena')
+const sectionTabs = ref<HTMLElement | null>(null)
+const battleMode = ref<'pvp' | 'npc'>('pvp')
+const sections = [
+  { id: 'arena', label: '对战大厅', icon: 'play' },
+  { id: 'equipment', label: '配装工坊', icon: 'craft' },
+  { id: 'season', label: '赛季榜单', icon: 'collection' },
+] as const
+const speciesNames: Record<string, string> = { momota: '摸摸獭', hexiaotun: '荷小豚', yubingmiao: '鱼饼喵', paixiaoyu: '派小鱼' }
+const petName = computed(() => {
+  const pet = pets.pet
+  return pet && pet.id === state.value?.petId ? pet.name : speciesNames[state.value?.species ?? ''] ?? '我的宠物'
+})
+const portrait = (species: string | null | undefined, size = 160) => {
+  const source = species ? petPortrait(species) : undefined
+  return source ? imageThumbnail(source, size, size) : undefined
+}
 const frame = ref(0)
 const playing = ref(false)
 const compact = ref(true)
@@ -156,7 +175,7 @@ async function openReport(id: string, autoplay = false) {
     frame.value = autoplay ? 0 : result.turns.length + 1
     remaining = stepDuration
     retryReport.value = undefined
-    if (autoplay && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) play()
+    if (autoplay && section.value === 'arena' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) play()
     else skip()
   } catch (reason) {
     if (!request.signal.aborted) reportError.value = describe(reason)
@@ -177,7 +196,7 @@ function skip() {
   status.value = resultLabel(report.value.winner)
 }
 function play() {
-  if (!report.value || playing.value) return
+  if (!report.value || playing.value || section.value !== 'arena') return
   if (frame.value === 0 || ended.value) {
     playbackKey.value++
     frame.value = 1
@@ -213,6 +232,31 @@ function scheduleStep() {
 }
 function updateCompact() { compact.value = compactQuery?.matches ?? true }
 function pauseWhenHidden() { if (document.hidden) stop() }
+watch(section, value => { if (value !== 'arena') stop() })
+async function selectSection(value: typeof section.value) {
+  section.value = value
+  await nextTick()
+  if (mounted && section.value === value) sectionTabs.value?.querySelector<HTMLButtonElement>(`#brawl-tab-${value}`)?.focus({ preventScroll: true })
+}
+function navigateSection(event: KeyboardEvent) {
+  const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End']
+  if (!keys.includes(event.key)) return
+  event.preventDefault()
+  const index = sections.findIndex(item => item.id === section.value)
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? sections.length - 1
+    : (index + (event.key === 'ArrowRight' ? 1 : -1) + sections.length) % sections.length
+  section.value = sections[next]!.id
+  ;(event.currentTarget as HTMLElement).querySelector<HTMLButtonElement>(`#brawl-tab-${section.value}`)?.focus()
+}
+async function viewReport(id: string) {
+  const context = getAuthContextVersion()
+  const owner = auth.account?.oId
+  section.value = 'arena'
+  await nextTick()
+  if (!mounted || !auth.isLoggedIn || context !== getAuthContextVersion() || owner !== auth.account?.oId) return
+  fighters.value?.closest('section')?.scrollIntoView({ block: 'start', behavior: 'instant' })
+  await openReport(id)
+}
 function fight(practice: boolean) {
   if (locked.value || !eligible.value || !state.value?.petId || (!practice && stage.value > state.value.unlocked)) return
   status.value = ''
@@ -272,6 +316,11 @@ function clear() {
   next.value = null
   status.value = error.value = reportError.value = ''
   loading.value = historyLoading.value = reportLoading.value = false
+  section.value = 'arena'
+  battleMode.value = 'pvp'
+  weapon.value = 'SPOON'
+  skill.value = 'SPLASH'
+  stage.value = 1
 }
 function initialize() {
   if (!auth.isLoggedIn) return
@@ -307,165 +356,325 @@ onUnmounted(() => {
 <template>
   <main class="fp-page fp-page--wide fp-ui brawl-page" :data-brawl-ready="state ? 'true' : undefined">
     <header class="heading">
-      <div><RouterLink to="/pets">宠物家园</RouterLink><h1>宠物乱斗</h1></div>
-      <div v-if="state" class="materials"><strong>{{ state.materials.toLocaleString() }}</strong><span>历练材料</span></div>
+      <div class="heading-copy"><RouterLink class="back-link" to="/pets"><PetIcon name="home" />宠物家园<PetIcon name="chevron" /></RouterLink><h1>宠物乱斗</h1></div>
+      <button type="button" class="refresh-button" :disabled="loading || historyLoading" @click="refresh(); loadHistory()"><PetIcon name="refresh" />刷新进度</button>
     </header>
     <PetFeedback />
-    <p v-if="loading && !state" role="status">正在读取乱斗进度…</p>
-    <div v-if="error" class="panel"><p role="alert">{{ error }}</p><button type="button" @click="refresh()">重新读取进度</button></div>
-    <section v-if="state && !eligible" class="panel">
-      <h2>Lv.{{ state.minLevel }} 解锁乱斗</h2>
-      <p>{{ state.petId ? `当前宠物 Lv.${state.level}` : '请先领养一只宠物。' }}</p>
-      <RouterLink to="/pets">返回宠物家园</RouterLink>
-    </section>
-    <div v-if="state && (eligible || report || reportLoading)" class="arena" :class="{ single: !eligible }">
-      <section v-if="eligible" class="panel">
-        <h2>出战配置</h2>
-        <div class="fields">
-          <label>武器<select v-model="weapon" :disabled="locked"><option v-for="item in brawlWeapons" :key="item" :value="item">{{ weapons[item] }} +{{ state.levels[item] }}</option></select></label>
-          <label>招式<select v-model="skill" :disabled="locked"><option v-for="item in brawlSkills" :key="item" :value="item">{{ skills[item] }}</option></select></label>
-          <label>对手<select v-model.number="stage" :disabled="locked"><option v-for="item in state.stages" :key="item" :value="item">第 {{ item }} 关 · {{ opponents[item - 1] }}{{ item <= state.cleared ? '（已通关）' : item > state.unlocked ? '（仅陪练）' : '' }}</option></select></label>
+    <p v-if="loading && !state" class="panel loading-state" role="status">正在读取乱斗进度…</p>
+    <div v-if="error" class="panel error-state"><p role="alert">{{ error }}</p><button type="button" @click="refresh()">重新读取进度</button></div>
+    <template v-if="state">
+      <section class="brawl-overview" aria-label="宠物乱斗进度">
+        <div class="pet-identity">
+          <img v-if="portrait(state.species, 88)" :src="portrait(state.species, 88)" width="88" height="88" alt="" />
+          <span v-else class="pet-placeholder"><PetIcon name="pet" /></span>
+          <div><span class="eyebrow">{{ eligible ? '准备出战' : '成长进行中' }}</span><h2>{{ state.petId ? petName : '还没有宠物' }}<span v-if="state.petId" class="level-tag">Lv.{{ state.level }}</span></h2><p>{{ eligible ? '闯关积累材料，配装挑战对手。' : `宠物达到 Lv.${state.minLevel} 后开启对战。` }}</p></div>
         </div>
-        <p v-if="growth" class="subtle">生命 {{ hp(growth.maxHp + (selectedGear?.hp ?? 0)) }} · 基础伤害 {{ hp(growth.attack + (selectedGear?.attack ?? 0)) }}</p>
-        <p v-if="nextGrowth" class="subtle">下一级 · 生命 {{ hp(nextGrowth.maxHp + (selectedGear?.hp ?? 0)) }} · 基础伤害 {{ hp(nextGrowth.attack + (selectedGear?.attack ?? 0)) }}</p>
-        <div class="actions">
-          <button type="button" :disabled="locked || !cost || state.materials < cost" @click="upgrade()">{{ cost ? `强化至 +${level + 1} · ${cost} 材料` : '已达最高等级' }}</button>
-          <PetBrawlCheckout v-if="state.petId" :pet-id="state.petId" :weapon="weapon" :level="level"
-            :version="state.version" :materials="state.materials" :cost="cost" :disabled="locked" :gear-options="gearOptions" />
-        </div>
-        <template v-if="selectedGear">
-          <hr />
-          <h2>进阶配装</h2>
-          <p class="subtle">{{ selectedGear.artifact ? '已进阶神器' : level === 5 ? '可在积分强化与订单中进阶神器' : '武器 +5 后可进阶神器' }} · 装备增益 生命 +{{ hp(selectedGear.hp) }}，基础伤害 +{{ hp(selectedGear.attack) }}</p>
-          <div v-for="slot in (['soul', 'rune'] as const)" :key="slot" class="socket-row">
-            <label :for="`brawl-slot-${slot}`">{{ slot === 'soul' ? '魂珠槽' : '符石槽' }}</label>
-            <select :id="`brawl-slot-${slot}`" v-model="socketDraft[slot]" :disabled="locked || slot === 'rune' && !selectedGear.slot">
-              <option value="">{{ slot === 'rune' && !selectedGear.slot ? '第二槽未解锁' : '空槽（可拆卸）' }}</option>
-              <option v-for="item in ownedSocketItems(slot)" :key="item.id" :value="item.id">{{ item.name }} Lv.{{ item.rank }}</option>
-            </select>
-            <button type="button" :disabled="locked || socketDraft[slot] === selectedGear[slot] || slot === 'rune' && !selectedGear.slot"
-              @click="socket(slot)">{{ socketDraft[slot] ? '保存镶嵌' : '拆卸' }}</button>
-          </div>
-        </template>
-        <template v-if="state.pvp">
-          <hr />
-          <h2>实装对战</h2>
-          <a href="#brawl-season">查看赛季排行榜</a>
-          <p class="subtle">报名后可在离线时接受挑战。对局使用报名武器及其开战时的强化等级。</p>
-          <p class="subtle" role="status">{{ state.pvp.enabled ? '已报名' : '未报名' }} · 今日还可主动挑战 {{ state.pvp.remaining }} 场 · 被挑战 {{ state.pvp.received }} / {{ state.pvp.receivedLimit }}</p>
-          <p v-if="pvpDirty" class="subtle">保存当前配置后即可匹配。</p>
-          <div class="actions">
-            <button v-if="!state.pvp.enabled || pvpDirty" type="button" :disabled="locked" @click="pvpAction('enroll')">{{ state.pvp.enabled ? '保存对战配置' : '报名接受匹配' }}</button>
-            <button v-if="state.pvp.enabled" type="button" :disabled="locked" @click="pvpAction('withdraw')">退出报名</button>
-            <button type="button" class="primary" :disabled="locked || !state.pvp.enabled || !state.pvp.remaining || pvpDirty" @click="pvpAction('match')">寻找对手</button>
-          </div>
-        </template>
-        <hr />
-        <p class="subtle">今日闯关奖励 {{ state.rewardCount }} / {{ state.rewards.length }} 场。{{ state.rewards[state.rewardCount] ? `下场可得 ${state.rewards[state.rewardCount]} 材料。` : '今日材料已领完。' }}</p>
-        <div class="actions">
-          <button type="button" :disabled="locked" @click="fight(true)">开始陪练</button>
-          <button type="button" class="primary" :disabled="locked || stage > state.unlocked" @click="fight(false)">开始闯关</button>
-        </div>
+        <dl class="overview-stats">
+          <div><dt><PetIcon name="material" />历练材料</dt><dd>{{ state.materials.toLocaleString() }}</dd></div>
+          <div><dt><PetIcon name="outing" />闯关进度</dt><dd>{{ state.cleared }}<small> / {{ state.stages }} 关</small></dd></div>
+          <div><dt><PetIcon name="gift" />今日闯关奖励</dt><dd>{{ state.rewardCount }}<small> / {{ state.rewards.length }} 场</small></dd></div>
+        </dl>
       </section>
-      <section class="panel battle" aria-labelledby="battle-heading">
-        <h2 id="battle-heading">对局回放</h2>
-        <p v-if="report?.season" class="subtle">第 {{ report.season }} 赛季 · 实装 PvP</p>
-        <p v-if="reportLoading" role="status">正在读取战报…</p>
-        <template v-if="report">
-          <div ref="fighters" class="fighters">
-            <div>
-              <div class="fighter-avatar">
-                <PetAnimation v-if="!compact && battleAction(0)" :species="report.species" alt=""
-                  :battle-action="battleAction(0)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing"
-                  :loop="false" :width="160" :height="160" />
-                <img v-else :src="petPortrait(report.species)" alt="" width="160" height="160">
-              </div>
-              <strong>我的宠物</strong><span>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</span>
-              <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ hp(report.player.gearHp) }} · 伤害 +{{ hp(report.player.gearAttack) }}</span>
-              <progress aria-label="我的宠物生命" :max="report.player.maxHp" :value="turn?.playerHp ?? report.player.maxHp" />
-              <span>{{ hp(turn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
-            </div>
-            <div>
-              <div class="fighter-avatar fighter-avatar--opponent">
-                <PetAnimation v-if="!compact && battleAction(1)" :species="report.opponentSpecies ?? 'momota'" alt=""
-                  :battle-action="battleAction(1)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing"
-                  :loop="false" :width="160" :height="160" />
-                <img v-else :src="petPortrait(report.opponentSpecies ?? 'momota')" alt="" width="160" height="160">
-              </div>
-              <strong>{{ report.mode === 'pvp' ? '对手宠物' : opponents[report.stage - 1] }}</strong><span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
-              <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
-              <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="turn?.opponentHp ?? report.opponent.maxHp" />
-              <span>{{ hp(turn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
-            </div>
-          </div>
-          <p class="turn">{{ ended ? `${resultLabel(report.winner)}${report.mode === 'pvp' ? '' : ` · 获得 ${report.reward} 材料`}` : turn ? `第 ${turn.round} 回合 · ${turn.actor === 0 ? '我方' : '对手'}造成 ${hp(turn.damage)} 伤害${turn.healing ? `，回复 ${hp(turn.healing)} 生命` : ''}` : '准备开战' }}</p>
-          <div class="actions">
-            <button type="button" :disabled="reportLoading" @click="playing ? stop() : play()">{{ playing ? '暂停' : ended ? '重播' : '继续' }}</button>
-            <button type="button" :disabled="reportLoading || (ended && !playing)" @click="skip()">跳过</button>
-          </div>
-          <details v-if="ended"><summary>逐回合战报</summary><ol>
-            <li v-for="(event, index) in report.turns" :key="index">第 {{ event.round }} 回合 · {{ event.actor === 0 ? '我方' : '对手' }}造成 {{ hp(event.damage) }} 伤害<span v-if="event.healing">，回复 {{ hp(event.healing) }} 生命</span></li>
-          </ol></details>
-        </template>
-        <p v-else-if="!reportLoading" class="subtle">开始一场陪练或闯关即可观看回放。</p>
+      <section v-if="!eligible" class="panel unlock-panel">
+        <span class="unlock-symbol"><PetIcon name="lock" /></span>
+        <div><h2>Lv.{{ state.minLevel }} 解锁乱斗</h2><p class="subtle">{{ state.petId ? '照顾宠物、参加课程和外出活动，继续积累成长经验。' : '先领养一只伙伴，再一起开启乱斗旅程。' }}</p></div>
+        <RouterLink class="button-link" to="/pets">{{ state.petId ? '回家继续成长' : '前往领养' }}<PetIcon name="chevron" /></RouterLink>
       </section>
-    </div>
+      <div ref="sectionTabs" class="section-tabs" role="tablist" aria-label="乱斗分区" @keydown="navigateSection">
+        <button v-for="item in sections" :id="`brawl-tab-${item.id}`" :key="item.id" type="button" role="tab"
+          :aria-selected="section === item.id" :aria-controls="`brawl-panel-${item.id}`" :tabindex="section === item.id ? 0 : -1"
+          @click="selectSection(item.id)"><PetIcon :name="item.icon" />{{ item.label }}</button>
+      </div>
+      <div id="brawl-panel-arena" v-show="section === 'arena'" class="section-content" role="tabpanel" aria-labelledby="brawl-tab-arena" tabindex="0">
+        <div class="arena" :class="{ single: !eligible }">
+          <section class="panel battle" aria-labelledby="battle-heading">
+            <div class="panel-heading"><h2 id="battle-heading"><PetIcon name="play" />对局回放</h2><span v-if="report" class="subtle">{{ report.mode === 'pvp' ? report.season ? `第 ${report.season} 赛季` : '实装对战' : report.practice ? '陪练' : `第 ${report.stage} 关` }}</span><span v-else class="subtle">等待开场</span></div>
+            <p v-if="reportLoading" role="status" class="subtle">正在读取战报…</p>
+            <p v-if="reportError && retryReport" role="alert" class="error-state">{{ reportError }} <button type="button" @click="openReport(retryReport)">重读战报</button></p>
+            <div ref="fighters" class="battle-stage">
+              <template v-if="report">
+                <div class="fighters">
+                  <div class="fighter">
+                    <span class="fighter-side">我方</span>
+                    <div class="fighter-avatar">
+                      <PetAnimation v-if="!compact && battleAction(0)" :species="report.species" alt=""
+                        :battle-action="battleAction(0)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing && section === 'arena'"
+                        :loop="false" :width="160" :height="160" />
+                      <img v-else :src="portrait(report.species, compact ? 96 : 160)" alt="" width="160" height="160" />
+                    </div>
+                    <strong>我的宠物</strong><span>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</span>
+                    <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ hp(report.player.gearHp) }} · 伤害 +{{ hp(report.player.gearAttack) }}</span>
+                    <progress aria-label="我的宠物生命" :max="report.player.maxHp" :value="turn?.playerHp ?? report.player.maxHp" />
+                    <span>{{ hp(turn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
+                  </div>
+                  <span class="versus" aria-hidden="true">VS</span>
+                  <div class="fighter">
+                    <span class="fighter-side opponent">对手</span>
+                    <div class="fighter-avatar fighter-avatar--opponent">
+                      <PetAnimation v-if="!compact && battleAction(1)" :species="report.opponentSpecies ?? 'momota'" alt=""
+                        :battle-action="battleAction(1)" :playback-key="`${report.id}:${playbackKey}:${frame}`" :active="playing && section === 'arena'"
+                        :loop="false" :width="160" :height="160" />
+                      <img v-else :src="portrait(report.opponentSpecies ?? 'momota', compact ? 96 : 160)" alt="" width="160" height="160" />
+                    </div>
+                    <strong>{{ report.mode === 'pvp' ? '对手宠物' : opponents[report.stage - 1] }}</strong><span>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</span>
+                    <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
+                    <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="turn?.opponentHp ?? report.opponent.maxHp" />
+                    <span>{{ hp(turn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
+                  </div>
+                </div>
+                <p class="turn" :class="{ 'is-ended': ended }">{{ ended ? `${resultLabel(report.winner)}${report.mode === 'pvp' ? '' : ` · 获得 ${report.reward} 材料`}` : turn ? `第 ${turn.round} 回合 · ${turn.actor === 0 ? '我方' : '对手'}造成 ${hp(turn.damage)} 伤害${turn.healing ? `，回复 ${hp(turn.healing)} 生命` : ''}` : '准备开战' }}</p>
+              </template>
+              <div v-else class="stage-empty">
+                <img v-if="portrait(state.species)" :src="portrait(state.species)" width="160" height="160" alt="" />
+                <PetIcon v-else name="play" />
+                <h3>{{ eligible ? '准备好，开始第一场较量' : '未来的对手在这里等你' }}</h3>
+                <p>{{ eligible ? '选择玩家对战，或从闯关陪练开始。' : `达到 Lv.${state.minLevel} 后即可参加。` }}</p>
+              </div>
+            </div>
+            <div v-if="report" class="replay-controls" data-floating-obstacle><span class="subtle">{{ ended ? '对局已结束' : `回合 ${turn?.round ?? 0} / ${report.turns[report.turns.length - 1]?.round}` }}</span><div class="actions"><button type="button" :disabled="reportLoading" @click="playing ? stop() : play()"><PetIcon :name="playing ? 'rest' : 'refresh'" />{{ playing ? '暂停' : ended ? '重播' : '继续' }}</button><button type="button" :disabled="reportLoading || (ended && !playing)" @click="skip()">跳过</button></div></div>
+            <details v-if="report && ended" class="turn-details"><summary>逐回合战报</summary><ol><li v-for="(event, index) in report.turns" :key="index">第 {{ event.round }} 回合 · {{ event.actor === 0 ? '我方' : '对手' }}造成 {{ hp(event.damage) }} 伤害<span v-if="event.healing">，回复 {{ hp(event.healing) }} 生命</span></li></ol></details>
+          </section>
+          <section v-if="eligible" class="panel battle-controls" data-floating-obstacle aria-label="出战操作">
+            <div class="mode-switch" aria-label="对战方式"><button v-if="state.pvp" type="button" :aria-pressed="battleMode === 'pvp'" @click="battleMode = 'pvp'">玩家对战</button><button type="button" :aria-pressed="battleMode === 'npc' || !state.pvp" @click="battleMode = 'npc'">闯关陪练</button></div>
+            <div class="loadout-heading"><h3>本次出战配置</h3><button type="button" class="text-button" @click="selectSection('equipment')">调整配装<PetIcon name="chevron" /></button></div>
+            <div class="fields quick-fields"><label>武器<select v-model="weapon" :disabled="locked"><option v-for="item in brawlWeapons" :key="item" :value="item">{{ weapons[item] }} +{{ state.levels[item] }}</option></select></label><label>招式<select v-model="skill" :disabled="locked"><option v-for="item in brawlSkills" :key="item" :value="item">{{ skills[item] }}</option></select></label></div>
+            <dl v-if="growth" class="combat-stats"><div><dt>生命</dt><dd>{{ hp(growth.maxHp + (selectedGear?.hp ?? 0)) }}</dd></div><div><dt>基础伤害</dt><dd>{{ hp(growth.attack + (selectedGear?.attack ?? 0)) }}</dd></div></dl>
+            <template v-if="state.pvp && battleMode === 'pvp'">
+              <div class="pvp-summary"><span class="registration" :class="{ ready: state.pvp.enabled }">{{ state.pvp.enabled ? '已报名' : '未报名' }}</span><span>今日可挑战 <strong>{{ state.pvp.remaining }}</strong> 场</span></div>
+              <p class="subtle">报名后，离线也能接受挑战。对战使用已报名的武器与招式。</p>
+              <p v-if="pvpDirty" class="config-notice" role="status">配置已调整，保存后即可匹配。</p>
+              <div class="match-actions">
+                <button v-if="!state.pvp.enabled || pvpDirty" type="button" :class="{ primary: !state.pvp.enabled || pvpDirty }" :disabled="locked" @click="pvpAction('enroll')">{{ state.pvp.enabled ? '保存对战配置' : '报名接受匹配' }}</button>
+                <button type="button" class="primary" :disabled="locked || !state.pvp.enabled || !state.pvp.remaining || pvpDirty" @click="pvpAction('match')"><PetIcon name="play" />寻找对手</button>
+              </div>
+              <div class="control-footer"><span>今日被挑战 {{ state.pvp.received }} / {{ state.pvp.receivedLimit }}</span><button v-if="state.pvp.enabled" type="button" class="text-button" :disabled="locked" @click="pvpAction('withdraw')">退出报名</button></div>
+            </template>
+            <template v-else>
+              <label class="stage-label">挑战关卡<select v-model.number="stage" :disabled="locked"><option v-for="item in state.stages" :key="item" :value="item">第 {{ item }} 关 · {{ opponents[item - 1] }}{{ item <= state.cleared ? '（已通关）' : item > state.unlocked ? '（仅陪练）' : '' }}</option></select></label>
+              <p class="reward-note"><PetIcon name="gift" />{{ state.rewards[state.rewardCount] ? `下场闯关奖励 ${state.rewards[state.rewardCount]} 材料` : '今日闯关材料已领完' }}</p>
+              <div class="match-actions"><button type="button" :disabled="locked" @click="fight(true)">开始陪练</button><button type="button" class="primary" :disabled="locked || stage > state.unlocked" @click="fight(false)">开始闯关</button></div>
+              <p class="subtle control-footer">{{ stage > state.unlocked ? '通关前一关后解锁；当前仍可陪练。' : `已通关 ${state.cleared} / ${state.stages} 关` }}</p>
+            </template>
+          </section>
+        </div>
+        <section class="panel history" aria-labelledby="history-heading">
+          <div class="panel-heading"><h2 id="history-heading"><PetIcon name="history" />我的战报</h2><button type="button" class="text-button" :disabled="historyLoading" @click="loadHistory()"><PetIcon name="refresh" />刷新战报</button></div>
+          <p v-if="reportError && !retryReport" role="alert">{{ reportError }}</p>
+          <p v-if="historyLoading" role="status" class="subtle">正在读取战报列表…</p>
+          <p v-if="!matches.length && !historyLoading && !reportError" class="empty-history">还没有战报，完成对局后会记录在这里。</p>
+          <ul v-if="matches.length"><li v-for="match in matches" :key="match.id"><button type="button" :class="{ selected: report?.id === match.id }" :disabled="reportLoading" @click="viewReport(match.id)"><span class="result-mark" :class="{ win: match.winner === 0, loss: match.winner === 1 }">{{ resultLabel(match.winner) }}</span><span class="match-title">{{ match.mode === 'pvp' ? '实装对战' : `${match.practice ? '陪练' : '闯关'} · 第 ${match.stage} 关` }}<time :datetime="new Date(match.createdAt).toISOString()">{{ dateTime.format(match.createdAt) }}</time></span><span v-if="match.mode !== 'pvp'" class="match-reward">+{{ match.reward }}<small> 材料</small></span><PetIcon name="chevron" /></button></li></ul>
+          <button v-if="next" type="button" class="more-history" :disabled="historyLoading" @click="loadHistory(next)">更早的战报</button>
+        </section>
+      </div>
+      <div id="brawl-panel-equipment" v-show="section === 'equipment'" class="section-content" role="tabpanel" aria-labelledby="brawl-tab-equipment" tabindex="0">
+        <div v-if="eligible" class="workshop">
+          <section class="panel weapon-panel" aria-labelledby="weapon-heading">
+            <div class="panel-heading"><h2 id="weapon-heading"><PetIcon name="bag" />武器与招式</h2><span class="subtle">当前装备</span></div>
+            <div class="weapon-options" aria-label="选择武器"><button v-for="item in brawlWeapons" :key="item" type="button" :aria-pressed="weapon === item" :disabled="locked" @click="weapon = item"><span class="weapon-symbol"><PetIcon :name="item === 'SPOON' ? 'feed' : item === 'GUARD' ? 'care' : 'outing'" /></span><strong>{{ weapons[item] }}</strong><span>+{{ state.levels[item] }}</span><PetIcon v-if="weapon === item" name="check" /></button></div>
+            <label class="stage-label">出战招式<select v-model="skill" :disabled="locked"><option v-for="item in brawlSkills" :key="item" :value="item">{{ skills[item] }}</option></select></label>
+            <dl v-if="growth" class="combat-stats large"><div><dt>生命</dt><dd>{{ hp(growth.maxHp + (selectedGear?.hp ?? 0)) }}</dd></div><div><dt>基础伤害</dt><dd>{{ hp(growth.attack + (selectedGear?.attack ?? 0)) }}</dd></div></dl>
+            <p v-if="pvpDirty" class="config-notice">报名配置待更新，请到对战大厅保存。</p>
+            <button type="button" class="button-wide" @click="selectSection('arena')">返回对战大厅<PetIcon name="chevron" /></button>
+          </section>
+          <div class="equipment-column" data-floating-obstacle>
+            <section class="panel" aria-labelledby="upgrade-heading">
+              <div class="panel-heading"><h2 id="upgrade-heading"><PetIcon name="growth" />武器强化</h2><span class="level-tag">{{ weapons[weapon] }} +{{ level }}</span></div>
+              <div class="upgrade-track" aria-label="强化等级"><span v-for="n in 6" :key="n" :class="{ reached: level >= n - 1, current: level === n - 1 }">+{{ n - 1 }}</span></div>
+              <div v-if="nextGrowth" class="upgrade-preview"><span>强化至 +{{ level + 1 }}</span><span>生命 <strong>{{ hp(nextGrowth.maxHp + (selectedGear?.hp ?? 0)) }}</strong></span><span>基础伤害 <strong>{{ hp(nextGrowth.attack + (selectedGear?.attack ?? 0)) }}</strong></span></div>
+              <p v-else class="subtle">武器已达最高强化等级。</p>
+              <div class="forge-actions"><button type="button" class="primary" :disabled="locked || !cost || state.materials < cost" @click="upgrade()">{{ cost ? `材料强化 · ${cost} 材料` : '已达最高等级' }}</button><PetBrawlCheckout v-if="state.petId" :pet-id="state.petId" :weapon="weapon" :level="level" :version="state.version" :materials="state.materials" :cost="cost" :disabled="locked" :gear-options="gearOptions" /></div>
+              <p v-if="cost && state.materials < cost" class="subtle">还差 {{ cost - state.materials }} 材料，可以通过闯关积累。</p>
+            </section>
+            <section v-if="selectedGear" class="panel" aria-labelledby="socket-heading">
+              <div class="panel-heading"><h2 id="socket-heading"><PetIcon name="collection" />神器与镶嵌</h2><span class="subtle">{{ selectedGear.artifact ? '神器已进阶' : '神器未进阶' }}</span></div>
+              <p class="subtle">{{ selectedGear.artifact ? '当前装备增益' : level === 5 ? '可在积分与材料商店中进阶神器' : '武器 +5 后可进阶神器' }} · 生命 +{{ hp(selectedGear.hp) }}，基础伤害 +{{ hp(selectedGear.attack) }}</p>
+              <div v-for="slot in (['soul', 'rune'] as const)" :key="slot" class="socket-row"><span class="socket-symbol"><PetIcon :name="slot === 'soul' ? 'material' : 'collection'" /></span><label :for="`brawl-slot-${slot}`">{{ slot === 'soul' ? '魂珠槽' : '符石槽' }}<select :id="`brawl-slot-${slot}`" v-model="socketDraft[slot]" :disabled="locked || slot === 'rune' && !selectedGear.slot"><option value="">{{ slot === 'rune' && !selectedGear.slot ? '第二槽未解锁' : '空槽（可拆卸）' }}</option><option v-for="item in ownedSocketItems(slot)" :key="item.id" :value="item.id">{{ item.name }} Lv.{{ item.rank }}</option></select></label><button type="button" :disabled="locked || socketDraft[slot] === selectedGear[slot] || slot === 'rune' && !selectedGear.slot" @click="socket(slot)">{{ socketDraft[slot] ? '保存镶嵌' : '拆卸' }}</button></div>
+            </section>
+          </div>
+        </div>
+        <div v-else class="panel empty-history">宠物达到 Lv.{{ state.minLevel }} 后可进行配装强化。</div>
+      </div>
+      <section id="brawl-panel-season" v-show="section === 'season'" class="panel" data-floating-obstacle role="tabpanel" aria-labelledby="brawl-tab-season" tabindex="0"><PetBrawlSeason /></section>
+    </template>
     <p class="sr-only" role="status">{{ status }}</p>
-    <section v-if="state" class="panel" aria-labelledby="brawl-season">
-      <PetBrawlSeason />
-    </section>
-    <section v-if="state" class="panel history">
-      <div class="history-heading"><h2>我的战报</h2><button type="button" :disabled="historyLoading" @click="refresh(); loadHistory()">刷新</button></div>
-      <p v-if="reportError" role="alert">{{ reportError }} <button v-if="retryReport" type="button" @click="openReport(retryReport)">重读战报</button></p>
-      <p v-if="!matches.length && !historyLoading && !reportError" class="subtle">还没有战报。</p>
-      <ul v-if="matches.length">
-        <li v-for="match in matches" :key="match.id"><button type="button"  :disabled="reportLoading" @click="openReport(match.id)">
-          <span>{{ match.mode === 'pvp' ? '实装对战' : `${match.practice ? '陪练' : '闯关'} · 第 ${match.stage} 关` }} · {{ resultLabel(match.winner) }}</span>
-          <time :datetime="new Date(match.createdAt).toISOString()">{{ dateTime.format(match.createdAt) }}</time>
-        </button></li>
-      </ul>
-      <button v-if="next" type="button" :disabled="historyLoading" @click="loadHistory(next)">更早的战报</button>
-    </section>
   </main>
 </template>
 
 <style scoped>
-.brawl-page { display: grid; gap: 16px; padding-bottom: 32px; }
-.heading, .history-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-h1 { margin: 6px 0 0; color: var(--fp-title); }
-h2 { margin: 0; font-size: 1.125rem; color: var(--fp-title); }
-.materials { display: grid; text-align: end; font-size: .85rem; color: var(--fp-muted); }
-.materials strong { color: var(--fp-text); font-size: 1.45rem; font-variant-numeric: tabular-nums; }
-.arena { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 16px; align-items: start; }
-.arena.single { grid-template-columns: 1fr; }
-.sr-only { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); }
-.panel { padding: clamp(16px, 3vw, 24px); border: 1px solid var(--fp-border); border-radius: 12px; background: var(--fp-card); }
-.fields { display: grid; gap: 12px; margin-top: 16px; }
-.fields label { display: grid; gap: 5px; color: var(--fp-muted); }
-select, button { min-block-size: 44px; padding-inline: 12px; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-card); color: var(--fp-text); font: inherit; }
+.brawl-page { display: grid; gap: 20px; padding-bottom: 40px; --brawl-ink: var(--fp-primary-ink, var(--fp-primary)); }
+.heading, .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.heading { padding-block: 2px 4px; }
+h1 { margin: 8px 0 0; color: var(--fp-title); font-size: clamp(1.6rem, 1.35rem + .7vw, 2rem); letter-spacing: -.025em; }
+h2 { margin: 0; color: var(--fp-title); font-size: 1rem; }
+h3 { margin: 0; color: var(--fp-title); font-size: .875rem; }
+p { line-height: 1.65; }
+.back-link { display: inline-flex; align-items: center; gap: 7px; color: var(--fp-muted); font-size: .8rem; text-decoration: none; }
+.back-link svg { width: 15px; height: 15px; }
+.back-link:hover { color: var(--brawl-ink); }
+.panel, .brawl-overview { min-inline-size: 0; padding: 24px; border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius, 14px); background: var(--fp-card); }
+.panel-heading { margin-bottom: 20px; }
+.panel-heading h2 { display: flex; align-items: center; gap: 8px; }
+.panel-heading h2 svg { color: var(--fp-muted); width: 18px; height: 18px; }
+.brawl-overview { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px 32px; background: linear-gradient(110deg, var(--fp-primary-soft), transparent 60%), var(--fp-card); }
+.pet-identity { display: flex; align-items: center; gap: 18px; min-inline-size: 0; }
+.pet-identity img { display: block; object-fit: contain; flex: none; }
+.pet-identity > div { min-inline-size: 0; }
+.pet-identity h2 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-block: 5px; font-size: 1.3rem; overflow-wrap: anywhere; }
+.pet-identity p { margin: 0; color: var(--fp-muted); font-size: .8rem; }
+.eyebrow { font-size: .72rem; color: var(--brawl-ink); font-weight: 600; }
+.pet-placeholder { display: grid; place-items: center; inline-size: 88px; block-size: 88px; }
+.pet-placeholder svg { width: 40px; height: 40px; color: var(--fp-muted); }
+.level-tag { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 6px; background: var(--fp-bg); font-size: .75rem; font-weight: 600; color: var(--fp-muted); white-space: nowrap; }
+.overview-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin: 0; }
+.overview-stats > div { display: grid; gap: 8px; }
+dt { color: var(--fp-muted); font-size: .75rem; }
+.overview-stats dt { display: flex; align-items: center; gap: 5px; }
+.overview-stats dt svg { width: 15px; height: 15px; }
+dd { margin: 0; color: var(--fp-title); font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+dd small { color: var(--fp-muted); font-size: .75rem; font-weight: 400; }
+button, select, .button-link { min-block-size: 44px; padding: 8px 14px; border: 1px solid var(--fp-border); border-radius: 9px; background: var(--fp-card); color: var(--fp-text); font: inherit; font-size: .85rem; }
+button, .button-link { display: inline-flex; align-items: center; justify-content: center; gap: 7px; transition: background .15s, border-color .15s; }
 button:not(:disabled) { cursor: pointer; }
-button:not(:disabled):hover { background: var(--fp-hover); }
-button.primary:not(:disabled) { background: var(--fp-primary-soft); color: var(--fp-primary); }
-button:disabled { opacity: .55; }
-.socket-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-top: 8px; }
-.actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.subtle, time { color: var(--fp-muted); font-size: .875rem; }
-hr { border: 0; border-top: 1px solid var(--fp-border); margin: 16px 0; }
-.fighters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
-.fighters > div { display: grid; justify-items: center; gap: 5px; text-align: center; }
-.fighters span { font-size: .82rem; color: var(--fp-muted); }
+button:hover:not(:disabled) { background: var(--fp-hover); border-color: color-mix(in srgb, var(--fp-muted) 40%, var(--fp-border)); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button:focus-visible, select:focus-visible, summary:focus-visible, [role='tabpanel']:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
+button.primary { background: var(--fp-primary-fill, var(--fp-primary)); color: #fff; border-color: transparent; font-weight: 600; }
+button.primary:hover:not(:disabled) { background: var(--fp-primary-fill-hover, var(--fp-primary-hover)); border-color: transparent; }
+button.text-button { border-color: transparent; background: transparent; padding-inline: 6px; color: var(--fp-muted); font-size: .78rem; }
+button.text-button:hover:not(:disabled) { color: var(--brawl-ink); background: var(--fp-hover); }
+.text-button svg, .refresh-button svg { width: 16px; height: 16px; }
+button.button-wide, .button-link { text-decoration: none; color: var(--brawl-ink); }
+.button-wide { inline-size: 100%; }
+.subtle, time { color: var(--fp-muted); font-size: .8rem; }
+.section-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--fp-border); }
+.section-tabs button { position: relative; padding: 12px 20px 16px; background: none; border: 0; border-radius: 8px 8px 0 0; color: var(--fp-muted); font-weight: 600; }
+.section-tabs button[aria-selected='true'] { color: var(--brawl-ink); background: var(--fp-primary-soft); }
+.section-tabs button[aria-selected='true']::after { content: ''; position: absolute; inset-inline: 16px; bottom: -1px; height: 2px; background: var(--fp-primary); }
+.section-tabs svg { width: 18px; height: 18px; }
+.section-content { display: grid; gap: 20px; min-inline-size: 0; }
+.arena { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
+.arena.single { grid-template-columns: 1fr; }
+.battle { scroll-margin-top: 90px; }
+.battle-stage { background: linear-gradient(180deg, var(--fp-bg), var(--fp-card)); border: 1px solid var(--fp-border); border-radius: 12px; padding: 24px 16px 16px; }
+.fighters { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 8px; align-items: start; }
+.fighter { display: grid; justify-items: center; gap: 7px; text-align: center; min-inline-size: 0; }
+.fighter strong { font-size: .9rem; overflow-wrap: anywhere; }
+.fighter > span { color: var(--fp-muted); font-size: .73rem; }
+.fighter-side { padding: 3px 10px; border-radius: 6px; background: var(--fp-primary-soft); color: var(--brawl-ink) !important; }
+.fighter-side.opponent { background: var(--fp-bg); color: var(--fp-muted) !important; }
 .fighter-avatar { inline-size: 160px; max-inline-size: 100%; aspect-ratio: 1; }
-.fighter-avatar > img { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
+.fighter-avatar img { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
 .fighter-avatar--opponent { transform: scaleX(-1); }
-@media (max-width: 720px), (hover: none) and (pointer: coarse) {
-  .fighter-avatar { inline-size: 86px; }
+.versus { margin-top: 90px; color: var(--fp-muted); opacity: .5; font-size: 1.2rem; font-weight: 800; font-style: italic; }
+progress { appearance: none; width: 100%; max-width: 10rem; height: 6px; border: 0; border-radius: 10px; accent-color: var(--fp-primary); background: var(--fp-border); }
+progress::-webkit-progress-bar { background: var(--fp-border); border-radius: 10px; }
+progress::-webkit-progress-value { background: var(--fp-primary); border-radius: 10px; }
+progress::-moz-progress-bar { background: var(--fp-primary); border-radius: 10px; }
+.turn { min-block-size: 2.6em; margin: 24px 0 0; text-align: center; font-size: .82rem; color: var(--fp-muted); }
+.turn.is-ended { color: var(--brawl-ink); font-weight: 600; }
+.replay-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.stage-empty { display: grid; justify-items: center; align-content: center; gap: 12px; min-block-size: 300px; text-align: center; }
+.stage-empty img { object-fit: contain; }
+.stage-empty p { margin: 0; font-size: .8rem; color: var(--fp-muted); }
+.stage-empty > svg { width: 64px; height: 64px; color: var(--fp-primary); }
+.turn-details { margin-top: 16px; border-top: 1px solid var(--fp-border); padding-top: 12px; color: var(--fp-muted); font-size: .8rem; }
+.turn-details summary { cursor: pointer; padding-block: 8px; min-block-size: 44px; }
+.turn-details ol { line-height: 1.9; padding-left: 22px; }
+.mode-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; background: var(--fp-bg); border-radius: 10px; }
+.mode-switch button { border: 0; background: transparent; color: var(--fp-muted); }
+.mode-switch button[aria-pressed='true'] { background: var(--fp-card); box-shadow: var(--fp-card-shadow); color: var(--fp-title); font-weight: 600; }
+.loadout-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; }
+.fields { display: grid; gap: 12px; }
+.quick-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+label { display: grid; gap: 8px; font-size: .75rem; color: var(--fp-muted); min-inline-size: 0; }
+select { min-inline-size: 0; inline-size: 100%; max-inline-size: 100%; }
+.combat-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding-block: 16px; border-block: 1px solid var(--fp-border); margin-block: 20px; }
+.combat-stats > div + div { padding-left: 18px; border-left: 1px solid var(--fp-border); }
+.combat-stats dd { font-size: 1.2rem; margin-top: 4px; }
+.combat-stats.large dd { font-size: 1.8rem; }
+.pvp-summary { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: .8rem; color: var(--fp-muted); }
+.registration { padding: 4px 8px; background: var(--fp-bg); border-radius: 6px; font-size: .72rem; }
+.registration.ready { background: var(--fp-primary-soft); color: var(--brawl-ink); }
+.pvp-summary strong { color: var(--fp-title); }
+.config-notice { padding: 10px 12px; border-radius: 8px; background: var(--fp-primary-soft); color: var(--brawl-ink); font-size: .8rem; }
+.match-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.match-actions button { flex: 1 1 130px; }
+.control-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-block: 12px 0; color: var(--fp-muted); font-size: .72rem; }
+.stage-label { margin-block: 16px; }
+.reward-note { display: flex; align-items: center; gap: 8px; color: var(--brawl-ink); font-size: .8rem; }
+.history ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.history li { min-inline-size: 0; }
+.history li button { display: flex; align-items: center; gap: 14px; width: 100%; text-align: start; padding: 12px; }
+.history li button.selected { background: var(--fp-primary-soft); border-color: color-mix(in srgb, var(--fp-primary) 35%, var(--fp-border)); }
+.result-mark { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 8px; background: var(--fp-bg); color: var(--fp-muted); font-size: .75rem; font-weight: 600; }
+.result-mark.win { color: var(--brawl-ink); background: var(--fp-primary-soft); }
+.result-mark.loss { color: var(--fp-muted); }
+.match-title { display: grid; gap: 5px; min-inline-size: 0; }
+.match-title time { font-size: .72rem; }
+.match-reward { margin-left: auto; white-space: nowrap; color: var(--fp-muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.match-reward small { font-size: .72rem; }
+.history li svg { width: 16px; height: 16px; color: var(--fp-muted); margin-left: auto; }
+.more-history { margin-top: 16px; width: 100%; }
+.empty-history { color: var(--fp-muted); text-align: center; padding-block: 24px; font-size: .85rem; }
+.workshop { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 1.6fr); gap: 20px; align-items: start; }
+.equipment-column { display: grid; gap: 20px; min-inline-size: 0; }
+.weapon-options { display: grid; gap: 10px; }
+.weapon-options button { display: flex; justify-content: start; padding: 12px; gap: 12px; }
+.weapon-options button[aria-pressed='true'] { background: var(--fp-primary-soft); border-color: var(--fp-primary); color: var(--brawl-ink); }
+.weapon-options button strong { font-size: .85rem; }
+.weapon-options button > span:not(.weapon-symbol) { margin-left: auto; }
+.weapon-symbol { display: grid; place-items: center; width: 36px; height: 36px; background: var(--fp-bg); border-radius: 8px; }
+.upgrade-track { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-block: 24px; }
+.upgrade-track span { display: grid; place-items: center; padding-block: 10px; border-radius: 6px; background: var(--fp-bg); border: 1px solid var(--fp-border); font-size: .8rem; color: var(--fp-muted); }
+.upgrade-track span.reached { background: var(--fp-primary-soft); color: var(--brawl-ink); border-color: transparent; }
+.upgrade-track span.current { border-color: var(--fp-primary); font-weight: 700; }
+.upgrade-preview { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 20px; color: var(--fp-muted); font-size: .8rem; }
+.upgrade-preview strong { color: var(--fp-text); }
+.forge-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.socket-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding-block: 16px; }
+.socket-row + .socket-row { border-top: 1px solid var(--fp-border); }
+.socket-symbol { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 9px; background: var(--fp-bg); color: var(--brawl-ink); }
+.socket-row button { align-self: end; }
+.unlock-panel { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.unlock-symbol { display: grid; place-items: center; width: 44px; height: 44px; background: var(--fp-bg); border-radius: 10px; color: var(--fp-muted); }
+.unlock-panel p { margin-bottom: 0; }
+.unlock-panel .button-link { margin-inline-start: auto; }
+.loading-state, .error-state { color: var(--fp-muted); font-size: .85rem; }
+.sr-only { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); }
+@media (max-width: 1000px) {
+  .brawl-overview { gap: 20px; }
+  .overview-stats { flex: 1 1 100%; padding-top: 18px; border-top: 1px solid var(--fp-border); gap: 16px; }
+  .arena { grid-template-columns: minmax(0, 1.1fr) minmax(290px, 1fr); }
+  .panel { padding: 20px; }
 }
-progress { width: 100%; max-width: 10rem; accent-color: var(--fp-primary); }
-.turn { min-block-size: 2.6em; margin-bottom: 4px; }
-details { margin-top: 12px; }
-summary { cursor: pointer; }
-.history ul { list-style: none; padding: 0; margin: 12px 0; }
-.history li + li { margin-top: 6px; }
-.history li button { display: flex; justify-content: space-between; gap: 6px 12px; align-items: center; flex-wrap: wrap; width: 100%; text-align: start; }
-@media (max-width: 720px) { .arena { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .brawl-page, .section-content { gap: 16px; }
+  .arena, .workshop { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .history ul { grid-template-columns: minmax(0, 1fr); }
+  .section-tabs { gap: 2px; }
+  .section-tabs button { flex: 1; padding: 12px 6px; font-size: .8rem; gap: 5px; }
+  .section-tabs svg { width: 16px; height: 16px; }
+  .brawl-overview { padding: 18px; }
+  .pet-identity { gap: 12px; }
+  .pet-identity img { width: 64px; height: 64px; }
+  .pet-identity h2 { font-size: 1.1rem; }
+  .overview-stats { gap: 10px; }
+  .overview-stats dd { font-size: 1.3rem; }
+  .overview-stats dt { font-size: .67rem; gap: 4px; }
+  .overview-stats dt svg { display: none; }
+  .panel { padding: 16px; }
+  .panel-heading { margin-bottom: 16px; }
+  .battle-stage { padding: 16px 10px; }
+  .stage-empty { min-block-size: 230px; }
+  .stage-empty img { width: 120px; height: 120px; }
+  .fighter-avatar { inline-size: 96px; }
+  .fighters { grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr); gap: 4px; }
+  .versus { margin-top: 65px; font-size: 1rem; }
+  .unlock-panel .button-link { width: 100%; }
+  .socket-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .socket-symbol { display: none; }
+  .forge-actions > * { flex: 1 1 160px; }
+}
+@media (prefers-reduced-motion: reduce) { button, .button-link { transition: none; } }
 </style>
