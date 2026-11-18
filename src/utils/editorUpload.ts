@@ -3,6 +3,12 @@ import { uploadV3Files, uploadedMarkdown } from '@/api/v3-uploads'
 
 export type EditorUploadStatus = { pending: boolean; text: string } | null
 
+function formatUploadLimit(bytes: number) {
+  if (bytes % (1024 * 1024) === 0) return `${bytes / (1024 * 1024)} MB`
+  if (bytes % 1024 === 0) return `${bytes / 1024} KB`
+  return `${bytes} 字节`
+}
+
 export function createEditorUpload(
   insert: (markdown: string) => void,
   showStatus: (status: EditorUploadStatus) => void = () => {},
@@ -38,7 +44,18 @@ export function createEditorUpload(
         const markdown = results.map(uploadedMarkdown).filter(Boolean).join('\n')
         if (markdown) insert(`\n${markdown}\n`)
         const failures = results.filter(item => !item.url)
-        if (failures.length) message = `已插入${results.length - failures.length}个文件，${failures.length}个文件上传失败或未返回结果，请检查后重试失败文件`
+        if (failures.length) {
+          const details: string[] = []
+          const succeeded = results.length - failures.length
+          if (succeeded) details.push(`已插入 ${succeeded} 个文件`)
+          const tooLarge = failures.filter(item => item.maxBytes !== undefined)
+          const otherFailures = failures.length - tooLarge.length
+          for (const item of tooLarge) {
+            if (item.maxBytes !== undefined) details.push(`「${item.name}」超过单文件上限，最大可上传 ${formatUploadLimit(item.maxBytes)}`)
+          }
+          if (otherFailures) details.push(`${otherFailures}个文件上传失败或未返回结果，请检查后重试失败文件`)
+          message = details.join('。')
+        }
         return message
       } catch (error) {
         if (!current()) return null

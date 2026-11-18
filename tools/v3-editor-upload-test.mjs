@@ -30,3 +30,20 @@ let retries=0;globalThis.fetch=async()=>{retries++;throw Error('network')};await
 console.log('PASS upload 8 inconsistent result rejected and network ambiguity does not automatically repeat file transfer')
 const source=await fs.readFile('src/components/MarkdownEditor.vue','utf8');assert.ok(source.includes('await uploads.handler(files)'));assert.ok(source.includes('uploads.dispose()')&&source.includes('uploads.cancel()'));assert.ok(!source.includes('uploadFiles')&&!source.includes("if (!props.apiKey) return '请先登录后再上传'"))
 console.log('PASS upload 9 shared editor uses v3 upload, external value/identity/unmount cancel, legacy upload gate removed')
+
+const mixed = createEditorUpload(markdown => inserted.push(markdown), status => statuses.push(status))
+globalThis.fetch = async () => new Response(JSON.stringify({ code: 0, data: {
+  succMap: { 'upload-1.png': 'https://file.fishpi.cn/valid.png' },
+  errFiles: ['upload-2.png', 'upload-3.zip', 'upload-4.mp4'],
+  sizeLimits: { 'upload-1.png': 99, 'upload-2.png': 20971520, 'upload-3.zip': 20971520, 'upload-4.mp4': -1 },
+} }))
+const mixedMessage = await mixed.handler([file(), file('大图.png'), file('附件.zip', 'application/zip'), file('视频.mp4', 'video/mp4')])
+assert.match(mixedMessage, /已插入 1 个文件/)
+assert.match(mixedMessage, /「大图.png」超过单文件上限，最大可上传 20 MB/)
+assert.match(mixedMessage, /「附件.zip」超过单文件上限，最大可上传 20 MB/)
+assert.match(mixedMessage, /1个文件上传失败/)
+assert.equal(statuses.at(-1).text, mixedMessage)
+assert.match(inserted.at(-1), /valid.png/)
+globalThis.fetch = async () => new Response('Request Entity Too Large', { status: 413 })
+assert.match(await mixed.handler([file()]), /这批文件超过上传请求的大小限制/)
+console.log('PASS upload 10 actual per-file limits for image and attachment, mixed success and proxy limit fallback')

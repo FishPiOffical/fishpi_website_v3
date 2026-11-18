@@ -1,6 +1,6 @@
 import { ApiError, request } from './http'
 type Row = Record<string, unknown>
-export type UploadResult = { name: string; url: string | null; image: boolean }
+export type UploadResult = { name: string; url: string | null; image: boolean; maxBytes?: number }
 const invalid = () => new ApiError('上传服务响应不正确', 502)
 function row(v: unknown): Row { if (!v || typeof v !== 'object' || Array.isArray(v)) throw invalid(); return v as Row }
 function outputURL(v: unknown): string {
@@ -33,13 +33,25 @@ export async function uploadV3Files(files: File[], signal: AbortSignal): Promise
   try { response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${credential}` }, body: form, credentials: 'omit', redirect: 'error', signal }) }
   catch (error) { if (signal.aborted) throw error; throw new ApiError('上传结果未确认，请检查网络后再选择文件', 0) }
   signal.throwIfAborted()
+  if (response.status === 413) throw new ApiError('这批文件超过上传请求的大小限制，请减少文件数量或压缩后重试', 413)
   let result: Row
   try { result = row(await response.json()) } catch { throw new ApiError('上传结果未确认，请检查后再试', response.status) }
   signal.throwIfAborted()
   if (!response.ok || result.code !== 0) throw new ApiError('图床上传失败，请检查文件后重试', response.status)
   const data = row(result.data), successes = row(data.succMap), failures = data.errFiles
   if (!Array.isArray(failures) || failures.some(name => typeof name !== 'string' || !names.includes(name)) || new Set(failures).size !== failures.length || Object.keys(successes).some(name => !names.includes(name) || failures.includes(name))) throw invalid()
-  return files.map((file, i) => ({ name: file.name || names[i]!, url: Object.hasOwn(successes, names[i]!) ? outputURL(successes[names[i]!]) : null, image: file.type.startsWith('image/') }))
+  const sizeLimits = data.sizeLimits
+  const limits = sizeLimits && typeof sizeLimits === 'object' && !Array.isArray(sizeLimits) ? sizeLimits as Row : {}
+  return files.map((file, i) => {
+    const name = names[i]!
+    const sizeLimit = failures.includes(name) && Object.hasOwn(limits, name) ? limits[name] : undefined
+    return {
+      name: file.name || name,
+      url: Object.hasOwn(successes, name) ? outputURL(successes[name]) : null,
+      image: file.type.startsWith('image/'),
+      ...(typeof sizeLimit === 'number' && Number.isSafeInteger(sizeLimit) && sizeLimit > 0 ? { maxBytes: sizeLimit } : {}),
+    }
+  })
 }
 export function uploadedMarkdown(result: UploadResult): string {
   if (!result.url) return ''
