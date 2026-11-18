@@ -8,6 +8,8 @@ import PetBrawlFighterVisual from '@/components/pets/PetBrawlFighterVisual.vue'
 import { brawlWeaponVisuals } from '@/components/pets/brawlWeaponArt'
 import PetFeedback from '@/components/pets/PetFeedback.vue'
 import PetBrawlCheckout from '@/components/pets/PetBrawlCheckout.vue'
+import PetBrawlUpgradeStats from '@/components/pets/PetBrawlUpgradeStats.vue'
+import { formatBattleStat, formatBattleEffect } from '@/components/pets/brawlStats'
 import PetBrawlSeason from '@/components/pets/PetBrawlSeason.vue'
 import PetBrawlInvitations from '@/components/pets/PetBrawlInvitations.vue'
 import PetBrawlWeaponArt from '@/components/pets/PetBrawlWeaponArt.vue'
@@ -90,7 +92,6 @@ const level = computed(() => state.value?.levels[weapon.value] ?? 0)
 const maxUpgrade = computed(() => state.value?.maxUpgrade ?? 20)
 const milestones = computed(() => Array.from({ length: 6 }, (_, index) => index * maxUpgrade.value / 5))
 const growth = computed(() => state.value?.growth[level.value])
-const nextGrowth = computed(() => state.value?.growth[level.value + 1])
 const selectedGear = computed(() => state.value?.gear?.weapons[weapon.value])
 const gearOptions = computed(() => {
   if (!selectedGear.value || !state.value?.gear) return []
@@ -119,14 +120,13 @@ const turn = computed(() => {
   return turns?.[Math.min(frame.value, turns.length) - 1]
 })
 const ended = computed(() => !!report.value && frame.value > report.value.turns.length)
-const hp = (centi: number) => (centi / 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 const settled = computed(() => contactReached.value || stillReplay.value || ended.value)
 const hpTurn = computed(() => settled.value ? turn.value : report.value?.turns[frame.value - 2])
 const turnFeedback = computed(() => {
   if (!turn.value || !settled.value || ended.value) return []
   const { actor, damage, healing } = turn.value
-  const received = { kind: turn.value.effects?.criticalBonus ? 'critical' : 'damage', text: `−${hp(damage)}` }
-  const restored = healing > 0 ? { kind: 'heal', text: `+${hp(healing)}` } : undefined
+  const received = { kind: turn.value.effects?.criticalBonus ? 'critical' : 'damage', text: `−${formatBattleStat(damage)}` }
+  const restored = healing > 0 ? { kind: 'heal', text: `+${formatBattleStat(healing)}` } : undefined
   return actor === 0 ? [restored, received] : [received, restored]
 })
 type BattleTurn = NonNullable<typeof turn.value>
@@ -178,8 +178,8 @@ const turnLabel = computed(() => {
   const { round, actor, damage, healing } = turn.value
   const subject = `第 ${round} 回合 · ${actor === 0 ? '我方' : '对手'}`
   if (!settled.value) return `${subject}出招`
-  const recovery = healing ? `，回复 ${hp(healing)} 生命` : ''
-  return `${subject}造成 ${hp(damage)} 伤害${recovery}`
+  const recovery = healing ? `，回复 ${formatBattleStat(healing)} 生命` : ''
+  return `${subject}造成 ${formatBattleStat(damage)} 伤害${recovery}`
 })
 const describe = (reason: unknown) => reason instanceof Error ? reason.message : '读取失败，请重试'
 
@@ -517,9 +517,9 @@ onUnmounted(() => {
                       <PetBrawlWeaponArt :weapon="report.player.weapon" :level="report.player.level" :max-level="report.maxUpgrade" :artifact="report.player.artifact" size="battle" />
                       <span><strong>{{ weapons[report.player.weapon] }} +{{ report.player.level }}</strong><small>{{ skills[report.player.skill] }}</small></span>
                     </span>
-                    <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ hp(report.player.gearHp) }} · 伤害 +{{ hp(report.player.gearAttack) }}</span>
+                    <span v-if="report.player.gearHp || report.player.gearAttack">配装 生命 +{{ formatBattleStat(report.player.gearHp) }} · 伤害 +{{ formatBattleStat(report.player.gearAttack) }}</span>
                     <progress aria-label="我的宠物生命" :max="report.player.maxHp" :value="hpTurn?.playerHp ?? report.player.maxHp" />
-                    <span>{{ hp(hpTurn?.playerHp ?? report.player.maxHp) }} / {{ hp(report.player.maxHp) }}</span>
+                    <span>{{ formatBattleStat(hpTurn?.playerHp ?? report.player.maxHp) }} / {{ formatBattleStat(report.player.maxHp) }}</span>
                   </div>
                   <span class="versus" aria-hidden="true">VS</span>
                   <div class="fighter">
@@ -542,9 +542,9 @@ onUnmounted(() => {
                       <PetBrawlWeaponArt :weapon="report.opponent.weapon" :level="report.opponent.level" :max-level="report.maxUpgrade" :artifact="report.opponent.artifact" size="battle" />
                       <span><strong>{{ weapons[report.opponent.weapon] }} +{{ report.opponent.level }}</strong><small>{{ skills[report.opponent.skill] }}</small></span>
                     </span>
-                    <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ hp(report.opponent.gearHp) }} · 伤害 +{{ hp(report.opponent.gearAttack) }}</span>
+                    <span v-if="report.opponent.gearHp || report.opponent.gearAttack">配装 生命 +{{ formatBattleStat(report.opponent.gearHp) }} · 伤害 +{{ formatBattleStat(report.opponent.gearAttack) }}</span>
                     <progress aria-label="对手生命" :max="report.opponent.maxHp" :value="hpTurn?.opponentHp ?? report.opponent.maxHp" />
-                    <span>{{ hp(hpTurn?.opponentHp ?? report.opponent.maxHp) }} / {{ hp(report.opponent.maxHp) }}</span>
+                    <span>{{ formatBattleStat(hpTurn?.opponentHp ?? report.opponent.maxHp) }} / {{ formatBattleStat(report.opponent.maxHp) }}</span>
                   </div>
                   <div v-if="projectile" :key="turnKey" class="projectile-lane" :class="{ reversed: turn?.actor === 1 }"
                     :data-projectile="projectile.art"
@@ -556,7 +556,7 @@ onUnmounted(() => {
                 <div class="turn-readout" :class="{ 'has-effects': !ended && !!turn?.effects }">
                   <p class="turn" :class="{ 'is-ended': ended }">{{ turnLabel }}</p>
                   <ul v-if="replayNotes.length" class="effect-notes" aria-label="本次行动效果">
-                    <li v-for="note in replayNotes" :key="note.text">{{ note.text }} <b>{{ note.sign }}{{ hp(note.amount) }}</b></li>
+                    <li v-for="note in replayNotes" :key="note.text">{{ note.text }} <b>{{ note.sign }}{{ formatBattleStat(note.amount) }}</b></li>
                   </ul>
                 </div>
               </template>
@@ -572,9 +572,9 @@ onUnmounted(() => {
               <summary>逐回合战报</summary>
               <ol>
                 <li v-for="(event, index) in report.turns" :key="index">
-                  第 {{ event.round }} 回合 · {{ event.actor === 0 ? '我方' : '对手' }}造成 {{ hp(event.damage) }} 伤害<span v-if="event.healing">，回复 {{ hp(event.healing) }} 生命</span>
+                  第 {{ event.round }} 回合 · {{ event.actor === 0 ? '我方' : '对手' }}造成 {{ formatBattleStat(event.damage) }} 伤害<span v-if="event.healing">，回复 {{ formatBattleStat(event.healing) }} 生命</span>
                   <ul v-if="event.effects" class="effect-notes" aria-label="伤害与回血明细">
-                    <li v-for="note in effectNotes(event, true)" :key="note.text">{{ note.text }} <b>{{ note.sign }}{{ hp(note.amount) }}</b></li>
+                    <li v-for="note in effectNotes(event, true)" :key="note.text">{{ note.text }} <b>{{ note.sign }}{{ formatBattleStat(note.amount) }}</b></li>
                   </ul>
                 </li>
               </ol>
@@ -596,7 +596,7 @@ onUnmounted(() => {
                     </optgroup>
                   </template>
                 </select>
-                <small v-if="selectedWeapon?.effect" id="brawl-arena-weapon-effect">{{ selectedWeapon.effect }}</small>
+                <small v-if="selectedWeapon?.effect" id="brawl-arena-weapon-effect">{{ formatBattleEffect(selectedWeapon.effect) }}</small>
               </div>
               <div class="equipment-field">
                 <label for="brawl-arena-skill">招式</label>
@@ -608,10 +608,10 @@ onUnmounted(() => {
                     </optgroup>
                   </template>
                 </select>
-                <small v-if="selectedSkill?.effect" id="brawl-arena-skill-effect">{{ selectedSkill.effect }}</small>
+                <small v-if="selectedSkill?.effect" id="brawl-arena-skill-effect">{{ formatBattleEffect(selectedSkill.effect) }}</small>
               </div>
             </div>
-            <dl v-if="growth" class="combat-stats"><div><dt>生命</dt><dd>{{ hp(growth.maxHp + (selectedGear?.hp ?? 0)) }}</dd></div><div><dt>基础伤害</dt><dd>{{ hp(growth.attack + (selectedGear?.attack ?? 0)) }}</dd></div></dl>
+            <dl v-if="growth" class="combat-stats"><div><dt>生命</dt><dd>{{ formatBattleStat(growth.maxHp + (selectedGear?.hp ?? 0)) }}</dd></div><div><dt>基础伤害</dt><dd>{{ formatBattleStat(growth.attack + (selectedGear?.attack ?? 0)) }}</dd></div></dl>
             <template v-if="state.pvp && battleMode === 'pvp'">
               <div class="pvp-summary"><span class="registration" :class="{ ready: state.pvp.enabled }">{{ state.pvp.enabled ? '已报名' : '未报名' }}</span><span>今日可挑战 <strong>{{ state.pvp.remaining }}</strong> 场</span></div>
               <p class="subtle">报名后，离线也能接受挑战。对战使用已报名的武器与招式。</p>
@@ -678,7 +678,7 @@ onUnmounted(() => {
                   type="button" :aria-pressed="weapon === item.id" :disabled="locked" @click="weapon = item.id">
                   <PetBrawlWeaponArt :weapon="item.id" :level="state.levels[item.id] ?? 0" :max-level="maxUpgrade"
                     :artifact="Boolean(state.gear?.weapons[item.id]?.artifact)" />
-                  <span class="weapon-description"><strong>{{ item.name }}</strong><small v-if="item.effect">{{ item.effect }}</small></span>
+                  <span class="weapon-description"><strong>{{ item.name }}</strong><small v-if="item.effect">{{ formatBattleEffect(item.effect) }}</small></span>
                   <span>+{{ state.levels[item.id] }}</span>
                   <PetIcon v-if="weapon === item.id" name="check" />
                 </button>
@@ -694,9 +694,9 @@ onUnmounted(() => {
                   </optgroup>
                 </template>
               </select>
-              <small v-if="selectedSkill?.effect" id="brawl-workshop-skill-effect">{{ selectedSkill.effect }}</small>
+              <small v-if="selectedSkill?.effect" id="brawl-workshop-skill-effect">{{ formatBattleEffect(selectedSkill.effect) }}</small>
             </div>
-            <dl v-if="growth" class="combat-stats large"><div><dt>生命</dt><dd>{{ hp(growth.maxHp + (selectedGear?.hp ?? 0)) }}</dd></div><div><dt>基础伤害</dt><dd>{{ hp(growth.attack + (selectedGear?.attack ?? 0)) }}</dd></div></dl>
+            <dl v-if="growth" class="combat-stats large"><div><dt>生命</dt><dd>{{ formatBattleStat(growth.maxHp + (selectedGear?.hp ?? 0)) }}</dd></div><div><dt>基础伤害</dt><dd>{{ formatBattleStat(growth.attack + (selectedGear?.attack ?? 0)) }}</dd></div></dl>
             <button v-if="state.pvp?.friendlyWeapon" type="button" class="button-wide"
               :disabled="locked || (state.pvp.friendlyWeapon === weapon && state.pvp.friendlySkill === skill)"
               @click="pvpAction('save')">保存出战配装<PetIcon name="check" /></button>
@@ -717,18 +717,13 @@ onUnmounted(() => {
                   <span v-for="milestone in milestones" :key="milestone" :class="{ reached: level >= milestone }">+{{ milestone }}</span>
                 </div>
               </div>
-              <div v-if="growth && nextGrowth" class="upgrade-preview">
-                <span>强化至 +{{ level + 1 }}</span>
-                <span>生命 <strong>{{ hp(nextGrowth.maxHp + (selectedGear?.hp ?? 0)) }}</strong> <small>+{{ hp(nextGrowth.maxHp - growth.maxHp) }}</small></span>
-                <span>基础伤害 <strong>{{ hp(nextGrowth.attack + (selectedGear?.attack ?? 0)) }}</strong> <small>+{{ hp(nextGrowth.attack - growth.attack) }}</small></span>
-              </div>
-              <p v-else class="subtle">武器已达最高强化等级。</p>
-              <div class="forge-actions"><button type="button" class="primary" :disabled="locked || !cost || state.materials < cost" @click="upgrade()">{{ cost ? `材料强化 · ${cost} 材料` : '已达最高等级' }}</button><PetBrawlCheckout v-if="state.petId" :pet-id="state.petId" :weapon="weapon" :level="level" :version="state.version" :materials="state.materials" :cost="cost" :disabled="locked" :gear-options="gearOptions" /></div>
+              <PetBrawlUpgradeStats class="forge-stats" :growth="state.growth" :to-level="Math.min(level + 1, maxUpgrade)" />
+              <div class="forge-actions"><button type="button" class="primary" :disabled="locked || !cost || state.materials < cost" @click="upgrade()">{{ cost ? `材料强化 · ${cost} 材料` : '已达最高等级' }}</button><PetBrawlCheckout v-if="state.petId" :pet-id="state.petId" :weapon="weapon" :level="level" :version="state.version" :materials="state.materials" :cost="cost" :disabled="locked" :gear-options="gearOptions" :growth="state.growth" /></div>
               <p v-if="cost && state.materials < cost" class="subtle">还差 {{ cost - state.materials }} 材料，可以通过闯关积累。</p>
             </section>
             <section v-if="selectedGear" class="panel" aria-labelledby="socket-heading">
               <div class="panel-heading"><h2 id="socket-heading"><PetIcon name="collection" />神器与镶嵌</h2><span class="subtle">{{ selectedGear.artifact ? '神器已进阶' : '神器未进阶' }}</span></div>
-              <p class="subtle">{{ selectedGear.artifact ? '当前装备增益' : level === maxUpgrade ? '可在积分与材料商店中进阶神器' : `武器 +${maxUpgrade} 后可进阶神器` }} · 生命 +{{ hp(selectedGear.hp) }}，基础伤害 +{{ hp(selectedGear.attack) }}</p>
+              <p class="subtle">{{ selectedGear.artifact ? '当前装备增益' : level === maxUpgrade ? '可在积分与材料商店中进阶神器' : `武器 +${maxUpgrade} 后可进阶神器` }} · 生命 +{{ formatBattleStat(selectedGear.hp) }}，基础伤害 +{{ formatBattleStat(selectedGear.attack) }}</p>
               <div v-for="slot in (['soul', 'rune'] as const)" :key="slot" class="socket-row"><span class="socket-symbol"><PetIcon :name="slot === 'soul' ? 'material' : 'collection'" /></span><label :for="`brawl-slot-${slot}`">{{ slot === 'soul' ? '魂珠槽' : '符石槽' }}<select :id="`brawl-slot-${slot}`" v-model="socketDraft[slot]" :disabled="locked || slot === 'rune' && !selectedGear.slot"><option value="">{{ slot === 'rune' && !selectedGear.slot ? '第二槽未解锁' : '空槽（可拆卸）' }}</option><option v-for="item in ownedSocketItems(slot)" :key="item.id" :value="item.id">{{ item.name }} Lv.{{ item.rank }}</option></select></label><button type="button" :disabled="locked || socketDraft[slot] === selectedGear[slot] || slot === 'rune' && !selectedGear.slot" @click="socket(slot)">{{ socketDraft[slot] ? '保存镶嵌' : '拆卸' }}</button></div>
             </section>
           </div>
@@ -961,9 +956,7 @@ select { min-inline-size: 0; inline-size: 100%; max-inline-size: 100%; }
 .upgrade-track progress { max-width: none; height: 8px; }
 .upgrade-milestones { display: flex; justify-content: space-between; color: var(--fp-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
 .upgrade-milestones .reached { color: var(--brawl-ink); font-weight: 600; }
-.upgrade-preview { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 20px; color: var(--fp-muted); font-size: .8rem; }
-.upgrade-preview strong { color: var(--fp-text); }
-.upgrade-preview small { color: var(--brawl-ink); font-weight: 600; }
+.forge-stats { margin-bottom: 20px; }
 .forge-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .socket-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding-block: 16px; }
 .socket-row + .socket-row { border-top: 1px solid var(--fp-border); }

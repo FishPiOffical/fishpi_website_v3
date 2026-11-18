@@ -143,7 +143,7 @@ async function mount(options = {}) {
   server = fixture(options)
   const pinia = createPinia(); setActivePinia(pinia)
   auth = useAuthStore(); pets = usePetsStore()
-  props = reactive({ petId: '1', weapon: 'SPOON', level: 0, version: 1, cost: 20, materials: 5, disabled: false, gearOptions: [], ...options.props })
+  props = reactive({ petId: '1', weapon: 'SPOON', level: 0, version: 1, cost: 20, materials: 5, disabled: false, growth: [{ maxHp: 10000, attack: 900 }, { maxHp: 10020, attack: 902 }], gearOptions: [], ...options.props })
   app = createApp({ setup: () => () => h(Component, props) }); app.use(pinia); app.mount('#app'); await flush()
   document.querySelector('.checkout-trigger').click(); await flush()
   assert.ok(dialog('积分与材料商店'))
@@ -152,6 +152,20 @@ try {
   Component = (await import(await compileFile('src/components/pets/PetBrawlCheckout.vue'))).default
   usePetsStore = (await import(await compileFile('src/stores/pets.ts'))).usePetsStore
 
+  const { formatBattleEffect } = await import(await compileFile('src/components/pets/brawlStats.ts'))
+  assert.equal(formatBattleEffect('第 3、5 回合各加伤 3.6，并各穿透最多 1.2 减伤'), '第 3、5 回合各加伤 360，并各穿透最多 120 减伤')
+  assert.equal(formatBattleEffect('第 4 回合最多回复 7.5，第 5 回合减伤 0.4'), '第 4 回合最多回复 750，第 5 回合减伤 40')
+  assert.equal(formatBattleEffect('第 3 回合减伤 12.5%'), '第 3 回合减伤 12.5%')
+  await mount({ props: { level: 1, growth: [
+    { maxHp: 10000, attack: 900 }, { maxHp: 10020, attack: 902 }, { maxHp: 10040, attack: 904 },
+  ] } })
+  const statCells = root => [...root.querySelectorAll('.upgrade-stats tbody tr')].map(row =>
+    [...row.cells].map(cell => cell.textContent.trim()))
+  const expected = [['生命', '10,040', '+20', '+40 (0.4%)'], ['基础伤害', '904', '+2', '+4 (0.44%)']]
+  assert.deepEqual(statCells(dialog('积分与材料商店')), expected)
+  await click('强化')
+  assert.deepEqual(statCells(dialog('确认强化')), expected)
+  pass('强化预览和报价确认按服务端成长表分别显示本级与累计属性')
   await mount(); await click('强化')
   assert.ok(dialog('确认强化'), '必须弹出第二个确认对话框')
   assert.equal(quotes().length, 1); assert.equal(confirms().length, 0); assert.equal(server.charges, 0)
