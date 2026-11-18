@@ -14,6 +14,7 @@ const imports = {
   '@/components/EmojiPicker.vue': stub,
   '@/stores/appearance': url('export function useAppearanceStore(){return {state:{theme:"light"}}}'),
   '@/utils/markdownPreview': url('export function createMarkdownPreview(){return {reset(){},dispose(){},transform(){},parse(){}}}'),
+  '@/utils/markdownEditorAssets': url(ts.transpileModule(await fs.readFile('src/utils/markdownEditorAssets.ts', 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText),
   '@/utils/editorUpload': url('export const editorUploadAccept = ""; export function createEditorUpload(){return {cancel(){},dispose(){},handler(){}}}'),
   '@/utils/mentionHints': url('export function createMentionHints(){return {cancel(){},dispose(){},hint(){}}}'),
   '@/api/http': url('export function getAuthContextVersion(){return 1} export function onAccessTokenChange(){return ()=>{}}'),

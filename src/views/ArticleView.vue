@@ -6,7 +6,7 @@ import { formatDisplayTime } from '@/utils/time'
 import RandomArticles from '@/components/discovery/RandomArticles.vue'
 import { articleTitle } from '@/utils/text'
 import { avatarStyle, imagePreviewSource, withImageThumbnailSrcset } from '@/utils/avatar'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchPostEffect } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
@@ -42,6 +42,7 @@ import ImageLightbox from '@/components/ImageLightbox.vue'
 import LongArticleReader from '@/components/articles/LongArticleReader.vue'
 import { useLayoutStore } from '@/stores/layout'
 import { createReusableTemplate } from '@/utils/reusableTemplate'
+import { preloadMarkdownEditor } from '@/utils/markdownEditorAssets'
 
 const reactionEvents=useV3ReactionsStore()
 const route = useRoute(), router = useRouter()
@@ -144,6 +145,35 @@ const STATEMENT_LABELS: Record<number, string> = {
 const typeBadge = computed(() => TYPE_BADGES[Number(article.value?.articleType)] || '')
 const commentingEnabled = computed(() => article.value?.articleCommentable === true)
 const statementLabel = computed(() => article.value?.articleStatement == null ? '状态暂不可用' : STATEMENT_LABELS[article.value.articleStatement] || '')
+
+watchPostEffect(onCleanup => {
+  if (typeof requestAnimationFrame !== 'function' || !routeMounted.value || !isLoggedIn.value ||
+      !commentingEnabled.value || !article.value?.articleContent ||
+      (!bodyEl.value && !readerRef.value)) return
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+  if (connection?.saveData) return
+  let frame = 0, cancelIdle: (() => void) | undefined
+  const schedule = () => {
+    // 首屏先绘制，编辑器脚本只预取，不在阅读时执行。
+    frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        if (typeof window.requestIdleCallback === 'function') {
+          const job = window.requestIdleCallback(preloadMarkdownEditor)
+          cancelIdle = () => window.cancelIdleCallback(job)
+        } else {
+          preloadMarkdownEditor()
+        }
+      })
+    })
+  }
+  if (document.readyState === 'complete') schedule()
+  else window.addEventListener('load', schedule, { once: true })
+  onCleanup(() => {
+    window.removeEventListener('load', schedule)
+    cancelAnimationFrame(frame)
+    cancelIdle?.()
+  })
+})
 
 const quickReplyOpen = ref(false)
 const quickReplyStarted = ref(false)

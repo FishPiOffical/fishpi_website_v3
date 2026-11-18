@@ -4,6 +4,7 @@ import { useAppearanceStore } from '@/stores/appearance'
 import FpLoading from '@/components/FpLoading.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import { createMarkdownPreview } from '@/utils/markdownPreview'
+import { VDITOR_CDN, VDITOR_SCRIPT } from '@/utils/markdownEditorAssets'
 import { createEditorUpload, editorUploadAccept, type EditorUploadStatus } from '@/utils/editorUpload'
 import { createMentionHints } from '@/utils/mentionHints'
 import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
@@ -81,8 +82,6 @@ function resizeWithKeys(event: KeyboardEvent) {
   const nextHeight = clampHeight(displayedHeight.value + (event.key === increaseKey ? 12 : -12))
   if (nextHeight !== displayedHeight.value) saveHeight(nextHeight)
 }
-
-const VDITOR_CDN = 'https://file.fishpi.cn/vditor/latest/dist'
 
 interface VditorInstance {
   readonly vditor?: { lute?: { GetEmojis(): Record<string, unknown> } }
@@ -163,7 +162,7 @@ function loadVditor(): Promise<VditorCtor> {
       document.head.appendChild(css)
     }
     const script = document.createElement('script')
-    script.src = `${VDITOR_CDN}/index.min.js`
+    script.src = VDITOR_SCRIPT
     script.onload = () => (w.Vditor ? resolve(w.Vditor) : reject(new Error('Vditor 未注册')))
     script.onerror = () => reject(new Error('编辑器加载失败'))
     document.head.appendChild(script)
