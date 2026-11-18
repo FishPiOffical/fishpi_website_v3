@@ -844,14 +844,16 @@ export const readPetRisk = (signal?: AbortSignal) => read('/api/v3/me/pet/risk',
   return { retryAt: integer(row.retryAt), verificationRequired: flag(row.verificationRequired), serverNow: integer(row.serverNow) }
 }, signal)
 export async function createPetRiskChallenge(command: PetCommand, signal?: AbortSignal): Promise<PetRiskChallenge> {
-  const operation = petRiskOperation(command)
+  return createGameRiskChallenge(petRiskOperation(command), command.key, signal)
+}
+export async function createGameRiskChallenge(operation: string, key: string, signal?: AbortSignal): Promise<PetRiskChallenge> {
   const response = await petRequest<{ code: number; data: unknown }>('/api/v3/me/pet/risk/challenge', {
-    method: 'POST', body: JSON.stringify({ operation, idempotencyKey: command.key }), signal,
+    method: 'POST', body: JSON.stringify({ operation, idempotencyKey: key }), signal,
   })
   if (response?.code !== 0) throw invalid()
   const row = object(response.data)
-  if (row.operation !== operation || row.idempotencyKey !== command.key || row.provider !== 'geetest4') throw invalid()
-  return { challengeId: text(row.challengeId, 128), operation, idempotencyKey: command.key,
+  if (row.operation !== operation || row.idempotencyKey !== key || row.provider !== 'geetest4') throw invalid()
+  return { challengeId: text(row.challengeId, 128), operation, idempotencyKey: key,
     expiresAt: integer(row.expiresAt), provider: 'geetest4', captchaId: text(row.captchaId, 128),
     ...(row.serverNow === undefined ? {} : { serverNow: integer(row.serverNow) }),
     ...(row.verified === undefined ? {} : { verified: flag(row.verified) }) }
