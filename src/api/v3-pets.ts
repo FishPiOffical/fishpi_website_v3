@@ -120,6 +120,7 @@ export interface PetCatalog {
     maxNameLength: number; initialCoins: number; initialFood: number
     dailyCoins: number; dailyFood: number; restDurationMs: number
     restEnergyPerHour: number; growthDailyLimit: number
+    waterGain?: number; petMood?: number; playMood?: number; playEnergy?: number
   }
 }
 export interface Pet {
@@ -391,6 +392,9 @@ export function decodePetCatalog(value: unknown): PetCatalog {
     },
   }
   if (catalog.species.length !== 4 || catalog.skills.length !== 6 || catalog.jobs.length !== 6 || !catalog.items.some(item => item.id === 'food')) throw invalid()
+  for (const key of ['waterGain', 'petMood', 'playMood', 'playEnergy'] as const) {
+    if (rules[key] !== undefined) catalog.rules[key] = integer(rules[key], 0, 100)
+  }
   const itemIds = new Set(catalog.items.map(item => item.id)), collectionIds = new Set(catalog.collections.map(item => item.id))
   // 旧目录缺失时保持未知，不在客户端补造成长规则。
   if (row.growthRules !== undefined) {
