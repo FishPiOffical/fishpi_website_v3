@@ -7,6 +7,9 @@ import { useAuthStore } from '@/stores/auth'
 import { formatUploadLimit, imageUploadAccept, validateEditorFile } from '@/utils/editorUpload'
 import { memberSnapshotKey, removePublicSnapshot } from '@/utils/publicSnapshots'
 
+const MAX_BACKGROUND_UPLOAD_BYTES = 2 * 1024 * 1024
+const backgroundUploadLimit = formatUploadLimit(MAX_BACKGROUND_UPLOAD_BYTES)
+
 const auth = useAuthStore()
 const saved = ref<string | null>(null)
 const draft = ref('')
@@ -51,10 +54,14 @@ async function upload(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file || busy.value || operation.value || saved.value === null || !auth.isLoggedIn) return
+  error.value = message.value = ''
+  if (file.size > MAX_BACKGROUND_UPLOAD_BYTES) {
+    error.value = `背景图片不能超过 ${backgroundUploadLimit}，请选择更小的图片`
+    return
+  }
   const owner = identity(), run = version, controller = new AbortController()
   const valid = () => run === version && owner === identity() && !controller.signal.aborted
   uploadRequest = controller
-  error.value = message.value = ''
   uploadStatus.value = '正在检查图片…'
   try {
     const image = await validateEditorFile(file, controller.signal, true)
