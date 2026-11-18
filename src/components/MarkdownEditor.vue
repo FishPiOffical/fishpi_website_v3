@@ -260,6 +260,19 @@ function visibleEditorField() {
   ) ?? []).find(element => element.getClientRects().length > 0)
 }
 
+function insertText(text: string) {
+  const field = ready.value ? visibleEditorField() : undefined
+  if (field) {
+    field.focus({ preventScroll: true })
+    // 通过原生文本输入保留 @ 后的普通空格及编辑器光标，Markdown 解析会裁掉行尾空格。
+    if (document.activeElement === field && document.execCommand('insertText', false, text)) {
+      reportContentState()
+      return
+    }
+  }
+  insertEmoji(text)
+}
+
 function destroyEditor() {
   editor?.destroy()
   editor = null
@@ -457,6 +470,7 @@ defineExpose({
     editor?.focus()
   },
   insert: insertEmoji,
+  insertText,
   toggleEmoji,
 })
 </script>

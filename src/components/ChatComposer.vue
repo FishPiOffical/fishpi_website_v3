@@ -82,7 +82,7 @@ defineExpose({
   flush,
   focus: () => editor.value?.focus(),
   reveal,
-  insert: (text: string) => editor.value?.insert(text),
+  insert: (text: string) => editor.value?.insertText(text),
 })
 </script>
 
