@@ -15,13 +15,14 @@ const imageFormats = new Map([
   ['gif', 'image/gif'], ['webp', 'image/webp'],
 ])
 const attachmentFormats = ['zip', 'rar', '7z', 'mp3', 'mp4', 'webm', 'mov']
-export const editorUploadAccept = [...imageFormats.keys(), ...attachmentFormats].map(ext => `.${ext}`).join(',')
+export const imageUploadAccept = [...imageFormats.keys()].map(ext => `.${ext}`).join(',')
+export const editorUploadAccept = [imageUploadAccept, ...attachmentFormats.map(ext => `.${ext}`)].join(',')
 const supportedImageTypes = new Set(imageFormats.values())
 
-async function validateEditorFile(file: File, signal: AbortSignal): Promise<File> {
+export async function validateEditorFile(file: File, signal: AbortSignal, imageOnly = false): Promise<File> {
   const extension = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]?.toLowerCase()
   const expected = extension ? imageFormats.get(extension) : undefined
-  if (!expected && !file.type.toLowerCase().startsWith('image/')) {
+  if (!imageOnly && !expected && !file.type.toLowerCase().startsWith('image/')) {
     if (extension && attachmentFormats.includes(extension)) return file
     throw new Error(`「${file.name}」格式不支持。图片仅支持 JPG、PNG、GIF、WebP，其他附件支持 ${attachmentFormats.map(ext => ext.toUpperCase()).join('、')}`)
   }
@@ -40,7 +41,7 @@ async function validateEditorFile(file: File, signal: AbortSignal): Promise<File
   return file.type === actual ? file : new File([file], file.name, { type: actual, lastModified: file.lastModified })
 }
 
-function formatUploadLimit(bytes: number) {
+export function formatUploadLimit(bytes: number) {
   if (bytes % (1024 * 1024) === 0) return `${bytes / (1024 * 1024)} MB`
   if (bytes % 1024 === 0) return `${bytes / 1024} KB`
   return `${bytes} 字节`

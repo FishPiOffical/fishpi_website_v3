@@ -49,6 +49,13 @@ export function displayAvatar(raw: string): string {
   try { const url = new URL(raw, 'https://fishpi.cn'); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? raw : '' } catch { return '' }
 }
 export async function fetchV3Avatar(): Promise<string> { return displayAvatar(text((await data(`${root}/avatar`)).avatarURL)) }
+export async function fetchV3CardBackground(signal?: AbortSignal): Promise<string> {
+  return text((await data(`${root}/card-background`, { signal, cache: 'no-store' })).cardBg)
+}
+export async function saveV3CardBackground(cardBg: string, key: string): Promise<void> {
+  const saved = text((await put('card-background', { cardBg }, key)).cardBg)
+  if (saved !== cardBg) throw invalid()
+}
 export async function saveV3Avatar(avatarURL: string, key: string): Promise<string> {
   const value = text((await put('avatar', { avatarURL }, key)).avatarURL)
   if (value !== avatarURL) throw invalid()
