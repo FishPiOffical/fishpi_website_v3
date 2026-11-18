@@ -31,6 +31,9 @@ const server=http.createServer(async(req,res)=>{
  if(req.url==='/api/v3/fixture/rate'){
   res.writeHead(429,{'Content-Type':'text/plain','Retry-After':'120'});res.end('Slow down');return
  }
+ if(req.url==='/api/v3/chat/realtime-ticket'){
+  res.writeHead(200,{'Content-Type':'application/json'});res.end('{"code":0,"data":{"ticket":"fixture"}}');return
+ }
  const format=req.url.split('/').pop()
  if(format==='error'){res.writeHead(422,{'Content-Type':'application/json'});res.end('{"code":"invalid_request","msg":"Rejected"}');return}
  if(format==='html'){res.writeHead(404,{'Content-Type':'text/html'});res.end('<p>Internal route missing</p>');return}
@@ -124,13 +127,23 @@ try{
   now+=16_000
   assert.equal(api.resumeHomeReads(),true)
   const rateStart=received.length
+  const ticketPath='/api/v3/chat/realtime-ticket'
+  const ticketOptions={method:'POST',body:'{}'}
   await Promise.all(['/api/v3/fixture/rate','/api/v3/fixture/json'].map(path=>
    assert.rejects(api.request(path),error=>error.code==='home_reads_paused')))
   assert.deepEqual(received.slice(rateStart).map(entry=>entry.path),['/api/v3/fixture/rate'])
+  await assert.rejects(api.request(ticketPath,ticketOptions),error=>error.code==='home_reads_paused'&&Number(error.retryAfter)>0)
+  assert.equal(received.length,rateStart+1)
   now+=118_000
   assert.equal(api.resumeHomeReads(),false)
   now+=2000
+  await assert.rejects(api.request('/api/v3/fixture/json'),error=>error.code==='home_reads_paused')
+  assert.equal((await api.request(ticketPath,ticketOptions)).data.ticket,'fixture')
+  assert.equal(received.at(-1).path,ticketPath)
+  assert.ok(api.getHomeReadPause())
+  const resumeEvents=offline.filter(event=>event==='fp:home-reads-resumed').length
   assert.equal(api.resumeHomeReads(),true)
+  assert.equal(offline.filter(event=>event==='fp:home-reads-resumed').length,resumeEvents+1)
   assert.equal((await api.request('/api/v3/fixture/json')).code,0)
   now+=1000
   guestRefresh=true

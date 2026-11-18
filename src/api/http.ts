@@ -76,7 +76,7 @@ let nextHomeReadAt = 0
 let homeReadInFlight: Promise<unknown> | null = null
 let homePriorityRead: Promise<unknown> | null = null
 let homeSessionRestore: Promise<unknown> | null = null
-let homeReadPause: { until: number; message: string } | null = null
+let homeReadPause: { until: number; message: string; rateLimited?: boolean } | null = null
 const HOME_READ_PAUSE_KEY = 'fp.home-read-pause-until'
 
 export function setHomeReadsActive(active: boolean) {
@@ -85,9 +85,11 @@ export function setHomeReadsActive(active: boolean) {
   homeReadGeneration++
   if (active && !homeReadPause) {
     try {
-      const until = Number(window.sessionStorage.getItem(HOME_READ_PAUSE_KEY))
+      const saved = window.sessionStorage.getItem(HOME_READ_PAUSE_KEY) ?? ''
+      const [deadline, reason] = saved.split(':')
+      const until = Number(deadline)
       if (Number.isFinite(until) && until > Date.now()) {
-        homeReadPause = { until, message: '首页读取仍在暂停中。' }
+        homeReadPause = { until, message: '首页读取仍在暂停中。', rateLimited: reason === '429' }
       }
     } catch { /* Storage may be disabled. */ }
   }
@@ -112,17 +114,27 @@ export function resumeHomeReads() {
   homeReadGeneration++
   try { window.sessionStorage.removeItem(HOME_READ_PAUSE_KEY) } catch { /* Storage may be disabled. */ }
   window.dispatchEvent(new Event('fp:home-reads-paused'))
+  window.dispatchEvent(new Event('fp:home-reads-resumed'))
   return true
 }
 
 function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promise<T>, priority: boolean): Promise<T> {
   const generation = homeReadGeneration, version = authVersion
   const sessionRead = priority || path === '/api/v3/me/membership'
+  const chatTicket = path === '/api/v3/chat/realtime-ticket'
+  const pauseError = (pause: NonNullable<typeof homeReadPause>) => {
+    const error = new ApiError(pause.message, 0, 'home_reads_paused')
+    if (chatTicket && pause.rateLimited) error.retryAfter = String(Math.ceil((pause.until - Date.now()) / 1_000))
+    return error
+  }
   const check = () => {
     if ((!sessionRead && generation !== homeReadGeneration) || (init.credentials !== 'omit' && version !== authVersion) || init.signal?.aborted) {
       throw new ApiError('请求已取消', 0, 'aborted')
     }
-    if (homeReadPause) throw new ApiError(homeReadPause.message, 0, 'home_reads_paused')
+    // 限流结束后允许聊天室单独恢复，首页其他读取仍由原入口恢复。
+    if (homeReadPause && !(chatTicket && homeReadPause.rateLimited && Date.now() >= homeReadPause.until)) {
+      throw pauseError(homeReadPause)
+    }
   }
   const execute = async () => {
     while (true) {
@@ -155,12 +167,14 @@ function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promi
         const retryAt = header && /^\d+$/.test(header) ? now + Number(header) * 1000 : Date.parse(header ?? '')
         homeReadPause = {
           until: Math.max(now + (error.status === 429 ? 60_000 : 15_000), Number.isFinite(retryAt) ? retryAt : 0),
+          rateLimited: error.status === 429,
           message: error.status === 429 ? '请求过于频繁，首页已暂停读取。'
             : error.code === 'offline' ? '连接暂不可用，首页已暂停读取。' : '访问暂时受限，首页已暂停读取。',
         }
-        try { window.sessionStorage.setItem(HOME_READ_PAUSE_KEY, String(homeReadPause.until)) } catch { /* Storage may be disabled. */ }
+        try { window.sessionStorage.setItem(HOME_READ_PAUSE_KEY, String(homeReadPause.until) + (homeReadPause.rateLimited ? ':429' : '')) } catch { /* Storage may be disabled. */ }
+        const paused = pauseError(homeReadPause)
         window.dispatchEvent(new Event('fp:home-reads-paused'))
-        throw new ApiError(homeReadPause.message, 0, 'home_reads_paused')
+        throw paused
       }
       throw error
     } finally {
