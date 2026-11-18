@@ -2,7 +2,7 @@ import { setSsrReadGate } from './api/http'
 import { createSsrUpstreamGate } from './seo/ssrUpstreamGate'
 import { fetchDirectoryPage } from './api/v3-directory'
 import { fetchHomeBootstrap, fetchHomeRead, type HomeRead } from './api/v3-home-reads'
-import { createPublicHomeCache } from './seo/publicHomeCache'
+import { createPublicHomeCache, PUBLIC_HOME_CACHE_TTL_MS } from './seo/publicHomeCache'
 import { fetchArticleListing } from './api/v3-article-list'
 import { fetchRecentMembers } from './api/v3-discovery-extras'
 import { fetchPublicUser } from './api/v3-public-user'
@@ -44,13 +44,14 @@ async function prefetchHome(withinBudget: WithinBudget): Promise<SsrPayload> {
   const expires: Partial<Record<HomeRead, number>> = {}
   const rankingExpires: Partial<Record<'checkin' | 'online', number>> = {}
   let recentMembersExpires: number | undefined
+  let homeBreezemoonFetchedAt: number | undefined
   // The gate admits requests in start order. Recent and hot must reach it before secondary modules.
   const settled = await Promise.allSettled([
     fetchHomeBootstrap(key => withinBudget(homeRead(key, () => fetchHomeRead(key), expiry => { expires[key] = expiry }))),
     withinBudget(homeRead('ranking:checkin:8', () => fetchRanking('checkin', 1, undefined, 8, 'omit'), expiry => { rankingExpires.checkin = expiry })),
     withinBudget(homeRead('ranking:online:8', () => fetchRanking('online', 1, undefined, 8, 'omit'), expiry => { rankingExpires.online = expiry })),
     withinBudget(homeRead('recent-members', fetchRecentMembers, expiry => { recentMembersExpires = expiry })),
-    withinBudget(homeRead('breezemoons:8', () => fetchV3Breezemoons(1, 8))),
+    withinBudget(homeRead('breezemoons:8', () => fetchV3Breezemoons(1, 8), expiry => { homeBreezemoonFetchedAt = expiry - PUBLIC_HOME_CACHE_TTL_MS })),
     withinBudget(homeRead('repeater:joke', () => fetchRepeaterItems('joke'))),
   ])
   const val = <T>(i: number, fallback: T): T =>
@@ -64,6 +65,7 @@ async function prefetchHome(withinBudget: WithinBudget): Promise<SsrPayload> {
     recentMembers: val(3, null),
     recentMembersExpires,
     homeBreezemoonPage: val(4, null),
+    homeBreezemoonFetchedAt,
     repeater: val(5, undefined),
   }
 }

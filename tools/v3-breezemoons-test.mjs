@@ -36,8 +36,11 @@ let release;state.responses.push(()=>new Promise(resolve=>release=resolve));cons
 actor.account={oId:'1'};actor.accessToken='D';state.responses.push(new ApiError('delete lost',503));await store.remove('201','source');assert.equal(store.pending.operation,'delete');const deleteKey=store.pending.key;state.responses.push(env({}));await store.retry();assert.equal(store.pending,null);assert.equal(state.requests.at(-1).init.headers['Idempotency-Key'],deleteKey);
 console.log('PASS moons 3 cancellation/identity change during confirmation sends nothing; delete works only after confirmation, delayed old write cannot revive state')
 function tickUntil(predicate){return(async()=>{for(let i=0;i<100&&!predicate();i++)await Promise.resolve();assert.ok(predicate())})()}
-const storeURL=url('export const useV3BreezemoonStore=globalThis.__moonsStore'),payloadURL=url('export function consumeBreezemoonPagePayload(){return null}'),routerURL=url(`import{h}from'${import.meta.resolve('vue')}';export const RouterLink={props:['to'],setup:(p,{slots})=>()=>h('a',{href:typeof p.to==='string'?p.to:p.to.path},slots.default?.())}`),avatarURL=url(compile(await fs.readFile('src/utils/avatar.ts','utf8'))),vipURL=url(`import{h}from'${import.meta.resolve('vue')}';export default{props:['text'],setup:p=>()=>h('span',p.text)}`)
-const useFeedURL=url(rewrite(compile(await fs.readFile('src/composables/useBreezemoonFeed.ts','utf8')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-breezemoons',apiURL],['@/stores/auth',authURL],['@/stores/v3Breezemoons',storeURL]]))
+const storeURL=url('export const useV3BreezemoonStore=globalThis.__moonsStore'),payloadURL=url('export function consumeBreezemoonPagePayload(){return null} export function consumeHomeBreezemoonFetchedAt(){return undefined}'),routerURL=url(`import{h}from'${import.meta.resolve('vue')}';export const RouterLink={props:['to'],setup:(p,{slots})=>()=>h('a',{href:typeof p.to==='string'?p.to:p.to.path},slots.default?.())}`),avatarURL=url(compile(await fs.readFile('src/utils/avatar.ts','utf8'))),vipURL=url(`import{h}from'${import.meta.resolve('vue')}';export default{props:['text'],setup:p=>()=>h('span',p.text)}`)
+let realtimeCalls=0, closeRealtimeCalls=0, realtimeChange, realtimeStatus
+globalThis.__moonsRealtime=(changed,status)=>{realtimeCalls++;realtimeChange=changed;realtimeStatus=status;return()=>{closeRealtimeCalls++}}
+const realtimeURL=url('export const subscribeBreezemoonChanges=globalThis.__moonsRealtime')
+const useFeedURL=url(rewrite(compile(await fs.readFile('src/composables/useBreezemoonFeed.ts','utf8')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-realtime',realtimeURL],['@/api/v3-breezemoons',apiURL],['@/stores/auth',authURL],['@/stores/v3Breezemoons',storeURL]]))
 const timeURL=url(compile(await fs.readFile('src/utils/time.ts','utf8')))
 const sidebarDraftsURL=url(rewrite(compile(await fs.readFile('src/composables/sidebarDrafts.ts','utf8')),[['vue',import.meta.resolve('vue')]]))
 function sfc(source,pairs){return url(rewrite(compile(compileScript(parse(source).descriptor,{id:'moons-sfc',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['vue-router',routerURL],['@/utils/time',timeURL],...pairs]))}
@@ -48,7 +51,7 @@ const renderer=createRenderer({patchProp(el,k,old,v){el.props[k]=v},insert,remov
 const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' ')
 const find=(n,fn)=>fn(n)?n:(n.children||[]).map(c=>find(c,fn)).find(Boolean)
 const tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()}
-function mount(pinia=createPinia()){const root={children:[]},app=renderer.createApp(component,{manage:true});app.use(pinia);const user=auth(pinia);app.mount(root);return{root,app,user,text:()=>text(root),click:()=>find(root,n=>n.tag==='button').props.onClick()}}
+function mount(pinia=createPinia(), props={manage:true}){const root={children:[]},app=renderer.createApp(component,props);app.use(pinia);const user=auth(pinia);app.mount(root);return{root,app,user,text:()=>text(root),click:()=>find(root,n=>n.tag==='button').props.onClick()}}
 
 const click=(view,label)=>{const button=find(view.root,n=>n.tag==='button'&&text(n).trim()===label);assert.ok(button,'Missing '+label);button.props.onClick()}
 const input=(view,value)=>{const node=find(view.root,n=>n.tag==='textarea');assert.ok(node);node.props['onUpdate:modelValue'](value)}
@@ -65,3 +68,39 @@ console.log('PASS moons 8 retry from a different composer clears only the origin
 let ssrReads=0;state.dispatch=()=>{ssrReads++;throw Error('SSR')};const ssr=createSSRApp(component);ssr.use(createPinia());await renderToString(ssr);assert.equal(ssrReads,0)
 console.log('PASS moons 7 panel SSR never sends reader requests or mutations; public prefetch is supplied independently')
 function findAll(node,predicate){return [...(predicate(node)?[node]:[]),...(node.children||[]).flatMap(child=>findAll(child,predicate))]}
+
+state.dispatch=async path=>{
+ const query=new URL(path,'https://fixture.test').searchParams
+ return env(page([],1,0,Number(query.get('size'))))
+}
+const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))
+const previewPinia=createPinia()
+const previewUser=auth(previewPinia)
+previewUser.accessToken='preview-reader'
+previewUser.account={oId:'1',userName:'owner'}
+const beforePreview=state.requests.length
+const socketsBefore=realtimeCalls
+const firstPreview=mount(previewPinia,{compact:true,size:8})
+let secondPreview=mount(previewPinia,{compact:true,size:8,previewLimit:6})
+await tick()
+assert.match(firstPreview.text(),/暂无清风明月动态/)
+assert.match(secondPreview.text(),/暂无清风明月动态/)
+assert.equal(state.requests.length,beforePreview+1)
+assert.equal(realtimeCalls,socketsBefore+1)
+secondPreview.app.unmount()
+secondPreview=mount(previewPinia,{compact:true,size:8,previewLimit:6})
+await tick()
+assert.equal(state.requests.length,beforePreview+1)
+realtimeStatus('ready')
+realtimeChange();realtimeChange();realtimeChange()
+await pause(280);await tick()
+assert.equal(state.requests.length,beforePreview+2)
+realtimeStatus('closed');realtimeStatus('ready')
+await pause(280);await tick()
+assert.equal(state.requests.length,beforePreview+3)
+const priorClose=closeRealtimeCalls
+firstPreview.app.unmount();secondPreview.app.unmount()
+await pause(520);assert.equal(closeRealtimeCalls,priorClose+1)
+previewUser.accessToken=null
+previewUser.account=null
+console.log('PASS 清风共享首屏缓存与单一订阅，变更合并请求，重连补读，离开后释放连接')

@@ -121,18 +121,18 @@ export function resumeHomeReads() {
 function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promise<T>, priority: boolean): Promise<T> {
   const generation = homeReadGeneration, version = authVersion
   const sessionRead = priority || path === '/api/v3/me/membership'
-  const chatTicket = path === '/api/v3/chat/realtime-ticket'
+  const retryableTicket = path === '/api/v3/chat/realtime-ticket' || path === '/api/v3/breezemoons/realtime-ticket'
   const pauseError = (pause: NonNullable<typeof homeReadPause>) => {
     const error = new ApiError(pause.message, 0, 'home_reads_paused')
-    if (chatTicket && pause.rateLimited) error.retryAfter = String(Math.ceil((pause.until - Date.now()) / 1_000))
+    if (retryableTicket && pause.rateLimited) error.retryAfter = String(Math.ceil((pause.until - Date.now()) / 1_000))
     return error
   }
   const check = () => {
     if ((!sessionRead && generation !== homeReadGeneration) || (init.credentials !== 'omit' && version !== authVersion) || init.signal?.aborted) {
       throw new ApiError('请求已取消', 0, 'aborted')
     }
-    // 限流结束后允许聊天室单独恢复，首页其他读取仍由原入口恢复。
-    if (homeReadPause && !(chatTicket && homeReadPause.rateLimited && Date.now() >= homeReadPause.until)) {
+    // 限流结束后允许实时订阅单独恢复，首页其他读取仍由原入口恢复。
+    if (homeReadPause && !(retryableTicket && homeReadPause.rateLimited && Date.now() >= homeReadPause.until)) {
       throw pauseError(homeReadPause)
     }
   }

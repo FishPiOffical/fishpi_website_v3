@@ -32,6 +32,7 @@ export interface SsrPayload {
   milestonePage?: MilestonePage | null
   breezemoonPage?: BreezemoonPage | null
   homeBreezemoonPage?: BreezemoonPage | null
+  homeBreezemoonFetchedAt?: number
   article?: ArticleDetail | null
   member?: PublicUser | null
   feed?: ArticleSummary[]
@@ -133,6 +134,10 @@ export function consumeTagsPayload(): { tags: TagItem[]; total: number } | null 
 
 export function consumeBreezemoonPagePayload(scope: 'global' | 'home'): BreezemoonPage | null {
   return takeField(scope === 'global' ? 'breezemoonPage' : 'homeBreezemoonPage') || null
+}
+
+export function consumeHomeBreezemoonFetchedAt() {
+  return takeField('homeBreezemoonFetchedAt')
 }
 
 export function consumeRepeaterPayload(): RepeaterItem[] | null {

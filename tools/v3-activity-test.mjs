@@ -4,7 +4,7 @@ const state=globalThis.__activity={context:1,calls:[],dispatch:null,ssr:false,ke
 const http=url(`export class ApiError extends Error{constructor(m,status=0,code=''){super(m);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__activity.context}export async function request(path,init){globalThis.__activity.calls.push({path,init});return globalThis.__activity.dispatch(path,init)}`),{ApiError}=await import(http),apiURL=url(replace(compile(await fs.readFile('src/api/v3-activity.ts','utf8')),[['./http',http]])),api=await import(apiURL)
 const auth=defineStore('activity-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__activityAuth=auth;const authURL=url('export const useAuthStore=globalThis.__activityAuth')
 const storeURL=url(replace(compile((await fs.readFile('src/stores/v3Activity.ts','utf8')).replaceAll('import.meta.env.SSR','globalThis.__activity.ssr')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/stores/auth',authURL],['@/api/v3-activity',apiURL],['@/api/v3-profile',url('export function profileOperationKey(){return "reward-k-"+(++globalThis.__activity.key)}')]])),{useV3ActivityStore}=await import(storeURL)
-const feedURL=url(replace(compile((await fs.readFile('src/composables/useActivityStatus.ts','utf8')).replaceAll('import.meta.env.SSR','globalThis.__activity.ssr')),[['vue',import.meta.resolve('vue')],['@/api/http',http],['@/api/v3-activity',apiURL],['@/stores/auth',authURL],['@/stores/v3Activity',storeURL]])),routerURL=url(`import{h}from '${import.meta.resolve('vue')}';export const RouterLink={props:['to'],setup(p,{slots}){return()=>h('a',{href:p.to},slots.default?.())}}`)
+const feedURL=url(replace(compile((await fs.readFile('src/composables/useActivityStatus.ts','utf8')).replaceAll('import.meta.env.SSR','globalThis.__activity.ssr')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-activity',apiURL],['@/stores/auth',authURL],['@/stores/v3Activity',storeURL]])),routerURL=url(`import{h}from '${import.meta.resolve('vue')}';export const RouterLink={props:['to'],setup(p,{slots}){return()=>h('a',{href:p.to},slots.default?.())}}`)
 let recoveryComponentURL=url('export default {render(){return null}}')
 async function component(path){const d=parse(await fs.readFile(path,'utf8')).descriptor;return(await import(url(replace(compile(compileScript(d,{id:path,inlineTemplate:true}).content),[['@/components/ActivityRecovery.vue',recoveryComponentURL],['vue',import.meta.resolve('vue')],['vue-router',routerURL],['@/api/http',http],['@/api/v3-activity',apiURL],['@/stores/v3Activity',storeURL],['@/composables/useActivityStatus',feedURL],['@/stores/auth',authURL],['@/composables/useDialog',url('export function fpConfirm(options){return globalThis.__activity.confirmation(options)}')]])))).default}
 const Recovery=await component('src/components/ActivityRecovery.vue')
@@ -63,3 +63,29 @@ console.log('PASS activity 13 route leave aborts pending confirmation before POS
 state.ssr=true;const app=createSSRApp(Page);app.use(createPinia());const calls=state.calls.length,html=await renderToString(app);assert.equal(state.calls.length,calls);assert.ok(!html.includes('65.25')&&!html.includes('领取昨日活跃奖励'));state.ssr=false
 const [facade,shell,source]=await Promise.all(['src/api/fishpi.ts','src/layouts/AppShell.vue','src/components/home/CheckinPanel.vue'].map(p=>fs.readFile(p,'utf8')));assert.ok(!facade.includes('fetchCheckedIn')&&!facade.includes('LIVENESS_STORE')&&!facade.includes('yesterday-liveness-reward-api'));assert.ok(!shell.includes('<ActivityRecovery'));assert.ok((await fs.readFile('src/components/home/CheckinPanel.vue','utf8')).includes('<ActivityRecovery '));assert.ok(source.includes('lang="scss"')&&!source.includes('apiKey')&&!source.includes('readCache')&&!source.includes('v-html'));assert.ok(!source.includes('class="checkin-card"'))
 console.log('PASS activity 14 SSR guards, recovery inside the check-in card and removal of legacy API/localStorage/nested-card paths')
+
+const sharedPinia=createPinia()
+const cacheStart=state.calls.length
+let a=mount(sharedPinia), b=mount(sharedPinia)
+await tick()
+assert.equal(state.calls.length-cacheStart,2)
+assert.match(a.text(),/65.25%/)
+assert.match(b.text(),/65.25%/)
+a.app.unmount(); b.app.unmount()
+a=mount(sharedPinia)
+await tick()
+assert.equal(state.calls.length-cacheStart,2)
+const originalNow=Date.now
+try {
+ const nextDay=originalNow()+86_400_000
+ Date.now=()=>nextDay
+ b=mount(sharedPinia)
+ await tick()
+ assert.equal(state.calls.length-cacheStart,4)
+ await click(a,'刷新签到状态')
+ await tick()
+ assert.equal(state.calls.length-cacheStart,6)
+ b.app.unmount()
+} finally { Date.now=originalNow }
+a.app.unmount()
+console.log('PASS 签到与奖励合并并发、跨页面缓存命中、跨日失效和手动刷新')

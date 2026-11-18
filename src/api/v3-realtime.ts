@@ -81,13 +81,17 @@ export function subscribeChatChanges(event:(value:ChatRealtimeEvent)=>void,state
  return subscribeChanges('chat','/api/v3/chat/realtime-ticket',()=>{},undefined,event,state)
 }
 
+export function subscribeBreezemoonChanges(changed: () => void, state: (value: ChatRealtimeState) => void): () => void {
+  return subscribeChanges('breezemoons', '/api/v3/breezemoons/realtime-ticket', changed, undefined, undefined, state)
+}
+
 function rateLimitRetryAt(value: string | undefined, now: number) {
   const header = value?.trim() ?? ''
   const retryAt = /^\d+$/.test(header) ? now + Number(header) * 1_000 : Date.parse(header)
   return Number.isFinite(retryAt) ? Math.max(now + 1_000, retryAt) : now + 60_000
 }
 
-function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',path:string,changed:()=>void,articleId?:string,chatEvent?:(value:ChatRealtimeEvent)=>void,connectionState?:(value:ChatRealtimeState)=>void,unavailable?:()=>void,initialRead?:()=>void):()=>void {
+function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat'|'breezemoons',path:string,changed:()=>void,articleId?:string,chatEvent?:(value:ChatRealtimeEvent)=>void,connectionState?:(value:ChatRealtimeState)=>void,unavailable?:()=>void,initialRead?:()=>void):()=>void {
   if (import.meta.env.SSR) return () => {}
   const unreadChannel = channel === 'notifications' || channel === 'messages'
   if (typeof WebSocket === 'undefined') {
@@ -128,7 +132,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
   window.addEventListener?.('pageshow', resume)
   window.addEventListener?.('online', online)
   window.addEventListener?.('fp:captcha-passed', captchaPassed)
-  if (channel === 'chat') window.addEventListener?.('fp:home-reads-resumed', homeReadsResumed)
+  if (channel === 'chat' || channel === 'breezemoons') window.addEventListener?.('fp:home-reads-resumed', homeReadsResumed)
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', resume)
   const current = () => !stopped && getAccessToken() === token
   function timers() {
@@ -243,7 +247,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
             hasConnected = true
             // 未读数在首次订阅就绪后读取，重连就绪后补读断线期间的变更。
             if (unreadChannel && !reconnecting && !initialUnreadFallback && initialRead) initialRead()
-            else if (channel !== 'article' || reconnecting) changed()
+            else if (channel !== 'breezemoons' && (channel !== 'article' || reconnecting)) changed()
           } else if(authenticated&&channel==='chat'){
             if (message.type === 'chat.red_packet.claimed' || message.type === 'chat.presence.changed') {
               const notice = chatNotice(message.type, message.data)
@@ -283,7 +287,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
     } catch (error) {
       if (!current() || turn !== sequence) return
       const needsCaptcha = error instanceof ApiError && (error.code === 'captcha' || error.code === 'captcha_required')
-      if (channel === 'chat' && error instanceof ApiError && !needsCaptcha) {
+      if ((channel === 'chat' || channel === 'breezemoons') && error instanceof ApiError && !needsCaptcha) {
         if (error.code === 'home_reads_paused') {
           homeReadsPaused = true
           retire()
@@ -296,7 +300,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
           return
         }
       }
-      if (channel === 'article' && error instanceof ApiError && !needsCaptcha && [403,404].includes(error.status)) {
+      if ((channel === 'article' || channel === 'breezemoons') && error instanceof ApiError && !needsCaptcha && [403,404].includes(error.status)) {
         retire()
         unavailable?.()
         return
@@ -318,7 +322,7 @@ function subscribeChanges(channel:'notifications'|'article'|'messages'|'chat',pa
     window.removeEventListener?.('pageshow', resume)
     window.removeEventListener?.('online', online)
     window.removeEventListener?.('fp:captcha-passed', captchaPassed)
-    if (channel === 'chat') window.removeEventListener?.('fp:home-reads-resumed', homeReadsResumed)
+    if (channel === 'chat' || channel === 'breezemoons') window.removeEventListener?.('fp:home-reads-resumed', homeReadsResumed)
     if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', resume)
     if (retry) clearTimeout(retry)
     retry = null; retire()
