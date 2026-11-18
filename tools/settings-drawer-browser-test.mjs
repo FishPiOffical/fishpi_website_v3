@@ -14,9 +14,9 @@ const imports = {
   pinia: data(fs.readFileSync('node_modules/pinia/dist/pinia.esm-browser.prod.js', 'utf8')),
 }
 // 实际编译设置、所有本机设置 store 和模块列表；仅隔离账号服务、路由和不属于本次的业务弹窗。
-const services = data(`import {reactive} from 'vue';import {defineStore} from 'pinia';
-export const useAuthStore=defineStore('fixtureAuth',()=>reactive({isLoggedIn:true,accessToken:'fixture',account:{oId:'fixture',userName:'fixture'}}));
-export const usePrivateInboxStore=defineStore('fixtureInbox',()=>reactive({unreadTotal:0,error:'',inboxOpen:false,showInbox(){this.inboxOpen=true}}));
+const services = data(`import {reactive,ref} from 'vue';import {defineStore} from 'pinia';
+export const useAuthStore=defineStore('fixtureAuth',()=>({isLoggedIn:ref(true),accessToken:ref('fixture'),account:ref({oId:'fixture',userName:'fixture'})}));
+export const usePrivateInboxStore=defineStore('fixtureInbox',()=>{const inboxOpen=ref(false);return {unreadTotal:ref(0),error:ref(''),inboxOpen,showInbox(){inboxOpen.value=true}}});
 export const useAppearanceShopStore=defineStore('fixtureShop',()=>reactive({open:false,show(){this.open=true}}));
 export const useFeedbackPanelStore=defineStore('fixtureFeedback',()=>reactive({open:false,target:'',show(target){this.target=target;this.open=true}}));
 export const feedbackEnabled=true;
@@ -101,7 +101,7 @@ try {
   await check('旧配置中资料位于中间时，箭头排序仍按可见顺序移动', async () => {
     await page.evaluate(() => {fixture.page.pref.order=['income','profile','appearance','checkin','download','breezemoons','ad']})
     await row('income').getByRole('button', { name: '下移上下班时间' }).click()
-    assert.deepEqual((await page.locator('[data-module-id]').evaluateAll(rows => rows.map(row => row.dataset.moduleId))).slice(0, 3), ['profile','appearance','income'])
+    assert.deepEqual((await page.locator('[data-module-id]').evaluateAll(rows => rows.map(row => row.dataset.moduleId))).slice(0, 3), ['profile','checkin','income'])
     await row('income').getByRole('button', { name: '上移上下班时间' }).click()
     assert.equal(await page.locator('[data-module-id]').nth(1).getAttribute('data-module-id'), 'income')
   })
@@ -118,8 +118,8 @@ try {
   await check('聊天显示开关与文案横向排列，精简模式保留座驾开关联动', async () => {
     await nav('聊天室输入').click()
     const switches = page.locator('.setting-toggle')
-    assert.equal(await switches.count(), 2)
-    assert.deepEqual(await switches.evaluateAll(rows => rows.map(row => getComputedStyle(row).flexDirection)), ['row', 'row'])
+    assert.equal(await switches.count(), 3)
+    assert.deepEqual(await switches.evaluateAll(rows => rows.map(row => getComputedStyle(row).flexDirection)), ['row', 'row', 'row'])
     await switches.first().getByRole('checkbox').check()
     assert.equal(await switches.nth(1).getByRole('checkbox').isDisabled(), true)
     await switches.first().getByRole('checkbox').uncheck()
@@ -165,6 +165,46 @@ try {
     assert.equal(await row('breezemoons').getByRole('button', {name:'独立卡片',exact:true}).getAttribute('aria-pressed'), 'true')
     await page.keyboard.press('Escape')
     assert.equal(await page.evaluate(() => fixture.drawer.open), false)
+  })
+  await check('左侧入口悬浮时贴住屏幕，焦点提示按输入方式显示', async () => {
+    await page.evaluate(() => fixture.drawer.show('chatBlock'))
+    const filter = page.locator('.content input[type="checkbox"]').first()
+    await filter.check()
+    await page.getByRole('button', { name: '关闭设置' }).click()
+    await page.locator('.fp-set-panel').waitFor({ state: 'hidden' })
+
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 844 })
+      for (const selector of ['.fp-set-handle', '.fp-hidden-handle', '.fp-whisper-handle']) {
+        const handle = page.locator(selector)
+        await page.mouse.move(70, 300)
+        await handle.waitFor({ state: 'visible' })
+        await page.waitForFunction(selector => document.querySelector(selector)?.getBoundingClientRect().width === 28, selector)
+        const { y, height } = await handle.boundingBox()
+        await page.mouse.move(1, y + height / 2)
+        await page.waitForFunction(selector => document.querySelector(selector).getBoundingClientRect().width === 32, selector)
+        const bounds = await handle.boundingBox()
+        assert.equal(bounds.x, 0)
+        assert.equal(bounds.y, y)
+        assert(await handle.evaluate((element) => {
+          const { top, height } = element.getBoundingClientRect()
+          return element.contains(document.elementFromPoint(1, top + height / 2))
+        }))
+      }
+    }
+    const settings = page.locator('.fp-set-handle')
+    await settings.click()
+    assert.equal(await settings.getAttribute('aria-expanded'), 'true')
+    assert.equal(await settings.evaluate(element => getComputedStyle(element).outlineStyle), 'none')
+    await page.locator('.fp-set-panel .head h2').click()
+    assert.equal(await page.locator('.fp-set-panel .head h2').evaluate(element => document.activeElement === element), false)
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Tab')
+    await settings.focus()
+    assert.equal(await settings.evaluate(element => element.matches(':focus-visible') && getComputedStyle(element).outlineWidth === '2px'), true)
+    await page.keyboard.press('Enter')
+    assert.equal(await settings.getAttribute('aria-expanded'), 'true')
+    await page.keyboard.press('Escape')
   })
   assert.deepEqual(errors, [])
   assert.deepEqual(requests, [])

@@ -166,6 +166,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
       class="fp-set-handle"
       :class="{ active: open }"
       aria-label="打开设置"
+      :aria-expanded="open"
       title="设置"
       @click="open ? drawer.hide() : drawer.show()"
     >
@@ -457,105 +458,57 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 </style>
 
 <style scoped>
+:is(.fp-set-handle, .fp-hidden-handle, .fp-whisper-handle) {
+  position: fixed;
+  left: 0;
+  z-index: 1190;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 38px;
+  border: 1px solid var(--fp-border);
+  border-left: 0;
+  border-radius: 0 9px 9px 0;
+  background: var(--fp-card);
+  color: var(--fp-muted);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, width 0.2s ease, top 0.24s ease;
+}
 .fp-set-handle {
-  position: fixed;
-  left: 0;
   top: 50%;
-  z-index: 1190;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 38px;
   transform: translateY(-50%);
-  border: 1px solid var(--fp-border);
-  border-left: 0;
-  border-radius: 0 9px 9px 0;
-  background: var(--fp-card);
-  color: var(--fp-muted);
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s, transform 0.2s ease;
 }
-.fp-set-handle:hover,
-.fp-set-handle.active {
-  background: var(--fp-hover);
-  color: var(--fp-link);
-}
-.fp-set-handle:hover {
-  transform: translate(4px, -50%);
-}
-.fp-set-handle svg {
-  width: 16px;
-  height: 16px;
-  transition: transform 0.35s ease;
-}
-.fp-set-handle:hover svg {
-  transform: rotate(45deg);
-}
-.fp-hidden-handle {
-  position: fixed;
-  left: 0;
+:is(.fp-hidden-handle, .fp-whisper-handle) {
   top: calc(50% + 30px);
-  z-index: 1190;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 38px;
-  border: 1px solid var(--fp-border);
-  border-left: 0;
-  border-radius: 0 9px 9px 0;
-  background: var(--fp-card);
-  color: var(--fp-muted);
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s, transform 0.2s ease;
-}
-.fp-hidden-handle:hover {
-  background: var(--fp-hover);
-  color: var(--fp-link);
-  transform: translateX(4px);
-}
-.fp-hidden-handle svg {
-  width: 16px;
-  height: 16px;
-  transition: transform 0.2s ease;
-}
-.fp-hidden-handle:hover svg {
-  transform: scale(1.12);
-}
-.fp-whisper-handle {
-  position: fixed;
-  left: 0;
-  top: calc(50% + 30px);
-  z-index: 1190;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 38px;
-  border: 1px solid var(--fp-border);
-  border-left: 0;
-  border-radius: 0 9px 9px 0;
-  background: var(--fp-card);
-  color: var(--fp-muted);
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s, transform 0.2s ease, top 0.24s ease;
 }
 .fp-whisper-handle.after-hidden {
   top: calc(50% + 74px);
 }
-.fp-whisper-handle:hover {
-  transform: translateX(4px);
-  background: var(--fp-hover);
-  color: var(--fp-link);
-}
-.fp-whisper-handle svg {
+:is(.fp-set-handle, .fp-hidden-handle, .fp-whisper-handle) svg {
   width: 16px;
   height: 16px;
   transition: transform 0.2s ease;
 }
-.fp-whisper-handle:hover svg {
-  transform: scale(1.12);
+.fp-set-handle svg {
+  transition-duration: 0.35s;
+}
+.fp-set-handle.active {
+  background: var(--fp-hover);
+  color: var(--fp-link);
+}
+:is(.fp-set-handle, .fp-hidden-handle, .fp-whisper-handle):focus-visible {
+  outline: 2px solid var(--fp-primary-ink, var(--fp-text));
+  outline-offset: -3px;
+}
+@media (hover: hover) {
+  :is(.fp-set-handle, .fp-hidden-handle, .fp-whisper-handle):hover {
+    width: 32px;
+    background: var(--fp-hover);
+    color: var(--fp-link);
+  }
+  .fp-set-handle:hover svg { transform: rotate(45deg); }
+  :is(.fp-hidden-handle, .fp-whisper-handle):hover svg { transform: scale(1.12); }
 }
 .unread-badge {
   position: absolute;
