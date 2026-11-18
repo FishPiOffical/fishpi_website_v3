@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useV3CommentsStore } from '@/stores/v3Comments'
 import ChatComposer from '@/components/ChatComposer.vue'
 const props=withDefaults(defineProps<{articleId:string;editId?:string;parentId?:string;paragraphId?:string;replyLabel?:string;writable?:boolean}>(),{writable:true,editId:'',parentId:'',paragraphId:'',replyLabel:''})
-const emit=defineEmits<{cancel:[];saved:[];clearReply:[]}>()
+const emit=defineEmits<{cancel:[];saved:[];clearReply:[];draftState:[hasDraft:boolean]}>()
 const {accessToken,account}=storeToRefs(useAuthStore()),operations=useV3CommentsStore(),mounted=ref(false),draft=ref(''),anonymous=ref(false),visible=ref(false),editVisibility=ref('preserve'),sourceLoading=ref(false),sourceReady=ref(false),localError=ref('')
 const editor=ref<InstanceType<typeof ChatComposer>|null>(null),origin=Symbol('comment-composer')
 const ready=computed(()=>mounted.value&&!!accessToken.value&&!!account.value),locked=computed(()=>operations.busy||operations.confirming||!!operations.pending||sourceLoading.value)
@@ -26,6 +26,7 @@ watch(()=>props.writable,enabled=>{
   if(enabled&&!sourceReady.value)void source()
 },{flush:'sync'})
 watch([()=>props.parentId,()=>props.paragraphId],()=>operations.cancelConfirmation(origin),{flush:'sync'})
+watch(()=>!!draft.value.trim(),hasDraft=>emit('draftState',hasDraft))
 watch(()=>operations.pending,command=>{if(command&&command.articleId===props.articleId&&command.operation!=='delete'&&command.id===props.editId&&command.input.content===draft.value)submitted={key:command.key,draft:draft.value}},{flush:'sync'})
 watch(()=>operations.completed,command=>{if(command&&submitted?.key===command.key){if(draft.value===submitted.draft)draft.value='';submitted=null;emit('saved')}},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity();void source()})

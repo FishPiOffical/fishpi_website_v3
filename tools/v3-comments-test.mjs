@@ -88,19 +88,19 @@ const reactionStoreURL=url('export function useV3ReactionsStore(){return {invali
 const articleRealtimeURL=url('export function subscribeArticleChanges(id,changed){globalThis.__articleSubscription={id,changed,closed:false};return()=>{globalThis.__articleSubscription.closed=true}}'),articleHeatURL=url('export async function articleHeat(){return 3}')
 const parentPairs=[['@/api/v3-realtime',articleRealtimeURL],['@/api/v3-article-heat',articleHeatURL],['@/api/http',http],['@/stores/v3Reactions',reactionStoreURL],['@/components/user/VipNickname.vue',nicknameFixtureURL],['vue-router',routerURL],['@/utils/text',textURL],['@/api/fishpi',fishpiURL],['@/stores/auth',authURL],['@/stores/v3Comments',storeURL],['@/seo/site',seoURL],['@/composables/usePageSeo',pageSeoURL],['@/seo/payload',payloadURL],['@/stores/layout',layoutURL],['@/utils/reusableTemplate',reusableURL],['@/utils/swr',cacheURL],['@/components/CommentItem.vue',itemURL],['@/components/articles/CommentComposer.vue',composerURL]]
 for(const name of ['articles/ArticleCommentLocation','discovery/RandomArticles','articles/ArticleOwnerActions','articles/RevisionHistory','articles/ContentRelationButton','articles/ArticleInteraction','medal/MedalList','V3ReactionBar','ReportDialog','FpLoading','ArticleSkeleton','ImageLightbox','articles/LongArticleReader'])parentPairs.push(['@/components/'+name+'.vue',noopURL])
-const quickReplyURL=sfc(await fs.readFile('src/components/articles/QuickReplyPanel.vue','utf8'),[])
+// 浏览器验证弹窗和焦点。这里仅替代自定义渲染器不支持的 body Teleport。
+const quickReplyURL=url("export default { props: ['open', 'modalOnly'], emits: ['close'], setup(_, { slots }) { return () => slots.default?.() } }")
 parentPairs.push(['@/components/articles/QuickReplyPanel.vue',quickReplyURL])
 const threadRepliesURL=sfc(await fs.readFile('src/components/articles/ArticleThreadReplies.vue','utf8'),[['@/api/http',http],['@/api/v3-content',contentURL]])
 parentPairs.push(['@/components/articles/ArticleThreadReplies.vue',threadRepliesURL],['@/utils/articleCode',url('export const vArticleCode = {}')])
 const parent=(await import(sfc(parentSource,parentPairs))).default
 const actualWebSocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};globalThis.location={protocol:'http:',host:'local'}
-// 父页的快捷回复挂载会注册滚动事件，测试只补事件宿主，不伪造滚动目标。
 const actualWindow=globalThis.window
 globalThis.window={addEventListener(){},removeEventListener(){}}
 let records=[],parentReadFail=false,reads=0;globalThis.__parentFetch=async()=>{reads++;if(parentReadFail)throw Error('列表503');return{oId:'2',articleTitle:'实际文章页联动',articleCommentable:true,articleStatement:0,articleType:0,articleContent:'<p>正文</p>',articleTags:'',articleAuthorId:'9',articleAuthorName:'other',articleRewardPoint:0,articleCommentCount:records.length,articleComments:records.map(x=>({...x})),pagination:{paginationCurrentPageNum:1,paginationPageCount:1}}}
 state.confirmWork=async()=>true;writes=[];state.dispatch=async(path,init)=>{if(init?.method){writes.push({path,init});if(init.method==='POST'){records=[{oId:'3',commentAuthorId:'1',commentAuthorName:'owner',commentContent:'<p>已发布</p>',commentContentVisible:true}];parentReadFail=true;return env({id:'3',permalink:'/article/2#comment3'})}if(init.method==='PUT'){records[0].commentContent='<p>已编辑</p>';return env({id:'3',permalink:'/article/2#comment3'})}records=[];return env({id:'3',removed:true})}return env(comment)}
 function mountParent(){const root={children:[]},app=renderer.createApp(parent),pinia=createPinia();app.use(pinia);app.mount(root);return{root,app,user:auth(pinia),text:()=>text(root)}}
-view=mountParent();await tick();input(view,'实际联动发布');await tick();click(view,'发表评论');await tick();assert.equal(writes.length,1);assert.match(view.text(),/操作已确认，评论重新读取失败：列表503/);const afterWriteReads=reads;parentReadFail=false;click(view,'重读评论');await tick();assert.equal(writes.length,1);assert.ok(reads>afterWriteReads);assert.ok(find(view.root,n=>n.props?.innerHTML==='<p>已发布</p>'))
+view=mountParent();await tick();assert.ok(!find(view.root,n=>n.tag==='textarea'));click(view,'写回复');await tick();input(view,'实际联动发布');await tick();click(view,'发表评论');await tick();assert.equal(writes.length,1);assert.match(view.text(),/操作已确认，评论重新读取失败：列表503/);const afterWriteReads=reads;parentReadFail=false;click(view,'重读评论');await tick();assert.equal(writes.length,1);assert.ok(reads>afterWriteReads);assert.ok(find(view.root,n=>n.props?.innerHTML==='<p>已发布</p>'))
 console.log('PASS comments 10 actual ArticleView + CommentItem + Composer + ChatComposer: committed post/read503 exposes GET-only recovery and current server comment')
 click(view,'编辑');await tick();input(view,'实际联动编辑');await tick();click(view,'保存修改');await tick();assert.equal(writes.at(-1).init.method,'PUT');assert.ok(find(view.root,n=>n.props?.innerHTML==='<p>已编辑</p>'));click(view,'删除');await tick();assert.equal(writes.at(-1).init.method,'DELETE');assert.match(view.text(),/暂无回帖/);assert.equal(writes.length,3);view.app.unmount();globalThis.WebSocket=actualWebSocket
 console.log('PASS comments 11 actual article owner edit/source/PUT/current GET and confirmed delete/current list, no optimistic receipt content')
@@ -145,7 +145,7 @@ console.log('PASS comments 20 article events during credential refresh keep the 
 // Generic SWR must never restore an article body after a current authorization failure.
 const sharedCache=await import(cacheURL);sharedCache.writeCache('article:2:1',{oId:'2',articleContent:'POISONED_OLD_BODY',articleComments:[]});globalThis.__parentFetch=async()=>{throw new ApiError('not readable',403)};view=mountParent();await tick();assert.match(view.text(),/当前已无权阅读/);assert.ok(!view.text().includes('POISONED_OLD_BODY')&&!find(view.root,n=>n.props?.innerHTML==='POISONED_OLD_BODY'));view.app.unmount();sharedCache.clearCache();console.log('PASS comments 21 full ArticleView ignores generic SWR article cache and shows current 403 without old content')
 // A current-reader refresh must keep the actual comment composer instance and unsent draft.
-globalThis.WebSocket=class{close(){}};globalThis.__parentFetch=originalRead;view=mountParent();await tick();input(view,'UNSENT_AFTER_ROTATION');await tick();let rotatedReads=0;globalThis.__parentFetch=async()=>{rotatedReads++;return originalRead()};view.user.accessToken='same-owner-rotation';await tick();assert.ok(rotatedReads>0);assert.equal(find(view.root,n=>n.tag==='textarea').props.value,'UNSENT_AFTER_ROTATION');view.app.unmount();globalThis.WebSocket=actualWebSocket;console.log('PASS comments 22 full ArticleView and actual CommentComposer retain unsent draft while ordinary token rotation refreshes content')
+globalThis.WebSocket=class{close(){}};globalThis.__parentFetch=originalRead;view=mountParent();await tick();click(view,'写回复');await tick();input(view,'UNSENT_AFTER_ROTATION');await tick();let rotatedReads=0;globalThis.__parentFetch=async()=>{rotatedReads++;return originalRead()};view.user.accessToken='same-owner-rotation';await tick();assert.ok(rotatedReads>0);assert.equal(find(view.root,n=>n.tag==='textarea').props.value,'UNSENT_AFTER_ROTATION');view.app.unmount();globalThis.WebSocket=actualWebSocket;console.log('PASS comments 22 full ArticleView and actual CommentComposer retain unsent draft while ordinary token rotation refreshes content')
 
 // Current visibility can shrink while browsing later comment pages.
 globalThis.document={getElementById:()=>null}
@@ -236,10 +236,7 @@ state.dispatch=async(path,init)=>{
   return env({id:'21',permalink:'/article/2#comment21'});
 };
 globalThis.__commentNavigation=null;
-const replyParentImports=parentPairs.map(([name, value])=>[name,name==='@/components/articles/QuickReplyPanel.vue'
-  ? url("export default { props: ['open'], emits: ['close'], setup(_, { slots }) { return () => slots.default?.() } }") : value]);
-const replyParent=(await import(sfc(parentSource,replyParentImports))).default;
-const replyRoot={children:[]},replyApp=renderer.createApp(replyParent);
+const replyRoot={children:[]},replyApp=renderer.createApp(parent);
 replyApp.use(createPinia());replyApp.mount(replyRoot);
 view={root:replyRoot,app:replyApp,text:()=>text(replyRoot)};
 await tick();click(view,'回复');await tick();input(view,'跨页回复');await tick();click(view,'发表评论');await tick();

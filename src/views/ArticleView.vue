@@ -146,19 +146,34 @@ const commentingEnabled = computed(() => article.value?.articleCommentable === t
 const statementLabel = computed(() => article.value?.articleStatement == null ? '状态暂不可用' : STATEMENT_LABELS[article.value.articleStatement] || '')
 
 const quickReplyOpen = ref(false)
-const commentsInView = ref(false)
-function updateReplyShortcut() {
-  const comments = document.querySelector('.comments-list')
-  commentsInView.value = !!comments && comments.getBoundingClientRect().top < window.innerHeight
-}
+const quickReplyStarted = ref(false)
+const quickReplyHasDraft = ref(false)
+const quickReplyEntry = ref<HTMLElement | null>(null)
+const replyEntryPassed = ref(false)
+watch(quickReplyEntry, (entry, _, onCleanup) => {
+  replyEntryPassed.value = false
+  if (!entry || typeof IntersectionObserver === 'undefined') return
+  const observer = new IntersectionObserver(([position]) => {
+    replyEntryPassed.value = !position.isIntersecting && position.boundingClientRect.bottom <= (position.rootBounds?.top ?? 0)
+  })
+  observer.observe(entry)
+  onCleanup(() => observer.disconnect())
+}, { flush: 'post' })
 function openQuickReply() {
   if (!commentingEnabled.value) return
   if (!isLoggedIn.value) { void router.push({ path: '/login', query: { redirect: loginRedirect.value } }); return }
+  quickReplyStarted.value = true
   quickReplyOpen.value = true
 }
-onMounted(() => window.addEventListener('scroll', updateReplyShortcut, { passive: true }))
-onUnmounted(() => window.removeEventListener('scroll', updateReplyShortcut))
-watch([id, viewerIdentity], () => { quickReplyOpen.value = false; commentsInView.value = false })
+function openArticleReply() {
+  if (!quickReplyHasDraft.value) clearReplyTarget()
+  openQuickReply()
+}
+watch([id, viewerIdentity], () => {
+  quickReplyOpen.value = false
+  quickReplyStarted.value = false
+  quickReplyHasDraft.value = false
+})
 const composerRef = ref<InstanceType<typeof CommentComposer> | null>(null)
 const readerRef = ref<InstanceType<typeof LongArticleReader> | null>(null)
 const [DefineOwnerActions, ReuseOwnerActions] = createReusableTemplate()
@@ -516,7 +531,7 @@ function itemHandlers(c: ArticleComment) {
   <template v-else-if="article">
     <span v-if="!accessToken" data-public-content="ready" hidden />
     <p v-if="realtimeReadError" role="alert">{{ realtimeReadError }}</p>
-    <button v-if="routeMounted && !isLong && commentingEnabled && commentsInView && !quickReplyOpen" class="quick-reply-floating" type="button" title="写回复" aria-label="写回复" @click="openQuickReply()"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/></svg></button>
+    <button v-if="routeMounted && !isLong && commentingEnabled && replyEntryPassed" :class="{ 'quick-reply-during-dialog': quickReplyOpen }" class="quick-reply-floating" type="button" :title="quickReplyHasDraft ? '继续编辑回复' : '写回复'" :aria-label="quickReplyHasDraft ? '继续编辑回复' : '写回复'" aria-haspopup="dialog" @click="openArticleReply"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/></svg></button>
     <DefineOwnerActions>
       <ArticleOwnerActions :article-id="article.oId" :author-id="article.articleAuthorId||''" :anonymous="Number(article.articleAnonymous)===1" :permanent="article.stick?.permanent||false" @changed="ownerChanged" @deleted="ownerDeleted" />
       <RevisionHistory kind="article" :target-id="article.oId" />
@@ -568,13 +583,13 @@ function itemHandlers(c: ArticleComment) {
       </footer>
     </DefineComments>
     <DefineComposer>
-      <QuickReplyPanel :open="quickReplyOpen" @close="quickReplyOpen=false">
-      <div class="composer-inner">
+      <QuickReplyPanel :open="quickReplyOpen" :modal-only="!isLong" @close="quickReplyOpen=false">
+      <div class="composer-inner" :class="{ 'composer-inner--modal': !isLong }">
         <p v-if="article.articleCommentable === false" class="hint-login">作者已关闭回帖。</p>
         <p v-else-if="!commentingEnabled" class="hint-login">评论状态暂不可用。</p>
         <template v-if="isLoggedIn">
           <blockquote v-if="replyComment" class="quick-reply-quote"><strong>回复 {{ who(replyComment) }}</strong><p>{{ replyComment.commentContentVisible === false ? '评论正文当前不可见' : stripHtml(replyComment.commentContent || '') }}</p></blockquote>
-          <CommentComposer @saved="quickReplyOpen=false" :writable="commentingEnabled" ref="composerRef" :article-id="article.oId" :parent-id="replyId" :paragraph-id="paragraphIdForReply" :reply-label="replyAuthor" @clear-reply="cancelReply" />
+          <CommentComposer @saved="quickReplyOpen=false" :writable="commentingEnabled" ref="composerRef" :article-id="article.oId" :parent-id="replyId" :paragraph-id="paragraphIdForReply" :reply-label="replyAuthor" @clear-reply="cancelReply" @draft-state="quickReplyHasDraft=$event" />
         </template>
         <p v-else-if="commentingEnabled" class="hint-login">
           <RouterLink :to="{ path: '/login', query: { redirect: loginRedirect } }" class="login-link">登录</RouterLink>
@@ -684,7 +699,6 @@ function itemHandlers(c: ArticleComment) {
         </nav>
 
         <!-- 文章底部互动操作栏 -->
-        <button v-if="commentingEnabled" type="button" class="btn quick-reply-entry" @click="clearReplyTarget();openQuickReply()">写回复</button>
         <div class="article-tail-bar">
           <div class="tail-main-row">
             <div class="actions">
@@ -743,29 +757,27 @@ function itemHandlers(c: ArticleComment) {
         </div>
       </article>
 
-      <section v-if="nice.length" class="card nice-comments-card">
-        <div class="module-header">
-          <span><b>✨ 优质回帖</b></span>
-        </div>
-        <div class="comments-list">
-          <CommentItem v-for="c in nice" :key="'n' + c.oId" class="cmt-root" :comment="c" readonly />
-        </div>
-      </section>
-
       <section id="articleCommentsPanel" class="card comments-card">
         <div class="module-header comments-header">
           <span><b>💬 全部回帖 ({{ commentTotal }})</b></span>
         </div>
-
-        <ReuseComments />
-      </section>
-
-      <!-- 底部发表回帖区域 -->
-      <section class="card composer-card">
-        <div class="module-header">
-          <span><b>参与讨论</b></span>
+        <div v-if="commentingEnabled" ref="quickReplyEntry" class="quick-reply-entry">
+          <button type="button" class="quick-reply-field" aria-haspopup="dialog" @click="openArticleReply">
+            {{ quickReplyHasDraft ? '回复草稿已保留' : isLoggedIn ? '写下你的回复…' : '登录后参与讨论' }}
+          </button>
+          <button type="button" class="quick-reply-action" aria-haspopup="dialog" @click="openArticleReply">
+            {{ quickReplyHasDraft ? '继续编辑' : '写回复' }}
+          </button>
         </div>
-        <ReuseComposer />
+        <p v-else class="quick-reply-unavailable">{{ article.articleCommentable === false ? '作者已关闭回帖。' : '评论状态暂不可用。' }}</p>
+        <div v-if="nice.length" class="nice-comments-card">
+          <div class="module-header"><b>✨ 优质回帖</b></div>
+          <div class="comments-list">
+            <CommentItem v-for="c in nice" :key="'n' + c.oId" class="cmt-root" :comment="c" readonly />
+          </div>
+        </div>
+        <ReuseComments />
+        <ReuseComposer v-if="quickReplyStarted" />
       </section>
 
       <section v-if="!isLong" class="card"><RandomArticles :size="10" :exclude-id="id" /></section>
@@ -1250,6 +1262,9 @@ h1 {
 .composer-inner {
   padding: 18px;
 }
+.composer-inner--modal {
+  padding: 0;
+}
 .reply-quote-box {
   display: flex;
   align-items: center;
@@ -1430,8 +1445,15 @@ h1 {
 </style>
 
 <style scoped>
-.quick-reply-entry { margin-top: 20px; }
+.quick-reply-entry { display: flex; align-items: stretch; gap: 8px; margin: 0 18px; padding: 14px 0; border-bottom: 1px solid var(--fp-border); }
+.quick-reply-field, .quick-reply-action { min-height: 44px; padding: 0 14px; border-radius: 8px; font: inherit; font-size: 14px; cursor: pointer; }
+.quick-reply-field { flex: 1; min-width: 0; border: 1px solid var(--fp-border); background: var(--fp-bg); color: var(--fp-muted); text-align: start; }
+.quick-reply-field:hover { border-color: var(--fp-accent); color: var(--fp-text); }
+.quick-reply-action { flex: none; border: 1px solid color-mix(in srgb, var(--fp-primary) 30%, var(--fp-border)); background: color-mix(in srgb, var(--fp-primary) 14%, var(--fp-card)); color: var(--fp-text); font-weight: 600; }
+.quick-reply-action:hover { border-color: var(--fp-primary); background: color-mix(in srgb, var(--fp-primary) 22%, var(--fp-card)); }
+.quick-reply-unavailable { margin: 12px 18px; color: var(--fp-muted); font-size: 13px; }
 .quick-reply-floating { position: fixed; right: 24px; bottom: 88px; z-index: 100; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--fp-border); border-radius: 12px; background: var(--fp-card); color: var(--fp-text); box-shadow: 0 3px 12px rgb(0 0 0 / 8%); cursor: pointer; }
+.quick-reply-during-dialog { opacity: 0; pointer-events: none; }
 .quick-reply-quote { margin: 0 0 12px; padding: 10px 12px; border-left: 3px solid var(--fp-border); background: color-mix(in srgb, var(--fp-muted) 6%, transparent); font-size: 13px; color: var(--fp-muted); }
 .quick-reply-quote p { margin: 5px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 </style>

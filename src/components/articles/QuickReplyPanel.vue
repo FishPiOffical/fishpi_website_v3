@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-const props = defineProps<{ open: boolean }>()
+const props = defineProps<{ open: boolean; modalOnly?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const panel = ref<HTMLElement | null>(null)
 let previousFocus: HTMLElement | null = null
-let previousOverflow = ''
+let previousOverflow: string | null = null
 function keydown(event: KeyboardEvent) {
   if (event.key === 'Escape') { event.preventDefault(); emit('close') }
   if (event.key !== 'Tab') return
@@ -14,26 +14,47 @@ function keydown(event: KeyboardEvent) {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
 }
 function release() {
+  if (previousOverflow === null) return
   document.removeEventListener('keydown', keydown)
   document.body.style.overflow = previousOverflow
+  previousOverflow = null
   if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
+  previousFocus = null
 }
-watch(() => props.open, async open => {
+watch(() => props.open, async (open, _, onCleanup) => {
   if (open) {
     previousFocus = document.activeElement as HTMLElement | null
     previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', keydown)
+    let observer: MutationObserver | undefined
+    onCleanup(() => observer?.disconnect())
     await nextTick()
-    if (props.open) panel.value?.querySelector<HTMLButtonElement>('.quick-reply-close')?.focus()
-  } else release()
-})
-onBeforeUnmount(() => { if (props.open) release() })
+    if (!props.open || !panel.value) return
+    const close = panel.value.querySelector<HTMLButtonElement>('.quick-reply-close')
+    close?.focus({ preventScroll: true })
+    if (!props.modalOnly || window.matchMedia('(max-width: 640px)').matches) return
+    function focusEditor() {
+      if (document.activeElement !== close) return true
+      const field = Array.from(panel.value?.querySelectorAll<HTMLElement>('.vditor [contenteditable="true"], .md-fallback') ?? [])
+        .find(element => element.getClientRects().length > 0)
+      field?.focus({ preventScroll: true })
+      return !!field
+    }
+    if (focusEditor()) return
+    observer = new MutationObserver(() => { if (focusEditor()) observer?.disconnect() })
+    observer.observe(panel.value, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'contenteditable'] })
+  } else {
+    await nextTick()
+    if (!props.open) release()
+  }
+}, { immediate: true })
+onBeforeUnmount(release)
 </script>
 <template>
   <!-- 只移动同一份编辑器 DOM，关闭弹窗不销毁草稿或待确认操作。 -->
   <Teleport to="body" :disabled="!open">
-    <div :class="{ 'quick-reply-mask': open }">
+    <div v-show="open || !modalOnly" :class="{ 'quick-reply-mask': open }">
       <section ref="panel" :class="{ 'quick-reply-panel': open }" :role="open ? 'dialog' : undefined" :aria-modal="open ? true : undefined" :aria-label="open ? '写回复' : undefined">
         <header v-if="open" class="quick-reply-heading"><strong>写回复</strong><button class="quick-reply-close" type="button" aria-label="关闭回复窗口，保留草稿" @click="emit('close')">×</button></header>
         <slot />
