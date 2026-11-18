@@ -459,14 +459,18 @@ defineExpose({
 
 @media (max-width: 767px) {
   .md-adaptive :deep(.vditor:not(.vditor--fullscreen)),
+  .md-editor--reply .md-resizable :deep(.vditor:not(.vditor--fullscreen)),
   .md-adaptive .md-fallback { height: auto !important; }
+  .md-editor--reply .md-resizable :deep(.vditor:not(.vditor--fullscreen)) { max-height: none; }
   .md-adaptive .md-fallback { field-sizing: content; resize: none; }
   .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-resize) { display: none; }
-  .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-content) { flex: 0 1 auto; }
+  .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-content),
+  .md-editor--reply .md-resizable :deep(.vditor:not(.vditor--fullscreen) .vditor-content) { flex: 0 1 auto; }
+  .md-editor--reply .md-resizable :deep(.vditor:not(.vditor--fullscreen) .vditor-content [contenteditable="true"]),
   .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-content [contenteditable="true"]) {
     height: auto;
     min-height: 64px;
-    max-height: 25dvh;
+    max-height: max(64px, 25dvh);
     overflow-y: auto;
   }
 }

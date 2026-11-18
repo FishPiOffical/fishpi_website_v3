@@ -134,6 +134,7 @@ defineExpose({
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  container: chat-composer / inline-size;
 }
 .bar {
   display: flex;
@@ -186,7 +187,7 @@ defineExpose({
   .emoji-trigger { padding: 6px 8px; span { display: none; } }
 }
 .inline-context { min-width: 0; }
-@media (max-width: 600px) {
+@container chat-composer (max-width: 600px) {
   .bar.has-inline-context {
     grid-template-columns: minmax(0, 1fr) max-content;
     .tools, .actions { flex-wrap: wrap; }

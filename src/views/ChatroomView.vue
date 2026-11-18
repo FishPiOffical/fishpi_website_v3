@@ -800,7 +800,11 @@ function clearScreen() {
   svg { width: 14px; height: 14px; }
   &:hover, &[aria-expanded='true'] { background: var(--fp-hover); color: var(--fp-accent); }
 }
-@media(max-width:600px){.composer-tool-btn { padding: 6px 10px; gap: 0; span { display: none; } }.classic-topic-pill { gap: 6px; .topic-text { white-space: normal; overflow-wrap: anywhere; } }}
+@media(max-width:600px){.composer-tool-btn { padding: 6px 10px; gap: 0; span { display: none; } }}
+@container chat-composer (max-width: 600px) {
+  .classic-topic-pill { gap: 6px; }
+  .topic-quote .topic-text { white-space: normal; overflow-wrap: anywhere; }
+}
 
 .classic-online-bar {
   margin-top: 12px;
