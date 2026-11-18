@@ -1,7 +1,14 @@
 import { ApiError, getAccessToken, getAuthContextVersion } from '@/api/http'
 import { uploadV3Files, uploadedMarkdown, type UploadResult } from '@/api/v3-uploads'
 
-export type EditorUploadStatus = { pending: boolean; text: string } | null
+type UploadItem = {
+  name: string
+  phase: 'queued' | 'uploading' | 'processing' | 'done' | 'failed' | 'skipped'
+  percent: number | null
+  error?: string
+}
+
+export type EditorUploadStatus = { pending: boolean; text: string; items?: UploadItem[] } | null
 
 const imageFormats = new Map([
   ['jpg', 'image/jpeg'], ['jpeg', 'image/jpeg'], ['png', 'image/png'],
@@ -66,17 +73,27 @@ export function createEditorUpload(
       controller = abort
       const current = () => !disposed && !abort.signal.aborted && run === generation && version === getAuthContextVersion() && !!getAccessToken()
       const label = files.every(file => file.type.startsWith('image/')) ? '张图片' : '个文件'
-      showStatus({ pending: true, text: `正在上传 ${files.length} ${label}…` })
+      const items: UploadItem[] = files.map((file, index) => ({
+        name: file.name || `粘贴图片 ${index + 1}`, phase: 'queued', percent: null,
+      }))
+      const updateStatus = () => showStatus({
+        pending: true, text: `正在上传 ${files.length} ${label}…`, items: items.map(item => ({ ...item })),
+      })
+      updateStatus()
       let message: string | null = null
       try {
-        const validated: File[] = []
+        const validated: { file: File; item: UploadItem }[] = []
         const rejected: string[] = []
-        for (const file of files) {
+        for (const [index, file] of files.entries()) {
+          const item = items[index]!
           try {
-            validated.push(await validateEditorFile(file, abort.signal))
+            validated.push({ file: await validateEditorFile(file, abort.signal), item })
           } catch (error) {
             if (!current()) return null
-            rejected.push(error instanceof Error ? error.message : '无法读取所选文件')
+            item.phase = 'failed'
+            item.error = error instanceof Error ? error.message : '无法读取所选文件'
+            rejected.push(item.error)
+            updateStatus()
           }
           if (!current()) return null
         }
@@ -85,24 +102,37 @@ export function createEditorUpload(
           return message
         }
         const results: UploadResult[] = []
-        for (const [index, file] of validated.entries()) {
-          if (validated.length > 1) {
-            showStatus({ pending: true, text: `正在上传 ${index + 1}/${validated.length}：${file.name}` })
-          }
+        for (const [index, { file, item }] of validated.entries()) {
+          item.phase = 'uploading'
+          updateStatus()
           try {
-            const [result] = await uploadV3Files([file], abort.signal)
+            const [result] = await uploadV3Files([file], abort.signal, percent => {
+              if (!current() || percent === item.percent || item.phase !== 'uploading') return
+              item.percent = percent
+              if (percent === 100) item.phase = 'processing'
+              updateStatus()
+            })
             if (!current()) return null
             if (result) results.push(result)
+            item.phase = result?.url ? 'done' : 'failed'
+            if (result?.url) item.percent = 100
+            else item.error = result?.maxBytes !== undefined
+              ? `最大可上传 ${formatUploadLimit(result.maxBytes)}`
+              : result?.failureMessage || '上传失败或未返回结果'
           } catch (error) {
             if (!current()) return null
             const reason = error instanceof Error ? error.message : '文件上传失败'
+            item.phase = 'failed'
+            item.error = reason
             rejected.push(validated.length === 1 ? reason : `「${file.name}」：${reason}`)
             if (error instanceof ApiError && [401, 403, 429].includes(error.status)) {
               const remaining = validated.length - index - 1
+              for (const queued of validated.slice(index + 1)) queued.item.phase = 'skipped'
               if (remaining) rejected.push(`剩余 ${remaining} 个文件尚未上传`)
               break
             }
           }
+          updateStatus()
         }
         const markdown = results.map(uploadedMarkdown).filter(Boolean).join('\n')
         if (markdown) insert(`\n${markdown}\n`)
@@ -130,7 +160,13 @@ export function createEditorUpload(
         if (controller === abort) {
           const isCurrent = current()
           controller = null
-          showStatus(isCurrent && message ? { pending: false, text: message } : null)
+          if (!isCurrent) showStatus(null)
+          else {
+            const succeeded = items.filter(item => item.phase === 'done').length
+            const remaining = items.length - succeeded
+            const text = remaining ? `已上传 ${succeeded}/${items.length}，${remaining} 个未完成` : `已上传 ${succeeded} 个文件`
+            showStatus({ pending: false, text, items })
+          }
         }
       }
     },

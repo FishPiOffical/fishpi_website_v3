@@ -29,12 +29,14 @@ globalThis.fetch = async (_path, { body }) => {
 }
 const beforeTickets = state.calls.length
 const partial = editor.handler([file(), file()])
-assert.deepEqual(statuses.at(-1), { pending: true, text: '正在上传 2 张图片…' })
+assert.equal(statuses.at(-1).pending, true)
+assert.deepEqual(statuses.at(-1).items.map(item => item.phase), ['queued', 'queued'])
 const message = await partial
 assert.equal(batchRequests, 2)
 assert.equal(state.calls.length - beforeTickets, 2)
 assert.match(message, /1个文件上传失败/)
-assert.deepEqual(statuses.at(-1), { pending: false, text: message })
+assert.equal(statuses.at(-1).pending, false)
+assert.deepEqual(statuses.at(-1).items.map(item => item.phase), ['done', 'failed'])
 assert.equal(inserted.length, 1)
 assert.ok(!inserted[0].includes('null'))
 console.log('PASS upload 5 successful links inserted once while reporting failed files without automatic batch retry')
@@ -65,7 +67,7 @@ assert.match(mixedMessage, /已插入 1 个文件/)
 assert.match(mixedMessage, /「大图.png」超过单文件上限，最大可上传 20 MB/)
 assert.match(mixedMessage, /「附件.zip」超过单文件上限，最大可上传 20 MB/)
 assert.match(mixedMessage, /1个文件上传失败/)
-assert.equal(statuses.at(-1).text, mixedMessage)
+assert.deepEqual(statuses.at(-1).items.map(item => item.phase), ['done', 'failed', 'failed', 'failed'])
 assert.match(inserted.at(-1), /valid.png/)
 globalThis.fetch = async () => new Response('Request Entity Too Large', { status: 413 })
 assert.match(await mixed.handler([file()]), /文件超过上传入口的大小限制/)
@@ -115,3 +117,43 @@ assert.match(await mixed.handler([file()]), /图片后缀与实际格式不符/)
 globalThis.fetch = async () => new Response(JSON.stringify({ code: 1, msg: '图片后缀与实际格式不符，请选择正确格式的图片' }))
 assert.equal(await mixed.handler([file()]), '图片后缀与实际格式不符，请选择正确格式的图片')
 console.log('PASS upload 12 editor surfaces the server format rejection')
+
+const progressSnapshots = []
+const progressEditor = createEditorUpload(() => {}, status => progressSnapshots.push(status))
+const activeRequests = []
+globalThis.XMLHttpRequest = class extends EventTarget {
+  upload = new EventTarget()
+  status = 200
+  responseText = JSON.stringify({ code: 0, data: { succMap: { 'upload-1.png': 'https://file.fishpi.cn/ok.png' }, errFiles: [] } })
+  open(method, path) { assert.equal(method, 'POST'); assert.equal(path, '/rhypic-upload/api/v1/files') }
+  setRequestHeader(name, value) { assert.equal(name, 'Authorization'); assert.equal(value, 'Bearer only-upload-ticket') }
+  send(form) { assert.equal(form.getAll('file').length, 1); activeRequests.push(this) }
+  abort() { this.dispatchEvent(new Event('abort')); this.dispatchEvent(new Event('loadend')) }
+  progress(loaded) {
+    this.upload.dispatchEvent(Object.assign(new Event('progress'), { lengthComputable: true, loaded, total: 200 }))
+  }
+  finish() { this.dispatchEvent(new Event('load')); this.dispatchEvent(new Event('loadend')) }
+}
+const progressRun = progressEditor.handler([file('one.png'), file('two.png')])
+await new Promise(setImmediate)
+assert.equal(activeRequests.length, 1)
+activeRequests[0].progress(85)
+assert.equal(progressSnapshots.at(-1).items[0].percent, 42)
+activeRequests[0].upload.dispatchEvent(new Event('load'))
+assert.equal(progressSnapshots.at(-1).items[0].phase, 'processing')
+activeRequests[0].finish()
+await new Promise(setImmediate)
+assert.equal(activeRequests.length, 2)
+activeRequests[1].progress(110)
+assert.deepEqual(progressSnapshots.at(-1).items.map(({ phase, percent }) => [phase, percent]), [['done', 100], ['uploading', 55]])
+activeRequests[1].finish()
+assert.equal(await progressRun, null)
+assert.deepEqual(progressSnapshots.at(-1).items.map(item => item.phase), ['done', 'done'])
+const cancelProgress = progressEditor.handler([file()])
+await new Promise(setImmediate)
+progressEditor.cancel()
+assert.equal(await cancelProgress, null)
+activeRequests.at(-1).progress(110)
+assert.equal(progressSnapshots.at(-1), null)
+delete globalThis.XMLHttpRequest
+console.log('PASS upload 13 browser byte progress, response processing, independent queue rows and cancellation')

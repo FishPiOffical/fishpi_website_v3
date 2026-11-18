@@ -414,11 +414,25 @@ defineExpose({
       </div>
     </div>
     <template v-if="!fallback">
-      <div class="md-upload-status" role="status">
-        <div v-if="uploadStatus" class="md-upload-feedback" :class="{ 'md-upload-error': !uploadStatus.pending }">
-          <progress v-if="uploadStatus.pending" aria-hidden="true" />
-          <span>{{ uploadStatus.text }}</span>
+      <div v-if="uploadStatus" class="md-upload-feedback">
+        <div class="md-upload-heading">
+          <strong role="status">{{ uploadStatus.text }}</strong>
+          <button v-if="!uploadStatus.pending" type="button" aria-label="关闭上传进度" @click="uploadStatus = null">×</button>
         </div>
+        <ul v-if="uploadStatus.items?.length" class="md-upload-files" aria-label="文件上传进度">
+          <li v-for="(item, index) in uploadStatus.items" :key="index">
+            <div class="md-upload-row">
+              <span class="md-upload-name" :title="item.name">{{ item.name }}</span>
+              <span class="md-upload-state" :data-phase="item.phase">
+                {{ item.phase === 'queued' ? '等待上传' : item.phase === 'processing' ? '图床处理中' :
+                  item.phase === 'done' ? '已完成' : item.phase === 'failed' ? '失败' :
+                  item.phase === 'skipped' ? '未上传' : item.percent === null ? '上传中' : `${item.percent}%` }}
+              </span>
+            </div>
+            <progress v-if="item.phase === 'uploading' || item.phase === 'processing'" :aria-label="`${item.name} 的上传进度`" :value="item.percent ?? undefined" max="100" />
+            <div v-if="item.error" class="md-upload-error">{{ item.error }}</div>
+          </li>
+        </ul>
       </div>
       <p v-if="mentionError" role="status">{{ mentionError }}</p>
     </template>
@@ -430,23 +444,32 @@ defineExpose({
   position: relative;
 }
 .md-upload-feedback {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  background: var(--fp-surface-subtle, var(--fp-card));
   color: var(--fp-muted);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-.md-upload-feedback progress { width: 44px; flex: none; accent-color: var(--fp-primary); }
-.md-upload-error { color: var(--fp-danger); }
+.md-upload-heading, .md-upload-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.md-upload-heading strong { font-weight: 600; color: var(--fp-title); }
+.md-upload-heading button { width: 24px; height: 24px; flex: none; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; font-size: 18px; line-height: 1; cursor: pointer; }
+.md-upload-heading button:hover { background: var(--fp-hover); }
+.md-upload-files { display: grid; gap: 6px; max-height: min(156px, 25dvh); overflow-y: auto; margin: 6px 0 0; padding: 0; list-style: none; }
+.md-upload-files li + li { border-top: 1px solid var(--fp-border); padding-top: 5px; }
+.md-upload-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--fp-text); }
+.md-upload-state { flex: none; font-variant-numeric: tabular-nums; }
+.md-upload-state[data-phase='done'] { color: var(--fp-primary); }
+.md-upload-feedback progress { display: block; width: 100%; height: 5px; margin-top: 4px; accent-color: var(--fp-primary); }
+.md-upload-error, .md-upload-state[data-phase='failed'] { color: var(--fp-danger-ink, var(--fp-danger)); }
 .md-editor:has(:deep(.vditor--fullscreen)) .md-upload-feedback {
   position: fixed;
   z-index: 1000;
   inset-inline: 8px;
   bottom: max(12px, env(safe-area-inset-bottom));
-  width: fit-content;
-  max-width: calc(100% - 16px);
+  width: min(420px, calc(100% - 16px));
   border-radius: 6px;
   background: var(--fp-card);
 }

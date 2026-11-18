@@ -79,6 +79,9 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: true,
           rewrite: (path) => path.replace(/^\/rhypic-upload/, ''),
+          configure: proxy => {
+            proxy.on('proxyReq', request => request.removeHeader('cookie'))
+          },
         },
         '/captcha': proxy,
         '/test': proxy,
