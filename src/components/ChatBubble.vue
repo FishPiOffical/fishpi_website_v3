@@ -129,7 +129,15 @@ const isStandalone = computed(() => props.chatroom && (
 const AVATAR_DOUBLE_CLICK_WINDOW_MS = 500
 const bubbleControls = 'a, button, input, textarea, select, summary, [role="button"], [role="link"], [contenteditable], img, picture, video, audio, iframe, .chat-image-frame, .fp-chat-tail'
 let pointerType = ''
+let pointerStartX = 0
+let pointerStartY = 0
 let avatarNavigation: ReturnType<typeof setTimeout> | undefined
+
+function onPointerDown(event: PointerEvent) {
+  pointerType = event.pointerType
+  pointerStartX = event.clientX
+  pointerStartY = event.clientY
+}
 
 function cancelAvatarNavigation() {
   clearTimeout(avatarNavigation)
@@ -169,10 +177,15 @@ function onAvatarDoubleClick(event: MouseEvent) {
 function onBubbleDoubleClick(event: MouseEvent) {
   if (!props.chatroom || !props.userName || isStandalone.value || !display.value.html || !props.messageId || !plainMouseActivation(event)) return
   const target = event.target
-  if (!(target instanceof Element) || target.closest(bubbleControls)) return
-  // 双击文字可能是浏览器的选词操作，保留选区及复制流程。
-  if (target.closest('.body') && window.getSelection()?.isCollapsed === false) return
-  if (quickQuote?.enabled(props.messageId)) quickQuote.quote(props.messageId)
+  if (!(target instanceof Element) || target.closest(bubbleControls) || !quickQuote?.enabled(props.messageId)) return
+  // 快速单击后拖选时，部分浏览器仍可能派发双击。保留这时的原生选区。
+  if (Math.hypot(event.clientX - pointerStartX, event.clientY - pointerStartY) > 4) return
+  event.preventDefault()
+  const selection = window.getSelection()
+  const bubble = event.currentTarget
+  if (bubble instanceof Element && selection && !selection.isCollapsed &&
+      bubble.contains(selection.anchorNode) && bubble.contains(selection.focusNode)) selection.removeAllRanges()
+  quickQuote.quote(props.messageId)
 }
 
 
@@ -199,7 +212,7 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'has-sakura-arrival': animateSakura && mounted && chatPreferences.showSakuraEffects, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }" @pointerdown="pointerType = $event.pointerType">
+  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'has-sakura-arrival': animateSakura && mounted && chatPreferences.showSakuraEffects, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }" @pointerdown="onPointerDown">
     <RouterLink :to="`/member/${userName}`" custom v-slot="{ href, navigate, isActive, isExactActive }">
       <a :href="href" class="fp-avatar-frame" :class="{ 'router-link-active': isActive, 'router-link-exact-active': isExactActive }"
         :aria-current="isExactActive ? 'page' : undefined" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`"
