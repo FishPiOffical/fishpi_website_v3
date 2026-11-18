@@ -62,6 +62,7 @@ const fixtures = [
   { id: 'own-multi', userName: 'Yui', self: true, html: '<p>一起回复</p>' + previousQuote + nextHeading + '<blockquote><p>好</p></blockquote><blockquote><p>手写补充</p></blockquote>' },
   { id: 'nested', userName: '小羊', html: '<p>再次回复</p>' + nextHeading + '<blockquote><p>直接引用的内容</p>' + previousQuote + '</blockquote>' },
   { id: 'shortcuts', userName: 'shortcut-peer', html: '<p>Selection should still work.</p><p><a href="#normal-link">链接</a></p>' },
+  { id: 'image-only', userName: 'media-peer', html: '<p><img src="https://file.fishpi.cn/test.png"></p>' },
   { id: 'mixed-media', userName: 'media-peer', html: '<p>图文消息</p><p><img src="https://file.fishpi.cn/test.png"></p>' },
   { id: 'standalone', userName: 'standalone-peer', standalone: true, html: '<p>独立卡片</p>' },
 ]
@@ -232,23 +233,47 @@ try {
   assert.equal(new URL(page.url()).hash, '#normal-link')
   await imageQuote.locator('.chat-quote-author').dblclick()
   assert.equal(new URL(page.url()).hash, '#normal-link', '双击引用摘要仍不跳转原消息')
-  await page.locator('[data-case="mixed-media"] .body img').click()
-  await lightbox.waitFor()
-  await page.keyboard.press('Escape')
-  await lightbox.waitFor({ state: 'hidden' })
   await page.locator('[data-case="standalone"] .fp-bubble').dblclick({ position: { x: 3, y: 3 } })
-  assert.deepEqual(await page.evaluate(() => window.quickQuotes), quoted, '控件、图片和独立卡片不触发快捷引用')
+  assert.deepEqual(await page.evaluate(() => window.quickQuotes), quoted, '控件和独立卡片不触发快捷引用')
+
+  for (const [simple, compact] of [[false, false], [true, false], [false, true]]) {
+    await page.evaluate(([simple, compact]) => { prefs.simpleMode = simple; narrow.value = compact }, [simple, compact])
+    for (const id of ['mixed-media', 'image-only']) {
+      const photo = page.locator(`[data-case="${id}"] .body img`)
+      await photo.dblclick()
+      quoted.push(id)
+      assert.deepEqual(await page.evaluate(() => window.quickQuotes), quoted, '双击引用图片所属的整条消息')
+      await page.waitForTimeout(550)
+      assert.equal(await lightbox.isVisible(), false, '双击后没有延迟打开的大图')
+    }
+    await page.locator('[data-case="image-only"] .body img').click()
+    await lightbox.waitFor()
+    assert.equal(await lightbox.getByRole('link', { name: '原图' }).getAttribute('href'), 'https://file.fishpi.cn/test.png')
+    await page.keyboard.press('Escape')
+    await lightbox.waitFor({ state: 'hidden' })
+    assert.deepEqual(await page.evaluate(() => window.quickQuotes), quoted, '单击只查看大图')
+  }
   await page.evaluate(() => { window.shortcutsEnabled = false })
   await message.dblclick({ position: { x: 3, y: 3 } })
   assert.deepEqual(await page.evaluate(() => window.quickQuotes), quoted)
+  await page.locator('[data-case="image-only"] .body img').click()
+  assert.equal(await lightbox.isVisible(), true, '不能引用时鼠标单击也立即看大图')
+  await page.keyboard.press('Escape')
+  await lightbox.waitFor({ state: 'hidden' })
   const touchPage = await browser.newPage({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true })
   await touchPage.route('http://quotes.test/**', route => route.fulfill({ contentType: 'text/html', body: html }))
+  await touchPage.route(url => url.origin === 'https://file.fishpi.cn' && url.pathname === '/test.png', route => route.fulfill({
+    contentType: 'image/png', body: fs.readFileSync('public/images/user-thumbnail.png'),
+  }))
   await touchPage.goto('http://quotes.test/cr')
   await touchPage.locator('[data-case="shortcuts"] .fp-avatar-frame').tap()
   assert.deepEqual(await touchPage.evaluate(() => window.avatarNavigations), ['/member/shortcut-peer'], '触屏单击头像立即导航')
   assert.deepEqual(await touchPage.evaluate(() => window.mentions), [])
+  await touchPage.locator('[data-case="image-only"] .body img').tap()
+  assert.equal(await touchPage.locator('.img-zoom').isVisible(), true, '手机点图立即打开大图')
+  assert.deepEqual(await touchPage.evaluate(() => window.quickQuotes), [])
   await touchPage.close()
-  console.log('PASS 快捷操作实测：头像单击、键盘、触屏和双击分流，正文与空白均可双击引用，保留拖选、链接、图片和独立卡片')
+  console.log('PASS 快捷操作实测：头像单击、键盘、触屏和双击分流，正文与空白均可双击引用，保留拖选、链接、独立卡片，正文图片单击预览与双击引用分流')
   assert.deepEqual(errors, [])
   assert.equal(requests.filter(url => /\/api\//.test(url)).length, 0, '渲染引用不能触发详情补查')
   for (const [file, count] of [
@@ -257,7 +282,9 @@ try {
     ['src/components/chat/HiddenChatConversations.vue', 1],
     ['src/components/chat/ChatContextPanel.vue', 1],
   ]) {
-    assert.equal((fs.readFileSync(file, 'utf8').match(/:source="(?:entry\.message|line|message)\.content"/g) || []).length, count, file)
+    const source = fs.readFileSync(file, 'utf8')
+    assert.equal((source.match(/:source="(?:entry\.message|line|message)\.content"/g) || []).length, count, file)
+    if (file.includes('ChatroomView') || file.includes('WhisperConversations')) assert.match(source, /provide\(CHAT_QUICK_QUOTE,/)
   }
   console.log('PASS 引用气泡实测：本人/他人、旧链接/清洗链接、图片/清风/纯引用、手写保留、320px至桌面单行省略、回跳/移除、无补查及全部消费者接线')
 } finally {

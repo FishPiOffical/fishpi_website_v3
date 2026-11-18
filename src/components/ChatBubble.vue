@@ -126,12 +126,13 @@ const isStandalone = computed(() => props.chatroom && (
   props.standalone || singleImage.value || (!display.value.html && !!display.value.quote)
 ))
 
-const AVATAR_DOUBLE_CLICK_WINDOW_MS = 500
+const MOUSE_DOUBLE_CLICK_WINDOW_MS = 500
 const bubbleControls = 'a, button, input, textarea, select, summary, [role="button"], [role="link"], [contenteditable], img, picture, video, audio, iframe, .chat-image-frame, .fp-chat-tail'
 let pointerType = ''
 let pointerStartX = 0
 let pointerStartY = 0
 let avatarNavigation: ReturnType<typeof setTimeout> | undefined
+let imagePreview: { image: HTMLImageElement; timer: ReturnType<typeof setTimeout> } | undefined
 
 function onPointerDown(event: PointerEvent) {
   pointerType = event.pointerType
@@ -145,7 +146,16 @@ function cancelAvatarNavigation() {
 }
 
 watch([() => props.userId, () => props.userName, () => auth.account?.oId], cancelAvatarNavigation)
-onBeforeUnmount(cancelAvatarNavigation)
+function cancelImagePreview() {
+  clearTimeout(imagePreview?.timer)
+  imagePreview = undefined
+}
+
+watch([() => props.messageId, () => props.html, () => auth.account?.oId], cancelImagePreview)
+onBeforeUnmount(() => {
+  cancelAvatarNavigation()
+  cancelImagePreview()
+})
 
 function plainMouseActivation(event: MouseEvent) {
   return pointerType === 'mouse' && event.button === 0 && event.detail > 0 &&
@@ -164,7 +174,7 @@ function onAvatarClick(event: MouseEvent, navigate: (event?: MouseEvent) => unkn
     avatarNavigation = setTimeout(() => {
       avatarNavigation = undefined
       void navigate()
-    }, AVATAR_DOUBLE_CLICK_WINDOW_MS)
+    }, MOUSE_DOUBLE_CLICK_WINDOW_MS)
   }
 }
 
@@ -174,18 +184,37 @@ function onAvatarDoubleClick(event: MouseEvent) {
   mention?.insert(props.userName)
 }
 
+function bodyImage(target: EventTarget | null) {
+  const image = target instanceof Element ? target.closest<HTMLImageElement>('img:not(.emoji)') : null
+  return image?.closest('.vditor-reset') ? image : null
+}
+
 function onBubbleDoubleClick(event: MouseEvent) {
-  if (!props.chatroom || !props.userName || isStandalone.value || !display.value.html || !props.messageId || !plainMouseActivation(event)) return
+  const id = props.messageId
+  if (!props.chatroom || !props.userName || props.standalone || !display.value.html || !id ||
+      !plainMouseActivation(event) || !quickQuote?.enabled(id)) return
   const target = event.target
-  if (!(target instanceof Element) || target.closest(bubbleControls) || !quickQuote?.enabled(props.messageId)) return
+  if (!(target instanceof Element)) return
   // 快速单击后拖选时，部分浏览器仍可能派发双击。保留这时的原生选区。
   if (Math.hypot(event.clientX - pointerStartX, event.clientY - pointerStartY) > 4) return
+
+  const image = bodyImage(target)
+  if (image) {
+    if (imagePreview?.image !== image) return
+    cancelImagePreview()
+    event.preventDefault()
+    quickQuote.quote(id)
+    return
+  }
+
+  if (isStandalone.value || target.closest(bubbleControls)) return
+  cancelImagePreview()
   event.preventDefault()
   const selection = window.getSelection()
   const bubble = event.currentTarget
   if (bubble instanceof Element && selection && !selection.isCollapsed &&
       bubble.contains(selection.anchorNode) && bubble.contains(selection.focusNode)) selection.removeAllRanges()
-  quickQuote.quote(props.messageId)
+  quickQuote.quote(id)
 }
 
 
@@ -194,10 +223,31 @@ function onAvatarError(e: Event) {
   if (img.getAttribute('src') !== DEFAULT_AVATAR) img.src = DEFAULT_AVATAR
 }
 
-function onBodyClick(e: MouseEvent) {
-  const img = (e.target as HTMLElement | null)?.closest('img')
-  if (!img || img.classList.contains('emoji') || !img.closest('.vditor-reset')) return
-  e.preventDefault()
+function onBodyClick(event: MouseEvent) {
+  const image = bodyImage(event.target)
+  if (!image) return
+  const id = props.messageId
+  const canMouseQuote = props.chatroom && !props.standalone && !!props.userName && !!id &&
+    plainMouseActivation(event) && !!quickQuote?.enabled(id)
+  event.preventDefault()
+
+  if (!canMouseQuote) {
+    cancelImagePreview()
+    openBodyImage(image)
+    return
+  }
+  if (event.detail > 1 && imagePreview?.image === image) return
+
+  // 只有鼠标单击且能引用时才等第二击，触屏和不能引用的消息立即看大图。
+  cancelImagePreview()
+  const timer = setTimeout(() => {
+    imagePreview = undefined
+    if (image.isConnected) openBodyImage(image)
+  }, MOUSE_DOUBLE_CLICK_WINDOW_MS)
+  imagePreview = { image, timer }
+}
+
+function openBodyImage(img: HTMLImageElement) {
   const displayed = img.currentSrc || img.src
   const original = img.getAttribute('data-chat-original')
   const source = img.getAttribute('src')
