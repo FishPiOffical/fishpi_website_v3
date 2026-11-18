@@ -47,13 +47,14 @@ const { descriptor } = parse(source, { filename: file })
 let code = compile(compileScript(descriptor, { id: 'chat-tail-test', inlineTemplate: true }).content)
 const replacements = {
   vue: import.meta.resolve('vue'),
-  'vue-router': moduleUrl(`import {h} from '${import.meta.resolve('vue')}'; export const RouterLink={setup(_,{slots}){return()=>h('a',slots.default?.())}}`),
+  'vue-router': moduleUrl(`import {h} from '${import.meta.resolve('vue')}'; export const RouterLink={props:{to:String,custom:Boolean},setup(p,{slots}){return()=>p.custom?slots.default?.({href:p.to,navigate(){}}):h('a',slots.default?.())}}`),
   '@/api/v3-chat-messages': messageModule,
   '@/stores/auth': moduleUrl('export const useAuthStore=()=>({account:null})'),
   '@/stores/chatPreferences': stateModule,
   '@/stores/functionPreferences': moduleUrl('export const useFunctionPreferencesStore=()=>({blurChatImages:false})'),
   '@/utils/time': moduleUrl('export const formatDisplayTime=()=>""'),
   '@/chat/mention': moduleUrl('export const CHAT_MENTION=Symbol();export const chatMentionText=x=>x'),
+  '@/chat/messageShortcuts': moduleUrl(compile(await fs.readFile('src/chat/messageShortcuts.ts', 'utf8'))),
   '@/utils/avatar': moduleUrl('export const DEFAULT_AVATAR="";export const avatarThumbnail=x=>x;export const rhyPicThumbnail=x=>x;export const imageThumbnail=x=>x'),
   '@/utils/chatAppearance': appearances,
   '@/utils/chatMessage': imageModule,

@@ -17,15 +17,17 @@ export const chatPetStatusLabels={idle:'空闲'},formatDisplayTime=()=> '12:30';
 export const chatMessageDetail=async()=>{window.reads=(window.reads||0)+1;await new Promise(r=>setTimeout(r,80));return {type:'text',content:'一起摸鱼'}};`)
 const modules = {vue, '@/utils/chatRepeatGroups':data(transpile(fs.readFileSync('src/utils/chatRepeatGroups.ts','utf8'))), '@/utils/avatar':data(transpile(fs.readFileSync('src/utils/avatar.ts','utf8')))}
 for (const name of ['@/stores/chatPreferences','@/stores/functionPreferences','@/stores/auth','@/stores/v3ChatPublication','@/api/http','@/api/v3-chat-messages','@/utils/time']) modules[name]=mocks
-for (const name of ['chatAppearance','chatMessage','chatQuote']) {
+for (const name of ['bubbleStyle','chatAppearance','chatMessage','chatQuote']) {
   const source = transpile(fs.readFileSync('src/utils/' + name + '.ts', 'utf8'))
-  modules['@/utils/' + name] = data(source.replace("'@/utils/chatMessage'", `'${modules['@/utils/chatMessage']}'`))
+  modules['@/utils/' + name] = data(source.replace("'@/utils/chatMessage'", `'${modules['@/utils/chatMessage']}'`)
+    .replaceAll("'@/utils/bubbleStyle'", `'${modules['@/utils/bubbleStyle']}'`))
 }
 modules['@/chat/mention']=data(transpile(fs.readFileSync('src/chat/mention.ts','utf8')))
+modules['@/chat/messageShortcuts']=data(transpile(fs.readFileSync('src/chat/messageShortcuts.ts','utf8')))
 // 路由导航和外围服务隔离；实际气泡仍负责昵称、@ 行为、身份及方向。
-modules['vue-router']=data(`import {h} from '${vue}';export const RouterLink={props:['to'],setup(p,{slots}){return()=>h('a',{href:typeof p.to==='string'?p.to:JSON.stringify(p.to)},slots.default?.())}}`)
+modules['vue-router']=data(`import {h} from '${vue}';export const RouterLink={props:{to:{},custom:Boolean},setup(p,{slots}){return()=>{const href=typeof p.to==='string'?p.to:JSON.stringify(p.to);return p.custom?slots.default?.({href,navigate(){}}):h('a',{href},slots.default?.())}}}`)
 const noop=data('export default {setup(){return()=>null}}')
-for(const name of ['@/components/chat/CollectChatEmoji.vue','@/components/ImageLightbox.vue','@/components/medal/MedalList.vue','@/components/user/VipNickname.vue']) modules[name]=noop
+for(const name of ['@/components/chat/CollectChatEmoji.vue','@/components/ImageLightbox.vue','@/components/medal/MedalList.vue','@/components/user/VipNickname.vue','@/components/packs/ManagedBubbleShape.vue','@/components/packs/SakuraDecoration.vue']) modules[name]=noop
 let css=''
 function compile(file,id) {
   const {descriptor}=parse(fs.readFileSync(file,'utf8'))

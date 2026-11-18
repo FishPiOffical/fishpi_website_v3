@@ -5,6 +5,7 @@ import { useSakuraArrivals } from '@/composables/useSakuraArrivals'
 import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink,useRoute,useRouter } from 'vue-router'
 import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
+import { CHAT_QUICK_QUOTE } from '@/chat/messageShortcuts'
 import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
 import { useChatQuoteNavigation } from '@/composables/useChatQuoteNavigation'
@@ -50,7 +51,7 @@ const { simpleMode } = storeToRefs(chatPreferences)
 const { account, isLoggedIn, accessToken } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 provide(CHAT_MENTION, {
-  enabled: () => isLoggedIn.value && !publication.pending,
+  enabled: () => isLoggedIn.value && !!composerRef.value && !publication.pending,
   insert: userName => {
     const text = chatMentionText(userName)
     if (!isLoggedIn.value || publication.pending || !text) return
@@ -119,6 +120,10 @@ watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.va
 
 const showNodes = ref(false)
 const {quote,quoteBusy,quoteErr,quoteMessage:readQuote,clearQuote,buildQuoteSuffix}=useChatMessageSource()
+provide(CHAT_QUICK_QUOTE, {
+  enabled: id => isLoggedIn.value && !!composerRef.value && !sending.value && !publication.pending && quoteBusy.value !== id,
+  quote: id => { void quoteMessage({oId:id}) },
+})
 const composerQuotes = computed(() => quote.value
   ? [chatMessageQuotePreview(quote.value), ...breezemoonQuotes.value]
   : breezemoonQuotes.value)

@@ -30,8 +30,6 @@ export const chat=reactive({messages:[],sending:false,loading:false,loadingMore:
 window.auth=auth;window.timeline=timeline;window.chat=chat;window.mainLoads=0;window.mainReads=0;window.apiRequests=[];window.resolvedRequests=[];
 export const storeToRefs=toRefs,useAuthStore=()=>auth,useChatPreferencesStore=()=>prefs,useFunctionPreferencesStore=()=>prefs,useChatStore=()=>chat,useV3ChatTimelineStore=()=>timeline,useV3ChatPublicationStore=()=>publication;
 export const useChatFilterStore=()=>({modeFor:()=> 'show'});
-export const useChatMessageSource=()=>({quote:ref(null),quoteBusy:ref(''),quoteErr:ref(''),quoteMessage(){},clearQuote(){},buildQuoteSuffix:()=>''});
-export const CHAT_MENTION=Symbol(),chatMentionText=x=>x;
 export const getAuthContextVersion=()=>1,formatDisplayTime=()=> '2026-11-14 13:07';
 export class ApiError extends Error {constructor(message,status){super(message);this.status=status}}
 export async function request(url,options={}){
@@ -42,8 +40,8 @@ export async function request(url,options={}){
 }
 export default {props:['open'],setup(p,{slots}){return()=>p.open===false?null:slots.default?.()||null}};
 `)
-for (const name of ['pinia', '@/stores/auth', '@/stores/chatPreferences', '@/stores/functionPreferences', '@/stores/v3ChatTimeline', '@/stores/v3ChatPublication', '@/stores/chatFilter', '@/composables/useChatMessageSource', '@/chat/mention', '@/api/http', '@/utils/time']) modules.set(name, mocks)
-modules.set('@/components/ChatComposer.vue', publish('composer', `import {h} from '${vue}';export default {props:['modelValue','height'],setup(p,{slots,expose}){expose({flush:()=>p.modelValue,reveal(){document.querySelector('[data-editor]')?.focus()},insert(){}});return()=>h('div',{class:'fixture-composer'},[slots.top?.(),h('textarea',{'data-editor':'true','aria-label':'聊天输入框',value:p.modelValue,style:{height:(p.height||100)+'px'}}),h('div',{class:'bar'},[slots.tools?.(),slots['inline-context']?.(),slots.actions?.()])])}}`))
+for (const name of ['pinia', '@/stores/auth', '@/stores/chatPreferences', '@/stores/functionPreferences', '@/stores/v3ChatTimeline', '@/stores/v3ChatPublication', '@/stores/chatFilter', '@/api/http', '@/utils/time']) modules.set(name, mocks)
+modules.set('@/components/ChatComposer.vue', publish('composer', `import {h} from '${vue}';export default {props:['modelValue','height'],emits:['update:modelValue','submit'],setup(p,{slots,expose,emit}){expose({flush:()=>p.modelValue,reveal(){document.querySelector('[data-editor]')?.focus()},insert(text){emit('update:modelValue',p.modelValue+text)}});return()=>h('div',{class:'fixture-composer'},[slots.top?.(),h('textarea',{'data-editor':'true','aria-label':'聊天输入框',value:p.modelValue,style:{height:(p.height||100)+'px'}}),h('div',{class:'bar'},[slots.tools?.(),slots['inline-context']?.(),slots.actions?.()])])}}`))
 const noop = publish('noop', 'export default {setup(){return()=>null}}')
 for (const name of ['ChatToolDialog', 'ChatRoomNotice', 'ChatConnectionStatus', 'ChatRepeatAction', 'ChatRevokeAction', 'ChatRevokeRecovery', 'ChatPublicationRecovery', 'ChatTopicEditor', 'ChatTopicRecovery', 'ChatOnlineList', 'ChatRedPacketCard', 'CollectChatEmoji']) modules.set(`@/components/chat/${name}.vue`, noop)
 for (const name of ['ChatCard', 'V3ReactionBar', 'ReportDialog', 'FpLoading', 'ImageLightbox']) modules.set(`@/components/${name}.vue`, noop)
@@ -51,6 +49,8 @@ modules.set('@/chat/sidebar/ChatSidebar.vue', publish('sidebar', `import{h}from'
 modules.set('@/components/FpDialog.vue', mocks)
 modules.set('@/components/medal/MedalList.vue', noop)
 modules.set('@/components/user/VipNickname.vue', mocks)
+modules.set('@/components/packs/ManagedBubbleShape.vue', noop)
+modules.set('@/components/packs/SakuraDecoration.vue', noop)
 let css = ''
 function rewrite(code, filename) {
   return code.replace(/import\.meta\.env\.SSR/g, 'false').replace(/\bfrom\s+(['"])([^'"]+)\1/g, (_, quote, specifier) => {
@@ -80,13 +80,17 @@ function compileVue(file) {
   return url
 }
 // 消息解码、窗口读取、引用气泡、完整聊天室模板和布局都由仓库源码编译。
-for (const name of ['avatar', 'chatAppearance', 'chatMessage', 'chatQuote', 'chatRepeatGroups', 'chatScrollFollow']) compileTs(`src/utils/${name}.ts`)
+for (const name of ['avatar', 'bubbleStyle', 'chatAppearance', 'chatMessage', 'chatQuote', 'chatRepeatGroups', 'chatScrollFollow']) compileTs(`src/utils/${name}.ts`)
+compileTs('src/chat/mention.ts')
+compileTs('src/chat/messageShortcuts.ts')
 compileTs('src/api/v3-reactions.ts')
 compileTs('src/api/v3-chat-messages.ts')
 compileTs('src/composables/useChatContext.ts')
 compileTs('src/composables/useChatQuoteNavigation.ts')
 compileTs('src/composables/useChatScrollFollow.ts')
 compileTs('src/composables/useScrollPagination.ts')
+compileTs('src/composables/useSakuraArrivals.ts')
+compileTs('src/composables/useChatMessageSource.ts')
 const chatSource = fs.readFileSync('src/stores/chat.ts', 'utf8')
 const projection = chatSource.slice(chatSource.indexOf('export function asV3Line'), chatSource.indexOf("export const useChatStore"))
 modules.set('@/stores/chat', publish('chat', transpile(projection) + `\nexport {useChatStore} from '${mocks}';`))
@@ -114,12 +118,13 @@ function findScrollBehavior(node) {
 findScrollBehavior(routerSource)
 assert.ok(scrollBehavior, '必须使用实际路由滚动行为')
 const html = `<!doctype html><meta charset="utf-8"><style>
+${fs.readFileSync('src/styles/inner-pages.css', 'utf8')}
 *{box-sizing:border-box}body{margin:0;font:14px system-ui;background:#f4f6f8;--fp-card:#fff;--fp-border:#dfe4e9;--fp-text:#252a31;--fp-title:#252a31;--fp-muted:#737c89;--fp-primary:#62ae37;--fp-accent:#4d9633;--fp-accent-soft:#edf4e7;--fp-hover:#f4f6f8;--fp-bg:#f5f6f8;--fp-self:#edf4e7;--fp-avatar-radius:8px;--fp-link:#3977c8;--fp-nav-h:58px;--fp-page-gap:20px;--fp-panel-padding:20px;--fp-panel-radius:12px}
 header.fixture-nav{height:58px;position:fixed;top:0;inset-inline:0;background:#fff;border-bottom:1px solid #ddd;z-index:50;padding:16px}#app{max-width:1200px;margin:70px auto 0;padding:0 12px}.fixture-composer textarea{display:block;width:100%;resize:none;border:1px solid #ddd;border-radius:7px;padding:10px;font:inherit}.fixture-composer .bar{display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-height:40px}.fixture-composer button{cursor:pointer}a{color:inherit}${css}
 </style><header class="fixture-nav">聊天室引用定位 · 只读本地夹具</header><div id="app"></div><script type="module">
 import {createApp,h} from '${vue}';import {createRouter,createWebHistory,RouterView} from '${router}';import View from '${view}';import {chat} from '${mocks}';import {asV3Line} from '${modules.get('@/stores/chat')}';
 chat.messages=${JSON.stringify(initial)}.map(asV3Line);chat.chatStyle=new URLSearchParams(location.search).get('mode')||'classic';
-const router=createRouter({history:createWebHistory(),routes:[{path:'/cr',component:View}],${scrollBehavior}});window.fixtureRouter=router;
+const router=createRouter({history:createWebHistory(),routes:[{path:'/cr',component:View},{path:'/member/:name',component:{render:()=>h('p','资料页')}}],${scrollBehavior}});window.fixtureRouter=router;
 window.addRealtime=()=>chat.messages.push(asV3Line(${JSON.stringify(message('9999'))}));
 createApp({render:()=>h(RouterView)}).use(router).mount('#app');window.fixtureReady=true;
 </script>`
@@ -136,6 +141,7 @@ try {
     if (url.origin !== origin) { unexpected.push(url.href); await route.abort(); return }
     if (files.has(url.pathname)) { await route.fulfill({ contentType: 'text/javascript', body: files.get(url.pathname) }); return }
     if (url.pathname === '/cr') { await route.fulfill({ contentType: 'text/html', body: html }); return }
+    if (url.pathname === '/images/chat-client-icons.svg') { await route.fulfill({ path: 'public/images/chat-client-icons.svg', contentType: 'image/svg+xml' }); return }
     if (url.pathname === '/delayed.svg') {
       await new Promise(resolve => { imageRelease = resolve })
       await route.fulfill({ contentType:'image/svg+xml', body:'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="800"><rect width="400" height="800" fill="#b8d8ee"/></svg>' }); return
@@ -151,6 +157,8 @@ try {
       if (id === '1100') for (const item of list) if (item.id !== id) item.contentHtml = '<p><img src="/delayed.svg" alt="延迟图片"></p>'
       await route.fulfill({ json: { code: 0, data: { anchorId: id, list, hasMoreBefore: true, hasMoreAfter: true, nextBefore: list[0].id, nextAfter: list.at(-1).id } } }); return
     }
+    const detail = /^\/api\/v3\/chat\/messages\/(\d+)$/.exec(url.pathname)
+    if (detail) { await route.fulfill({ json: { code: 0, data: message(detail[1]) } }); return }
     if (url.pathname === '/api/v3/chat/messages') {
       assert.equal(url.searchParams.get('size'), '10')
       const before = url.searchParams.get('before'), after = url.searchParams.get('after')
@@ -161,6 +169,28 @@ try {
     unexpected.push(url.href); await route.abort()
   })
   const calls = () => page.evaluate(() => [...window.apiRequests])
+  for (const mode of ['classic', 'modern']) {
+    await page.goto(`${origin}/cr?mode=${mode}`)
+    const message = page.locator('#chatroom9001')
+    await message.locator('.fp-avatar-frame').dblclick()
+    await page.waitForFunction(() => document.querySelector('[data-editor]').value === ' @测试用户 ')
+    assert.equal(new URL(page.url()).pathname, '/cr', '双击头像应留在当前聊天室')
+    await message.locator('.fp-bubble').dblclick({ position: { x: 3, y: 3 } })
+    const preview = page.locator('.chat-quote-preview .chat-quote-card')
+    await preview.filter({ hasText: '消息 9001' }).waitFor()
+    assert.equal(await page.locator('[data-editor]').inputValue(), ' @测试用户 ', '引用不覆盖刚才写入的草稿')
+    await message.locator('.chat-quote-jump').click()
+    const context = page.locator('#chatroom100')
+    await context.locator('.fp-bubble').dblclick({ position: { x: 3, y: 3 } })
+    await preview.filter({ hasText: '消息 100：' }).waitFor()
+    await context.locator('.fp-avatar-frame').dblclick()
+    await page.waitForFunction(() => document.querySelector('[data-editor]').value === ' @测试用户  @测试用户 ')
+    assert.deepEqual(await calls(), [
+      '/api/v3/chat/messages/9001', '/api/v3/chat/messages/100/context?radius=5', '/api/v3/chat/messages/100',
+    ])
+    assert.equal(new URL(page.url()).hash, '#chatroom100', '历史快捷入口保留当前历史窗口')
+  }
+  console.log('PASS 经典、简约和历史窗口的双击快捷键使用真实路由和消息详情，草稿与定位保持正确。')
   async function anchorVisible(id, contained) {
     await page.waitForSelector(`.chat-context li#chatroom${id}[data-anchor="true"]`)
     await page.waitForFunction(({ id, contained }) => {
@@ -194,7 +224,7 @@ try {
     if (mode === 'modern') {
       assert.equal(await page.evaluate(() => scrollY), y, '简约定位不得滚动页面')
       const box = await page.locator('[data-editor]').boundingBox()
-      assert.ok(box.y >= 58 && box.y + box.height <= 900, '简约模式编辑器须保持可见')
+      assert.ok(box.y >= 58 && box.y + box.height <= 900, `简约模式 ${width}px 编辑器须保持可见：${JSON.stringify(box)}`)
       const before = await page.locator('.chat-context').evaluate(el => el.scrollTop)
       await page.locator('.chat-context').hover()
       await page.mouse.wheel(0, 300)

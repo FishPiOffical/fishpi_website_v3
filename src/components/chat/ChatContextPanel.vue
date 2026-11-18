@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import ChatBubble from '@/components/ChatBubble.vue'
 import ChatCard from '@/components/ChatCard.vue'
 import ChatRedPacketCard from '@/components/chat/ChatRedPacketCard.vue'
+import { CHAT_QUICK_QUOTE } from '@/chat/messageShortcuts'
 import { getAuthContextVersion } from '@/api/http'
 import { useChatContext } from '@/composables/useChatContext'
 import { useAuthStore } from '@/stores/auth'
@@ -11,6 +12,7 @@ import { asV3Line } from '@/stores/chat'
 const props = defineProps<{ messageId: string; contained?: boolean; reverse?: boolean }>()
 const emit = defineEmits<{ close: []; latest: [] }>()
 const context = useChatContext()
+const quickQuote = inject(CHAT_QUICK_QUOTE, null)
 const { accessToken, account } = storeToRefs(useAuthStore())
 const scrollArea = ref<HTMLElement | null>(null)
 const messageList = ref<HTMLOListElement | null>(null)
@@ -106,6 +108,9 @@ onBeforeUnmount(() => {
             <template v-if="message.redPacket || message.card" #default>
             <ChatRedPacketCard v-if="message.redPacket" :packet="message.redPacket" :packet-id="message.oId" />
             <ChatCard v-else-if="message.card" :card="message.card" />
+            </template>
+            <template v-if="quickQuote && !message.redPacket && !message.card" #actions>
+              <button type="button" title="引用消息" :disabled="!quickQuote.enabled(message.oId)" @click="quickQuote.quote(message.oId)">引用</button>
             </template>
           </ChatBubble>
         </li>

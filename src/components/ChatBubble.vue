@@ -6,8 +6,9 @@ import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { formatDisplayTime } from '@/utils/time'
 
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
+import { CHAT_QUICK_QUOTE } from '@/chat/messageShortcuts'
 import { RouterLink } from 'vue-router'
 import CollectChatEmoji from '@/components/chat/CollectChatEmoji.vue'
 import ChatQuoteCard from '@/components/chat/ChatQuoteCard.vue'
@@ -64,12 +65,14 @@ const messageClient = computed(() => {
   const icon = clientIcons.get(name) || 'other'
   return { href: `/images/chat-client-icons.svg#ic-${icon}`, label: version ? `${name} ${version}` : name }
 })
-const ownPet = computed(() => !!props.userId && props.userId === auth.account?.oId)
-const petDestination = computed(() => ownPet.value
+const isOwnUser = computed(() => !!props.userId && props.userId === auth.account?.oId)
+const petDestination = computed(() => isOwnUser.value
   ? { name: 'pets' }
   : { name: 'chat-pet-profile', params: { messageId: props.messageId } })
 const mention = inject(CHAT_MENTION, null)
 const canMention = computed(() => props.chatroom && !props.self && !!chatMentionText(props.userName) && !!mention?.enabled())
+const canQuickMention = computed(() => canMention.value && !!props.userId && !isOwnUser.value)
+const quickQuote = inject(CHAT_QUICK_QUOTE, null)
 const chatPreferences = useChatPreferencesStore()
 const simpleMode = computed(() => mounted.value && props.chatroom && chatPreferences.simpleMode)
 const functionPreferences = useFunctionPreferencesStore()
@@ -123,6 +126,55 @@ const isStandalone = computed(() => props.chatroom && (
   props.standalone || singleImage.value || (!display.value.html && !!display.value.quote)
 ))
 
+const AVATAR_DOUBLE_CLICK_WINDOW_MS = 500
+const bubbleControls = 'a, button, input, textarea, select, summary, [role="button"], [role="link"], [contenteditable], img, picture, video, audio, iframe, .chat-image-frame, .fp-chat-tail'
+let pointerType = ''
+let avatarNavigation: ReturnType<typeof setTimeout> | undefined
+
+function cancelAvatarNavigation() {
+  clearTimeout(avatarNavigation)
+  avatarNavigation = undefined
+}
+
+watch([() => props.userId, () => props.userName, () => auth.account?.oId], cancelAvatarNavigation)
+onBeforeUnmount(cancelAvatarNavigation)
+
+function plainMouseActivation(event: MouseEvent) {
+  return pointerType === 'mouse' && event.button === 0 && event.detail > 0 &&
+    !event.defaultPrevented && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey
+}
+
+function onAvatarClick(event: MouseEvent, navigate: (event?: MouseEvent) => unknown) {
+  if (!canQuickMention.value || !plainMouseActivation(event)) {
+    cancelAvatarNavigation()
+    void navigate(event)
+    return
+  }
+  event.preventDefault()
+  cancelAvatarNavigation()
+  if (event.detail === 1) {
+    avatarNavigation = setTimeout(() => {
+      avatarNavigation = undefined
+      void navigate()
+    }, AVATAR_DOUBLE_CLICK_WINDOW_MS)
+  }
+}
+
+function onAvatarDoubleClick(event: MouseEvent) {
+  if (!canQuickMention.value || !plainMouseActivation(event)) return
+  cancelAvatarNavigation()
+  mention?.insert(props.userName)
+}
+
+function onBubbleDoubleClick(event: MouseEvent) {
+  if (!props.chatroom || !props.userName || isStandalone.value || !display.value.html || !props.messageId || !plainMouseActivation(event)) return
+  const target = event.target
+  if (!(target instanceof Element) || target.closest(bubbleControls)) return
+  // 双击文字可能是浏览器的选词操作，保留选区及复制流程。
+  if (target.closest('.body') && window.getSelection()?.isCollapsed === false) return
+  if (quickQuote?.enabled(props.messageId)) quickQuote.quote(props.messageId)
+}
+
 
 function onAvatarError(e: Event) {
   const img = e.target as HTMLImageElement
@@ -147,10 +199,14 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'has-sakura-arrival': animateSakura && mounted && chatPreferences.showSakuraEffects, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
-    <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`">
-      <img class="fp-avatar" :src="avatarThumbnail(avatar, avatarSize)" alt="" loading="lazy" @error="onAvatarError" />
-      <SakuraDecoration v-if="sakuraFrame" :style-id="sakuraFrame" kind="frame" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
+  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'has-sakura-arrival': animateSakura && mounted && chatPreferences.showSakuraEffects, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }" @pointerdown="pointerType = $event.pointerType">
+    <RouterLink :to="`/member/${userName}`" custom v-slot="{ href, navigate, isActive, isExactActive }">
+      <a :href="href" class="fp-avatar-frame" :class="{ 'router-link-active': isActive, 'router-link-exact-active': isExactActive }"
+        :aria-current="isExactActive ? 'page' : undefined" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`"
+        @click="onAvatarClick($event, navigate)" @dblclick="onAvatarDoubleClick">
+        <img class="fp-avatar" :src="avatarThumbnail(avatar, avatarSize)" alt="" loading="lazy" @error="onAvatarError" />
+        <SakuraDecoration v-if="sakuraFrame" :style-id="sakuraFrame" kind="frame" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
+      </a>
     </RouterLink>
     <div class="message-stack">
       <div v-if="chatroom" class="head">
@@ -166,7 +222,7 @@ function onBodyClick(e: MouseEvent) {
             </span>
           </component>
           <RouterLink v-if="petStatus && messageId && !simpleMode" :to="petDestination" class="fp-chat-pet-status" :data-species="petStatus.speciesId"
-            :title="`宠物：${petStatus.name} · ${chatPetStatusLabels[petStatus.state]}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${ownPet ? '前往宠物家园' : '查看宠物资料'}`">
+            :title="`宠物：${petStatus.name} · ${chatPetStatusLabels[petStatus.state]}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${isOwnUser ? '前往宠物家园' : '查看宠物资料'}`">
             <span class="fp-chat-pet-info">
               <span class="fp-chat-pet-name">{{ petStatus.name }}</span>
               <span class="fp-chat-pet-state">{{ chatPetStatusLabels[petStatus.state] }}</span>
@@ -176,7 +232,7 @@ function onBodyClick(e: MouseEvent) {
         </div>
         <MedalList class="chat-medals" :items="medals" variant="mini" />
       </div>
-      <div v-if="!display.quote || display.html || $slots.default" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick">
+      <div v-if="!display.quote || display.html || $slots.default" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick" @dblclick="onBubbleDoubleClick">
         <SakuraDecoration v-if="sakuraBubble" :style-id="sakuraBubble" kind="bubble" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
         <ManagedBubbleShape v-if="managedStyle?.shape" :shape="managedStyle.shape" />
         <img v-if="managedStyle?.image" class="managed-bubble-mark" :src="managedStyle.shape ? imageThumbnail(managedStyle.image, 34, 34) : managedStyle.image" alt="" loading="lazy">

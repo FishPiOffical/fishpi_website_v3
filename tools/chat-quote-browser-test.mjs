@@ -17,9 +17,12 @@ export const useAuthStore=()=>({account:{oId:'me'}});
 export const useChatPreferencesStore=()=>prefs,useFunctionPreferencesStore=()=>prefs;
 export const CHAT_MENTION=Symbol(),chatMentionText=x=>x,chatPetStatusLabels={};
 export const formatDisplayTime=()=> '2026-11-14 13:07';
-export const RouterLink={props:['to'],setup(p,{slots}){return()=>h('a',{href:p.to},slots.default?.())}};`)
+export const RouterLink={props:{to:{},custom:Boolean},setup(p,{slots}){return()=>p.custom
+  ? slots.default?.({href:p.to,navigate(event){if(event?.ctrlKey||event?.metaKey)return;event?.preventDefault();window.avatarNavigations.push(p.to)}})
+  : h('a',{href:p.to},slots.default?.())}};`)
 const modules = { vue, 'vue-router': mocks }
 for (const path of ['@/stores/auth', '@/stores/chatPreferences', '@/stores/functionPreferences', '@/chat/mention', '@/api/v3-chat-messages', '@/utils/time']) modules[path] = mocks
+modules['@/chat/messageShortcuts'] = data(transpile(fs.readFileSync('src/chat/messageShortcuts.ts', 'utf8')))
 for (const name of ['avatar', 'bubbleStyle', 'chatAppearance', 'chatMessage', 'chatQuote']) {
   const source = transpile(fs.readFileSync(`src/utils/${name}.ts`, 'utf8'))
   modules['@/utils/' + name] = data(source
@@ -58,18 +61,26 @@ const fixtures = [
   { id: 'short', userName: '短引用', html: '<p>收到</p><h5>引用 @Yui <a href="/cr#chatroom321">↩</a></h5><blockquote><p>好</p></blockquote>' },
   { id: 'own-multi', userName: 'Yui', self: true, html: '<p>一起回复</p>' + previousQuote + nextHeading + '<blockquote><p>好</p></blockquote><blockquote><p>手写补充</p></blockquote>' },
   { id: 'nested', userName: '小羊', html: '<p>再次回复</p>' + nextHeading + '<blockquote><p>直接引用的内容</p>' + previousQuote + '</blockquote>' },
+  { id: 'shortcuts', userName: 'shortcut-peer', html: '<p>Selection should still work.</p><p><a href="#normal-link">链接</a></p>' },
+  { id: 'mixed-media', userName: 'media-peer', html: '<p>图文消息</p><p><img src="https://file.fishpi.cn/test.png"></p>' },
+  { id: 'standalone', userName: 'standalone-peer', standalone: true, html: '<p>独立卡片</p>' },
 ]
 const packs = fs.readFileSync('src/packs/bubbles/star-route/style.css', 'utf8')
 const html = `<!doctype html><meta charset="utf-8"><style>
 *{box-sizing:border-box}body{margin:0;font:14px system-ui;background:#f4f6f8;--fp-card:#fff;--fp-border:#dfe4e9;--fp-text:#252a31;--fp-muted:#737c89;--fp-primary:#62ae37;--fp-hover:#f4f6f8;--fp-bg:#f5f6f8;--fp-self:#edf4e7;--fp-avatar-radius:8px;--fp-link:#3977c8}
 a{color:inherit}.panel{padding:20px;background:white;max-width:760px;margin:16px auto}.case{margin:16px 0 24px}.title{font-size:12px;color:#7b8390;margin-bottom:12px}${css}${packs}
 </style><div id="app"></div><script type="module">
-import {createApp,h,ref} from '${vue}';import Bubble from '${bubble}';import Preview from '${preview}';
+import {createApp,h,ref,provide} from '${vue}';import Bubble from '${bubble}';import Preview from '${preview}';
+import {CHAT_MENTION} from '${mocks}';import {CHAT_QUICK_QUOTE} from '${modules['@/chat/messageShortcuts']}';
 const fixtures=${JSON.stringify(fixtures)};const narrow=ref(false);window.narrow=narrow;
-createApp({setup:()=>()=>h('div',{class:'panel'},[
-...fixtures.map(f=>h('section',{class:'case','data-case':f.id},[h('div',{class:'title'},f.id),h(Bubble,{...f,chatroom:true,userId:f.self?'me':'other',avatar:'${avatar}',avatarSize:narrow.value?24:36,appearance:{bubbleId:'star-route',frameId:'none',version:1}})])),
+window.mentions=[];window.quickQuotes=[];window.avatarNavigations=[];window.shortcutsEnabled=true;
+createApp({setup(){
+provide(CHAT_MENTION,{enabled:()=>window.shortcutsEnabled,insert:name=>window.mentions.push(name)});
+provide(CHAT_QUICK_QUOTE,{enabled:()=>window.shortcutsEnabled,quote:id=>window.quickQuotes.push(id)});
+return ()=>h('div',{class:'panel'},[
+...fixtures.map(f=>h('section',{class:'case','data-case':f.id},[h('div',{class:'title'},f.id),h(Bubble,{...f,chatroom:true,messageId:f.id,userId:f.self?'me':'other',avatar:'${avatar}',avatarSize:narrow.value?24:36,appearance:{bubbleId:'star-route',frameId:'none',version:1}})])),
 h('section',{class:'case','data-case':'preview'},[h(Preview,{quotes:[{kind:'message',href:'/cr#chatroom123',author:'Yui',excerpt:${JSON.stringify(excerpt)}}],onRemove:()=>window.removed=true})])
-])}).mount('#app');
+])}}).mount('#app');
 </script>`
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
@@ -181,6 +192,55 @@ try {
   assert.equal(new URL(page.url()).hash, '#chatroom321')
   await page.locator('[data-case="preview"] button').click()
   assert.equal(await page.evaluate(() => window.removed), true)
+
+  const shortcut = page.locator('[data-case="shortcuts"]')
+  const avatarLink = shortcut.locator('.fp-avatar-frame')
+  const message = shortcut.locator('.fp-bubble')
+  assert.equal(await avatarLink.getAttribute('data-user-card'), 'shortcut-peer', '头像保留悬浮资料卡入口')
+  await avatarLink.dblclick()
+  assert.deepEqual(await page.evaluate(() => window.mentions), ['shortcut-peer'])
+  await avatarLink.click()
+  assert.deepEqual(await page.evaluate(() => window.avatarNavigations), [])
+  await page.waitForFunction(() => window.avatarNavigations.length === 1)
+  await avatarLink.focus()
+  await page.keyboard.press('Enter')
+  assert.deepEqual(await page.evaluate(() => window.avatarNavigations), ['/member/shortcut-peer', '/member/shortcut-peer'])
+  await page.locator('[data-case="own"] .fp-avatar-frame').click()
+  assert.equal(await page.evaluate(() => window.avatarNavigations.at(-1)), '/member/Yui', '本人头像单击保持直接导航')
+  assert.deepEqual(await page.evaluate(() => window.mentions), ['shortcut-peer'])
+  await message.dblclick({ position: { x: 3, y: 3 } })
+  assert.deepEqual(await page.evaluate(() => window.quickQuotes), ['shortcuts'])
+  const textBox = shortcut.locator('.body p').first()
+  const point = await textBox.evaluate(el => {
+    const range = document.createRange()
+    range.setStart(el.firstChild, 2)
+    range.setEnd(el.firstChild, 3)
+    const rect = range.getBoundingClientRect()
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+  })
+  await page.mouse.dblclick(point.x, point.y)
+  assert.equal(await page.evaluate(() => getSelection()?.toString()), 'Selection', '正文双击保留浏览器选词')
+  await shortcut.getByRole('link', { name: '链接' }).dblclick()
+  assert.equal(new URL(page.url()).hash, '#normal-link')
+  await imageQuote.locator('.chat-quote-author').dblclick()
+  assert.equal(new URL(page.url()).hash, '#normal-link', '双击引用摘要仍不跳转原消息')
+  await page.locator('[data-case="mixed-media"] .body img').click()
+  await lightbox.waitFor()
+  await page.keyboard.press('Escape')
+  await lightbox.waitFor({ state: 'hidden' })
+  await page.locator('[data-case="standalone"] .fp-bubble').dblclick({ position: { x: 3, y: 3 } })
+  assert.deepEqual(await page.evaluate(() => window.quickQuotes), ['shortcuts'], '控件、图片和独立卡片不触发快捷引用')
+  await page.evaluate(() => { window.shortcutsEnabled = false })
+  await message.dblclick({ position: { x: 3, y: 3 } })
+  assert.deepEqual(await page.evaluate(() => window.quickQuotes), ['shortcuts'])
+  const touchPage = await browser.newPage({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true })
+  await touchPage.route('http://quotes.test/**', route => route.fulfill({ contentType: 'text/html', body: html }))
+  await touchPage.goto('http://quotes.test/cr')
+  await touchPage.locator('[data-case="shortcuts"] .fp-avatar-frame').tap()
+  assert.deepEqual(await touchPage.evaluate(() => window.avatarNavigations), ['/member/shortcut-peer'], '触屏单击头像立即导航')
+  assert.deepEqual(await touchPage.evaluate(() => window.mentions), [])
+  await touchPage.close()
+  console.log('PASS 快捷操作实测：头像单击、键盘、触屏和双击分流，正文空白双击引用，保留选词、链接、图片和独立卡片')
   assert.deepEqual(errors, [])
   assert.equal(requests.filter(url => /\/api\//.test(url)).length, 0, '渲染引用不能触发详情补查')
   for (const [file, count] of [
