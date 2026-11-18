@@ -57,6 +57,7 @@ const clientIcons = new Map([
   ['ElvesOnline', 'moon'], ['IceNet', 'icenet'], ['Extension', 'extension'], ['Edge', 'edge'],
   ['Chrome', 'chrome'], ['VSCode', 'vscode'], ['IDEA', 'idea'], ['Python', 'python'],
   ['Golang', 'golang'], ['Harmony', 'harmony'], ['Rust', 'rust'], ['CLI', 'cli'], ['uTools', 'utools'],
+  ['Deepseek Harness', 'deepseek-harness'], ['Codex', 'codex'],
 ])
 const messageClient = computed(() => {
   const [name, ...parts] = (props.client || '').trim().split('/')

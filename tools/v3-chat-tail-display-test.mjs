@@ -78,6 +78,16 @@ assert.equal(clientNode().getAttribute('title'), 'iOS 1.2.3')
 assert.equal(clientNode().querySelector('use').getAttribute('href'), '/images/chat-client-icons.svg#ic-apple')
 props.client = 'Unknown/2.0'; await nextTick()
 assert.equal(clientNode().querySelector('use').getAttribute('href'), '/images/chat-client-icons.svg#ic-other')
+for (const [client, label, icon] of [
+  ['Deepseek Harness/1.2.3', 'Deepseek Harness 1.2.3', 'ic-deepseek-harness'],
+  ['Codex/2.3.4', 'Codex 2.3.4', 'ic-codex'],
+]) {
+  props.client = client
+  await nextTick()
+  assert.equal(clientNode().getAttribute('title'), label)
+  assert.equal(clientNode().getAttribute('aria-label'), label)
+  assert.equal(clientNode().querySelector('use').getAttribute('href'), `/images/chat-client-icons.svg#${icon}`)
+}
 props.client = ''; await nextTick(); assert.equal(clientNode(), null)
 props.client = 'Mobile/移动网页端'; await nextTick()
 preferences.simpleMode = true; await nextTick(); assert.equal(tailNode(), null)

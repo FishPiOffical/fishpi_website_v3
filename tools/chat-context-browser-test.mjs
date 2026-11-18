@@ -107,7 +107,10 @@ function message(id, quoteId = '') {
   const quote = quoteId ? `<h5>引用 @测试用户 <a href="/cr#chatroom${quoteId}">↩</a></h5><blockquote><p>查看消息 ${quoteId}</p></blockquote>` : ''
   return { id: String(id), createdAt: 1763111220000 + Number(id), type: 'text', content: body, contentHtml: `<p>${body}</p><p>第二行真实布局内容，保留自然消息高度。</p>${quote}`, author: { id: '2', userName: '测试用户', userNickname: '测试昵称', userAvatarURL: avatar }, client: 'Web', card: {} }
 }
-const initial = [message('9001', '100'), message('9002', '200')]
+const initial = [
+  { ...message('9001', '100'), client: 'Deepseek Harness/1.2.3' },
+  { ...message('9002', '200'), client: 'Codex/2.3.4' },
+]
 // 复用生产路由的滚动行为，防止夹具默认行为掩盖 hash 抢滚动问题。
 const routerSource = ts.createSourceFile('router.ts', fs.readFileSync('src/router/index.ts', 'utf8'), ts.ScriptTarget.Latest, true)
 let scrollBehavior = ''
@@ -172,6 +175,18 @@ try {
   for (const mode of ['classic', 'modern']) {
     await page.goto(`${origin}/cr?mode=${mode}`)
     const message = page.locator('#chatroom9001')
+    for (const [id, label, symbol] of [
+      ['9001', 'Deepseek Harness 1.2.3', 'ic-deepseek-harness'],
+      ['9002', 'Codex 2.3.4', 'ic-codex'],
+    ]) {
+      const icon = page.locator(`#chatroom${id}`).getByRole('img', { name: label, exact: true })
+      await icon.waitFor()
+      assert.equal(await icon.getAttribute('title'), label)
+      await page.waitForFunction(({ id, symbol }) => {
+        const use = document.querySelector(`#chatroom${id} .message-client use`)
+        return use?.getAttribute('href') === `/images/chat-client-icons.svg#${symbol}` && use.getBBox().width > 0
+      }, { id, symbol })
+    }
     await message.locator('.fp-avatar-frame').dblclick()
     await page.waitForFunction(() => document.querySelector('[data-editor]').value === ' @测试用户 ')
     assert.equal(new URL(page.url()).pathname, '/cr', '双击头像应留在当前聊天室')
