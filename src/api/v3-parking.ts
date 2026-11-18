@@ -3,10 +3,10 @@ import { ApiError, request } from './http'
 export type ParkingInput =
   | { action: 'starter'; car: string }
   | { action: 'buy'; car: string; expectedPrice: number }
-  | { action: 'park'; car: string; hostId: string; note?: string }
+  | { action: 'park'; car: string; hostId: string; note?: string; petId?: string }
   | { action: 'collect' | 'ticket' | 'pardon'; sessionId: string }
 export interface ParkingCar { id: string; name: string; starter: boolean; enabled: boolean; price: number; rate: number }
-export interface ParkingSession { id: string; car: string; startedAt: number; rate: number; earned: number; otherName: string; note: string; mountStyle: string; pardoned: boolean }
+export interface ParkingSession { id: string; car: string; startedAt: number; rate: number; earned: number; otherName: string; note: string; mountStyle: string; passengerSpecies: string | null; pardoned: boolean }
 
 function invalid(): never { throw new ApiError('停车数据格式异常', 502, 'invalid_response') }
 function row(value: unknown): Record<string, unknown> {
@@ -21,7 +21,7 @@ function id(v: unknown) { const raw = str(v); return /^[1-9][0-9]{0,18}$/.test(r
 function session(v: unknown): ParkingSession | null {
   if (v === null) return null
   const s = row(v)
-  return { id: id(s.id), car: carId(s.car), otherName: str(s.otherName), note: str(s.note ?? ''), mountStyle: str(s.mountStyle ?? ''), pardoned: s.pardoned === true, rate: num(s.rate), startedAt: num(s.startedAt), earned: num(s.earned) }
+  return { passengerSpecies: s.passengerSpecies == null ? null : str(s.passengerSpecies), id: id(s.id), car: carId(s.car), otherName: str(s.otherName), note: str(s.note ?? ''), mountStyle: str(s.mountStyle ?? ''), pardoned: s.pardoned === true, rate: num(s.rate), startedAt: num(s.startedAt), earned: num(s.earned) }
 }
 async function data(path: string, init: RequestInit) {
   const envelope = await request<{ code: number; data: unknown }>(path, { ...init, signal: AbortSignal.timeout(15_000) })
@@ -46,7 +46,9 @@ export async function readParking(after = '', scope: 'all' | 'following' = 'all'
     if (s.ending !== 'collect' && s.ending !== 'ticket') invalid()
     return { id: id(s.oId), car: carId(s.car), endedAt: num(s.endedAt), ending: s.ending, paid: num(s.paid) }
   })
-  return { catalog, recent, coins: num(r.coins), owned: list(r.owned).map(carId), serverNow: num(r.serverNow),
+  const pet = r.availablePet == null ? null : row(r.availablePet)
+  const availablePet = pet && { id: id(pet.id), speciesId: str(pet.speciesId) }
+  return { availablePet, catalog, recent, coins: num(r.coins), owned: list(r.owned).map(carId), serverNow: num(r.serverNow),
     occupant: session(r.occupant), driving: session(r.driving), spaces, next: r.next === '' ? '' : id(r.next) }
 }
 export type ParkingState = Awaited<ReturnType<typeof readParking>>

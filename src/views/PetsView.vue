@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { petSpeciesChoices as choices } from '@/components/pets/species'
 import { petPortrait } from '@/components/pets/animations'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
@@ -46,10 +47,7 @@ const animationActive = computed(() => mounted.value && section.value === 'care'
 const animation = usePetAnimationState(now, animationActive)
 const owner = computed(() => `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.accessToken}`)
 const loggedIn = computed(() => mounted.value && auth.isLoggedIn)
-const choices = [
-  { id: 'momota', name: '摸摸獭' }, { id: 'hexiaotun', name: '荷小豚' },
-  { id: 'yubingmiao', name: '鱼饼喵' }, { id: 'paixiaoyu', name: '派小鱼' },
-] as const
+
 const selectedSpecies = computed(() => pets.catalog?.species.find(species => species.id === selected.value))
 const speciesName = computed(() => pets.catalog?.species.find(species => species.id === pets.pet?.speciesId)?.name ?? choices.find(species => species.id === pets.pet?.speciesId)?.name)
 const locked = computed(() => pets.busy || !!pets.pending || pets.refreshNeeded || pets.loading)

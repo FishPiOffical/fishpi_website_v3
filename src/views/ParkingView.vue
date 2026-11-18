@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { petSpeciesChoices } from '@/components/pets/species'
+import { petBattlePoster, petPortrait } from '@/components/pets/animations'
 import { mountAssets } from '@/utils/mounts'
 import FpDialog from '@/components/FpDialog.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
@@ -13,6 +15,20 @@ usePageSeo(() => ({ title: '抢车位', path: '/parking', robots: 'noindex' }))
 const game = useParkingStore(), auth = useAuthStore()
 const route = useRoute()
 const note = ref('')
+const passengerId = ref('')
+const availablePet = computed(() => game.state?.availablePet)
+const speciesName = (id: string) => petSpeciesChoices.find(pet => pet.id === id)?.name
+watch(() => availablePet.value?.id, () => { passengerId.value = '' })
+function fallbackPortrait(event: Event, species: string) {
+  const img = event.currentTarget as HTMLImageElement
+  const fallback = petBattlePoster(species)
+  if (fallback && img.getAttribute('src') !== fallback) img.src = fallback
+}
+function park(hostId: string) {
+  const petId = passengerId.value
+  void game.submit({ action: 'park', car: activeCar.value, hostId, ...(note.value ? { note: note.value } : {}),
+    ...(petId && petId === availablePet.value?.id ? { petId } : {}) })
+}
 const notes: Record<string, string> = { hello: '来串个门', thanks: '谢谢你的车位', coffee: '请你喝杯咖啡' }
 const target = computed(() => typeof route.query.host === 'string' && /^[1-9][0-9]{0,18}$/.test(route.query.host) ? route.query.host : '')
 function setScope(value: 'all' | 'following') {
@@ -52,7 +68,7 @@ watch(() => game.challenge, async c => {
 }, { flush: 'post' })
 function refresh() { if (mounted.value && auth.accessToken && auth.account?.oId && !game.busy) void game.load() }
 watch([() => auth.account?.oId, () => !!auth.accessToken], () => {
-  selected.value = ''; note.value = ''; purchase.value = null; game.host = target.value; refresh()
+  passengerId.value = ''; selected.value = ''; note.value = ''; purchase.value = null; game.host = target.value; refresh()
 })
 watch(target, id => { game.host = id; game.scope = 'all'; if (mounted.value) void game.load() })
 onMounted(() => {
@@ -87,6 +103,10 @@ onBeforeUnmount(() => { clearInterval(timer); window.removeEventListener('focus'
             <h3>{{ carName(game.state[side].car) }}</h3>
             <p>{{ side === 'driving' ? '停在 ' + game.state[side].otherName + ' 的车位' : '车主 · ' + game.state[side].otherName }}</p>
             <p>预计{{ side === 'driving' ? '收入' : '车主收入' }} <strong>{{ estimate(game.state[side]) }}</strong> 游园币</p>
+            <span v-if="game.state[side].passengerSpecies && speciesName(game.state[side].passengerSpecies)" class="passenger">
+              <img :src="petPortrait(game.state[side].passengerSpecies)" @error="fallbackPortrait($event, game.state[side].passengerSpecies)" width="32" height="32" alt="">
+              副驾 · {{ speciesName(game.state[side].passengerSpecies) }}
+            </span>
             <p v-if="notes[game.state[side].note]">便签 · {{ notes[game.state[side].note] }}</p>
             <p v-if="protectedTrip(game.state[side])">已放行，计费期满后可清位。</p>
             <button v-if="side === 'occupant' && !game.state[side].pardoned && withinBillingPeriod(game.state[side])" :disabled="locked" @click="game.submit({ action: 'pardon', sessionId: game.state[side].id })">放你一马</button>
@@ -105,8 +125,13 @@ onBeforeUnmount(() => { clearInterval(timer); window.removeEventListener('focus'
         <template v-if="activeCar && !game.state.driving">
         <label>选择车辆 <select v-model="selected" :disabled="locked"><option value="">{{ carName(game.state.owned[0]!) }}</option><option v-for="id in game.state.owned.slice(1)" :key="id" :value="id">{{ carName(id) }}</option></select></label>
         <label>随车便签 <select v-model="note" :disabled="locked"><option value="">不留便签</option><option v-for="(label, key) in notes" :key="key" :value="key">{{ label }}</option></select></label>
+        <label v-if="availablePet && speciesName(availablePet.speciesId)" class="passenger-choice">
+          <input v-model="passengerId" type="checkbox" :true-value="availablePet.id" false-value="" :disabled="locked">
+          <img :src="petPortrait(availablePet.speciesId)" @error="fallbackPortrait($event, availablePet.speciesId)" width="28" height="28" alt="">
+          带{{ speciesName(availablePet.speciesId) }}坐副驾
+        </label>
         </template>
-        <ul><li v-for="space in game.state.spaces" :key="space.id"><span>{{ space.name }}</span><button :disabled="locked || !space.free || !activeCar || !!game.state.driving" @click="game.submit({ action: 'park', car: activeCar, hostId: space.id, ...(note ? { note } : {}) })">{{ space.free ? '停在这里' : '车位已占用' }}</button></li></ul>
+        <ul><li v-for="space in game.state.spaces" :key="space.id"><span>{{ space.name }}</span><button :disabled="locked || !space.free || !activeCar || !!game.state.driving" @click="park(space.id)">{{ space.free ? '停在这里' : '车位已占用' }}</button></li></ul>
         <p v-if="!game.state.spaces.length">{{ target ? '这位鱼友尚未开放车位。' : game.scope === 'following' ? '关注的鱼友暂时没有空车位。' : '目前没有空车位。' }}</p>
         <button v-if="game.state.next" :disabled="locked" @click="game.load(game.state.next)">下一批车位</button>
       </section>
@@ -156,6 +181,11 @@ onBeforeUnmount(() => { clearInterval(timer); window.removeEventListener('focus'
 .parking button,.parking select { min-height:36px; padding:6px 12px; font:inherit; font-size:14px; color:var(--fp-text); background:var(--fp-card); border:1px solid var(--fp-border); border-radius:8px; }
 .parking button { cursor:pointer; }.parking button:enabled:hover { border-color:var(--fp-primary); }.parking button:disabled { opacity:.55; cursor:default; }
 .parking .owned { color:var(--fp-primary); }.spaces label { display:block; margin:12px 0; }
+.spaces .passenger-choice,.passenger { display:inline-flex; align-items:center; gap:6px; }
+.spaces .passenger-choice { margin:0; min-height:44px; cursor:pointer; }
+.passenger-choice input { accent-color:var(--fp-primary); }
+.passenger { display:flex; width:fit-content; margin:4px 0 10px; font-size:13px; color:var(--fp-muted); }
+.passenger img,.passenger-choice img { object-fit:contain; }
 .spaces ul { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr)); gap:8px 20px; padding:0; margin:8px 0; }
 .spaces li { padding:6px 0; border-bottom:1px solid var(--fp-border); }.spaces li span { overflow-wrap:anywhere; }.spaces li button { flex:none; }
 .settlements { margin:8px 0 0; padding:0; }.settlements strong { white-space:nowrap; }
