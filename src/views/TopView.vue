@@ -5,6 +5,7 @@ import { rankingTitles, type RankingType } from '@/api/v3-rankings'
 import { consumeRankingPayload } from '@/seo/payload'
 import { usePageSeo } from '@/composables/usePageSeo'
 import RankingBoard from '@/components/RankingBoard.vue'
+import ParkingRanking from '@/components/ParkingRanking.vue'
 import ProfessionRanking from '@/components/profession/ProfessionRanking.vue'
 const route = useRoute()
 const kind = computed(() => { const key = route.path.split('/')[2]; return key && Object.hasOwn(rankingTitles, key) ? key as RankingType : null })
@@ -21,6 +22,7 @@ const catalog = [
   { key:'donate', title:'鱼排续命师', desc:'感谢每一份对摸鱼派的支持', group:'community', icon:'heart' },
   { key:'invite', title:'邀请成员', desc:'好社区，和朋友一起分享', group:'community', icon:'users' },
   { key:'links', title:'热门外链', desc:'发现鱼油们分享的精彩链接', group:'community', icon:'link' },
+  { key:'parking', title:'停车周榜', desc:'本周停车已到账的游园币', group:'games', icon:'wallet' },
   { key:'pets', title:'宠物排行榜', desc:'按等级与经验查看宠物排名', group:'games', icon:'growth' },
   { key:'xiaoice', title:'小冰修仙', desc:'漫漫修仙路，谁能更进一步', group:'games', icon:'star' },
   { key:'evolve', title:'进化 Evolve', desc:'从微小生命走向文明进化', group:'games', icon:'growth' },
@@ -55,8 +57,8 @@ const iconPaths:Record<string,string> = {
 }
 </script>
 <template>
-  <div class="top-page fp-page fp-page--wide fp-ui" :class="{'is-detail': kind || route.path === '/top/profession'}">
-    <aside v-if="kind || route.path === '/top/profession'" class="ranking-sidebar" aria-label="排行榜分类">
+  <div class="top-page fp-page fp-page--wide fp-ui" :class="{'is-detail': kind || ['/top/profession','/top/parking'].includes(route.path)}">
+    <aside v-if="kind || ['/top/profession','/top/parking'].includes(route.path)" class="ranking-sidebar" aria-label="排行榜分类">
       <RouterLink to="/top" class="back-catalog">← 全部榜单</RouterLink>
       <nav v-for="section in sections" :key="section.key" :aria-labelledby="`ranking-nav-${section.key}`">
         <h2 :id="`ranking-nav-${section.key}`" class="ranking-category-title">{{ section.title }}</h2>
@@ -74,6 +76,7 @@ const iconPaths:Record<string,string> = {
       </header>
       <RankingBoard :key="kind" :type="kind" :initial="initial" />
     </section>
+    <section v-else-if="route.path === '/top/parking'" class="top-board"><ParkingRanking /></section>
     <section v-else-if="route.path === '/top/profession'" class="top-board"><ProfessionRanking /></section>
     <template v-else>
       <header class="catalog-hero">

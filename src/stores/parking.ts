@@ -11,10 +11,12 @@ export const useParkingStore = defineStore('parking', () => {
   const state = ref<ParkingState | null>(null), receivedAt = ref(0)
   const loading = ref(false), busy = ref(false), readError = ref(''), message = ref('')
   const pending = ref<{ input: ParkingInput; key: string } | null>(null)
+  const scope = ref<'all' | 'following'>('all'), host = ref('')
   const needsProof = ref(false), challenge = ref<PetRiskChallenge | null>(null)
   let generation = 0, readSequence = 0, uncertain = false
   const identity = () => [auth.account?.oId, !!auth.accessToken, getAuthContextVersion()].join('|')
   watch(identity, () => {
+    scope.value = 'all'; host.value = ''
     generation++; readSequence++; state.value = null; pending.value = null; challenge.value = null
     loading.value = busy.value = uncertain = needsProof.value = false; readError.value = message.value = ''
   }, { flush: 'sync' })
@@ -24,7 +26,7 @@ export const useParkingStore = defineStore('parking', () => {
     const seq = ++readSequence, actor = identity()
     loading.value = true; readError.value = ''
     try {
-      const result = await readParking(after)
+      const result = await readParking(after, scope.value, host.value)
       if (seq !== readSequence || actor !== identity()) return
       state.value = result; receivedAt.value = Date.now()
     } catch (e) {
@@ -42,7 +44,7 @@ export const useParkingStore = defineStore('parking', () => {
       const amount = await writeParking(cmd.input, cmd.key)
       if (gen !== generation) return
       pending.value = null; uncertain = needsProof.value = false; challenge.value = null
-      const labels = { starter: '初始车已入库', buy: '购车成功', park: '已停入车位', collect: '收车到账', ticket: '已贴条，车主到账' }
+      const labels = { starter: '初始车已入库', buy: '购车成功', park: '已停入车位', collect: '收车到账', ticket: '已贴条，车主到账', pardon: '本次停车已放行' }
       message.value = labels[cmd.input.action] + (['collect','ticket','buy'].includes(cmd.input.action) ? ' ' + amount + ' 游园币' : '')
       await load()
     } catch (e) {
@@ -84,5 +86,5 @@ export const useParkingStore = defineStore('parking', () => {
   function cancelVerifiedFailure() {
     if (needsProof.value && !uncertain && !busy.value) { pending.value = null; needsProof.value = false; challenge.value = null; message.value = '' }
   }
-  return { state, receivedAt, loading, busy, pending, message, readError, challenge, needsProof, load, run, submit, verification, cancelVerifiedFailure }
+  return { scope, host, state, receivedAt, loading, busy, pending, message, readError, challenge, needsProof, load, run, submit, verification, cancelVerifiedFailure }
 })

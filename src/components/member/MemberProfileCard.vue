@@ -55,6 +55,7 @@ function fallback(event: Event) {
         </dl>
         <MemberProfileDates :member-id="profile.id" :last-login-time="profile.userLatestLoginTime" />
         <template v-if="canAct">
+          <RouterLink class="profile-website" :to="self ? '/parking' : { path: '/parking', query: { host: profile.id } }">{{ self ? '我的停车场' : '去鱼友停车场' }} ↗</RouterLink>
           <RouterLink v-if="self" to="/settings" class="profile-edit">编辑资料</RouterLink>
           <template v-else>
             <div class="profile-actions">

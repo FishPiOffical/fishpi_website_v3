@@ -276,6 +276,7 @@ const routes = [
   { path: '/breezemoons', component: () => import('@/views/BreezemoonView.vue') },
   { path: '/repeater', component: () => import('@/views/RepeaterView.vue') },
   { path: '/logs', component: () => import('@/views/LogsView.vue'), meta: { auth: true, robots: 'noindex' } },
+  { path: '/top/parking', component: () => import('@/views/TopView.vue'), meta: { auth: true, robots: 'noindex' } },
   { path: '/top/pets', component: () => import('@/views/TopView.vue') },
   { path: '/pets/profile/:petId', name: 'ranked-pet-profile', component: () => import('@/views/PetProfileView.vue'), meta: { robots: 'noindex' } },
   { path: '/top/links', component: () => import('@/views/TopView.vue') },
