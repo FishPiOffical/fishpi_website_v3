@@ -3,6 +3,36 @@ import { uploadV3Files, uploadedMarkdown } from '@/api/v3-uploads'
 
 export type EditorUploadStatus = { pending: boolean; text: string } | null
 
+const imageFormats = new Map([
+  ['jpg', 'image/jpeg'], ['jpeg', 'image/jpeg'], ['png', 'image/png'],
+  ['gif', 'image/gif'], ['webp', 'image/webp'],
+])
+const attachmentFormats = ['zip', 'rar', '7z', 'mp3', 'mp4', 'webm', 'mov']
+export const editorUploadAccept = [...imageFormats.keys(), ...attachmentFormats].map(ext => `.${ext}`).join(',')
+const supportedImageTypes = new Set(imageFormats.values())
+
+async function validateEditorFile(file: File, signal: AbortSignal): Promise<File> {
+  const extension = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]?.toLowerCase()
+  const expected = extension ? imageFormats.get(extension) : undefined
+  if (!expected && !file.type.toLowerCase().startsWith('image/')) {
+    if (extension && attachmentFormats.includes(extension)) return file
+    throw new Error(`「${file.name}」格式不支持。图片仅支持 JPG、PNG、GIF、WebP，其他附件支持 ${attachmentFormats.map(ext => ext.toUpperCase()).join('、')}`)
+  }
+  const unsupported = () => new Error(`「${file.name || '粘贴的图片'}」格式不支持，图片仅支持 JPG、PNG、GIF、WebP`)
+  if (extension ? !expected : !supportedImageTypes.has(file.type)) throw unsupported()
+  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer())
+  signal.throwIfAborted()
+  const ascii = (start: number, end: number) => String.fromCharCode(...header.slice(start, end))
+  let actual: string
+  if (header[0] === 255 && header[1] === 216 && header[2] === 255) actual = 'image/jpeg'
+  else if ([137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => header[index] === value)) actual = 'image/png'
+  else if (['GIF87a', 'GIF89a'].includes(ascii(0, 6))) actual = 'image/gif'
+  else if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') actual = 'image/webp'
+  else throw unsupported()
+  if (actual !== (expected || file.type)) throw unsupported()
+  return file.type === actual ? file : new File([file], file.name, { type: actual, lastModified: file.lastModified })
+}
+
 function formatUploadLimit(bytes: number) {
   if (bytes % (1024 * 1024) === 0) return `${bytes / (1024 * 1024)} MB`
   if (bytes % 1024 === 0) return `${bytes / 1024} KB`
@@ -39,12 +69,27 @@ export function createEditorUpload(
       showStatus({ pending: true, text: `正在上传 ${files.length} ${label}…` })
       let message: string | null = null
       try {
-        const results = await uploadV3Files(files, abort.signal)
+        const validated: File[] = []
+        const rejected: string[] = []
+        for (const file of files) {
+          try {
+            validated.push(await validateEditorFile(file, abort.signal))
+          } catch (error) {
+            if (!current()) return null
+            rejected.push(error instanceof Error ? error.message : '无法读取所选文件')
+          }
+          if (!current()) return null
+        }
+        if (!validated.length) {
+          message = rejected.join('。')
+          return message
+        }
+        const results = await uploadV3Files(validated, abort.signal)
         if (!current()) return null
         const markdown = results.map(uploadedMarkdown).filter(Boolean).join('\n')
         if (markdown) insert(`\n${markdown}\n`)
         const failures = results.filter(item => !item.url)
-        if (failures.length) {
+        if (failures.length || rejected.length) {
           const details: string[] = []
           const succeeded = results.length - failures.length
           if (succeeded) details.push(`已插入 ${succeeded} 个文件`)
@@ -54,7 +99,7 @@ export function createEditorUpload(
             if (item.maxBytes !== undefined) details.push(`「${item.name}」超过单文件上限，最大可上传 ${formatUploadLimit(item.maxBytes)}`)
           }
           if (otherFailures) details.push(`${otherFailures}个文件上传失败或未返回结果，请检查后重试失败文件`)
-          message = details.join('。')
+          message = [...details, ...rejected].join('。')
         }
         return message
       } catch (error) {

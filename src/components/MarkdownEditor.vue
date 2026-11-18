@@ -4,7 +4,7 @@ import { useAppearanceStore } from '@/stores/appearance'
 import FpLoading from '@/components/FpLoading.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import { createMarkdownPreview } from '@/utils/markdownPreview'
-import { createEditorUpload, type EditorUploadStatus } from '@/utils/editorUpload'
+import { createEditorUpload, editorUploadAccept, type EditorUploadStatus } from '@/utils/editorUpload'
 import { createMentionHints } from '@/utils/mentionHints'
 import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
 
@@ -285,7 +285,7 @@ onMounted(async () => {
     toolbarConfig: { pin: !inline },
     ctrlEnter: props.disableSubmitShortcut ? undefined : () => emit('submit'),
     upload: {
-      accept: 'image/*,.zip,.rar,.7z,.mp3,.mp4,.webm,.mov',
+      accept: editorUploadAccept,
       // 自定义上传由编辑器统一展示状态，避免 Vditor 再弹一次相同错误。
       handler: async (files: File[]) => { await uploads.handler(files) },
     },

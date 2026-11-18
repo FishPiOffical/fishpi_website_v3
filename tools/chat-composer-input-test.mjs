@@ -14,7 +14,7 @@ const imports = {
   '@/components/EmojiPicker.vue': stub,
   '@/stores/appearance': url('export function useAppearanceStore(){return {state:{theme:"light"}}}'),
   '@/utils/markdownPreview': url('export function createMarkdownPreview(){return {reset(){},dispose(){},transform(){},parse(){}}}'),
-  '@/utils/editorUpload': url('export function createEditorUpload(){return {cancel(){},dispose(){},handler(){}}}'),
+  '@/utils/editorUpload': url('export const editorUploadAccept = ""; export function createEditorUpload(){return {cancel(){},dispose(){},handler(){}}}'),
   '@/utils/mentionHints': url('export function createMentionHints(){return {cancel(){},dispose(){},hint(){}}}'),
   '@/api/http': url('export function getAuthContextVersion(){return 1} export function onAccessTokenChange(){return ()=>{}}'),
   '@/utils/chatSendShortcut': url('export function matchesChatSendShortcut(){return false}'),
