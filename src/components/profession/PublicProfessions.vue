@@ -5,6 +5,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { ApiError } from '@/api/http'
+import MemberRecordsTable from '@/components/member/MemberRecordsTable.vue'
+import { professionTriggers } from '@/api/v3-professions'
 import { fetchV3PublicProfessions, type PublicProfessionProfile, type PublicJob } from '@/api/v3-profession-public'
 const props = defineProps<{ userName: string }>()
 const { accessToken } = storeToRefs(useAuthStore())
@@ -13,6 +15,12 @@ let mounted = false, generation = 0
 const jobs = computed(() => [profile.value?.primaryProfession, ...(profile.value?.professions || [])].filter((value): value is PublicJob => !!value))
 function name(id: string) { return jobs.value.find(value => value.professionId === id)?.displayName || `职业编号 ${id}` }
 const date = formatDateTime
+function sourceName(item: NonNullable<PublicProfessionProfile['activityFeed']>[number]) {
+  const label = Object.hasOwn(professionTriggers, item.actionCode)
+    ? professionTriggers[item.actionCode as keyof typeof professionTriggers]
+    : '职业活动'
+  return item.sourceDescription || label
+}
 function reset() { generation++; profile.value = null; unavailable.value = false; error.value = ''; loading.value = false }
 async function load() {
   const token = accessToken.value, target = props.userName, current = ++generation
@@ -33,6 +41,22 @@ const rewardStatus = { PENDING: '待发放', GRANTED: '已发放', REVOKED: '已
     <p v-if="loading" role="status">正在读取职业资料…</p><div v-if="error" class="error" role="alert">{{ error }} <button type="button" @click="load">重试职业详情</button></div>
     <p v-if="unavailable">当前没有可展示的职业资料。</p>
     <template v-if="profile">
+      <section v-if="profile.activityFeed !== undefined" aria-label="公开职业动态">
+        <h2>近 90 天</h2>
+        <MemberRecordsTable v-if="profile.activityFeed.length" heading="近 90 天职业动态" :columns="['职业', '来源', '经验变化', '时间']">
+          <tr v-for="(item, index) in profile.activityFeed" :key="index">
+            <td>{{ name(item.professionId) }}</td>
+            <td>{{ sourceName(item) }}</td>
+            <td :class="{ 'experience-up': (item.experienceDelta ?? 0) > 0 }">
+              <template v-if="item.experienceDelta !== undefined">{{ item.experienceDelta > 0 ? '+' : '' }}{{ item.experienceDelta }} 经验</template>
+              <span v-else aria-label="未公开">—</span>
+            </td>
+            <td><time>{{ date(item.occurredAt) }}</time></td>
+          </tr>
+        </MemberRecordsTable>
+        <p v-else>暂无可展示的动态。</p>
+      </section>
+      <p v-else class="hint">职业动态未公开。</p>
       <section v-if="profile.primaryProfession" aria-label="公开主职业">
         <h3>主职业</h3><h4>{{ profile.primaryProfession.displayName }}</h4><p>{{ profile.primaryProfession.description }}</p>
         <p v-if="profile.primaryProfession.state === 'SELECTED'">已选择，尚无经验进度。</p>
@@ -52,9 +76,6 @@ const rewardStatus = { PENDING: '待发放', GRANTED: '已发放', REVOKED: '已
       <section v-if="profile.contributionStats !== undefined" aria-label="公开贡献统计">
         <h3>贡献统计</h3><p v-if="!profile.contributionStats.length">暂无可展示的统计。</p><ul><li v-for="item in profile.contributionStats" :key="item.professionId">{{ name(item.professionId) }} · {{ item.eventCount }} 次<span v-if="item.experienceSum !== undefined"> · {{ item.experienceSum }} 经验</span><span>最近 {{ date(item.lastOccurredAt) }}</span></li></ul>
       </section>
-      <section v-if="profile.activityFeed !== undefined" aria-label="公开职业动态">
-        <h3>近90天职业动态</h3><p v-if="!profile.activityFeed.length">暂无可展示的动态。</p><ul><li v-for="(item, index) in profile.activityFeed" :key="index">{{ name(item.professionId) }} · {{ item.actionCode }}<span v-if="item.experienceDelta !== undefined"> · {{ item.experienceDelta > 0 ? '+' : '' }}{{ item.experienceDelta }} 经验</span><span>{{ date(item.occurredAt) }}</span></li></ul>
-      </section>
       <section v-if="profile.levelHistory !== undefined" aria-label="公开职业等级变化">
         <h3>近90天等级变化</h3><p v-if="!profile.levelHistory.length">暂无可展示的等级变化。</p><ul><li v-for="(item, index) in profile.levelHistory" :key="index">{{ name(item.professionId) }} · {{ item.beforeLevelCode }} → {{ item.afterLevelCode }}<span>{{ date(item.occurredAt) }}</span></li></ul>
       </section>
@@ -69,7 +90,6 @@ const rewardStatus = { PENDING: '待发放', GRANTED: '已发放', REVOKED: '已
 </template>
 
 <style scoped lang="scss">
-.public-professions { padding: 16px 18px; } section > section { padding: 12px 0; border-top: 1px solid var(--fp-border); } h2 { margin: 0 0 12px; font-size: 20px; } h3 { margin: 0 0 10px; font-size: 17px; } h4 { margin: 8px 0; } li { margin: 12px 0; overflow-wrap: anywhere; } li > span:last-child { display: block; } ul { padding-left: 22px; }
+.public-professions { min-width: 0; } .experience-up { color: var(--fp-primary); font-weight: 650; } section > section { padding: 12px 0; border-top: 1px solid var(--fp-border); } h2 { margin: 0 0 10px; font-size: 17px; } h3 { margin: 0 0 10px; font-size: 17px; } h4 { margin: 8px 0; } li { margin: 12px 0; overflow-wrap: anywhere; } li > span:last-child { display: block; } ul { padding-left: 22px; }
 button { border: 1px solid var(--fp-border); border-radius: 8px; color: var(--fp-text); background: transparent; padding: 7px 12px; cursor: pointer; } button:disabled { opacity: .5; cursor: default; }.hint { color: var(--fp-muted); font-size: 13px; } .error { color: #c34a36; }
-@media(max-width: 640px) { .public-professions { padding: 14px; } }
 </style>

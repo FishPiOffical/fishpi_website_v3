@@ -83,7 +83,7 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
     </section>
 
     <section id="member-profession" aria-label="职业">
-      <RouterLink v-if="summary" to="/top/profession" class="profession-badge" aria-label="查看职业排行榜">
+      <RouterLink v-if="summary" :to="`/member/${encodeURIComponent(userName)}/profession`" class="profession-badge" aria-label="查看职业动态">
         <img v-if="summary.iconUrl" :src="imageThumbnail(summary.iconUrl, 32)" referrerpolicy="no-referrer" alt="" />
         <span><strong>{{ summary.job.displayName }}</strong><small v-if="summary.job.state !== 'SELECTED'">{{ summary.job.levelName }}</small></span>
         <span class="profession-arrow" aria-hidden="true">›</span>

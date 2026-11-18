@@ -264,12 +264,13 @@ const routes = [
         : memberTab === 'followingTags' || memberTab === 'followingArticles' || memberTab === 'watchingArticles'
           ? () => import('@/views/SavedContentView.vue')
           : () => import('@/views/MemberView.vue'),
-    meta: { memberTab },
+    meta: { memberTab, ...(memberTab === 'points' ? { robots: 'noindex' } : {}) },
   })),
-  ...(['profession', 'medals'] as const).map(section => ({
-    path: `/member/:userName/${section}`,
-    redirect: (to: RouteLocation) => ({ path: `/member/${encodeURIComponent(String(to.params.userName))}`, query: to.query, hash: `#member-${section}` }),
-  })),
+  { path: '/member/:userName/profession', component: () => import('@/views/MemberProfessionView.vue') },
+  {
+    path: '/member/:userName/medals',
+    redirect: (to: RouteLocation) => ({ path: `/member/${encodeURIComponent(String(to.params.userName))}`, query: to.query, hash: '#member-medals' }),
+  },
   { path: '/domains', component: () => import('@/views/DomainView.vue') },
   { path: '/tags', component: () => import('@/views/TagsView.vue') },
   { path: '/breezemoons', component: () => import('@/views/BreezemoonView.vue') },
