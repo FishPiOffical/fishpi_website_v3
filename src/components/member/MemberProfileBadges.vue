@@ -96,9 +96,9 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
 .profile-badges section:not(:empty) { margin-top: 10px; }
 .profile-badges button { background: var(--fp-surface-subtle); border: 1px solid var(--fp-border); border-radius: 7px; color: var(--fp-text); font: inherit; font-size: 12px; padding: 3px 7px; cursor: pointer; }
 .profile-badges button:disabled { opacity: .55; cursor: default; }
-.medal-row { display: flex; align-items: center; justify-content: center; gap: 4px 8px; }
+.medal-row { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px 8px; }
 .medal-row--expanded { flex-wrap: wrap; }
-.medal-entry { position: relative; min-width: 0; max-width: 100%; }
+.medal-entry { min-width: 0; max-width: 100%; }
 .profile-badges .medal-toggle { flex: none; padding: 2px 7px; color: var(--fp-muted); white-space: nowrap; }
 .profile-badges .medal-toggle:hover { background: var(--fp-hover); color: var(--fp-text); }
 .medal-row--expanded .medal-toggle { margin-inline: 2px; }
@@ -106,7 +106,7 @@ onScopeDispose(() => { mounted = false; pending?.abort() })
 .medal-preview button { background: transparent; border: 0; color: var(--fp-muted); padding: 3px; }
 .medal-preview { cursor: help; border-radius: 6px; }
 .medal-preview:focus-visible { outline: 2px solid var(--fp-primary); outline-offset: 3px; }
-.medal-description { display: none; position: absolute; z-index: 20; top: 100%; left: 50%; transform: translateX(-50%); box-sizing: border-box; width: min(230px, 65vw); padding: 10px 12px; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-card); color: var(--fp-text); box-shadow: 0 6px 20px rgb(0 0 0 / 12%); font-size: 12px; line-height: 1.6; text-align: left; overflow-wrap: anywhere; }
+.medal-description { display: none; position: absolute; z-index: 20; inset-inline: 0; margin-inline: auto; box-sizing: border-box; width: min(230px, 100%); max-height: min(22rem, 45dvh); overflow-y: auto; padding: 10px 12px; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-card); color: var(--fp-text); box-shadow: 0 6px 20px rgb(0 0 0 / 12%); font-size: 12px; line-height: 1.6; text-align: left; overflow-wrap: anywhere; }
 .medal-entry.is-open .medal-description,
 .medal-entry:has(.medal-preview:focus-visible) .medal-description { display: block; }
 @media (hover: hover) { .medal-entry:hover .medal-description { display: block; } }

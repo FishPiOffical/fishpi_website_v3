@@ -68,7 +68,8 @@ function fallback(event: Event) {
   </aside>
 </template>
 <style scoped lang="scss">
-.member-profile {  overflow:hidden; min-width:0; border:1px solid var(--fp-border); border-radius:12px; background:var(--fp-card); box-shadow:var(--fp-card-shadow); overflow-wrap:anywhere; }
+.member-profile { min-width:0; border:1px solid var(--fp-border); border-radius:12px; background:var(--fp-card); box-shadow:var(--fp-card-shadow); overflow-wrap:anywhere; }
+.profile-cover { overflow:hidden; border-radius:11px 11px 0 0; }
 .profile-cover { height:112px; background-size:cover; background-position:center 38%; position:relative; &::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.06),color-mix(in srgb,var(--fp-card) 45%,transparent) 75%,var(--fp-card)); backdrop-filter:blur(3px); } }
 .profile-cover.has-background::after { background:linear-gradient(180deg,transparent 65%,rgba(0,0,0,.08)); backdrop-filter:none; }
 .profile-body { position:relative; padding:0 20px 18px; text-align:center; }
