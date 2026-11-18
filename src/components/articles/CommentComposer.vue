@@ -6,7 +6,7 @@ import { readV3CommentSource, type CommentInput } from '@/api/v3-comments'
 import { useAuthStore } from '@/stores/auth'
 import { useV3CommentsStore } from '@/stores/v3Comments'
 import ChatComposer from '@/components/ChatComposer.vue'
-const props=withDefaults(defineProps<{articleId:string;editId?:string;parentId?:string;paragraphId?:string;replyLabel?:string;writable?:boolean}>(),{writable:true,editId:'',parentId:'',paragraphId:'',replyLabel:''})
+const props=withDefaults(defineProps<{articleId:string;editId?:string;parentId?:string;paragraphId?:string;replyLabel?:string;writable?:boolean;instantInput?:boolean}>(),{writable:true,editId:'',parentId:'',paragraphId:'',replyLabel:''})
 const emit=defineEmits<{cancel:[];saved:[];clearReply:[];draftState:[hasDraft:boolean]}>()
 const {accessToken,account}=storeToRefs(useAuthStore()),operations=useV3CommentsStore(),mounted=ref(false),draft=ref(''),anonymous=ref(false),visible=ref(false),editVisibility=ref('preserve'),sourceLoading=ref(false),sourceReady=ref(false),localError=ref('')
 const editor=ref<InstanceType<typeof ChatComposer>|null>(null),origin=Symbol('comment-composer')
@@ -43,7 +43,7 @@ defineExpose({reveal:()=>props.writable&&editor.value?.reveal()})
       <template v-else>
         <p v-if="parentId">回复 {{ replyLabel || `评论 ${parentId}` }}<button type="button" :disabled="locked" @click="emit('clearReply')">取消回复</button></p>
         <p v-else-if="paragraphId">发表当前段落的独立段评</p>
-        <ChatComposer ref="editor" v-model="draft" :disabled="locked" :sending="operations.busy" :allow-empty="true" :height="180" :submit-text="editId?'保存修改':'发表评论'" placeholder="Markdown评论，最多4096个UTF-16字符" @submit="save" />
+        <ChatComposer ref="editor" v-model="draft" :disabled="locked" :sending="operations.busy" :allow-empty="true" :height="180" :instant-input="instantInput" :submit-text="editId?'保存修改':'发表评论'" placeholder="Markdown评论，最多4096个UTF-16字符" @submit="save" />
         <div class="options">
           <template v-if="!editId"><label><input v-model="anonymous" type="checkbox" :disabled="locked" />匿名（需相应权限）</label><label><input v-model="visible" type="checkbox" :disabled="locked" />仅楼主及本人可见</label></template>
           <label v-else>可见范围<select v-model="editVisibility" :disabled="locked"><option value="preserve">保持现有范围</option><option value="all">公开</option><option value="author">仅楼主及本人</option></select></label>

@@ -619,7 +619,7 @@ function itemHandlers(c: ArticleComment) {
         <p v-else-if="!commentingEnabled" class="hint-login">评论状态暂不可用。</p>
         <template v-if="isLoggedIn">
           <blockquote v-if="replyComment" class="quick-reply-quote"><strong>回复 {{ who(replyComment) }}</strong><p>{{ replyComment.commentContentVisible === false ? '评论正文当前不可见' : stripHtml(replyComment.commentContent || '') }}</p></blockquote>
-          <CommentComposer @saved="quickReplyOpen=false" :writable="commentingEnabled" ref="composerRef" :article-id="article.oId" :parent-id="replyId" :paragraph-id="paragraphIdForReply" :reply-label="replyAuthor" @clear-reply="cancelReply" @draft-state="quickReplyHasDraft=$event" />
+          <CommentComposer @saved="quickReplyOpen=false" :writable="commentingEnabled" ref="composerRef" :article-id="article.oId" :parent-id="replyId" :paragraph-id="paragraphIdForReply" :reply-label="replyAuthor" :instant-input="!isLong" @clear-reply="cancelReply" @draft-state="quickReplyHasDraft=$event" />
         </template>
         <p v-else-if="commentingEnabled" class="hint-login">
           <RouterLink :to="{ path: '/login', query: { redirect: loginRedirect } }" class="login-link">登录</RouterLink>

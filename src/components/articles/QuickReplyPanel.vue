@@ -6,7 +6,7 @@ const panel = ref<HTMLElement | null>(null)
 let previousFocus: HTMLElement | null = null
 let previousOverflow: string | null = null
 function keydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') { event.preventDefault(); emit('close') }
+  if (event.key === 'Escape' && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); emit('close') }
   if (event.key !== 'Tab') return
   const nodes = Array.from(panel.value?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),a[href],[contenteditable="true"],[tabindex="0"]') || []).filter(el => el.getClientRects().length)
   const first = nodes[0], last = nodes.at(-1)

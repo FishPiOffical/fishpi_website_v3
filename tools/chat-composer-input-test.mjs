@@ -27,12 +27,13 @@ async function component(path) {
   return url(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
 }
 let instance
+let delayReady = false
 window.Vditor = class {
   constructor(host, options) {
     instance = this; this.options = options
     this.el = document.createElement('div'); this.el.setAttribute('contenteditable', 'true')
     host.append(this.el); this.el.textContent = options.value
-    queueMicrotask(options.after)
+    if (!delayReady) queueMicrotask(options.after)
   }
   getValue() { return this.el.textContent }
   setValue(value) { this.el.textContent = value }
@@ -68,5 +69,39 @@ draft.value = ''; await tick(); assert.equal(button().disabled, true)
 assert.equal(instance.options.preview.delay, 750)
 assert.equal(instance.options.undoDelay, undefined, '保留 Vditor 默认撤销节流')
 instance.el.dispatchEvent(new Event('input', { bubbles: true })); app.unmount(); await tick()
-dom.window.close()
 console.log('PASS 输入即时启用、清空/空白禁用、最新正文发送、发送中/未确认禁用、IME、外部清空及卸载；撤销和预览节流不变')
+
+delayReady = true
+let nextFrame
+globalThis.requestAnimationFrame = callback => { nextFrame = callback; return 1 }
+globalThis.cancelAnimationFrame = () => { nextFrame = undefined }
+const replyDraft = ref(''), replies = []
+const reply = createApp({ render: () => h(Composer, { modelValue: replyDraft.value, instantInput: true, allowEmpty: true,
+  'onUpdate:modelValue': value => { replyDraft.value = value }, onSubmit: () => replies.push(replyDraft.value) }) })
+reply.mount('#app'); await tick()
+const textarea = document.querySelector('textarea')
+assert.ok(textarea, '编辑器就绪前显示可输入的正文')
+textarea.value = '起始：'
+textarea.dispatchEvent(new Event('input', { bubbles: true }))
+await tick()
+assert.equal(replyDraft.value, '起始：')
+textarea.dispatchEvent(new Event('compositionstart', { bubbles: true }))
+textarea.value = '起始：zhongwen'
+textarea.dispatchEvent(new Event('input', { bubbles: true }))
+instance.options.after(); await tick()
+assert.equal(document.querySelector('textarea'), textarea, '选字时保留原输入节点')
+assert.equal(replyDraft.value, '起始：', '组合中的拼音不写入草稿')
+button().click()
+assert.deepEqual(replies, [], '选字期间不提交')
+textarea.dispatchEvent(new Event('compositionend', { bubbles: true }))
+textarea.value = '起始：中文'
+textarea.dispatchEvent(new Event('input', { bubbles: true }))
+await tick()
+assert.equal(document.querySelector('textarea'), textarea, '等待确认选字后的最后一次 input')
+nextFrame(); await tick()
+assert.equal(document.querySelector('textarea'), null)
+assert.equal(instance.getValue(), '起始：中文')
+button().click(); await tick()
+assert.deepEqual(replies, ['起始：中文'])
+reply.unmount(); dom.window.close()
+console.log('PASS 回复可提前输入，选字期间不接管或提交，Vditor 接管最后确认的正文')

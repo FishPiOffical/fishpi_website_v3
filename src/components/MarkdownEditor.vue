@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAppearanceStore } from '@/stores/appearance'
 import FpLoading from '@/components/FpLoading.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
@@ -17,6 +17,7 @@ const props = withDefaults(
     /** 聊天室编辑器拖动边缘，顶部和底部独立保存本机高度 */
     resizeEdge?: 'top' | 'bottom'
     disableSubmitShortcut?: boolean
+    instantInput?: boolean
     placeholder?: string
     outline?: boolean
     /** reply：聊天室 / 私信 / 回帖共用的短文工具栏，仅编辑区；post：发帖的长文工具栏，分屏预览 */
@@ -179,6 +180,8 @@ const nativeEmojis = ref<Record<string, string>>({})
 const fallback = ref(false)
 const ready = ref(false)
 const fallbackInput = ref<HTMLTextAreaElement | null>(null)
+const plainInput = computed(() => fallback.value || (props.instantInput && !ready.value))
+const plainDraft = computed({ get: () => props.modelValue, set: value => emit('update:modelValue', value) })
 let editor: VditorInstance | null = null
 let lastEmitted = props.modelValue
 let lastRenderedValue: string | undefined
@@ -192,9 +195,11 @@ const mentionError = ref('')
 const mentions = createMentionHints(message => { mentionError.value = message })
 let composing = false
 let disposed = false
+let richLoaded = false
+let compositionFrame: number | undefined
 function reportContentState() {
   if (disposed) return
-  const value = fallback.value ? fallbackInput.value?.value ?? props.modelValue : editor?.getValue() ?? props.modelValue
+  const value = plainInput.value ? fallbackInput.value?.value ?? props.modelValue : editor?.getValue() ?? props.modelValue
   emit('content-state', !composing && Boolean(value.trim()))
 }
 function onImmediateInput(event: Event) {
@@ -204,10 +209,23 @@ function onImmediateInput(event: Event) {
   queueMicrotask(reportContentState)
 }
 function onCompositionStart() {
+  if (compositionFrame !== undefined) cancelAnimationFrame(compositionFrame)
+  compositionFrame = undefined
   composing = true
   emit('content-state', false)
 }
-function onCompositionEnd() {
+function onCompositionEnd(event: Event) {
+  if (props.instantInput && event.target === fallbackInput.value) {
+    if (compositionFrame !== undefined) cancelAnimationFrame(compositionFrame)
+    // 等确认选字后的最后一个 input 更新文本框，再把编辑权移交给 Vditor。
+    compositionFrame = requestAnimationFrame(() => {
+      compositionFrame = undefined
+      composing = false
+      upgradePlainInput()
+      reportContentState()
+    })
+    return
+  }
   composing = false
   queueMicrotask(reportContentState)
 }
@@ -236,6 +254,57 @@ function applyTheme() {
   editor.setTheme(dark.value ? 'dark' : 'classic', dark.value ? 'dark' : 'light', dark.value ? 'native' : 'github', CONTENT_THEME_PATH)
 }
 
+function visibleEditorField() {
+  return Array.from(host.value?.querySelectorAll<HTMLElement>(
+    '.vditor-sv[contenteditable="true"], .vditor-ir > [contenteditable="true"], .vditor-wysiwyg > [contenteditable="true"]',
+  ) ?? []).find(element => element.getClientRects().length > 0)
+}
+
+function destroyEditor() {
+  editor?.destroy()
+  editor = null
+}
+
+function upgradePlainInput() {
+  if (!richLoaded || ready.value || disposed || composing || !editor) return
+  const input = fallbackInput.value
+  const value = input?.value ?? props.modelValue
+  const selection = input && document.activeElement === input ? [input.selectionStart, input.selectionEnd] as const : null
+  lastEmitted = value
+  if (value !== props.modelValue) emit('update:modelValue', value)
+  editor.setValue(value, true)
+  lastRenderedValue = editor.getValue()
+  ready.value = true
+  reportContentState()
+  if (dark.value) applyTheme()
+  if (!selection) return
+  void nextTick(() => {
+    const field = visibleEditorField()
+    if (!field || disposed || document.activeElement !== document.body) return
+    field.focus({ preventScroll: true })
+    const range = document.createRange()
+    range.selectNodeContents(field)
+    range.collapse(false)
+    // 对内容相同的纯文本保留选区。Markdown 经过富文本转换时，光标放在正文末尾。
+    if (field.textContent === value || field.textContent === `${value}\n`) {
+      const walker = document.createTreeWalker(field, NodeFilter.SHOW_TEXT)
+      let offset = 0
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const end = offset + (node.textContent?.length ?? 0)
+        if (selection[0] >= offset && selection[0] <= end) range.setStart(node, selection[0] - offset)
+        if (selection[1] >= offset && selection[1] <= end) {
+          range.setEnd(node, selection[1] - offset)
+          break
+        }
+        offset = end
+      }
+    }
+    const currentSelection = window.getSelection()
+    currentSelection?.removeAllRanges()
+    currentSelection?.addRange(range)
+  })
+}
+
 onMounted(async () => {
   if (props.resizeEdge) {
     updateHeightLimit()
@@ -255,10 +324,10 @@ onMounted(async () => {
   try {
     Vditor = await loadVditor()
   } catch {
-    fallback.value = true
+    if (!disposed) fallback.value = true
     return
   }
-  if (!host.value) return
+  if (disposed || !host.value) return
   const narrow = window.innerWidth < 768
   const inline = props.mode === 'reply'
   const toolbar = props.toolbarPreset === 'message'
@@ -295,6 +364,7 @@ onMounted(async () => {
       extend: [{ key: '@', hint: mentions.hint }],
     },
     input: (value: string) => {
+      if (disposed || (props.instantInput && !ready.value)) return
       reportContentState()
       preview.reset()
       lastEmitted = value
@@ -302,6 +372,7 @@ onMounted(async () => {
       emit('update:modelValue', value)
     },
     after: () => {
+      if (disposed) { destroyEditor(); return }
       // Display Unicode and bundled image labels; insertion stays the server-provided alias.
       const labels: Record<string, string> = Object.create(null)
       const local = editor?.vditor?.lute?.GetEmojis() || {}
@@ -312,6 +383,11 @@ onMounted(async () => {
         if (unicode || bundledImage) labels[alias] = value
       }
       nativeEmojis.value = labels
+      if (props.instantInput) {
+        richLoaded = true
+        upgradePlainInput()
+        return
+      }
       ready.value = true
       const cached = editor?.getValue().replace(/\n$/, '') || ''
       if (props.modelValue !== lastEmitted) editor?.setValue(props.modelValue, true)
@@ -345,34 +421,34 @@ watch(
 onBeforeUnmount(() => {
   if (props.resizeEdge) window.removeEventListener('resize', updateHeightLimit)
   disposed = true
+  if (compositionFrame !== undefined) cancelAnimationFrame(compositionFrame)
   stopPreviewAuth?.()
   preview.dispose()
   uploads.dispose()
   mentions.dispose()
-  editor?.destroy()
-  editor = null
+  // 即时输入可能在 Vditor 内部初始化前离页，此时等 after 再销毁实例。
+  if (!props.instantInput || richLoaded) destroyEditor()
 })
 
 defineExpose({
   flush() {
-    if (!fallback.value && (!editor || !ready.value)) throw new Error('编辑器仍在加载，请稍后再试')
-    const value = fallback.value ? fallbackInput.value?.value ?? props.modelValue : editor!.getValue()
-    if (!fallback.value && value === lastRenderedValue) return lastEmitted
+    if (!plainInput.value && (!editor || !ready.value)) throw new Error('编辑器仍在加载，请稍后再试')
+    if (props.instantInput && plainInput.value && composing) throw new Error('请先确认输入法选字')
+    const value = plainInput.value ? fallbackInput.value?.value ?? props.modelValue : editor!.getValue()
+    if (!plainInput.value && value === lastRenderedValue) return lastEmitted
     lastEmitted = value
     lastRenderedValue = value
     emit('update:modelValue', value)
     return value
   },
   focus(options?: FocusOptions) {
-    if (fallback.value) {
+    if (plainInput.value) {
       fallbackInput.value?.focus(options)
       return
     }
     if (host.value?.contains(document.activeElement) && document.activeElement?.matches('[contenteditable]')) return
     if (options?.preventScroll && host.value) {
-      const field = Array.from(host.value.querySelectorAll<HTMLElement>(
-        '.vditor-sv[contenteditable="true"], .vditor-ir > [contenteditable="true"], .vditor-wysiwyg > [contenteditable="true"]',
-      )).find(element => element.getClientRects().length > 0)
+      const field = visibleEditorField()
       if (field) {
         field.focus(options)
         return
@@ -396,19 +472,20 @@ defineExpose({
         :aria-valuemin="minHeight" :aria-valuemax="maxHeight" :aria-valuenow="displayedHeight"
         @pointerdown="startResize" @pointermove="moveResize" @pointerup="endResize"
         @pointercancel="endResize" @lostpointercapture="endResize" @keydown="resizeWithKeys" />
-      <div>
+      <div class="md-input-area">
+        <p v-if="instantInput && plainInput" class="md-quick-status" role="status">{{ fallback ? '格式工具暂不可用' : '格式工具加载中…' }}</p>
         <textarea
-          v-if="fallback"
+          v-if="plainInput"
           ref="fallbackInput"
           class="md-fallback"
-          :value="modelValue"
+          v-model="plainDraft"
+          :aria-label="placeholder || '正文'"
           :placeholder="placeholder"
           :style="{ height: `${height}px` }"
-          @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
         />
-        <template v-else>
-          <div ref="host" />
-          <div v-if="!ready" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
+        <template v-if="!fallback">
+          <div :class="{ 'md-warming-editor': plainInput }" :inert="plainInput"><div ref="host" /></div>
+          <div v-if="!ready && !plainInput" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
         </template>
       </div>
     </div>
@@ -442,6 +519,10 @@ defineExpose({
 .md-editor {
   position: relative;
 }
+.md-input-area { position: relative; }
+.md-warming-editor { position: absolute; inset: 0 0 auto; visibility: hidden; pointer-events: none; }
+.md-quick-status { margin: 0 0 6px; font-size: 12px; color: var(--fp-muted); }
+.md-input-area:has(.md-quick-status) .md-fallback { display: block; font: inherit; }
 .md-upload-feedback {
   margin-top: 8px;
   padding: 8px 10px;
