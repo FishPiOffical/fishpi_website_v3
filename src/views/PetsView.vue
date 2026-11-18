@@ -153,7 +153,7 @@ onMounted(() => {
   <div ref="page" class="pets-page fp-page fp-page--wide fp-ui">
     <header class="page-heading">
       <div><RouterLink to="/games" class="back-link">游戏 / 鱼游</RouterLink><h1>宠物家园</h1></div>
-      <div v-if="loggedIn && pets.state" class="pet-wallet" title="仅用于宠物家园"><PetIcon name="coin" /><strong>{{ pets.coins?.toLocaleString() }}</strong><span>宠物币</span></div>
+      <div v-if="loggedIn && pets.state" class="pet-wallet" :title="pets.currencyName + '余额'"><PetIcon name="coin" /><strong>{{ pets.coins?.toLocaleString() }}</strong><span>{{ pets.currencyName }}</span></div>
     </header>
 
     <section v-if="!loggedIn" class="guest-panel pet-panel">
@@ -183,7 +183,7 @@ onMounted(() => {
           <button type="submit" class="pet-primary" :disabled="locked || petNameLength(name || selectedSpecies.name) > (pets.catalog?.rules.maxNameLength ?? 12)">{{ pets.busy ? '正在领养…' : `带${selectedSpecies.name}回家` }}</button>
           <p v-if="nameError" class="form-error" role="alert">{{ nameError }}</p>
         </form>
-        <p v-if="pets.catalog" class="adoption-supply"><PetIcon name="gift" />入住时获得 {{ pets.catalog.rules.initialCoins }} 宠物币和 {{ pets.catalog.rules.initialFood }} 份口粮。</p>
+        <p v-if="pets.catalog" class="adoption-supply"><PetIcon name="gift" />入住时获得 {{ pets.catalog.rules.initialCoins }} {{ pets.currencyName }}和 {{ pets.catalog.rules.initialFood }} 份口粮。</p>
       </section>
 
       <template v-if="pets.pet && pets.state">
@@ -213,8 +213,8 @@ onMounted(() => {
         </section>
 
         <div id="pet-daily-supplies" class="daily-supplies" tabindex="-1">
-          <section class="supply-panel pet-panel" aria-labelledby="supply-title"><div class="supply-icon"><PetIcon name="gift" /></div><div class="supply-copy"><h2 id="supply-title">每日补给</h2><p>{{ pets.state.dailySupply.coins }} 宠物币 <span>＋</span> {{ pets.state.dailySupply.food }} 份口粮</p></div><button type="button" :class="pets.state.dailySupply.claimed ? 'pet-secondary' : 'pet-primary'" :disabled="locked || pets.state.dailySupply.claimed" @click="pets.claimSupply()">{{ pets.state.dailySupply.claimed ? '今日已领取' : '领取补给' }}</button></section>
-          <p class="income-summary"><PetIcon name="coin" /><span>今日工作已赚 <strong>{{ pets.state.income.earned }}</strong> 币，还可赚 <strong>{{ pets.state.income.remaining }}</strong> 币。<span>每日补给单独计算，消费不会恢复工作额度。</span></span></p>
+          <section class="supply-panel pet-panel" aria-labelledby="supply-title"><div class="supply-icon"><PetIcon name="gift" /></div><div class="supply-copy"><h2 id="supply-title">每日补给</h2><p>{{ pets.state.dailySupply.coins }} {{ pets.currencyName }} <span>＋</span> {{ pets.state.dailySupply.food }} 份口粮</p></div><button type="button" :class="pets.state.dailySupply.claimed ? 'pet-secondary' : 'pet-primary'" :disabled="locked || pets.state.dailySupply.claimed" @click="pets.claimSupply()">{{ pets.state.dailySupply.claimed ? '今日已领取' : '领取补给' }}</button></section>
+          <p class="income-summary"><PetIcon name="coin" /><span>今日活动收益 <strong>{{ pets.state.income.earned }}</strong> {{ pets.currencyName }}，还可赚 <strong>{{ pets.state.income.remaining }}</strong> {{ pets.currencyName }}。<span>每日补给单独计算，消费不会恢复收益额度。</span></span></p>
         </div>
         <section class="desktop-settings" aria-label="桌宠显示设置"><div><h2>让它陪你逛社区</h2><p>拖动桌宠可调整位置，收起后仍能随时找到它。</p></div><div class="desktop-buttons"><button type="button" class="pet-secondary" @click="display.visible ? display.hide() : display.show()">{{ display.visible ? '隐藏桌宠' : '显示桌宠' }}</button><button type="button" class="text-button" @click="display.resetPosition()">恢复默认位置</button></div></section>
         <PetReadoption />
@@ -279,6 +279,6 @@ button:disabled { opacity: .5; cursor: default; }button:focus-visible, a:focus-v
   .companion :deep(.growth-summary) { grid-column: 1 / -1; width: 100%; max-width: none; margin-top: 12px; text-align: center; }
   .rename-form { flex-wrap: wrap; }.rename-form input { flex-basis: 100%; }
 }
-@media (max-width: 390px) { .care-panel, .adoption { padding: 16px; }.pet-stats { gap: 20px 12px; }.pet-wallet > span { display: none; }.supply-panel { padding: 16px; }.supply-panel .pet-primary, .supply-panel .pet-secondary { padding-inline: 10px; font-size: 12px; }.species-description { font-size: 11px; } }
+@media (max-width: 390px) { .care-panel, .adoption { padding: 16px; }.pet-stats { gap: 20px 12px; }.page-heading { flex-wrap: wrap; gap: 8px; }.supply-panel { padding: 16px; }.supply-panel .pet-primary, .supply-panel .pet-secondary { padding-inline: 10px; font-size: 12px; }.species-description { font-size: 11px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
 </style>

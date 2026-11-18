@@ -15,7 +15,7 @@ const price = computed(() => pets.catalog?.readoptionRules.coins)
 const species = computed(() => pets.catalog?.species.find(item => item.id === selected.value))
 const locked = computed(() => pets.loading || pets.busy || !!pets.pending || pets.refreshNeeded)
 const pending = computed(() => pets.pending?.kind === 'readoption')
-const unavailable = computed(() => pets.pet?.activity ? '请先结束当前活动并领取成果' : price.value === undefined ? '暂时无法读取领养费用' : (pets.coins ?? 0) < price.value ? '宠物币不足' : '')
+const unavailable = computed(() => pets.pet?.activity ? '请先结束当前活动并领取成果' : price.value === undefined ? '暂时无法读取领养费用' : (pets.coins ?? 0) < price.value ? `${pets.currencyName}不足` : '')
 const error = computed(() => {
   const text = pets.pendingError || pets.error
   return /JSON|HTTP|SQL|fetch|network|token|stack|接口|数据格式/i.test(text) ? '暂时无法确认操作结果，请稍后核对。' : text
@@ -66,20 +66,20 @@ onBeforeUnmount(() => { sequence++; unlock() })
 
 <template>
   <section v-if="pets.pet && pets.catalog" class="pet-readoption" aria-labelledby="pet-readoption-title">
-    <div><h2 id="pet-readoption-title">重新选择伙伴</h2><p>重置宠物成长，账号中的背包与收藏会保留。<span v-if="price !== undefined">需要 {{ price }} 宠物币。</span></p></div><button ref="opener" type="button" class="readoption-open" :disabled="locked" title="查看重新领养规则" @click="open">重新领养<PetIcon name="chevron" /></button>
+    <div><h2 id="pet-readoption-title">重新选择伙伴</h2><p>重置宠物成长，账号中的背包与收藏会保留。<span v-if="price !== undefined">需要 {{ price }} {{ pets.currencyName }}。</span></p></div><button ref="opener" type="button" class="readoption-open" :disabled="locked" title="查看重新领养规则" @click="open">重新领养<PetIcon name="chevron" /></button>
     <FpDialog :open="opened" title="重新领养宠物" :width="580" :persistent="pets.busy" :closable="!pets.busy" @close="close">
       <form ref="panel" class="readoption-form" tabindex="-1" @submit.prevent="submit">
-        <p class="readoption-intro">本次需要 <strong>{{ price }} 宠物币</strong>。请先选好新伙伴，再确认要重置的内容。</p>
+        <p class="readoption-intro">本次需要 <strong>{{ price }} {{ pets.currencyName }}</strong>。请先选好新伙伴，再确认要重置的内容。</p>
         <fieldset class="readoption-species"><legend>选择新伙伴</legend><label v-for="item in pets.catalog.species" :key="item.id" :class="{ selected: selected === item.id }"><input v-model="selected" type="radio" name="readoption-species" :value="item.id" :disabled="locked" /><img :src="petPortrait(item.id)" width="96" height="96" alt="" /><span>{{ item.name }}</span></label></fieldset>
         <div class="readoption-name"><label for="readoption-name">新伙伴的名字<span>{{ petNameLength(name || species?.name || '') }} / {{ pets.catalog.rules.maxNameLength }}</span></label><input id="readoption-name" v-model="name" :placeholder="species?.name" autocomplete="off" :disabled="locked" /></div>
-        <div class="readoption-rules"><div><h3>重新开始</h3><p>宠物回到初始等级，经验、亲密度、课程技能和职业熟练度归零。</p></div><div><h3>继续保留</h3><p>剩余宠物币、背包、收藏、成长旅程进度和已领奖励，以及旧伙伴的活动记录。</p></div></div>
+        <div class="readoption-rules"><div><h3>重新开始</h3><p>宠物回到初始等级，经验、亲密度、课程技能和职业熟练度归零。</p></div><div><h3>继续保留</h3><p>剩余{{ pets.currencyName }}、背包、收藏、成长旅程进度和已领奖励，以及旧伙伴的活动记录。</p></div></div>
         <p class="readoption-note">当日补给、收入与成长额度、互动冷却继续沿用，不会再次发放首次领养奖励。</p>
-        <label class="readoption-accept"><input v-model="accepted" type="checkbox" :disabled="locked" /><span>我已了解：花费 {{ price }} 宠物币，重置当前宠物成长，开始照顾新伙伴。</span></label>
+        <label class="readoption-accept"><input v-model="accepted" type="checkbox" :disabled="locked" /><span>我已了解：花费 {{ price }} {{ pets.currencyName }}，重置当前宠物成长，开始照顾新伙伴。</span></label>
         <p v-if="validation" class="readoption-error" role="alert">{{ validation }}</p>
         <div v-if="pending && !pets.busy" class="readoption-feedback" role="status"><span>{{ error || '结果尚未确认，请先核对原操作，不要重复领养。' }}</span><button type="button" class="readoption-retry" aria-label="核对重新领养操作" title="核对原操作" @click="recover"><PetIcon name="refresh" /></button></div>
         <p v-else-if="error" class="readoption-error" role="alert">{{ error }}</p>
         <p v-if="unavailable" class="readoption-note">{{ unavailable }}</p>
-        <div class="readoption-actions"><button type="button" :disabled="pets.busy" @click="close">取消</button><button type="submit" class="readoption-submit" :disabled="locked || !!unavailable || !accepted || !species || petNameLength(name || species.name) > pets.catalog.rules.maxNameLength">{{ pets.busy ? '正在处理…' : `花费 ${price} 币重新领养` }}</button></div>
+        <div class="readoption-actions"><button type="button" :disabled="pets.busy" @click="close">取消</button><button type="submit" class="readoption-submit" :disabled="locked || !!unavailable || !accepted || !species || petNameLength(name || species.name) > pets.catalog.rules.maxNameLength">{{ pets.busy ? '正在处理…' : `花费 ${price} ${pets.currencyName}重新领养` }}</button></div>
       </form>
     </FpDialog>
   </section>

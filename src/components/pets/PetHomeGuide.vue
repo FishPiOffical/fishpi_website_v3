@@ -37,7 +37,7 @@ function openActivity() {
     </button>
     <button v-if="!pets.state.dailySupply.claimed" type="button" class="guide-item pet-guide-supply" @click="emit('navigate', { section: 'care', anchor: 'supplies' })">
       <span class="guide-icon"><PetIcon name="bag" /></span>
-      <span class="guide-copy"><span>每日补给 · 待领取</span><strong>{{ pets.state.dailySupply.coins }} 币与 {{ pets.state.dailySupply.food }} 份口粮</strong></span>
+      <span class="guide-copy"><span>每日补给 · 待领取</span><strong>{{ pets.state.dailySupply.coins }} {{ pets.currencyName }}与 {{ pets.state.dailySupply.food }} 份口粮</strong></span>
       <PetIcon name="chevron" />
     </button>
     <button v-if="journey" type="button" class="guide-item pet-guide-journey" :class="{ ready: journey.ready }" @click="emit('navigate', { section: 'stories' })">

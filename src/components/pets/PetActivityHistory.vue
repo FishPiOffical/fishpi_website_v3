@@ -17,7 +17,7 @@ onBeforeUnmount(() => history.close())
 
 function rewards(value: PetActivityRewards, showWorkIncome = false) {
   const result: string[] = []
-  if (value.coins || showWorkIncome) result.push(`宠物币 +${value.coins}${showWorkIncome && value.coins === 0 ? '（当日额度已用完）' : ''}`)
+  if (value.coins || showWorkIncome) result.push(`${pets.currencyName} +${value.coins}${showWorkIncome && value.coins === 0 ? '（当日额度已用完）' : ''}`)
   if (value.experience) result.push(`经验 +${value.experience}`)
   if (value.food) result.push(`口粮 +${value.food}`)
   if (value.mood) result.push(`心情 +${Number(value.mood.toFixed(2))}`)
@@ -31,7 +31,7 @@ function eventIcon(item: PetJournalEvent) { return item.kind === 'story' ? 'jour
 function signed(value: number) { return `${value > 0 ? '+' : ''}${Number(value.toFixed(2))}` }
 function eventChanges(item: PetJournalEvent) {
   const result: string[] = []
-  if (item.coinsDelta) result.push(`宠物币 ${signed(item.coinsDelta)}`)
+  if (item.coinsDelta) result.push(`${pets.currencyName} ${signed(item.coinsDelta)}`)
   for (const change of item.itemChanges) result.push(`${itemName(change.itemId)} ${signed(change.quantity)}`)
   return result.join(' · ')
 }
@@ -59,7 +59,7 @@ function collectionName(id: string) { return pets.catalog?.collections.find(item
             <div class="history-kind"><PetIcon :name="item.kind" /></div>
             <div class="history-record"><header><div><span>{{ petActivityLabels[item.kind] }}</span><h3>{{ item.name }}</h3></div><span class="history-status" :class="item.status === 'claimed' ? 'claimed' : item.endsAt <= now || item.status === 'claimable' ? 'claimable' : 'running'">{{ item.status === 'claimed' ? '已领取' : item.endsAt <= now || item.status === 'claimable' ? '待领取' : '进行中' }}</span></header>
               <div class="history-times"><span>开始 <time>{{ formatDateTime(item.startedAt) }}</time></span><span>{{ item.status === 'claimed' ? '领取' : '结束' }} <time>{{ formatDateTime(item.status === 'claimed' ? item.claimedAt : item.endsAt) }}</time></span></div>
-              <p class="history-cost"><span>已投入</span>{{ item.cost.coins }} 宠物币 · 精力 {{ item.cost.energy }} · 饱食 {{ item.cost.hunger }} · 水分 {{ item.cost.water }}</p>
+              <p class="history-cost"><span>已投入</span>{{ item.cost.coins }} {{ pets.currencyName }} · 精力 {{ item.cost.energy }} · 饱食 {{ item.cost.hunger }} · 水分 {{ item.cost.water }}</p>
               <p v-if="item.status === 'claimed' && !item.actualRewards" class="history-old">早期记录未保存成果明细</p>
               <p v-else class="history-rewards" :class="{ actual: item.status === 'claimed' }"><span>{{ item.status === 'claimed' ? '实际获得' : '预计收获' }}</span>{{ rewards(item.actualRewards ?? item.rewards, item.kind === 'work' && item.status === 'claimed') }}</p>
             </div>

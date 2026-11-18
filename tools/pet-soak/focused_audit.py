@@ -53,7 +53,7 @@ def audit(directory):
         }
         assert actual == expected, '数据库记录数量与单次成功回执数量不一致'
         offset = result['fixtureOffsets'].get(str(index), {}).get('coins', 0)
-        coins = int(fixture.sql("SELECT coins FROM symphony_pet_account WHERE oId='" + uid + "'"))
+        coins = int(fixture.sql("SELECT coins FROM symphony_game_wallet WHERE oId='" + uid + "'"))
         ledger = fixture.ledger(actor)
         assert coins == ledger + offset, '钱包与流水及明确前置资金不一致'
         checks.append({'actor': index, 'successfulCommands': operations, 'databaseCounts': actual,

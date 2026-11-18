@@ -85,14 +85,14 @@ class LocalFixture:
         assert actor.state['wallet']['coins'] == actor.catalog['rules']['initialCoins']
         assert actor.state['pet']['experience'] == 0 and all(item['experience'] == 0 for item in actor.state['pet']['skills'])
         now = int(time.time() * 1000)
-        statements = ["UPDATE symphony_pet_account SET coins=coins+9900 WHERE oId='" + uid + "';"]
+        statements = ["UPDATE symphony_game_wallet SET coins=coins+99000 WHERE oId='" + uid + "';"]
         for skill in ('vitality', 'exploration', 'knowledge', 'expression', 'crafting', 'kindness'):
             statements.append("INSERT INTO symphony_pet_skill(oId,userId,petId,skillId,experience,updatedAt) VALUES('"
                               + pet_id + ':' + skill + "','" + uid + "','" + pet_id + "','" + skill + "',20," + str(now) + ');')
         self.transaction(actor, statements)
         self.seeded.add(actor.index)
-        self.offsets[actor.index] = {'coins': 9900, 'skills': 20, 'initialPetId': pet_id}
-        self.record('explicit-assets', actor, coinsOffset=9900, skillExperiencePerKind=20,
+        self.offsets[actor.index] = {'coins': 99000, 'skills': 20, 'initialPetId': pet_id}
+        self.record('explicit-assets', actor, coinsOffset=99000, skillExperiencePerKind=20,
                     note='前置夹具，不属于游戏奖励，不用于证明自然成长速度')
         actor.read()
 
@@ -125,7 +125,7 @@ class LocalFixture:
 
     def ledger(self, actor):
         uid, _ = self.identity(actor)
-        return int(self.sql('SELECT COALESCE(SUM(coinDelta),0) FROM symphony_pet_ledger WHERE userId=\'' + uid + "'"))
+        return int(self.sql('SELECT COALESCE(SUM(coinDelta),0) FROM symphony_game_wallet_ledger WHERE userId=\'' + uid + "'"))
 
     def counts(self, actor):
         uid, _ = self.identity(actor)

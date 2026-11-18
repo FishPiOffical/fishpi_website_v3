@@ -514,7 +514,7 @@ try {
   serverState.income = { date: '2026-11-12', earned: 60, limit: 60, remaining: 0 }
   await pets.refresh(); await settle()
   assert(document.querySelector('[aria-label="开始图书助理"]').disabled)
-  assert(document.querySelector('[aria-label="开始图书助理"]').title.includes('今日工作收入已达上限'))
+  assert(document.querySelector('[aria-label="开始图书助理"]').title.includes('今日活动收益已达上限'))
   serverState.income = { date: '2026-11-12', earned: 55, limit: 60, remaining: 5 }
   await pets.refresh(); await settle()
   await click(document.querySelector('[aria-label="开始图书助理"]'))
@@ -1080,6 +1080,19 @@ try {
   assert.equal(pets.foodQuantity, supplyFood + serverState.dailySupply.food)
   assert.equal(supplyButton().disabled, true)
   console.log('PASS 补给领取增加宠物币和口粮，更新已领取状态；重复点击及重新读取不重复发奖')
+
+  serverState.catalogVersion = catalog.version = 4
+  catalog.activityVersion = 6
+  catalog.items.find(item => item.id === 'food').price = 50
+  serverState.wallet.coins = 3250
+  serverState.income = { date: serverState.today, earned: 480, limit: 600, remaining: 120 }
+  serverState.dailySupply.coins = 200
+  await pets.refresh(); await settle()
+  assert.equal(pets.catalog.version, 4)
+  assert.match(document.querySelector('.pet-wallet').textContent, /3,250游园币/)
+  assert.match(document.querySelector('.income-summary').textContent, /480 游园币.*120 游园币/)
+  assert.match(document.querySelector('.supply-copy').textContent, /200 游园币/)
+  console.log('PASS 目录从旧版切换到统一钱包，余额、收入额度和补给直接显示服务端数值')
 
   const coffeePath = '/api/v3/me/pet/coffee'
   const coffeeOffer = { enabled: true, price: 64, version: 1, today: serverState.today, dailyLimit: 3, remaining: 3, energy: 30, balance: 128 }
