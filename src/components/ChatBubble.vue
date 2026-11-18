@@ -33,6 +33,7 @@ const props = withDefaults(
     avatar?: string
     avatarSize?: number
     time?: string
+    client?: string
     html?: string
     /** 当前可见消息的原文，仅用于恢复被清洗掉的引用来源，不作为 HTML 渲染。 */
     source?: string
@@ -49,6 +50,20 @@ const props = withDefaults(
 )
 
 const auth = useAuthStore()
+const clientIcons = new Map([
+  ['Web', 'fish'], ['Mobile', 'mobile'], ['PC', 'pc2'], ['iOS', 'apple'], ['macOS', 'apple'],
+  ['Android', 'apk'], ['Windows', 'windows'], ['Linux', 'linux'], ['Bird', 'bird'], ['Dart', 'dart'],
+  ['ElvesOnline', 'moon'], ['IceNet', 'icenet'], ['Extension', 'extension'], ['Edge', 'edge'],
+  ['Chrome', 'chrome'], ['VSCode', 'vscode'], ['IDEA', 'idea'], ['Python', 'python'],
+  ['Golang', 'golang'], ['Harmony', 'harmony'], ['Rust', 'rust'], ['CLI', 'cli'], ['uTools', 'utools'],
+])
+const messageClient = computed(() => {
+  const [name, ...parts] = (props.client || '').trim().split('/')
+  if (!name) return null
+  const version = parts.join('/').trim()
+  const icon = clientIcons.get(name) || 'other'
+  return { href: `/images/chat-client-icons.svg#ic-${icon}`, label: version ? `${name} ${version}` : name }
+})
 const ownPet = computed(() => !!props.userId && props.userId === auth.account?.oId)
 const petDestination = computed(() => ownPet.value
   ? { name: 'pets' }
@@ -189,7 +204,12 @@ function onBodyClick(e: MouseEvent) {
         <ChatQuoteCard :quote="display.quote" />
       </div>
       <div v-if="chatroom" class="foot">
-        <time>{{ formatDisplayTime(time) }}</time>
+        <span class="message-meta">
+          <time>{{ formatDisplayTime(time) }}</time>
+          <span v-if="messageClient" class="message-client" :title="messageClient.label" role="img" :aria-label="messageClient.label">
+            <svg aria-hidden="true"><use :href="messageClient.href" /></svg>
+          </span>
+        </span>
         <CollectChatEmoji v-if="/<img\b/i.test(html)" :html="html" />
         <div v-if="$slots.reactions" class="message-reactions"><slot name="reactions" /></div>
         <span v-if="$slots.actions" class="actions"><slot name="actions" /></span>
@@ -615,6 +635,9 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
 }
 .is-room.is-self .foot { flex-direction: row-reverse; }
 .is-room time { font-variant-numeric: tabular-nums; }
+.message-meta { display: inline-flex; align-items: center; gap: 5px; }
+.message-client { display: inline-flex; flex: none; color: var(--fp-muted); }
+.message-client svg { width: 13px; height: 13px; fill: currentColor; }
 .is-room .actions, .is-room.is-self .actions {
   position: static;
   padding: 0;

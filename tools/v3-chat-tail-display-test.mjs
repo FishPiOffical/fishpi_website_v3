@@ -10,7 +10,8 @@ const { createApp, reactive, nextTick, h } = await import('vue')
 const moduleUrl = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 const compile = source => ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
 const http = moduleUrl('export class ApiError extends Error{}; export const request=()=>{throw Error("unexpected request")}')
-const appearances = moduleUrl(compile(await fs.readFile('src/utils/chatAppearance.ts', 'utf8')))
+const bubbleStyles = moduleUrl(compile(await fs.readFile('src/utils/bubbleStyle.ts', 'utf8')))
+const appearances = moduleUrl(compile(await fs.readFile('src/utils/chatAppearance.ts', 'utf8')).replaceAll("'@/utils/bubbleStyle'", `'${bubbleStyles}'`))
 const reactions = moduleUrl(compile(await fs.readFile('src/api/v3-reactions.ts', 'utf8')).replace("from './http'", `from '${http}'`))
 const messageModule = moduleUrl(compile(await fs.readFile('src/api/v3-chat-messages.ts', 'utf8'))
   .replace("from './http'", `from '${http}'`)
@@ -60,7 +61,7 @@ const replacements = {
 }
 code = code.replace(/from (["'])([^"']+)\1/g, (match, _quote, name) => `from '${replacements[name] || (name.endsWith('.vue') ? componentStub : name)}'`)
 const ChatBubble = (await import(moduleUrl(code))).default
-const props = reactive({ userName: 'fish', html: '<p>原正文</p>', chatroom: true, tail: { text: '<img src=x onerror=alert(1)> @fish' } })
+const props = reactive({ userName: 'fish', html: '<p>原正文</p>', chatroom: true, client: 'iOS/1.2.3', tail: { text: '<img src=x onerror=alert(1)> @fish' } })
 const mount = document.createElement('div'); document.body.append(mount)
 // 使用真实组件模板，验证纯文本渲染和已挂载后的精简开关。
 const app = createApp({ render: () => h(ChatBubble, props) })
@@ -71,10 +72,19 @@ assert.equal(tailNode().querySelector('svg.tail-label').getAttribute('aria-label
 assert.equal(tailNode().querySelector('img'), null)
 assert.equal(tailNode().querySelector('a'), null)
 assert.equal(mount.querySelector('.body').textContent, '原正文')
+const clientNode = () => mount.querySelector('.message-client')
+assert.equal(clientNode().getAttribute('title'), 'iOS 1.2.3')
+assert.equal(clientNode().querySelector('use').getAttribute('href'), '/images/chat-client-icons.svg#ic-apple')
+props.client = 'Unknown/2.0'; await nextTick()
+assert.equal(clientNode().querySelector('use').getAttribute('href'), '/images/chat-client-icons.svg#ic-other')
+props.client = ''; await nextTick(); assert.equal(clientNode(), null)
+props.client = 'Mobile/移动网页端'; await nextTick()
 preferences.simpleMode = true; await nextTick(); assert.equal(tailNode(), null)
+assert.equal(clientNode().getAttribute('title'), 'Mobile 移动网页端')
 preferences.simpleMode = false; await nextTick(); assert.equal(tailNode().querySelector('.tail-content').textContent, props.tail.text)
 props.standalone = true; await nextTick(); assert.equal(tailNode(), null)
 props.standalone = false; props.chatroom = false; await nextTick(); assert.equal(tailNode(), null)
+assert.equal(clientNode(), null)
 app.unmount()
 console.log('PASS 真实 ChatBubble 模板纯文本、标识、精简即时隐藏恢复和特殊卡片/非聊天室排除')
 
@@ -86,6 +96,8 @@ for (const [file, count] of [
 ]) {
   const text = await fs.readFile(file, 'utf8')
   assert.equal((text.match(/:tail="(?:entry\.message|line|message)\.tail"/g) || []).length, count, file)
+  assert.equal((text.match(/:client="(?:entry\.message|line|message)\.client"/g) || []).length, count, file)
 }
 assert.match(await fs.readFile('src/stores/chat.ts', 'utf8'), /tail:message\.tail/)
+assert.match(await fs.readFile('src/stores/chat.ts', 'utf8'), /client:message\.client/)
 console.log('PASS 经典/简约、悬浮、隐藏会话及上下文的小尾巴传递接线')
