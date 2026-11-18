@@ -6,7 +6,9 @@ const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__preview={token:'A',version:1,calls:[],dispatch:async()=>({code:0,data:{html:'<p>safe</p>'}})};const state=__preview
 const http=url(`export class ApiError extends Error{constructor(m,status=0){super(m);this.status=status}}export function getAccessToken(){return globalThis.__preview.token}export function getAuthContextVersion(){return globalThis.__preview.version}export async function request(path,init){globalThis.__preview.calls.push({path,init});return globalThis.__preview.dispatch(path,init)}`)
 const apiURL=url(compile(await fs.readFile('src/api/v3-markdown.ts','utf8')).replace("from './http'",`from '${http}'`)),api=await import(apiURL)
-const {createMarkdownPreview}=await import(url(compile(await fs.readFile('src/utils/markdownPreview.ts','utf8')).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-markdown'",`from '${apiURL}'`)))
+const renders = globalThis.__articlePreviewCalls = []
+const codeURL = url('export function renderArticleCode(element, text) { globalThis.__articlePreviewCalls.push([element.innerHTML, text]) }')
+const {createMarkdownPreview}=await import(url(compile(await fs.readFile('src/utils/markdownPreview.ts','utf8')).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-markdown'",`from '${apiURL}'`).replace("from './articleCode'",`from '${codeURL}'`)))
 function element(){return{_text:'',_html:'',children:[],listeners:{},set textContent(v){this._text=v;this._html='';this.children=[]},get textContent(){return this._text},set innerHTML(v){this._html=v;this._text='';this.children=[]},get innerHTML(){return this._html},replaceChildren(...children){this.children=children;this._html='';this._text=''},addEventListener(k,v){this.listeners[k]=v}}}
 globalThis.document={createElement:element,createTextNode:text=>({text})}
 const tick=async()=>{for(let i=0;i<20;i++)await Promise.resolve()}
@@ -28,3 +30,10 @@ state.dispatch=()=>new Promise(r=>finish=r);preview.parse(root);await tick();sta
 console.log('PASS preview 6 ordinary token rotation retains result; unmount clears and aborts pending output')
 const editor=await fs.readFile('src/components/MarkdownEditor.vue','utf8');assert.ok(!editor.includes("url: '/markdown'"));for(const s of ['transform: preview.transform','parse: preview.parse','preview.reset()','stopPreviewAuth?.()','preview.dispose()'])assert.ok(editor.includes(s));assert.ok(editor.includes('onAccessTokenChange(token =>'))
 console.log('PASS preview 7 shared desktop/mobile editor callback/auth/disposal wiring, legacy preview URL removed')
+assert.deepEqual(renders, [])
+const postPreview = createMarkdownPreview(() => ':::code-group', true)
+state.dispatch = async () => ({code:0,data:{html:'<p>:::code-group</p>'}})
+postPreview.parse(root); await tick()
+assert.deepEqual(renders, [['<p>:::code-group</p>', ':::code-group']])
+postPreview.dispose()
+console.log('PASS post preview enhances the authorized HTML with the matching draft; reply preview is unchanged')

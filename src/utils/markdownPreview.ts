@@ -1,8 +1,9 @@
 import { getAccessToken, getAuthContextVersion } from '@/api/http'
 import { markdownPreview } from '@/api/v3-markdown'
+import { renderArticleCode } from './articleCode'
 
 /** Vditor's synchronous transform never inserts its unverified local fallback HTML. */
-export function createMarkdownPreview(value: () => string) {
+export function createMarkdownPreview(value: () => string, article = false) {
   let target: HTMLElement | null = null, controller: AbortController | null = null, sequence = 0, disposed = false
   function reset() {
     sequence++; controller?.abort(); controller = null
@@ -19,7 +20,10 @@ export function createMarkdownPreview(value: () => string) {
     const current = () => !disposed && sequence === run && target === element && version === getAuthContextVersion() && !!getAccessToken() && text === value()
     try {
       const html = await markdownPreview(text, abort.signal)
-      if (current()) element.innerHTML = html
+      if (current()) {
+        element.innerHTML = html
+        if (article) renderArticleCode(element, text)
+      }
     } catch (error) {
       if (!current() || abort.signal.aborted) return
       const label = document.createElement('span'); label.textContent = error instanceof Error ? error.message : '预览失败'

@@ -37,6 +37,24 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 
 - 图片预览默认使用 `imageThumbnail(url, 显示宽度, 显示高度)`，受支持的 RhyPic 公开原图按显示尺寸请求二倍图，单边最多 1024px。正文中已清洗的图片可用 `withImageThumbnailSrcset` 保留原地址并添加缩略图地址。签名链接、已有缩放参数及外站图片保留原地址。
 
+### 发帖代码分组
+
+发帖时可以把同一个示例的多种语言写进 `:::code-group`。起止标记各占一个独立段落，组内只放至少两个围栏代码块，语言名就是标签。发帖预览、普通帖和长文详情均可切换；不分组的代码块照常显示。
+
+````markdown
+:::code-group
+
+```javascript
+console.log('你好')
+```
+
+```python
+print('你好')
+```
+
+:::
+````
+
 ### SEO / SSR
 
 - 客户端：`@unhead/vue` 设置 title / description / og / canonical；帖子页输出 Article JSON-LD

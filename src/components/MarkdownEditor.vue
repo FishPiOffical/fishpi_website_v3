@@ -183,7 +183,7 @@ const fallbackInput = ref<HTMLTextAreaElement | null>(null)
 let editor: VditorInstance | null = null
 let lastEmitted = props.modelValue
 let lastRenderedValue: string | undefined
-const preview = createMarkdownPreview(() => editor?.getValue() ?? props.modelValue)
+const preview = createMarkdownPreview(() => editor?.getValue() ?? props.modelValue, props.mode === 'post')
 const uploadStatus = ref<EditorUploadStatus>(null)
 const uploads = createEditorUpload(markdown => {
   editor?.insertMD(markdown)

@@ -36,6 +36,26 @@ try {
     assert.ok(await page.locator('pre').first().evaluate(el => el.scrollWidth > el.clientWidth))
     await page.evaluate(() => window.replacePost())
     await page.waitForFunction(() => document.querySelector('.language-python .hljs-keyword')?.textContent === 'def')
+    const groupMarkdown = ':::code-group\n\n```js\nrun()\n```\n\n```python\nrun()\n```\n\n:::'
+    await page.evaluate(markdown => {
+      const region = document.createElement('article')
+      const pair = '<pre><code>run()\n</code></pre>'.repeat(2)
+      region.innerHTML = '<p>:::code-group</p>' + pair + '<p>:::</p>' + '<pre><code>plain</code></pre>'
+        + '<p>:::code-group</p><pre><code>unfinished</code></pre>'
+      document.body.append(region)
+      articleCode.renderArticleCode(region, markdown)
+      articleCode.renderArticleCode(region, markdown)
+    }, groupMarkdown)
+    const tabs = page.getByRole('tab'), visiblePanel = page.getByRole('tabpanel')
+    assert.deepEqual(await tabs.allTextContents(), ['js', 'python'])
+    assert.equal(await visiblePanel.count(), 1)
+    assert.equal(await page.locator('article > pre').count(), 3)
+    await tabs.last().click()
+    assert.equal(await visiblePanel.getAttribute('aria-labelledby'), await tabs.last().getAttribute('id'))
+    await tabs.last().press('ArrowRight')
+    assert.equal(await tabs.first().getAttribute('aria-selected'), 'true')
+    await tabs.first().press('End')
+    assert.equal(await tabs.last().getAttribute('aria-selected'), 'true')
     await page.close()
     console.log(`PASS ${width}px ${theme}: hydration, inline code, fenced language, escaped markup, overflow, post replacement`)
   }
