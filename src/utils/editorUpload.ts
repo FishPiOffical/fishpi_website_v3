@@ -99,6 +99,8 @@ export function createEditorUpload(
             if (item.maxBytes !== undefined) details.push(`「${item.name}」超过单文件上限，最大可上传 ${formatUploadLimit(item.maxBytes)}`)
           }
           if (otherFailures) details.push(`${otherFailures}个文件上传失败或未返回结果，请检查后重试失败文件`)
+          const formatMessage = failures.find(item => item.failureMessage)?.failureMessage
+          if (formatMessage) details.push(formatMessage)
           message = [...details, ...rejected].join('。')
         }
         return message

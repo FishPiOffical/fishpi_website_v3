@@ -68,3 +68,12 @@ for (const image of [
   assert.match(inserted.at(-1), /!\[/)
 }
 console.log('PASS upload 11 supported image headers and clipboard data pass; renamed or unsupported images never request a ticket')
+
+globalThis.fetch = async () => new Response(JSON.stringify({
+  code: 0, msg: '图片后缀与实际格式不符，请选择正确格式的图片',
+  data: { succMap: {}, errFiles: ['upload-1.png'] },
+}))
+assert.match(await mixed.handler([file()]), /图片后缀与实际格式不符/)
+globalThis.fetch = async () => new Response(JSON.stringify({ code: 1, msg: '图片后缀与实际格式不符，请选择正确格式的图片' }))
+assert.equal(await mixed.handler([file()]), '图片后缀与实际格式不符，请选择正确格式的图片')
+console.log('PASS upload 12 editor surfaces the server format rejection')

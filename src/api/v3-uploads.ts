@@ -1,6 +1,6 @@
 import { ApiError, request } from './http'
 type Row = Record<string, unknown>
-export type UploadResult = { name: string; url: string | null; image: boolean; maxBytes?: number }
+export type UploadResult = { name: string; url: string | null; image: boolean; maxBytes?: number; failureMessage?: string }
 const invalid = () => new ApiError('上传服务响应不正确', 502)
 function row(v: unknown): Row { if (!v || typeof v !== 'object' || Array.isArray(v)) throw invalid(); return v as Row }
 function outputURL(v: unknown): string {
@@ -37,7 +37,8 @@ export async function uploadV3Files(files: File[], signal: AbortSignal): Promise
   let result: Row
   try { result = row(await response.json()) } catch { throw new ApiError('上传结果未确认，请检查后再试', response.status) }
   signal.throwIfAborted()
-  if (!response.ok || result.code !== 0) throw new ApiError('图床上传失败，请检查文件后重试', response.status)
+  const formatMessage = result.msg === '图片后缀与实际格式不符，请选择正确格式的图片' ? result.msg : undefined
+  if (!response.ok || result.code !== 0) throw new ApiError(formatMessage || '图床上传失败，请检查文件后重试', response.status)
   const data = row(result.data), successes = row(data.succMap), failures = data.errFiles
   if (!Array.isArray(failures) || failures.some(name => typeof name !== 'string' || !names.includes(name)) || new Set(failures).size !== failures.length || Object.keys(successes).some(name => !names.includes(name) || failures.includes(name))) throw invalid()
   const sizeLimits = data.sizeLimits
@@ -50,6 +51,7 @@ export async function uploadV3Files(files: File[], signal: AbortSignal): Promise
       url: Object.hasOwn(successes, name) ? outputURL(successes[name]) : null,
       image: file.type.startsWith('image/'),
       ...(typeof sizeLimit === 'number' && Number.isSafeInteger(sizeLimit) && sizeLimit > 0 ? { maxBytes: sizeLimit } : {}),
+      ...(formatMessage && failures.includes(name) ? { failureMessage: formatMessage } : {}),
     }
   })
 }
