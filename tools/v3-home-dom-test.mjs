@@ -100,11 +100,19 @@ assert.ok(template.includes('ref="routeView"'))
 const render = new Function('Vue', compileTemplate(template, { mode: 'function', prefixIdentifiers: true }).code)(vue)
 let mounts = 0, unmounts = 0
 const Home = { name: 'HomeView', setup() { mounts++; vue.onUnmounted(() => unmounts++); return () => h('div', { 'data-home-module': 'recentA' }, '首页') } }
-const routes = [{ path: '/', component: Home }, { path: '/top', component: { render: () => h('section', '总榜') } }, { path: '/offline', component: { render: () => h('section', '离线') } }]
+const Listing = { props: ['listingRoute'], setup: props => () => h('section', { 'data-listing': props.listingRoute.path }) }
+const SideBar = { render: () => h('aside', { 'data-list-sidebar': '' }) }
+const routes = [
+  { path: '/', component: Home },
+  { path: '/top', component: { render: () => h('section', '总榜') } },
+  { path: '/offline', component: { render: () => h('section', '离线') } },
+  { path: '/recent', component: Listing, meta: { list: 'recent' } },
+  { path: '/recent/hot', component: Listing, meta: { list: 'hot' } },
+]
 const router = () => createRouter({ history: createMemoryHistory(), routes })
 let currentRouter
 function root() {
-  return { components: { RouterView, MemberLayout: { render: () => null } }, setup() {
+  return { components: { RouterView, SideBar, MemberLayout: { render: () => null } }, setup() {
     const pageHost = ref(null), routeView = ref(null)
     return { pageHost, routeView, pageRevision: useRouteDomBoundary(pageHost, routeView, () => currentRouter.currentRoute.value.fullPath), route: currentRouter.currentRoute,
       listingCacheIdentity: 'guest', ssrAuthShell: false, isChatroom: false, isModernChat: false, immersive: false }
@@ -138,6 +146,23 @@ console.log('PASS home DOM 4 observed failure reproduced: live route with empty 
 await currentRouter.push('/top'); await tick(); assert.equal(document.querySelector('main').textContent, '总榜')
 await currentRouter.push('/offline'); await tick(); assert.equal(document.querySelector('main').textContent, '离线')
 await currentRouter.push('/'); await tick(); assert.equal(document.querySelectorAll('main [data-home-module]').length, 1)
+await currentRouter.push('/recent'); await tick()
+const listing = document.querySelector('[data-listing="/recent"]')
+const sidebar = document.querySelector('[data-list-sidebar]')
+assert.ok(listing && sidebar)
+await currentRouter.push('/recent/hot'); await tick()
+assert.equal(listing.isConnected, false)
+assert.ok(document.querySelector('[data-listing="/recent/hot"]'))
+assert.equal(document.querySelector('[data-list-sidebar]'), sidebar)
+await currentRouter.push('/recent'); await tick()
+assert.equal(document.querySelector('[data-listing="/recent"]'), listing)
+assert.equal(document.querySelector('[data-list-sidebar]'), sidebar)
+await currentRouter.push('/top'); await tick()
+assert.equal(sidebar.isConnected, false)
+await currentRouter.push('/recent'); await tick()
+assert.equal(document.querySelector('[data-listing="/recent"]'), listing)
+assert.ok(document.querySelector('[data-list-sidebar]'))
+console.log('PASS article tabs share the mounted sidebar and keep each list cached across other routes')
 const beforeDispose = mounts
 app.unmount(); await tick(); assert.equal(document.querySelector('#app').childNodes.length, 0); assert.equal(mounts, beforeDispose)
 console.log('PASS home DOM 5 switching routes/offline/back preserves connected content; unmount disconnects recovery observer')
