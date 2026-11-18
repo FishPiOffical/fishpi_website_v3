@@ -205,6 +205,7 @@ export type PetCommand = (
   | { kind: 'name'; petId: string; name: string }
   | { kind: 'actions'; petId: string; action: PetAction; itemId?: string }
   | { kind: 'supplies'; expectedDate: string }
+  | { kind: 'coffee'; petId: string; expectedDate: string; version: number }
   | { kind: 'purchases'; petId: string; itemId: string; quantity: number; catalogVersion: number }
   | { kind: 'activities'; petId: string; activityKind: PetActivityKind; entryId: string; activityVersion: number }
   | { kind: 'activities/claim'; petId: string; activityId: string }
@@ -558,6 +559,18 @@ async function read<T>(path: string, decode: (value: unknown) => T, signal?: Abo
 }
 export const readPetCatalog = (signal?: AbortSignal) => read('/api/v3/pets/catalog', decodePetCatalog, signal)
 export const readPetState = (signal?: AbortSignal) => read('/api/v3/me/pet', decodePetState, signal)
+export const readPetCoffee = (signal?: AbortSignal) => read('/api/v3/me/pet/coffee', value => {
+  const row = object(value)
+  const dailyLimit = integer(row.dailyLimit, 1, 3)
+  return {
+    enabled: flag(row.enabled), price: integer(row.price, 1, 100_000),
+    version: integer(row.version, 1, 2147483647), today: date(row.today),
+    energy: integer(row.energy, 1, 100), dailyLimit,
+    remaining: integer(row.remaining, 0, dailyLimit), balance: integer(row.balance, -2147483648, 2147483647),
+  }
+}, signal)
+export type PetCoffeeOffer = Awaited<ReturnType<typeof readPetCoffee>>
+
 
 const brawlPath = '/api/v3/me/pet/brawl'
 function brawlId(value: unknown): string {

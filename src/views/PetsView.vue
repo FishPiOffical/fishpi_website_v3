@@ -222,7 +222,7 @@ onMounted(() => {
         <!-- 分区保留组件实例，切换时不丢失购买数量、筛选与未确认操作。 -->
         <div v-show="section === 'activities'" id="pet-home-panel-activities" class="pet-home-panel" data-pet-panel="activities" role="tabpanel" aria-labelledby="pet-home-tab-activities" tabindex="-1"><PetActivities ref="activities" /></div>
         <div v-show="section === 'stories'" id="pet-home-panel-stories" class="pet-home-panel" data-pet-panel="stories" role="tabpanel" aria-labelledby="pet-home-tab-stories" tabindex="-1"><PetStories /></div>
-        <div v-show="section === 'shop'" id="pet-home-panel-shop" class="pet-home-panel" data-pet-panel="shop" role="tabpanel" aria-labelledby="pet-home-tab-shop" tabindex="-1"><PetShop ref="shop" /></div>
+        <div v-show="section === 'shop'" id="pet-home-panel-shop" class="pet-home-panel" data-pet-panel="shop" role="tabpanel" aria-labelledby="pet-home-tab-shop" tabindex="-1"><PetShop ref="shop" :active="section === 'shop'" /></div>
         <div v-show="section === 'workshop'" id="pet-home-panel-workshop" class="pet-home-panel" data-pet-panel="workshop" role="tabpanel" aria-labelledby="pet-home-tab-workshop" tabindex="-1"><PetWorkshop @navigate="navigate" /></div>
         <div v-show="section === 'history'" id="pet-home-panel-history" class="pet-home-panel" data-pet-panel="history" role="tabpanel" aria-labelledby="pet-home-tab-history" tabindex="-1"><PetActivityHistory /></div>
       </template>

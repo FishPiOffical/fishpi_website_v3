@@ -1,13 +1,82 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import type { PetCatalog } from '@/api/v3-pets'
+import { readPetCoffee, type PetCatalog, type PetCoffeeOffer } from '@/api/v3-pets'
+import { fpConfirm } from '@/composables/useDialog'
 import { getAuthContextVersion } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
 import PetIcon from './PetIcon.vue'
 
 type Item = PetCatalog['items'][number]
+const props = defineProps<{ active: boolean }>()
 const pets = usePetsStore(), auth = useAuthStore()
+const coffee = ref<PetCoffeeOffer | null>(null)
+const coffeeLoading = ref(false)
+const coffeeError = ref('')
+const confirmingCoffee = ref(false)
+let coffeeRead: AbortController | undefined
+let coffeeConfirmation: AbortController | undefined
+const coffeeOwner = () => `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.accessToken}:${pets.pet?.id ?? ''}`
+const showCoffee = computed(() => filter.value === 'all' || filter.value === 'drink')
+const coffeeReason = computed(() => {
+  if (!coffee.value?.enabled || !pets.pet) return ''
+  if (coffee.value.remaining === 0) return '今天的咖啡次数已用完'
+  if (pets.pet.activity) return '休息或活动结束后才能购买'
+  if (pets.pet.energy >= 100) return '宠物精力已满'
+  if (coffee.value.balance < coffee.value.price) return '积分余额不足'
+  return ''
+})
+async function refreshCoffee() {
+  coffeeRead?.abort()
+  const controller = new AbortController()
+  coffeeRead = controller
+  coffeeLoading.value = true
+  coffeeError.value = ''
+  try {
+    const result = await readPetCoffee(controller.signal)
+    if (!controller.signal.aborted) coffee.value = result
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      coffee.value = null
+      coffeeError.value = error instanceof Error ? error.message : '宠物咖啡暂不可用'
+    }
+  } finally {
+    if (!controller.signal.aborted) coffeeLoading.value = false
+  }
+}
+watch([coffeeOwner, () => props.active, () => pets.state], ([owner, active], previous) => {
+  if (owner !== previous?.[0] || !active) {
+    coffeeRead?.abort()
+    coffeeConfirmation?.abort()
+    coffee.value = null
+    coffeeLoading.value = false
+    coffeeError.value = ''
+  }
+  if (active && pets.pet && auth.accessToken) void refreshCoffee()
+}, { immediate: true })
+
+async function buyCoffee() {
+  const offer = coffee.value, pet = pets.pet, owner = coffeeOwner()
+  if (!offer?.enabled || !pet || !props.active || locked.value || coffeeLoading.value || coffeeReason.value || confirmingCoffee.value) return
+  const controller = new AbortController()
+  coffeeConfirmation = controller
+  confirmingCoffee.value = true
+  try {
+    const confirmed = await fpConfirm({ title: '购买宠物咖啡', confirmText: '购买并使用', signal: controller.signal,
+      message: `将扣除 ${offer.price} 积分，立即恢复最多 ${offer.energy} 点精力。当前余额 ${offer.balance} 积分，今天还可使用 ${offer.remaining} 次。` })
+    if (!confirmed || controller.signal.aborted || owner !== coffeeOwner()) return
+    if (offer.today !== pets.state?.today) await pets.refresh()
+    if (controller.signal.aborted || owner !== coffeeOwner()) return
+    const purchased = await pets.buyCoffee(pet.id, offer.today, offer.version)
+    if (!purchased && owner === coffeeOwner() && props.active && !pets.refreshNeeded && !pets.pending) await refreshCoffee()
+  } finally {
+    if (coffeeConfirmation === controller) {
+      coffeeConfirmation = undefined
+      confirmingCoffee.value = false
+    }
+  }
+}
+
 const filter = ref('all'), quantities = reactive<Record<string, number>>({})
 const root = ref<HTMLElement | null>(null)
 let focusVersion = 0
@@ -57,7 +126,7 @@ async function focusItem(itemId?: string, stillActive: () => boolean = () => tru
   return document.activeElement === heading
 }
 defineExpose({ focusItem })
-onBeforeUnmount(() => { focusVersion++ })
+onBeforeUnmount(() => { focusVersion++; coffeeRead?.abort(); coffeeConfirmation?.abort() })
 watch(() => `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.accessToken}`, () => {
   filter.value = 'all'
   for (const key of Object.keys(quantities)) delete quantities[key]
@@ -66,7 +135,7 @@ watch(() => `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.acce
 
 <template>
   <section v-if="pets.catalog && pets.state && pets.pet" ref="root" class="pet-shop" aria-labelledby="pet-shop-title">
-    <header class="shop-heading"><div><h2 id="pet-shop-title" tabindex="-1"><PetIcon name="shop" />家园小铺</h2><p>补充食物与饮品，也为下一件手作准备材料。</p></div><span><PetIcon name="bag" />购买后存入背包</span></header>
+    <header class="shop-heading"><div><h2 id="pet-shop-title" tabindex="-1"><PetIcon name="shop" />家园小铺</h2><p>补充食物与饮品，也为下一件手作准备材料。</p></div><span><PetIcon name="bag" />普通商品存入背包</span></header>
     <div class="shop-filters" aria-label="商店分类"><button v-for="option in filters" :key="option.id" type="button" :aria-pressed="filter === option.id" @click="filter = option.id">{{ option.name }}</button></div>
     <div class="shop-grid">
       <article v-for="item in items" :key="item.id" class="shop-item">
@@ -76,8 +145,15 @@ watch(() => `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.acce
         <button v-if="item.category !== 'material'" type="button" class="item-use" :disabled="locked || !!useReason(item)" :title="useReason(item) || `使用一份${item.name}`" :aria-label="`使用${item.name}`" @click="use(item)">{{ useReason(item) || '使用一份' }}</button>
         <p v-else class="material-use">在手作配方中制作收藏</p>
       </article>
+      <article v-if="showCoffee && coffee?.enabled" class="shop-item">
+        <header><span class="item-icon"><PetIcon name="water" /></span><div><h3>宠物咖啡</h3><span>今日剩余 {{ coffee.remaining }} / {{ coffee.dailyLimit }} 次</span></div><strong>{{ coffee.price }}<small> 积分</small></strong></header>
+        <p class="item-description">购买后立即使用</p>
+        <p class="item-effects">精力 +{{ coffee.energy }} · 上限 100</p>
+        <div class="shop-buy"><button type="button" :disabled="locked || confirmingCoffee || coffeeLoading || !!coffeeReason" @click="buyCoffee">{{ coffeeReason || '购买并使用' }}</button></div>
+      </article>
     </div>
-    <p v-if="!items.length" class="shop-empty">这个分类暂时没有在售物品。</p>
+    <p v-if="showCoffee && coffeeError" class="shop-empty" role="status">宠物咖啡读取失败 <button type="button" @click="refreshCoffee">重试</button></p>
+    <p v-if="!items.length && !(showCoffee && coffee?.enabled)" class="shop-empty">这个分类暂时没有在售物品。</p>
   </section>
 </template>
 

@@ -149,6 +149,9 @@ function journalEvent(kind, action, name, changes = {}) {
 }
 const response = data => ({ code: 0, data: structuredClone(data) })
 const success = async (url, options) => {
+  if (url === '/api/v3/me/pet/coffee' && !options?.method) return response({
+    enabled: false, price: 64, version: 1, today: serverState.today, dailyLimit: 3, remaining: 3, energy: 30, balance: 0,
+  })
   if (options?.method) {
     const body = JSON.parse(options.body), kind = url.split('/').at(-1)
     if (kind === 'adoption') serverState = adopted('pet-a', body.name, body.speciesId)
@@ -878,8 +881,10 @@ try {
   assert.equal(retainedQuantity.value, '10')
   await click(sectionButton('activities'))
   assert.equal(document.querySelector('#pet-work-tab').getAttribute('aria-selected'), 'true')
-  assert.equal(calls.length, navigationReadCount, '普通分区切换不得读取聚合状态或提交操作')
-  console.log('PASS 家园六区只显示当前面板，切换保留购买数量和活动选择且零额外请求')
+  assert.deepEqual(calls.slice(navigationReadCount).map(({ url, options }) => [url, options?.method ?? 'GET']), [
+    ['/api/v3/me/pet/coffee', 'GET'], ['/api/v3/me/pet/coffee', 'GET'],
+  ], '切换只允许商店读取咖啡商品，不读取聚合状态或提交操作')
+  console.log('PASS 家园六区只显示当前面板，切换保留购买数量和活动选择，商店只读咖啡商品')
 
   await click(sectionButton('care'))
   const navigationKeys = calls.length
@@ -910,7 +915,7 @@ try {
   await click(sectionButton('workshop'))
   assert(document.querySelector('[aria-label="查看森林种子来源：森林寻种"]'))
   assert.equal(document.querySelector('[aria-label="查看森林种子来源：家园小铺"]'), null, '非卖品不能伪造购买来源')
-  assert.equal(calls.length, materialRequestCount, '材料指引只能定位，不能自动探索、购买或刷新')
+  assert.equal(calls.slice(materialRequestCount).filter(call => call.url !== '/api/v3/me/pet/coffee').length, 0, '材料指引只能定位，不能自动探索、购买或刷新')
   console.log('PASS 缺材料显示目录中的真实来源，导航聚焦正确条目，不把锁定活动或非卖品变成可执行操作')
 
   await click(sectionButton('shop'))
@@ -920,7 +925,7 @@ try {
   const navigationPending = structuredClone(vue.toRaw(pets.pending)), pendingCalls = calls.length
   for (const section of ['stories', 'care', 'activities', 'shop']) await click(sectionButton(section))
   assert.deepEqual(structuredClone(vue.toRaw(pets.pending)), navigationPending)
-  assert.equal(calls.length, pendingCalls, '切区不得自动恢复未知写入')
+  assert.equal(calls.slice(pendingCalls).filter(call => call.url !== '/api/v3/me/pet/coffee').length, 0, '切区不得自动恢复未知写入')
   auth.accessToken = 'token-d-rotated'; await settle()
   selectedSection('shop')
   assert.deepEqual(structuredClone(vue.toRaw(pets.pending)), navigationPending)
@@ -1014,7 +1019,7 @@ try {
     selectedSection('stories')
     assert.equal(document.activeElement, sectionButton('stories'), '旧材料来源的延迟聚焦不能抢走新分区焦点')
   }
-  assert.equal(calls.length, rapidNavigationRequests)
+  assert.equal(calls.slice(rapidNavigationRequests).filter(call => call.url !== '/api/v3/me/pet/coffee').length, 0)
   console.log('PASS 外出与小铺来源异步定位期间快速切区，不聚焦已经隐藏的旧目标')
 
   const originalNavigationCatalog = pets.catalog, removedTargetRequests = calls.length
@@ -1040,7 +1045,7 @@ try {
     assert.equal(document.querySelector('h3[data-pet-item="reed"]'), null)
     pets.catalog = originalNavigationCatalog; await settle()
   }
-  assert.equal(calls.length, removedTargetRequests)
+  assert.equal(calls.slice(removedTargetRequests).filter(call => call.url !== '/api/v3/me/pet/coffee').length, 0)
   console.log('PASS 定位期间目录移除目标时回到当前分区，不聚焦旧条目或发起补查')
 
   await click(sectionButton('history'))
@@ -1075,6 +1080,45 @@ try {
   assert.equal(pets.foodQuantity, supplyFood + serverState.dailySupply.food)
   assert.equal(supplyButton().disabled, true)
   console.log('PASS 补给领取增加宠物币和口粮，更新已领取状态；重复点击及重新读取不重复发奖')
+
+  const coffeePath = '/api/v3/me/pet/coffee'
+  const coffeeOffer = { enabled: true, price: 64, version: 1, today: serverState.today, dailyLimit: 3, remaining: 3, energy: 30, balance: 128 }
+  const { activeDialogState } = await import(await compileFile('src/composables/useDialog.ts'))
+  let chargedKey
+  serverState.pet.energy = 50
+  handler = async (url, options) => {
+    if (url !== coffeePath) return success(url, options)
+    if (!options?.method) return response(coffeeOffer)
+    const key = options.headers['Idempotency-Key']
+    const receipt = { operation: 'coffee', petId: serverState.pet.id, committedAt: now }
+    assert.deepEqual(JSON.parse(options.body), { petId: serverState.pet.id, expectedDate: coffeeOffer.today, version: 1 })
+    if (chargedKey) {
+      assert.equal(key, chargedKey)
+      return response(receipt)
+    }
+    chargedKey = key
+    coffeeOffer.balance -= coffeeOffer.price
+    coffeeOffer.remaining--
+    serverState.pet.energy += 30
+    throw new ApiError('网络中断', 503, 'temporarily_unavailable')
+  }
+  await pets.refresh()
+  await click(sectionButton('shop'))
+  await click(shopFilter('全部'))
+  const coffeeButton = () => [...document.querySelectorAll('.shop-buy button')].find(button => button.textContent === '购买并使用')
+  await click(coffeeButton())
+  assert.match(activeDialogState.value.message, /64 积分.*30 点精力/)
+  activeDialogState.value.resolve(false); await settle()
+  assert.equal(chargedKey, undefined)
+  await click(coffeeButton())
+  activeDialogState.value.resolve(true); await settle()
+  assert.equal(pets.pending.key, chargedKey)
+  await click(document.querySelector('[aria-label="核对上次宠物操作"]'))
+  assert.equal(pets.pending, null)
+  assert.equal(pets.pet.energy, 80)
+  assert.match(document.querySelector('.shop-grid').textContent, /今日剩余 2 \/ 3 次/)
+  assert.equal(coffeeOffer.balance, 64)
+  console.log('PASS 购买前显示费用、取消不提交、丢回包后同键恢复及更新精力和次数')
 } finally {
   app?.unmount()
   await fs.rm(temporary, { recursive: true, force: true })

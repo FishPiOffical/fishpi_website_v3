@@ -453,6 +453,11 @@ export const usePetsStore = defineStore('pets', () => {
   function buyFood(quantity: number): Promise<boolean> {
     return buyItem('food', quantity)
   }
+  function buyCoffee(petId: string, expectedDate: string, version: number): Promise<boolean> {
+    if (!canWrite() || pet.value?.id !== petId || state.value?.today !== expectedDate) return Promise.resolve(false)
+    return execute({ kind: 'coffee', petId, expectedDate, version, key: profileOperationKey() })
+  }
+
   function buyItem(itemId: string, quantity: number): Promise<boolean> {
     if (!canWrite() || !pet.value || !catalog.value) return Promise.resolve(false)
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 20) {
@@ -550,6 +555,6 @@ export const usePetsStore = defineStore('pets', () => {
     loading, catalogLoading, error, catalogError, busy, pending, pendingError, refreshNeeded, offline,
     riskStage, riskOpen, riskBusy, riskError, riskUntil, riskChallenge, pendingUncertain,
     prepareRisk, submitRiskProof, closeRisk, cancelRejectedOperation,
-    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, craft, claimStory, readopt, startActivity, claimActivity, retryPending, executeBrawl,
+    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, buyCoffee, craft, claimStory, readopt, startActivity, claimActivity, retryPending, executeBrawl,
   }
 })
