@@ -24,18 +24,31 @@ onMounted(() => { mounted.value = true })
 onScopeDispose(() => { revision++ })
 </script>
 <template>
-  <header class="board-header"><RouterLink to="/parking">抢车位</RouterLink><h1>停车周榜</h1><p>按本周实际到账游园币排名，每周一北京时间零点重新统计，展示前 50 名。</p></header>
+  <header class="board-header">
+    <RouterLink to="/parking">抢车位</RouterLink><span aria-hidden="true"> / </span><span>周榜</span>
+    <h1 class="fp-page-title">停车周榜</h1>
+    <p>按本周实际到账的游园币排序，展示前 50 名。每周一北京时间零点重新统计。</p>
+  </header>
   <p v-if="error" role="alert">{{ error }} <button @click="load">重试</button></p>
-  <ol v-else-if="result?.rows.length"><li v-for="row in result.rows" :key="row.userName">
-    <RouterLink :to="'/member/' + encodeURIComponent(row.userName)">{{ row.name }}</RouterLink><strong>{{ row.income.toLocaleString() }} 游园币</strong>
-  </li></ol>
+  <ol v-else-if="result?.rows.length" class="parking-ranks">
+    <li v-for="(row, index) in result.rows" :key="row.userName">
+      <span class="position" aria-hidden="true">{{ index + 1 }}</span>
+      <RouterLink :to="'/member/' + encodeURIComponent(row.userName)">{{ row.name }}</RouterLink>
+      <strong>{{ row.income.toLocaleString() }} <small>游园币</small></strong>
+    </li>
+  </ol>
   <p v-else role="status">{{ result ? '本周还没有停车收益到账。' : '正在读取周榜…' }}</p>
 </template>
 <style scoped>
-header,ol,p { margin:0; padding:16px; }
-h1 { margin:8px 0; }
-header p { padding:0; color:var(--fp-muted); }
-ol { list-style-position:inside; }
-li { padding:10px 0; border-top:1px solid var(--fp-border); }
-strong { float:right; font-variant-numeric:tabular-nums; }
+.board-header { border-bottom: 1px solid var(--fp-border); padding-bottom: 16px; color: var(--fp-muted); font-size: 13px; }
+.board-header h1 { margin-block: 6px; }
+.board-header p { margin: 0; }
+.parking-ranks { margin: 0; padding: 0; list-style: none; }
+.parking-ranks li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px 0; }
+.parking-ranks li + li { border-top: 1px solid var(--fp-border); }
+.position { display: grid; place-items: center; min-height: 27px; border-radius: 6px; font-weight: 650; color: var(--fp-muted); background: var(--fp-elevated); }
+li:nth-child(-n+3) .position { color: var(--fp-primary-ink, var(--fp-primary)); background: var(--fp-primary-soft); }
+.parking-ranks a { width: fit-content; max-width: 100%; color: var(--fp-text); overflow-wrap: anywhere; }
+.parking-ranks strong { font-variant-numeric: tabular-nums; }
+.parking-ranks small { color: var(--fp-muted); font-weight: 400; }
 </style>

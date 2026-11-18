@@ -1,0 +1,142 @@
+.parking {
+  display: grid;
+  gap: 18px;
+  --lane: var(--fp-primary-ink, var(--fp-primary));
+}
+.parking h1, .parking h2, .parking h3, .parking p, .parking ul, .parking ol, .rates, .rates dd { margin: 0; }
+.parking h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; }
+.parking h3 { font-size: 17px; overflow-wrap: anywhere; }
+.parking h2 svg { color: var(--lane); width: 18px; }
+.parking p { line-height: 1.6; color: var(--fp-muted); }
+.mast {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: clamp(20px, 3vw, 36px);
+  border-radius: var(--fp-panel-radius);
+  background: #203f37;
+  color: #fff;
+}
+.mast::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: 27%;
+  height: 220%;
+  inset: -60% auto auto 39%;
+  transform: skewX(-31deg);
+  border-inline: 2px solid #ffffff20;
+  background: linear-gradient(to right, transparent 49%, #ffffff20 49% 51%, transparent 51%) center / 100% 26px repeat-y;
+  mask-image: repeating-linear-gradient(transparent 0 9px, black 9px 42px);
+}
+.mast-title a { color: #d0e2db; font-size: 13px; }
+.mast h1 { color: #fff; font-size: clamp(26px, 3vw, 36px); line-height: 1.25; margin-top: 6px; }
+.balance, .mast-actions, .wallet span, .controls, .trip-actions, .space-head, .bay-heading, .filters, .owned, .passenger {
+  display: flex; align-items: center; gap: 8px;
+}
+.balance { flex-wrap: wrap; justify-content: flex-end; gap: 22px; }
+.wallet span { color: #d0e2db; font-size: 13px; gap: 5px; }
+.wallet svg { width: 16px; }
+.wallet strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+.parking button, .parking select, .mast-actions a {
+  box-sizing: border-box; min-height: 36px; max-width: 100%; padding: 6px 12px; border: 1px solid var(--fp-border);
+  border-radius: 8px; background: var(--fp-card); color: var(--fp-text); font: inherit; font-size: 14px;
+}
+.parking button:enabled, .parking select:enabled { cursor: pointer; }
+.parking button:enabled:hover { border-color: var(--lane); }
+.parking button:disabled { color: var(--fp-muted); opacity: .68; cursor: default; }
+.mast-actions :is(a,button) { display: inline-flex; align-items: center; justify-content: center; gap: 5px; color: white; border-color: #ffffff45; background: #ffffff0d; }
+.mast-actions svg { width: 15px; }
+.mast-actions :is(a:hover,button:enabled:hover) { background: #ffffff19; border-color: #ffffff80; }
+.lot, .dispatch { display: grid; gap: 16px; min-width: 0; }
+.lot { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lot article, .spaces, .showroom, .notice {
+  min-width: 0; padding: var(--fp-panel-padding); border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius); background: var(--fp-card);
+}
+.bay-heading, .space-head { justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.bay-status { padding: 3px 9px; border-radius: 20px; background: var(--fp-elevated); color: var(--fp-muted); font-size: 12px; }
+.bay-status.active, .owned, .neighbor-name i { color: var(--lane); background: var(--fp-primary-soft); }
+.bay-body { display: grid; grid-template-columns: clamp(90px, 12vw, 140px) minmax(0, 1fr); align-items: center; gap: 18px; margin-top: 15px; }
+.bay-art {
+  aspect-ratio: 1.25; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; overflow: hidden; border-radius: 10px; background: #fcebd7;
+}
+.bay-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.bay-art.vacant { background: var(--fp-elevated); }
+.bay-art.vacant span {
+  display: grid; place-items: center; width: 66%; height: 58%; border: 2px dashed var(--fp-border);
+  border-radius: 6px; font: 700 27px/1 system-ui; color: var(--fp-muted);
+}
+.bay-info p, .showroom > p { font-size: 13px; }
+.bay-info h3 + p { margin-top: 5px; }
+.passenger { margin-block: 5px; color: var(--fp-muted); font-size: 13px; }
+.passenger img, .passenger-choice img { object-fit: contain; }
+.trip-actions { flex-wrap: wrap; margin-top: 10px; }
+.dispatch { grid-template-columns: minmax(0, 1.85fr) minmax(245px, 1fr); align-items: start; }
+.dispatch:empty { display: none; }
+.dispatch > :only-child { grid-column: 1 / -1; }
+.filters { gap: 2px; padding: 3px; background: var(--fp-elevated); border-radius: 8px; }
+.filters button { border: 0; min-height: 30px; padding: 3px 10px; background: transparent; }
+.filters button[aria-pressed="true"] { background: var(--fp-card); color: var(--lane); box-shadow: var(--fp-card-shadow); }
+.trip-options { margin: 14px 0 6px; display: flex; flex-wrap: wrap; align-items: end; gap: 9px 14px; padding: 12px; background: var(--fp-elevated); border-radius: 9px; }
+.trip-options label { display: grid; gap: 4px; min-width: 0; color: var(--fp-muted); font-size: 12px; }
+.trip-options select { width: 100%; min-width: 0; }
+.trip-options .passenger-choice { display: flex; align-items: center; gap: 5px; min-height: 36px; cursor: pointer; color: var(--fp-text); }
+.passenger-choice input { accent-color: var(--lane); }
+.neighbors, .settlements { padding: 0; list-style: none; }
+.neighbors { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(214px, 100%), 1fr)); gap: 0 20px; }
+.neighbors li, .settlements li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--fp-border); }
+.neighbor-name { min-width: 0; display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+.neighbor-name i { flex: none; display: grid; place-items: center; width: 25px; height: 27px; border-radius: 5px; font: 700 14px system-ui; }
+.neighbors button { flex: none; }
+.neighbors button:enabled, .trip-actions button:enabled:last-child, .cars button:enabled { color: var(--lane); background: var(--fp-primary-soft); border-color: transparent; }
+.neighbors button:enabled:hover, .trip-actions button:enabled:hover, .cars button:enabled:hover { border-color: var(--lane); }
+.spaces > p, .spaces > button, .history ol { margin-top: 12px; }
+.settlements { max-height: 320px; overflow: auto; }
+.settlements b, .settlements small { display: block; }
+.settlements b { font-size: 14px; }
+.settlements small, .rates dt { color: var(--fp-muted); font-size: 12px; }
+.settlements strong { color: var(--lane); font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.showroom > p { margin: 4px 0 16px; }
+.cars { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(205px, 100%), 1fr)); gap: 12px; }
+.cars article { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--fp-border); border-radius: 10px; overflow: hidden; }
+.cars article > img { display: block; width: 100%; height: 135px; object-fit: contain; background: #fcebd7; }
+.details { flex: 1; display: flex; flex-direction: column; align-items: stretch; padding: 12px; }
+.details h3 { font-size: 15px; }
+.rates { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 10px 0 14px; }
+.rates dd { font-size: 13px; font-weight: 650; }
+.details button, .owned { margin-top: auto; }
+.owned { align-self: start; min-height: 36px; background: none; font-size: 13px; gap: 4px; }
+.owned svg { width: 16px; }
+.purchase-summary { display: flex; align-items: center; gap: 14px; }
+.purchase-summary img { border-radius: 8px; }
+.purchase-summary p { margin: 5px 0 0; color: var(--fp-muted); }
+.controls { flex-wrap: wrap; }
+.parking .notice { color: var(--fp-text); }
+@media (max-width: 860px) {
+  .dispatch { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .parking { gap: 12px; }
+  .mast { align-items: flex-start; padding: 16px; }
+  .balance { gap: 6px; flex-direction: column; align-items: flex-end; }
+  .wallet { display: flex; align-items: center; gap: 6px; }
+  .wallet strong { font-size: 20px; }
+  .mast-actions { gap: 4px; }
+  .lot, .dispatch { grid-template-columns: 1fr; gap: 10px; }
+  .bay-body { grid-template-columns: 88px minmax(0, 1fr); gap: 12px; margin-top: 10px; }
+  .cars { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .cars article > img { height: 105px; }
+  .details { padding: 9px; }
+  .rates { gap: 5px 12px; }
+  .parking button, .parking select, .mast-actions a { min-height: 42px; }
+  .trip-options label:not(.passenger-choice) { flex: 1 1 110px; }
+  .trip-options .passenger-choice { min-height: 40px; }
+}
+@media (max-width: 350px) {
+  .mast { flex-wrap: wrap; }
+  .balance { align-items: flex-start; }
+}
