@@ -51,6 +51,15 @@ export const useParkingStore = defineStore('parking', () => {
       if (gen !== generation) return
       message.value = e instanceof Error ? e.message : '操作结果待确认'
       if (e instanceof ApiError && e.code === 'parking_verification_required') needsProof.value = true
+      else if (cmd.input.action === 'buy' && e instanceof ApiError && e.status === 429) {
+        if (e.code === 'parking_rate_limited' && !uncertain) {
+          pending.value = null
+          message.value = '购车操作较频繁，请稍后再试。'
+        } else {
+          uncertain = true
+          message.value = '购车结果尚未确认，请稍后继续原操作核对。'
+        }
+      }
       else if (!(e instanceof ApiError) || !e.status || e.status === 408 || e.status >= 500 || e.code === 'invalid_response') {
         uncertain = true
         message.value = '尚未确认操作结果，请继续原操作核对。'

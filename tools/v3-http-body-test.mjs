@@ -8,10 +8,17 @@ const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.E
 const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64')
 const received=[];let cut=true,bodyReadStarted,challenged=false,guestRefresh=false
 let captchaCalls=0
+let parkingResponse = 'limited'
 globalThis.__testRiskCaptcha=async()=>{captchaCalls++;challenged=true}
 const server=http.createServer(async(req,res)=>{
  const chunks=[];for await(const chunk of req)chunks.push(chunk)
  received.push({path:req.url,method:req.method,key:req.headers['idempotency-key'],body:Buffer.concat(chunks).toString()})
+ if (req.url === '/api/v3/me/parking/buy') {
+  if (parkingResponse === 'disconnect') { req.socket.destroy(); return }
+  res.writeHead(429, {'Content-Type':'application/json'})
+  res.end(JSON.stringify({ code: parkingResponse === 'limited' ? 'parking_rate_limited' : 'rate_limited' }))
+  return
+ }
  if(req.url==='/api/v3/auth/refresh'){
   res.writeHead(guestRefresh?401:200,{'Content-Type':'application/json'})
   res.end(guestRefresh?'{"code":"unauthorized"}':'{"code":0,"data":{"accessToken":"synthetic-rotated"}}')
@@ -97,8 +104,40 @@ try{
  assert.equal(received.filter(x=>x.path===route).length,1)
  cut=false;await store.set('reward','2',null);assert.equal(store.commands['reward:2'],undefined);assert.equal(store.lastChange.targetId,'2')
  const writes=received.filter(x=>x.path===route);assert.equal(writes.length,2);assert.ok(writes.every(x=>x.key==='wire-original-key'&&x.body===''))
- stop();store.$dispose();delete globalThis.__wireAuth
+ stop();store.$dispose()
  console.log('PASS HTTP body 5 actual Pinia + production API/transport retain the unknown purchase key across real socket loss and normal token refresh, then explicit same-key recovery clears it')
+
+ const parkingApi = url(compile(await fs.readFile('src/api/v3-parking.ts','utf8')).replace("from './http'", `from '${httpURL}'`))
+ let parkingSource = compile(await fs.readFile('src/stores/parking.ts','utf8')).replaceAll('import.meta.env.SSR','false')
+ for (const [name, target] of [
+  ['vue',import.meta.resolve('vue')], ['pinia',import.meta.resolve('pinia')], ['./auth',shimAuth],
+  ['@/api/http',httpURL], ['@/api/v3-profile',keys], ['@/api/v3-parking',parkingApi],
+  ['@/api/v3-pets',url('export const createGameRiskChallenge = null, verifyPetRiskChallenge = null')],
+ ]) parkingSource = parkingSource.replace(`from '${name}'`, `from '${target}'`)
+ const { useParkingStore } = await import(url(parkingSource))
+ const purchase = { action:'buy', car:'waffle', expectedPrice:1200 }
+ for (const firstResponse of ['limited','disconnect','generic']) {
+  const parking = useParkingStore(createPinia())
+  parkingResponse = firstResponse
+  await parking.submit(purchase)
+  if (firstResponse === 'limited') {
+   assert.equal(parking.pending,null)
+   assert.match(parking.message,/购车操作较频繁/)
+  } else {
+   const original = parking.pending
+   assert.ok(original)
+   parkingResponse = 'limited'
+   await parking.run()
+   assert.equal(parking.pending,original)
+   assert.match(parking.message,/尚未确认/)
+   const attempts = received.filter(entry => entry.path === '/api/v3/me/parking/buy').slice(-2)
+   assert.equal(attempts[0].key,attempts[1].key)
+   assert.equal(attempts[0].body,attempts[1].body)
+  }
+  parking.$dispose()
+ }
+ delete globalThis.__wireAuth
+ console.log('PASS 购车明确限流解除操作锁；断线或普通 429 后继续保留原命令和幂等键')
 
  const beforeGuest=received.length
  api.setAccessToken(null)

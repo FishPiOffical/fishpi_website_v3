@@ -385,20 +385,21 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
   }
 
   if (res.status === 429) {
-    // 宠物账号冷却只限制宠物操作，不能误当成全站 IP 风控。其它接口保持原有处理。
-    if (/^\/api\/v3\/me\/pet(?:\/|\?|$)/.test(path) && isJsonContentType(res.headers.get('content-type'))) {
+    // 只在对应的接口识别业务限流码，网关或其他接口的 429 继续按普通限流处理。
+    const petRequest = /^\/api\/v3\/me\/pet(?:\/|\?|$)/.test(path)
+    const parkingPurchase = path === '/api/v3/me/parking/buy' && init.method?.toUpperCase() === 'POST'
+    let code: string | undefined
+    if ((petRequest || parkingPurchase) && isJsonContentType(res.headers.get('content-type'))) {
       const text = await readNetworkBody(() => res.text(), init.signal, identity)
-      let code: string | undefined
       try {
         const candidate = JSON.parse(text)?.code
-        if (candidate === 'pet_rate_limited' || candidate === 'pet_transport_limited') code = candidate
+        if (petRequest && (candidate === 'pet_rate_limited' || candidate === 'pet_transport_limited')) code = candidate
+        if (parkingPurchase && candidate === 'parking_rate_limited') code = candidate
       } catch { /* 无法确认来源时仍按普通限流保护。 */ }
-      const error = new ApiError('操作过于频繁，请稍后重试', 429, code)
-      error.retryAfter = res.headers.get('Retry-After') ?? undefined
-      throw error
+    } else {
+      void res.body?.cancel().catch(() => {})
     }
-    void res.body?.cancel().catch(() => {})
-    const error = new ApiError('操作过于频繁，请稍后重试', 429)
+    const error = new ApiError('操作过于频繁，请稍后重试', 429, code)
     error.retryAfter = res.headers.get('Retry-After') ?? undefined
     throw error
   }
