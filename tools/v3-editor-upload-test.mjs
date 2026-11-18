@@ -18,7 +18,25 @@ for(const bad of ['javascript:alert(1)','http://evil.invalid/a','https://user:pw
 console.log('PASS upload 3 malformed tickets/endpoints/credentials and unsafe output URL rejected before insertion')
 state.result={code:0,data:{succMap:{'upload-1.png':'https://file.fishpi.cn/a.png'},errFiles:[]}};let n=state.calls.length;await assert.rejects(()=>api.uploadV3Files([file('blob','application/octet-stream')],signal()),e=>e.status===422);assert.equal(state.calls.length,n);await api.uploadV3Files([file('blob','image/png')],signal());assert.equal(state.fetches.at(-1).init.body.get('file').name,'upload-1.png');const md=api.uploadedMarkdown({name:'<img>[x]\\.png',url:'https://file.fishpi.cn/a(b).png?x=1',image:true});assert.ok(md.includes('&lt;img&gt;\\[x\\]\\\\.png'));assert.ok(md.endsWith('](https://file.fishpi.cn/a\\(b\\).png?x=1)'))
 console.log('PASS upload 4 unnamed image gets extension; unsupported unnamed file rejected, filename/Markdown URL escaping')
-let inserted=[];const statuses=[];const editor=createEditorUpload(md=>inserted.push(md), status=>statuses.push(status));state.result={code:0,data:{succMap:{'upload-1.png':'https://file.fishpi.cn/a.png'},errFiles:['upload-2.png']}};const partial=editor.handler([file(),file()]);assert.deepEqual(statuses.at(-1),{pending:true,text:'正在上传 2 张图片…'});const message=await partial;assert.match(message,/1个文件上传失败/);assert.deepEqual(statuses.at(-1),{pending:false,text:message});assert.equal(inserted.length,1);assert.ok(!inserted[0].includes('null'))
+let inserted=[];const statuses=[];const editor=createEditorUpload(md=>inserted.push(md), status=>statuses.push(status))
+let batchRequests = 0
+globalThis.fetch = async (_path, { body }) => {
+  assert.equal(body.getAll('file').length, 1)
+  const data = ++batchRequests === 1
+    ? { succMap: { 'upload-1.png': 'https://file.fishpi.cn/a.png' }, errFiles: [] }
+    : { succMap: {}, errFiles: ['upload-1.png'] }
+  return new Response(JSON.stringify({ code: 0, data }))
+}
+const beforeTickets = state.calls.length
+const partial = editor.handler([file(), file()])
+assert.deepEqual(statuses.at(-1), { pending: true, text: '正在上传 2 张图片…' })
+const message = await partial
+assert.equal(batchRequests, 2)
+assert.equal(state.calls.length - beforeTickets, 2)
+assert.match(message, /1个文件上传失败/)
+assert.deepEqual(statuses.at(-1), { pending: false, text: message })
+assert.equal(inserted.length, 1)
+assert.ok(!inserted[0].includes('null'))
 console.log('PASS upload 5 successful links inserted once while reporting failed files without automatic batch retry')
 let finish;state.dispatch=()=>new Promise(r=>finish=r);const pending=editor.handler([file()]);assert.equal(statuses.at(-1).pending,true);await new Promise(setImmediate);const before=state.fetches.length;state.version++;editor.cancel();assert.equal(statuses.at(-1),null);const canceledStatuses=statuses.length;finish({code:0,data:original});assert.equal(await pending,null);assert.equal(statuses.length,canceledStatuses);assert.equal(state.fetches.length,before);assert.equal(inserted.length,1)
 state.dispatch=null;let finishUpload;globalThis.fetch=async(path,init)=>{state.fetches.push({path,init});return new Promise(r=>finishUpload=r)};const p=editor.handler([file()]);for(let i=0;i<10;i++)await Promise.resolve();const upload=state.fetches.at(-1);assert.match(await editor.handler([file()]),/正在上传/);editor.dispose();finishUpload(new Response(JSON.stringify({code:0,data:{succMap:{'upload-1.png':'https://file.fishpi.cn/OLD'},errFiles:[]}})));assert.equal(await p,null);assert.equal(upload.init.signal.aborted,true);assert.equal(inserted.length,1)
@@ -32,11 +50,16 @@ const source=await fs.readFile('src/components/MarkdownEditor.vue','utf8');asser
 console.log('PASS upload 9 shared editor uses v3 upload, external value/identity/unmount cancel, legacy upload gate removed')
 
 const mixed = createEditorUpload(markdown => inserted.push(markdown), status => statuses.push(status))
-globalThis.fetch = async () => new Response(JSON.stringify({ code: 0, data: {
-  succMap: { 'upload-1.png': 'https://file.fishpi.cn/valid.png' },
-  errFiles: ['upload-2.png', 'upload-3.zip', 'upload-4.mp4'],
-  sizeLimits: { 'upload-1.png': 99, 'upload-2.png': 20971520, 'upload-3.zip': 20971520, 'upload-4.mp4': -1 },
-} }))
+let mixedRequests = 0
+globalThis.fetch = async (_path, { body }) => {
+  const [part] = body.getAll('file')
+  const request = ++mixedRequests
+  return new Response(JSON.stringify({ code: 0, data: {
+    succMap: request === 1 ? { [part.name]: 'https://file.fishpi.cn/valid.png' } : {},
+    errFiles: request === 1 ? [] : [part.name],
+    sizeLimits: { [part.name]: request === 1 ? 99 : request === 4 ? -1 : 20971520 },
+  } }))
+}
 const mixedMessage = await mixed.handler([file(), file('大图.png'), file('附件.zip', 'application/zip'), file('视频.mp4', 'video/mp4')])
 assert.match(mixedMessage, /已插入 1 个文件/)
 assert.match(mixedMessage, /「大图.png」超过单文件上限，最大可上传 20 MB/)
@@ -45,7 +68,22 @@ assert.match(mixedMessage, /1个文件上传失败/)
 assert.equal(statuses.at(-1).text, mixedMessage)
 assert.match(inserted.at(-1), /valid.png/)
 globalThis.fetch = async () => new Response('Request Entity Too Large', { status: 413 })
-assert.match(await mixed.handler([file()]), /这批文件超过上传请求的大小限制/)
+assert.match(await mixed.handler([file()]), /文件超过上传入口的大小限制/)
+const uploadedAfter413 = []
+const retrySelection = createEditorUpload(markdown => uploadedAfter413.push(markdown))
+let sequence = 0
+globalThis.fetch = async (_path, { body }) => {
+  assert.equal(body.getAll('file').length, 1)
+  if (++sequence === 2) return new Response('Request Entity Too Large', { status: 413 })
+  return new Response(JSON.stringify({ code: 0, data: {
+    succMap: { 'upload-1.png': `https://file.fishpi.cn/${sequence}.png` }, errFiles: [],
+  } }))
+}
+const sizeError = await retrySelection.handler([file('第一张.png'), file('过大.png'), file('最后一张.png')])
+assert.match(sizeError, /过大\.png.*大小限制/)
+assert.equal(sequence, 3)
+assert.equal(uploadedAfter413.length, 1)
+assert.match(uploadedAfter413[0], /第一张\.png[\s\S]*最后一张\.png/)
 console.log('PASS upload 10 actual per-file limits for image and attachment, mixed success and proxy limit fallback')
 
 const beforeFormatValidation = state.calls.length

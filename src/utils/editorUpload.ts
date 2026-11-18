@@ -1,5 +1,5 @@
-import { getAccessToken, getAuthContextVersion } from '@/api/http'
-import { uploadV3Files, uploadedMarkdown } from '@/api/v3-uploads'
+import { ApiError, getAccessToken, getAuthContextVersion } from '@/api/http'
+import { uploadV3Files, uploadedMarkdown, type UploadResult } from '@/api/v3-uploads'
 
 export type EditorUploadStatus = { pending: boolean; text: string } | null
 
@@ -84,8 +84,26 @@ export function createEditorUpload(
           message = rejected.join('。')
           return message
         }
-        const results = await uploadV3Files(validated, abort.signal)
-        if (!current()) return null
+        const results: UploadResult[] = []
+        for (const [index, file] of validated.entries()) {
+          if (validated.length > 1) {
+            showStatus({ pending: true, text: `正在上传 ${index + 1}/${validated.length}：${file.name}` })
+          }
+          try {
+            const [result] = await uploadV3Files([file], abort.signal)
+            if (!current()) return null
+            if (result) results.push(result)
+          } catch (error) {
+            if (!current()) return null
+            const reason = error instanceof Error ? error.message : '文件上传失败'
+            rejected.push(validated.length === 1 ? reason : `「${file.name}」：${reason}`)
+            if (error instanceof ApiError && [401, 403, 429].includes(error.status)) {
+              const remaining = validated.length - index - 1
+              if (remaining) rejected.push(`剩余 ${remaining} 个文件尚未上传`)
+              break
+            }
+          }
+        }
         const markdown = results.map(uploadedMarkdown).filter(Boolean).join('\n')
         if (markdown) insert(`\n${markdown}\n`)
         const failures = results.filter(item => !item.url)

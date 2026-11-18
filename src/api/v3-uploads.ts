@@ -33,7 +33,11 @@ export async function uploadV3Files(files: File[], signal: AbortSignal): Promise
   try { response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${credential}` }, body: form, credentials: 'omit', redirect: 'error', signal }) }
   catch (error) { if (signal.aborted) throw error; throw new ApiError('上传结果未确认，请检查网络后再选择文件', 0) }
   signal.throwIfAborted()
-  if (response.status === 413) throw new ApiError('这批文件超过上传请求的大小限制，请减少文件数量或压缩后重试', 413)
+  if (response.status === 413) {
+    throw new ApiError(files.length === 1
+      ? '文件超过上传入口的大小限制，请压缩文件后重试'
+      : '这批文件超过上传请求的大小限制，请减少文件数量或压缩后重试', 413)
+  }
   let result: Row
   try { result = row(await response.json()) } catch { throw new ApiError('上传结果未确认，请检查后再试', response.status) }
   signal.throwIfAborted()
