@@ -108,6 +108,15 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
           <AppearancePicker />
         </section>
         <OwnerPreferences v-if="isLoggedIn" key="site-skins" resource="display" title="站点皮肤" :fields="['skin', 'mobileSkin']" />
+        <section v-if="isLoggedIn" class="card fp-card card-background-setting">
+          <div>
+            <h2>个人卡片背景</h2>
+            <p>用于个人主页和悬浮资料卡。可在经典站上传图片或恢复默认。</p>
+          </div>
+          <a href="https://fishpi.cn/settings/system#cardBgUploadButtons" target="_blank" rel="noopener noreferrer">
+            编辑卡片背景 <span aria-hidden="true">↗</span>
+          </a>
+        </section>
       </div>
 
       <section v-if="tab === 'avatar' && isLoggedIn" class="card fp-card">
@@ -192,5 +201,10 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
 .page{display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:20px;align-items:start}.settings-page-head{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:20px;padding:4px 2px 8px}.settings-eyebrow{font-size:11px;letter-spacing:2px;color:var(--fp-muted)}.settings-page-head h1{font-size:26px;color:var(--fp-title);line-height:1.4;margin:6px 0 7px;font-weight:650}.settings-page-head p{font-size:13px;color:var(--fp-muted);margin:0;line-height:1.7}.settings-page-head>a{font-size:12px;color:var(--fp-muted);text-decoration:none}.settings-page-head>a:hover{text-decoration:underline;text-underline-offset:3px}.set-main{display:flex;flex-direction:column;gap:16px;min-width:0}.card{background:var(--fp-card);border:1px solid var(--fp-border);box-shadow:var(--fp-card-shadow);border-radius:var(--fp-panel-radius,10px);padding:24px;min-width:0}.card>.hint{color:var(--fp-muted);font-size:12px;line-height:1.8;margin:0 0 18px}.login-notice{font-size:13px;color:var(--fp-muted);padding:16px 20px}.set-side{position:sticky;top:calc(var(--fp-nav-h) + 14px)}.set-toggle{display:none}.set-menu{display:flex;flex-direction:column;gap:18px;padding:16px 10px;background:var(--fp-card);border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius,10px)}.menu-group{display:flex;flex-direction:column;gap:3px}.menu-group h2{font-size:11px;font-weight:500;color:var(--fp-muted);margin:0 12px 6px}.set-menu a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-radius:7px;color:var(--fp-text);text-decoration:none;font-size:13px;transition:background-color .16s}.set-menu a:hover{background:var(--fp-hover);text-decoration:underline;text-underline-offset:3px}.set-menu a.current{color:var(--fp-primary);font-weight:600;background:var(--fp-primary-soft)}.menu-arrow{color:var(--fp-muted);opacity:.5}.set-menu a.current .menu-arrow{color:inherit;opacity:1}.help-list{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;margin:0}.help-list li{padding:18px;border:1px solid var(--fp-border);border-radius:10px;display:flex;flex-direction:column;gap:6px}.help-list a{font-size:14px;color:var(--fp-title);font-weight:600}.help-list span{font-size:12px;color:var(--fp-muted)}.chevron{transition:transform .16s}.chevron.open{transform:rotate(180deg)}a:focus-visible,button:focus-visible{outline:2px solid var(--fp-primary);outline-offset:3px}
 @media(max-width:800px){.page{grid-template-columns:minmax(0,1fr);gap:14px}.settings-page-head{grid-row:1}.settings-page-head h1{font-size:23px}.set-side{grid-row:2;position:static}.set-main{grid-row:3}.set-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:12px 16px;border:1px solid var(--fp-border);border-radius:10px;background:var(--fp-card);color:var(--fp-title);font:inherit;font-size:13px}.set-menu{display:none;margin-top:8px}.set-menu.open{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 10px}.card{padding:18px}.settings-page-head{gap:12px}.help-list{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.set-menu a,.chevron{transition:none}}
+.card-background-setting { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px 20px; }
+.card-background-setting h2 { margin:0 0 4px; font-size:15px; color:var(--fp-title); }
+.card-background-setting p { margin:0; font-size:12px; color:var(--fp-muted); line-height:1.6; }
+.card-background-setting a { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:0 12px; border:1px solid var(--fp-border); border-radius:7px; color:var(--fp-text); font-size:13px; text-decoration:none; }
+.card-background-setting a:hover { background:var(--fp-hover); }
 </style>
 <style src="../styles/settings.css"></style>
