@@ -76,7 +76,7 @@ const article=await fs.readFile('src/views/ArticleView.vue','utf8'),long=await f
 console.log('PASS comments 9 real long article adapter gets anchored HTML, ordinary/long integration and legacy wrapper removal')
 
 const route=reactive({params:{id:'2'},fullPath:'/article/2'});globalThis.__commentRoute=route
-const routerURL=url(`import {h} from '${import.meta.resolve('vue')}';export function useRoute(){return globalThis.__commentRoute}export function useRouter(){return {replace:async()=>{if(globalThis.__ownerNavigationFail)throw Error('navigation failed')}}}export const RouterLink={props:['to'],setup(_,{slots}){return()=>h('a',slots.default?.())}}`)
+const routerURL=url(`import {h} from '${import.meta.resolve('vue')}';export function useRoute(){return globalThis.__commentRoute}export function useRouter(){return {replace:async target=>{if(globalThis.__ownerNavigationFail)throw Error('navigation failed');globalThis.__commentNavigation=target}}}export const RouterLink={props:['to'],setup(_,{slots}){return()=>h('a',slots.default?.())}}`)
 const itemURL=sfc(await fs.readFile('src/components/CommentItem.vue','utf8'),[['@/components/articles/RevisionHistory.vue',noopURL],['@/components/articles/ArticleInteraction.vue',noopURL],['@/components/user/VipNickname.vue',nicknameFixtureURL],['vue-router',routerURL],['@/components/V3ReactionBar.vue',noopURL],['@/components/ReportDialog.vue',noopURL],['@/components/ImageLightbox.vue',noopURL],['@/components/medal/MedalList.vue',noopURL]])
 const composerURL=sfc(await fs.readFile('src/components/articles/CommentComposer.vue','utf8'),[['@/api/http',http],['@/api/v3-comments',apiURL],['@/stores/auth',authURL],['@/stores/v3Comments',storeURL],['@/components/ChatComposer.vue',chatURL]])
 const fishpiURL=url(`export const fetchArticle=(...a)=>globalThis.__parentFetch(...a);export async function fetchArticleHeat(){return 0}export async function fetchRandomArticles(){return []}export async function fetchArticleRevision(){return{}}export async function fetchArticleRevisions(){return []}export async function previewMarkdown(){return ''}export async function thankComment(){}export async function toggleReaction(){}export async function acceptComment(){}export async function voteComment(){}export function applyReactionPayload(){}`)
@@ -90,6 +90,8 @@ const parentPairs=[['@/api/v3-realtime',articleRealtimeURL],['@/api/v3-article-h
 for(const name of ['articles/ArticleCommentLocation','discovery/RandomArticles','articles/ArticleOwnerActions','articles/RevisionHistory','articles/ContentRelationButton','articles/ArticleInteraction','medal/MedalList','V3ReactionBar','ReportDialog','FpLoading','ArticleSkeleton','ImageLightbox','articles/LongArticleReader'])parentPairs.push(['@/components/'+name+'.vue',noopURL])
 const quickReplyURL=sfc(await fs.readFile('src/components/articles/QuickReplyPanel.vue','utf8'),[])
 parentPairs.push(['@/components/articles/QuickReplyPanel.vue',quickReplyURL])
+const threadRepliesURL=sfc(await fs.readFile('src/components/articles/ArticleThreadReplies.vue','utf8'),[['@/api/http',http],['@/api/v3-content',contentURL]])
+parentPairs.push(['@/components/articles/ArticleThreadReplies.vue',threadRepliesURL],['@/utils/articleCode',url('export const vArticleCode = {}')])
 const parent=(await import(sfc(parentSource,parentPairs))).default
 const actualWebSocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};globalThis.location={protocol:'http:',host:'local'}
 // 父页的快捷回复挂载会注册滚动事件，测试只补事件宿主，不伪造滚动目标。
@@ -211,9 +213,42 @@ const locationComponentURL=sfc(await fs.readFile('src/components/articles/Articl
 const locationParentPairs=parentPairs.filter(([name])=>name!=='@/components/articles/ArticleCommentLocation.vue');locationParentPairs.push(['@/components/articles/ArticleCommentLocation.vue',locationComponentURL]);const locationParent=(await import(sfc(parentSource,locationParentPairs))).default;
 const locationSocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};const targetedPages=[],targetedScrolls=[];let locationPage=2;
 const priorDocument=globalThis.document;globalThis.document={getElementById:id=>({scrollIntoView(){targetedScrolls.push(id)}})};
-state.dispatch=async path=>{assert.equal(path,'/api/v3/comments/3/location');return env({id:'3',articleId:'2',type:0,page:locationPage,size:20,paragraph:null})};
+state.dispatch=async path=>{assert.equal(path,'/api/v3/comments/3/location?view=threads');return env({id:'3',articleId:'2',type:0,page:locationPage,size:20,paragraph:null,rootId:'3',replyPage:0})};
 globalThis.__parentFetch=async(id,p)=>{targetedPages.push(p);return{...policyBase,articleCommentable:true,articleComments:p===locationPage?[{oId:'3',commentAuthorId:'1',commentAuthorName:'owner',commentContent:'<p>targeted actual comment</p>',commentContentVisible:true}]:[],articleCommentCount:41,pagination:{paginationCurrentPageNum:p,paginationPageCount:3}}};
 const targetRoot={children:[]},targetApp=renderer.createApp(locationParent);targetApp.use(createPinia());targetApp.mount(targetRoot);const targetView={root:targetRoot,text:()=>text(targetRoot)};await tick();assert.ok(targetedPages.includes(2));assert.ok(find(targetRoot,n=>n.props?.id==='comment3'));assert.ok(targetedScrolls.includes('comment3'));locationPage=3;click(targetView,'重新定位评论');await tick();assert.ok(targetedPages.includes(3));assert.match(targetView.text(),/3 \/ 3/);targetApp.unmount();globalThis.document=priorDocument;globalThis.WebSocket=locationSocket;delete route.query;delete route.hash;
 console.log('PASS comments 32 full production ArticleView + locator + comment DOM: current location selects page two, scrolls actual comment ID and GET-only re-location loads changed page three')
+
+route.query={};route.hash='';
+const replySocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};
+const rootComment={oId:'20',commentAuthorName:'other',commentAuthorId:'9',commentContent:'<p>原评论</p>',commentContentVisible:true};
+let sentReply=false;
+globalThis.__parentFetch=async()=>({
+  ...policyBase,articleCommentable:true,articleComments:[{...rootComment,commentThreadReplyCount:sentReply?1:0,commentThreadReplies:sentReply
+    ? [{oId:'21',commentOriginalCommentId:'20',commentAuthorName:'owner',commentAuthorId:'1',commentContent:'<p>跨页回复</p>',commentContentVisible:true}] : []}],
+  pagination:{paginationCurrentPageNum:1,paginationPageCount:1}
+});
+state.confirmWork=async()=>true;
+state.dispatch=async(path,init)=>{
+  assert.equal(path,'/api/v3/articles/2/comments');
+  assert.equal(init.method,'POST');
+  assert.equal(JSON.parse(init.body).parentId,'20');
+  sentReply=true;
+  return env({id:'21',permalink:'/article/2#comment21'});
+};
+globalThis.__commentNavigation=null;
+const replyParentImports=parentPairs.map(([name, value])=>[name,name==='@/components/articles/QuickReplyPanel.vue'
+  ? url("export default { props: ['open'], emits: ['close'], setup(_, { slots }) { return () => slots.default?.() } }") : value]);
+const replyParent=(await import(sfc(parentSource,replyParentImports))).default;
+const replyRoot={children:[]},replyApp=renderer.createApp(replyParent);
+replyApp.use(createPinia());replyApp.mount(replyRoot);
+view={root:replyRoot,app:replyApp,text:()=>text(replyRoot)};
+await tick();click(view,'回复');await tick();input(view,'跨页回复');await tick();click(view,'发表评论');await tick();
+assert.ok(sentReply);
+assert.deepEqual(globalThis.__commentNavigation,{query:{comment:'21'},hash:'#comment21'});
+const renderedRoot=find(view.root,n=>n.props?.id==='comment20');
+assert.ok(find(renderedRoot,n=>n.props?.id==='comment21'),'已确认回复从新的服务端线程快照挂在原评论下');
+view.app.unmount();globalThis.WebSocket=replySocket;
+console.log('PASS ordinary reply sends the direct parent, reloads its thread and updates the comment link to the receipt ID')
+
 
 globalThis.window=actualWindow

@@ -25,6 +25,7 @@ import { ApiError,getAuthContextVersion } from '@/api/http'
 import QuickReplyPanel from '@/components/articles/QuickReplyPanel.vue'
 import CommentComposer from '@/components/articles/CommentComposer.vue'
 import ArticleCommentLocation from '@/components/articles/ArticleCommentLocation.vue'
+import ArticleThreadReplies from '@/components/articles/ArticleThreadReplies.vue'
 import type {CommentLocation} from '@/api/v3-comment-location'
 import { useV3CommentsStore } from '@/stores/v3Comments'
 import MedalList from '@/components/medal/MedalList.vue'
@@ -118,28 +119,6 @@ function jumpToc(anchor: string) {
 const comments = computed<ArticleComment[]>(() => article.value?.articleComments || [])
 const replyAuthor = computed(() => replyComment.value?.commentAuthorName || comments.value.find((c) => c.oId === replyId.value)?.commentAuthorName || replyId.value)
 const nice = computed(() => article.value?.articleNiceComments || [])
-/** 一级评论 + 其下全部回复（多级回复拍平到根评论下，按原顺序）。 */
-const threads = computed(() => {
-  const list = comments.value
-  const byId = new Map(list.map((c) => [c.oId, c]))
-  const rootOf = (c: ArticleComment) => {
-    let cur = c
-    const seen = new Set<string>()
-    while (cur.commentOriginalCommentId && byId.has(cur.commentOriginalCommentId) && !seen.has(cur.oId)) {
-      seen.add(cur.oId)
-      cur = byId.get(cur.commentOriginalCommentId)!
-    }
-    return cur
-  }
-  const replies = new Map<string, ArticleComment[]>()
-  const roots: ArticleComment[] = []
-  for (const c of list) {
-    const root = rootOf(c)
-    if (root === c) roots.push(c)
-    else replies.set(root.oId, [...(replies.get(root.oId) || []), c])
-  }
-  return roots.map((c) => ({ c, replies: replies.get(c.oId) || [] }))
-})
 const commentPages = computed(() => Number(article.value?.pagination?.paginationPageCount ?? 0))
 const tagList = computed(() =>
   String(article.value?.articleTags || '')
@@ -443,6 +422,19 @@ watch(()=>commentWrites.revision,()=>{
   editingId.value=''
   if(command.operation==='create'&&(command.input.parentId||'')===replyId.value&&(command.input.paragraphId||'')===paragraphIdForReply.value)cancelReply()
   void load(true)
+  const receipt = commentWrites.receipt
+  if (command.operation === 'create' && command.input.parentId && !command.input.paragraphId && receipt?.id) {
+    const target = id.value, viewer = viewerIdentity.value
+    const hash = `#comment${receipt.id}`
+    const showLocationError = () => {
+      if (id.value === target && viewerIdentity.value === viewer && route.hash !== hash) {
+        commentRefreshError.value = '回复已发送，暂时无法跳转到该回复。'
+      }
+    }
+    void router.replace({ query: { ...route.query, comment: receipt.id }, hash }).then(failure => {
+      if (failure) showLocationError()
+    }, showLocationError)
+  }
   readerRef.value?.refreshParagraphComments()
 },{flush:'sync'})
 
@@ -455,13 +447,21 @@ function who(c: ArticleComment) {
   return c.commentAuthorNickname || c.commentAuthorName || '匿名'
 }
 
-function parentAuthor(c: ArticleComment) {
-  const parent = comments.value.find((x) => x.oId === c.commentOriginalCommentId)
+function parentAuthor(reply: ArticleComment, root: ArticleComment, replies: ArticleComment[]) {
+  const parent = root.oId === reply.commentOriginalCommentId
+    ? root : replies.find(comment => comment.oId === reply.commentOriginalCommentId)
   return parent ? who(parent) : ''
+}
+
+function replyTarget(rootId: string) {
+  const target = locatedComment.value
+  return target?.thread?.rootId === rootId && target.page === article.value?.pagination?.paginationCurrentPageNum
+    ? target : null
 }
 
 function startReply(c: ArticleComment) {
   if (!commentingEnabled.value) return
+  paragraphIdForReply.value = ''
   replyId.value = c.oId
   replyComment.value = c
   if (isLong.value) {
@@ -531,28 +531,30 @@ function itemHandlers(c: ArticleComment) {
       <p v-if="commentWrites.receipt?.articleId === article.oId && commentWrites.message" role="status">{{ commentWrites.message }}</p>
       <div class="comments-list" :aria-busy="articleReading">
         <CommentItem
-          v-for="t in threads"
-          :key="t.c.oId"
-          v-bind="itemProps(t.c)"
+          v-for="comment in comments"
+          :key="comment.oId"
+          v-bind="itemProps(comment)"
           class="cmt-root"
-          v-on="itemHandlers(t.c)"
+          v-on="itemHandlers(comment)"
         >
           <template #editor>
             <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
           </template>
-          <template v-if="t.replies.length" #default>
-            <CommentItem
-              v-for="r in t.replies"
-              :key="r.oId"
-              v-bind="itemProps(r)"
-              reply
-              :reply-to="parentAuthor(r)"
-              v-on="itemHandlers(r)"
-            >
-              <template #editor>
-                <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
-              </template>
-            </CommentItem>
+          <template v-if="comment.commentThreadReplyCount || replyTarget(comment.oId)?.thread?.replyPage" #default>
+            <ArticleThreadReplies :key="viewerIdentity" :article-id="article.oId" :root="comment" :target="replyTarget(comment.oId)" v-slot="{ replies }">
+              <CommentItem
+                v-for="reply in replies"
+                :key="reply.oId"
+                v-bind="itemProps(reply)"
+                reply
+                :reply-to="parentAuthor(reply, comment, replies)"
+                v-on="itemHandlers(reply)"
+              >
+                <template #editor>
+                  <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
+                </template>
+              </CommentItem>
+            </ArticleThreadReplies>
           </template>
         </CommentItem>
       </div>

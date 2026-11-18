@@ -25,8 +25,8 @@ function params(p: number, size: number) {
   }
   return `p=${p}&size=${size}`
 }
-async function get(path: string, credentials?: RequestCredentials): Promise<unknown> {
-  const envelope = row(await request(path, { cache: 'no-store', ...(credentials ? { credentials } : {}) }))
+async function get(path: string, credentials?: RequestCredentials, signal?: AbortSignal): Promise<unknown> {
+  const envelope = row(await request(path, { cache: 'no-store', ...(credentials ? { credentials } : {}), ...(signal ? { signal } : {}) }))
   if (envelope.code !== 0) throw new ApiError(typeof envelope.msg === 'string' ? envelope.msg : '内容加载失败', 400, String(envelope.code))
   return envelope.data
 }
@@ -251,24 +251,45 @@ async function articleInteractions(detail: Row, articleId: string): Promise<Arti
   return result
 }
 
-export async function v3Article(articleId: string, page = 1, includeInteractions = false): Promise<ArticleDetail> {
+function decodeCommentList(rows: Row[], articleId: string, started: number, seen = new Set<string>()) {
+  return rows.map(item => {
+    if (item.articleId !== articleId) throw invalid()
+    const result = adaptV3Comment(item, started)
+    if (seen.has(result.oId)) throw invalid()
+    seen.add(result.oId)
+    return result
+  })
+}
+
+export async function readV3CommentReplies(articleId: string, rootId: string, page: number, signal?: AbortSignal) {
+  const started = performance.now()
+  const data = row(await get(`/api/v3/articles/${pathId(articleId)}/comments?${params(page, 20)}&view=replies&rootId=${pathId(rootId)}`, undefined, signal))
+  const { list, pagination } = decodeV3ContentPage(data)
+  if (data.rootId !== rootId || pagination.p !== page || pagination.size !== 20) throw invalid()
+  return { replies: decodeCommentList(list, articleId, started, new Set([rootId])), pagination }
+}
+
+export async function v3Article(articleId: string, page = 1, includeInteractions = false, threaded = false): Promise<ArticleDetail> {
   const path = pathId(articleId), paging = params(page, 20)
   if (page > 42949672) throw new ApiError('页码不合法', 422)
   const interactionReadStarted = performance.now()
   const [raw, rawComments] = await Promise.all([
     get(`/api/v3/articles/${path}${includeInteractions ? '?includeInteractions=true' : ''}`),
-    get(`/api/v3/articles/${path}/comments?${paging}&sort=oldest`),
+    get(`/api/v3/articles/${path}/comments?${paging}&sort=oldest${threaded ? '&view=threads' : ''}`),
   ])
   const detail = row(raw), comments = decodeV3ContentPage(rawComments)
   if (detail.id !== articleId || comments.pagination.p !== page || comments.pagination.size !== 20) throw invalid()
   const seen = new Set<string>()
-  const commentList = comments.list.map(item => {
-    if (item.articleId !== articleId) throw invalid()
-    const result = adaptV3Comment(item, interactionReadStarted)
-    if (seen.has(result.oId)) throw invalid()
-    seen.add(result.oId)
-    return result
-  })
+  const commentList = decodeCommentList(comments.list, articleId, interactionReadStarted, seen)
+  if (threaded) {
+    for (const [index, item] of comments.list.entries()) {
+      const replyCount = number(item.replyCount)
+      if (!Array.isArray(item.replies) || item.replies.length !== Math.min(replyCount, 3)) throw invalid()
+      const comment = commentList[index]!
+      comment.commentThreadReplyCount = replyCount
+      comment.commentThreadReplies = decodeCommentList(item.replies.map(row), articleId, interactionReadStarted, seen)
+    }
+  }
   const format = text(detail.contentFormat)
   if (format !== 'markdown' && format !== 'thought') throw invalid()
   const rewarded = bool(detail.rewarded)

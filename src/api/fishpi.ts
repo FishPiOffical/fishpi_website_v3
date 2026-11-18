@@ -314,6 +314,7 @@ export interface ArticleComment {
   commentParagraphId?: string
   commentParagraphStatus?: number
   commentThreadReplies?: ArticleComment[]
+  commentThreadReplyCount?: number
 }
 
 export interface ParagraphCommentSummary {
@@ -584,7 +585,7 @@ export type RepeaterItem = RepeaterEntry
 export function fetchRepeaterItems(type = '') { return repeaterList(type as import('./v3-repeater').RepeaterKind) }
 
 export async function fetchArticle(id: string, page = 1, includeInteractions = false): Promise<ArticleDetail> {
-  return v3Article(id, page, includeInteractions)
+  return v3Article(id, page, includeInteractions, true)
 }
 
 

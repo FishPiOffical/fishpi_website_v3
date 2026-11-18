@@ -16,7 +16,7 @@ async function read(){
  const current=++generation,owner=binding();abort?.abort();abort=null;location.value=null;error.value='';placement.value='';scrolled='';loading.value=false;emit('reset')
  if(requested.value.error){error.value=requested.value.error;return}if(!requested.value.target)return
  const controller=new AbortController();abort=controller;loading.value=true
- try{const value=await fetchCommentLocation(requested.value.target,props.articleId,controller.signal);if(mounted&&current===generation&&owner===binding()&&!controller.signal.aborted){location.value=value;emit('located',value)}}
+ try{const value=await fetchCommentLocation(requested.value.target,props.articleId,controller.signal,true);if(mounted&&current===generation&&owner===binding()&&!controller.signal.aborted){location.value=value;emit('located',value)}}
  catch(e){if(mounted&&current===generation&&owner===binding()&&!controller.signal.aborted)error.value=e instanceof Error?e.message:'评论定位失败'}
  finally{if(mounted&&current===generation&&owner===binding())loading.value=false}
 }
@@ -24,8 +24,9 @@ async function scroll(){
  const value=location.value;if(!mounted||!value||value.type!==0||props.article?.oId!==value.articleId||props.commentPage!==value.page||props.article.pagination?.paginationCurrentPageNum!==value.page)return
  const current=generation,owner=binding();await nextTick()
  if(!mounted||current!==generation||owner!==binding())return
- const exists=props.article?.articleComments?.some(c=>c.oId===value.id)
+ const exists=props.article?.articleComments?.some(c=>c.oId===(value.thread?.rootId ?? value.id))
  if(!exists){placement.value='评论位置已变化或本页暂不可见，请重新定位。';return}
+ if(value.thread?.replyPage){placement.value='';return}
  const key=`${owner}:${value.page}:${value.id}`;if(scrolled===key)return
  const element=document.getElementById('comment'+value.id)
  if(element){element.scrollIntoView({block:'center'});scrolled=key;placement.value=''}
