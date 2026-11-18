@@ -53,7 +53,7 @@ function fallback(event: Event) {
           <div><dt>积分</dt><dd>{{ points === null ? '—' : points?.toLocaleString() }}</dd></div>
           <div :title="profile.onlineMinute === undefined ? undefined : `累计 ${profile.onlineMinute.toLocaleString()} 分钟`"><dt>在线时长</dt><dd>{{ onlineTime }}</dd></div>
         </dl>
-        <MemberProfileDates :member-id="profile.id" />
+        <MemberProfileDates :member-id="profile.id" :last-login-time="profile.userLatestLoginTime" />
         <template v-if="canAct">
           <RouterLink v-if="self" to="/settings" class="profile-edit">编辑资料</RouterLink>
           <template v-else>

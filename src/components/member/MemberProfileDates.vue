@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { formatDate, formatDateTime, timeISO } from '@/utils/time'
 
-const props = defineProps<{ memberId: string }>()
+const props = defineProps<{ memberId: string; lastLoginTime?: number }>()
 const auth = useAuthStore()
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
@@ -11,7 +11,7 @@ const dates = computed(() => {
   const owner = mounted.value && auth.isLoggedIn && auth.account?.oId === props.memberId ? auth.account : null
   return [
     { label: '注册时间', value: /^\d{13}$/.test(props.memberId) ? Number(props.memberId) : undefined, format: formatDate },
-    { label: '最后登录时间', value: owner?.userLatestLoginTime, format: (value: number) => formatDateTime(value).slice(0, 16) },
+    { label: '最后登录时间', value: props.lastLoginTime ?? owner?.userLatestLoginTime, format: (value: number) => formatDateTime(value).slice(0, 16) },
   ].flatMap(({ label, value, format }) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 1e12 && value < 1e13
     ? [{ label, datetime: timeISO(value), text: format(value) }] : [])
 })

@@ -11,6 +11,7 @@ export type PublicUser = RelationUser & {
   userOnlineFlag?: boolean
   userPoint?: number
   onlineMinute?: number
+  userLatestLoginTime?: number
 }
 export function publicUserName(value: string) {
   if (typeof value !== 'string' || value.length < 1 || value.length > 64 || /[^A-Za-z0-9_-]/.test(value)) throw new ApiError('用户名不合法', 422)
@@ -44,11 +45,16 @@ export function decodePublicUser(value: unknown, expectedName: string): PublicUs
     if (typeof value !== 'number' || !Number.isSafeInteger(value) || field === 'onlineMinute' && value < 0) throw new ApiError('用户统计响应格式不正确', 502)
     profile[field] = value
   }
+  const lastLogin = row.userLatestLoginTime
+  if (typeof lastLogin === 'number' && Number.isSafeInteger(lastLogin) && lastLogin >= 1e12 && lastLogin < 1e13) {
+    profile.userLatestLoginTime = lastLogin
+  }
   return profile
 }
-export async function fetchPublicUser(userName: string, credentials?: RequestCredentials): Promise<PublicUser> {
+export async function fetchPublicUser(userName: string, credentials?: RequestCredentials, options?: { includeLoginTime?: boolean }): Promise<PublicUser> {
   publicUserName(userName)
-  const envelope = await request<{ code: number; data: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}`, { cache: 'no-store', ...(credentials ? { credentials } : {}) })
+  const query = options?.includeLoginTime ? '?includeLoginTime=true' : ''
+  const envelope = await request<{ code: number; data: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}${query}`, { cache: 'no-store', ...(credentials ? { credentials } : {}) })
   if (!envelope || envelope.code !== 0) throw new ApiError('用户资料响应格式不正确', 502)
   return decodePublicUser(envelope.data, userName)
 }
