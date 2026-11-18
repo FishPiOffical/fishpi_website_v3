@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ArticlePinBadge from '@/components/articles/ArticlePinBadge.vue'
+import { vArticleCode } from '@/utils/articleCode'
 import { formatDisplayTime } from '@/utils/time'
 
 import RandomArticles from '@/components/discovery/RandomArticles.vue'
@@ -666,7 +667,7 @@ function itemHandlers(c: ArticleComment) {
 
         <audio v-if="article.articleAudioURL" class="article-audio" :src="article.articleAudioURL" controls preload="none" />
 
-        <div ref="bodyEl" class="body" @click="onContentClick" v-html="displayArticleHtml" />
+        <div ref="bodyEl" class="body fp-article-prose" v-article-code="[displayArticleHtml, article.articleOriginalContent]" @click="onContentClick" v-html="displayArticleHtml" />
 
         <ReuseReward />
 

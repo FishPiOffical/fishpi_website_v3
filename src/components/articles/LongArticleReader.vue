@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { vArticleCode } from '@/utils/articleCode'
 import { withImageThumbnailSrcset } from '@/utils/avatar'
 import ArticlePinBadge from '@/components/articles/ArticlePinBadge.vue'
 import CommentVisibilityNotice from '@/components/comments/CommentVisibilityNotice.vue'
@@ -598,7 +599,8 @@ function chapterTitle(c: LongArticleChapter) {
 
         <div
           ref="contentEl"
-          class="la-content"
+          class="la-content fp-article-prose"
+          v-article-code="[displayArticleHtml, article.articleOriginalContent]"
           @click="handleContentClick"
           v-html="displayArticleHtml"
         />
