@@ -72,8 +72,8 @@ function onEditorKeydown(event: KeyboardEvent) {
 
 function reveal() {
   void nextTick(() => {
+    editor.value?.focus({ preventScroll: true })
     root.value?.scrollIntoView({ block: 'nearest' })
-    editor.value?.focus()
   })
 }
 

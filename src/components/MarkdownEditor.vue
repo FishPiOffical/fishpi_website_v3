@@ -364,9 +364,22 @@ defineExpose({
     emit('update:modelValue', value)
     return value
   },
-  focus() {
-    if (fallback.value) fallbackInput.value?.focus()
-    else if (!host.value?.contains(document.activeElement) || !document.activeElement?.matches('[contenteditable]')) editor?.focus()
+  focus(options?: FocusOptions) {
+    if (fallback.value) {
+      fallbackInput.value?.focus(options)
+      return
+    }
+    if (host.value?.contains(document.activeElement) && document.activeElement?.matches('[contenteditable]')) return
+    if (options?.preventScroll && host.value) {
+      const field = Array.from(host.value.querySelectorAll<HTMLElement>(
+        '.vditor-sv[contenteditable="true"], .vditor-ir > [contenteditable="true"], .vditor-wysiwyg > [contenteditable="true"]',
+      )).find(element => element.getClientRects().length > 0)
+      if (field) {
+        field.focus(options)
+        return
+      }
+    }
+    editor?.focus()
   },
   insert: insertEmoji,
   toggleEmoji,

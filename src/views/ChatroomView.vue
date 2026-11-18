@@ -751,7 +751,11 @@ function clearScreen() {
   &.style-toggle { background: var(--fp-surface-subtle,var(--fp-bg)); color: var(--fp-text); }
 }
 
-/* 输入框容器与文本域：100% 占满宽度 */
+.cr-classic-reply :deep(.composer),
+.cr-composer-panel :deep(.composer) {
+  scroll-margin-top: calc(var(--fp-nav-h, 58px) + 12px);
+  scroll-margin-bottom: max(12px, env(safe-area-inset-bottom));
+}
 
 .comment-login-hint {
   text-align: center;
