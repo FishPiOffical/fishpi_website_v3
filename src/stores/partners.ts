@@ -53,8 +53,11 @@ export const usePartnersStore = defineStore('partners', () => {
     } catch (e) {
       if (actor !== identity()) return
       if (!(e instanceof ApiError) || !e.status || e.status >= 500 || e.status === 408 || e.code === 'invalid_response') uncertain = true
-      if (uncertain) message.value = '结果尚未确认，请核对原操作。'
-      else {
+      if (uncertain) {
+        message.value = e instanceof ApiError && e.status === 503 && e.code === 'partner_busy'
+          ? '服务繁忙，请稍后核对原操作。'
+          : '结果尚未确认，请核对原操作。'
+      } else {
         pending.value = null
         message.value = e instanceof Error ? e.message : '操作失败'
         if (e instanceof ApiError && e.status === 409) await load()
