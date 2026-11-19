@@ -35,11 +35,6 @@ function openActivity() {
       <span class="guide-copy"><span>{{ activityReady ? '收获等你领取' : '伙伴近况' }}</span><strong>{{ activityText }}</strong></span>
       <PetIcon name="chevron" />
     </button>
-    <button v-if="!pets.state.dailySupply.claimed" type="button" class="guide-item pet-guide-supply" @click="emit('navigate', { section: 'care', anchor: 'supplies' })">
-      <span class="guide-icon"><PetIcon name="bag" /></span>
-      <span class="guide-copy"><span>每日补给 · 待领取</span><strong>{{ pets.state.dailySupply.coins }} {{ pets.currencyName }}与 {{ pets.state.dailySupply.food }} 份口粮</strong></span>
-      <PetIcon name="chevron" />
-    </button>
     <button v-if="journey" type="button" class="guide-item pet-guide-journey" :class="{ ready: journey.ready }" @click="emit('navigate', { section: 'stories' })">
       <span class="guide-icon"><PetIcon :name="journey.ready ? 'gift' : 'journey'" /></span>
       <span class="guide-copy"><span>{{ journey.name }}{{ journey.ready ? ' · 待领奖' : '' }}</span><strong>{{ journey.ready ? '查看旅程奖励' : journey.next || '查看成长旅程' }}</strong></span>

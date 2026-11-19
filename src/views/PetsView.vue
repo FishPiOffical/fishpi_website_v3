@@ -101,10 +101,8 @@ async function navigate(target: PetHomeTarget, focusPanel = true) {
   if (target.section === 'activities') focused = await activities.value?.focusEntry(target.kind, target.entryId, valid) ?? false
   else if (target.section === 'shop') focused = await shop.value?.focusItem(target.itemId, valid) ?? false
   if (!focused && valid()) {
-    const destination = target.section === 'care' && target.anchor === 'supplies'
-      ? page.value?.querySelector<HTMLElement>('#pet-daily-supplies') : panel
-    destination?.focus({ preventScroll: true })
-    destination?.scrollIntoView?.({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    panel?.focus({ preventScroll: true })
+    panel?.scrollIntoView?.({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
   }
 }
 function applyActivityRouteIntent() {
@@ -210,10 +208,7 @@ onMounted(() => {
           </div>
         </section>
 
-        <div id="pet-daily-supplies" class="daily-supplies" tabindex="-1">
-          <section class="supply-panel pet-panel" aria-labelledby="supply-title"><div class="supply-icon"><PetIcon name="gift" /></div><div class="supply-copy"><h2 id="supply-title">每日补给</h2><p>{{ pets.state.dailySupply.coins }} {{ pets.currencyName }} <span>＋</span> {{ pets.state.dailySupply.food }} 份口粮</p></div><button type="button" :class="pets.state.dailySupply.claimed ? 'pet-secondary' : 'pet-primary'" :disabled="locked || pets.state.dailySupply.claimed" @click="pets.claimSupply()">{{ pets.state.dailySupply.claimed ? '今日已领取' : '领取补给' }}</button></section>
-          <p class="income-summary"><PetIcon name="coin" /><span>今日活动收益 <strong>{{ pets.state.income.earned }}</strong> {{ pets.currencyName }}，还可赚 <strong>{{ pets.state.income.remaining }}</strong> {{ pets.currencyName }}。<span>每日补给单独计算，消费不会恢复收益额度。</span></span></p>
-        </div>
+        <p class="income-summary"><PetIcon name="coin" /><span>今日活动收益 <strong>{{ pets.state.income.earned }}</strong> {{ pets.currencyName }}，还可赚 <strong>{{ pets.state.income.remaining }}</strong> {{ pets.currencyName }}。<span>消费不会恢复收益额度。</span></span></p>
         <section class="desktop-settings" aria-label="桌宠显示设置"><div><h2>让它陪你逛社区</h2><p>拖动桌宠可调整位置，收起后仍能随时找到它。</p></div><div class="desktop-buttons"><button type="button" class="pet-secondary" @click="display.visible ? display.hide() : display.show()">{{ display.visible ? '隐藏桌宠' : '显示桌宠' }}</button><button type="button" class="text-button" @click="display.resetPosition()">恢复默认位置</button></div></section>
         <PetReadoption />
         </div>
@@ -230,7 +225,7 @@ onMounted(() => {
 
 <style scoped>
 .pets-page { max-width: 1180px; margin-inline: auto; color: var(--fp-text); }
-.pet-home-panel, #pet-daily-supplies { scroll-margin-top: calc(var(--fp-nav-h, 58px) + 16px); }
+.pet-home-panel { scroll-margin-top: calc(var(--fp-nav-h, 58px) + 16px); }
 .pet-home-panel:focus-visible { outline: 2px solid var(--fp-primary-ink, var(--fp-primary)); outline-offset: 4px; border-radius: 12px; }
 .pet-home-panel > :deep(.pet-activities), .pet-home-panel > :deep(.pet-stories), .pet-home-panel > :deep(.pet-workshop), .pet-home-panel > :deep(.pet-shop), .pet-home-panel > :deep(.pet-history) { margin-top: 0; }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
@@ -255,15 +250,14 @@ button:disabled { opacity: .5; cursor: default; }button:focus-visible, a:focus-v
 .pet-name { display: flex; align-items: center; justify-content: center; gap: 3px; }.pet-name h2 { margin: 0; font-size: 24px; color: var(--fp-title); overflow-wrap: anywhere; }.pet-name button { margin-right: -34px; }.pet-status { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 8px 0 18px; font-size: 12px; color: var(--fp-muted); }.pet-status > span { width: 6px; height: 6px; border-radius: 50%; background: var(--fp-primary); }.pet-status > span.sleeping { background: #8392bb; }.rename-form { display: flex; align-items: center; gap: 4px; }.rename-form input { width: 100%; min-width: 0; border: 1px solid var(--fp-border); border-radius: 8px; padding: 8px; color: var(--fp-text); background: var(--fp-card); font: inherit; }.rename-count { margin: 6px 0; color: var(--fp-muted); font-size: 11px; }
 .care-panel { padding: 28px; border-left: 1px solid var(--fp-border); }.care-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }.care-heading h2 { margin: 0; font-size: 18px; color: var(--fp-title); }.pet-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }.pet-stat > div:first-child { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }.pet-stat > div:first-child > span { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }.pet-stat svg { width: 16px; height: 16px; color: var(--fp-muted); }.pet-stat strong { font-size: 15px; font-variant-numeric: tabular-nums; }.pet-stat small { color: var(--fp-muted); font-size: 11px; font-weight: 400; }.stat-track { height: 6px; background: var(--fp-hover); border-radius: 5px; overflow: hidden; }.stat-track > span { display: block; height: 100%; border-radius: inherit; background: #88a968; transition: width .3s; }.water .stat-track > span { background: #6b9bb4; }.mood .stat-track > span { background: #d29b91; }.energy .stat-track > span { background: #c5a35e; }.low strong { color: var(--fp-danger, #bb4038); }.care-note { color: var(--fp-muted); font-size: 12px; line-height: 1.7; margin: 16px 0 24px; }.daily-growth { display: flex; align-items: center; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--fp-border); color: var(--fp-muted); font-size: 12px; }.daily-growth strong { color: var(--fp-text); font-variant-numeric: tabular-nums; font-weight: 500; }
 .daily-growth-note { margin: 8px 0 0; color: var(--fp-muted); font-size: 11px; line-height: 1.7; }
-.income-summary { display: flex; align-items: flex-start; gap: 8px; margin: -4px 4px 0; color: var(--fp-muted); font-size: 12px; line-height: 1.8; }.income-summary > svg { width: 16px; height: 16px; margin-top: 3px; }.income-summary strong { color: var(--fp-text); font-variant-numeric: tabular-nums; }.income-summary > span > span { display: block; font-size: 11px; }
-.daily-supplies { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 16px; }.supply-panel { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 20px; }.supply-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; color: var(--fp-primary); background: var(--fp-primary-soft); flex: none; }.supply-copy { flex: 1; }.supply-copy h2 { margin: 0; color: var(--fp-title); font-size: 15px; }.supply-copy h2 > span { color: var(--fp-muted); margin-left: 6px; font-size: 12px; font-weight: 400; }.supply-copy p { margin: 6px 0 0; color: var(--fp-muted); font-size: 12px; }.supply-copy p > span { padding-inline: 5px; }
+.income-summary { display: flex; align-items: flex-start; gap: 8px; margin: 12px 4px 0; color: var(--fp-muted); font-size: 12px; line-height: 1.8; }.income-summary > svg { width: 16px; height: 16px; margin-top: 3px; }.income-summary strong { color: var(--fp-text); font-variant-numeric: tabular-nums; }.income-summary > span > span { display: block; font-size: 11px; }
 .desktop-settings { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 4px; }.desktop-settings h2 { font-size: 14px; margin: 0; }.desktop-settings p { color: var(--fp-muted); font-size: 12px; margin: 6px 0 0; line-height: 1.6; }.desktop-buttons { display: flex; align-items: center; gap: 16px; }.text-button { padding: 8px 0; background: transparent; color: var(--fp-muted); border: 0; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }.text-button:hover { color: var(--fp-text); text-decoration: underline; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
 .name-input:focus-within { border-color: var(--fp-primary); box-shadow: var(--fp-focus-ring); }
 .name-input #pet-adoption-name { min-height: 42px; padding: 10px 12px; border: 0; background: transparent; box-shadow: none; outline: none; }
 .pet-stat > .stat-track > span { display: block; height: 100%; }
 .activity-mark { position: absolute; top: 15%; right: 9%; display: grid; place-items: center; width: 36px; height: 36px; z-index: 2; border: 1px solid var(--fp-border); border-radius: 10px; color: var(--fp-primary); background: var(--fp-card); }
-@media (max-width: 1000px) { .daily-supplies { grid-template-columns: 1fr; }.pet-home { grid-template-columns: minmax(240px, .8fr) minmax(0, 1fr); }.care-panel { padding: 24px 20px; }.pet-stats { gap: 20px 16px; } }
+@media (max-width: 1000px) { .pet-home { grid-template-columns: minmax(240px, .8fr) minmax(0, 1fr); }.care-panel { padding: 24px 20px; }.pet-stats { gap: 20px 16px; } }
 @media (max-width: 720px) { .page-heading { margin-bottom: 16px; }.page-heading h1 { font-size: 24px; }.pet-home { grid-template-columns: 1fr; }.companion { padding: 20px; }.pet-scene { margin-top: -18px; margin-bottom: 0; }.pet-scene .pet-animation { width: 220px; }.care-panel { border-left: 0; border-top: 1px solid var(--fp-border); padding: 20px; }.species-options { grid-template-columns: 1fr 1fr; gap: 10px; }.species-option img { max-width: 140px; }.adoption { padding: 20px; }.adoption-form { flex-direction: column; align-items: stretch; }.name-input { max-width: none; }.desktop-settings { flex-direction: column; align-items: flex-start; gap: 12px; }.desktop-buttons { width: 100%; justify-content: space-between; }.section-heading h2 { font-size: 20px; }.pet-wallet { gap: 6px; padding: 10px 12px; }.pet-wallet strong { font-size: 18px; } }
 @media (max-width: 720px) { .pet-name h2 { min-width: 0; }.pet-name button { margin-right: 0; }.icon-button { width: 44px; height: 44px; }.pet-primary, .pet-secondary, .text-button { min-height: 44px; }#pet-name, #pet-adoption-name { min-height: 44px; font-size: 16px; }.rename-form .icon-button { flex: none; } }
 @media (max-width: 600px) {
@@ -277,6 +271,6 @@ button:disabled { opacity: .5; cursor: default; }button:focus-visible, a:focus-v
   .companion :deep(.growth-summary) { grid-column: 1 / -1; width: 100%; max-width: none; margin-top: 12px; text-align: center; }
   .rename-form { flex-wrap: wrap; }.rename-form input { flex-basis: 100%; }
 }
-@media (max-width: 390px) { .care-panel, .adoption { padding: 16px; }.pet-stats { gap: 20px 12px; }.page-heading { flex-wrap: wrap; gap: 8px; }.supply-panel { padding: 16px; }.supply-panel .pet-primary, .supply-panel .pet-secondary { padding-inline: 10px; font-size: 12px; }.species-description { font-size: 11px; } }
+@media (max-width: 390px) { .care-panel, .adoption { padding: 16px; }.pet-stats { gap: 20px 12px; }.page-heading { flex-wrap: wrap; gap: 8px; }.species-description { font-size: 11px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
 </style>

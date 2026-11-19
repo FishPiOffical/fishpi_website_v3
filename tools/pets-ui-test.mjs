@@ -159,8 +159,6 @@ const success = async (url, options) => {
     if (kind === 'supplies') {
       if (body.expectedDate !== serverState.today) throw new ApiError('补给日期已变化', 409, 'date_changed')
       if (serverState.dailySupply.claimed) throw new ApiError('今天的补给已经领取了', 409, 'supply_claimed')
-      serverState.wallet.coins += serverState.dailySupply.coins
-      changeInventory('food', serverState.dailySupply.food)
       serverState.dailySupply.claimed = true
     }
     if (url.endsWith('/stories/claim')) {
@@ -974,10 +972,6 @@ try {
   await click(document.querySelector('.pet-guide-activity'))
   selectedSection('activities')
   assert.equal(document.activeElement, document.querySelector('#pet-activities-title'))
-  await click(document.querySelector('.pet-guide-supply'))
-  selectedSection('care')
-  assert.equal(document.activeElement, document.querySelector('#pet-daily-supplies'))
-  assert.equal(pets.state.dailySupply.claimed, false, '补给摘要不能代替用户领取')
   await click(document.querySelector('.pet-guide-journey'))
   selectedSection('stories')
   assert.equal(calls.length, guideRequests)
@@ -1005,7 +999,7 @@ try {
   selectedSection('care')
   assert.equal(pets.pet.activity.kind, 'rest', '休息摘要不可自动唤醒')
   assert.equal(calls.length, restGuideRequests)
-  console.log('PASS 近况、补给和旅程摘要只导航，领取与唤醒必须由用户单独操作')
+  console.log('PASS 近况和旅程摘要只导航，领取与唤醒必须由用户单独操作')
 
   serverState.pet.activity = null; await pets.refresh(); await settle()
   const rapidNavigationRequests = calls.length
@@ -1058,28 +1052,12 @@ try {
   assert.equal(historyCount(), changedPetHistoryCount)
   console.log('PASS 同账号更换宠物回到照顾分区并关闭旧日志，后续状态读取不后台刷日志')
 
-  // 补给须同时改变资产和今日状态，不能只凭成功回执或动画判定领取完成。
   serverState = adopted('supply-preview-pet', '补给测试', 'hexiaotun')
   await pets.refresh(); await settle()
-  const supplyCoins = pets.coins, supplyFood = pets.foodQuantity, supplyCalls = calls.length
-  const supplyButton = () => document.querySelector('.supply-panel button')
-  await click(supplyButton())
-  assert.equal(pets.coins, supplyCoins + serverState.dailySupply.coins)
-  assert.equal(pets.foodQuantity, supplyFood + serverState.dailySupply.food)
-  assert.equal(pets.state.dailySupply.claimed, true)
-  assert.equal(supplyButton().textContent, '今日已领取')
-  assert.equal(supplyButton().disabled, true)
-  assert.equal(document.querySelector('.pet-guide-supply'), null)
-  assert.deepEqual(calls.slice(supplyCalls).map(call => call.options?.method || 'GET'), ['POST', 'GET'])
-  const afterSupply = calls.length
-  await click(supplyButton())
-  assert.equal(await pets.claimSupply(), false)
-  assert.equal(calls.length, afterSupply, '已领取后点击或直接调用均不能重发请求')
-  await pets.refresh(); await settle()
-  assert.equal(pets.coins, supplyCoins + serverState.dailySupply.coins)
-  assert.equal(pets.foodQuantity, supplyFood + serverState.dailySupply.food)
-  assert.equal(supplyButton().disabled, true)
-  console.log('PASS 补给领取增加宠物币和口粮，更新已领取状态；重复点击及重新读取不重复发奖')
+  assert.equal(pets.state.dailySupply.claimed, false)
+  assert.equal(document.querySelector('.pet-guide-supply, .supply-panel, #pet-daily-supplies'), null)
+  assert.doesNotMatch(document.body.textContent, /每日补给|领取补给/)
+  console.log('PASS 旧接口仍返回未领取补给时，家园也不显示每日补给入口')
 
   serverState.catalogVersion = catalog.version = 4
   catalog.activityVersion = 6
@@ -1091,8 +1069,7 @@ try {
   assert.equal(pets.catalog.version, 4)
   assert.match(document.querySelector('.pet-wallet').textContent, /3,250游园币/)
   assert.match(document.querySelector('.income-summary').textContent, /480 游园币.*120 游园币/)
-  assert.match(document.querySelector('.supply-copy').textContent, /200 游园币/)
-  console.log('PASS 目录从旧版切换到统一钱包，余额、收入额度和补给直接显示服务端数值')
+  console.log('PASS 目录从旧版切换到统一钱包，余额和收入额度直接显示服务端数值')
 
   const coffeePath = '/api/v3/me/pet/coffee'
   const coffeeOffer = { enabled: true, price: 64, version: 1, today: serverState.today, dailyLimit: 3, remaining: 3, energy: 30, balance: 128 }
