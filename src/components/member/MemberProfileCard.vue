@@ -5,7 +5,7 @@ import type { PublicUser } from '@/api/v3-public-user'
 import { useAuthStore } from '@/stores/auth'
 import { coverStyle, avatarStyle, avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
 import { getAuthContextVersion } from '@/api/http'
-import { readPartnerCard } from '@/api/v3-partners'
+import { formatPartnerValue, readPartnerCard } from '@/api/v3-partners'
 import MemberProfileBadges from './MemberProfileBadges.vue'
 import MemberProfileDates from './MemberProfileDates.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
@@ -72,7 +72,7 @@ function fallback(event: Event) {
         <template v-if="canAct">
           <RouterLink class="profile-website" :to="self ? '/parking' : { path: '/parking', query: { host: profile.id } }">{{ self ? '我的停车场' : '去鱼友停车场' }} ↗</RouterLink>
           <RouterLink v-if="partnerCard" class="profile-website" :to="self ? '/partners' : { path:'/partners', query:{ peer:partnerCard.id } }">
-            {{ self ? '我的搭子' : partnerCard.mine ? '查看我的搭子' : partnerCard.full ? '查看搭子名片' : '请 TA 当搭子 · '+partnerCard.price+' 币' }} ↗
+            <span v-if="partnerCard.displayValue">身价 {{ formatPartnerValue(partnerCard.displayValue) }} · </span>{{ self ? '我的搭子' : partnerCard.mine ? '查看我的搭子' : partnerCard.full ? '查看搭子名片' : '请 TA 当搭子 · '+partnerCard.price+' 币' }} ↗
           </RouterLink>
           <button v-else-if="partnerError" class="profile-website" @click="retryPartner++">重试搭子名片</button>
           <RouterLink v-if="self" to="/settings" class="profile-edit">编辑资料</RouterLink>

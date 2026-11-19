@@ -15,6 +15,19 @@ function num(v: unknown) { return typeof v === 'number' && Number.isSafeInteger(
 function bool(v: unknown) { return typeof v === 'boolean' ? v : invalid() }
 function list(v: unknown): unknown[] { return Array.isArray(v) ? v : invalid() }
 
+// 金额按十进制字符串处理，完整保留亿以上的身价精度。
+function displayValue(value: unknown) {
+  if (value === undefined) return undefined
+  return typeof value === 'string' && /^[1-9][0-9]{0,41}$/.test(value) ? value : invalid()
+}
+
+export function formatPartnerValue(value: string) {
+  const places = value.length > 8 ? 8 : 4
+  if (value.length <= places) return value
+  const fraction = value.slice(-places).replace(/0+$/, '')
+  return value.slice(0, -places) + (fraction ? '.' + fraction : '') + (places === 8 ? ' 亿' : ' 万')
+}
+
 const base = '/api/v3/me/partners'
 async function data(path: string, init: RequestInit) {
   const response = await request<{code: number; data: unknown}>(path, { ...init, signal: AbortSignal.timeout(15000) })
@@ -24,7 +37,7 @@ function decodeCard(value: unknown) {
   const s = row(value)
   const price = num(s.price)
   const legacy = s.rateVersion === undefined && s.rate === undefined
-  return { rate: legacy ? 40 + (price - 100) / 10 : num(s.rate),
+  return { displayValue: displayValue(s.displayValue), rate: legacy ? 40 + (price - 100) / 10 : num(s.rate),
     rateVersion: legacy ? undefined : num(s.rateVersion), id: str(s.id), name: str(s.name), userName: str(s.userName), avatar: str(s.avatar), price,
     revision: num(s.revision), mine: bool(s.mine), full: bool(s.full), following: bool(s.following) }
 }
@@ -38,7 +51,7 @@ export async function readPartners(after = '', peer = '') {
   if (peer) query.set('peer', peer)
   const r = await data(base + '?' + query, { cache: 'no-store' })
   return {
-    joined: bool(r.joined), revision: num(r.revision), coins: num(r.coins), today: num(r.today),
+    displayValue: displayValue(r.displayValue), joined: bool(r.joined), revision: num(r.revision), coins: num(r.coins), today: num(r.today),
     holderName: str(r.holderName), next: str(r.next),
     slots: list(r.slots).map(value => {
       const s = row(value)

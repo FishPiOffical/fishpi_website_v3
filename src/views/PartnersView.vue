@@ -7,7 +7,7 @@ import FpDialog from '@/components/FpDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePartnersStore } from '@/stores/partners'
 import { usePageSeo } from '@/composables/usePageSeo'
-import type { PartnerCommand } from '@/api/v3-partners'
+import { formatPartnerValue, type PartnerCommand } from '@/api/v3-partners'
 
 usePageSeo(() => ({ title: '抢搭子', path: '/partners', robots: 'noindex' }))
 const auth = useAuthStore(), game = usePartnersStore()
@@ -39,7 +39,7 @@ function accept() {
   <main class="partners fp-page fp-page--wide fp-ui">
     <header class="mast">
       <div><RouterLink to="/games">游戏大厅</RouterLink><h1>抢搭子</h1></div>
-      <dl v-if="game.state"><div><dt>游园币余额</dt><dd>{{ game.state.coins.toLocaleString() }}</dd></div>
+      <dl v-if="game.state"><div v-if="game.state.displayValue"><dt>我的身价</dt><dd>{{ formatPartnerValue(game.state.displayValue) }}</dd></div><div><dt>游园币余额</dt><dd>{{ game.state.coins.toLocaleString() }}</dd></div>
         <div><dt>今日营业收入</dt><dd>{{ game.state.today }}</dd></div></dl>
     </header>
     <p v-if="game.error" role="alert">{{ game.error }} <button @click="game.load()">重试</button></p>
@@ -67,9 +67,9 @@ function accept() {
         <header><h2>{{ peer ? '鱼友名片' : '可以请的鱼友' }}</h2><RouterLink v-if="peer" to="/partners">全部鱼友</RouterLink><button :disabled="locked" @click="game.load()">刷新</button></header>
         <p v-if="!game.state.list.length">{{ peer ? '这位鱼友当前没有开放名片。' : '这一页还没有鱼友名片。' }}</p>
         <ul class="directory"><li v-for="player in game.state.list" :key="player.id">
-          <div class="person"><RouterLink :to="'/member/'+encodeURIComponent(player.userName)" :data-user-card="player.userName"><img :src="avatarThumbnail(player.avatar,36)" alt="" width="36" height="36" loading="lazy" @error="fallbackAvatar"/><strong>{{ player.name }}</strong></RouterLink><small>{{ player.following ? '已关注 · ' : '' }}{{ player.rate }} 币/小时</small></div>
+          <div class="person"><RouterLink :to="'/member/'+encodeURIComponent(player.userName)" :data-user-card="player.userName"><img :src="avatarThumbnail(player.avatar,36)" alt="" width="36" height="36" loading="lazy" @error="fallbackAvatar"/><strong>{{ player.name }}</strong></RouterLink><small>{{ player.following ? '已关注 · ' : '' }}<template v-if="player.displayValue">身价 {{ formatPartnerValue(player.displayValue) }} · </template>{{ player.rate }} 币/小时</small></div>
           <button :disabled="locked || !canHire || player.mine || player.full || game.state.coins<player.price"
-            @click="ask('请 '+player.name+' 搭班？','成交价 '+player.price+' 币，每小时赚 '+player.rate+' 币。放手或对方退出时退 100 币。','确认 · '+player.price+' 币',{action:'hire',peer:player.id,revision:player.revision,rateVersion:player.rateVersion})">
+            @click="ask('请 '+player.name+' 搭班？','本次请人费用 '+player.price+' 币，每小时赚 '+player.rate+' 币。放手或对方退出时退 100 币。','确认 · '+player.price+' 币',{action:'hire',peer:player.id,revision:player.revision,rateVersion:player.rateVersion})">
             {{ player.mine ? '我的搭子' : player.full ? '已满价' : (player.price===100?'请 TA':'抢走')+' · '+player.price+' 币' }}
           </button>
         </li></ul>
