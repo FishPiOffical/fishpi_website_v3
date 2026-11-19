@@ -321,7 +321,7 @@ function openBodyImage(img: HTMLImageElement) {
         </template>
       </div>
       <div v-if="display.quote" class="chat-quote-stack">
-        <ChatQuoteCard :quote="display.quote" />
+        <ChatQuoteCard :quote="display.quote" :standalone="!display.html && !$slots.default" />
       </div>
       <div v-if="chatroom" class="foot">
         <span class="message-meta">

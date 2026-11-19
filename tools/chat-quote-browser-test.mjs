@@ -55,7 +55,7 @@ const fixtures = [
   { id: 'other', userName: '冰岚', html: stripped, source },
   { id: 'classic', userName: '小羊', html: linked },
   { id: 'image', userName: '图片引用', html: '<p>看图</p><h5>引用 @Yui <a href="/cr#chatroom789">↩</a></h5><blockquote><p><img src="https://file.fishpi.cn/test.png"></p></blockquote>' },
-  { id: 'only', userName: '只有引用', html: linked.replace('<p>这是旧版的消息</p>', '') },
+  { id: 'only', userName: '小羊', html: '<h5>引用 @冰岚 <a href="/cr#chatroom456">↩</a></h5><blockquote><p>周末有空的话，一起去河边走走吧。<br>上次那条沿河步道还没走完，<br>刚好可以顺路去看看新开的咖啡店。<br>到时候再决定要不要一起吃晚饭。</p></blockquote>' },
   { id: 'hand', userName: '手写引用', html: '<p>我的正文</p><blockquote><p>没有来源的普通引用</p></blockquote>' },
   { id: 'moon', userName: '清风', html: '<p>分享</p><blockquote><p><a href="https://fishpi.cn/member/Yui/breezemoons/123">清风明月 · Yui</a></p><p>快点放假吧</p></blockquote>' },
   { id: 'short', userName: '短引用', html: '<p>收到</p><h5>引用 @Yui <a href="/cr#chatroom321">↩</a></h5><blockquote><p>好</p></blockquote>' },
@@ -67,7 +67,7 @@ const fixtures = [
   { id: 'standalone', userName: 'standalone-peer', standalone: true, html: '<p>独立卡片</p>' },
 ]
 const packs = fs.readFileSync('src/packs/bubbles/star-route/style.css', 'utf8')
-const html = `<!doctype html><meta charset="utf-8"><style>
+const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>
 *{box-sizing:border-box}body{margin:0;font:14px system-ui;background:#f4f6f8;--fp-card:#fff;--fp-border:#dfe4e9;--fp-text:#252a31;--fp-muted:#737c89;--fp-primary:#62ae37;--fp-hover:#f4f6f8;--fp-bg:#f5f6f8;--fp-self:#edf4e7;--fp-avatar-radius:8px;--fp-link:#3977c8}
 a{color:inherit}.panel{padding:20px;background:white;max-width:760px;margin:16px auto}.case{margin:16px 0 24px}.title{font-size:12px;color:#7b8390;margin-bottom:12px}${css}${packs}
 </style><div id="app"></div><script type="module">
@@ -79,7 +79,7 @@ createApp({setup(){
 provide(CHAT_MENTION,{enabled:()=>window.shortcutsEnabled,insert:name=>window.mentions.push(name)});
 provide(CHAT_QUICK_QUOTE,{enabled:()=>window.shortcutsEnabled,quote:id=>window.quickQuotes.push(id)});
 return ()=>h('div',{class:'panel'},[
-...fixtures.map(f=>h('section',{class:'case','data-case':f.id},[h('div',{class:'title'},f.id),h(Bubble,{...f,chatroom:true,messageId:f.id,userId:f.self?'me':'other',avatar:'${avatar}',avatarSize:narrow.value?24:36,appearance:{bubbleId:'star-route',frameId:'none',version:1}})])),
+...fixtures.map(f=>h('section',{class:'case','data-case':f.id},[h('div',{class:'title'},f.id === 'only' ? '纯引用' : f.id),h(Bubble,{...f,chatroom:true,messageId:f.id,userId:f.self?'me':'other',avatar:'${avatar}',avatarSize:narrow.value?24:36,appearance:{bubbleId:'star-route',frameId:'none',version:1}})])),
 h('section',{class:'case','data-case':'preview'},[h(Preview,{quotes:[{kind:'message',href:'/cr#chatroom123',author:'Yui',excerpt:${JSON.stringify(excerpt)}}],onRemove:()=>window.removed=true})])
 ])}}).mount('#app');
 </script>`
@@ -106,6 +106,9 @@ try {
   const thumbnail = imageQuote.getByRole('button', { name: '查看引用大图' })
   assert.equal(await thumbnail.locator('img').getAttribute('src'), 'https://file.fishpi.cn/test.png?imageView2/1/w/80/h/64')
   assert.equal(await page.locator('[data-case="only"] .fp-bubble').count(), 0)
+  const standalone = page.locator('[data-case="only"] .chat-quote-card--standalone')
+  assert.equal(await standalone.count(), 1)
+  assert.equal(await page.locator('.chat-quote-card--standalone').count(), 1)
   assert.equal(await page.locator('[data-case="hand"] .body blockquote').innerText(), '没有来源的普通引用')
   for (const [id, excerpt] of [['own-multi', '好'], ['nested', '直接引用的内容']]) {
     const section = page.locator(`[data-case="${id}"]`)
@@ -122,6 +125,15 @@ try {
       .filter(el => el.getBoundingClientRect().right > innerWidth || el.getBoundingClientRect().left < 0)
       .map(el => ({ element: el.className, case: el.closest('[data-case]')?.getAttribute('data-case'), left: el.getBoundingClientRect().left, right: el.getBoundingClientRect().right })))
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `页面横向溢出：${width} ${JSON.stringify(overflow)}`)
+    const standaloneLayout = await standalone.locator('.chat-quote-excerpt').evaluate(el => ({
+      lines: getComputedStyle(el).webkitLineClamp,
+      height: el.clientHeight,
+      lineHeight: parseFloat(getComputedStyle(el).lineHeight),
+      contentHeight: el.scrollHeight,
+    }))
+    assert.equal(standaloneLayout.lines, '3')
+    assert.ok(Math.abs(standaloneLayout.height - standaloneLayout.lineHeight * 3) < 1)
+    assert.ok(standaloneLayout.contentHeight > standaloneLayout.height, '纯引用超过三行时应截断')
     for (const id of ['own', 'other', 'classic', 'short']) {
       const layout = await page.locator(`[data-case="${id}"] .chat-quote-card`).evaluate(el => {
         const preview = el.querySelector('.chat-quote-excerpt'), style = getComputedStyle(preview)
@@ -146,6 +158,13 @@ try {
   await page.evaluate(() => { narrow.value = false })
   await page.waitForTimeout(60)
   await page.screenshot({ path: '/tmp/chat-quotes-1000.png', fullPage: true })
+  await page.locator('[data-case="only"] .fp-msg').screenshot({ path: '/tmp/fishpi-standalone-quote.png' })
+  await standalone.hover()
+  const standaloneHint = page.getByRole('tooltip')
+  await standaloneHint.waitFor()
+  assert.match(await standaloneHint.innerText(), /要不要一起吃晚饭/)
+  await page.keyboard.press('Escape')
+  await standaloneHint.waitFor({ state: 'detached' })
   // 暗色复用站点主题变量，引用文字保持弱化但仍可读，不显示醒目卡片边框。
   await page.addStyleTag({ content: 'body{background:#222424;--fp-card:#282a2a;--fp-text:#cbc5ba;--fp-muted:#9e9689;--fp-border:#424545;--fp-hover:#343737;--fp-bg:#222424}.panel{background:var(--fp-card)}' })
   await page.screenshot({ path: '/tmp/chat-quotes-dark.png', fullPage: true })
@@ -266,6 +285,11 @@ try {
     contentType: 'image/png', body: fs.readFileSync('public/images/user-thumbnail.png'),
   }))
   await touchPage.goto('http://quotes.test/cr')
+  const touchJump = touchPage.locator('[data-case="only"] .chat-quote-jump')
+  await touchJump.waitFor()
+  const touchTarget = await touchJump.boundingBox()
+  assert.ok(touchTarget.width >= 44 && touchTarget.height >= 44, '触屏纯引用的回跳按钮应保留 44px 点击区域')
+  assert.ok(await touchPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '触屏布局不应横向溢出')
   await touchPage.locator('[data-case="shortcuts"] .fp-avatar-frame').tap()
   assert.deepEqual(await touchPage.evaluate(() => window.avatarNavigations), ['/member/shortcut-peer'], '触屏单击头像立即导航')
   assert.deepEqual(await touchPage.evaluate(() => window.mentions), [])
