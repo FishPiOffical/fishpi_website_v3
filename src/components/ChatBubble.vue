@@ -123,8 +123,9 @@ const display = computed(() => {
   }
   return { html: template.innerHTML.trim(), quote }
 })
+const isQuoteOnly = computed(() => !!display.value.quote && !display.value.html && !props.standalone)
 const isStandalone = computed(() => props.chatroom && (
-  props.standalone || singleImage.value || (!display.value.html && !!display.value.quote)
+  props.standalone || singleImage.value || isQuoteOnly.value
 ))
 
 const MOUSE_DOUBLE_CLICK_WINDOW_MS = 500
@@ -296,7 +297,7 @@ function openBodyImage(img: HTMLImageElement) {
         </div>
         <MedalList class="chat-medals" :items="medals" variant="mini" />
       </div>
-      <div v-if="!display.quote || display.html || $slots.default" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick" @dblclick="onBubbleDoubleClick">
+      <div v-if="!isQuoteOnly" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick" @dblclick="onBubbleDoubleClick">
         <SakuraDecoration v-if="sakuraBubble" :style-id="sakuraBubble" kind="bubble" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
         <ManagedBubbleShape v-if="managedStyle?.shape" :shape="managedStyle.shape" />
         <img v-if="managedStyle?.image" class="managed-bubble-mark" :src="managedStyle.shape ? imageThumbnail(managedStyle.image, 34, 34) : managedStyle.image" alt="" loading="lazy">
@@ -321,7 +322,7 @@ function openBodyImage(img: HTMLImageElement) {
         </template>
       </div>
       <div v-if="display.quote" class="chat-quote-stack">
-        <ChatQuoteCard :quote="display.quote" :standalone="!display.html && !$slots.default" />
+        <ChatQuoteCard :quote="display.quote" :standalone="isQuoteOnly" />
       </div>
       <div v-if="chatroom" class="foot">
         <span class="message-meta">
