@@ -67,7 +67,6 @@ const replyComment = ref<ArticleComment | null>(null)
 const paragraphIdForReply = ref('')
 const commentPage = ref(1)
 const locatedComment=ref<CommentLocation|null>(null)
-const commentLocator = ref<InstanceType<typeof ArticleCommentLocation> | null>(null)
 function positionComment(value:CommentLocation){locatedComment.value=value;if(value.type===0){commentPage.value=value.page;readerRef.value?.openComments()}}
 const heat = ref<number|null>(null),heatError=ref(''),realtimeReadError=ref('')
 const editingId = ref('')
@@ -549,7 +548,7 @@ function itemHandlers(c: ArticleComment) {
 </script>
 
 <template>
-  <ArticleCommentLocation ref="commentLocator" :article-id="id" :article="article" :comment-page="commentPage" @located="positionComment" @reset="locatedComment=null" />
+  <ArticleCommentLocation :article-id="id" :article="article" :comment-page="commentPage" @located="positionComment" @reset="locatedComment=null" />
   <ArticleSkeleton v-if="loading" />
   <article v-else-if="error" class="card load-error">
     <p class="err">{{ error }}</p>
@@ -587,7 +586,7 @@ function itemHandlers(c: ArticleComment) {
             <CommentComposer :writable="commentingEnabled" :article-id="article.oId" :edit-id="editingId" @cancel="editingId=''" @saved="editingId=''" />
           </template>
           <template v-if="comment.commentThreadReplyCount || replyTarget(comment.oId)?.thread?.replyPage" #default>
-            <ArticleThreadReplies :key="viewerIdentity" :article-id="article.oId" :root="comment" :target="replyTarget(comment.oId)" @relocate="commentLocator?.read()" v-slot="{ replies }">
+            <ArticleThreadReplies :key="viewerIdentity" :article-id="article.oId" :root="comment" :target="replyTarget(comment.oId)" v-slot="{ replies }">
               <CommentItem
                 v-for="reply in replies"
                 :key="reply.oId"
@@ -643,7 +642,6 @@ function itemHandlers(c: ArticleComment) {
       @content-click="onContentClick"
       @reply="clearReplyTarget"
       @paragraph-reply="onParagraphReply"
-      @relocate="commentLocator?.read()"
     >
       <template #owner-actions><ReuseOwnerActions /></template>
       <template #reward><ReuseReward /></template>

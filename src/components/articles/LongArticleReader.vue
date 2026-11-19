@@ -48,7 +48,6 @@ const commentingEnabled = computed(() => props.article.articleCommentable === tr
 const emit = defineEmits<{
   contentClick: [e: MouseEvent]
   reply: []
-  relocate: []
   paragraphReply: [paragraphId: string, commentId: string, comment?: ArticleComment]
 }>()
 
@@ -91,7 +90,7 @@ const paragraphPages = ref(0)
 const paragraphTotal = ref<number | null>(null)
 const paragraphSort = ref('')
 const readerMounted=ref(false)
-const paragraphState=ref<'active'|'orphaned'>('active'),paragraphLocationId=ref(''),paragraphLocationError=ref('')
+const paragraphState=ref<'active'|'orphaned'>('active'),paragraphLocationId=ref('')
 let paragraphRequest = 0, paragraphSummaryRequest=0
 
 const chapters = computed(() => props.column?.chapters || [])
@@ -216,7 +215,7 @@ function openComments() {
   if (activeParagraphId.value) emit('paragraphReply', '', '')
   activeParagraphId.value = ''
   activeSnapshot.value = ''
-  paragraphState.value='active';paragraphLocationId.value='';paragraphLocationError.value=''
+  paragraphState.value='active';paragraphLocationId.value=''
   commentsOpen.value = true
 }
 
@@ -289,9 +288,10 @@ async function loadParagraphSummary() {
   }
 }
 
-async function loadParagraphComments(page = 1) {
+async function loadParagraphComments(page = 1, locate = false) {
   const articleId = props.article.oId
   const paragraphId = activeParagraphId.value, state=paragraphState.value
+  const locationId = locate ? paragraphLocationId.value : ''
   if (!articleId || !paragraphId) return
   const requestId = ++paragraphRequest, reader=getAuthContextVersion(), owner=auth.account?.oId
   paragraphLoading.value = true
@@ -301,16 +301,22 @@ async function loadParagraphComments(page = 1) {
   try {
     const data = await fetchV3ParagraphComments(articleId, paragraphId, page, paragraphSort.value || 'oldest',state)
     if (requestId !== paragraphRequest || activeParagraphId.value !== paragraphId || paragraphState.value!==state || props.article.oId !== articleId || reader!==getAuthContextVersion() || owner!==auth.account?.oId) return
-    paragraphComments.value = data.commentThreadParents || []
+    if (locate && locationId !== paragraphLocationId.value) return
+    const comments = data.commentThreadParents || []
+    if (locate && !comments.some(comment => comment.oId === locationId)) {
+      commentsOpen.value = false
+      return
+    }
+    paragraphComments.value = comments
     paragraphPages.value = data.pagination.paginationPageCount
     paragraphTotal.value = data.pagination.paginationRecordCount
-    paragraphLocationError.value=''
-    if(paragraphLocationId.value){
-      const target=paragraphLocationId.value
-      if(!paragraphComments.value.some(c=>c.oId===target))paragraphLocationError.value='评论位置已变化或本页暂不可见。'
-    }
+    if (locate) commentsOpen.value = true
   } catch (error) {
     if (requestId !== paragraphRequest || reader!==getAuthContextVersion() || owner!==auth.account?.oId) return
+    if (locate) {
+      if (locationId === paragraphLocationId.value) commentsOpen.value = false
+      return
+    }
     paragraphError.value = error instanceof Error ? error.message : '段评加载失败'
     paragraphComments.value = []
   } finally {
@@ -325,11 +331,10 @@ async function loadParagraphComments(page = 1) {
       ||owner!==auth.account?.oId||paragraphLocationId.value!==target)return
   const element=document.getElementById('comment'+target)
   if(element)element.scrollIntoView({block:'center'})
-  else paragraphLocationError.value='评论当前无法在页面中定位。'
 }
 
 function openParagraph(paragraphId: string) {
-  paragraphState.value='active';paragraphLocationId.value='';paragraphLocationError.value=''
+  paragraphState.value='active';paragraphLocationId.value=''
   const paragraph = contentEl.value?.querySelector<HTMLElement>(`[data-long-paragraph-id="${CSS.escape(paragraphId)}"]`)
   if (!paragraph) return
   if (activeParagraphId.value === paragraphId && commentsOpen.value) {
@@ -423,11 +428,11 @@ function locateComment(value:CommentLocation){
   if(!value.paragraph)return
   catalogOpen.value=false;closeFloating();composerOpen.value=false
   activeParagraphId.value=value.paragraph.id;paragraphState.value=value.paragraph.state
-  paragraphLocationId.value=value.id;paragraphLocationError.value='';paragraphSort.value=''
+  paragraphLocationId.value=value.id;paragraphSort.value=''
   const element=contentEl.value?.querySelector<HTMLElement>(`[data-long-paragraph-id="${CSS.escape(value.paragraph.id)}"]`)
   activeSnapshot.value=element?paragraphSnapshot(element):value.paragraph.state==='orphaned'?'原段落已移除；以下为仍可读取的段评。':'当前段落无法高亮；以下为该段评列表。'
-  commentsOpen.value=true;emit('paragraphReply','','')
-  void loadParagraphComments(value.page)
+  emit('paragraphReply','','')
+  void loadParagraphComments(value.page, true)
 }
 
 async function refreshParagraphComments() {
@@ -690,10 +695,6 @@ function chapterTitle(c: LongArticleChapter) {
 
         <template v-if="activeParagraphId">
           <div class="la-paragraph-context">{{ activeSnapshot || '此段落' }}</div>
-          <p v-if="paragraphLocationError" role="status">
-            {{ paragraphLocationError }}
-            <button type="button" @click="emit('relocate')">重新定位评论</button>
-          </p>
           <p v-if="paragraphSummaryError" role="status">{{ paragraphSummaryError }}<button type="button" @click="loadParagraphSummary()">重读统计</button></p>
           <div class="la-paragraph-sort" role="tablist" aria-label="段评排序">
             <button type="button" :class="{ active: paragraphSort === '' }" @click="paragraphSort = ''; loadParagraphComments(1)">正序</button>
