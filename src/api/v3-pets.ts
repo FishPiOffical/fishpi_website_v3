@@ -140,6 +140,7 @@ export interface Pet {
   jobs: { id: PetJobId; experience: number; level: number; completed: number }[]
   cooldowns: { pet: number; play: number }
   careAvailableAt?: { feed: number; water: number }
+  autoRestAt?: number
   growthToday: { used: number; limit: number }
 }
 export interface PetState {
@@ -446,6 +447,7 @@ export function decodePetState(value: unknown): PetState {
       ...(data.careAvailableAt === undefined ? {} : { careAvailableAt: {
         feed: integer(object(data.careAvailableAt).feed), water: integer(object(data.careAvailableAt).water),
       } }),
+      ...(data.autoRestAt === undefined ? {} : { autoRestAt: integer(data.autoRestAt, 1) }),
       growthToday: { used: integer(growth.used), limit: integer(growth.limit, 1) },
     }
     if (pet.growthToday.used > pet.growthToday.limit || pet.skills.length !== 6 || pet.jobs.length !== 6) throw invalid()

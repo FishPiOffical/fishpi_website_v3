@@ -202,7 +202,7 @@ onMounted(() => {
             <header class="care-heading"><h2>今天也要好好照顾它</h2><button type="button" class="icon-button" :disabled="pets.loading || pets.busy" aria-label="刷新宠物状态" title="刷新状态" @click="pets.refresh()"><PetIcon name="refresh" /></button></header>
             <div class="pet-stats"><div v-for="stat in stats" :key="stat.key" class="pet-stat" :class="[stat.key, { low: stat.value < 25 }]"><div><span><PetIcon :name="stat.icon" />{{ stat.label }}</span><strong>{{ stat.value }}<small> / 100</small></strong></div><div class="stat-track" role="progressbar" :aria-label="stat.label" :aria-valuenow="stat.value" :aria-valuemin="0" :aria-valuemax="100"><span :style="{ width: `${stat.value}%` }" /></div></div></div>
             <PetActions :active="section === 'care'" />
-            <p class="care-note">{{ resting ? '休息时暂停其他互动，想提前见面也可以唤醒它。' : pets.pet.activity ? '这次活动结束并领取成果后，就可以继续照顾它了。' : '不在身边时也会慢慢消耗状态，休息可以恢复精力。' }}</p>
+            <p class="care-note">{{ resting ? '休息时暂停其他互动，想提前见面也可以唤醒它。' : pets.pet.activity ? '这次活动结束并领取成果后，就可以继续照顾它了。' : pets.pet.autoRestAt ? '精力不足，空闲一段时间后会自动休息。' : '不在身边时也会慢慢消耗状态，休息可以恢复精力。' }}</p>
             <div class="daily-growth"><span>今日照顾成长</span><strong>{{ pets.pet.growthToday.used }} / {{ pets.pet.growthToday.limit }} 次</strong></div>
             <p v-if="pets.catalog?.growthRules" class="daily-growth-note">每日前 {{ pets.pet.growthToday.limit }} 次成功喂食、饮水、抚摸或玩耍，获得 {{ pets.catalog.growthRules.careExperience }} 经验及至多 {{ pets.catalog.growthRules.careFriendship }} 亲密度。之后仍可照顾宠物。</p>
           </div>
