@@ -297,32 +297,35 @@ function openBodyImage(img: HTMLImageElement) {
         </div>
         <MedalList class="chat-medals" :items="medals" variant="mini" />
       </div>
-      <div v-if="!isQuoteOnly" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick" @dblclick="onBubbleDoubleClick">
-        <SakuraDecoration v-if="sakuraBubble" :style-id="sakuraBubble" kind="bubble" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
-        <ManagedBubbleShape v-if="managedStyle?.shape" :shape="managedStyle.shape" />
-        <img v-if="managedStyle?.image" class="managed-bubble-mark" :src="managedStyle.shape ? imageThumbnail(managedStyle.image, 34, 34) : managedStyle.image" alt="" loading="lazy">
-        <div v-if="!chatroom" class="head">
-          <RouterLink :to="`/member/${userName}`" class="name">
-            <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>
-            <template v-else>{{ nickname || userName }}</template>
-            <small v-if="nickname && nickname !== userName">({{ userName }})</small>
-          </RouterLink>
-          <MedalList :items="medals" variant="chat" />
-        </div>
-        <slot>
-          <div v-if="display.html" class="vditor-reset body" v-html="display.html" />
-        </slot>
-        <p v-if="chatroom && tail && !simpleMode && !isStandalone" class="fp-chat-tail" data-chat-tail><svg class="tail-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="小尾巴"><title>小尾巴</title><path fill="currentColor" stroke="none" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"/></svg><span class="tail-content">{{ tail.text }}</span></p>
-        <template v-if="!chatroom">
-          <slot name="reactions" />
-          <div class="foot">
-            <span class="actions"><slot name="actions" /></span>
-            <time>{{ formatDisplayTime(time) }}</time>
+      <div class="message-content-row">
+        <div v-if="!isQuoteOnly" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick" @dblclick="onBubbleDoubleClick">
+          <SakuraDecoration v-if="sakuraBubble" :style-id="sakuraBubble" kind="bubble" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
+          <ManagedBubbleShape v-if="managedStyle?.shape" :shape="managedStyle.shape" />
+          <img v-if="managedStyle?.image" class="managed-bubble-mark" :src="managedStyle.shape ? imageThumbnail(managedStyle.image, 34, 34) : managedStyle.image" alt="" loading="lazy">
+          <div v-if="!chatroom" class="head">
+            <RouterLink :to="`/member/${userName}`" class="name">
+              <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>
+              <template v-else>{{ nickname || userName }}</template>
+              <small v-if="nickname && nickname !== userName">({{ userName }})</small>
+            </RouterLink>
+            <MedalList :items="medals" variant="chat" />
           </div>
-        </template>
-      </div>
-      <div v-if="display.quote" class="chat-quote-stack">
-        <ChatQuoteCard :quote="display.quote" :standalone="isQuoteOnly" />
+          <slot>
+            <div v-if="display.html" class="vditor-reset body" v-html="display.html" />
+          </slot>
+          <p v-if="chatroom && tail && !simpleMode && !isStandalone" class="fp-chat-tail" data-chat-tail><svg class="tail-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="小尾巴"><title>小尾巴</title><path fill="currentColor" stroke="none" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"/></svg><span class="tail-content">{{ tail.text }}</span></p>
+          <template v-if="!chatroom">
+            <slot name="reactions" />
+            <div class="foot">
+              <span class="actions"><slot name="actions" /></span>
+              <time>{{ formatDisplayTime(time) }}</time>
+            </div>
+          </template>
+        </div>
+        <div v-if="display.quote" class="chat-quote-stack">
+          <ChatQuoteCard :quote="display.quote" :standalone="isQuoteOnly" />
+        </div>
+        <div v-if="$slots.repeat" class="message-repeat"><slot name="repeat" /></div>
       </div>
       <div v-if="chatroom" class="foot">
         <span class="message-meta">
@@ -685,6 +688,30 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
 .chat-quote-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-width: 100%; min-width: 0; }
 .is-room.is-self .chat-quote-stack { justify-items: end; }
 .fp-bubble + .chat-quote-stack { margin-top: 2px; }
+.message-content-row { display: contents; }
+.message-repeat:empty { display: none; }
+.message-content-row:has(> .message-repeat > button) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 5px;
+  row-gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  justify-items: start;
+}
+.message-content-row > :is(.fp-bubble, .chat-quote-stack) { grid-column: 1; }
+.message-content-row > .fp-bubble + .chat-quote-stack { grid-row: 2; }
+.message-content-row > .message-repeat:has(> button) {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+}
+.is-self .message-content-row:has(> .message-repeat > button) {
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-items: end;
+}
+.is-self .message-content-row > :is(.fp-bubble, .chat-quote-stack) { grid-column: 2; }
+.is-self .message-content-row > .message-repeat { grid-column: 1; }
 .is-room .body :deep(p + p) { margin-top: 6px; }
 .is-room .body :deep(.chat-image-frame) {
   display: inline-flex;

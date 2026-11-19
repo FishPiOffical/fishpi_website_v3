@@ -65,11 +65,13 @@ function mountRepeat(pinia=createPinia(), content=repeatSource) {
   app.use(pinia);app.mount(root)
   return {root,app,pinia,events,source,user:auth(pinia),store:useV3ChatPublicationStore(pinia),text:()=>text(root)}
 }
+const repeatButton = view => find(view.root,node=>node.tag==='button'&&node.props?.['aria-label']==='复读这条消息')
+const clickRepeat = view => { const button=repeatButton(view);assert.ok(button&&!button.props.disabled);return button.props.onClick() }
 state.dispatch=dispatch;state.confirm=async()=>true;readFails=false;lose=false
 msg.tail={text:'不要复读对方的小尾巴'}
 let repeated=mountRepeat();await tick()
 const beforeRepeat=state.calls.length
-await click(repeated,'复读');await tick()
+await clickRepeat(repeated);await tick()
 assert.deepEqual(state.calls.slice(beforeRepeat).map(({path,init})=>[init.method || 'GET',path]), [
   ['POST','/api/v3/chat/messages'], ['GET','/api/v3/chat/messages/3'],
 ])
@@ -78,10 +80,10 @@ assert.equal(repeated.store.completed.origin,'repeat')
 repeated.app.unmount();repeated.store.$dispose()
 console.log('PASS 复读直接提交列表原始 Markdown，保留图片和换行，首个请求就是 POST')
 
-repeated=mountRepeat();await tick();lose=true;await click(repeated,'复读');await tick()
+repeated=mountRepeat();await tick();lose=true;await clickRepeat(repeated);await tick()
 const repeatCommand=repeated.store.pending
 assert.equal(repeatCommand.origin,'repeat')
-assert.equal(find(repeated.root,n=>n.tag==='button'&&text(n).trim()==='复读').props.disabled,true)
+assert.equal(repeatButton(repeated).props.disabled,true)
 const repeatPinia=repeated.pinia
 repeated.app.unmount();repeated=mountRepeat(repeatPinia,'快照已经变更');await tick()
 await click(repeated,'恢复本次聊天室发送');await tick()
@@ -95,7 +97,7 @@ let confirmRepeat
 state.dispatch=(path,init)=>init.method==='POST'?new Promise(resolve=>confirmRepeat=resolve):env(msg)
 repeated=mountRepeat();await tick()
 const beforeDouble=state.calls.length
-const button=find(repeated.root,n=>n.tag==='button'&&text(n).trim()==='复读')
+const button=repeatButton(repeated)
 const pendingRepeat=button.props.onClick()
 await button.props.onClick()
 assert.equal(state.calls.length,beforeDouble+1)
@@ -103,18 +105,18 @@ repeated.user.accessToken=null
 confirmRepeat(env({id:'3',createdAt:3}));await pendingRepeat;await tick()
 assert.equal(state.calls.length,beforeDouble+1)
 assert.equal(repeated.store.receipt,null)
-assert.ok(!find(repeated.root,n=>n.tag==='button'&&text(n).trim()==='复读'))
+assert.ok(!repeatButton(repeated))
 repeated.app.unmount();repeated.store.$dispose()
 console.log('PASS 复读连点只有一次发送，退出后不接收迟到回执、不补读')
 
 for(const content of ['', '  \n  ']) {
   repeated=mountRepeat(createPinia(),content);await tick()
-  assert.ok(!find(repeated.root,n=>n.tag==='button'&&text(n).trim()==='复读'))
+  assert.ok(!repeatButton(repeated))
   repeated.app.unmount();repeated.store.$dispose()
 }
 assert.equal(state.calls.length,beforeDouble+1)
 repeated=mountRepeat();await tick()
 repeated.source.value=undefined;await tick()
-assert.ok(!find(repeated.root,n=>n.tag==='button'&&text(n).trim()==='复读'))
+assert.ok(!repeatButton(repeated))
 repeated.app.unmount();repeated.store.$dispose()
 console.log('PASS 缺失或空白正文不提供复读入口，也不额外读取详情')

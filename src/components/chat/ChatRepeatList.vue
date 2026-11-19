@@ -2,7 +2,6 @@
 import { computed, ref, watch, onMounted, onUpdated, onBeforeUnmount } from 'vue'
 import { groupChatRepeats, chatRepeatPreview, type RepeatEntry } from '@/utils/chatRepeatGroups'
 import { avatarThumbnail, fallbackAvatar, imageThumbnail } from '@/utils/avatar'
-import ChatRepeatAction from './ChatRepeatAction.vue'
 import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 const props = defineProps<{ entries: T[]; reverse?: boolean; ownName?: string }>()
@@ -82,7 +81,6 @@ function toggle(key: string) {
       <template v-else><template v-for="entry in (reverse ? [...group].reverse() : group)" :key="entry.key"><slot :entry="entry" :align-self="groupSelf(group)" /></template></template>
       <div class="repeat-controls">
         <button type="button" :aria-expanded="expanded.has(group[0]!.key)" @click="toggle(group[0]!.key)">{{ expanded.has(group[0]!.key) ? '收起' : '展开' }} · {{ group.length }} 条复读 <span aria-hidden="true">{{ expanded.has(group[0]!.key) ? '⌃' : '⌄' }}</span></button>
-        <ChatRepeatAction :content="group[group.length - 1]!.message!.content" label="+1" compact />
       </div>
     </template>
   </div>

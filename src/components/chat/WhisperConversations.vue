@@ -504,8 +504,10 @@ onUnmounted(() => {
                     <ChatBubble :key="line.oId" :appearance="line.appearance" :animate-sakura="sakuraArrivals.has(line.oId)" :tail="line.tail" :pet-status="line.petStatus" :medals="line.sysMetal" :message-id="line.oId" :user-id="line.userOId" :user-name="line.userName" :avatar="line.userAvatarURL" :avatar-size="isCompactPanel ? 24 : 36" :time="line.time" :client="line.client" chatroom :standalone="Boolean(line.redPacket || line.card)" :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :source="line.content" :self="line.userOId===account?.oId" :align-self="alignSelf">
                       <ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" />
                       <ChatCard v-else-if="line.card" :card="line.card" />
-                      <template #actions>
+                      <template #repeat>
                         <ChatRepeatAction v-if="!line.redPacket&&!line.card" :content="line.content" />
+                      </template>
+                      <template #actions>
                         <ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" />
                         <button v-if="!line.redPacket && !line.card && auth.accessToken" type="button" title="引用消息"
                           :disabled="!canQuote(line.oId)" @click="quoteRoomMessage(line.oId)">{{ quoteBusy === line.oId ? '…' : '引用' }}</button>

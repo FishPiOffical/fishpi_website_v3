@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ChatPublicationStore } from '@/stores/v3ChatPublication'
 
-const props = defineProps<{ content?: string; label?: string; compact?: boolean }>()
+const props = defineProps<{ content?: string }>()
 const auth = useAuthStore()
 const publication = useV3ChatPublicationStore()
 const mounted = ref(false)
@@ -22,15 +22,50 @@ async function repeat() {
 onMounted(() => { mounted.value = true })
 </script>
 <template>
-  <span v-if="mounted && auth.accessToken && auth.account?.oId && content?.trim()" class="chat-repeat" :class="{ 'chat-repeat--compact': compact }">
-    <button type="button" title="复读这条消息" aria-label="复读这条消息" :disabled="sending || publication.busy || !!publication.pending" :aria-busy="sending" @click="repeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4M3 11V8a2 2 0 0 1 2-2h16M7 22l-4-4 4-4m14-1v3a2 2 0 0 1-2 2H3"/></svg><span>{{ sending ? '…' : (label || '复读') }}</span></button>
-  </span>
+  <button v-if="mounted && auth.accessToken && auth.account?.oId && content?.trim()" type="button"
+    class="chat-repeat" title="复读这条消息" aria-label="复读这条消息"
+    :disabled="sending || publication.busy || !!publication.pending" :aria-busy="sending" @click="repeat">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 10a7 7 0 0 1 12-3l2 2m0-4v4h-4M19 14a7 7 0 0 1-12 3l-2-2m0 4v-4h4" />
+    </svg>
+  </button>
 </template>
 <style scoped>
-.chat-repeat{display:inline-flex;align-items:center;gap:6px;max-width:100%}.chat-repeat button{display:inline-flex;align-items:center;gap:3px;font:inherit;color:inherit;background:transparent;border:0;padding:2px 0;cursor:pointer}.chat-repeat svg{width:13px;height:13px;flex:none}.chat-repeat button:disabled{opacity:.45;cursor:default}.chat-repeat button:focus-visible{outline:2px solid var(--fp-primary);outline-offset:2px}
-/* 折叠组的 +1 保持独立触点，其他消息操作仍用原来的轻量文本样式。 */
-.chat-repeat--compact button { min-width: 56px; min-height: 30px; justify-content: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-hover); color: var(--fp-text); font-weight: 600; transition: background .15s, border-color .15s; }
-.chat-repeat--compact button:hover:not(:disabled) { border-color: var(--fp-primary); color: var(--fp-primary); }
-.chat-repeat--compact button:active:not(:disabled) { background: var(--fp-border); }
-.chat-repeat--compact svg { width: 14px; height: 14px; }
+.chat-repeat {
+  display: grid;
+  place-items: center;
+  min-inline-size: 26px;
+  min-block-size: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fp-muted);
+  cursor: pointer;
+}
+.chat-repeat svg { width: 16px; height: 16px; }
+.chat-repeat:disabled { opacity: .5; cursor: default; }
+.chat-repeat:focus-visible { outline: 2px solid var(--fp-link); outline-offset: 2px; }
+.chat-repeat:enabled:is(:focus-visible, :active) {
+  background: var(--fp-hover);
+  color: var(--fp-title, var(--fp-text));
+}
+@media (hover: hover) and (pointer: fine) {
+  .chat-repeat:enabled:hover {
+    background: var(--fp-primary-soft, var(--fp-hover));
+    color: var(--fp-primary-ink, var(--fp-title, var(--fp-text)));
+  }
+  .chat-repeat:enabled:active { background: var(--fp-border); }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .chat-repeat:enabled:hover svg { animation: repeat-turn 260ms ease-out; }
+}
+@media (pointer: coarse) {
+  .chat-repeat { min-inline-size: 44px; min-block-size: 44px; }
+}
+@keyframes repeat-turn {
+  0%, 100% { transform: rotate(0); }
+  48% { transform: rotate(24deg) scale(1.12); }
+}
 </style>
