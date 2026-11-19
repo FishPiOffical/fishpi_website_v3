@@ -48,6 +48,7 @@ const commentingEnabled = computed(() => props.article.articleCommentable === tr
 const emit = defineEmits<{
   contentClick: [e: MouseEvent]
   reply: []
+  relocate: []
   paragraphReply: [paragraphId: string, commentId: string, comment?: ArticleComment]
 }>()
 
@@ -306,7 +307,7 @@ async function loadParagraphComments(page = 1) {
     paragraphLocationError.value=''
     if(paragraphLocationId.value){
       const target=paragraphLocationId.value
-      if(!paragraphComments.value.some(c=>c.oId===target))paragraphLocationError.value='评论位置已变化或本页暂不可见，请使用上方的重新定位评论。'
+      if(!paragraphComments.value.some(c=>c.oId===target))paragraphLocationError.value='评论位置已变化或本页暂不可见。'
     }
   } catch (error) {
     if (requestId !== paragraphRequest || reader!==getAuthContextVersion() || owner!==auth.account?.oId) return
@@ -324,7 +325,7 @@ async function loadParagraphComments(page = 1) {
       ||owner!==auth.account?.oId||paragraphLocationId.value!==target)return
   const element=document.getElementById('comment'+target)
   if(element)element.scrollIntoView({block:'center'})
-  else paragraphLocationError.value='评论当前无法在页面中定位，请使用上方的重新定位评论。'
+  else paragraphLocationError.value='评论当前无法在页面中定位。'
 }
 
 function openParagraph(paragraphId: string) {
@@ -689,7 +690,10 @@ function chapterTitle(c: LongArticleChapter) {
 
         <template v-if="activeParagraphId">
           <div class="la-paragraph-context">{{ activeSnapshot || '此段落' }}</div>
-          <p v-if="paragraphLocationError" role="status">{{ paragraphLocationError }}</p>
+          <p v-if="paragraphLocationError" role="status">
+            {{ paragraphLocationError }}
+            <button type="button" @click="emit('relocate')">重新定位评论</button>
+          </p>
           <p v-if="paragraphSummaryError" role="status">{{ paragraphSummaryError }}<button type="button" @click="loadParagraphSummary()">重读统计</button></p>
           <div class="la-paragraph-sort" role="tablist" aria-label="段评排序">
             <button type="button" :class="{ active: paragraphSort === '' }" @click="paragraphSort = ''; loadParagraphComments(1)">正序</button>

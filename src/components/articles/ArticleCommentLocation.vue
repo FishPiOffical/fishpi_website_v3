@@ -36,6 +36,15 @@ watch(binding,()=>{void read()},{flush:'post'})
 watch([location,()=>props.article,()=>props.commentPage],()=>{void scroll()},{flush:'post'})
 onMounted(()=>{mounted=true;void read()})
 onBeforeUnmount(()=>{mounted=false;generation++;abort?.abort();location.value=null})
+defineExpose({ read })
 </script>
-<template><div v-if="requested.target||requested.error" class="comment-location" role="status"><span v-if="loading">正在定位评论…</span><span v-else-if="error">{{ error }}</span><span v-else-if="placement">{{ placement }}</span><span v-else-if="location">评论位置已读取。</span><button v-if="!loading" type="button" @click="read">重新定位评论</button></div></template>
+<template>
+  <div v-if="loading || error || placement" class="comment-location" role="status">
+    <span v-if="loading">正在定位评论…</span>
+    <template v-else>
+      <span>{{ error || placement }}</span>
+      <button type="button" @click="read">重新定位评论</button>
+    </template>
+  </div>
+</template>
 <style scoped lang="scss">.comment-location{padding:8px 0;color:var(--fp-muted);font-size:13px;overflow-wrap:anywhere}button{margin-left:8px;color:var(--fp-text);background:var(--fp-card);border:1px solid var(--fp-border);border-radius:5px;padding:4px 8px}</style>
