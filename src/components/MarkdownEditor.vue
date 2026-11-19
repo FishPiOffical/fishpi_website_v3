@@ -647,8 +647,11 @@ defineExpose({
   overflow: clip;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.md-editor .vditor-toolbar--pin {
+.md-editor .vditor:not(.vditor--fullscreen) .vditor-toolbar--pin {
   top: var(--fp-nav-h);
+}
+.md-editor .vditor--fullscreen .vditor-toolbar--pin {
+  top: 0;
 }
 .md-editor .vditor:focus-within {
   border-color: color-mix(in srgb, var(--fp-primary) 70%, transparent);
@@ -656,6 +659,7 @@ defineExpose({
 }
 .md-editor .vditor.vditor--fullscreen {
   border-radius: 0;
+  background-color: var(--fp-card);
 }
 
 .md-editor .vditor-toolbar {
