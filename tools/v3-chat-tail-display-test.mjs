@@ -81,6 +81,8 @@ assert.equal(clientNode().querySelector('use').getAttribute('href'), '/images/ch
 for (const [client, label, icon] of [
   ['Deepseek Harness/1.2.3', 'Deepseek Harness 1.2.3', 'ic-deepseek-harness'],
   ['Codex/2.3.4', 'Codex 2.3.4', 'ic-codex'],
+  ['WPS/12.1.0', 'WPS 12.1.0', 'ic-wps'],
+  ['WPS', 'WPS', 'ic-wps'],
 ]) {
   props.client = client
   await nextTick()

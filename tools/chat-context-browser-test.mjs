@@ -126,7 +126,7 @@ function longQuote(id, withBody) {
   }
 }
 const quoteLayoutMessages = [
-  longQuote('9201', false),
+  { ...longQuote('9201', false), client: 'WPS/12.1.0' },
   longQuote('9202', true),
   { ...message('9203'), type: 'music', card: { title: '测试音乐卡片' } },
 ]
@@ -200,6 +200,13 @@ try {
     const pure = page.locator('.fp-msg').filter({ has: page.locator('.chat-quote-jump[href="/cr#chatroom92010"]') })
     const withBody = page.locator('.fp-msg').filter({ has: page.locator('.chat-quote-jump[href="/cr#chatroom92020"]') })
     await pure.waitFor()
+    const wps = pure.getByRole('img', { name: 'WPS 12.1.0', exact: true })
+    await wps.waitFor()
+    assert.equal(await wps.getAttribute('title'), 'WPS 12.1.0')
+    await page.waitForFunction(() => {
+      const use = document.querySelector('.message-client[aria-label="WPS 12.1.0"] use')
+      return use?.getAttribute('href') === '/images/chat-client-icons.svg#ic-wps' && use.getBBox().width > 0
+    })
     assert.equal(await pure.locator('.fp-bubble').count(), 0, `${mode} 纯引用不应出现空气泡`)
     assert.equal(await pure.locator('.chat-quote-card--standalone').count(), 1, `${mode} 纯引用应使用三行卡片`)
     const excerpt = await pure.locator('.chat-quote-excerpt').evaluate(el => {
@@ -214,7 +221,7 @@ try {
     assert.equal(await page.locator('.fp-bubble [data-special-card]').innerText(), '测试音乐卡片')
   }
   await page.setViewportSize({ width: 1200, height: 900 })
-  console.log('PASS 经典、简约和悬浮聊天室的纯引用三行、带正文单行及真实卡片插槽。')
+  console.log('PASS 经典、简约和悬浮聊天室的纯引用三行、带正文单行、真实卡片插槽及 WPS 图标与版本。')
   for (const mode of ['classic', 'modern']) {
     await page.goto(`${origin}/cr?mode=${mode}`)
     const message = page.locator('#chatroom9001')
