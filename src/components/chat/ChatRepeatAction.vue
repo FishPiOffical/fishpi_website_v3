@@ -27,7 +27,7 @@ onMounted(() => { mounted.value = true })
     :disabled="sending || publication.busy || !!publication.pending" :aria-busy="sending" @click="repeat">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M5 10a7 7 0 0 1 12-3l2 2m0-4v4h-4M19 14a7 7 0 0 1-12 3l-2-2m0 4v-4h4" />
+      <path d="M8 21H5a2 2 0 0 1-2-2v-1.5L1.5 16V9a2 2 0 0 1 2-2H5m5-3h9a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-1v4l-5-4h-3a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Zm4.5 3.75v5.5m-2.75-2.75h5.5" />
     </svg>
   </button>
 </template>
@@ -66,6 +66,6 @@ onMounted(() => { mounted.value = true })
 }
 @keyframes repeat-turn {
   0%, 100% { transform: rotate(0); }
-  48% { transform: rotate(24deg) scale(1.12); }
+  48% { transform: rotate(14deg) scale(1.12); }
 }
 </style>

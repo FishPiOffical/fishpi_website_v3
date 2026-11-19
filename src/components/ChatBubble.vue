@@ -322,10 +322,13 @@ function openBodyImage(img: HTMLImageElement) {
             </div>
           </template>
         </div>
-        <div v-if="display.quote" class="chat-quote-stack">
-          <ChatQuoteCard :quote="display.quote" :standalone="isQuoteOnly" />
+        <div v-else-if="display.quote" class="chat-quote-stack">
+          <ChatQuoteCard :quote="display.quote" standalone />
         </div>
         <div v-if="$slots.repeat" class="message-repeat"><slot name="repeat" /></div>
+      </div>
+      <div v-if="display.quote && !isQuoteOnly" class="chat-quote-stack">
+        <ChatQuoteCard :quote="display.quote" />
       </div>
       <div v-if="chatroom" class="foot">
         <span class="message-meta">
@@ -687,31 +690,18 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
 }
 .chat-quote-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-width: 100%; min-width: 0; }
 .is-room.is-self .chat-quote-stack { justify-items: end; }
-.fp-bubble + .chat-quote-stack { margin-top: 2px; }
+.message-content-row + .chat-quote-stack { margin-top: 2px; }
 .message-content-row { display: contents; }
-.message-repeat:empty { display: none; }
-.message-content-row:has(> .message-repeat > button) {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 5px;
-  row-gap: 5px;
+.is-room .message-content-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
   max-width: 100%;
-  justify-items: start;
 }
-.message-content-row > :is(.fp-bubble, .chat-quote-stack) { grid-column: 1; }
-.message-content-row > .fp-bubble + .chat-quote-stack { grid-row: 2; }
-.message-content-row > .message-repeat:has(> button) {
-  grid-column: 2;
-  grid-row: 1;
-  align-self: center;
-}
-.is-self .message-content-row:has(> .message-repeat > button) {
-  grid-template-columns: auto minmax(0, 1fr);
-  justify-items: end;
-}
-.is-self .message-content-row > :is(.fp-bubble, .chat-quote-stack) { grid-column: 2; }
-.is-self .message-content-row > .message-repeat { grid-column: 1; }
+.is-room.is-self .message-content-row { flex-direction: row-reverse; }
+.message-repeat { flex: none; }
+.message-repeat:empty { display: none; }
 .is-room .body :deep(p + p) { margin-top: 6px; }
 .is-room .body :deep(.chat-image-frame) {
   display: inline-flex;

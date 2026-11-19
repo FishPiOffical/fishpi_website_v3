@@ -130,6 +130,7 @@ const quoteLayoutMessages = [
   { ...longQuote('9201', false), client: 'WPS/12.1.0' },
   longQuote('9202', true),
   { ...message('9203'), type: 'music', card: { title: '测试音乐卡片' } },
+  { ...longQuote('9204', true), author: { ...message('9204').author, id: '1', userName: '本人' } },
 ]
 // 复用生产路由的滚动行为，防止夹具默认行为掩盖 hash 抢滚动问题。
 const routerSource = ts.createSourceFile('router.ts', fs.readFileSync('src/router/index.ts', 'utf8'), ts.ScriptTarget.Latest, true)
@@ -193,7 +194,7 @@ try {
     unexpected.push(url.href); await route.abort()
   })
   const calls = () => page.evaluate(() => [...window.apiRequests])
-  for (const [mode, width] of [['classic', 1200], ['modern', 390], ['floating', 390]]) {
+  for (const [mode, width] of [['classic', 1200], ['modern', 390], ['floating', 390], ['floating', 320]]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto(`${origin}/cr?mode=${mode}&quoteLayout`)
     if (mode === 'floating') await page.getByRole('button', { name: /聊天室/ }).click()
@@ -224,9 +225,19 @@ try {
     await repeatButton.waitFor()
     const bubble = await withBody.locator('.fp-bubble').boundingBox()
     const repeat = await repeatButton.boundingBox()
-    assert.ok(repeat.x >= bubble.x + bubble.width && repeat.y < bubble.y + bubble.height, `${mode} 复读按钮应紧邻气泡`)
+    assert.ok(Math.abs(repeat.x - bubble.x - bubble.width - 5) < 1, `${mode} 长引用不能把复读按钮推开`)
+    assert.ok(repeat.y < bubble.y + bubble.height)
+    const quote = await withBody.locator('.chat-quote-card').boundingBox()
+    assert.ok(quote.width > bubble.width && quote.y >= bubble.y + bubble.height)
+    const own = page.locator('.fp-msg').filter({ has: page.locator('.chat-quote-jump[href="/cr#chatroom92040"]') })
+    const ownBubble = await own.locator('.fp-bubble').boundingBox()
+    const ownRepeat = await own.locator('.chat-repeat').boundingBox()
+    assert.ok(Math.abs(ownBubble.x - ownRepeat.x - ownRepeat.width - 5) < 1, `${mode} 本人图标应贴气泡左侧`)
     assert.equal(await withBody.locator('.foot .chat-repeat').count(), 0)
     assert.equal(await pure.locator('.message-repeat .chat-repeat').count(), 1)
+    const pureCard = await pure.locator('.chat-quote-card').boundingBox()
+    const pureRepeat = await pure.locator('.chat-repeat').boundingBox()
+    assert.ok(Math.abs(pureRepeat.x - pureCard.x - pureCard.width - 5) < 1, `${mode} 纯引用的图标应贴卡片`)
     assert.equal(await page.locator('.fp-msg').filter({ has: page.locator('[data-special-card]') }).locator('.chat-repeat').count(), 0)
     const restingBackground = await repeatButton.evaluate(el => getComputedStyle(el).backgroundColor)
     await repeatButton.hover()
@@ -240,7 +251,7 @@ try {
     assert.deepEqual(await calls(), [], `${mode} 复读不应先读取原消息详情`)
   }
   await page.setViewportSize({ width: 1200, height: 900 })
-  console.log('PASS 经典、简约和悬浮聊天室的纯引用三行、带正文单行、真实卡片插槽及 WPS 图标与版本。')
+  console.log('PASS 经典、简约和悬浮聊天室的长引用、纯引用、左右复读图标间距及悬浮动画。')
   for (const mode of ['classic', 'modern']) {
     await page.goto(`${origin}/cr?mode=${mode}`)
     const message = page.locator('#chatroom9001')
