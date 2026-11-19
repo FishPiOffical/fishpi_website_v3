@@ -4,6 +4,8 @@ import { RouterLink } from 'vue-router'
 import type { PublicUser } from '@/api/v3-public-user'
 import { useAuthStore } from '@/stores/auth'
 import { coverStyle, avatarStyle, avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
+import { getAuthContextVersion } from '@/api/http'
+import { readPartnerCard } from '@/api/v3-partners'
 import MemberProfileBadges from './MemberProfileBadges.vue'
 import MemberProfileDates from './MemberProfileDates.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
@@ -18,6 +20,19 @@ defineEmits<{ retry: [] }>()
 const auth = useAuthStore(), mounted = ref(false), showTransfer = ref(false)
 const self = computed(() => mounted.value && !!props.profile && auth.account?.oId === props.profile.id)
 const canAct = computed(() => mounted.value && auth.isLoggedIn && !props.fromCache)
+const partnerCard = ref<Awaited<ReturnType<typeof readPartnerCard>>>(null)
+const partnerError = ref(false), retryPartner = ref(0)
+watch([canAct, () => props.profile?.id, () => auth.account?.oId, getAuthContextVersion, retryPartner], async ([allowed, id], _, cleanup) => {
+  let current = true
+  cleanup(() => { current = false })
+  partnerCard.value = null
+  partnerError.value = false
+  if (!allowed || typeof id !== 'string') return
+  try {
+    const card = await readPartnerCard(id)
+    if (current) partnerCard.value = card
+  } catch { if (current) partnerError.value = true }
+}, { flush: 'sync' })
 const points = computed(() => props.profile?.userPoint ?? null)
 const onlineTime = computed(() => {
   const minutes = props.profile?.onlineMinute
@@ -56,6 +71,10 @@ function fallback(event: Event) {
         <MemberProfileDates :member-id="profile.id" :last-login-time="profile.userLatestLoginTime" />
         <template v-if="canAct">
           <RouterLink class="profile-website" :to="self ? '/parking' : { path: '/parking', query: { host: profile.id } }">{{ self ? '我的停车场' : '去鱼友停车场' }} ↗</RouterLink>
+          <RouterLink v-if="partnerCard" class="profile-website" :to="self ? '/partners' : { path:'/partners', query:{ peer:partnerCard.id } }">
+            {{ self ? '我的搭子' : partnerCard.mine ? '查看我的搭子' : partnerCard.full ? '查看搭子名片' : '请 TA 当搭子 · '+partnerCard.price+' 币' }} ↗
+          </RouterLink>
+          <button v-else-if="partnerError" class="profile-website" @click="retryPartner++">重试搭子名片</button>
           <RouterLink v-if="self" to="/settings" class="profile-edit">编辑资料</RouterLink>
           <template v-else>
             <div class="profile-actions">

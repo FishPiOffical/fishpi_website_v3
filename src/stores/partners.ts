@@ -9,7 +9,7 @@ export const usePartnersStore = defineStore('partners', () => {
   const auth = useAuthStore()
   const state = ref<Awaited<ReturnType<typeof readPartners>> | null>(null)
   const loading = ref(false), busy = ref(false), error = ref(''), message = ref('')
-  const cursor = ref('')
+  const cursor = ref(''), target = ref('')
   const pending = ref<{ cmd: PartnerCommand; key: string } | null>(null)
   let sequence = 0, uncertain = false
   const identity = () => [getAuthContextVersion(), auth.account?.oId, !!auth.accessToken].join('|')
@@ -17,17 +17,19 @@ export const usePartnersStore = defineStore('partners', () => {
     sequence++
     state.value = pending.value = null
     loading.value = busy.value = uncertain = false
-    error.value = message.value = cursor.value = ''
+    error.value = message.value = cursor.value = target.value = ''
   }, { flush: 'sync' })
 
-  async function load(after = cursor.value) {
+  async function load(after = cursor.value, peer = target.value) {
     if (import.meta.env.SSR || !auth.account?.oId || !auth.accessToken) return
     const seq = ++sequence
+    if (target.value !== peer) state.value = null
+    target.value = peer
     cursor.value = after
     loading.value = true
     error.value = ''
     try {
-      const result = await readPartners(after)
+      const result = await readPartners(after, peer)
       if (seq === sequence) state.value = result
     } catch (e) {
       if (seq === sequence) {

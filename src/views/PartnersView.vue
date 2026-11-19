@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { avatarThumbnail, fallbackAvatar } from '@/utils/avatar'
+import { useRoute } from 'vue-router'
+import PartnerActivity from '@/components/PartnerActivity.vue'
 import FpDialog from '@/components/FpDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePartnersStore } from '@/stores/partners'
@@ -10,13 +12,15 @@ import type { PartnerCommand } from '@/api/v3-partners'
 usePageSeo(() => ({ title: '抢搭子', path: '/partners', robots: 'noindex' }))
 const auth = useAuthStore(), game = usePartnersStore()
 const confirm = ref<{ title: string; detail: string; button: string; cmd: PartnerCommand } | null>(null)
+const route = useRoute()
+const peer = computed(() => typeof route.query.peer === 'string' && /^[1-9][0-9]{0,18}$/.test(route.query.peer) ? route.query.peer : '')
 const locked = computed(() => game.loading || game.busy || !!game.pending)
 const canHire = computed(() => game.state?.joined && game.state.slots.some(s => !s.peer))
 const unlockCost = computed(() => game.state?.slots.length === 1 ? 600 : 1600)
 const mounted = ref(false)
-watch([mounted, () => auth.account?.oId, () => !!auth.accessToken], () => {
+watch([mounted, peer, () => auth.account?.oId, () => !!auth.accessToken], () => {
   confirm.value = null
-  if (mounted.value && auth.isLoggedIn) void game.load('')
+  if (mounted.value && auth.isLoggedIn) void game.load('', peer.value)
 }, { flush: 'post' })
 function refresh() {
   if (!document.hidden && !game.busy && !game.loading) void game.load()
@@ -46,7 +50,8 @@ function accept() {
       <section class="panel">
         <header><h2>我的搭子</h2><button v-if="game.state.joined" :disabled="locked" @click="ask('退出搭子社？','现有搭班全部结束，每位邀请人收回 100 币。已购位置和今日使用时间会保留。','退出搭子社',{action:'leave',revision:game.state.revision})">退出搭子社</button></header>
         <template v-if="game.state.joined">
-          <p>{{ game.state.holderName ? '我正在给 '+game.state.holderName+' 搭班，每小时赚 2 币。' : '我的名片已开放，鱼友可以来请我。' }}</p>
+          <div class="host"><span>谁请了我</span><strong>{{ game.state.holderName || '暂时空闲' }}</strong>
+            <small>{{ game.state.holderName ? '搭班收入 2 币/小时' : '名片已开放' }}</small></div>
           <ul class="slots"><li v-for="(slot,i) in game.state.slots" :key="i">
             <small>搭子位 {{ i+1 }}</small><strong>{{ slot.name || '空位' }}</strong>
             <span>{{ slot.peer ? slot.rate+' 币/小时 · ' : '' }}今日已赚 {{ slot.today }} 币</span>
@@ -59,10 +64,10 @@ function accept() {
           <button class="primary" :disabled="locked" @click="game.submit({action:'join'})">加入搭子社</button></template>
       </section>
       <section class="panel">
-        <header><h2>可以请的鱼友</h2><button :disabled="locked" @click="game.load()">刷新</button></header>
-        <p v-if="!game.state.list.length">这一页还没有鱼友名片。</p>
+        <header><h2>{{ peer ? '鱼友名片' : '可以请的鱼友' }}</h2><RouterLink v-if="peer" to="/partners">全部鱼友</RouterLink><button :disabled="locked" @click="game.load()">刷新</button></header>
+        <p v-if="!game.state.list.length">{{ peer ? '这位鱼友当前没有开放名片。' : '这一页还没有鱼友名片。' }}</p>
         <ul class="directory"><li v-for="player in game.state.list" :key="player.id">
-          <div class="person"><RouterLink :to="'/member/'+encodeURIComponent(player.userName)" :data-user-card="player.userName"><img :src="avatarThumbnail(player.avatar,36)" alt="" width="36" height="36" loading="lazy" @error="fallbackAvatar"/><strong>{{ player.name }}</strong></RouterLink><small>{{ 40+(player.price-100)/10 }} 币/小时</small></div>
+          <div class="person"><RouterLink :to="'/member/'+encodeURIComponent(player.userName)" :data-user-card="player.userName"><img :src="avatarThumbnail(player.avatar,36)" alt="" width="36" height="36" loading="lazy" @error="fallbackAvatar"/><strong>{{ player.name }}</strong></RouterLink><small>{{ player.following ? '已关注 · ' : '' }}{{ 40+(player.price-100)/10 }} 币/小时</small></div>
           <button :disabled="locked || !canHire || player.mine || player.full || game.state.coins<player.price"
             @click="ask('请 '+player.name+' 搭班？','成交价 '+player.price+' 币，每小时赚 '+(40+(player.price-100)/10)+' 币。放手或对方退出时退 100 币。','确认 · '+player.price+' 币',{action:'hire',peer:player.id,revision:player.revision})">
             {{ player.mine ? '我的搭子' : player.full ? '已满价' : (player.price===100?'请 TA':'抢走')+' · '+player.price+' 币' }}
@@ -71,6 +76,7 @@ function accept() {
         <footer v-if="game.cursor || game.state.next"><button v-if="game.cursor" :disabled="locked" @click="game.load('')">回第一页</button>
           <button v-if="game.state.next" :disabled="locked" @click="game.load(game.state.next)">下一页</button></footer>
       </section>
+      <PartnerActivity :snapshot="game.state" />
     </template>
     <FpDialog :open="!!confirm" :title="confirm?.title" @close="confirm=null">
       <p>{{ confirm?.detail }}</p><template #footer><button @click="confirm=null">取消</button>
@@ -100,6 +106,7 @@ strong { overflow-wrap:anywhere; }
 button { justify-self:start; background:var(--fp-elevated); border:1px solid var(--fp-border); border-radius:7px; padding:7px 12px; color:var(--fp-text); font:inherit; cursor:pointer; }
 button:disabled { opacity:.55; cursor:default; } button:enabled:hover { border-color:var(--fp-primary); }
 button.primary { background:var(--fp-primary-soft); color:var(--fp-primary-ink); }
+.host { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; } .host span { color:var(--fp-muted); }
 .slots button { margin-top:5px; } footer { justify-content:flex-end; }
 @media(max-width:600px) { .directory,.slots { grid-template-columns:1fr; } button { min-height:44px; } }
 </style>

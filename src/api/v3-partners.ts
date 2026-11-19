@@ -19,8 +19,20 @@ async function data(path: string, init: RequestInit) {
   const response = await request<{code: number; data: unknown}>(path, { ...init, signal: AbortSignal.timeout(15000) })
   return response?.code === 0 ? row(response.data) : invalid()
 }
-export async function readPartners(after = '') {
-  const r = await data(base + (after ? '?after=' + encodeURIComponent(after) : ''), { cache: 'no-store' })
+function decodeCard(value: unknown) {
+  const s = row(value)
+  return { id: str(s.id), name: str(s.name), userName: str(s.userName), avatar: str(s.avatar), price: num(s.price),
+    revision: num(s.revision), mine: bool(s.mine), full: bool(s.full), following: bool(s.following) }
+}
+export async function readPartnerCard(id: string) {
+  const r = await data(base + '/card/' + encodeURIComponent(id), { cache: 'no-store' })
+  return r.card === null ? null : decodeCard(r.card)
+}
+export async function readPartners(after = '', peer = '') {
+  const query = new URLSearchParams({ sort: 'following' })
+  if (after) query.set('after', after)
+  if (peer) query.set('peer', peer)
+  const r = await data(base + '?' + query, { cache: 'no-store' })
   return {
     joined: bool(r.joined), revision: num(r.revision), coins: num(r.coins), today: num(r.today),
     holderName: str(r.holderName), next: str(r.next),
@@ -28,14 +40,25 @@ export async function readPartners(after = '') {
       const s = row(value)
       return { peer: str(s.peer), name: s.peer ? str(s.name) : '', rate: num(s.rate), today: num(s.today), usedMs: num(s.usedMs) }
     }),
-    list: list(r.list).map(value => {
-      const s = row(value)
-      return { id: str(s.id), name: str(s.name), userName: str(s.userName), avatar: str(s.avatar), price: num(s.price), revision: num(s.revision), mine: bool(s.mine), full: bool(s.full) }
-    }),
+    list: list(r.list).map(decodeCard),
   }
 }
 export async function writePartner(cmd: PartnerCommand, key: string) {
   const { action, ...body } = cmd
   const receipt = await data(base + '/' + action, { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify(body) })
   if (receipt.action !== action) invalid()
+}
+
+export type PartnerFeed = 'events' | 'wallet'
+export async function readPartnerActivity(kind: PartnerFeed, before: string) {
+  const query = new URLSearchParams({ kind })
+  if (before) query.set('before', before)
+  const r = await data(base + '/activity?' + query, { cache: 'no-store' })
+  return { next: str(r.next), list: list(r.list).map(value => {
+    const item = row(value)
+    if (typeof item.amount !== 'number' || !Number.isSafeInteger(item.amount)) return invalid()
+    return { id: str(item.oId), time: num(item.createdAt), amount: item.amount,
+      summary: kind === 'events' ? str(item.summary) : '', operation: kind === 'wallet' ? str(item.operation) : '',
+      price: kind === 'events' ? num(item.price) : 0 }
+  }) }
 }
