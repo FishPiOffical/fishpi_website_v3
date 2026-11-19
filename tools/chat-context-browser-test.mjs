@@ -24,12 +24,12 @@ const mocks = publish('mocks', `import { reactive, ref, toRefs, h } from '${vue}
 export const auth=reactive({accessToken:'fixture-token',isLoggedIn:true,account:{oId:'1',userName:'本人'}});
 export const prefs=reactive({simpleMode:false,blurChatImages:false,sendShortcut:'enter'});
 export const timeline=reactive({changeHint:null,notices:[]});
-export const publication=reactive({pending:null,receipt:null});
+export const publication=reactive({pending:null,receipt:null,async send(content,origin){window.fixtureRepeats.push({content,origin})}});
 const privateInbox=reactive({inboxPeer:'',inboxPeerId:''});
 export const usePrivateInboxStore=()=>privateInbox;
 export const chat=reactive({messages:[],sending:false,loading:false,loadingMore:false,hasMore:false,error:'',topicError:'',discuss:'本地引用定位专项',onlineTotal:1,nodeName:'本地夹具',nodeOptions:[],chatStyle:'classic',connecting:false,
  acquire(){window.acquired=(window.acquired||0)+1},release(){},loadMore(){window.mainLoads++},refreshMessages(){window.mainReads++},async send(content,replyToMessageId){window.fixtureSends.push({content,replyToMessageId});return true},clearScreen(){},toggleChatStyle(){this.chatStyle=this.chatStyle==='classic'?'modern':'classic'}});
-window.auth=auth;window.timeline=timeline;window.chat=chat;window.mainLoads=0;window.mainReads=0;window.fixtureSends=[];window.apiRequests=[];window.resolvedRequests=[];
+window.auth=auth;window.timeline=timeline;window.chat=chat;window.mainLoads=0;window.mainReads=0;window.fixtureSends=[];window.fixtureRepeats=[];window.apiRequests=[];window.resolvedRequests=[];
 export const storeToRefs=toRefs,useAuthStore=()=>auth,useChatPreferencesStore=()=>prefs,useFunctionPreferencesStore=()=>prefs,useChatStore=()=>chat,useV3ChatTimelineStore=()=>timeline,useV3ChatPublicationStore=()=>publication;
 export const useChatFilterStore=()=>({modeFor:()=> 'show'});
 export const getAuthContextVersion=()=>1,formatDisplayTime=()=> '2026-11-14 13:07';
@@ -45,7 +45,7 @@ export default {props:['open'],setup(p,{slots}){return()=>p.open===false?null:sl
 for (const name of ['pinia', '@/stores/auth', '@/stores/chatPreferences', '@/stores/functionPreferences', '@/stores/v3ChatTimeline', '@/stores/v3ChatPublication', '@/stores/chatFilter', '@/stores/privateInbox', '@/api/http', '@/utils/time']) modules.set(name, mocks)
 modules.set('@/components/ChatComposer.vue', publish('composer', `import {h} from '${vue}';export default {props:['modelValue','height'],emits:['update:modelValue','submit'],setup(p,{slots,expose,emit}){expose({flush:()=>p.modelValue,reveal(){document.querySelector('[data-editor]')?.focus()},insert(text){emit('update:modelValue',p.modelValue+text)}});return()=>h('div',{class:'fixture-composer'},[slots.top?.(),h('textarea',{'data-editor':'true','aria-label':'聊天输入框',value:p.modelValue,style:{height:(p.height||100)+'px'}}),h('div',{class:'bar'},[slots.tools?.(),slots['inline-context']?.(),slots.actions?.(),h('button',{type:'button','data-fixture-send':'true',onClick:()=>emit('submit')},'夹具发送')])])}}`))
 const noop = publish('noop', 'export default {setup(){return()=>null}}')
-for (const name of ['ChatToolDialog', 'ChatRoomNotice', 'ChatConnectionStatus', 'ChatRepeatAction', 'ChatRevokeAction', 'ChatRevokeRecovery', 'ChatPublicationRecovery', 'ChatTopicEditor', 'ChatTopicRecovery', 'ChatOnlineList', 'ChatRedPacketCard', 'CollectChatEmoji']) modules.set(`@/components/chat/${name}.vue`, noop)
+for (const name of ['ChatToolDialog', 'ChatRoomNotice', 'ChatConnectionStatus', 'ChatRevokeAction', 'ChatRevokeRecovery', 'ChatPublicationRecovery', 'ChatTopicEditor', 'ChatTopicRecovery', 'ChatOnlineList', 'ChatRedPacketCard', 'CollectChatEmoji']) modules.set(`@/components/chat/${name}.vue`, noop)
 for (const name of ['V3ReactionBar', 'ReportDialog', 'FpLoading', 'ImageLightbox']) modules.set(`@/components/${name}.vue`, noop)
 modules.set('@/components/ChatCard.vue', publish('special-card', `import{h}from'${vue}';export default {props:['card'],setup(props){return()=>h('div',{'data-special-card':true},props.card.title)}}`))
 modules.set('@/components/chat/V3PrivateMessages.vue', publish('private-panel', `import{h}from'${vue}';export default {props:['chatroomActive'],setup(props,{slots}){return()=>h('div',[slots['sidebar-top']?.(),props.chatroomActive ? slots['main-override']?.() : null])}}`))
@@ -102,6 +102,7 @@ compileVue('src/components/chat/ChatQuoteCard.vue')
 compileVue('src/components/chat/ChatQuotePreview.vue')
 compileVue('src/components/ChatBubble.vue')
 compileVue('src/components/chat/ChatContextPanel.vue')
+compileVue('src/components/chat/ChatRepeatAction.vue')
 compileVue('src/components/chat/ChatRepeatList.vue')
 compileVue('src/components/chat/ChatMessageEntry.vue')
 const view = compileVue('src/views/ChatroomView.vue')
@@ -219,6 +220,10 @@ try {
     assert.equal(await withBody.locator('.chat-quote-card--standalone').count(), 0, `${mode} 带正文引用应保持紧凑`)
     assert.equal(await withBody.locator('.chat-quote-excerpt').evaluate(el => getComputedStyle(el).whiteSpace), 'nowrap')
     assert.equal(await page.locator('.fp-bubble [data-special-card]').innerText(), '测试音乐卡片')
+    await withBody.locator('.body').hover()
+    await withBody.getByRole('button', { name: '复读这条消息' }).click()
+    assert.deepEqual(await page.evaluate(() => window.fixtureRepeats), [{ content: quoteLayoutMessages[1].content, origin: 'repeat' }])
+    assert.deepEqual(await calls(), [], `${mode} 复读不应先读取原消息详情`)
   }
   await page.setViewportSize({ width: 1200, height: 900 })
   console.log('PASS 经典、简约和悬浮聊天室的纯引用三行、带正文单行、真实卡片插槽及 WPS 图标与版本。')

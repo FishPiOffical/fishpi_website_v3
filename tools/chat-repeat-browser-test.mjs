@@ -11,7 +11,7 @@ const mocks = data(`import {reactive} from '${vue}';
 export const prefs=reactive({simpleMode:false,blurChatImages:false});window.prefs=prefs;
 export const useChatPreferencesStore=()=>prefs,useFunctionPreferencesStore=()=>prefs;
 export const useAuthStore=()=>({accessToken:'fixture',account:{oId:'me'}}),getAuthContextVersion=()=>1;
-const publication=reactive({busy:false,pending:null,async send(content){publication.busy=true;window.sent=(window.sent||0)+1;await new Promise(r=>setTimeout(r,120));publication.busy=false}});
+const publication=reactive({busy:false,pending:null,async send(content,origin){publication.busy=true;window.sent.push({content,origin});await new Promise(r=>setTimeout(r,120));publication.busy=false}});
 export const useV3ChatPublicationStore=()=>publication;
 export const chatPetStatusLabels={idle:'空闲'},formatDisplayTime=()=> '12:30';
 export const chatMessageDetail=async()=>{window.reads=(window.reads||0)+1;await new Promise(r=>setTimeout(r,80));return {type:'text',content:'一起摸鱼'}};`)
@@ -49,7 +49,7 @@ import {createApp,h,ref,provide} from '${vue}';import List from '${list}';import
 const make=(id,name,content='一起摸鱼')=>({key:id,message:{oId:id,userName:name,userNickname:name,userAvatarURL:'${avatar}',html:'<p>'+content+'</p>',content,appearance:{version:1,frameId:'none',bubbleId:name==='我'?'candy':'fishpond-blue'}}});
 const entries=ref([make('1','小羊'),{key:'join',message:null,notice:{kind:'join'}},make('2','冰岚'),{key:'claim',message:null,notice:{kind:'claim'}},make('3','我')]);
 const reverse=ref(false),ownName=ref('我');window.entries=entries;window.make=make;window.reverse=reverse;window.ownName=ownName;
-window.mentions=[];
+window.mentions=[];window.sent=[];window.reads=0;
 createApp({setup(){provide(CHAT_MENTION,{enabled:()=>true,insert:name=>window.mentions.push(name)});return()=>h('div',{class:'fixture-panel'},[h(List,{entries:entries.value,ownName:ownName.value,reverse:reverse.value},{default:({entry,alignSelf})=>entry.notice?h('p',{'data-notice':entry.key},entry.notice.kind):h(Bubble,{chatroom:true,self:entry.message.userName==='我',alignSelf,userName:entry.message.userName,userId:entry.message.userName==='我'?'me':'other',avatar:'${avatar}',html:entry.message.html,source:entry.message.content,appearance:entry.message.appearance,'data-message':entry.key,'data-author':entry.message.userName})})])}}).mount('#app');
 </script>`
 const browser=await chromium.launch({channel:'chrome',headless:true})
@@ -98,7 +98,7 @@ try {
  await page.screenshot({path:'/tmp/chat-repeat-compact-320.png'})
  await page.setViewportSize({width:1000,height:1000});await page.screenshot({path:'/tmp/chat-repeat-compact-1000.png'})
  await page.locator('.chat-repeat--compact button').evaluate(el=>{el.click();el.click()})
- await page.waitForTimeout(250);assert.equal(await page.evaluate(()=>window.sent),1);assert.equal(await page.evaluate(()=>window.reads),1)
+ await page.waitForFunction(()=>window.sent.length===1);assert.deepEqual(await page.evaluate(()=>window.sent),[{content:'一起摸鱼',origin:'repeat'}]);assert.equal(await page.evaluate(()=>window.reads),0)
  await page.locator('.repeat-controls > button').click();assert.equal(await page.locator('[data-message]').count(),3)
  await direction(false)
  await page.locator('.repeat-controls > button').click()

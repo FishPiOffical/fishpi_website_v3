@@ -505,7 +505,7 @@ onUnmounted(() => {
                       <ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" />
                       <ChatCard v-else-if="line.card" :card="line.card" />
                       <template #actions>
-                        <ChatRepeatAction v-if="!line.redPacket&&!line.card" :id="line.oId" />
+                        <ChatRepeatAction v-if="!line.redPacket&&!line.card" :content="line.content" />
                         <ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" />
                         <button v-if="!line.redPacket && !line.card && auth.accessToken" type="button" title="引用消息"
                           :disabled="!canQuote(line.oId)" @click="quoteRoomMessage(line.oId)">{{ quoteBusy === line.oId ? '…' : '引用' }}</button>

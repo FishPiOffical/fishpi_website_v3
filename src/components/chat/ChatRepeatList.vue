@@ -82,7 +82,7 @@ function toggle(key: string) {
       <template v-else><template v-for="entry in (reverse ? [...group].reverse() : group)" :key="entry.key"><slot :entry="entry" :align-self="groupSelf(group)" /></template></template>
       <div class="repeat-controls">
         <button type="button" :aria-expanded="expanded.has(group[0]!.key)" @click="toggle(group[0]!.key)">{{ expanded.has(group[0]!.key) ? '收起' : '展开' }} · {{ group.length }} 条复读 <span aria-hidden="true">{{ expanded.has(group[0]!.key) ? '⌃' : '⌄' }}</span></button>
-        <ChatRepeatAction :id="group[group.length - 1]!.message!.oId" label="+1" compact />
+        <ChatRepeatAction :content="group[group.length - 1]!.message!.content" label="+1" compact />
       </div>
     </template>
   </div>

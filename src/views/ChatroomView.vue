@@ -466,7 +466,7 @@ function clearScreen() {
                   <V3ReactionBar kind="chat" :target-id="entry.message.oId" :initial-state="entry.message.reactions" :reactions-unavailable="entry.message.reactionsUnavailable" :initial-read-started="entry.message.reactionReadStarted" />
                 </template>
                 <template #actions>
-                  <ChatRepeatAction v-if="!entry.message.redPacket && !entry.message.card" :id="entry.message.oId" />
+                  <ChatRepeatAction v-if="!entry.message.redPacket && !entry.message.card" :content="entry.message.content" />
                   <ChatRevokeAction :id="entry.message.oId" :author-id="entry.message.userOId" :red-packet="!!entry.message.redPacket" />
                   <template v-if="!entry.message.redPacket && accessToken">
                     <button type="button" title="引用消息" :disabled="quoteBusy === entry.message.oId" @click="quoteMessage(entry.message!)">
@@ -584,7 +584,7 @@ function clearScreen() {
                   <V3ReactionBar kind="chat" :target-id="entry.message.oId" :initial-state="entry.message.reactions" :reactions-unavailable="entry.message.reactionsUnavailable" :initial-read-started="entry.message.reactionReadStarted" />
                 </template>
                 <template #actions>
-                  <ChatRepeatAction v-if="!entry.message.redPacket && !entry.message.card" :id="entry.message.oId" />
+                  <ChatRepeatAction v-if="!entry.message.redPacket && !entry.message.card" :content="entry.message.content" />
                   <ChatRevokeAction :id="entry.message.oId" :author-id="entry.message.userOId" :red-packet="!!entry.message.redPacket" />
                   <template v-if="!entry.message.redPacket && accessToken">
                     <button type="button" title="引用消息" :disabled="quoteBusy === entry.message.oId" @click="quoteMessage(entry.message!)">
