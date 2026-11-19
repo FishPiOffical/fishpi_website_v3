@@ -303,10 +303,17 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
 
           <div v-else-if="section === 'chatInput'" class="content">
+            <button type="button" class="chat-tail-entry" :disabled="!isLoggedIn" @click="openChatTail">
+              <span class="chat-tail-entry-icon"><SidebarIcon name="pencil" /></span>
+              <span class="chat-tail-entry-copy">
+                <strong>小尾巴设置</strong>
+                <small>{{ isLoggedIn ? '在聊天消息末尾加一句签名' : '登录后可设置' }}</small>
+              </span>
+              <SidebarIcon v-if="isLoggedIn" class="chat-tail-entry-arrow" name="chevron" />
+            </button>
             <label class="setting-toggle" :class="{ selected: chatPreferences.simpleMode }"><input type="checkbox" :checked="chatPreferences.simpleMode" @change="chatPreferences.setSimpleMode(($event.target as HTMLInputElement).checked)"><span><b>精简模式</b><small>隐藏头像框、气泡、小尾巴和进出场效果</small></span></label>
             <label class="setting-toggle" :class="{ selected: chatPreferences.mountEffects, 'is-disabled': chatPreferences.simpleMode }"><input type="checkbox" :disabled="chatPreferences.simpleMode" :checked="chatPreferences.mountEffects" @change="chatPreferences.setMountEffects(($event.target as HTMLInputElement).checked)"><span><b>显示座驾进场特效</b></span></label>
             <label class="setting-toggle" :class="{ selected: chatPreferences.sakuraEffects, 'is-disabled': chatPreferences.simpleMode }"><input type="checkbox" :disabled="chatPreferences.simpleMode" :checked="chatPreferences.sakuraEffects" @change="chatPreferences.setSakuraEffects(($event.target as HTMLInputElement).checked)"><span><b>播放樱花外观动效</b></span></label>
-            <div class="setting-options"><button type="button" class="fp-btn" :disabled="!isLoggedIn" @click="openChatTail">小尾巴设置</button><small v-if="!isLoggedIn">登录后可设置</small></div>
             <fieldset class="setting-options">
               <legend>发送快捷键</legend>
               <label :class="{ selected: chatPreferences.sendShortcut === 'mod-enter' }">
@@ -443,6 +450,43 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 </template>
 
 <style scoped>
+.chat-tail-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--fp-primary) 42%, var(--fp-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fp-primary) 8%, var(--fp-card));
+  color: var(--fp-title);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.chat-tail-entry:enabled:hover {
+  border-color: var(--fp-primary);
+  background: color-mix(in srgb, var(--fp-primary) 14%, var(--fp-card));
+}
+.chat-tail-entry:enabled:active { background: color-mix(in srgb, var(--fp-primary) 20%, var(--fp-card)); }
+.chat-tail-entry:focus-visible { outline: 2px solid var(--fp-title); outline-offset: 2px; }
+.chat-tail-entry:disabled { background: var(--fp-card); border-color: var(--fp-border); cursor: default; }
+.chat-tail-entry-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--fp-card);
+}
+.chat-tail-entry-icon svg, .chat-tail-entry-arrow { width: 17px; height: 17px; }
+.chat-tail-entry-copy { display: grid; flex: 1; min-width: 0; gap: 4px; }
+.chat-tail-entry-copy strong { font-size: 14px; }
+.chat-tail-entry-copy small { color: var(--fp-muted); font-size: 12px; }
+.chat-tail-entry-arrow { flex: none; color: var(--fp-muted); rotate: -90deg; }
 .setting-options { display:flex; flex-direction:column; gap:8px; margin:0 0 16px; padding:0; border:0; }
 .setting-options legend { margin-bottom:8px; font-size:13px; font-weight:600; color:var(--fp-title); }
 .setting-options label, .setting-toggle { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--fp-border); border-radius:8px; cursor:pointer; }

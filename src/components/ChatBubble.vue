@@ -440,7 +440,7 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
   padding-top: 6px;
   border-top: 1px solid color-mix(in srgb, var(--fp-muted) 22%, transparent);
   color: var(--fp-muted);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
