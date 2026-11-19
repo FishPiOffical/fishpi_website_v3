@@ -36,8 +36,8 @@ function setScope(value: 'all' | 'following') {
   game.scope = value
   void game.load()
 }
-function tripArt(s: ParkingSession) {
-  return Object.hasOwn(mountAssets,s.mountStyle) ? mountAssets[s.mountStyle] : art(s.car)
+function mountArt(style: string) {
+  return Object.hasOwn(mountAssets, style) ? mountAssets[style] : undefined
 }
 const serverTime = computed(() => (game.state?.serverNow || 0) + Math.max(0, current.value - game.receivedAt))
 function withinBillingPeriod(s: ParkingSession) {
@@ -110,7 +110,7 @@ onBeforeUnmount(() => { clearInterval(timer); window.removeEventListener('focus'
           </header>
           <div class="bay-body">
             <div class="bay-art" :class="{ vacant: side === 'occupant' && !game.state.occupant }">
-              <img v-if="game.state[side]" :src="tripArt(game.state[side])" alt="" width="136" height="112" />
+              <img v-if="game.state[side]" :src="art(game.state[side].car)" alt="" width="136" height="112" />
               <img v-else-if="side === 'driving'" :src="art(activeCar)" alt="" width="136" height="112" />
               <span v-else aria-hidden="true">P</span>
             </div>
@@ -119,10 +119,16 @@ onBeforeUnmount(() => { clearInterval(timer); window.removeEventListener('focus'
                 <h3>{{ carName(game.state[side].car) }}</h3>
                 <p>{{ side === 'driving' ? '停在 ' + game.state[side].otherName + ' 的车位' : '车主 · ' + game.state[side].otherName }}</p>
                 <p>预计{{ side === 'driving' ? '收入' : '车主收入' }} <strong>{{ estimate(game.state[side]) }}</strong> 游园币</p>
-                <span v-if="game.state[side].passengerSpecies && speciesName(game.state[side].passengerSpecies)" class="passenger">
-                  <img :src="petPortrait(game.state[side].passengerSpecies)" @error="fallbackPortrait($event, game.state[side].passengerSpecies)" width="32" height="32" alt="">
-                  副驾 · {{ speciesName(game.state[side].passengerSpecies) }}
-                </span>
+                <div class="trip-details">
+                  <span v-if="game.state[side].passengerSpecies && speciesName(game.state[side].passengerSpecies)" class="passenger">
+                    <img :src="petPortrait(game.state[side].passengerSpecies)" @error="fallbackPortrait($event, game.state[side].passengerSpecies)" width="32" height="32" alt="">
+                    副驾 · {{ speciesName(game.state[side].passengerSpecies) }}
+                  </span>
+                  <span v-if="mountArt(game.state[side].mountStyle)" class="passenger trip-mount">
+                    <img :src="mountArt(game.state[side].mountStyle)" width="32" height="32" alt="">
+                    座驾外观
+                  </span>
+                </div>
                 <p v-if="notes[game.state[side].note]">便签 · {{ notes[game.state[side].note] }}</p>
                 <p v-if="protectedTrip(game.state[side])">已放行，计费期满后可清位。</p>
                 <div class="trip-actions"><button v-if="side === 'occupant' && !game.state[side].pardoned && withinBillingPeriod(game.state[side])" :disabled="locked" @click="game.submit({ action: 'pardon', sessionId: game.state[side].id })">放你一马</button>

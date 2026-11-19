@@ -72,6 +72,7 @@
 }
 .bay-info p, .showroom > p { font-size: 13px; }
 .bay-info h3 + p { margin-top: 5px; }
+.trip-details { display: flex; flex-wrap: wrap; column-gap: 12px; }
 .passenger { margin-block: 5px; color: var(--fp-muted); font-size: 13px; }
 .passenger img, .passenger-choice img { object-fit: contain; }
 .trip-actions { flex-wrap: wrap; margin-top: 10px; }
