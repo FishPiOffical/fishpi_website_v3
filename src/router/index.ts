@@ -395,6 +395,7 @@ const routes = [
     component: () => import('@/views/PetBrawlView.vue'),
     meta: { auth: true, robots: 'noindex' },
   },
+  { path: '/partners', name: 'partners', component: () => import('@/views/PartnersView.vue'), meta: { auth: true, robots: 'noindex' } },
   { path: '/parking', name: 'parking', component: () => import('@/views/ParkingView.vue'), meta: { auth: true, robots: 'noindex' } },
   {
     path: '/pets',
