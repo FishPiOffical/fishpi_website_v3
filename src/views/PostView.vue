@@ -31,7 +31,8 @@ const OP_LABELS={'publish':'发布文章','edit':'编辑文章','draft-save':'�
 const auth=useAuthStore(),{accessToken,account,isLoggedIn}=storeToRefs(auth),operations=useV3PostsStore(),router=useRouter(),route=useRoute()
 const editId=computed(()=>typeof route.params.id==='string'?route.params.id:'')
 const title=ref(''),tags=ref(''),content=ref(''),type=ref(0),offer=ref(0),rewardOpen=ref(false),rewardContent=ref(''),rewardPoint=ref<number|null>(0)
-const anonymous=ref(false),commentable=ref(true),notifyFollowers=ref(false),showInList=ref(true),statement=ref(0)
+const anonymous=ref(false),commentable=ref(true),notifyFollowers=ref(false),showInList=ref(true),statement=ref(0),goodPost=ref(false)
+const introductionPost=computed(()=>/新人报[道到]/.test(tags.value))
 const columnMode=ref<''|'__NEW__'|'existing'>(''),columnId=ref(''),columnTitle=ref(''),chapterNo=ref(''),columnCoverURL=ref(''),thoughtContent=ref('')
 const drafts=ref<DraftSummary[]>([]),draftPagination=ref({p:1,size:20,total:0,pageCount:0}),draftPageNo=ref(1),draftId=ref(''),draftsError=ref(''),draftsLoading=ref(false)
 const source=ref<PostSource|null>(null),sourceLoading=ref(false),sourceError=ref(''),error=ref(''),mounted=ref(false),initialDraftResolved=ref(false),sourceTarget=ref(''),loadConfirming=ref(false),published=ref(false),needsReload=ref(false)
@@ -56,9 +57,9 @@ function toggleReward(){
 }
 function snapshot():PostFields{
   const reward=editId.value?retainedReward.value||rewardOpen.value:rewardOpen.value&&!isLong.value&&type.value!==5
-  return{title:title.value,content:content.value,tags:tags.value,type:type.value,rewardContent:reward?rewardContent.value:'',rewardPoint:reward?Number(rewardPoint.value??0):0,qnaOfferPoint:editId.value?Number(offer.value):type.value===5?Number(offer.value):0,commentable:commentable.value,showInList:showInList.value?1:0,statement:statement.value,anonymous:editId.value?anonymous.value:allowAnonymous.value&&anonymous.value,notifyFollowers:notifyFollowers.value,columnId:columnMode.value==='existing'?columnId.value.trim():'',columnTitle:columnMode.value?columnTitle.value:'',chapterNo:columnMode.value?chapterNo.value:'',columnCoverURL:columnCoverURL.value,thoughtContent:thoughtContent.value}
+  return{title:title.value,content:content.value,tags:tags.value,type:type.value,rewardContent:reward?rewardContent.value:'',rewardPoint:reward?Number(rewardPoint.value??0):0,qnaOfferPoint:editId.value?Number(offer.value):type.value===5?Number(offer.value):0,commentable:commentable.value,showInList:showInList.value?1:0,statement:statement.value,anonymous:editId.value?anonymous.value:allowAnonymous.value&&anonymous.value,notifyFollowers:notifyFollowers.value,columnId:columnMode.value==='existing'?columnId.value.trim():'',columnTitle:columnMode.value?columnTitle.value:'',chapterNo:columnMode.value?chapterNo.value:'',columnCoverURL:columnCoverURL.value,thoughtContent:thoughtContent.value,goodPost:goodPost.value}
 }
-function apply(value:PostFields){title.value=value.title;tags.value=value.tags;content.value=value.content;type.value=value.type;offer.value=value.qnaOfferPoint;rewardContent.value=value.rewardContent;rewardPoint.value=value.rewardPoint;rewardOpen.value=value.rewardPoint>0||!!value.rewardContent;anonymous.value=value.anonymous;commentable.value=value.commentable;showInList.value=value.showInList===1;statement.value=value.statement;notifyFollowers.value=value.notifyFollowers;columnId.value=value.columnId;columnTitle.value=value.columnTitle;columnMode.value=value.columnId?'existing':value.columnTitle?'__NEW__':'';chapterNo.value=value.chapterNo;columnCoverURL.value=value.columnCoverURL;thoughtContent.value=value.thoughtContent}
+function apply(value:PostFields){title.value=value.title;tags.value=value.tags;content.value=value.content;type.value=value.type;offer.value=value.qnaOfferPoint;rewardContent.value=value.rewardContent;rewardPoint.value=value.rewardPoint;rewardOpen.value=value.rewardPoint>0||!!value.rewardContent;anonymous.value=value.anonymous;commentable.value=value.commentable;showInList.value=value.showInList===1;statement.value=value.statement;notifyFollowers.value=value.notifyFollowers;columnId.value=value.columnId;columnTitle.value=value.columnTitle;columnMode.value=value.columnId?'existing':value.columnTitle?'__NEW__':'';chapterNo.value=value.chapterNo;columnCoverURL.value=value.columnCoverURL;thoughtContent.value=value.thoughtContent;goodPost.value=value.goodPost}
 function reset(){generation++;sourceSequence++;listSequence++;loadConfirmation?.abort();loadConfirmation=null;loadConfirming.value=false;sourceTarget.value='';operations.cancelConfirmation(commandOrigin);source.value=null;sourceLoading.value=false;sourceError.value='';error.value='';draftsError.value='';drafts.value=[];draftPagination.value={p:1,size:20,total:0,pageCount:0};draftPageNo.value=1;draftsLoading.value=false;draftId.value='';localKey='';initialDraftResolved.value=false;published.value=false;needsReload.value=false;apply(emptyPost());initialForm=''}
 async function loadDrafts(p=draftPageNo.value){
   if(!mounted.value||!isLoggedIn.value||editId.value)return
@@ -130,6 +131,7 @@ async function dropDraft(id:string){
 }
 async function restore(){const command=operations.pending;if(!command||operations.busy)return;const owned=localKey===command.key,reader=identity(),version=generation;const result=await operations.retry();await after(result,operations.completed,reader,version,owned)}
 async function blank(){if(locked.value)return;const reader=identity();const query={...route.query};delete query.draft;await router.replace({path:route.path,query});if(mounted.value&&reader===identity())await initialize(true)}
+watch(introductionPost,value=>{if(value)goodPost.value=false},{flush:'sync'})
 watch([accessToken,()=>account.value?.oId,()=>route.fullPath],()=>{const next=identity();if(next===boundary)return;boundary=next;void initialize()},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity();void initialize()})
 onBeforeUnmount(()=>{mounted.value=false;reset()})
@@ -239,6 +241,15 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
 
       <p v-if="error" class="err fp-state">{{ error }}</p>
       <div class="tools">
+        <template v-if="!editId && type !== 3">
+          <label class="check">
+            <input v-model="goodPost" type="checkbox" :disabled="locked || published || introductionPost" aria-describedby="good-post-hint" />这是好帖（获取优质奖励）
+          </label>
+          <span id="good-post-hint" class="hint" aria-live="polite">
+            <template v-if="introductionPost">新人报道帖不能标记为好帖。</template>
+            <RouterLink v-else to="/article/1683775497629" target="_blank" rel="noopener">好帖奖励说明</RouterLink>
+          </span>
+        </template>
         <button v-if="!editId" type="button" class="ghost fp-control" :aria-disabled="locked||!ready" @click="saveDraft">
           {{ operations.busy ? '保存中…' : '存草稿' }}
         </button>

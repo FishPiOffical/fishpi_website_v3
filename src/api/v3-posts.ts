@@ -1,5 +1,5 @@
 import { ApiError, request } from './http'
-export type PostFields={title:string;content:string;tags:string;type:number;rewardContent:string;rewardPoint:number;qnaOfferPoint:number;commentable:boolean;showInList:number;statement:number;columnId:string;columnTitle:string;chapterNo:string;columnCoverURL:string;anonymous:boolean;notifyFollowers:boolean;thoughtContent:string}
+export type PostFields={title:string;content:string;tags:string;type:number;rewardContent:string;rewardPoint:number;qnaOfferPoint:number;commentable:boolean;showInList:number;statement:number;columnId:string;columnTitle:string;chapterNo:string;columnCoverURL:string;anonymous:boolean;notifyFollowers:boolean;thoughtContent:string;goodPost:boolean}
 export type PostSource=PostFields&{id:string;status:number;editorType:number;createdAt:number;updatedAt:number}
 export type DraftSummary={id:string;title:string;summary:string;tags:string;type:number;columnId:string;columnTitle:string;chapterNo:string;createdAt:number;updatedAt:number}
 export type PostCommand={op:'publish'|'edit'|'draft-save'|'draft-delete';id:string;input:Record<string,unknown>;key:string}
@@ -15,8 +15,8 @@ function integer(v:unknown,min=0,max=Number.MAX_SAFE_INTEGER){if(typeof v!=='num
 function bool(v:unknown){if(typeof v!=='boolean')throw bad();return v}
 function checkedId(v:unknown){if(!postId(v))throw invalid();return v}
 function type(v:unknown){return integer(v,0,6)}
-export function emptyPost():PostFields{return{title:'',content:'',tags:'',type:0,rewardContent:'',rewardPoint:0,qnaOfferPoint:0,commentable:true,showInList:1,statement:0,columnId:'',columnTitle:'',chapterNo:'',columnCoverURL:'',anonymous:false,notifyFollowers:false,thoughtContent:''}}
-function fields(r:Record<string,unknown>,draft=false):PostFields{return{title:text(r.title,65536),content:text(r.content,2097152),tags:text(r.tags,65536),type:type(r.type),rewardContent:text(r.rewardContent,2097152),rewardPoint:integer(r.rewardPoint,0,2147483647),qnaOfferPoint:integer(r.qnaOfferPoint,0,2147483647),commentable:bool(r.commentable),showInList:integer(r.showInList,0,1),statement:integer(r.statement,0,3),anonymous:bool(r.anonymous),notifyFollowers:draft?bool(r.notifyFollowers):false,columnId:text(r.columnId,19),columnTitle:text(r.columnTitle,65536),chapterNo:text(r.chapterNo,32),columnCoverURL:draft?'':text(r.columnCoverURL,1024),thoughtContent:draft?text(r.thoughtContent,2097152):''}}
+export function emptyPost():PostFields{return{title:'',content:'',tags:'',type:0,rewardContent:'',rewardPoint:0,qnaOfferPoint:0,commentable:true,showInList:1,statement:0,columnId:'',columnTitle:'',chapterNo:'',columnCoverURL:'',anonymous:false,notifyFollowers:false,thoughtContent:'',goodPost:false}}
+function fields(r:Record<string,unknown>,draft=false):PostFields{return{title:text(r.title,65536),content:text(r.content,2097152),tags:text(r.tags,65536),type:type(r.type),rewardContent:text(r.rewardContent,2097152),rewardPoint:integer(r.rewardPoint,0,2147483647),qnaOfferPoint:integer(r.qnaOfferPoint,0,2147483647),commentable:bool(r.commentable),showInList:integer(r.showInList,0,1),statement:integer(r.statement,0,3),anonymous:bool(r.anonymous),notifyFollowers:draft?bool(r.notifyFollowers):false,columnId:text(r.columnId,19),columnTitle:text(r.columnTitle,65536),chapterNo:text(r.chapterNo,32),columnCoverURL:draft?'':text(r.columnCoverURL,1024),thoughtContent:draft?text(r.thoughtContent,2097152):'',goodPost:false}}
 export async function postSource(id:string):Promise<PostSource>{const r=data(await request(`/api/v3/me/articles/${checkedId(id)}/source`,{cache:'no-store'}));if(r.id!==id)throw bad();return{...fields(r),id,status:integer(r.status,0,2),editorType:integer(r.editorType),createdAt:integer(r.createdAt),updatedAt:integer(r.updatedAt)}}
 function draftSummary(raw:unknown):DraftSummary{const r=row(raw);if(!postId(r.id))throw bad();return{id:r.id,title:text(r.title,65536),summary:text(r.summary,65536),tags:text(r.tags,65536),type:type(r.type),columnId:text(r.columnId,19),columnTitle:text(r.columnTitle,65536),chapterNo:text(r.chapterNo,32),createdAt:integer(r.createdAt),updatedAt:integer(r.updatedAt)}}
 export async function draftPage(p=1){if(!Number.isSafeInteger(p)||p<1||p>42949672)throw invalid();const r=data(await request(`/api/v3/me/drafts?p=${p}&size=20`,{cache:'no-store'})),page=row(r.pagination),total=integer(page.total),pageCount=integer(page.pageCount);if(page.p!==p||page.size!==20||pageCount!==Math.ceil(total/20)||!Array.isArray(r.list)||r.list.length!==Math.max(0,Math.min(20,total-(p-1)*20)))throw bad();const seen=new Set<string>();const list=r.list.map(v=>{const d=draftSummary(v);if(seen.has(d.id))throw bad();seen.add(d.id);return d});return{list,pagination:{p,size:20,total,pageCount}}}
@@ -59,7 +59,10 @@ export function postInput(op:PostCommand['op'],full:PostFields,source:PostSource
   if(op!=='draft-save'&&source&&source.rewardPoint>0&&full.rewardPoint===0)throw new ApiError('已启用打赏不能设为0关闭',422)
   if(op!=='draft-save'&&(full.rewardPoint>0&&(javaTrim(full.rewardContent).length<4)||full.rewardPoint===0&&full.rewardContent!==''))throw invalid()
   if(op!=='draft-save'&&full.type===5&&full.qnaOfferPoint<20)throw new ApiError('问答悬赏至少20积分',422)
-  if(op==='publish'&&draftId)input.draftId=checkedId(draftId)
+  if(op==='publish'){
+    if(full.goodPost)input.goodPost=true
+    if(draftId)input.draftId=checkedId(draftId)
+  }
   validate(input,op);return input
 }
 export async function writePost(command:PostCommand):Promise<PostReceipt>{
