@@ -3,7 +3,8 @@ import { ApiError, request } from './http'
 export type PartnerCommand =
   | { action: 'join' }
   | { action: 'leave' | 'unlock'; revision: number }
-  | { action: 'hire' | 'release'; revision: number; peer: string }
+  | { action: 'hire'; rateVersion?: number; revision: number; peer: string }
+  | { action: 'release'; revision: number; peer: string }
 
 function invalid(): never { throw new ApiError('搭子数据格式异常', 502, 'invalid_response') }
 function row(value: unknown) {
@@ -21,7 +22,10 @@ async function data(path: string, init: RequestInit) {
 }
 function decodeCard(value: unknown) {
   const s = row(value)
-  return { id: str(s.id), name: str(s.name), userName: str(s.userName), avatar: str(s.avatar), price: num(s.price),
+  const price = num(s.price)
+  const legacy = s.rateVersion === undefined && s.rate === undefined
+  return { rate: legacy ? 40 + (price - 100) / 10 : num(s.rate),
+    rateVersion: legacy ? undefined : num(s.rateVersion), id: str(s.id), name: str(s.name), userName: str(s.userName), avatar: str(s.avatar), price,
     revision: num(s.revision), mine: bool(s.mine), full: bool(s.full), following: bool(s.following) }
 }
 export async function readPartnerCard(id: string) {

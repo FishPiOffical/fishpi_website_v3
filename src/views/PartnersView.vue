@@ -67,9 +67,9 @@ function accept() {
         <header><h2>{{ peer ? '鱼友名片' : '可以请的鱼友' }}</h2><RouterLink v-if="peer" to="/partners">全部鱼友</RouterLink><button :disabled="locked" @click="game.load()">刷新</button></header>
         <p v-if="!game.state.list.length">{{ peer ? '这位鱼友当前没有开放名片。' : '这一页还没有鱼友名片。' }}</p>
         <ul class="directory"><li v-for="player in game.state.list" :key="player.id">
-          <div class="person"><RouterLink :to="'/member/'+encodeURIComponent(player.userName)" :data-user-card="player.userName"><img :src="avatarThumbnail(player.avatar,36)" alt="" width="36" height="36" loading="lazy" @error="fallbackAvatar"/><strong>{{ player.name }}</strong></RouterLink><small>{{ player.following ? '已关注 · ' : '' }}{{ 40+(player.price-100)/10 }} 币/小时</small></div>
+          <div class="person"><RouterLink :to="'/member/'+encodeURIComponent(player.userName)" :data-user-card="player.userName"><img :src="avatarThumbnail(player.avatar,36)" alt="" width="36" height="36" loading="lazy" @error="fallbackAvatar"/><strong>{{ player.name }}</strong></RouterLink><small>{{ player.following ? '已关注 · ' : '' }}{{ player.rate }} 币/小时</small></div>
           <button :disabled="locked || !canHire || player.mine || player.full || game.state.coins<player.price"
-            @click="ask('请 '+player.name+' 搭班？','成交价 '+player.price+' 币，每小时赚 '+(40+(player.price-100)/10)+' 币。放手或对方退出时退 100 币。','确认 · '+player.price+' 币',{action:'hire',peer:player.id,revision:player.revision})">
+            @click="ask('请 '+player.name+' 搭班？','成交价 '+player.price+' 币，每小时赚 '+player.rate+' 币。放手或对方退出时退 100 币。','确认 · '+player.price+' 币',{action:'hire',peer:player.id,revision:player.revision,rateVersion:player.rateVersion})">
             {{ player.mine ? '我的搭子' : player.full ? '已满价' : (player.price===100?'请 TA':'抢走')+' · '+player.price+' 币' }}
           </button>
         </li></ul>
