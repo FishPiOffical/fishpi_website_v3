@@ -80,7 +80,7 @@ export const useChatStore = defineStore('chat', () => {
   watch(()=>publication.currentMessage,message=>{if(message)timeline.upsertConfirmed(message)})
   async function refreshMessages(){await timeline.readLatest()}
 
-  async function send(text:string){return !!await publication.send(text)}
+  async function send(text:string,replyToMessageId?:string){return !!await publication.send(text,undefined,replyToMessageId)}
   function clearScreen(){timeline.clearVisible(10)}
 
   return {

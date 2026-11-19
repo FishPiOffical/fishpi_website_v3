@@ -5,12 +5,12 @@ import {useAuthStore} from '@/stores/auth'
 import {getAuthContextVersion} from '@/api/http'
 import {useV3ChatPublicationStore} from '@/stores/v3ChatPublication'
 import {fpConfirm} from '@/composables/useDialog'
-const emit=defineEmits<{confirmed:[content:string]}>(),publication=useV3ChatPublicationStore(),{accessToken,account}=storeToRefs(useAuthStore())
+const emit=defineEmits<{confirmed:[content:string,replyToMessageId?:string]}>(),publication=useV3ChatPublicationStore(),{accessToken,account}=storeToRefs(useAuthStore())
 const recoveryPending = computed(() => publication.pending && !publication.busy)
 const identity=()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])
 let abort:AbortController|null=null,disposed=false
 function cancel(){abort?.abort();abort=null}
-async function retry(){if(!accessToken.value||!account.value?.oId||publication.busy)return;const reader=identity(),command=publication.pending;if(!command)return;cancel();const controller=new AbortController();abort=controller;try{let confirmed=false;if(publication.needsConfirmation){confirmed=await fpConfirm({signal:controller.signal,title:'再次确认发送原消息',message:'平台要求再次确认本条内容。将使用原请求键和原正文发送，是否继续？',confirmText:'确认发送'});if(!confirmed)return}if(disposed||controller.signal.aborted||reader!==identity()||publication.pending!==command)return;if(await publication.retry(confirmed)){if(!disposed&&reader===identity()&&command.origin!=='repeat')emit('confirmed',command.content)}}finally{if(abort===controller)abort=null}}
+async function retry(){if(!accessToken.value||!account.value?.oId||publication.busy)return;const reader=identity(),command=publication.pending;if(!command)return;cancel();const controller=new AbortController();abort=controller;try{let confirmed=false;if(publication.needsConfirmation){confirmed=await fpConfirm({signal:controller.signal,title:'再次确认发送原消息',message:'平台要求再次确认本条内容。将使用原请求键和原消息发送，是否继续？',confirmText:'确认发送'});if(!confirmed)return}if(disposed||controller.signal.aborted||reader!==identity()||publication.pending!==command)return;if(await publication.retry(confirmed)){if(!disposed&&reader===identity()&&command.origin!=='repeat')emit('confirmed',command.content,command.replyToMessageId)}}finally{if(abort===controller)abort=null}}
 watch(identity,cancel,{flush:'sync'});onBeforeUnmount(()=>{disposed=true;cancel()})
 </script>
 <template><div v-if="accessToken&&account?.oId&&(publication.error||recoveryPending||publication.readError)" class="publication-state">

@@ -78,7 +78,7 @@ provide(CHAT_MENTION, {
     }
   },
 })
-const { quote, quoteBusy, quoteErr, quoteMessage: readQuote, clearQuote, buildQuoteSuffix } = useChatMessageSource()
+const { quote, quoteBusy, quoteErr, quoteMessage: readQuote, clearQuote } = useChatMessageSource()
 const roomQuotes = computed(() => quote.value ? [chatMessageQuotePreview(quote.value)] : [])
 const roomIdentity = computed(() => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, account.value?.oId || '']))
 function canQuote(messageId: string) {
@@ -97,8 +97,7 @@ provide(CHAT_QUICK_QUOTE, { enabled: canQuote, quote: quoteRoomMessage })
 const sakuraArrivals = useSakuraArrivals(() => props.modelValue && isChatroomSelected.value && !chatPreferences.simpleMode)
 const roomRepeatEntries = computed(() => visibleRoomMessages.value.map(message => ({ key: message.oId, message })))
 const visibleRoomMessages = computed(() => roomMessages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
-const composedRoomContent = () => `${draft.value}${buildQuoteSuffix()}`
-const canSend = computed(() => Boolean(composedRoomContent().trim()) && !roomSending.value && !publication.pending && !quoteBusy.value)
+const canSend = computed(() => Boolean(draft.value.trim() || quote.value) && !roomSending.value && !publication.pending && !quoteBusy.value)
 function onCompactComposerKeydown(event: KeyboardEvent) {
   if (!matchesChatSendShortcut(event, chatPreferences.sendShortcut)) return
   event.preventDefault()
@@ -341,12 +340,13 @@ async function loadOlder() {
 
 async function submit() {
   if (!canSend.value) return
-  const text = composedRoomContent(), reader = roomIdentity.value
-  if(await chat.send(text)&&reader===roomIdentity.value)acceptRoomConfirmed(text.trim())
+  const text = draft.value, reader = roomIdentity.value
+  const replyToMessageId = quote.value?.messageId
+  if(await chat.send(text, replyToMessageId)&&reader===roomIdentity.value)acceptRoomConfirmed(text.trim(), replyToMessageId)
 }
 
-function acceptRoomConfirmed(content: string) {
-  if (composedRoomContent().trim() !== content) return
+function acceptRoomConfirmed(content: string, replyToMessageId?: string) {
+  if (draft.value.trim() !== content || quote.value?.messageId !== replyToMessageId || quoteBusy.value) return
   draft.value = ''
   clearQuote()
 }

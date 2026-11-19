@@ -26,8 +26,8 @@ export const prefs=reactive({simpleMode:false,blurChatImages:false,sendShortcut:
 export const timeline=reactive({changeHint:null,notices:[]});
 export const publication=reactive({pending:null,receipt:null});
 export const chat=reactive({messages:[],sending:false,loading:false,loadingMore:false,hasMore:false,error:'',topicError:'',discuss:'本地引用定位专项',onlineTotal:1,nodeName:'本地夹具',nodeOptions:[],chatStyle:'classic',connecting:false,
- acquire(){window.acquired=(window.acquired||0)+1},release(){},loadMore(){window.mainLoads++},refreshMessages(){window.mainReads++},send(){throw Error('禁止测试发消息')},clearScreen(){},toggleChatStyle(){this.chatStyle=this.chatStyle==='classic'?'modern':'classic'}});
-window.auth=auth;window.timeline=timeline;window.chat=chat;window.mainLoads=0;window.mainReads=0;window.apiRequests=[];window.resolvedRequests=[];
+ acquire(){window.acquired=(window.acquired||0)+1},release(){},loadMore(){window.mainLoads++},refreshMessages(){window.mainReads++},async send(content,replyToMessageId){window.fixtureSends.push({content,replyToMessageId});return true},clearScreen(){},toggleChatStyle(){this.chatStyle=this.chatStyle==='classic'?'modern':'classic'}});
+window.auth=auth;window.timeline=timeline;window.chat=chat;window.mainLoads=0;window.mainReads=0;window.fixtureSends=[];window.apiRequests=[];window.resolvedRequests=[];
 export const storeToRefs=toRefs,useAuthStore=()=>auth,useChatPreferencesStore=()=>prefs,useFunctionPreferencesStore=()=>prefs,useChatStore=()=>chat,useV3ChatTimelineStore=()=>timeline,useV3ChatPublicationStore=()=>publication;
 export const useChatFilterStore=()=>({modeFor:()=> 'show'});
 export const getAuthContextVersion=()=>1,formatDisplayTime=()=> '2026-11-14 13:07';
@@ -41,7 +41,7 @@ export async function request(url,options={}){
 export default {props:['open'],setup(p,{slots}){return()=>p.open===false?null:slots.default?.()||null}};
 `)
 for (const name of ['pinia', '@/stores/auth', '@/stores/chatPreferences', '@/stores/functionPreferences', '@/stores/v3ChatTimeline', '@/stores/v3ChatPublication', '@/stores/chatFilter', '@/api/http', '@/utils/time']) modules.set(name, mocks)
-modules.set('@/components/ChatComposer.vue', publish('composer', `import {h} from '${vue}';export default {props:['modelValue','height'],emits:['update:modelValue','submit'],setup(p,{slots,expose,emit}){expose({flush:()=>p.modelValue,reveal(){document.querySelector('[data-editor]')?.focus()},insert(text){emit('update:modelValue',p.modelValue+text)}});return()=>h('div',{class:'fixture-composer'},[slots.top?.(),h('textarea',{'data-editor':'true','aria-label':'聊天输入框',value:p.modelValue,style:{height:(p.height||100)+'px'}}),h('div',{class:'bar'},[slots.tools?.(),slots['inline-context']?.(),slots.actions?.()])])}}`))
+modules.set('@/components/ChatComposer.vue', publish('composer', `import {h} from '${vue}';export default {props:['modelValue','height'],emits:['update:modelValue','submit'],setup(p,{slots,expose,emit}){expose({flush:()=>p.modelValue,reveal(){document.querySelector('[data-editor]')?.focus()},insert(text){emit('update:modelValue',p.modelValue+text)}});return()=>h('div',{class:'fixture-composer'},[slots.top?.(),h('textarea',{'data-editor':'true','aria-label':'聊天输入框',value:p.modelValue,style:{height:(p.height||100)+'px'}}),h('div',{class:'bar'},[slots.tools?.(),slots['inline-context']?.(),slots.actions?.(),h('button',{type:'button','data-fixture-send':'true',onClick:()=>emit('submit')},'夹具发送')])])}}`))
 const noop = publish('noop', 'export default {setup(){return()=>null}}')
 for (const name of ['ChatToolDialog', 'ChatRoomNotice', 'ChatConnectionStatus', 'ChatRepeatAction', 'ChatRevokeAction', 'ChatRevokeRecovery', 'ChatPublicationRecovery', 'ChatTopicEditor', 'ChatTopicRecovery', 'ChatOnlineList', 'ChatRedPacketCard', 'CollectChatEmoji']) modules.set(`@/components/chat/${name}.vue`, noop)
 for (const name of ['ChatCard', 'V3ReactionBar', 'ReportDialog', 'FpLoading', 'ImageLightbox']) modules.set(`@/components/${name}.vue`, noop)
@@ -206,6 +206,25 @@ try {
     assert.equal(new URL(page.url()).hash, '#chatroom100', '历史快捷入口保留当前历史窗口')
   }
   console.log('PASS 经典、简约和历史窗口的双击快捷键使用真实路由和消息详情，草稿与定位保持正确。')
+  for (const [mode, width, withText] of [['classic', 1200, true], ['modern', 390, false]]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(`${origin}/cr?mode=${mode}`)
+    const message = page.locator('#chatroom9001')
+    if (withText) {
+      await message.locator('.fp-avatar-frame').dblclick()
+      await page.waitForFunction(() => document.querySelector('[data-editor]').value === ' @测试用户 ')
+    }
+    await message.locator('.fp-bubble').dblclick({ position: { x: 3, y: 3 } })
+    const preview = page.locator('.chat-quote-preview .chat-quote-card')
+    await preview.filter({ hasText: '消息 9001' }).waitFor()
+    await page.locator('[data-fixture-send]').click()
+    assert.deepEqual(await page.evaluate(() => window.fixtureSends), [
+      { content: withText ? ' @测试用户 ' : '', replyToMessageId: '9001' },
+    ])
+    await preview.waitFor({ state: 'detached' })
+    assert.equal(await page.locator('[data-editor]').inputValue(), '')
+  }
+  console.log('PASS 桌面经典与窄屏简约分别提交正文加引用、纯引用，成功清空草稿与预览。')
   async function anchorVisible(id, contained) {
     await page.waitForSelector(`.chat-context li#chatroom${id}[data-anchor="true"]`)
     await page.waitForFunction(({ id, contained }) => {

@@ -119,7 +119,7 @@ function togglePanel(panel: typeof chatTools[number]['id']) { activeTool.value =
 watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{activeTool.value=''},{flush:'sync'})
 
 const showNodes = ref(false)
-const {quote,quoteBusy,quoteErr,quoteMessage:readQuote,clearQuote,buildQuoteSuffix}=useChatMessageSource()
+const {quote,quoteBusy,quoteErr,quoteMessage:readQuote,clearQuote}=useChatMessageSource()
 provide(CHAT_QUICK_QUOTE, {
   enabled: id => isLoggedIn.value && !!composerRef.value && !sending.value && !publication.pending && quoteBusy.value !== id,
   quote: id => { void quoteMessage({oId:id}) },
@@ -228,19 +228,19 @@ function revealComposer() {
 }
 
 function composedContent() {
-  const text = `${draft.value}${buildQuoteSuffix()}`
-  return [text, ...breezemoonQuotes.value.map(breezemoonQuoteMarkdown)].filter(Boolean).join('\n\n')
+  return [draft.value, ...breezemoonQuotes.value.map(breezemoonQuoteMarkdown)].filter(Boolean).join('\n\n')
 }
 
 async function submit() {
   const content = composedContent()
-  if (!content.trim()) return
+  const replyToMessageId = quote.value?.messageId
+  if ((!content.trim() && !replyToMessageId) || quoteBusy.value) return
   const reader=JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])
-  if(await chat.send(content)&&reader===JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']))acceptConfirmed(content.trim())
+  if(await chat.send(content, replyToMessageId)&&reader===JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']))acceptConfirmed(content.trim(), replyToMessageId)
 }
 
-function acceptConfirmed(content: string) {
-  if (composedContent().trim() !== content) return
+function acceptConfirmed(content: string, replyToMessageId?: string) {
+  if (composedContent().trim() !== content || quote.value?.messageId !== replyToMessageId || quoteBusy.value) return
   draft.value = ''
   breezemoonQuotes.value = []
   clearQuote()
