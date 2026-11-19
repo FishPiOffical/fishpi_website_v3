@@ -46,8 +46,21 @@ const Composer = (await import(await component('src/components/ChatComposer.vue'
 const draft = ref(''), busy = ref(false), blocked = ref(false), sent = []
 const app = createApp({ render: () => h(Composer, { modelValue: draft.value, sending: busy.value, disabled: blocked.value,
   'onUpdate:modelValue': value => { draft.value = value }, onSubmit: () => sent.push(draft.value) }) })
+const assets = await import(imports['@/utils/markdownEditorAssets'])
+assets.preloadMarkdownEditor()
+const firstLoad = assets.loadVditor()
+const failedSheet = document.querySelector('link[rel="stylesheet"]')
+failedSheet.dispatchEvent(new Event('error'))
+await assert.rejects(firstLoad, /样式加载失败/)
+assert.equal(failedSheet.isConnected, false)
 app.mount('#app')
 const tick = async () => { await Promise.resolve(); await nextTick(); await Promise.resolve(); await nextTick() }
+await tick()
+assert.equal(instance, undefined, '脚本已就绪也要等真正的样式表加载')
+assert.equal(document.querySelectorAll('link[rel="preload"]').length, 2)
+const stylesheet = document.querySelector(`link[rel="stylesheet"][href="${assets.VDITOR_CDN}/index.css"]`)
+assert.ok(stylesheet, '脚本预加载不能替代样式表')
+stylesheet.dispatchEvent(new Event('load'))
 await tick()
 const button = () => document.querySelector('button.send')
 async function input(text) { instance.el.textContent = text; instance.el.dispatchEvent(new Event('input', { bubbles: true })); await tick() }

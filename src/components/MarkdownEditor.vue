@@ -4,7 +4,7 @@ import { useAppearanceStore } from '@/stores/appearance'
 import FpLoading from '@/components/FpLoading.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import { createMarkdownPreview } from '@/utils/markdownPreview'
-import { VDITOR_CDN, VDITOR_SCRIPT } from '@/utils/markdownEditorAssets'
+import { loadVditor, VDITOR_CDN, type VditorCtor, type VditorInstance } from '@/utils/markdownEditorAssets'
 import { createEditorUpload, editorUploadAccept, type EditorUploadStatus } from '@/utils/editorUpload'
 import { createMentionHints } from '@/utils/mentionHints'
 import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
@@ -84,19 +84,6 @@ function resizeWithKeys(event: KeyboardEvent) {
   if (nextHeight !== displayedHeight.value) saveHeight(nextHeight)
 }
 
-interface VditorInstance {
-  readonly vditor?: { lute?: { GetEmojis(): Record<string, unknown> } }
-  focus(): void
-  getValue(): string
-  setValue(value: string, clearStack?: boolean): void
-  insertMD(value: string): void
-  setTheme(theme: 'classic' | 'dark', contentTheme?: string, codeTheme?: string, contentThemePath?: string): void
-  destroy(): void
-}
-type VditorCtor = new (el: HTMLElement, options: Record<string, unknown>) => VditorInstance
-
-let loader: Promise<VditorCtor> | null = null
-
 const MORE_TOOLS = ['outdent', 'indent', 'insert-before', 'insert-after', 'line', 'info', 'help']
 
 const REPLY_TOOLBAR = [
@@ -150,29 +137,6 @@ const MOBILE_TOOLBAR = [
 ]
 
 const MESSAGE_TOOLBAR = ['emoji', 'bold', 'italic', 'link', 'upload']
-
-function loadVditor(): Promise<VditorCtor> {
-  const w = window as unknown as { Vditor?: VditorCtor }
-  if (w.Vditor) return Promise.resolve(w.Vditor)
-  if (loader) return loader
-  loader = new Promise<VditorCtor>((resolve, reject) => {
-    if (!document.querySelector(`link[href^="${VDITOR_CDN}"]`)) {
-      const css = document.createElement('link')
-      css.rel = 'stylesheet'
-      css.href = `${VDITOR_CDN}/index.css`
-      document.head.appendChild(css)
-    }
-    const script = document.createElement('script')
-    script.src = VDITOR_SCRIPT
-    script.onload = () => (w.Vditor ? resolve(w.Vditor) : reject(new Error('Vditor 未注册')))
-    script.onerror = () => reject(new Error('编辑器加载失败'))
-    document.head.appendChild(script)
-  }).catch((e) => {
-    loader = null
-    throw e
-  })
-  return loader
-}
 
 const host = ref<HTMLElement | null>(null)
 const emojiPicker = ref<InstanceType<typeof EmojiPicker> | null>(null)
