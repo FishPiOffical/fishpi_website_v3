@@ -27,7 +27,7 @@ modules['@/chat/messageShortcuts']=data(transpile(fs.readFileSync('src/chat/mess
 // 路由导航和外围服务隔离；实际气泡仍负责昵称、@ 行为、身份及方向。
 modules['vue-router']=data(`import {h} from '${vue}';export const RouterLink={props:{to:{},custom:Boolean},setup(p,{slots}){return()=>{const href=typeof p.to==='string'?p.to:JSON.stringify(p.to);return p.custom?slots.default?.({href,navigate(){}}):h('a',{href},slots.default?.())}}}`)
 const noop=data('export default {setup(){return()=>null}}')
-for(const name of ['@/components/chat/CollectChatEmoji.vue','@/components/ImageLightbox.vue','@/components/medal/MedalList.vue','@/components/user/VipNickname.vue','@/components/packs/ManagedBubbleShape.vue','@/components/packs/SakuraDecoration.vue']) modules[name]=noop
+for(const name of ['@/components/chat/ChatGameStatus.vue','@/components/chat/CollectChatEmoji.vue','@/components/ImageLightbox.vue','@/components/medal/MedalList.vue','@/components/user/VipNickname.vue','@/components/packs/ManagedBubbleShape.vue','@/components/packs/SakuraDecoration.vue']) modules[name]=noop
 let css=''
 function compile(file,id) {
   const {descriptor}=parse(fs.readFileSync(file,'utf8'))

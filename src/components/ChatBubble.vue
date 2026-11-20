@@ -11,6 +11,7 @@ import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
 import { CHAT_QUICK_QUOTE } from '@/chat/messageShortcuts'
 import { RouterLink } from 'vue-router'
 import CollectChatEmoji from '@/components/chat/CollectChatEmoji.vue'
+import ChatGameStatus from '@/components/chat/ChatGameStatus.vue'
 import ChatQuoteCard from '@/components/chat/ChatQuoteCard.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
@@ -85,6 +86,7 @@ const sakuraFrame = computed(() => props.chatroom && !simpleMode.value && isLoop
 const managedStyle = computed(() => props.chatroom && !simpleMode.value && !isStandalone.value ? snapshot.value.bubbleStyle : undefined)
 const zoomed = ref('')
 const originalImage = ref('')
+const authorLine = ref<HTMLElement | null>(null)
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
 const singleImage = computed(() => props.chatroom && isSingleImageMessage(props.html))
@@ -275,7 +277,7 @@ function openBodyImage(img: HTMLImageElement) {
     </RouterLink>
     <div class="message-stack">
       <div v-if="chatroom" class="head">
-        <div class="chat-author">
+        <div ref="authorLine" class="chat-author">
           <component :is="canMention ? 'button' : RouterLink" v-bind="canMention ? { type: 'button' } : { to: `/member/${userName}` }" class="name" :class="{ 'name--mention': canMention }" :data-user-card="canMention ? undefined : userName" :aria-label="canMention ? `点击 @${nickname || userName}` : undefined" @click="canMention && mention?.insert(userName)">
             <span v-if="canMention" class="mention-prefix" aria-hidden="true">@</span>
             <span class="chat-author-name">
@@ -294,6 +296,8 @@ function openBodyImage(img: HTMLImageElement) {
             </span>
             <span v-if="petStatus.level" class="fp-chat-pet-level" :data-tier="Math.floor(petStatus.level / 10)">Lv.{{ petStatus.level }}</span>
           </RouterLink>
+          <ChatGameStatus v-if="mounted && auth.isLoggedIn && !simpleMode && messageId && /^[1-9][0-9]{0,18}$/.test(userId)"
+            :author-line="authorLine" :user-id="userId" :name="nickname || userName" :own="isOwnUser" :pet="petStatus" :pet-to="petDestination" />
         </div>
         <MedalList class="chat-medals" :items="medals" variant="mini" />
       </div>
