@@ -70,8 +70,8 @@ export default defineConfig(({ mode }) => {
         '^/api/v3/auth/(?:login|refresh|logout|session)(?:\\?|$)': {
           ...proxy,
           changeOrigin: false,
-          // Keep the browser Host/Origin/Referer tuple for credential-origin checks.
-          headers: { 'User-Agent': FISHPI_UA },
+          // 保留浏览器的来源和 User-Agent，让设备列表能区分电脑与手机。
+          headers: {},
         },
         '/api/v3': proxy,
         '/rhypic-upload': {

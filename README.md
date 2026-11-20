@@ -35,6 +35,8 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 
 更新前的未绑定 Cookie 需要重新登录一次；注册、重置密码和第三方专用登录入口本次不改。开发联调请在两端统一使用 `localhost` 或统一 `127.0.0.1`，不同主机名不共享 Cookie。生产仍浏览器直连 fishpi.cn，不设置 `.fishpi.cn` 域 Cookie，不恢复旧 apiKey 桥接。专项：`node tools/v3-website-session-test.mjs`。
 
+账号安全中的「登录设备」（`/settings/account#login-devices`）可查看和退出其他浏览器的网页登录。同一浏览器的新旧站使用 Rhythm 签发的设备 Cookie 归组。最近活动取登录、续期或访问令牌最近使用的时间。客户端登录参数 `deviceId` 可省略，禁用本地存储时仍可登录。上线顺序为先执行 Rhythm 的 `sql/20261120_api_v3_website_devices.sql`，再更新 Rhythm，最后更新前端；旧版登录接口会拒绝新增字段。
+
 - 图片预览默认使用 `imageThumbnail(url, 显示宽度, 显示高度)`，受支持的 RhyPic 公开原图按显示尺寸请求二倍图，单边最多 1024px。正文中已清洗的图片可用 `withImageThumbnailSrcset` 保留原地址并添加缩略图地址。签名链接、已有缩放参数及外站图片保留原地址。
 
 ### 发帖与代码分组
