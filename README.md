@@ -35,6 +35,8 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 
 更新前的未绑定 Cookie 需要重新登录一次；注册、重置密码和第三方专用登录入口本次不改。开发联调请在两端统一使用 `localhost` 或统一 `127.0.0.1`，不同主机名不共享 Cookie。生产仍浏览器直连 fishpi.cn，不设置 `.fishpi.cn` 域 Cookie，不恢复旧 apiKey 桥接。专项：`node tools/v3-website-session-test.mjs`。
 
+首页内容读取暂停时，登录恢复的刷新凭据及本人资料请求仍按优先队列执行，保留凭据串行、身份隔离和验证码恢复。认证错误交由登录流程判断，已有内容暂停继续遵守冷却时间及显式重试。回归使用 `node tools/v3-home-session-restore-test.mjs`，贯通本地 HTTP 与实际认证 store。
+
 - 图片预览默认使用 `imageThumbnail(url, 显示宽度, 显示高度)`，受支持的 RhyPic 公开原图按显示尺寸请求二倍图，单边最多 1024px。正文中已清洗的图片可用 `withImageThumbnailSrcset` 保留原地址并添加缩略图地址。签名链接、已有缩放参数及外站图片保留原地址。
 
 ### SEO / SSR
