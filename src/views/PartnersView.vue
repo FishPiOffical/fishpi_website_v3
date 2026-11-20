@@ -46,28 +46,40 @@ function accept() {
     <p v-else-if="!game.state" role="status">正在读取搭子…</p>
     <p v-if="game.message" role="status">{{ game.message }}
       <button v-if="game.pending" :disabled="game.busy" @click="game.run()">核对原操作</button></p>
-    <template v-if="game.state">
-      <section class="panel">
+    <div v-if="game.state" class="lobby">
+      <div class="side">
+      <section class="panel team">
         <header><h2>我的搭子</h2><button v-if="game.state.joined" :disabled="locked" @click="ask('退出搭子社？','现有搭班全部结束，每位邀请人收回 100 币。已购位置和今日使用时间会保留。','退出搭子社',{action:'leave',revision:game.state.revision})">退出搭子社</button></header>
         <template v-if="game.state.joined">
           <div class="host"><span>谁请了我</span><strong>{{ game.state.holderName || '暂时空闲' }}</strong>
             <small>{{ game.state.holderName ? '搭班收入 2 币/小时' : '名片已开放' }}</small></div>
           <ul class="slots"><li v-for="(slot,i) in game.state.slots" :key="i">
-            <small>搭子位 {{ i+1 }}</small><strong>{{ slot.name || '空位' }}</strong>
+            <small class="seat-label">搭子位 {{ i+1 }}</small><strong>{{ slot.name || '空位' }}</strong>
             <span>{{ slot.peer ? slot.rate+' 币/小时 · ' : '' }}今日已赚 {{ slot.today }} 币</span>
             <small>今日剩余 {{ Math.ceil((28800000-slot.usedMs)/60000) }} 分钟</small>
             <button v-if="slot.peer" :disabled="locked" @click="ask('放手 '+slot.name+'？','营业收入自动结清，收回基础保证金 100 币。','放手 · 退 100 币',{action:'release',peer:slot.peer,revision:game.state.revision})">放手 · 退 100 币</button>
           </li></ul>
-          <button v-if="game.state.slots.length<3" :disabled="locked || game.state.coins<unlockCost" @click="ask('解锁搭子位？','支付 '+unlockCost+' 游园币，永久增加一个搭子位，每天可独立营业 8 小时。','确认解锁',{action:'unlock',revision:game.state.revision})">解锁下一位 · {{ unlockCost }} 币</button>
+          <button class="unlock" v-if="game.state.slots.length<3" :disabled="locked || game.state.coins<unlockCost" @click="ask('解锁搭子位？','支付 '+unlockCost+' 游园币，永久增加一个搭子位，每天可独立营业 8 小时。','确认解锁',{action:'unlock',revision:game.state.revision})">解锁下一位 · {{ unlockCost }} 币</button>
         </template>
         <template v-else><p>加入后鱼友可以请你搭班。第一个搭子位免费，每个位置每天营业最多 8 小时。</p>
           <button class="primary" :disabled="locked" @click="game.submit({action:'join'})">加入搭子社</button></template>
       </section>
-      <section class="panel">
+      <PartnerActivity class="history" :snapshot="game.state" />
+      </div>
+      <section class="panel market">
         <header><h2>{{ peer ? '鱼友名片' : '可以请的鱼友' }}</h2><RouterLink v-if="peer" to="/partners">全部鱼友</RouterLink><button :disabled="locked" @click="game.load()">刷新</button></header>
         <p v-if="!game.state.list.length">{{ peer ? '这位鱼友当前没有开放名片。' : '这一页还没有鱼友名片。' }}</p>
         <ul class="directory"><li v-for="player in game.state.list" :key="player.id">
-          <div class="person"><RouterLink :to="'/member/'+encodeURIComponent(player.userName)" :data-user-card="player.userName"><img :src="avatarThumbnail(player.avatar,36)" alt="" width="36" height="36" loading="lazy" @error="fallbackAvatar"/><strong>{{ player.name }}</strong></RouterLink><small>{{ player.following ? '已关注 · ' : '' }}<template v-if="player.displayValue">身价 {{ formatPartnerValue(player.displayValue) }} · </template>{{ player.rate }} 币/小时</small></div>
+          <div class="person">
+            <RouterLink :to="'/member/'+encodeURIComponent(player.userName)" :data-user-card="player.userName">
+              <img :src="avatarThumbnail(player.avatar,40)" alt="" width="40" height="40" loading="lazy" @error="fallbackAvatar"/>
+              <span><strong>{{ player.name }}</strong><small v-if="player.following">已关注</small></span>
+            </RouterLink>
+          </div>
+          <dl class="quote">
+            <div v-if="player.displayValue"><dt>身价</dt> <dd>{{ formatPartnerValue(player.displayValue) }}</dd></div>
+            <div><dt>营业时薪</dt><dd>{{ player.rate }} 币</dd></div>
+          </dl>
           <button :disabled="locked || !canHire || player.mine || player.full || game.state.coins<player.price"
             @click="ask('请 '+player.name+' 搭班？','本次请人费用 '+player.price+' 币，每小时赚 '+player.rate+' 币。放手或对方退出时退 100 币。','确认 · '+player.price+' 币',{action:'hire',peer:player.id,revision:player.revision,rateVersion:player.rateVersion})">
             {{ player.mine ? '我的搭子' : player.full ? '已满价' : (player.price===100?'请 TA':'抢走')+' · '+player.price+' 币' }}
@@ -76,8 +88,7 @@ function accept() {
         <footer v-if="game.cursor || game.state.next"><button v-if="game.cursor" :disabled="locked" @click="game.load('')">回第一页</button>
           <button v-if="game.state.next" :disabled="locked" @click="game.load(game.state.next)">下一页</button></footer>
       </section>
-      <PartnerActivity :snapshot="game.state" />
-    </template>
+    </div>
     <FpDialog :open="!!confirm" :title="confirm?.title" @close="confirm=null">
       <p>{{ confirm?.detail }}</p><template #footer><button @click="confirm=null">取消</button>
         <button class="primary" :disabled="locked" @click="accept">{{ confirm?.button }}</button></template>
@@ -86,27 +97,65 @@ function accept() {
 </template>
 <style scoped>
 .partners { display:grid; gap:16px; }
-.mast,.panel { border-radius:var(--fp-panel-radius,12px); padding:clamp(16px,2vw,24px); }
-.mast,.panel header,.directory li,footer { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.mast { background:#223f39; color:#fff; flex-wrap:wrap; }
-.mast a,.mast dt { color:#d6e6de; font-size:13px; }
 h1,h2,p,dl,dd,ul { margin:0; }
-h1 { margin-top:4px; font-size:30px; } h2 { font-size:18px; }
-dl { display:flex; gap:24px; } dd { font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; }
-.panel { background:var(--fp-card); border:1px solid var(--fp-border); display:grid; gap:14px; }
-.panel p,small,.slots span { color:var(--fp-muted); }
 ul { padding:0; list-style:none; }
-.slots,.directory { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)); }
-.slots li,.directory li { min-width:0; border:1px solid var(--fp-border); border-radius:9px; padding:14px; }
-.slots li,.directory li div { display:grid; align-content:start; gap:5px; }
-strong { overflow-wrap:anywhere; }
-.person a { display:flex; align-items:center; gap:8px; color:inherit; }
-.person img { flex:none; border-radius:9px; object-fit:cover; }
-.person small { padding-inline-start:44px; }
-button { justify-self:start; background:var(--fp-elevated); border:1px solid var(--fp-border); border-radius:7px; padding:7px 12px; color:var(--fp-text); font:inherit; cursor:pointer; }
-button:disabled { opacity:.55; cursor:default; } button:enabled:hover { border-color:var(--fp-primary); }
-button.primary { background:var(--fp-primary-soft); color:var(--fp-primary-ink); }
-.host { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; } .host span { color:var(--fp-muted); }
-.slots button { margin-top:5px; } footer { justify-content:flex-end; }
-@media(max-width:600px) { .directory,.slots { grid-template-columns:1fr; } button { min-height:44px; } }
+.mast,.panel { border-radius:var(--fp-panel-radius,12px); padding:clamp(16px,2vw,24px); }
+.mast { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:20px; background:#21433c; color:white; }
+.mast a,.mast dt { color:#d6e6de; font-size:13px; }
+h1 { margin-top:4px; font-size:30px; }
+h2 { font-size:18px; }
+.mast dl { display:flex; flex-wrap:wrap; gap:12px 24px; }
+.mast dl div { padding-inline-start:16px; border-inline-start:1px solid #ffffff40; }
+.mast dd { margin-top:4px; font-size:clamp(18px,2vw,26px); font-weight:700; overflow-wrap:anywhere; }
+dd,.slots { font-variant-numeric:tabular-nums; }
+.lobby { display:grid; grid-template-columns:minmax(0,2fr) minmax(290px,1fr); gap:16px; align-items:start; }
+.market { grid-column:1; grid-row:1; }
+.side { grid-column:2; grid-row:1; display:grid; gap:16px; min-width:0; }
+.panel { min-width:0; background:var(--fp-card); border:1px solid var(--fp-border); }
+.panel header,footer { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.panel header { border-bottom:1px solid var(--fp-border); padding-bottom:12px; margin-bottom:14px; }
+.panel header h2 { margin-inline-end:auto; }
+.panel p,small,.slots span,.quote dt,.host span { color:var(--fp-muted); }
+.host { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 10px; font-size:14px; }
+.host strong { margin-inline-start:auto; }
+.slots { display:grid; gap:8px; margin:14px 0 10px; }
+.slots li { display:grid; grid-template-columns:1fr auto; align-items:baseline; gap:5px 10px; padding:12px; background:var(--fp-elevated); border-radius:8px; }
+.slots strong { text-align:end; }
+.slots span,.slots small { font-size:12px; }
+.slots button { grid-column:1 / -1; }
+strong,.quote dd { overflow-wrap:anywhere; }
+.directory li { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto; align-items:center; gap:12px; padding:12px 0; }
+.directory li + li { border-top:1px solid var(--fp-border); }
+.person a { display:flex; align-items:center; gap:10px; color:inherit; }
+.person small { display:block; font-size:12px; }
+.person img { flex:none; border-radius:10px; object-fit:cover; }
+.quote { display:flex; flex-wrap:wrap; gap:6px 18px; }
+.quote dt { font-size:12px; }
+.quote dd { font-weight:600; font-size:14px; }
+button { justify-self:start; border:1px solid var(--fp-border); background:var(--fp-card); color:var(--fp-text); border-radius:7px; padding:7px 12px; font:inherit; cursor:pointer; }
+button:disabled { opacity:.56; cursor:default; }
+button:enabled:hover { border-color:var(--fp-primary); }
+button.primary,.directory button:enabled { color:var(--fp-primary-ink); background:var(--fp-primary-soft); }
+.unlock { width:100%; border-style:dashed; }
+.panel p + button { margin-top:12px; }
+footer { justify-content:flex-end; margin-top:12px; }
+@media(max-width:820px) {
+  .lobby { grid-template-columns:minmax(0,1fr); }
+  .side { display:contents; }
+  .team,.market,.history { grid-column:1; }
+  .team { grid-row:1; }
+  .market { grid-row:2; }
+  .history { grid-row:3; }
+}
+@media(max-width:560px) {
+  .mast { display:grid; gap:14px; }
+  .mast dl { display:grid; grid-template-columns:repeat(auto-fit,minmax(68px,1fr)); gap:8px; }
+  .mast dl div { padding-inline-start:8px; }
+  .mast dl div:first-child { padding:0; border:0; }
+  .directory li { grid-template-columns:minmax(0,1fr) auto; gap:6px 10px; }
+  .directory .quote { grid-column:1; margin-inline-start:50px; }
+  .quote div { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px; }
+  .directory button { grid-column:2; grid-row:span 2 / 3; }
+  button { min-height:44px; }
+}
 </style>
