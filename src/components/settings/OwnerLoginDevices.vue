@@ -14,10 +14,18 @@ const busy = ref(false)
 const feedback = ref('')
 const error = ref('')
 let identity: AbortController | undefined
+let refreshOnReturn = false
+
+function finish(signal: AbortSignal, refresh = false) {
+  if (signal.aborted) return
+  busy.value = false
+  if ((refresh || refreshOnReturn) && !document.hidden) void read()
+}
 
 async function read() {
   const signal = identity?.signal
   if (!signal || signal.aborted || busy.value) return
+  refreshOnReturn = false
   busy.value = true
   error.value = ''
   try {
@@ -29,7 +37,7 @@ async function read() {
       error.value = cause instanceof Error ? cause.message : '登录设备暂时无法读取'
     }
   } finally {
-    if (!signal.aborted) busy.value = false
+    finish(signal)
   }
 }
 
@@ -61,10 +69,7 @@ async function remove(device: LoginDevice) {
         ? cause.message : '退出结果尚未确认，请刷新设备列表核对。'
     }
   } finally {
-    if (!signal.aborted) {
-      busy.value = false
-      if (refresh) await read()
-    }
+    finish(signal, refresh)
   }
 }
 
@@ -74,8 +79,29 @@ watch(() => [mounted.value, !!auth.accessToken, auth.account?.oId, getAuthContex
   cleanup(() => controller.abort())
   devices.value = null
   busy.value = false
+  refreshOnReturn = false
   feedback.value = error.value = ''
-  if (mounted.value && auth.accessToken && auth.account?.oId) void read()
+  if (!mounted.value || !auth.accessToken || !auth.account?.oId) return
+
+  let away = document.hidden
+  const leave = () => {
+    away = true
+    refreshOnReturn = false
+  }
+  const resume = () => {
+    if (!away || document.hidden) return
+    away = false
+    if (busy.value) refreshOnReturn = true
+    else void read()
+  }
+  const options = { signal: controller.signal }
+  window.addEventListener('blur', leave, options)
+  window.addEventListener('focus', resume, options)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) leave()
+    else resume()
+  }, options)
+  if (!away) void read()
 }, { immediate: true, flush: 'sync' })
 </script>
 

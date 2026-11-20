@@ -196,8 +196,25 @@ function isCredentialPath(path: string) {
 }
 
 // Cookie rotations must complete in order, including logout followed immediately by login.
-function queueCredentialRequest<T>(run: () => Promise<T>): Promise<T> {
-  const next = credentialQueue.then(run, run)
+function queueCredentialRequest<T>(run: () => Promise<T>, signal?: AbortSignal | null): Promise<T> {
+  const next = credentialQueue.then(async () => {
+    // 同源标签页共用刷新 Cookie。等前一页的响应完成后，再让浏览器携带最新 Cookie。
+    let started = false
+    try {
+      const locks = globalThis.window?.navigator?.locks
+      if (locks) {
+        return await locks.request('fishpi.website.credentials', { signal: signal ?? undefined }, () => {
+          started = true
+          return run()
+        })
+      }
+    } catch (error) {
+      if (!started && signal?.aborted) throw new ApiError('请求已取消', 0, 'aborted')
+      // 浏览器禁止取锁时保留页内队列；已经发出的请求绝不在这里重发。
+      if (started || !(error instanceof DOMException && error.name === 'SecurityError')) throw error
+    }
+    return run()
+  })
   credentialQueue = next.catch(() => {})
   return next
 }
@@ -498,7 +515,7 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
       // Waiting behind another Cookie operation can cross logout/account boundaries.
       valid()
       return requestOnce<T>(path, init, identity)
-    }) : requestOnce<T>(path, init, identity)
+    }, init.signal) : requestOnce<T>(path, init, identity)
   const run = async () => {
     if (!import.meta.env.SSR && !isRiskCaptchaPath(path) && captchaRecovery) await captchaRecovery
     if (!import.meta.env.SSR) valid()
