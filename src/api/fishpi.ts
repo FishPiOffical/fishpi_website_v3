@@ -2,6 +2,7 @@ import {repeaterList,type RepeaterEntry} from './v3-repeater'
 import { md5 } from 'js-md5'
 import type { DomainItem } from './content-types'
 import { ApiError, request } from './http'
+import { loginDevicesEnabled } from './v3-login-devices'
 import { v3Article } from './v3-content'
 
 export type { DomainItem }
@@ -487,14 +488,13 @@ interface Envelope<T> {
 }
 
 export async function login(username: string, passwd: string, mfaCode = '') {
-  const deviceId = browserDeviceHint()
   const res = await request<Envelope<{ accessToken?: string }>>('/api/v3/auth/login', {
     method: 'POST',
     body: JSON.stringify({
       nameOrEmail: username,
       userPassword: md5(passwd),
       mfaCode,
-      deviceId,
+      ...(loginDevicesEnabled ? { deviceId: browserDeviceHint() } : {}),
     }),
   })
   if (res.code !== 0 || !res.data?.accessToken) {

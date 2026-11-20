@@ -27,21 +27,26 @@ console.log('PASS security 2 normalized new contacts, captcha four-field project
 const authDefinition=defineStore('security-auth',()=>{const accessToken=ref('A'),account=ref({oId:'1'});return{accessToken,account,logout:async()=>{state.logout++;accessToken.value=null;account.value=null}}});globalThis.__securityAuth=authDefinition;globalThis.__securityAPI={...api};globalThis.__securityRoute=reactive({hash:''})
 const authPort=url('export const useAuthStore=globalThis.__securityAuth'),apiPort=url(['securityProof','passwordDigest','fetchV3MfaState','changeV3Password','prepareV3Mfa','setV3Mfa','contactTarget','requestV3ContactCode','changeV3Contact'].map(k=>`export const ${k}=(...args)=>globalThis.__securityAPI.${k}(...args)`).join('\n')),routerPort=url('export function useRouter(){return{replace:async target=>globalThis.__security.routes.push(target)}}export function useRoute(){return globalThis.__securityRoute}'),keyPort=url('export function profileOperationKey(){return `security-${++globalThis.__security.keys}`}'),dialogPort=url('export function fpConfirm(value){return globalThis.__security.confirm(value)}'),captchaPort=url(`import{ref}from'${import.meta.resolve('vue')}';export function useGeetest4(container,fn){globalThis.__security.captcha=fn;return{error:ref(''),mount:async()=>{},destroy:()=>{}}}`)
 const timePort=url(compile(await fs.readFile('src/utils/time.ts','utf8')))
-const devicesApi=url(compile(await fs.readFile('src/api/v3-login-devices.ts','utf8')).replace("from './http'", `from '${http}'`))
+const devicesSource = compile(await fs.readFile('src/api/v3-login-devices.ts', 'utf8')).replace("from './http'", `from '${http}'`)
+function deviceBuild(flag, dev = false) {
+  return url(devicesSource.replaceAll('import.meta.env.VITE_LOGIN_DEVICES_ENABLED', JSON.stringify(flag) ?? 'undefined')
+    .replaceAll('import.meta.env.DEV', String(dev)))
+}
+const devicesApi = deviceBuild('true')
 const devicesDescriptor=parse(await fs.readFile('src/components/settings/OwnerLoginDevices.vue','utf8')).descriptor
 let devicesCode=compile(compileScript(devicesDescriptor,{id:'devices-test',inlineTemplate:true}).content)
 for (const [from,to] of [['vue',import.meta.resolve('vue')],['@/stores/auth',authPort],['@/api/http',http],['@/api/v3-login-devices',devicesApi],['@/composables/useDialog',dialogPort],['@/utils/time',timePort]]) {
   devicesCode=devicesCode.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`)
 }
 const descriptor=parse(await fs.readFile('src/components/settings/OwnerSecurity.vue','utf8')).descriptor;let componentCode=compile(compileScript(descriptor,{id:'security-test',inlineTemplate:true}).content)
-for(const[from,to]of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['vue-router',routerPort],['@/utils/time',timePort],['./OwnerLoginDevices.vue',url(devicesCode)],['@/api/http',http],['@/api/v3-security',apiPort],['@/api/v3-profile',keyPort],['@/stores/auth',authPort],['@/composables/useDialog',dialogPort],['@/composables/useGeetest4',captchaPort]])componentCode=componentCode.replace(new RegExp(`from ['"]${from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}['"]`,'g'),`from '${to}'`)
+for(const[from,to]of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['vue-router',routerPort],['@/utils/time',timePort],['./OwnerLoginDevices.vue',url(devicesCode)],['@/api/v3-login-devices',devicesApi],['@/api/http',http],['@/api/v3-security',apiPort],['@/api/v3-profile',keyPort],['@/stores/auth',authPort],['@/composables/useDialog',dialogPort],['@/composables/useGeetest4',captchaPort]])componentCode=componentCode.replace(new RegExp(`from ['"]${from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}['"]`,'g'),`from '${to}'`)
 const component=(await import(url(componentCode))).default
 const insert=(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}const i=a?p.children.indexOf(a):-1;p.children.splice(i<0?p.children.length:i,0,n);n.parent=p}
 globalThis.Document=class {};globalThis.ShadowRoot=class {};
 const renderer=createRenderer({patchProp(n,k,o,v){n.props[k]=v},insert,remove(n){if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}},createElement(tag){return{tag,children:[],props:{},innerHTML:'',value:'',addEventListener(){},removeEventListener(){},getRootNode(){return null}}},createText(text){return{text,children:[]}},createComment(){return{children:[]}},setText(n,t){n.text=t},setElementText(n,t){n.children=[{text:t,children:[]}]},parentNode:n=>n.parent,nextSibling(n){const s=n.parent?.children||[];return s[s.indexOf(n)+1]||null},insertStaticContent(text,p,a){const n={text,children:[]};insert(n,p,a);return[n,n]}})
 const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' '),find=(n,fn)=>fn(n)?n:(n.children||[]).map(c=>find(c,fn)).find(Boolean),tick=async()=>{for(let i=0;i<60;i++)await Promise.resolve();await nextTick()}
 const input=(root,label,value)=>{const n=find(root,n=>n.props?.['aria-label']===label);assert.ok(n,'Missing input '+label);n.props['onUpdate:modelValue'](value)}
-function mount(){const root={children:[]},pinia=createPinia(),app=renderer.createApp(component);app.use(pinia);const user=authDefinition(pinia);app.mount(root);return{root,app,user,text:()=>text(root),input:(label,value)=>input(root,label,value),click:label=>{const n=find(root,n=>n.tag==='button'&&text(n).trim()===label);assert.ok(n,'Missing button '+label);n.props.onClick?.()},submit:()=>{const n=find(root,n=>n.tag==='form');assert.ok(n);n.props.onSubmit({preventDefault(){}})}}}
+function mount(page = component){const root={children:[]},pinia=createPinia(),app=renderer.createApp(page);app.use(pinia);const user=authDefinition(pinia);app.mount(root);return{root,app,user,text:()=>text(root),input:(label,value)=>input(root,label,value),click:label=>{const n=find(root,n=>n.tag==='button'&&text(n).trim()===label);assert.ok(n,'Missing button '+label);n.props.onClick?.()},submit:()=>{const n=find(root,n=>n.tag==='form');assert.ok(n);n.props.onSubmit({preventDefault(){}})}}}
 __securityAPI.fetchV3MfaState=async()=>false;let changeCalls=[];__securityAPI.changeV3Password=async(...args)=>changeCalls.push(args)
 let view=mount();await tick();view.input('安全设置当前密码','old-password');view.input('安全设置新密码','new-password');view.input('安全设置确认新密码','new-password');view.submit();await tick();assert.equal(changeCalls.length,1);assert.equal(changeCalls[0][0].currentPassword,md5('old-password'));assert.equal(state.routes.at(-1).query.reason,'security-updated');assert.equal(state.logout,1);view.app.unmount()
 __securityAPI.changeV3Password=async()=>{throw new ApiError('lost acknowledgement',503)};view=mount();await tick();view.input('安全设置当前密码','old-password');view.input('安全设置新密码','new-password');view.input('安全设置确认新密码','new-password');view.submit();await tick();assert.equal(state.routes.at(-1).query.reason,'security-unconfirmed');view.app.unmount()
@@ -124,3 +129,48 @@ assert.ok(!view.text().includes('Safari'))
 assert.equal(state.requests.filter(r => r.path === targetPath).length, mutations)
 view.app.unmount()
 console.log('PASS security 9 remote device revocation keeps the current login and recovers a lost acknowledgement by reading the list')
+
+const compatApi = deviceBuild(undefined)
+const compat = await import(compatApi)
+assert.equal(compat.loginDevicesEnabled, false)
+assert.equal((await import(devicesApi)).loginDevicesEnabled, true)
+assert.equal((await import(deviceBuild(undefined, true))).loginDevicesEnabled, true)
+assert.equal((await import(deviceBuild('false', true))).loginDevicesEnabled, false)
+__securityRoute.hash = '#login-devices'
+const compatPage = (await import(url(componentCode.replaceAll(devicesApi, compatApi)))).default
+const beforeCompat = state.requests.length
+view = mount(compatPage)
+await tick()
+assert.doesNotMatch(view.text(), /登录设备/)
+assert.match(view.text(), /核对并修改密码/)
+await assert.rejects(compat.fetchLoginDevices(new AbortController().signal), e => e.code === 'feature_unavailable')
+await assert.rejects(compat.revokeLoginDevice(otherBrowser.id, new AbortController().signal), e => e.code === 'feature_unavailable')
+assert.equal(state.requests.length, beforeCompat)
+view.app.unmount()
+__securityRoute.hash = ''
+console.log('PASS 兼容模式隐藏设备入口，设备直链回到账号安全，设备列表和退出操作均无请求')
+
+const loginSource = compile(await fs.readFile('src/api/fishpi.ts', 'utf8'))
+  .replace("from './http'", `from '${http}'`)
+  .replace("from 'js-md5'", `from '${import.meta.resolve('js-md5')}'`)
+  .replace("from './v3-repeater'", `from '${url('export function repeaterList(){}')}'`)
+  .replace("from './v3-content'", `from '${url('export function v3Article(){}')}'`)
+const fakeId = '01234567-89ab-4cde-8000-123456789abc'
+let storageReads = 0
+globalThis.window = { localStorage: { getItem() { storageReads++; return fakeId } } }
+try {
+  for (const [feature, enabled] of [[compatApi, false], [devicesApi, true]]) {
+    const { login } = await import(url(loginSource.replace("from './v3-login-devices'", `from '${feature}'`)))
+    state.responses.push(env({accessToken: 'fixture'}))
+    assert.equal(await login('fixture', 'fixture-password', '012345'), 'fixture')
+    const req = state.requests.at(-1)
+    assert.equal(req.path, '/api/v3/auth/login')
+    const expected = { nameOrEmail: 'fixture', userPassword: md5('fixture-password'), mfaCode: '012345' }
+    if (enabled) expected.deviceId = fakeId
+    assert.deepEqual(JSON.parse(req.init.body), expected)
+    assert.equal(storageReads, enabled ? 1 : 0)
+  }
+} finally {
+  delete globalThis.window
+}
+console.log('PASS 实际密码登录在兼容模式发送原三字段且不读设备存储，启用时附带持久设备标识')

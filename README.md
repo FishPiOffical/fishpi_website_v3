@@ -37,7 +37,9 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 
 首页内容读取暂停时，登录恢复的刷新凭据及本人资料请求仍按优先队列执行，保留凭据串行、身份隔离和验证码恢复。认证错误交由登录流程判断，已有内容暂停继续遵守冷却时间及显式重试。回归使用 `node tools/v3-home-session-restore-test.mjs`，贯通本地 HTTP 与实际认证 store。
 
-账号安全中的「登录设备」（`/settings/account#login-devices`）可查看和退出其他浏览器的网页登录。同一浏览器的新旧站使用 Rhythm 签发的设备 Cookie 归组。最近活动取登录、续期或访问令牌最近使用的时间。客户端登录参数 `deviceId` 可省略，禁用本地存储时仍可登录。上线顺序为先执行 Rhythm 的 `sql/20261120_api_v3_website_devices.sql`，再更新 Rhythm，最后更新前端；旧版登录接口会拒绝新增字段。
+账号安全中的「登录设备」（`/settings/account#login-devices`）可查看和退出其他浏览器的网页登录。同一浏览器的新旧站使用 Rhythm 签发的设备 Cookie 归组。最近活动取登录、续期或访问令牌最近使用的时间。
+
+生产构建默认隐藏「登录设备」，密码登录沿用原有三个字段。本地开发默认开启，可设置 `VITE_LOGIN_DEVICES_ENABLED=false` 测试兼容模式。上线设备管理时，先执行 Rhythm 的 `sql/20261120_api_v3_website_devices.sql` 并更新 Rhythm，再以 `VITE_LOGIN_DEVICES_ENABLED=true` 重新构建并发布前端。开启后登录可携带 `deviceId`，浏览器禁用本地存储时也能登录。
 
 - 图片预览默认使用 `imageThumbnail(url, 显示宽度, 显示高度)`，受支持的 RhyPic 公开原图按显示尺寸请求二倍图，单边最多 1024px。正文中已清洗的图片可用 `withImageThumbnailSrcset` 保留原地址并添加缩略图地址。签名链接、已有缩放参数及外站图片保留原地址。
 
