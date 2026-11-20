@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { validateRiskCaptcha } from '@/api/fishpi'
 import { useGeetest4 } from '@/composables/useGeetest4'
-import { registerRiskCaptchaOpener } from '@/utils/riskCaptcha'
+import { registerRiskCaptchaOpener, type CaptchaContext } from '@/utils/riskCaptcha'
+import { captchaDiagnostic, captchaDiagnosticError, captchaDiagnosticId } from '@/utils/captchaDiagnostics'
 import FpDialog from '@/components/FpDialog.vue'
 
 const open = ref(false)
@@ -13,10 +14,19 @@ const captchaEl = ref<HTMLElement | null>(null)
 let resolveWait: (() => void) | null = null
 let rejectWait: ((e: Error) => void) | null = null
 let generation = 0
+const gateId = captchaDiagnosticId('gate')
+let context: CaptchaContext | null = null
+let submission = 0
+let openedAt = 0
+
+function diagnose(event: string, details: Record<string, string | number | boolean | null | undefined> = {}) {
+  captchaDiagnostic(event, { ...context, gateId, generation, submission, open: open.value, busy: busy.value, ...details })
+}
 
 const { error: gtError, mount: mountGt, destroy: destroyGt } = useGeetest4(captchaEl, (validate) => {
   void onSuccess(validate)
-})
+}, diagnose)
+watch(gtError, error => { if (error) diagnose('gate.error', { phase: 'widget', reason: 'component-error' }) })
 
 function settleOk() {
   resolveWait?.()
@@ -30,8 +40,12 @@ function settleErr(e: Error) {
   rejectWait = null
 }
 
-async function openGate(): Promise<void> {
+async function openGate(nextContext: CaptchaContext): Promise<void> {
+  context = nextContext
+  submission = 0
+  openedAt = performance.now()
   const turn = ++generation
+  diagnose('gate.open')
   const pending = new Promise<void>((resolve, reject) => {
     resolveWait = resolve
     rejectWait = reject
@@ -40,39 +54,58 @@ async function openGate(): Promise<void> {
   tip.value = '访问过于频繁，请完成人机验证后继续'
   open.value = true
   await nextTick()
-  if (turn !== generation) return pending
+  if (turn !== generation) { diagnose('gate.ignored', { phase: 'open', reason: 'stale-generation' }); return pending }
   destroyGt()
   try {
+    diagnose('gate.mount', { phase: 'popup' })
     // 浮动挑战会被 FpDialog 的滚动正文裁切，使用供应商独立弹层。
     await mountGt('popup')
   } catch (e) {
+    diagnose('gate.error', { phase: 'mount', ...captchaDiagnosticError(e) })
     tip.value = e instanceof Error ? e.message : '验证码加载失败'
   }
   return pending
 }
 
 async function onSuccess(captcha: unknown) {
-  if (busy.value || !open.value) return
+  diagnose('gate.proof', { hasProof: Boolean(captcha) })
+  if (busy.value || !open.value) {
+    diagnose('gate.ignored', { phase: 'proof', reason: busy.value ? 'busy' : 'closed' })
+    return
+  }
   const turn = generation
+  const proofContext = { ...context, gateId, generation: turn, submission: ++submission }
+  const started = performance.now()
   busy.value = true
   tip.value = '验证中…'
   try {
+    diagnose('gate.submit')
     await validateRiskCaptcha(captcha)
-    if (turn !== generation) return
+    captchaDiagnostic('gate.accepted', { ...proofContext, durationMs: Math.round(performance.now() - started) })
+    if (turn !== generation) {
+      captchaDiagnostic('gate.ignored', { ...proofContext, phase: 'submit', reason: 'stale-generation' })
+      return
+    }
     tip.value = '验证通过'
     destroyGt()
     open.value = false
+    diagnose('gate.close', { reason: 'success', durationMs: Math.round(performance.now() - openedAt) })
     settleOk()
   } catch (e) {
-    if (turn !== generation) return
+    captchaDiagnostic('gate.rejected', { ...proofContext, ...captchaDiagnosticError(e), durationMs: Math.round(performance.now() - started) })
+    if (turn !== generation) {
+      captchaDiagnostic('gate.ignored', { ...proofContext, phase: 'failure', reason: 'stale-generation' })
+      return
+    }
     tip.value = e instanceof Error ? e.message : '人机验证失败'
     destroyGt()
     await nextTick()
     if (turn !== generation || !open.value) return
     try {
+      diagnose('gate.remount', { reason: 'proof-rejected' })
       await mountGt('popup')
-    } catch {
-      /* keep tip */
+    } catch (error) {
+      diagnose('gate.error', { phase: 'remount', ...captchaDiagnosticError(error) })
     }
   } finally {
     if (turn === generation) busy.value = false
@@ -80,6 +113,7 @@ async function onSuccess(captcha: unknown) {
 }
 
 function dismiss() {
+  diagnose('gate.close', { reason: 'dismissed', durationMs: Math.round(performance.now() - openedAt) })
   generation++
   busy.value = false
   open.value = false
@@ -87,8 +121,12 @@ function dismiss() {
   settleErr(new Error('已取消人机验证'))
 }
 
-onMounted(() => registerRiskCaptchaOpener(openGate))
+onMounted(() => {
+  diagnose('gate.mounted')
+  registerRiskCaptchaOpener(openGate)
+})
 onUnmounted(() => {
+  diagnose('gate.unmounted', { reason: rejectWait ? 'pending' : 'idle' })
   generation++
   registerRiskCaptchaOpener(null)
   destroyGt()

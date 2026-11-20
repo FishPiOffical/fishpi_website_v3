@@ -9,6 +9,10 @@ export type Geetest4Instance = {
   getValidate: () => unknown
   reset: () => void
   destroy?: () => void
+  onReady?: (cb: () => void) => Geetest4Instance
+  onError?: (cb: (error: { code?: unknown }) => void) => Geetest4Instance
+  onClose?: (cb: () => void) => Geetest4Instance
+  onFail?: (cb: () => void) => Geetest4Instance
 }
 
 type InitFn = (cfg: object, cb: (g: Geetest4Instance) => void) => void
@@ -31,7 +35,8 @@ function loadScript(): Promise<InitFn> {
   return promise
 }
 
-export function useGeetest4(container: Ref<HTMLElement | null>, onSuccess: (validate: unknown) => void) {
+export function useGeetest4(container: Ref<HTMLElement | null>, onSuccess: (validate: unknown) => void,
+  diagnose?: (event: string, fields: Record<string, string | number | boolean>) => void) {
   const ready = ref(false)
   const error = ref('')
   let gt: Geetest4Instance | null = null
@@ -41,41 +46,71 @@ export function useGeetest4(container: Ref<HTMLElement | null>, onSuccess: (vali
   async function mount(product: 'float' | 'popup' = 'float', captchaId = FISHPI_GEETEST_ID) {
     destroy()
     const current = ++generation, target = container.value
+    diagnose?.('widget.mount', { widgetGeneration: current, phase: product, ready: Boolean(target) })
     error.value = ''
     if (!target) {
       error.value = '验证码容器未就绪'
+      diagnose?.('widget.error', { widgetGeneration: current, reason: 'container-missing' })
       return
     }
     try {
       const init = await loadScript()
-      if (current !== generation || container.value !== target) return
+      diagnose?.('widget.script', { widgetGeneration: current, reason: 'loaded' })
+      if (current !== generation || container.value !== target) {
+        diagnose?.('widget.stale', { widgetGeneration: current, phase: 'script' })
+        return
+      }
       target.innerHTML = ''
       ready.value = false
       init({ captchaId, product }, (instance) => {
-        if (current !== generation || container.value !== target) { instance.destroy?.(); return }
+        if (current !== generation || container.value !== target) {
+          diagnose?.('widget.stale', { widgetGeneration: current, phase: 'init' })
+          instance.destroy?.(); return
+        }
         gt = instance
+        instance.onReady?.(() => diagnose?.('widget.vendor-ready', { widgetGeneration: current }))
+        instance.onError?.(failure => diagnose?.('widget.error', {
+          widgetGeneration: current, reason: 'vendor-error',
+          vendorCode: typeof failure?.code === 'number' || typeof failure?.code === 'string' && /^\d{1,10}$/.test(failure.code) ? String(failure.code) : 'unknown',
+        }))
+        instance.onClose?.(() => diagnose?.('widget.close', { widgetGeneration: current }))
+        instance.onFail?.(() => diagnose?.('widget.fail', { widgetGeneration: current }))
         instance.appendTo(target).onSuccess(() => {
-          if (current !== generation || container.value !== target || gt !== instance) return
-          onSuccess(instance.getValidate())
-          const timer = setTimeout(() => { timers.delete(timer); if (current === generation && gt === instance) instance.reset() }, 3000)
+          if (current !== generation || container.value !== target || gt !== instance) {
+            diagnose?.('widget.stale', { widgetGeneration: current, phase: 'success' })
+            return
+          }
+          const proof = instance.getValidate()
+          diagnose?.('widget.success', { widgetGeneration: current, hasProof: Boolean(proof) })
+          onSuccess(proof)
+          const timer = setTimeout(() => {
+            timers.delete(timer)
+            if (current === generation && gt === instance) {
+              diagnose?.('widget.reset', { widgetGeneration: current, reason: 'success-timer' })
+              instance.reset()
+            }
+          }, 3000)
           timers.add(timer)
         })
         ready.value = true
+        diagnose?.('widget.ready', { widgetGeneration: current })
       })
     } catch (e) {
       if (current !== generation) return
       error.value = e instanceof Error ? e.message : '验证码加载失败'
+      diagnose?.('widget.error', { widgetGeneration: current, reason: 'load-or-init-failed' })
     }
   }
 
   function destroy() {
+    diagnose?.('widget.destroy', { widgetGeneration: generation, ready: Boolean(gt) })
     generation++
     for (const timer of timers) clearTimeout(timer)
     timers.clear()
     try {
       gt?.destroy?.()
     } catch {
-      /* ignore */
+      diagnose?.('widget.error', { widgetGeneration: generation, reason: 'destroy-failed' })
     }
     gt = null
     ready.value = false
