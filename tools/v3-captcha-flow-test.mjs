@@ -219,6 +219,21 @@ try {
   assert.equal(await staleRefresh, false)
   assert.deepEqual(received.slice(credentialStart).map(x => x.path), ['/api/v3/auth/session'])
   console.log('PASS queued refresh rechecks identity at credential dispatch: logout prevents any stale Cookie request')
+
+  const diagnostics = JSON.parse(window.fpCaptchaDiagnostics.export()).events
+  const recovery = diagnostics.find(event => event.event === 'recovery.start')
+  assert.ok(recovery?.requestId && recovery.flowId)
+  assert.ok(diagnostics.some(event => event.event === 'opener.open' && event.flowId === recovery.flowId))
+  assert.ok(diagnostics.some(event => event.event === 'recovery.success' && event.flowId === recovery.flowId))
+  assert.ok(diagnostics.some(event => event.event === 'proof.result' && event.flowId === recovery.flowId && event.code === 0))
+  assert.ok(diagnostics.some(event => event.event === 'request.retry-result' && event.requestId === recovery.requestId && event.flowId === recovery.flowId && event.reason === 'success'))
+  assert.ok(diagnostics.some(event => event.event === 'http.dispatch' && typeof event.authorizationAttached === 'boolean'))
+  assert.ok(diagnostics.some(event => event.event === 'challenge.late'))
+  assert.ok(diagnostics.some(event => event.event === 'request.retry-result' && event.code === 'captcha_required'))
+  assert.ok(!window.fpCaptchaDiagnostics.export().includes('fixture-old-identity'))
+  assert.ok(!window.fpCaptchaDiagnostics.export().includes('original-command'))
+  assert.ok(!window.fpCaptchaDiagnostics.export().includes('"value":1'))
+  console.log('PASS captcha diagnostics: request/flow/proof/retry linked, late and persistent challenges visible, credentials and payload omitted')
 } finally {
   risk.registerRiskCaptchaOpener(null)
   globalThis.fetch = nativeFetch

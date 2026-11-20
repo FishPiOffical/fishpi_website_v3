@@ -83,6 +83,15 @@ try {
   await flush(); app.unmount(); await lastAssertion
   await assert.rejects(risk.ensureRiskCaptcha(), /人机验证/)
   assert.ok(destroys >= 3)
+  const diagnostics = JSON.parse(window.fpCaptchaDiagnostics.export()).events
+  const rejected = diagnostics.find(event => event.event === 'gate.rejected')
+  assert.ok(rejected?.flowId && rejected.gateId && rejected.generation && rejected.submission === 1)
+  assert.ok(diagnostics.some(event => event.event === 'gate.remount' && event.flowId === rejected.flowId))
+  assert.ok(diagnostics.some(event => event.event === 'gate.accepted' && event.flowId === rejected.flowId && event.submission === 2))
+  assert.ok(diagnostics.some(event => event.event === 'gate.close' && event.reason === 'dismissed'))
+  assert.ok(diagnostics.some(event => event.event === 'gate.ignored' && event.reason === 'stale-generation'))
+  assert.ok(!window.fpCaptchaDiagnostics.export().includes('服务端未确认'))
+  console.log('PASS captcha gate diagnostics: popup generation, submission, remount, stale response and close reason correlated')
   console.log('PASS captcha gate: early dismissal, shared opener, late proof isolation, stale widget callbacks, failed proof retry, success and unmount cleanup')
 } finally {
   if (document.querySelector('#app')?.__vue_app__) app.unmount()

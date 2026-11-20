@@ -10,8 +10,21 @@ SSR 的 `ssrUpstreamGate` 保留上游验证码退避原因，每次渲染自行
 
 实时订阅收到验证码拒绝时保留blocked，不当作文章删除；`fp:captcha-passed` 触发重新申请票据，仍须WebSocket认证及ready才算连接恢复。卸载清监听和定时器。
 
+## 浏览器诊断日志
+
+全局验证码流程以 `[FP captcha]` 输出单行 JSON，关联 `pageId`、`requestId`、`flowId`、`gateId`、组件代次和提交次数。记录请求排队及实际发送、HTTP 状态、可读的服务端请求标识、凭据携带方式、内存令牌是否存在、共享恢复、供应商组件事件、服务端确认、关闭原因和原请求重试结果。页面启动记录诊断版本、产物文件名、浏览器版本、时区偏移、页面来源、刷新类型、窗口尺寸及 Service Worker 控制状态。
+
+采用字段白名单，路径中的动态值投影为 `:value`，查询参数、片段、请求体、响应正文、Cookie、Authorization 内容、验证码证明和错误原文均不进入日志。日志只保留在浏览器控制台与当前标签页 sessionStorage，最近 600 条跨刷新保留。存储不可用会输出事件，内存和控制台继续记录。没有网络上报。
+
+复现时打开 F12 → Console，勾选 Preserve log，过滤 `FP captcha`。发生重复弹窗后运行 `copy(window.fpCaptchaDiagnostics.export())`，将复制内容连同大致发生时间发送给维护人员。也可直接复制筛选后的控制台日志。清理时运行 `window.fpCaptchaDiagnostics.clear()`。导出包含自动验证实际记录，服务端内部判定仍需通过时间与服务端 requestId 关联查询。
+
+PC 和移动端分别验证成功、拒绝后重试、取消以及刷新后导出，核对同一轮 `flowId` 和原请求 `requestId` 连续，且导出中没有凭据或业务内容。自动专项使用受控供应商与本机 HTTP 边界验证事件关联。
+
 ## 自动验证
 
+专项统一通过 `node --import ./tools/ui-test-imports.mjs tools/<脚本名>.mjs` 执行，加载实际共享诊断模块。下列命令中的脚本名与验证范围一一对应。
+
+- `node tools/v3-captcha-diagnostics-test.mjs`：字段和路径脱敏、JSON 导出、跨刷新保留、容量与存储不可用边界。
 - `node tools/v3-captcha-flow-test.mjs`：本机HTTP、实际请求队列与协调器、entry-client启动逻辑，人工交互及应用挂载边界由夹具控制。
 - `node tools/v3-captcha-gate-test.mjs`：实际Vue组件、FpDialog及极验helper的生命周期；供应商和服务端结果由夹具控制。
 - `node tools/v3-ssr-upstream-gate-test.mjs`：上游退避、原因隔离及探测恢复。

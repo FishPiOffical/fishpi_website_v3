@@ -1,4 +1,5 @@
 import { ensureRiskCaptcha } from '@/utils/riskCaptcha'
+import { captchaDiagnostic, captchaDiagnosticError, captchaDiagnosticId, captchaDiagnosticOrigin, captchaDiagnosticPath } from '@/utils/captchaDiagnostics'
 
 export const FISHPI_UA =
   'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
@@ -35,6 +36,7 @@ const tokenListeners = new Set<(token: string | null) => void>()
 function publishToken(token: string | null) {
   if (import.meta.env.SSR) return
   accessToken = token
+  captchaDiagnostic('auth.changed', { authVersion, hasAccessToken: Boolean(token) })
   publicListFlights.clear()
   for (const listener of tokenListeners) listener(token)
 }
@@ -253,19 +255,33 @@ let captchaRecovery: Promise<void> | null = null
 let captchaRevision = 0
 let captchaFailureRevision = 0
 let captchaFailure: ApiError | null = null
+let captchaFlowId: string | null = null
 
 /** 同一页面共用验证屏障；队列内原请求原地重试，不重新排队造成互等。 */
-function recoverCaptcha(): Promise<void> {
-  if (captchaRecovery) return captchaRecovery
-  const flight = Promise.resolve().then(ensureRiskCaptcha).then(() => {
+function recoverCaptcha(trace: DiagnosticRequest): Promise<void> {
+  const { requestId } = trace
+  if (captchaRecovery) {
+    trace.flowId = captchaFlowId
+    captchaDiagnostic('recovery.join', { requestId, flowId: captchaFlowId })
+    return captchaRecovery
+  }
+  const flowId = captchaDiagnosticId('flow')
+  trace.flowId = flowId
+  captchaFlowId = flowId
+  const started = performance.now()
+  captchaDiagnostic('recovery.start', { requestId, flowId, captchaRevision, failureRevision: captchaFailureRevision, authVersion, hasAccessToken: Boolean(accessToken) })
+  const flight = Promise.resolve().then(() => ensureRiskCaptcha({ flowId, requestId })).then(() => {
     captchaRevision++
+    captchaDiagnostic('recovery.success', { requestId, flowId, captchaRevision, durationMs: Math.round(performance.now() - started) })
     window.dispatchEvent(new Event('fp:captcha-passed'))
   }).catch((error: unknown) => {
     captchaFailureRevision++
+    captchaDiagnostic('recovery.failure', { requestId, flowId, failureRevision: captchaFailureRevision, ...captchaDiagnosticError(error) })
     captchaFailure = new ApiError(error instanceof Error ? error.message : '人机验证未完成', 403, 'captcha_required')
     throw captchaFailure
   }).finally(() => {
-    if (captchaRecovery === flight) captchaRecovery = null
+    captchaDiagnostic('recovery.end', { flowId, durationMs: Math.round(performance.now() - started) })
+    if (captchaRecovery === flight) { captchaRecovery = null; captchaFlowId = null }
   })
   captchaRecovery = flight
   return flight
@@ -373,7 +389,44 @@ function isRiskCaptchaPath(path: string) {
   return path.includes('/validateCaptcha') || /(^|\/)test(\?|$)/.test(path)
 }
 
-async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, identity: RequestIdentity): Promise<T> {
+type DiagnosticRequest = { requestId: string; attempt: number; flowId: string | null }
+
+function diagnosticRequestFields(path: string, init: RequestInitExtra, trace: DiagnosticRequest) {
+  return {
+    ...trace, flowId: trace.flowId ?? captchaFlowId, path: captchaDiagnosticPath(path), method: (init.method || 'GET').toUpperCase(),
+    origin: captchaDiagnosticOrigin(resolveUrl(path)),
+    authVersion, hasAccessToken: Boolean(accessToken), credentials: init.credentials ?? 'include',
+    captchaRevision, failureRevision: captchaFailureRevision, homeReadsActive, homeReadGeneration,
+    homePaused: Boolean(homeReadPause), aborted: Boolean(init.signal?.aborted),
+  }
+}
+
+async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, identity: RequestIdentity, trace: DiagnosticRequest): Promise<T> {
+  trace.attempt++
+  const started = performance.now()
+  const details = diagnosticRequestFields(path, init, trace)
+  captchaDiagnostic('http.start', details)
+  try {
+    const result = await requestOnceTransport<T>(path, init, identity, trace)
+    captchaDiagnostic('http.complete', { ...details, durationMs: Math.round(performance.now() - started) })
+    return result
+  } catch (error) {
+    captchaDiagnostic('http.error', { ...details, ...captchaDiagnosticError(error), durationMs: Math.round(performance.now() - started) })
+    throw error
+  }
+}
+
+function diagnosticResponse(res: Response, trace: DiagnosticRequest, authorizationAttached: boolean) {
+  const serverRequestId = res.headers.get('x-request-id') || res.headers.get('request-id')
+  captchaDiagnostic('http.response', {
+    ...trace, status: res.status, redirected: res.redirected, authorizationAttached,
+    serverRequestId: serverRequestId && /^[A-Za-z0-9._:-]{1,128}$/.test(serverRequestId) ? serverRequestId : null,
+    responseType: isJsonContentType(res.headers.get('content-type')) ? 'json' : 'other',
+    origin: captchaDiagnosticOrigin(res.url), path: captchaDiagnosticPath(res.url),
+  })
+}
+
+async function requestOnceTransport<T = unknown>(path: string, init: RequestInitExtra, identity: RequestIdentity, trace: DiagnosticRequest): Promise<T> {
   const headers = new Headers(init.headers)
   if (import.meta.env.SSR && !headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
   if (init.body && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
@@ -386,6 +439,7 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
   const { __captchaRetried: _, __v3Retried: __, __authVersion: ___, __zip: ____, __svg: _____, ...fetchInit } = init
   const ssrRead = import.meta.env.SSR && ssrReadGate && (init.method || 'GET').toUpperCase() === 'GET'
   let res: Response
+  captchaDiagnostic('http.dispatch', { ...diagnosticRequestFields(path, init, trace), authorizationAttached: headers.has('Authorization') })
   try {
     res = await fetch(resolveUrl(path), {
       ...fetchInit,
@@ -398,6 +452,7 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
     asNetworkError(e, identity)
   }
 
+  diagnosticResponse(res, trace, headers.has('Authorization'))
   if (res.status === 429) {
     // 只在对应的接口识别业务限流码，网关或其他接口的 429 继续按普通限流处理。
     const petRequest = /^\/api\/v3\/me\/pet(?:\/|\?|$)/.test(path)
@@ -460,6 +515,12 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
     throw new ApiError('无法解析接口响应', res.status, 'invalid_response')
   }
 
+  if (path === '/validateCaptcha') {
+    const code = typeof data === 'object' && data && 'code' in data ? (data as { code: unknown }).code : undefined
+    captchaDiagnostic('proof.result', { ...trace, status: res.status,
+      code: typeof code === 'number' ? code : 'other', reason: code === 0 ? 'accepted' : 'rejected' })
+  }
+
   if (!res.ok) {
     const msg = typeof data === 'object' && data && 'msg' in data ? String((data as { msg?: string }).msg) : res.statusText
     const code = typeof data === 'object' && data && 'code' in data ? String((data as { code?: string | number }).code) : undefined
@@ -500,10 +561,16 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
   const version = identity.version
   const sentToken = getAccessToken()
   const failureRevision = captchaFailureRevision
+  const trace: DiagnosticRequest = { requestId: captchaDiagnosticId('request'), attempt: 0, flowId: captchaFlowId }
+  captchaDiagnostic('http.queued', diagnosticRequestFields(path, init, trace))
   const explicitAuthorization = new Headers(init.headers).has('Authorization')
   const valid = () => {
-    if (!isRiskCaptchaPath(path) && failureRevision !== captchaFailureRevision && captchaFailure) throw captchaFailure
+    if (!isRiskCaptchaPath(path) && failureRevision !== captchaFailureRevision && captchaFailure) {
+      captchaDiagnostic('request.invalidated', { ...trace, reason: 'captcha-failed' })
+      throw captchaFailure
+    }
     if (version !== authVersion || init.signal?.aborted) {
+      captchaDiagnostic('request.invalidated', { ...trace, reason: version !== authVersion ? 'identity-changed' : 'aborted' })
       throw new ApiError('请求已取消', 0, 'aborted')
     }
     if (init.__authVersion !== undefined && init.__authVersion !== authVersion) {
@@ -514,20 +581,34 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
     ? queueCredentialRequest(() => {
       // Waiting behind another Cookie operation can cross logout/account boundaries.
       valid()
-      return requestOnce<T>(path, init, identity)
-    }, init.signal) : requestOnce<T>(path, init, identity)
+      return requestOnce<T>(path, init, identity, trace)
+    }, init.signal) : requestOnce<T>(path, init, identity, trace)
   const run = async () => {
-    if (!import.meta.env.SSR && !isRiskCaptchaPath(path) && captchaRecovery) await captchaRecovery
+    if (!import.meta.env.SSR && !isRiskCaptchaPath(path) && captchaRecovery) {
+      trace.flowId = captchaFlowId
+      captchaDiagnostic('recovery.wait', { ...trace, flowId: captchaFlowId })
+      await captchaRecovery
+    }
     if (!import.meta.env.SSR) valid()
     const revision = captchaRevision
     try { return await transport() }
     catch (error) {
       if (import.meta.env.SSR || !isCaptchaRequired(error) || init.__captchaRetried || isRiskCaptchaPath(path)) throw error
+      captchaDiagnostic('challenge.received', { ...diagnosticRequestFields(path, init, trace), ...captchaDiagnosticError(error), flowId: captchaFlowId })
       valid()
       // 验证前发出的迟到响应只重试，不再次打开已经完成的验证。
-      if (revision === captchaRevision) await recoverCaptcha()
+      if (revision === captchaRevision) await recoverCaptcha(trace)
+      else captchaDiagnostic('challenge.late', { ...trace, captchaRevision, reason: 'already-passed' })
       valid()
-      return transport()
+      captchaDiagnostic('request.retry', { ...trace, captchaRevision })
+      try {
+        const result = await transport()
+        captchaDiagnostic('request.retry-result', { ...trace, reason: 'success' })
+        return result
+      } catch (retryError) {
+        captchaDiagnostic('request.retry-result', { ...trace, reason: 'failure', ...captchaDiagnosticError(retryError) })
+        throw retryError
+      }
     }
   }
   if (!import.meta.env.SSR && homeReadsActive && isV3Path(path)) {
@@ -567,13 +648,19 @@ async function requestWithRetry<T = unknown>(path: string, init: RequestInitExtr
 
 export async function requestText(path: string, init: RequestInitExtra = {}): Promise<string> {
   const version = authVersion
-  if (!import.meta.env.SSR && !isRiskCaptchaPath(path) && captchaRecovery) await captchaRecovery
+  const trace: DiagnosticRequest = { requestId: captchaDiagnosticId('request'), attempt: 0, flowId: captchaFlowId }
+  captchaDiagnostic('http.queued', diagnosticRequestFields(path, init, trace))
+  if (!import.meta.env.SSR && !isRiskCaptchaPath(path) && captchaRecovery) {
+    trace.flowId = captchaFlowId
+    captchaDiagnostic('recovery.wait', { ...trace, flowId: captchaFlowId })
+    await captchaRecovery
+  }
   if (!import.meta.env.SSR && (version !== authVersion || init.signal?.aborted)) {
     throw new ApiError('请求已取消', 0, 'aborted')
   }
   const revision = captchaRevision
   try {
-    return await requestTextOnce(path, init)
+    return await requestTextOnce(path, init, trace)
   } catch (e) {
     if (
       !import.meta.env.SSR &&
@@ -581,20 +668,38 @@ export async function requestText(path: string, init: RequestInitExtra = {}): Pr
       !init.__captchaRetried &&
       !isRiskCaptchaPath(path) && version === authVersion && !init.signal?.aborted
     ) {
-      if (revision === captchaRevision) await recoverCaptcha()
+      captchaDiagnostic('challenge.received', { ...diagnosticRequestFields(path, init, trace), ...captchaDiagnosticError(e) })
+      if (revision === captchaRevision) await recoverCaptcha(trace)
+      else captchaDiagnostic('challenge.late', { ...trace, captchaRevision, reason: 'already-passed' })
       if (version !== authVersion || init.signal?.aborted) throw e
-      return requestTextOnce(path, { ...init, __captchaRetried: true })
+      captchaDiagnostic('request.retry', trace)
+      return requestTextOnce(path, { ...init, __captchaRetried: true }, trace)
     }
     throw e
   }
 }
 
-async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
+async function requestTextOnce(path: string, init: RequestInitExtra, trace: DiagnosticRequest) {
+  trace.attempt++
+  const started = performance.now()
+  captchaDiagnostic('http.start', diagnosticRequestFields(path, init, trace))
+  try {
+    const result = await requestTextTransport(path, init, trace)
+    captchaDiagnostic('http.complete', { ...trace, durationMs: Math.round(performance.now() - started) })
+    return result
+  } catch (error) {
+    captchaDiagnostic('http.error', { ...trace, ...captchaDiagnosticError(error), durationMs: Math.round(performance.now() - started) })
+    throw error
+  }
+}
+
+async function requestTextTransport(path: string, init: RequestInitExtra, trace: DiagnosticRequest) {
   const identity = requestIdentity()
   const headers = new Headers(init.headers)
   if (import.meta.env.SSR && !headers.has('User-Agent')) headers.set('User-Agent', FISHPI_UA)
   const { __captchaRetried: _, ...fetchInit } = init
   let res: Response
+  captchaDiagnostic('http.dispatch', { ...diagnosticRequestFields(path, init, trace), authorizationAttached: headers.has('Authorization') })
   try {
     res = await fetch(resolveUrl(path), {
       ...fetchInit,
@@ -604,6 +709,7 @@ async function requestTextOnce(path: string, init: RequestInitExtra = {}) {
   } catch (e) {
     asNetworkError(e, identity)
   }
+  diagnosticResponse(res, trace, headers.has('Authorization'))
   try {
     const pathname = new URL(res.url).pathname
     if (/^\/test\/?$/.test(pathname)) {

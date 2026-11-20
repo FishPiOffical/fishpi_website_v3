@@ -7,26 +7,40 @@
  * SPA 侧由 RiskCaptchaGate 注册 opener，request() 遇 captcha 时 await 解封后重试一次。
  */
 
-type Opener = () => Promise<void>
+import { captchaDiagnostic, captchaDiagnosticError, captchaDiagnosticId } from '@/utils/captchaDiagnostics'
+
+export type CaptchaContext = { flowId: string; requestId?: string }
+type Opener = (context: CaptchaContext) => Promise<void>
 
 let opener: Opener | null = null
 let inflight: Promise<void> | null = null
 
 export function registerRiskCaptchaOpener(fn: Opener | null) {
   opener = fn
+  captchaDiagnostic('opener.register', { ready: Boolean(fn) })
 }
 
 /** 弹出全局极验并等待 /validateCaptcha 成功；并发调用共用同一次验证。 */
-export function ensureRiskCaptcha(): Promise<void> {
+export function ensureRiskCaptcha(context: CaptchaContext = { flowId: captchaDiagnosticId('flow') }): Promise<void> {
   if (import.meta.env.SSR) {
     return Promise.reject(new Error('服务端无法完成人机验证'))
   }
-  if (inflight) return inflight
+  if (inflight) {
+    captchaDiagnostic('opener.join', context)
+    return inflight
+  }
   if (!opener) {
+    captchaDiagnostic('opener.missing', context)
     return Promise.reject(new Error('访问过于频繁，请完成人机验证后再试'))
   }
   const open = opener
-  inflight = Promise.resolve().then(open).finally(() => {
+  captchaDiagnostic('opener.open', context)
+  inflight = Promise.resolve().then(() => open(context)).then(() => {
+    captchaDiagnostic('opener.success', context)
+  }).catch(error => {
+    captchaDiagnostic('opener.failure', { ...context, ...captchaDiagnosticError(error) })
+    throw error
+  }).finally(() => {
     inflight = null
   })
   return inflight
