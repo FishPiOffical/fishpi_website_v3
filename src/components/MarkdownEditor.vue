@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAppearanceStore } from '@/stores/appearance'
 import FpLoading from '@/components/FpLoading.vue'
 import EmojiPicker from '@/components/EmojiPicker.vue'
 import { createMarkdownPreview } from '@/utils/markdownPreview'
-import { createEditorUpload, type EditorUploadStatus } from '@/utils/editorUpload'
+import { loadVditor, VDITOR_CDN, type VditorCtor, type VditorInstance } from '@/utils/markdownEditorAssets'
+import { createEditorUpload, editorUploadAccept, type EditorUploadStatus } from '@/utils/editorUpload'
 import { createMentionHints } from '@/utils/mentionHints'
 import { getAuthContextVersion, onAccessTokenChange } from '@/api/http'
 
@@ -16,6 +17,7 @@ const props = withDefaults(
     /** 聊天室编辑器拖动边缘，顶部和底部独立保存本机高度 */
     resizeEdge?: 'top' | 'bottom'
     disableSubmitShortcut?: boolean
+    instantInput?: boolean
     placeholder?: string
     outline?: boolean
     /** reply：聊天室 / 私信 / 回帖共用的短文工具栏，仅编辑区；post：发帖的长文工具栏，分屏预览 */
@@ -82,21 +84,6 @@ function resizeWithKeys(event: KeyboardEvent) {
   if (nextHeight !== displayedHeight.value) saveHeight(nextHeight)
 }
 
-const VDITOR_CDN = 'https://file.fishpi.cn/vditor/latest/dist'
-
-interface VditorInstance {
-  readonly vditor?: { lute?: { GetEmojis(): Record<string, unknown> } }
-  focus(): void
-  getValue(): string
-  setValue(value: string, clearStack?: boolean): void
-  insertMD(value: string): void
-  setTheme(theme: 'classic' | 'dark', contentTheme?: string, codeTheme?: string, contentThemePath?: string): void
-  destroy(): void
-}
-type VditorCtor = new (el: HTMLElement, options: Record<string, unknown>) => VditorInstance
-
-let loader: Promise<VditorCtor> | null = null
-
 const MORE_TOOLS = ['outdent', 'indent', 'insert-before', 'insert-after', 'line', 'info', 'help']
 
 const REPLY_TOOLBAR = [
@@ -151,39 +138,18 @@ const MOBILE_TOOLBAR = [
 
 const MESSAGE_TOOLBAR = ['emoji', 'bold', 'italic', 'link', 'upload']
 
-function loadVditor(): Promise<VditorCtor> {
-  const w = window as unknown as { Vditor?: VditorCtor }
-  if (w.Vditor) return Promise.resolve(w.Vditor)
-  if (loader) return loader
-  loader = new Promise<VditorCtor>((resolve, reject) => {
-    if (!document.querySelector(`link[href^="${VDITOR_CDN}"]`)) {
-      const css = document.createElement('link')
-      css.rel = 'stylesheet'
-      css.href = `${VDITOR_CDN}/index.css`
-      document.head.appendChild(css)
-    }
-    const script = document.createElement('script')
-    script.src = `${VDITOR_CDN}/index.min.js`
-    script.onload = () => (w.Vditor ? resolve(w.Vditor) : reject(new Error('Vditor 未注册')))
-    script.onerror = () => reject(new Error('编辑器加载失败'))
-    document.head.appendChild(script)
-  }).catch((e) => {
-    loader = null
-    throw e
-  })
-  return loader
-}
-
 const host = ref<HTMLElement | null>(null)
 const emojiPicker = ref<InstanceType<typeof EmojiPicker> | null>(null)
 const nativeEmojis = ref<Record<string, string>>({})
 const fallback = ref(false)
 const ready = ref(false)
 const fallbackInput = ref<HTMLTextAreaElement | null>(null)
+const plainInput = computed(() => fallback.value || (props.instantInput && !ready.value))
+const plainDraft = computed({ get: () => props.modelValue, set: value => emit('update:modelValue', value) })
 let editor: VditorInstance | null = null
 let lastEmitted = props.modelValue
 let lastRenderedValue: string | undefined
-const preview = createMarkdownPreview(() => editor?.getValue() ?? props.modelValue)
+const preview = createMarkdownPreview(() => editor?.getValue() ?? props.modelValue, props.mode === 'post')
 const uploadStatus = ref<EditorUploadStatus>(null)
 const uploads = createEditorUpload(markdown => {
   editor?.insertMD(markdown)
@@ -193,9 +159,11 @@ const mentionError = ref('')
 const mentions = createMentionHints(message => { mentionError.value = message })
 let composing = false
 let disposed = false
+let richLoaded = false
+let compositionFrame: number | undefined
 function reportContentState() {
   if (disposed) return
-  const value = fallback.value ? fallbackInput.value?.value ?? props.modelValue : editor?.getValue() ?? props.modelValue
+  const value = plainInput.value ? fallbackInput.value?.value ?? props.modelValue : editor?.getValue() ?? props.modelValue
   emit('content-state', !composing && Boolean(value.trim()))
 }
 function onImmediateInput(event: Event) {
@@ -205,10 +173,23 @@ function onImmediateInput(event: Event) {
   queueMicrotask(reportContentState)
 }
 function onCompositionStart() {
+  if (compositionFrame !== undefined) cancelAnimationFrame(compositionFrame)
+  compositionFrame = undefined
   composing = true
   emit('content-state', false)
 }
-function onCompositionEnd() {
+function onCompositionEnd(event: Event) {
+  if (props.instantInput && event.target === fallbackInput.value) {
+    if (compositionFrame !== undefined) cancelAnimationFrame(compositionFrame)
+    // 等确认选字后的最后一个 input 更新文本框，再把编辑权移交给 Vditor。
+    compositionFrame = requestAnimationFrame(() => {
+      compositionFrame = undefined
+      composing = false
+      upgradePlainInput()
+      reportContentState()
+    })
+    return
+  }
   composing = false
   queueMicrotask(reportContentState)
 }
@@ -237,6 +218,70 @@ function applyTheme() {
   editor.setTheme(dark.value ? 'dark' : 'classic', dark.value ? 'dark' : 'light', dark.value ? 'native' : 'github', CONTENT_THEME_PATH)
 }
 
+function visibleEditorField() {
+  return Array.from(host.value?.querySelectorAll<HTMLElement>(
+    '.vditor-sv[contenteditable="true"], .vditor-ir > [contenteditable="true"], .vditor-wysiwyg > [contenteditable="true"]',
+  ) ?? []).find(element => element.getClientRects().length > 0)
+}
+
+function insertText(text: string) {
+  const field = ready.value ? visibleEditorField() : undefined
+  if (field) {
+    field.focus({ preventScroll: true })
+    // 通过原生文本输入保留 @ 后的普通空格及编辑器光标，Markdown 解析会裁掉行尾空格。
+    if (document.activeElement === field && document.execCommand('insertText', false, text)) {
+      reportContentState()
+      return
+    }
+  }
+  insertEmoji(text)
+}
+
+function destroyEditor() {
+  editor?.destroy()
+  editor = null
+}
+
+function upgradePlainInput() {
+  if (!richLoaded || ready.value || disposed || composing || !editor) return
+  const input = fallbackInput.value
+  const value = input?.value ?? props.modelValue
+  const selection = input && document.activeElement === input ? [input.selectionStart, input.selectionEnd] as const : null
+  lastEmitted = value
+  if (value !== props.modelValue) emit('update:modelValue', value)
+  editor.setValue(value, true)
+  lastRenderedValue = editor.getValue()
+  ready.value = true
+  reportContentState()
+  if (dark.value) applyTheme()
+  if (!selection) return
+  void nextTick(() => {
+    const field = visibleEditorField()
+    if (!field || disposed || document.activeElement !== document.body) return
+    field.focus({ preventScroll: true })
+    const range = document.createRange()
+    range.selectNodeContents(field)
+    range.collapse(false)
+    // 对内容相同的纯文本保留选区。Markdown 经过富文本转换时，光标放在正文末尾。
+    if (field.textContent === value || field.textContent === `${value}\n`) {
+      const walker = document.createTreeWalker(field, NodeFilter.SHOW_TEXT)
+      let offset = 0
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const end = offset + (node.textContent?.length ?? 0)
+        if (selection[0] >= offset && selection[0] <= end) range.setStart(node, selection[0] - offset)
+        if (selection[1] >= offset && selection[1] <= end) {
+          range.setEnd(node, selection[1] - offset)
+          break
+        }
+        offset = end
+      }
+    }
+    const currentSelection = window.getSelection()
+    currentSelection?.removeAllRanges()
+    currentSelection?.addRange(range)
+  })
+}
+
 onMounted(async () => {
   if (props.resizeEdge) {
     updateHeightLimit()
@@ -256,10 +301,10 @@ onMounted(async () => {
   try {
     Vditor = await loadVditor()
   } catch {
-    fallback.value = true
+    if (!disposed) fallback.value = true
     return
   }
-  if (!host.value) return
+  if (disposed || !host.value) return
   const narrow = window.innerWidth < 768
   const inline = props.mode === 'reply'
   const toolbar = props.toolbarPreset === 'message'
@@ -285,7 +330,7 @@ onMounted(async () => {
     toolbarConfig: { pin: !inline },
     ctrlEnter: props.disableSubmitShortcut ? undefined : () => emit('submit'),
     upload: {
-      accept: 'image/*,.zip,.rar,.7z,.mp3,.mp4,.webm,.mov',
+      accept: editorUploadAccept,
       // 自定义上传由编辑器统一展示状态，避免 Vditor 再弹一次相同错误。
       handler: async (files: File[]) => { await uploads.handler(files) },
     },
@@ -296,6 +341,7 @@ onMounted(async () => {
       extend: [{ key: '@', hint: mentions.hint }],
     },
     input: (value: string) => {
+      if (disposed || (props.instantInput && !ready.value)) return
       reportContentState()
       preview.reset()
       lastEmitted = value
@@ -303,6 +349,7 @@ onMounted(async () => {
       emit('update:modelValue', value)
     },
     after: () => {
+      if (disposed) { destroyEditor(); return }
       // Display Unicode and bundled image labels; insertion stays the server-provided alias.
       const labels: Record<string, string> = Object.create(null)
       const local = editor?.vditor?.lute?.GetEmojis() || {}
@@ -313,6 +360,11 @@ onMounted(async () => {
         if (unicode || bundledImage) labels[alias] = value
       }
       nativeEmojis.value = labels
+      if (props.instantInput) {
+        richLoaded = true
+        upgradePlainInput()
+        return
+      }
       ready.value = true
       const cached = editor?.getValue().replace(/\n$/, '') || ''
       if (props.modelValue !== lastEmitted) editor?.setValue(props.modelValue, true)
@@ -346,29 +398,43 @@ watch(
 onBeforeUnmount(() => {
   if (props.resizeEdge) window.removeEventListener('resize', updateHeightLimit)
   disposed = true
+  if (compositionFrame !== undefined) cancelAnimationFrame(compositionFrame)
   stopPreviewAuth?.()
   preview.dispose()
   uploads.dispose()
   mentions.dispose()
-  editor?.destroy()
-  editor = null
+  // 即时输入可能在 Vditor 内部初始化前离页，此时等 after 再销毁实例。
+  if (!props.instantInput || richLoaded) destroyEditor()
 })
 
 defineExpose({
   flush() {
-    if (!fallback.value && (!editor || !ready.value)) throw new Error('编辑器仍在加载，请稍后再试')
-    const value = fallback.value ? fallbackInput.value?.value ?? props.modelValue : editor!.getValue()
-    if (!fallback.value && value === lastRenderedValue) return lastEmitted
+    if (!plainInput.value && (!editor || !ready.value)) throw new Error('编辑器仍在加载，请稍后再试')
+    if (props.instantInput && plainInput.value && composing) throw new Error('请先确认输入法选字')
+    const value = plainInput.value ? fallbackInput.value?.value ?? props.modelValue : editor!.getValue()
+    if (!plainInput.value && value === lastRenderedValue) return lastEmitted
     lastEmitted = value
     lastRenderedValue = value
     emit('update:modelValue', value)
     return value
   },
-  focus() {
-    if (fallback.value) fallbackInput.value?.focus()
-    else if (!host.value?.contains(document.activeElement) || !document.activeElement?.matches('[contenteditable]')) editor?.focus()
+  focus(options?: FocusOptions) {
+    if (plainInput.value) {
+      fallbackInput.value?.focus(options)
+      return
+    }
+    if (host.value?.contains(document.activeElement) && document.activeElement?.matches('[contenteditable]')) return
+    if (options?.preventScroll && host.value) {
+      const field = visibleEditorField()
+      if (field) {
+        field.focus(options)
+        return
+      }
+    }
+    editor?.focus()
   },
   insert: insertEmoji,
+  insertText,
   toggleEmoji,
 })
 </script>
@@ -384,28 +450,43 @@ defineExpose({
         :aria-valuemin="minHeight" :aria-valuemax="maxHeight" :aria-valuenow="displayedHeight"
         @pointerdown="startResize" @pointermove="moveResize" @pointerup="endResize"
         @pointercancel="endResize" @lostpointercapture="endResize" @keydown="resizeWithKeys" />
-      <div>
+      <div class="md-input-area">
+        <p v-if="instantInput && plainInput" class="md-quick-status" role="status">{{ fallback ? '格式工具暂不可用' : '格式工具加载中…' }}</p>
         <textarea
-          v-if="fallback"
+          v-if="plainInput"
           ref="fallbackInput"
           class="md-fallback"
-          :value="modelValue"
+          v-model="plainDraft"
+          :aria-label="placeholder || '正文'"
           :placeholder="placeholder"
           :style="{ height: `${height}px` }"
-          @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
         />
-        <template v-else>
-          <div ref="host" />
-          <div v-if="!ready" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
+        <template v-if="!fallback">
+          <div :class="{ 'md-warming-editor': plainInput }" :inert="plainInput"><div ref="host" /></div>
+          <div v-if="!ready && !plainInput" class="md-loading" :style="{ height: `${height}px` }"><FpLoading small /></div>
         </template>
       </div>
     </div>
     <template v-if="!fallback">
-      <div class="md-upload-status" role="status">
-        <div v-if="uploadStatus" class="md-upload-feedback" :class="{ 'md-upload-error': !uploadStatus.pending }">
-          <progress v-if="uploadStatus.pending" aria-hidden="true" />
-          <span>{{ uploadStatus.text }}</span>
+      <div v-if="uploadStatus" class="md-upload-feedback">
+        <div class="md-upload-heading">
+          <strong role="status">{{ uploadStatus.text }}</strong>
+          <button v-if="!uploadStatus.pending" type="button" aria-label="关闭上传进度" @click="uploadStatus = null">×</button>
         </div>
+        <ul v-if="uploadStatus.items?.length" class="md-upload-files" aria-label="文件上传进度">
+          <li v-for="(item, index) in uploadStatus.items" :key="index">
+            <div class="md-upload-row">
+              <span class="md-upload-name" :title="item.name">{{ item.name }}</span>
+              <span class="md-upload-state" :data-phase="item.phase">
+                {{ item.phase === 'queued' ? '等待上传' : item.phase === 'processing' ? '图床处理中' :
+                  item.phase === 'done' ? '已完成' : item.phase === 'failed' ? '失败' :
+                  item.phase === 'skipped' ? '未上传' : item.percent === null ? '上传中' : `${item.percent}%` }}
+              </span>
+            </div>
+            <progress v-if="item.phase === 'uploading' || item.phase === 'processing'" :aria-label="`${item.name} 的上传进度`" :value="item.percent ?? undefined" max="100" />
+            <div v-if="item.error" class="md-upload-error">{{ item.error }}</div>
+          </li>
+        </ul>
       </div>
       <p v-if="mentionError" role="status">{{ mentionError }}</p>
     </template>
@@ -416,24 +497,37 @@ defineExpose({
 .md-editor {
   position: relative;
 }
+.md-input-area { position: relative; }
+.md-warming-editor { position: absolute; inset: 0 0 auto; visibility: hidden; pointer-events: none; }
+.md-quick-status { margin: 0 0 6px; font-size: 12px; color: var(--fp-muted); }
+.md-input-area:has(.md-quick-status) .md-fallback { display: block; font: inherit; }
 .md-upload-feedback {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--fp-border);
+  border-radius: 8px;
+  background: var(--fp-surface-subtle, var(--fp-card));
   color: var(--fp-muted);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-.md-upload-feedback progress { width: 44px; flex: none; accent-color: var(--fp-primary); }
-.md-upload-error { color: var(--fp-danger); }
+.md-upload-heading, .md-upload-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.md-upload-heading strong { font-weight: 600; color: var(--fp-title); }
+.md-upload-heading button { width: 24px; height: 24px; flex: none; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; font-size: 18px; line-height: 1; cursor: pointer; }
+.md-upload-heading button:hover { background: var(--fp-hover); }
+.md-upload-files { display: grid; gap: 6px; max-height: min(156px, 25dvh); overflow-y: auto; margin: 6px 0 0; padding: 0; list-style: none; }
+.md-upload-files li + li { border-top: 1px solid var(--fp-border); padding-top: 5px; }
+.md-upload-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--fp-text); }
+.md-upload-state { flex: none; font-variant-numeric: tabular-nums; }
+.md-upload-state[data-phase='done'] { color: var(--fp-primary); }
+.md-upload-feedback progress { display: block; width: 100%; height: 5px; margin-top: 4px; accent-color: var(--fp-primary); }
+.md-upload-error, .md-upload-state[data-phase='failed'] { color: var(--fp-danger-ink, var(--fp-danger)); }
 .md-editor:has(:deep(.vditor--fullscreen)) .md-upload-feedback {
   position: fixed;
   z-index: 1000;
   inset-inline: 8px;
   bottom: max(12px, env(safe-area-inset-bottom));
-  width: fit-content;
-  max-width: calc(100% - 16px);
+  width: min(420px, calc(100% - 16px));
   border-radius: 6px;
   background: var(--fp-card);
 }
@@ -459,14 +553,18 @@ defineExpose({
 
 @media (max-width: 767px) {
   .md-adaptive :deep(.vditor:not(.vditor--fullscreen)),
+  .md-editor--reply .md-resizable :deep(.vditor:not(.vditor--fullscreen)),
   .md-adaptive .md-fallback { height: auto !important; }
+  .md-editor--reply .md-resizable :deep(.vditor:not(.vditor--fullscreen)) { max-height: none; }
   .md-adaptive .md-fallback { field-sizing: content; resize: none; }
   .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-resize) { display: none; }
-  .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-content) { flex: 0 1 auto; }
+  .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-content),
+  .md-editor--reply .md-resizable :deep(.vditor:not(.vditor--fullscreen) .vditor-content) { flex: 0 1 auto; }
+  .md-editor--reply .md-resizable :deep(.vditor:not(.vditor--fullscreen) .vditor-content [contenteditable="true"]),
   .md-adaptive :deep(.vditor:not(.vditor--fullscreen) .vditor-content [contenteditable="true"]) {
     height: auto;
     min-height: 64px;
-    max-height: 25dvh;
+    max-height: max(64px, 25dvh);
     overflow-y: auto;
   }
 }
@@ -549,8 +647,11 @@ defineExpose({
   overflow: clip;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.md-editor .vditor-toolbar--pin {
+.md-editor .vditor:not(.vditor--fullscreen) .vditor-toolbar--pin {
   top: var(--fp-nav-h);
+}
+.md-editor .vditor--fullscreen .vditor-toolbar--pin {
+  top: 0;
 }
 .md-editor .vditor:focus-within {
   border-color: color-mix(in srgb, var(--fp-primary) 70%, transparent);
@@ -558,6 +659,7 @@ defineExpose({
 }
 .md-editor .vditor.vditor--fullscreen {
   border-radius: 0;
+  background-color: var(--fp-card);
 }
 
 .md-editor .vditor-toolbar {

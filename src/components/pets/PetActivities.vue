@@ -41,7 +41,7 @@ const occupiedText = computed(() => pets.pet?.activity?.kind === 'rest' ? '正�
 
 function rewards(value: PetActivityRewards) {
   const lines: string[] = []
-  if (value.coins) lines.push(`宠物币 +${value.coins}`)
+  if (value.coins) lines.push(`${pets.currencyName} +${value.coins}`)
   if (value.experience) lines.push(`经验 +${value.experience}`)
   if (value.food) lines.push(`口粮 +${value.food}`)
   if (value.mood) lines.push(`心情 +${value.mood}`)
@@ -60,13 +60,13 @@ function reason(entry: PetActivityEntry | PetJobEntry) {
   if (pets.pet?.activity) return occupiedText.value
   const pet = pets.pet
   if (!pet || !pets.state) return '请先读取当前宠物状态'
-  if (tab.value === 'work' && pets.state.income.remaining <= 0) return '今日工作收入已达上限'
+  if (tab.value === 'work' && pets.state.income.remaining <= 0) return '今日活动收益已达上限'
   for (const needed of entry.requirements) {
     const experience = pet.skills.find(skill => skill.id === needed.skillId)?.experience
     if (experience === undefined) return '技能状态暂不可用'
     if (experience < needed.experience) return `需要${requirement(entry)}`
   }
-  if (pets.state.wallet.coins < entry.cost.coins) return '宠物币不足'
+  if (pets.state.wallet.coins < entry.cost.coins) return `${pets.currencyName}不足`
   if (pet.energy < entry.cost.energy) return '精力不足，先休息一下'
   if (pet.hunger < entry.cost.hunger) return '饱食不足，先吃点东西'
   if (pet.water < entry.cost.water) return '水分不足，先喝点水'
@@ -130,14 +130,14 @@ watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () =>
       <span v-else class="current-duration"><PetIcon name="clock" />{{ petDuration(activity.endsAt - activity.startedAt) }}</span>
       <div class="activity-progress" role="progressbar" aria-label="当前活动进度" :aria-valuenow="Math.round(progress)" :aria-valuemin="0" :aria-valuemax="100"><span :style="{ width: `${progress}%` }" /></div>
       <p class="current-rewards"><span>预计收获</span>{{ rewards(activity.rewards).join(' · ') }}</p>
-      <p v-if="activity.kind === 'work'" class="current-cap">宠物币按领取当天的剩余额度结算。</p>
+      <p v-if="activity.kind === 'work'" class="current-cap">{{ pets.currencyName }}按领取当天的剩余额度结算。</p>
     </div>
     <p v-if="pets.pet.activity" class="occupied-note"><PetIcon :name="pets.pet.activity.kind === 'rest' ? 'rest' : 'clock'" />{{ occupiedText }}</p>
 
     <div v-if="pets.catalog" class="activity-tabs fp-tabs" role="tablist" aria-label="活动类型" @keydown="moveTab">
       <button v-for="item in tabs" :id="`pet-${item.id}-tab`" :key="item.id" type="button" role="tab" class="fp-tab" :aria-selected="tab === item.id" :tabindex="tab === item.id ? 0 : -1" aria-controls="pet-activity-options" @click="tab = item.id"><PetIcon :name="item.id" />{{ item.name }}<span>{{ item.id === 'outing' ? pets.catalog.places.length : item.id === 'course' ? pets.catalog.courses.length : pets.catalog.jobs.length }}</span></button>
     </div>
-    <div v-if="tab === 'work' && pets.state" class="work-income"><div><PetIcon name="coin" /><span>今日工作收入</span><strong>{{ pets.state.income.earned }}<small> / {{ pets.state.income.limit }} 币</small></strong></div><p>所有兼职共享每日额度，按领取当天结算。</p></div>
+    <div v-if="tab === 'work' && pets.state" class="work-income"><div><PetIcon name="coin" /><span>今日活动收益</span><strong>{{ pets.state.income.earned }}<small> / {{ pets.state.income.limit }} {{ pets.currencyName }}</small></strong></div><p>按账号共享每日收益额度，以领取日为准。</p></div>
     <div v-if="pets.catalog" id="pet-activity-options" class="activity-options" role="tabpanel" :aria-labelledby="`pet-${tab}-tab`">
       <template v-for="group in entryGroups" :key="group.name">
       <h3 v-if="group.name" class="activity-group-heading">{{ group.name }}<span v-if="group.name === '进阶探索'">带回材料，制作你的第一份收藏</span><span v-else-if="group.name === '进阶课程'">在已有本领上，再前进一步</span></h3>
@@ -147,7 +147,7 @@ watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () =>
         <p v-if="requirement(entry)" class="activity-requirement">需要{{ requirement(entry) }}</p>
         <div class="activity-rewards"><span class="detail-label">预计</span><p><span v-for="reward in rewards(entry.rewards)" :key="reward">{{ reward }}</span></p></div>
         <div class="activity-costs"><span class="detail-label">消耗</span><p><span>精力 {{ entry.cost.energy }}</span><span>饱食 {{ entry.cost.hunger }}</span><span>水分 {{ entry.cost.water }}</span></p></div>
-        <footer><span class="activity-price"><PetIcon name="coin" /><b>{{ entry.cost.coins }}</b>宠物币</span><button type="button" :aria-label="`开始${entry.name}`" :disabled="locked || !!reason(entry)" :title="reason(entry) || `${entry.cost.coins ? `花费 ${entry.cost.coins} 宠物币，` : ''}开始${entry.name}`" @click="start(entry)">{{ tab === 'outing' ? '出发' : tab === 'work' ? '去工作' : '去上课' }}<span aria-hidden="true">↗</span></button></footer>
+        <footer><span class="activity-price"><PetIcon name="coin" /><b>{{ entry.cost.coins }}</b>{{ pets.currencyName }}</span><button type="button" :aria-label="`开始${entry.name}`" :disabled="locked || !!reason(entry)" :title="reason(entry) || `${entry.cost.coins ? `花费 ${entry.cost.coins} ${pets.currencyName}，` : ''}开始${entry.name}`" @click="start(entry)">{{ tab === 'outing' ? '出发' : tab === 'work' ? '去工作' : '去上课' }}<span aria-hidden="true">↗</span></button></footer>
         <p v-if="!pets.pet.activity && reason(entry)" class="shortage">{{ reason(entry) }}</p>
       </article>
       </template>
@@ -176,7 +176,9 @@ watch([now, () => pets.state?.today, () => pets.loading, () => pets.busy], () =>
 .activity-requirement { margin: -5px 0 12px; color: var(--fp-muted); font-size: 11px; line-height: 1.6; }
 .job-progress { border-top: 1px solid var(--fp-border); padding-top: 20px; margin-top: 24px; }.job-progress > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 16px; }.job-progress h3 { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 14px; color: var(--fp-title); }.job-progress h3 svg { width: 17px; height: 17px; color: var(--fp-primary); }.job-progress > header > span { color: var(--fp-muted); font-size: 11px; }.jobs-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 24px; }.pet-job { padding: 10px 0; min-width: 0; }.pet-job header { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; }.pet-job header strong { color: var(--fp-primary); font-size: 11px; font-weight: 500; white-space: nowrap; }.pet-job p { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; margin: 7px 0 0; color: var(--fp-muted); font-size: 11px; }.pet-job p b { color: var(--fp-text); font-weight: 600; }.pet-job p > span { margin-left: auto; }
 button:disabled { opacity: .45; cursor: default; }button:focus-visible { outline: 2px solid var(--fp-primary-ink, var(--fp-primary)); outline-offset: 3px; }
-.activity-option:has(h3:focus) { border-color: var(--fp-primary); background: var(--fp-primary-soft); }h2[tabindex]:focus, h3[tabindex]:focus { outline: 2px solid var(--fp-primary-ink, var(--fp-primary)); outline-offset: 4px; border-radius: 2px; }h2[tabindex], h3[tabindex] { scroll-margin-block: calc(var(--fp-nav-h, 58px) + 16px) 24px; }
+.activity-option:has(h3:focus-visible) { border-color: var(--fp-primary); background: var(--fp-primary-soft); }
+:is(h2, h3)[tabindex="-1"]:focus-visible { outline: 2px solid var(--fp-primary-ink, var(--fp-primary)); outline-offset: 4px; border-radius: 2px; }
+:is(h2, h3)[tabindex="-1"] { scroll-margin-block: calc(var(--fp-nav-h, 58px) + 16px) 24px; }
 @media (max-width: 950px) { .activity-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }.skills-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 24px; } }
 @media (max-width: 600px) { .pet-activities { padding: 20px; }.activity-options { grid-template-columns: 1fr; }.activity-description, .activity-rewards { min-height: 0; }.activity-description { margin-bottom: 12px; }.activity-option { padding: 16px; }.activity-option footer { padding-top: 14px; }.current-activity { padding: 16px; gap: 12px; }.current-icon { width: 40px; height: 40px; }.current-duration { flex-basis: 100%; }.activities-heading h2 { font-size: 18px; }.skills-grid { gap: 18px 16px; }.activity-tabs button { min-height: 44px; }.activity-option footer button, .activity-primary { min-height: 44px; } }
 @media (max-width: 600px) { .jobs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 18px; }.pet-job p > span { flex-basis: 100%; margin: 0; } }

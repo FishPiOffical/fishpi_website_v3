@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { shouldInvalidatePublicSnapshot, PUBLIC_LIST_TTL, memberSnapshotKey, readPublicSnapshot, removePublicSnapshot, savePublicSnapshot } from '@/utils/publicSnapshots'
 
 function publicCard(profile: PublicUser) {
-  const { userPoint: _points, onlineMinute: _minutes, userCity: _city, userOnlineFlag: _online, ...card } = profile
+  const { userPoint: _points, onlineMinute: _minutes, userCity: _city, userOnlineFlag: _online, userLatestLoginTime: _lastLogin, ...card } = profile
   return card
 }
 
@@ -43,12 +43,12 @@ export function useMemberProfile(name: Ref<string>): MemberProfile {
     }
     profileLoading.value = profile.value === null
     try {
-      const result = await fetchPublicUser(target, 'omit')
+      const result = await fetchPublicUser(target, 'omit', { includeLoginTime: true })
       if (valid()) {
         const sameProfile = snapshotExpires > Date.now() && profile.value?.id === result.id
         // 公开身份可能已调整，即使其余资料缓存仍有效，也要同步角色名称与配色依据。
         profile.value = sameProfile && profile.value
-          ? { ...profile.value, cardBg: result.cardBg, userPoint: result.userPoint, onlineMinute: result.onlineMinute, userRole: result.userRole, userRoleId: result.userRoleId }
+          ? { ...profile.value, cardBg: result.cardBg, userPoint: result.userPoint, onlineMinute: result.onlineMinute, userRole: result.userRole, userRoleId: result.userRoleId, userLatestLoginTime: result.userLatestLoginTime }
           : result
         profileFromCache.value = false
         if (!sameProfile) { snapshotExpires = 0; savePublicSnapshot(key, publicCard(result)) }

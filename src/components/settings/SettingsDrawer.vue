@@ -166,6 +166,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
       class="fp-set-handle"
       :class="{ active: open }"
       aria-label="打开设置"
+      :aria-expanded="open"
       title="设置"
       @click="open ? drawer.hide() : drawer.show()"
     >
@@ -302,10 +303,17 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
           </div>
 
           <div v-else-if="section === 'chatInput'" class="content">
+            <button type="button" class="chat-tail-entry" :disabled="!isLoggedIn" @click="openChatTail">
+              <span class="chat-tail-entry-icon"><SidebarIcon name="pencil" /></span>
+              <span class="chat-tail-entry-copy">
+                <strong>小尾巴设置</strong>
+                <small>{{ isLoggedIn ? '在聊天消息末尾加一句签名' : '登录后可设置' }}</small>
+              </span>
+              <SidebarIcon v-if="isLoggedIn" class="chat-tail-entry-arrow" name="chevron" />
+            </button>
             <label class="setting-toggle" :class="{ selected: chatPreferences.simpleMode }"><input type="checkbox" :checked="chatPreferences.simpleMode" @change="chatPreferences.setSimpleMode(($event.target as HTMLInputElement).checked)"><span><b>精简模式</b><small>隐藏头像框、气泡、小尾巴和进出场效果</small></span></label>
             <label class="setting-toggle" :class="{ selected: chatPreferences.mountEffects, 'is-disabled': chatPreferences.simpleMode }"><input type="checkbox" :disabled="chatPreferences.simpleMode" :checked="chatPreferences.mountEffects" @change="chatPreferences.setMountEffects(($event.target as HTMLInputElement).checked)"><span><b>显示座驾进场特效</b></span></label>
             <label class="setting-toggle" :class="{ selected: chatPreferences.sakuraEffects, 'is-disabled': chatPreferences.simpleMode }"><input type="checkbox" :disabled="chatPreferences.simpleMode" :checked="chatPreferences.sakuraEffects" @change="chatPreferences.setSakuraEffects(($event.target as HTMLInputElement).checked)"><span><b>播放樱花外观动效</b></span></label>
-            <div class="setting-options"><button type="button" class="fp-btn" :disabled="!isLoggedIn" @click="openChatTail">小尾巴设置</button><small v-if="!isLoggedIn">登录后可设置</small></div>
             <fieldset class="setting-options">
               <legend>发送快捷键</legend>
               <label :class="{ selected: chatPreferences.sendShortcut === 'mod-enter' }">
@@ -442,6 +450,43 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 </template>
 
 <style scoped>
+.chat-tail-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--fp-primary) 42%, var(--fp-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fp-primary) 8%, var(--fp-card));
+  color: var(--fp-title);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.chat-tail-entry:enabled:hover {
+  border-color: var(--fp-primary);
+  background: color-mix(in srgb, var(--fp-primary) 14%, var(--fp-card));
+}
+.chat-tail-entry:enabled:active { background: color-mix(in srgb, var(--fp-primary) 20%, var(--fp-card)); }
+.chat-tail-entry:focus-visible { outline: 2px solid var(--fp-title); outline-offset: 2px; }
+.chat-tail-entry:disabled { background: var(--fp-card); border-color: var(--fp-border); cursor: default; }
+.chat-tail-entry-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--fp-card);
+}
+.chat-tail-entry-icon svg, .chat-tail-entry-arrow { width: 17px; height: 17px; }
+.chat-tail-entry-copy { display: grid; flex: 1; min-width: 0; gap: 4px; }
+.chat-tail-entry-copy strong { font-size: 14px; }
+.chat-tail-entry-copy small { color: var(--fp-muted); font-size: 12px; }
+.chat-tail-entry-arrow { flex: none; color: var(--fp-muted); rotate: -90deg; }
 .setting-options { display:flex; flex-direction:column; gap:8px; margin:0 0 16px; padding:0; border:0; }
 .setting-options legend { margin-bottom:8px; font-size:13px; font-weight:600; color:var(--fp-title); }
 .setting-options label, .setting-toggle { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--fp-border); border-radius:8px; cursor:pointer; }
@@ -457,105 +502,57 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 </style>
 
 <style scoped>
+:is(.fp-set-handle, .fp-hidden-handle, .fp-whisper-handle) {
+  position: fixed;
+  left: 0;
+  z-index: 1190;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 38px;
+  border: 1px solid var(--fp-border);
+  border-left: 0;
+  border-radius: 0 9px 9px 0;
+  background: var(--fp-card);
+  color: var(--fp-muted);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, width 0.2s ease, top 0.24s ease;
+}
 .fp-set-handle {
-  position: fixed;
-  left: 0;
   top: 50%;
-  z-index: 1190;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 38px;
   transform: translateY(-50%);
-  border: 1px solid var(--fp-border);
-  border-left: 0;
-  border-radius: 0 9px 9px 0;
-  background: var(--fp-card);
-  color: var(--fp-muted);
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s, transform 0.2s ease;
 }
-.fp-set-handle:hover,
-.fp-set-handle.active {
-  background: var(--fp-hover);
-  color: var(--fp-link);
-}
-.fp-set-handle:hover {
-  transform: translate(4px, -50%);
-}
-.fp-set-handle svg {
-  width: 16px;
-  height: 16px;
-  transition: transform 0.35s ease;
-}
-.fp-set-handle:hover svg {
-  transform: rotate(45deg);
-}
-.fp-hidden-handle {
-  position: fixed;
-  left: 0;
+:is(.fp-hidden-handle, .fp-whisper-handle) {
   top: calc(50% + 30px);
-  z-index: 1190;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 38px;
-  border: 1px solid var(--fp-border);
-  border-left: 0;
-  border-radius: 0 9px 9px 0;
-  background: var(--fp-card);
-  color: var(--fp-muted);
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s, transform 0.2s ease;
-}
-.fp-hidden-handle:hover {
-  background: var(--fp-hover);
-  color: var(--fp-link);
-  transform: translateX(4px);
-}
-.fp-hidden-handle svg {
-  width: 16px;
-  height: 16px;
-  transition: transform 0.2s ease;
-}
-.fp-hidden-handle:hover svg {
-  transform: scale(1.12);
-}
-.fp-whisper-handle {
-  position: fixed;
-  left: 0;
-  top: calc(50% + 30px);
-  z-index: 1190;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 38px;
-  border: 1px solid var(--fp-border);
-  border-left: 0;
-  border-radius: 0 9px 9px 0;
-  background: var(--fp-card);
-  color: var(--fp-muted);
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s, transform 0.2s ease, top 0.24s ease;
 }
 .fp-whisper-handle.after-hidden {
   top: calc(50% + 74px);
 }
-.fp-whisper-handle:hover {
-  transform: translateX(4px);
-  background: var(--fp-hover);
-  color: var(--fp-link);
-}
-.fp-whisper-handle svg {
+:is(.fp-set-handle, .fp-hidden-handle, .fp-whisper-handle) svg {
   width: 16px;
   height: 16px;
   transition: transform 0.2s ease;
 }
-.fp-whisper-handle:hover svg {
-  transform: scale(1.12);
+.fp-set-handle svg {
+  transition-duration: 0.35s;
+}
+.fp-set-handle.active {
+  background: var(--fp-hover);
+  color: var(--fp-link);
+}
+:is(.fp-set-handle, .fp-hidden-handle, .fp-whisper-handle):focus-visible {
+  outline: 2px solid var(--fp-primary-ink, var(--fp-text));
+  outline-offset: -3px;
+}
+@media (hover: hover) {
+  :is(.fp-set-handle, .fp-hidden-handle, .fp-whisper-handle):hover {
+    width: 32px;
+    background: var(--fp-hover);
+    color: var(--fp-link);
+  }
+  .fp-set-handle:hover svg { transform: rotate(45deg); }
+  :is(.fp-hidden-handle, .fp-whisper-handle):hover svg { transform: scale(1.12); }
 }
 .unread-badge {
   position: absolute;

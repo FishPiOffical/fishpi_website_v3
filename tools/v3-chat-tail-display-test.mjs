@@ -10,7 +10,8 @@ const { createApp, reactive, nextTick, h } = await import('vue')
 const moduleUrl = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 const compile = source => ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
 const http = moduleUrl('export class ApiError extends Error{}; export const request=()=>{throw Error("unexpected request")}')
-const appearances = moduleUrl(compile(await fs.readFile('src/utils/chatAppearance.ts', 'utf8')))
+const bubbleStyles = moduleUrl(compile(await fs.readFile('src/utils/bubbleStyle.ts', 'utf8')))
+const appearances = moduleUrl(compile(await fs.readFile('src/utils/chatAppearance.ts', 'utf8')).replaceAll("'@/utils/bubbleStyle'", `'${bubbleStyles}'`))
 const reactions = moduleUrl(compile(await fs.readFile('src/api/v3-reactions.ts', 'utf8')).replace("from './http'", `from '${http}'`))
 const messageModule = moduleUrl(compile(await fs.readFile('src/api/v3-chat-messages.ts', 'utf8'))
   .replace("from './http'", `from '${http}'`)
@@ -46,13 +47,14 @@ const { descriptor } = parse(source, { filename: file })
 let code = compile(compileScript(descriptor, { id: 'chat-tail-test', inlineTemplate: true }).content)
 const replacements = {
   vue: import.meta.resolve('vue'),
-  'vue-router': moduleUrl(`import {h} from '${import.meta.resolve('vue')}'; export const RouterLink={setup(_,{slots}){return()=>h('a',slots.default?.())}}`),
+  'vue-router': moduleUrl(`import {h} from '${import.meta.resolve('vue')}'; export const RouterLink={props:{to:String,custom:Boolean},setup(p,{slots}){return()=>p.custom?slots.default?.({href:p.to,navigate(){}}):h('a',slots.default?.())}}`),
   '@/api/v3-chat-messages': messageModule,
   '@/stores/auth': moduleUrl('export const useAuthStore=()=>({account:null})'),
   '@/stores/chatPreferences': stateModule,
   '@/stores/functionPreferences': moduleUrl('export const useFunctionPreferencesStore=()=>({blurChatImages:false})'),
   '@/utils/time': moduleUrl('export const formatDisplayTime=()=>""'),
   '@/chat/mention': moduleUrl('export const CHAT_MENTION=Symbol();export const chatMentionText=x=>x'),
+  '@/chat/messageShortcuts': moduleUrl(compile(await fs.readFile('src/chat/messageShortcuts.ts', 'utf8'))),
   '@/utils/avatar': moduleUrl('export const DEFAULT_AVATAR="";export const avatarThumbnail=x=>x;export const rhyPicThumbnail=x=>x;export const imageThumbnail=x=>x'),
   '@/utils/chatAppearance': appearances,
   '@/utils/chatMessage': imageModule,
@@ -60,7 +62,7 @@ const replacements = {
 }
 code = code.replace(/from (["'])([^"']+)\1/g, (match, _quote, name) => `from '${replacements[name] || (name.endsWith('.vue') ? componentStub : name)}'`)
 const ChatBubble = (await import(moduleUrl(code))).default
-const props = reactive({ userName: 'fish', html: '<p>原正文</p>', chatroom: true, tail: { text: '<img src=x onerror=alert(1)> @fish' } })
+const props = reactive({ userName: 'fish', html: '<p>原正文</p>', chatroom: true, client: 'iOS/1.2.3', tail: { text: '<img src=x onerror=alert(1)> @fish' } })
 const mount = document.createElement('div'); document.body.append(mount)
 // 使用真实组件模板，验证纯文本渲染和已挂载后的精简开关。
 const app = createApp({ render: () => h(ChatBubble, props) })
@@ -71,10 +73,31 @@ assert.equal(tailNode().querySelector('svg.tail-label').getAttribute('aria-label
 assert.equal(tailNode().querySelector('img'), null)
 assert.equal(tailNode().querySelector('a'), null)
 assert.equal(mount.querySelector('.body').textContent, '原正文')
+const clientNode = () => mount.querySelector('.message-client')
+assert.equal(clientNode().getAttribute('title'), 'iOS 1.2.3')
+assert.equal(clientNode().querySelector('use').getAttribute('href'), '/images/chat-client-icons.svg#ic-apple')
+props.client = 'Unknown/2.0'; await nextTick()
+assert.equal(clientNode().querySelector('use').getAttribute('href'), '/images/chat-client-icons.svg#ic-other')
+for (const [client, label, icon] of [
+  ['Deepseek Harness/1.2.3', 'Deepseek Harness 1.2.3', 'ic-deepseek-harness'],
+  ['Codex/2.3.4', 'Codex 2.3.4', 'ic-codex'],
+  ['WPS/12.1.0', 'WPS 12.1.0', 'ic-wps'],
+  ['WPS', 'WPS', 'ic-wps'],
+]) {
+  props.client = client
+  await nextTick()
+  assert.equal(clientNode().getAttribute('title'), label)
+  assert.equal(clientNode().getAttribute('aria-label'), label)
+  assert.equal(clientNode().querySelector('use').getAttribute('href'), `/images/chat-client-icons.svg#${icon}`)
+}
+props.client = ''; await nextTick(); assert.equal(clientNode(), null)
+props.client = 'Mobile/移动网页端'; await nextTick()
 preferences.simpleMode = true; await nextTick(); assert.equal(tailNode(), null)
+assert.equal(clientNode().getAttribute('title'), 'Mobile 移动网页端')
 preferences.simpleMode = false; await nextTick(); assert.equal(tailNode().querySelector('.tail-content').textContent, props.tail.text)
 props.standalone = true; await nextTick(); assert.equal(tailNode(), null)
 props.standalone = false; props.chatroom = false; await nextTick(); assert.equal(tailNode(), null)
+assert.equal(clientNode(), null)
 app.unmount()
 console.log('PASS 真实 ChatBubble 模板纯文本、标识、精简即时隐藏恢复和特殊卡片/非聊天室排除')
 
@@ -86,6 +109,8 @@ for (const [file, count] of [
 ]) {
   const text = await fs.readFile(file, 'utf8')
   assert.equal((text.match(/:tail="(?:entry\.message|line|message)\.tail"/g) || []).length, count, file)
+  assert.equal((text.match(/:client="(?:entry\.message|line|message)\.client"/g) || []).length, count, file)
 }
 assert.match(await fs.readFile('src/stores/chat.ts', 'utf8'), /tail:message\.tail/)
+assert.match(await fs.readFile('src/stores/chat.ts', 'utf8'), /client:message\.client/)
 console.log('PASS 经典/简约、悬浮、隐藏会话及上下文的小尾巴传递接线')

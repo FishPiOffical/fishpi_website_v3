@@ -9,7 +9,6 @@ import { imageThumbnail } from '@/utils/avatar'
 import type { ColumnOrder } from '@/api/v3-article-list'
 import ContentRelationButton from '@/components/articles/ContentRelationButton.vue'
 import ArticleFeed from '@/components/articles/ArticleFeed.vue'
-import SideBar from '@/components/SideBar.vue'
 import { usePageSeo } from '@/composables/usePageSeo'
 import { useArticleListing } from '@/composables/useArticleListing'
 import { consumeArticleListingPayload } from '@/seo/payload'
@@ -50,74 +49,69 @@ usePageSeo(() => ({ title: heading.value, description: kind.value === 'search' &
 </script>
 
 <template>
-  <div :data-public-content="value ? 'ready' : undefined" class="fp-page fp-page--wide fp-ui fp-list-page">
-    <div class="content">
-      <div ref="panel" class="list-content">
-        <section v-if="isColumnPage" class="column-intro">
-          <div class="column-intro-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> FISHPI · STORIES</div><h1>长篇专栏</h1><p>把故事慢慢写完，也把喜欢的章节一页页读下去。</p></div>
-          <div class="column-intro-mark" aria-hidden="true"><span>卷</span><i></i><b></b></div>
-          <div class="column-intro-footer"><span v-if="value">共 {{ value.total }} 部可见作品</span><span v-else>专栏目录</span><span>每一次更新，都是故事的新一页</span></div>
-        </section>
-        <ListPageHeading
-          v-else
-          :title="heading"
-          :count="value ? `共 ${value.total.toLocaleString('zh-CN')} 篇` : undefined"
-        >
-          <ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" />
-          <span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span>
-          <template v-if="showRecentTabs" #sort>
-            <RouterLink class="fp-tab" v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to">{{ tab.label }}</RouterLink>
-          </template>
-        </ListPageHeading>
-        <div v-if="isColumnPage" class="column-shelf-head">
-          <div><strong>专栏目录</strong><span>按当前可见章节统计</span></div>
-          <div class="column-switch fp-tabs" role="group" aria-label="专栏排序"><button class="fp-tab" type="button" :aria-pressed="columnShelf === 'recent'" @click="columnShelf = 'recent'">最近更新</button><button class="fp-tab" type="button" :aria-pressed="columnShelf === 'hot'" @click="columnShelf = 'hot'">热门作品</button></div>
-        </div>
-        <button type="button" class="btn refresh-list fp-control" :disabled="loading" @click="read()">刷新列表</button>
-        <FpLoading v-if="loading && !value" :rows="8" />
-        <FpListState v-if="error" kind="error" :message="error">
-          <template #actions>
-            <button class="fp-control" type="button" :disabled="loading" @click="read()">重试当前页</button>
-            <button v-if="p > 1" class="fp-control" type="button" @click="read(1)">返回第一页</button>
+  <div ref="panel" :data-public-content="value ? 'ready' : undefined" class="list-content">
+    <section v-if="isColumnPage" class="column-intro">
+      <div class="column-intro-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> FISHPI · STORIES</div><h1>长篇专栏</h1><p>把故事慢慢写完，也把喜欢的章节一页页读下去。</p></div>
+      <div class="column-intro-mark" aria-hidden="true"><span>卷</span><i></i><b></b></div>
+      <div class="column-intro-footer"><span v-if="value">共 {{ value.total }} 部可见作品</span><span v-else>专栏目录</span><span>每一次更新，都是故事的新一页</span></div>
+    </section>
+    <ListPageHeading
+      v-else
+      :title="heading"
+      :count="value ? `共 ${value.total.toLocaleString('zh-CN')} 篇` : undefined"
+    >
+      <ContentRelationButton v-if="kind === 'tag'" kind="tag" :target="extra" />
+      <span v-if="kind === 'search' && keyword" class="search-tag">关键词：{{ keyword }}</span>
+      <template v-if="showRecentTabs" #sort>
+        <RouterLink class="fp-tab" v-for="tab in RECENT_TABS" :key="tab.to" :to="tab.to">{{ tab.label }}</RouterLink>
+      </template>
+    </ListPageHeading>
+    <div v-if="isColumnPage" class="column-shelf-head">
+      <div><strong>专栏目录</strong><span>按当前可见章节统计</span></div>
+      <div class="column-switch fp-tabs" role="group" aria-label="专栏排序"><button class="fp-tab" type="button" :aria-pressed="columnShelf === 'recent'" @click="columnShelf = 'recent'">最近更新</button><button class="fp-tab" type="button" :aria-pressed="columnShelf === 'hot'" @click="columnShelf = 'hot'">热门作品</button></div>
+    </div>
+    <button type="button" class="btn refresh-list fp-control" :disabled="loading" @click="read()">刷新列表</button>
+    <FpLoading v-if="loading && !value" :rows="8" />
+    <FpListState v-if="error" kind="error" :message="error">
+      <template #actions>
+        <button class="fp-control" type="button" :disabled="loading" @click="read()">重试当前页</button>
+        <button v-if="p > 1" class="fp-control" type="button" @click="read(1)">返回第一页</button>
+      </template>
+    </FpListState>
+    <template v-if="value">
+      <div v-if="value.resource === 'columns'" class="column-grid">
+        <article v-for="column in columns" :key="column.id" class="column-card">
+          <RouterLink class="column-cover-link" :to="`/column/${column.id}`" :aria-label="`阅读《${decodeEntities(column.title)}》`">
+            <img v-if="column.coverURL && !failedCovers.has(column.id)" :src="imageThumbnail(column.coverURL, 88, 118)" alt="" loading="lazy" @error="failedCovers.add(column.id)"><span v-else class="cover-placeholder" aria-hidden="true" :style="{background:`hsl(${Number.parseInt(column.id.slice(-5),36)%360} 24% 38%)`}">{{ decodeEntities(column.title).slice(0,1) || '卷' }}</span>
+          </RouterLink>
+          <div class="column-card-copy">
+            <RouterLink class="column-title" :to="`/column/${column.id}`">{{ decodeEntities(column.title) }}</RouterLink>
+            <p v-if="column.chapters[0]?.preview" class="column-preview">{{ decodeEntities(column.chapters[0]!.preview || '') }}</p>
+            <div class="column-author-row"><span class="chapter-count">{{ column.articleCount }} 章</span><time v-if="column.updatedAt">{{ formatDate(column.updatedAt) }} 更新</time></div>
+            <div v-if="column.chapters[0]" class="latest-chapter"><span>最近更新</span><RouterLink :title="decodeEntities(column.chapters[0]!.title)" :to="`/article/${column.chapters[0]!.id}`">第 {{ column.chapters[0]!.chapterNo }} 章 · {{ decodeEntities(column.chapters[0]!.title) }}</RouterLink></div>
+            <div class="column-links"><RouterLink class="read-column" :to="`/column/${column.id}`">章节目录 →</RouterLink><RouterLink v-if="column.chapters.length" class="read-column" :to="`/article/${column.chapters[column.chapters.length-1]!.id}`">试读 ↗</RouterLink></div>
+          </div>
+        </article>
+        <FpListState v-if="!columns.length" class="column-empty" message="本页暂无可见专栏。" />
+      </div>
+      <template v-else>
+        <ArticleFeed v-if="items.length" :items="items" />
+        <FpListState v-else :message="kind === 'search' ? '没有找到相关帖子，试试缩短关键词或更换说法。' : '该分类下暂无内容'">
+          <template v-if="kind === 'search'" #actions>
+            <nav class="search-empty-links" aria-label="继续探索">
+              <RouterLink to="/recent">浏览最新</RouterLink>
+              <RouterLink to="/tags">按标签查找</RouterLink>
+            </nav>
           </template>
         </FpListState>
-        <template v-if="value">
-          <div v-if="value.resource === 'columns'" class="column-grid">
-            <article v-for="column in columns" :key="column.id" class="column-card">
-              <RouterLink class="column-cover-link" :to="`/column/${column.id}`" :aria-label="`阅读《${decodeEntities(column.title)}》`">
-                <img v-if="column.coverURL && !failedCovers.has(column.id)" :src="imageThumbnail(column.coverURL, 88, 118)" alt="" loading="lazy" @error="failedCovers.add(column.id)"><span v-else class="cover-placeholder" aria-hidden="true" :style="{background:`hsl(${Number.parseInt(column.id.slice(-5),36)%360} 24% 38%)`}">{{ decodeEntities(column.title).slice(0,1) || '卷' }}</span>
-              </RouterLink>
-              <div class="column-card-copy">
-                <RouterLink class="column-title" :to="`/column/${column.id}`">{{ decodeEntities(column.title) }}</RouterLink>
-                <p v-if="column.chapters[0]?.preview" class="column-preview">{{ decodeEntities(column.chapters[0]!.preview || '') }}</p>
-                <div class="column-author-row"><span class="chapter-count">{{ column.articleCount }} 章</span><time v-if="column.updatedAt">{{ formatDate(column.updatedAt) }} 更新</time></div>
-                <div v-if="column.chapters[0]" class="latest-chapter"><span>最近更新</span><RouterLink :title="decodeEntities(column.chapters[0]!.title)" :to="`/article/${column.chapters[0]!.id}`">第 {{ column.chapters[0]!.chapterNo }} 章 · {{ decodeEntities(column.chapters[0]!.title) }}</RouterLink></div>
-                <div class="column-links"><RouterLink class="read-column" :to="`/column/${column.id}`">章节目录 →</RouterLink><RouterLink v-if="column.chapters.length" class="read-column" :to="`/article/${column.chapters[column.chapters.length-1]!.id}`">试读 ↗</RouterLink></div>
-              </div>
-            </article>
-            <FpListState v-if="!columns.length" class="column-empty" message="本页暂无可见专栏。" />
-          </div>
-          <template v-else>
-            <ArticleFeed v-if="items.length" :items="items" />
-            <FpListState v-else :message="kind === 'search' ? '没有找到相关帖子，试试缩短关键词或更换说法。' : '该分类下暂无内容'">
-              <template v-if="kind === 'search'" #actions>
-                <nav class="search-empty-links" aria-label="继续探索">
-                  <RouterLink to="/recent">浏览最新</RouterLink>
-                  <RouterLink to="/tags">按标签查找</RouterLink>
-                </nav>
-              </template>
-            </FpListState>
-          </template>
-          <FpPagination label="列表分页" :page="p" :page-count="value.pageCount" :busy="loading" @change="read($event, true)">
-            <template v-if="p > value.pageCount && p > 1" #actions>
-              <button class="fp-control" type="button" @click="read(1)">返回第一页</button>
-            </template>
-          </FpPagination>
+      </template>
+      <FpPagination label="列表分页" :page="p" :page-count="value.pageCount" :busy="loading" @change="read($event, true)">
+        <template v-if="p > value.pageCount && p > 1" #actions>
+          <button class="fp-control" type="button" @click="read(1)">返回第一页</button>
         </template>
-        <FpListState v-else-if="!loading && !error" kind="loading" message="列表尚未读取。" />
-      </div>
-    </div>
-    <div class="side"><SideBar v-if="active" /></div>
+      </FpPagination>
+    </template>
+    <FpListState v-else-if="!loading && !error" kind="loading" message="列表尚未读取。" />
   </div>
 </template>
 

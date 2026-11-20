@@ -31,7 +31,8 @@ const OP_LABELS={'publish':'发布文章','edit':'编辑文章','draft-save':'�
 const auth=useAuthStore(),{accessToken,account,isLoggedIn}=storeToRefs(auth),operations=useV3PostsStore(),router=useRouter(),route=useRoute()
 const editId=computed(()=>typeof route.params.id==='string'?route.params.id:'')
 const title=ref(''),tags=ref(''),content=ref(''),type=ref(0),offer=ref(0),rewardOpen=ref(false),rewardContent=ref(''),rewardPoint=ref<number|null>(0)
-const anonymous=ref(false),commentable=ref(true),notifyFollowers=ref(false),showInList=ref(true),statement=ref(0)
+const anonymous=ref(false),commentable=ref(true),notifyFollowers=ref(false),showInList=ref(true),statement=ref(0),goodPost=ref(false)
+const introductionPost=computed(()=>/新人报[道到]/.test(tags.value))
 const columnMode=ref<''|'__NEW__'|'existing'>(''),columnId=ref(''),columnTitle=ref(''),chapterNo=ref(''),columnCoverURL=ref(''),thoughtContent=ref('')
 const drafts=ref<DraftSummary[]>([]),draftPagination=ref({p:1,size:20,total:0,pageCount:0}),draftPageNo=ref(1),draftId=ref(''),draftsError=ref(''),draftsLoading=ref(false)
 const source=ref<PostSource|null>(null),sourceLoading=ref(false),sourceError=ref(''),error=ref(''),mounted=ref(false),initialDraftResolved=ref(false),sourceTarget=ref(''),loadConfirming=ref(false),published=ref(false),needsReload=ref(false)
@@ -56,9 +57,9 @@ function toggleReward(){
 }
 function snapshot():PostFields{
   const reward=editId.value?retainedReward.value||rewardOpen.value:rewardOpen.value&&!isLong.value&&type.value!==5
-  return{title:title.value,content:content.value,tags:tags.value,type:type.value,rewardContent:reward?rewardContent.value:'',rewardPoint:reward?Number(rewardPoint.value??0):0,qnaOfferPoint:editId.value?Number(offer.value):type.value===5?Number(offer.value):0,commentable:commentable.value,showInList:showInList.value?1:0,statement:statement.value,anonymous:editId.value?anonymous.value:allowAnonymous.value&&anonymous.value,notifyFollowers:notifyFollowers.value,columnId:columnMode.value==='existing'?columnId.value.trim():'',columnTitle:columnMode.value?columnTitle.value:'',chapterNo:columnMode.value?chapterNo.value:'',columnCoverURL:columnCoverURL.value,thoughtContent:thoughtContent.value}
+  return{title:title.value,content:content.value,tags:tags.value,type:type.value,rewardContent:reward?rewardContent.value:'',rewardPoint:reward?Number(rewardPoint.value??0):0,qnaOfferPoint:editId.value?Number(offer.value):type.value===5?Number(offer.value):0,commentable:commentable.value,showInList:showInList.value?1:0,statement:statement.value,anonymous:editId.value?anonymous.value:allowAnonymous.value&&anonymous.value,notifyFollowers:notifyFollowers.value,columnId:columnMode.value==='existing'?columnId.value.trim():'',columnTitle:columnMode.value?columnTitle.value:'',chapterNo:columnMode.value?chapterNo.value:'',columnCoverURL:columnCoverURL.value,thoughtContent:thoughtContent.value,goodPost:goodPost.value}
 }
-function apply(value:PostFields){title.value=value.title;tags.value=value.tags;content.value=value.content;type.value=value.type;offer.value=value.qnaOfferPoint;rewardContent.value=value.rewardContent;rewardPoint.value=value.rewardPoint;rewardOpen.value=value.rewardPoint>0||!!value.rewardContent;anonymous.value=value.anonymous;commentable.value=value.commentable;showInList.value=value.showInList===1;statement.value=value.statement;notifyFollowers.value=value.notifyFollowers;columnId.value=value.columnId;columnTitle.value=value.columnTitle;columnMode.value=value.columnId?'existing':value.columnTitle?'__NEW__':'';chapterNo.value=value.chapterNo;columnCoverURL.value=value.columnCoverURL;thoughtContent.value=value.thoughtContent}
+function apply(value:PostFields){title.value=value.title;tags.value=value.tags;content.value=value.content;type.value=value.type;offer.value=value.qnaOfferPoint;rewardContent.value=value.rewardContent;rewardPoint.value=value.rewardPoint;rewardOpen.value=value.rewardPoint>0||!!value.rewardContent;anonymous.value=value.anonymous;commentable.value=value.commentable;showInList.value=value.showInList===1;statement.value=value.statement;notifyFollowers.value=value.notifyFollowers;columnId.value=value.columnId;columnTitle.value=value.columnTitle;columnMode.value=value.columnId?'existing':value.columnTitle?'__NEW__':'';chapterNo.value=value.chapterNo;columnCoverURL.value=value.columnCoverURL;thoughtContent.value=value.thoughtContent;goodPost.value=value.goodPost}
 function reset(){generation++;sourceSequence++;listSequence++;loadConfirmation?.abort();loadConfirmation=null;loadConfirming.value=false;sourceTarget.value='';operations.cancelConfirmation(commandOrigin);source.value=null;sourceLoading.value=false;sourceError.value='';error.value='';draftsError.value='';drafts.value=[];draftPagination.value={p:1,size:20,total:0,pageCount:0};draftPageNo.value=1;draftsLoading.value=false;draftId.value='';localKey='';initialDraftResolved.value=false;published.value=false;needsReload.value=false;apply(emptyPost());initialForm=''}
 async function loadDrafts(p=draftPageNo.value){
   if(!mounted.value||!isLoggedIn.value||editId.value)return
@@ -130,14 +131,33 @@ async function dropDraft(id:string){
 }
 async function restore(){const command=operations.pending;if(!command||operations.busy)return;const owned=localKey===command.key,reader=identity(),version=generation;const result=await operations.retry();await after(result,operations.completed,reader,version,owned)}
 async function blank(){if(locked.value)return;const reader=identity();const query={...route.query};delete query.draft;await router.replace({path:route.path,query});if(mounted.value&&reader===identity())await initialize(true)}
+watch(introductionPost,value=>{if(value)goodPost.value=false},{flush:'sync'})
 watch([accessToken,()=>account.value?.oId,()=>route.fullPath],()=>{const next=identity();if(next===boundary)return;boundary=next;void initialize()},{flush:'sync'})
 onMounted(()=>{mounted.value=true;boundary=identity();void initialize()})
 onBeforeUnmount(()=>{mounted.value=false;reset()})
 </script>
 
 <template>
-  <form class="card fp-page fp-ui fp-surface" @submit.prevent="submit">
-    <h1 class="fp-page-title">{{ heading }}</h1>
+  <form class="post-composer fp-page fp-page--wide fp-ui" @submit.prevent="submit">
+    <header class="composer-heading">
+      <div>
+        <div class="heading-line">
+          <h1 class="fp-page-title">{{ heading }}</h1>
+          <span v-if="ready" class="type-badge">{{ TYPE_LABELS[type] || '帖子' }}</span>
+        </div>
+        <p v-if="ready && (typeTip || isLong)" class="fp-page-description">{{ typeTip || '适合创作小说、长篇故事等' }}</p>
+      </div>
+      <details v-if="isLoggedIn && !editId" class="drafts fp-surface">
+        <summary>草稿箱 <span class="draft-count">{{ draftsLoading ? '读取中…' : draftsError ? '读取失败，展开重试' : `${draftPagination.total} 份草稿` }}</span></summary>
+        <div class="draft-list">
+          <p v-if="draftsLoading" role="status">正在读取草稿…</p><p v-if="draftsError" role="alert">{{ draftsError }}</p>
+          <button class="fp-control" type="button" :aria-disabled="draftsLoading" @click="!draftsLoading&&loadDrafts()">{{ draftsError?'重试草稿列表':'刷新草稿列表' }}</button>
+          <div v-for="d in drafts" :key="d.id"><button type="button" class="ghost fp-control" :aria-disabled="locked||sourceLoading" @click="loadDraft(d.id)">{{ d.title||'无标题' }}</button><button type="button" class="ghost fp-control" :aria-disabled="locked||sourceLoading" @click="dropDraft(d.id)">删除草稿 {{ d.id }}</button></div>
+          <p v-if="!draftsLoading&&!draftsError&&!drafts.length">{{ draftPagination.total===0?'暂无草稿':'本页无草稿' }}</p>
+          <nav v-if="draftPagination.pageCount>1||draftPageNo>1"><button class="fp-control" type="button" :aria-disabled="draftsLoading||draftPageNo<=1" @click="!draftsLoading&&draftPageNo>1&&loadDrafts(draftPageNo-1)">上一页草稿</button><span>第 {{ draftPageNo }} 页<span v-if="!draftsError&&!draftsLoading"> · 共 {{ draftPagination.total }}份</span></span><button class="fp-control" type="button" :aria-disabled="draftsLoading||draftPageNo>=draftPagination.pageCount" @click="!draftsLoading&&draftPageNo<draftPagination.pageCount&&loadDrafts(draftPageNo+1)">下一页草稿</button></nav>
+        </div>
+      </details>
+    </header>
     <p v-if="!isLoggedIn" class="hint">请先登录。</p>
     <template v-else>
       <template v-if="operations.pending">
@@ -147,104 +167,112 @@ onBeforeUnmount(()=>{mounted.value=false;reset()})
       <p v-if="operations.message" role="status">{{ operations.message }}</p><p v-if="operations.error" role="alert">{{ operations.error }}</p>
       <p v-if="operations.receipt&&(operations.receipt.op==='publish'||operations.receipt.op==='edit')">文章 {{ operations.receipt.id }} 已确认。<RouterLink :to="'/article/'+operations.receipt.id">查看文章</RouterLink></p>
       <button class="fp-control" v-if="operations.receipt?.op==='draft-save'&&!editId" type="button" :aria-disabled="locked" @click="loadDraft(operations.receipt.id)">载入已保存草稿 {{ operations.receipt.id }}</button>
-      <section v-if="!editId" class="drafts">
-        <h2>草稿</h2><p v-if="draftsLoading" role="status">正在读取草稿…</p><p v-if="draftsError" role="alert">{{ draftsError }}</p>
-        <button class="fp-control" type="button" :aria-disabled="draftsLoading" @click="!draftsLoading&&loadDrafts()">{{ draftsError?'重试草稿列表':'刷新草稿列表' }}</button>
-        <div v-for="d in drafts" :key="d.id"><button type="button" class="ghost fp-control" :aria-disabled="locked||sourceLoading" @click="loadDraft(d.id)">{{ d.title||'无标题' }}</button><button type="button" class="ghost fp-control" :aria-disabled="locked||sourceLoading" @click="dropDraft(d.id)">删除草稿 {{ d.id }}</button></div>
-        <p v-if="!draftsLoading&&!draftsError&&!drafts.length">{{ draftPagination.total===0?'暂无草稿':'本页无草稿' }}</p>
-        <nav v-if="draftPagination.pageCount>1||draftPageNo>1"><button class="fp-control" type="button" :aria-disabled="draftsLoading||draftPageNo<=1" @click="!draftsLoading&&draftPageNo>1&&loadDrafts(draftPageNo-1)">上一页草稿</button><span>第 {{ draftPageNo }} 页<span v-if="!draftsError&&!draftsLoading"> · 共 {{ draftPagination.total }}份</span></span><button class="fp-control" type="button" :aria-disabled="draftsLoading||draftPageNo>=draftPagination.pageCount" @click="!draftsLoading&&draftPageNo<draftPagination.pageCount&&loadDrafts(draftPageNo+1)">下一页草稿</button></nav>
-      </section>
       <p v-if="sourceLoading" role="status">正在读取原文…</p><p v-if="sourceError" role="alert">{{ sourceError }}</p>
       <button class="fp-control" v-if="sourceError" type="button" @click="retrySource()">重试原文</button><button class="fp-control" v-if="!editId&&sourceError&&initialDraftResolved" type="button" @click="sourceError=''">保留当前输入</button><button class="fp-control" v-if="!editId&&sourceError" type="button" @click="blank()">新建空白文章</button>
       <template v-if="ready">
       <p v-if="published" role="status">本次文章已发布。<button class="fp-control" type="button" @click="published=false">将当前输入作为新文章</button></p>
       <p v-if="needsReload" role="status">编辑已确认，继续编辑前请重新读取原文。<button class="fp-control" type="button" @click="reloadEdit()">重新读取原文后继续编辑</button></p>
       <p v-if="source&&source.status!==0" role="status">当前文章不可编辑，可查看源码。</p>
-      <p class="type-tip">
-        <b>{{ TYPE_LABELS[type] || '帖子' }}</b>
-        <span v-if="typeTip">{{ typeTip }}</span>
-        <span v-if="isLong">适合创作小说、长篇故事等</span>
-      </p>
-
-      <input v-model="title" class="title-input fp-control" required placeholder="标题" />
-      <textarea class="fp-control" v-if="type===3" v-model="content" aria-label="思绪回放记录" rows="12" /><p v-if="type===3" class="hint">思绪回放记录修改需保留原格式，不能作为普通 Markdown 发布。</p>
-      <MarkdownEditor v-else
-        ref="editorRef"
-        v-model="content"
-        :height="500"
-        outline
-        :placeholder="type === 1 ? '机要内容仅被 @ 的用户可见' : '支持 Markdown，可直接粘贴或拖拽上传图片'"
-      />
-      <div class="tools">
-        <EmojiPicker @insert="(md) => editorRef?.insert(md)" />
-      </div>
-
-      <section v-if="isLong" class="column-form">
-        <p class="type-tip">专栏设置（可选）：可将长文归入已有专栏，或新建专栏进行章节连载。</p>
-        <label class="inline-field">
-          所属专栏
-          <select class="fp-control" v-model="columnMode">
-            <option value="">不归属专栏（独立长文）</option>
-            <option value="existing">已有专栏</option>
-            <option value="__NEW__">+ 新建专栏</option>
-          </select>
-        </label>
-        <AuthorColumnPicker v-if="columnMode === 'existing'" :model-value="columnId" :current-title="columnTitle" :disabled="locked" @select="column => { columnId=column.id; columnTitle=column.title }" />
-        <label v-if="columnMode === '__NEW__'" class="inline-field">
-          新专栏名称
-          <input class="fp-control" v-model="columnTitle" maxlength="64" placeholder="请输入专栏名称（例如：《三体》）" />
-        </label>
-        <label v-if="columnMode" class="inline-field">
-          章节号
-          <input class="fp-control" v-model="chapterNo" inputmode="numeric" placeholder="可选，留空自动排在该专栏末尾" />
-        </label>
-        <p class="type-tip">同一专栏按章节号排序，阅读页将自动显示章节目录与上下章跳转。</p>
-      </section>
-
-      <template v-if="!isLong">
-      <TagInput v-model="tags" />
-      <label v-if="type === 5" class="inline-field">
-        悬赏积分
-        <input class="fp-control" v-model.number="offer" type="number" min="20" max="2147483647" placeholder="采纳答案时奖励给回答者" />
-      </label>
-      <section v-else class="reward">
-        <button type="button" class="ghost reward-toggle fp-control" @click="toggleReward">
-          {{ rewardOpen ? retainedReward ? '收起打赏设置' : '取消打赏' : '打赏' }}
-        </button>
-        <template v-if="rewardOpen">
-          <p class="type-tip">打赏内容仅对打赏过的用户可见。</p>
-          <MarkdownEditor ref="rewardEditorRef" v-model="rewardContent" :height="200" placeholder="打赏后可见的内容" />
-          <label class="inline-field">
-            打赏积分
-            <input class="fp-control" v-model.number="rewardPoint" type="number" min="1" max="2147483647" placeholder="打赏积分" />
+      <div class="compose-grid">
+        <section class="writing-panel fp-surface" aria-labelledby="writing-title">
+          <h2 id="writing-title" class="section-title">内容编辑</h2>
+          <label class="title-field">标题
+            <input v-model="title" class="title-input fp-control" required placeholder="标题" />
           </label>
-        </template>
-      </section>
+          <div class="body-toolbar"><span>正文</span><EmojiPicker @insert="(md) => editorRef?.insert(md)" /></div>
+          <textarea class="fp-control" v-if="type===3" v-model="content" aria-label="思绪回放记录" rows="12" /><p v-if="type===3" class="hint">思绪回放记录修改需保留原格式，不能作为普通 Markdown 发布。</p>
+          <MarkdownEditor v-else
+            ref="editorRef"
+            v-model="content"
+            :height="500"
+            outline
+            :placeholder="type === 1 ? '机要内容仅被 @ 的用户可见' : '支持 Markdown，可直接粘贴或拖拽上传图片'"
+          />
+          <section v-if="!isLong && type !== 5" class="reward">
+            <div class="reward-heading">
+              <div><h3>打赏内容</h3><p class="hint">可另写一段正文，仅对打赏过的用户可见。</p></div>
+              <button type="button" class="fp-control" :aria-expanded="rewardOpen" @click="toggleReward">
+                {{ rewardOpen ? retainedReward ? '收起打赏设置' : '取消打赏' : '打赏' }}
+              </button>
+            </div>
+            <template v-if="rewardOpen">
+              <MarkdownEditor ref="rewardEditorRef" v-model="rewardContent" :height="200" placeholder="打赏后可见的内容" />
+              <label class="inline-field">打赏积分
+                <input class="fp-control" v-model.number="rewardPoint" type="number" min="1" max="2147483647" placeholder="打赏积分" />
+              </label>
+            </template>
+          </section>
+        </section>
 
-      <section class="settings">
-        <label class="inline-field">
-          创作声明
-          <select class="fp-control" v-model.number="statement">
-            <option v-for="s in STATEMENTS" :key="s.value" :value="s.value">{{ s.label }}</option>
-          </select>
-        </label>
-        <label v-if="allowAnonymous" class="check">
-          <input v-model="anonymous" type="checkbox" :disabled="Boolean(editId)" />匿名
-        </label>
-        <label class="check"><input v-model="showInList" type="checkbox" />在列表展示</label>
-        <label class="check"><input v-model="commentable" type="checkbox" />允许回帖</label>
-        <label class="check"><input v-model="notifyFollowers" type="checkbox" />通知关注者</label>
-      </section>
-      </template>
+        <div class="publish-rail">
+          <section v-if="isLong" class="column-form fp-surface">
+            <h2 class="section-title">专栏设置</h2>
+            <p class="hint">可将长文归入已有专栏，或新建专栏进行连载。</p>
+            <label class="inline-field">
+              所属专栏
+              <select class="fp-control" v-model="columnMode">
+                <option value="">不归属专栏（独立长文）</option>
+                <option value="existing">已有专栏</option>
+                <option value="__NEW__">+ 新建专栏</option>
+              </select>
+            </label>
+            <AuthorColumnPicker v-if="columnMode === 'existing'" :model-value="columnId" :current-title="columnTitle" :disabled="locked" @select="column => { columnId=column.id; columnTitle=column.title }" />
+            <label v-if="columnMode === '__NEW__'" class="inline-field">
+              新专栏名称
+              <input class="fp-control" v-model="columnTitle" maxlength="64" placeholder="请输入专栏名称（例如：《三体》）" />
+            </label>
+            <label v-if="columnMode" class="inline-field">
+              章节号
+              <input class="fp-control" v-model="chapterNo" inputmode="numeric" placeholder="可选，留空自动排在该专栏末尾" />
+            </label>
+            <p class="type-tip">同一专栏按章节号排序，阅读页将自动显示章节目录与上下章跳转。</p>
+          </section>
 
-      <p v-if="error" class="err fp-state">{{ error }}</p>
-      <div class="tools">
-        <button v-if="!editId" type="button" class="ghost fp-control" :aria-disabled="locked||!ready" @click="saveDraft">
-          {{ operations.busy ? '保存中…' : '存草稿' }}
-        </button>
-        <button data-tone="primary" class="fp-control" type="submit" :aria-disabled="locked||!ready||published||needsReload||!!source&&source.status!==0">
-          {{ operations.busy ? '提交中…' : editId ? '保存' : '发布' }}
-        </button>
+          <section v-else class="settings fp-surface">
+            <h2 class="section-title">发布设置</h2>
+            <TagInput v-model="tags" />
+            <label v-if="type === 5" class="inline-field">
+              悬赏积分
+              <input class="fp-control" v-model.number="offer" type="number" min="20" max="2147483647" placeholder="采纳答案时奖励给回答者" />
+            </label>
+            <label class="inline-field">
+              创作声明
+              <select class="fp-control" v-model.number="statement">
+                <option v-for="s in STATEMENTS" :key="s.value" :value="s.value">{{ s.label }}</option>
+              </select>
+            </label>
+            <fieldset class="visibility-options"><legend>可见性与互动</legend>
+              <label v-if="allowAnonymous" class="check">
+                <input v-model="anonymous" type="checkbox" :disabled="Boolean(editId)" />匿名
+              </label>
+              <label class="check"><input v-model="showInList" type="checkbox" />在列表展示</label>
+              <label class="check"><input v-model="commentable" type="checkbox" />允许回帖</label>
+              <label class="check"><input v-model="notifyFollowers" type="checkbox" />通知关注者</label>
+            </fieldset>
+          </section>
+
+          <section class="submit-panel fp-surface">
+            <h2 class="section-title">{{ editId ? '保存修改' : '发布文章' }}</h2>
+            <div v-if="!editId && type !== 3" class="quality-option">
+              <label class="check">
+                <input v-model="goodPost" type="checkbox" :disabled="locked || published || introductionPost" aria-describedby="good-post-hint" />这是好帖（获取优质奖励）
+              </label>
+              <span id="good-post-hint" class="hint" aria-live="polite">
+                <template v-if="introductionPost">新人报道帖不能标记为好帖。</template>
+                <RouterLink v-else to="/article/1683775497629" target="_blank" rel="noopener">好帖奖励说明</RouterLink>
+              </span>
+            </div>
+            <p v-if="error" class="err fp-state" role="alert">{{ error }}</p>
+            <div class="submit-actions">
+              <button v-if="!editId" type="button" class="ghost fp-control" :aria-disabled="locked||!ready" @click="saveDraft">
+                {{ operations.busy ? '保存中…' : '存草稿' }}
+              </button>
+              <button data-tone="primary" class="fp-control" type="submit" :aria-disabled="locked||!ready||published||needsReload||!!source&&source.status!==0">
+                {{ operations.busy ? '提交中…' : editId ? '保存' : '发布' }}
+              </button>
+            </div>
+          </section>
+        </div>
       </div>
       </template>
     </template>

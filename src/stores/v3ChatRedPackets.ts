@@ -17,7 +17,7 @@ export const useV3ChatRedPacketsStore=defineStore('v3-chat-red-packets',()=>{
  function proof(){const run=generation,context=getAuthContextVersion(),actor=account.value?.oId;return()=>!import.meta.env.SSR&&!!accessToken.value&&!!actor&&run===generation&&context===getAuthContextVersion()&&actor===account.value?.oId}
  function close(){detailRun++;detailAbort?.abort();detailAbort=null;selectedId.value='';detail.value=null;detailError.value='';loading.value=false}
  function reset(){lastAttempt.value=undefined;generation++;readRun++;readAbort?.abort();readAbort=null;close();pending.value=completed.value=null;receipt.value=null;busy.value=reading.value=needsConfirmation.value=false;error.value=readError.value=''}
- async function open(id=selectedId.value,autoClaim=false){const valid=proof();if(!valid())return;close();selectedId.value=id;try{packetId(id)}catch(e){detailError.value=e instanceof Error?e.message:'红包ID不合法';return}loading.value=true;const run=detailRun,abort=new AbortController();detailAbort=abort;try{const value=await packetDetail(id,account.value!.oId,abort.signal);if(valid()&&run===detailRun&&!abort.signal.aborted){detail.value=value;if(autoClaim&&!pending.value&&!busy.value&&!wasDeniedRecipient(id)&&canClaimPacket(value,account.value?.oId)&&['random','average','specify'].includes(value.type))await claim(value.id,value.type,{})}}catch(e){if(valid()&&run===detailRun&&!abort.signal.aborted)detailError.value=e instanceof Error?e.message:'红包详情读取失败'}finally{if(valid()&&run===detailRun){loading.value=false;detailAbort=null}}}
+ async function open(id=selectedId.value){const valid=proof();if(!valid())return;close();selectedId.value=id;try{packetId(id)}catch(e){detailError.value=e instanceof Error?e.message:'红包ID不合法';return}loading.value=true;const run=detailRun,abort=new AbortController();detailAbort=abort;try{const value=await packetDetail(id,account.value!.oId,abort.signal);if(valid()&&run===detailRun&&!abort.signal.aborted){detail.value=value}}catch(e){if(valid()&&run===detailRun&&!abort.signal.aborted)detailError.value=e instanceof Error?e.message:'红包详情读取失败'}finally{if(valid()&&run===detailRun){loading.value=false;detailAbort=null}}}
  function wasDeniedRecipient(id:string){return lastAttempt.value?.kind==='claim'&&lastAttempt.value.id===id&&lastAttempt.value.errorCode==='recipient_required'}
  async function readCurrent(){const valid=proof(),id=receipt.value?.data.id;if(!valid()||!id)return;readAbort?.abort();const abort=new AbortController(),run=++readRun;readAbort=abort;reading.value=true;readError.value='';try{const value=await chatMessageDetail(id,abort.signal);if(value.type==='unavailable')throw new ApiError('当前红包消息不可读',404);if(valid()&&run===readRun&&!abort.signal.aborted&&receipt.value?.data.id===id)timeline.upsertConfirmed(value)}catch(e){if(valid()&&run===readRun&&!abort.signal.aborted)readError.value=e instanceof Error?e.message:'当前红包消息读取失败'}finally{if(valid()&&run===readRun){reading.value=false;readAbort=null}}}
  async function execute(command:PacketCommand,recovering:boolean){const valid=proof();if(!valid()||busy.value)return null;if(!recovering){receipt.value=null;completed.value=null;readError.value='';readRun++;readAbort?.abort();reading.value=false}lastAttempt.value=command.kind==='claim'?{kind:'claim',id:command.id}:{kind:'create'};pending.value=command;busy.value=true;error.value='';needsConfirmation.value=false
@@ -26,21 +26,34 @@ export const useV3ChatRedPacketsStore=defineStore('v3-chat-red-packets',()=>{
  finally{if(valid())busy.value=false}}
  function create(input:PacketInput){if(pending.value||busy.value)return Promise.resolve(null);try{return execute({kind:'create',input:packetInput(input,account.value?.oId||''),key:profileOperationKey()},false)}catch(e){error.value=e instanceof Error?e.message:'红包参数不合法';return Promise.resolve(null)}}
  function claim(id:string,type:PacketType,input:ClaimInput){if(pending.value||busy.value||detail.value?.id===id&&detail.value.legacy)return Promise.resolve(null);try{return execute({kind:'claim',id:packetId(id),type,input:packetClaimInput(type,input),key:profileOperationKey()},false)}catch(e){error.value=e instanceof Error?e.message:'领取参数不合法';return Promise.resolve(null)}}
- async function claimDuelFromCard(id:string,gesture:number,signal:AbortSignal){
-  const valid=proof()
-  if(!valid()||pending.value||busy.value)return
-  const ownerId=account.value!.oId
-  // 消息卡片不区分旧红包和新版红包。只在出拳时核对详情，避免逐条预读或尝试领取旧红包。
-  const current=await packetDetail(id,ownerId,signal)
-  if(!valid()||signal.aborted)return
-  const alreadySettled=receipt.value?.kind==='claim'&&receipt.value.data.id===id
-  if(alreadySettled||current.legacy||current.type!=='rockPaperScissors'||current.sender.id===ownerId||current.currentUserClaim||current.got>=current.count)return 'details'
-  if(pending.value||busy.value)return 'busy'
-  return claim(id,'rockPaperScissors',{gesture,riskAccepted:true})
+ async function claimFromCard(id: string, type: PacketType, input: ClaimInput) {
+  const valid = proof()
+  if (!valid() || pending.value || busy.value) return null
+  const current = detail.value?.id === id ? detail.value : null
+  const alreadyClaimed = receipt.value?.kind === 'claim' && receipt.value.data.id === id
+  if (alreadyClaimed || wasDeniedRecipient(id) || current && !canClaimPacket(current, account.value?.oId)) {
+   await open(id)
+   return null
+  }
+  close()
+  selectedId.value = id
+  loading.value = true
+  const run = detailRun
+  // 点击即提交；成功回执由 execute 触发详情读取，未知结果保留原命令。
+  const result = await claim(id, type, input)
+  if (valid() && run === detailRun && selectedId.value === id) {
+   if (pending.value) {
+    loading.value = false
+    detailError.value = error.value || '领取结果尚未确认，请恢复原操作'
+   } else {
+    await open(id)
+   }
+  }
+  return result
  }
  function retry(confirmed=false){return pending.value&&(!needsConfirmation.value||confirmed)?execute(pending.value,true):Promise.resolve(null)}
  function cancelConfirmation(){if(needsConfirmation.value&&!busy.value){pending.value=null;needsConfirmation.value=false;error.value=''}}
  function dismiss(){if(pending.value||busy.value)return;readRun++;readAbort?.abort();reading.value=false;receipt.value=null;error.value=readError.value=''}
  const stop=watch([accessToken,()=>account.value?.oId],()=>{const next=getAuthContextVersion(),actor=account.value?.oId;if(!accessToken.value||next!==boundary||actor!==owner)reset();boundary=next;owner=actor},{flush:'sync'})
- onScopeDispose(()=>{stop();reset()});return{lastAttempt,pending,completed,receipt,busy,error,needsConfirmation,selectedId,detail,loading,detailError,reading,readError,open,close,dismiss,readCurrent,create,claim,claimDuelFromCard,retry,cancelConfirmation,wasDeniedRecipient}
+ onScopeDispose(()=>{stop();reset()});return{lastAttempt,pending,completed,receipt,busy,error,needsConfirmation,selectedId,detail,loading,detailError,reading,readError,open,close,dismiss,readCurrent,create,claim,claimFromCard,retry,cancelConfirmation,wasDeniedRecipient}
 })

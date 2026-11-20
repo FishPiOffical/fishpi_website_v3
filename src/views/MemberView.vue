@@ -22,8 +22,6 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
 <template>
     <main ref="panel" class="member-content">
 
-      <p v-if="activeTab === 'points'" class="member-status">积分流水仅本人可在<RouterLink to="/points">我的积分</RouterLink>查看。</p>
-      <template v-else>
         <div class="content-section-head">
           <span v-if="content" class="content-total-badge">共 {{ content.total }} 条</span>
           <button type="button" class="refresh-member-btn fp-control" :disabled="contentLoading" aria-label="刷新用户内容" @click="readContent()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg>刷新</button>
@@ -65,7 +63,6 @@ usePageSeo(() => ({ title: `${profile.value?.userNickname || userName.value} 的
           </div>
         </template>
         <p v-else role="status" class="member-status">用户内容尚未读取。</p>
-      </template>
     </main>
 </template>
 <style scoped lang="scss">

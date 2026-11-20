@@ -119,6 +119,7 @@ export async function fetchChatPetProfile(id: string, signal: AbortSignal) {
   if (!name.trim() || name.length > 256 || (level !== undefined && (level < 1 || level > 40)) ||
     (experience !== undefined && experience < 0)) throw bad()
   return {
+    id: typeof data.id === 'string' && /^[1-9][0-9]{0,18}$/.test(data.id) ? data.id : undefined,
     name, state, level, experience, archived: data.archived === true,
     speciesId: data.speciesId === undefined ? undefined : decodePetSpecies(data.speciesId),
     user: decodeV3RelationUser(data.user),

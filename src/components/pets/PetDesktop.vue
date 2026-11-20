@@ -12,6 +12,7 @@ import PetIcon from './PetIcon.vue'
 import PetAnimation from './PetAnimation.vue'
 import { usePetAnimationState } from './usePetAnimationState'
 import { usePetClock } from './usePetClock'
+import { usePetCareAvailability } from './usePetCareAvailability'
 import { petActivityStatus } from './petActivityStatus'
 import { requestPetActivitiesNavigation } from './petNavigation'
 import { usePetPlacement } from './layout/usePetPlacement'
@@ -34,6 +35,7 @@ const available = computed(() => mounted.value && auth.isLoggedIn && (!!pets.pet
 const placement = usePetPlacement({ element, panel, preferred: () => display.position, collapsed: () => display.collapsed || recovering.value,
   active: () => available.value, panelOpen: () => panelOpen.value })
 const shown = computed(() => available.value && !placement.suppressed.value)
+usePetCareAvailability(() => shown.value, false)
 const compact = placement.compact, narrow = placement.narrow, panelStyle = placement.panelStyle
 const animationActive = computed(() => shown.value && !compact.value && !dragging.value)
 const animation = usePetAnimationState(now, animationActive)

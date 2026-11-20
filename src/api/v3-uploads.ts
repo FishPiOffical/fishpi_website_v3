@@ -1,6 +1,6 @@
 import { ApiError, request } from './http'
 type Row = Record<string, unknown>
-export type UploadResult = { name: string; url: string | null; image: boolean }
+export type UploadResult = { name: string; url: string | null; image: boolean; maxBytes?: number; failureMessage?: string }
 const invalid = () => new ApiError('上传服务响应不正确', 502)
 function row(v: unknown): Row { if (!v || typeof v !== 'object' || Array.isArray(v)) throw invalid(); return v as Row }
 function outputURL(v: unknown): string {
@@ -15,7 +15,37 @@ function filename(file: File, index: number) {
   // Stable unique multipart names keep duplicate user filenames distinguishable in succMap.
   return `upload-${index + 1}.${extension}`
 }
-export async function uploadV3Files(files: File[], signal: AbortSignal): Promise<UploadResult[]> {
+function uploadWithProgress(endpoint: string, credential: string, form: FormData, signal: AbortSignal, progress: (percent: number | null) => void) {
+  return new Promise<Response>((resolve, reject) => {
+    signal.throwIfAborted()
+    const xhr = new XMLHttpRequest()
+    const abort = () => xhr.abort()
+    xhr.addEventListener('loadend', () => signal.removeEventListener('abort', abort), { once: true })
+    xhr.addEventListener('abort', () => reject(signal.reason))
+    xhr.addEventListener('error', () => reject(new Error('上传连接中断')))
+    xhr.addEventListener('load', () => {
+      if (xhr.status < 200 || xhr.status > 599) {
+        reject(new Error('图床响应不正确'))
+        return
+      }
+      const empty = [204, 205, 304].includes(xhr.status)
+      resolve(new Response(empty ? null : xhr.responseText, { status: xhr.status }))
+    })
+    xhr.upload.addEventListener('progress', event => {
+      if (!signal.aborted) progress(event.lengthComputable && event.total > 0 ? Math.floor(event.loaded * 100 / event.total) : null)
+    })
+    xhr.upload.addEventListener('load', () => { if (!signal.aborted) progress(100) })
+    xhr.open('POST', endpoint)
+    xhr.setRequestHeader('Authorization', `Bearer ${credential}`)
+    signal.addEventListener('abort', abort, { once: true })
+    try { xhr.send(form) } catch (error) {
+      signal.removeEventListener('abort', abort)
+      reject(error)
+    }
+  })
+}
+
+export async function uploadV3Files(files: File[], signal: AbortSignal, progress?: (percent: number | null) => void): Promise<UploadResult[]> {
   if (!files.length) return []
   const names = files.map(filename); signal.throwIfAborted()
   const envelope = row(await request('/api/v3/uploads/tickets', { method: 'POST', body: '{}', signal, cache: 'no-store' }))
@@ -30,16 +60,38 @@ export async function uploadV3Files(files: File[], signal: AbortSignal): Promise
   const form = new FormData(); files.forEach((file, i) => form.append('file', file, names[i]))
   const endpoint = target.href === 'https://pic.fishpi.cn/api/v1/files' ? '/rhypic-upload/api/v1/files' : uploadURL
   let response: Response
-  try { response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${credential}` }, body: form, credentials: 'omit', redirect: 'error', signal }) }
+  try {
+    response = progress && endpoint.startsWith('/') && typeof XMLHttpRequest !== 'undefined'
+      ? await uploadWithProgress(endpoint, credential, form, signal, progress)
+      : await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${credential}` }, body: form, credentials: 'omit', redirect: 'error', signal })
+  }
   catch (error) { if (signal.aborted) throw error; throw new ApiError('上传结果未确认，请检查网络后再选择文件', 0) }
   signal.throwIfAborted()
+  if (response.status === 413) {
+    throw new ApiError(files.length === 1
+      ? '文件超过上传入口的大小限制，请压缩文件后重试'
+      : '这批文件超过上传请求的大小限制，请减少文件数量或压缩后重试', 413)
+  }
   let result: Row
   try { result = row(await response.json()) } catch { throw new ApiError('上传结果未确认，请检查后再试', response.status) }
   signal.throwIfAborted()
-  if (!response.ok || result.code !== 0) throw new ApiError('图床上传失败，请检查文件后重试', response.status)
+  const formatMessage = result.msg === '图片后缀与实际格式不符，请选择正确格式的图片' ? result.msg : undefined
+  if (!response.ok || result.code !== 0) throw new ApiError(formatMessage || '图床上传失败，请检查文件后重试', response.status)
   const data = row(result.data), successes = row(data.succMap), failures = data.errFiles
   if (!Array.isArray(failures) || failures.some(name => typeof name !== 'string' || !names.includes(name)) || new Set(failures).size !== failures.length || Object.keys(successes).some(name => !names.includes(name) || failures.includes(name))) throw invalid()
-  return files.map((file, i) => ({ name: file.name || names[i]!, url: Object.hasOwn(successes, names[i]!) ? outputURL(successes[names[i]!]) : null, image: file.type.startsWith('image/') }))
+  const sizeLimits = data.sizeLimits
+  const limits = sizeLimits && typeof sizeLimits === 'object' && !Array.isArray(sizeLimits) ? sizeLimits as Row : {}
+  return files.map((file, i) => {
+    const name = names[i]!
+    const sizeLimit = failures.includes(name) && Object.hasOwn(limits, name) ? limits[name] : undefined
+    return {
+      name: file.name || name,
+      url: Object.hasOwn(successes, name) ? outputURL(successes[name]) : null,
+      image: file.type.startsWith('image/'),
+      ...(typeof sizeLimit === 'number' && Number.isSafeInteger(sizeLimit) && sizeLimit > 0 ? { maxBytes: sizeLimit } : {}),
+      ...(formatMessage && failures.includes(name) ? { failureMessage: formatMessage } : {}),
+    }
+  })
 }
 export function uploadedMarkdown(result: UploadResult): string {
   if (!result.url) return ''

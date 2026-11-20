@@ -76,7 +76,7 @@ let nextHomeReadAt = 0
 let homeReadInFlight: Promise<unknown> | null = null
 let homePriorityRead: Promise<unknown> | null = null
 let homeSessionRestore: Promise<unknown> | null = null
-let homeReadPause: { until: number; message: string } | null = null
+let homeReadPause: { until: number; message: string; rateLimited?: boolean } | null = null
 const HOME_READ_PAUSE_KEY = 'fp.home-read-pause-until'
 
 export function setHomeReadsActive(active: boolean) {
@@ -85,9 +85,11 @@ export function setHomeReadsActive(active: boolean) {
   homeReadGeneration++
   if (active && !homeReadPause) {
     try {
-      const until = Number(window.sessionStorage.getItem(HOME_READ_PAUSE_KEY))
+      const saved = window.sessionStorage.getItem(HOME_READ_PAUSE_KEY) ?? ''
+      const [deadline, reason] = saved.split(':')
+      const until = Number(deadline)
       if (Number.isFinite(until) && until > Date.now()) {
-        homeReadPause = { until, message: '首页读取仍在暂停中。' }
+        homeReadPause = { until, message: '首页读取仍在暂停中。', rateLimited: reason === '429' }
       }
     } catch { /* Storage may be disabled. */ }
   }
@@ -112,17 +114,27 @@ export function resumeHomeReads() {
   homeReadGeneration++
   try { window.sessionStorage.removeItem(HOME_READ_PAUSE_KEY) } catch { /* Storage may be disabled. */ }
   window.dispatchEvent(new Event('fp:home-reads-paused'))
+  window.dispatchEvent(new Event('fp:home-reads-resumed'))
   return true
 }
 
 function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promise<T>, priority: boolean): Promise<T> {
   const generation = homeReadGeneration, version = authVersion
   const sessionRead = priority || path === '/api/v3/me/membership'
+  const retryableTicket = path === '/api/v3/chat/realtime-ticket' || path === '/api/v3/breezemoons/realtime-ticket'
+  const pauseError = (pause: NonNullable<typeof homeReadPause>) => {
+    const error = new ApiError(pause.message, 0, 'home_reads_paused')
+    if (retryableTicket && pause.rateLimited) error.retryAfter = String(Math.ceil((pause.until - Date.now()) / 1_000))
+    return error
+  }
   const check = () => {
     if ((!sessionRead && generation !== homeReadGeneration) || (init.credentials !== 'omit' && version !== authVersion) || init.signal?.aborted) {
       throw new ApiError('请求已取消', 0, 'aborted')
     }
-    if (!priority && homeReadPause) throw new ApiError(homeReadPause.message, 0, 'home_reads_paused')
+    // 登录恢复优先执行；限流结束后实时订阅也能单独重新申请票据。
+    if (!priority && homeReadPause && !(retryableTicket && homeReadPause.rateLimited && Date.now() >= homeReadPause.until)) {
+      throw pauseError(homeReadPause)
+    }
   }
   const execute = async () => {
     while (true) {
@@ -152,12 +164,14 @@ function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promi
         const retryAt = header && /^\d+$/.test(header) ? now + Number(header) * 1000 : Date.parse(header ?? '')
         homeReadPause = {
           until: Math.max(now + (error.status === 429 ? 60_000 : 15_000), Number.isFinite(retryAt) ? retryAt : 0),
+          rateLimited: error.status === 429,
           message: error.status === 429 ? '请求过于频繁，首页已暂停读取。'
             : error.code === 'offline' ? '连接暂不可用，首页已暂停读取。' : '访问暂时受限，首页已暂停读取。',
         }
-        try { window.sessionStorage.setItem(HOME_READ_PAUSE_KEY, String(homeReadPause.until)) } catch { /* Storage may be disabled. */ }
+        try { window.sessionStorage.setItem(HOME_READ_PAUSE_KEY, String(homeReadPause.until) + (homeReadPause.rateLimited ? ':429' : '')) } catch { /* Storage may be disabled. */ }
+        const paused = pauseError(homeReadPause)
         window.dispatchEvent(new Event('fp:home-reads-paused'))
-        throw new ApiError(homeReadPause.message, 0, 'home_reads_paused')
+        throw paused
       }
       throw error
     } finally {
@@ -368,20 +382,21 @@ async function requestOnce<T = unknown>(path: string, init: RequestInitExtra, id
   }
 
   if (res.status === 429) {
-    // 宠物账号冷却只限制宠物操作，不能误当成全站 IP 风控。其它接口保持原有处理。
-    if (/^\/api\/v3\/me\/pet(?:\/|\?|$)/.test(path) && isJsonContentType(res.headers.get('content-type'))) {
+    // 只在对应的接口识别业务限流码，网关或其他接口的 429 继续按普通限流处理。
+    const petRequest = /^\/api\/v3\/me\/pet(?:\/|\?|$)/.test(path)
+    const parkingPurchase = path === '/api/v3/me/parking/buy' && init.method?.toUpperCase() === 'POST'
+    let code: string | undefined
+    if ((petRequest || parkingPurchase) && isJsonContentType(res.headers.get('content-type'))) {
       const text = await readNetworkBody(() => res.text(), init.signal, identity)
-      let code: string | undefined
       try {
         const candidate = JSON.parse(text)?.code
-        if (candidate === 'pet_rate_limited' || candidate === 'pet_transport_limited') code = candidate
+        if (petRequest && (candidate === 'pet_rate_limited' || candidate === 'pet_transport_limited')) code = candidate
+        if (parkingPurchase && candidate === 'parking_rate_limited') code = candidate
       } catch { /* 无法确认来源时仍按普通限流保护。 */ }
-      const error = new ApiError('操作过于频繁，请稍后重试', 429, code)
-      error.retryAfter = res.headers.get('Retry-After') ?? undefined
-      throw error
+    } else {
+      void res.body?.cancel().catch(() => {})
     }
-    void res.body?.cancel().catch(() => {})
-    const error = new ApiError('操作过于频繁，请稍后重试', 429)
+    const error = new ApiError('操作过于频繁，请稍后重试', 429, code)
     error.retryAfter = res.headers.get('Retry-After') ?? undefined
     throw error
   }

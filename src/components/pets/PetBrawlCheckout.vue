@@ -2,6 +2,8 @@
 import { computed, nextTick, onUnmounted, ref, useId, watch } from 'vue'
 import FpDialog from '@/components/FpDialog.vue'
 import PetBrawlWeaponArt from './PetBrawlWeaponArt.vue'
+import PetBrawlUpgradeStats from './PetBrawlUpgradeStats.vue'
+import { formatBattleStat, type BrawlStats } from './brawlStats'
 import PetIcon from './PetIcon.vue'
 import { getAuthContextVersion } from '@/api/http'
 import { brawlMaxUpgrade, brawlWeaponNames as names, readBrawlOrder, readBrawlOrders, type BrawlOrder, type BrawlProduct, type BrawlWeapon } from '@/api/v3-pets'
@@ -9,7 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePetsStore } from '@/stores/pets'
 
 const props = defineProps<{ petId: string; weapon: BrawlWeapon; level: number; version: number; cost?: number; materials: number; disabled: boolean;
-  gearOptions: { id: BrawlProduct; name: string; level: number; cost?: number; hp: number; attack: number }[] }>()
+  growth: BrawlStats[]; gearOptions: { id: BrawlProduct; name: string; level: number; cost?: number; hp: number; attack: number }[] }>()
 const pets = usePetsStore()
 const auth = useAuthStore()
 const labels = { pending: '待确认', completed: '已完成', expired: '已过期' }
@@ -197,7 +199,11 @@ onUnmounted(() => {
               <option v-for="option in gearOptions" :key="option.id" :value="option.id" :disabled="!option.cost">{{ option.name }}{{ option.cost ? '' : '（暂不可用）' }}</option>
             </select>
           </div>
-          <p v-if="target && (target.hp || target.attack)" class="upgrade-benefit">本次提升 <span>生命 +{{ (target.hp / 100).toFixed(2) }}</span><span>基础伤害 +{{ (target.attack / 100).toFixed(2) }}</span></p>
+          <PetBrawlUpgradeStats v-if="!product && cost" :growth="growth" :to-level="level + 1" />
+          <div v-if="target && target.cost && (target.hp || target.attack)" class="upgrade-benefit">
+            <span>本级提升 · 生命 +{{ formatBattleStat(target.hp) }}，基础伤害 +{{ formatBattleStat(target.attack) }}</span>
+            <span>该配件累计 · 生命 +{{ formatBattleStat(target.hp * (target.level + 1)) }}，基础伤害 +{{ formatBattleStat(target.attack * (target.level + 1)) }}</span>
+          </div>
           <div class="deduction-field">
             <label :for="`${selectionId}-deduction`">抵扣材料<small>最多 {{ maximum }}，每份抵扣 10 积分</small></label>
             <input :id="`${selectionId}-deduction`" v-model.number="deduction" type="number" min="0" :max="maximum" step="1" required :disabled="blocked">
@@ -244,6 +250,7 @@ onUnmounted(() => {
             <span>{{ selected.status === 'completed' ? '已完成' : '强化后' }} +{{ appearance.after }}</span>
           </div>
         </div>
+        <PetBrawlUpgradeStats v-if="!selected.product && selected.version === version" :growth="growth" :to-level="selected.level + 1" />
         <dl class="order-details">
           <div><dt>{{ selected.status === 'completed' ? '已消耗材料' : '消耗材料' }}</dt><dd>{{ selected.materials.toLocaleString() }}</dd></div>
           <div class="order-total"><dt>{{ selected.status === 'completed' ? '实扣积分' : '扣除积分' }}</dt><dd><strong>{{ selected.points.toLocaleString() }}</strong> 积分</dd></div>

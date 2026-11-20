@@ -314,6 +314,7 @@ export interface ArticleComment {
   commentParagraphId?: string
   commentParagraphStatus?: number
   commentThreadReplies?: ArticleComment[]
+  commentThreadReplyCount?: number
 }
 
 export interface ParagraphCommentSummary {
@@ -486,18 +487,36 @@ interface Envelope<T> {
 }
 
 export async function login(username: string, passwd: string, mfaCode = '') {
+  const deviceId = browserDeviceHint()
   const res = await request<Envelope<{ accessToken?: string }>>('/api/v3/auth/login', {
     method: 'POST',
     body: JSON.stringify({
       nameOrEmail: username,
       userPassword: md5(passwd),
       mfaCode,
+      deviceId,
     }),
   })
   if (res.code !== 0 || !res.data?.accessToken) {
     throw new ApiError(res.msg || '登录失败', 401, String(res.code || 'login_failed'))
   }
   return res.data.accessToken
+}
+
+// 仅作登录提示；新旧站共用的设备身份由 Rhythm 的 HttpOnly Cookie 确定。
+function browserDeviceHint(): string | undefined {
+  if (typeof window === 'undefined') return
+  try {
+    const key = 'fishpi.login.device.v1'
+    const saved = window.localStorage.getItem(key)
+    if (saved && /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(saved)) return saved
+    const id = window.crypto.randomUUID()
+    window.localStorage.setItem(key, id)
+    return id
+  } catch {
+    // 浏览器禁用存储或不提供安全随机数时仍可正常登录。
+    return undefined
+  }
 }
 
 /** 通过极验结果解除 Rhythm IP 风控黑名单（对应现网 /validateCaptcha） */
@@ -584,7 +603,7 @@ export type RepeaterItem = RepeaterEntry
 export function fetchRepeaterItems(type = '') { return repeaterList(type as import('./v3-repeater').RepeaterKind) }
 
 export async function fetchArticle(id: string, page = 1, includeInteractions = false): Promise<ArticleDetail> {
-  return v3Article(id, page, includeInteractions)
+  return v3Article(id, page, includeInteractions, true)
 }
 
 

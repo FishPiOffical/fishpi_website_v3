@@ -6,13 +6,16 @@ import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { imageThumbnail, rhyPicThumbnail } from '@/utils/avatar'
 import type { ChatQuote } from '@/utils/chatQuote'
 
-const props = defineProps<{ quote: ChatQuote }>()
+const props = defineProps<{ quote: ChatQuote; standalone?: boolean }>()
 const preferences = useFunctionPreferencesStore()
 const zoomed = ref('')
 const failed = ref(false)
 const jumpLabel = computed(() => props.quote.kind === 'message' ? '查看原消息' : '查看清风明月')
 const thumbnail = computed(() => props.quote.image ? imageThumbnail(props.quote.image, 40, 32) : '')
 const hintText = computed(() => thumbnail.value ? '' : props.quote.fullText || '')
+const displayText = computed(() => props.standalone
+  ? hintText.value.replace(/\n{2,}/g, '\n') || props.quote.excerpt
+  : props.quote.excerpt)
 const hintId = useId()
 const card = ref<HTMLElement | null>(null)
 const excerpt = ref<HTMLElement | null>(null)
@@ -28,8 +31,10 @@ function closeHint() {
 function showHint() {
   clearTimeout(closeTimer)
   if (hintPosition.value || !hintText.value || !card.value || !excerpt.value) return
-  if (excerpt.value.scrollWidth <= excerpt.value.clientWidth && !hintText.value.includes('\n')
-    && hintText.value === props.quote.excerpt) return
+  const clipped = props.standalone
+    ? excerpt.value.scrollHeight > excerpt.value.clientHeight
+    : excerpt.value.scrollWidth > excerpt.value.clientWidth || hintText.value.includes('\n') || hintText.value !== props.quote.excerpt
+  if (!clipped) return
   const rect = card.value.getBoundingClientRect()
   const gutter = 8
   const width = Math.min(360, window.innerWidth - gutter * 2)
@@ -86,15 +91,18 @@ function openImage() {
 </script>
 
 <template>
-  <div ref="card" class="chat-quote-card" @pointerenter="onPointerEnter" @pointerleave="scheduleClose">
+  <div ref="card" class="chat-quote-card" :class="{ 'chat-quote-card--standalone': standalone }" @pointerenter="onPointerEnter" @pointerleave="scheduleClose">
     <span class="chat-quote-source">
-      <span class="chat-quote-author">{{ quote.author || (quote.kind === 'message' ? '引用消息' : '清风明月') }}</span><span>：</span>
+      <svg v-if="standalone" class="chat-quote-mark" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M6.9 3.1C4.5 3.9 3 5.8 3 8.8h3.6V13H2V9c0-3.6 1.7-6 4.3-7l.6 1.1Zm7 0C11.5 3.9 10 5.8 10 8.8h3.6V13H9V9c0-3.6 1.7-6 4.3-7l.6 1.1Z" />
+      </svg>
+      <span class="chat-quote-author">{{ quote.author || (quote.kind === 'message' ? '引用消息' : '清风明月') }}</span><span v-if="!standalone">：</span>
     </span>
     <button v-if="thumbnail" class="chat-quote-image" :class="{ 'chat-quote-image--fallback': failed }" type="button" aria-label="查看引用大图" @click="openImage">
       <img v-if="!failed" :src="thumbnail" :class="{ blurred: preferences.blurChatImages }" alt="" loading="lazy" @error="failed = true" />
       <span v-else>图片</span>
     </button>
-    <span v-else ref="excerpt" class="chat-quote-excerpt">{{ quote.excerpt }}</span>
+    <span v-else ref="excerpt" class="chat-quote-excerpt">{{ displayText }}</span>
     <component
       :is="quote.kind === 'message' ? RouterLink : 'a'"
       v-bind="quote.kind === 'message'
@@ -189,6 +197,51 @@ function openImage() {
   color: inherit;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.chat-quote-card--standalone {
+  display: grid;
+  grid-template-areas: "source jump" "excerpt excerpt";
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  max-width: min(20rem, 100%);
+  padding: 6px 8px 9px 11px;
+  border: 1px solid var(--fp-border);
+  border-inline-start: 2px solid color-mix(in srgb, var(--fp-primary) 56%, var(--fp-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fp-hover) 65%, var(--fp-card));
+}
+.chat-quote-card--standalone .chat-quote-source {
+  grid-area: source;
+  gap: 5px;
+  max-width: none;
+  font-weight: 600;
+}
+.chat-quote-mark {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--fp-primary-ink, var(--fp-muted));
+}
+.chat-quote-card--standalone .chat-quote-jump {
+  grid-area: jump;
+  margin-block: 0;
+}
+.chat-quote-card--standalone :is(.chat-quote-excerpt, .chat-quote-image) { grid-area: excerpt; }
+.chat-quote-card--standalone .chat-quote-excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--fp-text);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+@media (pointer: coarse) {
+  .chat-quote-card--standalone :is(.chat-quote-jump, .chat-quote-image) {
+    min-inline-size: 44px;
+    min-block-size: 44px;
+  }
 }
 .chat-quote-hint {
   position: fixed;

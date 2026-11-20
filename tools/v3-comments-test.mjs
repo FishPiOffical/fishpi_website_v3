@@ -76,7 +76,7 @@ const article=await fs.readFile('src/views/ArticleView.vue','utf8'),long=await f
 console.log('PASS comments 9 real long article adapter gets anchored HTML, ordinary/long integration and legacy wrapper removal')
 
 const route=reactive({params:{id:'2'},fullPath:'/article/2'});globalThis.__commentRoute=route
-const routerURL=url(`import {h} from '${import.meta.resolve('vue')}';export function useRoute(){return globalThis.__commentRoute}export function useRouter(){return {replace:async()=>{if(globalThis.__ownerNavigationFail)throw Error('navigation failed')}}}export const RouterLink={props:['to'],setup(_,{slots}){return()=>h('a',slots.default?.())}}`)
+const routerURL=url(`import {h} from '${import.meta.resolve('vue')}';export function useRoute(){return globalThis.__commentRoute}export function useRouter(){return {replace:async target=>{if(globalThis.__ownerNavigationFail)throw Error('navigation failed');globalThis.__commentNavigation=target}}}export const RouterLink={props:['to'],setup(_,{slots}){return()=>h('a',slots.default?.())}}`)
 const itemURL=sfc(await fs.readFile('src/components/CommentItem.vue','utf8'),[['@/components/articles/RevisionHistory.vue',noopURL],['@/components/articles/ArticleInteraction.vue',noopURL],['@/components/user/VipNickname.vue',nicknameFixtureURL],['vue-router',routerURL],['@/components/V3ReactionBar.vue',noopURL],['@/components/ReportDialog.vue',noopURL],['@/components/ImageLightbox.vue',noopURL],['@/components/medal/MedalList.vue',noopURL]])
 const composerURL=sfc(await fs.readFile('src/components/articles/CommentComposer.vue','utf8'),[['@/api/http',http],['@/api/v3-comments',apiURL],['@/stores/auth',authURL],['@/stores/v3Comments',storeURL],['@/components/ChatComposer.vue',chatURL]])
 const fishpiURL=url(`export const fetchArticle=(...a)=>globalThis.__parentFetch(...a);export async function fetchArticleHeat(){return 0}export async function fetchRandomArticles(){return []}export async function fetchArticleRevision(){return{}}export async function fetchArticleRevisions(){return []}export async function previewMarkdown(){return ''}export async function thankComment(){}export async function toggleReaction(){}export async function acceptComment(){}export async function voteComment(){}export function applyReactionPayload(){}`)
@@ -87,18 +87,21 @@ const parentSource=(await fs.readFile('src/views/ArticleView.vue','utf8')).repla
 const reactionStoreURL=url('export function useV3ReactionsStore(){return {invalidate(){}}}');
 const articleRealtimeURL=url('export function subscribeArticleChanges(id,changed){globalThis.__articleSubscription={id,changed,closed:false};return()=>{globalThis.__articleSubscription.closed=true}}'),articleHeatURL=url('export async function articleHeat(){return 3}')
 const parentPairs=[['@/api/v3-realtime',articleRealtimeURL],['@/api/v3-article-heat',articleHeatURL],['@/api/http',http],['@/stores/v3Reactions',reactionStoreURL],['@/components/user/VipNickname.vue',nicknameFixtureURL],['vue-router',routerURL],['@/utils/text',textURL],['@/api/fishpi',fishpiURL],['@/stores/auth',authURL],['@/stores/v3Comments',storeURL],['@/seo/site',seoURL],['@/composables/usePageSeo',pageSeoURL],['@/seo/payload',payloadURL],['@/stores/layout',layoutURL],['@/utils/reusableTemplate',reusableURL],['@/utils/swr',cacheURL],['@/components/CommentItem.vue',itemURL],['@/components/articles/CommentComposer.vue',composerURL]]
+parentPairs.push(['@/utils/markdownEditorAssets',url(compile(await fs.readFile('src/utils/markdownEditorAssets.ts','utf8')))])
 for(const name of ['articles/ArticleCommentLocation','discovery/RandomArticles','articles/ArticleOwnerActions','articles/RevisionHistory','articles/ContentRelationButton','articles/ArticleInteraction','medal/MedalList','V3ReactionBar','ReportDialog','FpLoading','ArticleSkeleton','ImageLightbox','articles/LongArticleReader'])parentPairs.push(['@/components/'+name+'.vue',noopURL])
-const quickReplyURL=sfc(await fs.readFile('src/components/articles/QuickReplyPanel.vue','utf8'),[])
+// 浏览器验证弹窗和焦点。这里仅替代自定义渲染器不支持的 body Teleport。
+const quickReplyURL=url("export default { props: ['open', 'modalOnly'], emits: ['close'], setup(_, { slots }) { return () => slots.default?.() } }")
 parentPairs.push(['@/components/articles/QuickReplyPanel.vue',quickReplyURL])
+const threadRepliesURL=sfc(await fs.readFile('src/components/articles/ArticleThreadReplies.vue','utf8'),[['@/api/http',http],['@/api/v3-content',contentURL]])
+parentPairs.push(['@/components/articles/ArticleThreadReplies.vue',threadRepliesURL],['@/utils/articleCode',url('export const vArticleCode = {}')])
 const parent=(await import(sfc(parentSource,parentPairs))).default
 const actualWebSocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};globalThis.location={protocol:'http:',host:'local'}
-// 父页的快捷回复挂载会注册滚动事件，测试只补事件宿主，不伪造滚动目标。
 const actualWindow=globalThis.window
 globalThis.window={addEventListener(){},removeEventListener(){}}
 let records=[],parentReadFail=false,reads=0;globalThis.__parentFetch=async()=>{reads++;if(parentReadFail)throw Error('列表503');return{oId:'2',articleTitle:'实际文章页联动',articleCommentable:true,articleStatement:0,articleType:0,articleContent:'<p>正文</p>',articleTags:'',articleAuthorId:'9',articleAuthorName:'other',articleRewardPoint:0,articleCommentCount:records.length,articleComments:records.map(x=>({...x})),pagination:{paginationCurrentPageNum:1,paginationPageCount:1}}}
 state.confirmWork=async()=>true;writes=[];state.dispatch=async(path,init)=>{if(init?.method){writes.push({path,init});if(init.method==='POST'){records=[{oId:'3',commentAuthorId:'1',commentAuthorName:'owner',commentContent:'<p>已发布</p>',commentContentVisible:true}];parentReadFail=true;return env({id:'3',permalink:'/article/2#comment3'})}if(init.method==='PUT'){records[0].commentContent='<p>已编辑</p>';return env({id:'3',permalink:'/article/2#comment3'})}records=[];return env({id:'3',removed:true})}return env(comment)}
 function mountParent(){const root={children:[]},app=renderer.createApp(parent),pinia=createPinia();app.use(pinia);app.mount(root);return{root,app,user:auth(pinia),text:()=>text(root)}}
-view=mountParent();await tick();input(view,'实际联动发布');await tick();click(view,'发表评论');await tick();assert.equal(writes.length,1);assert.match(view.text(),/操作已确认，评论重新读取失败：列表503/);const afterWriteReads=reads;parentReadFail=false;click(view,'重读评论');await tick();assert.equal(writes.length,1);assert.ok(reads>afterWriteReads);assert.ok(find(view.root,n=>n.props?.innerHTML==='<p>已发布</p>'))
+view=mountParent();await tick();assert.ok(!find(view.root,n=>n.tag==='textarea'));click(view,'写回复');await tick();input(view,'实际联动发布');await tick();click(view,'发表评论');await tick();assert.equal(writes.length,1);assert.match(view.text(),/操作已确认，评论重新读取失败：列表503/);const afterWriteReads=reads;parentReadFail=false;click(view,'重读评论');await tick();assert.equal(writes.length,1);assert.ok(reads>afterWriteReads);assert.ok(find(view.root,n=>n.props?.innerHTML==='<p>已发布</p>'))
 console.log('PASS comments 10 actual ArticleView + CommentItem + Composer + ChatComposer: committed post/read503 exposes GET-only recovery and current server comment')
 click(view,'编辑');await tick();input(view,'实际联动编辑');await tick();click(view,'保存修改');await tick();assert.equal(writes.at(-1).init.method,'PUT');assert.ok(find(view.root,n=>n.props?.innerHTML==='<p>已编辑</p>'));click(view,'删除');await tick();assert.equal(writes.at(-1).init.method,'DELETE');assert.match(view.text(),/暂无回帖/);assert.equal(writes.length,3);view.app.unmount();globalThis.WebSocket=actualWebSocket
 console.log('PASS comments 11 actual article owner edit/source/PUT/current GET and confirmed delete/current list, no optimistic receipt content')
@@ -143,7 +146,7 @@ console.log('PASS comments 20 article events during credential refresh keep the 
 // Generic SWR must never restore an article body after a current authorization failure.
 const sharedCache=await import(cacheURL);sharedCache.writeCache('article:2:1',{oId:'2',articleContent:'POISONED_OLD_BODY',articleComments:[]});globalThis.__parentFetch=async()=>{throw new ApiError('not readable',403)};view=mountParent();await tick();assert.match(view.text(),/当前已无权阅读/);assert.ok(!view.text().includes('POISONED_OLD_BODY')&&!find(view.root,n=>n.props?.innerHTML==='POISONED_OLD_BODY'));view.app.unmount();sharedCache.clearCache();console.log('PASS comments 21 full ArticleView ignores generic SWR article cache and shows current 403 without old content')
 // A current-reader refresh must keep the actual comment composer instance and unsent draft.
-globalThis.WebSocket=class{close(){}};globalThis.__parentFetch=originalRead;view=mountParent();await tick();input(view,'UNSENT_AFTER_ROTATION');await tick();let rotatedReads=0;globalThis.__parentFetch=async()=>{rotatedReads++;return originalRead()};view.user.accessToken='same-owner-rotation';await tick();assert.ok(rotatedReads>0);assert.equal(find(view.root,n=>n.tag==='textarea').props.value,'UNSENT_AFTER_ROTATION');view.app.unmount();globalThis.WebSocket=actualWebSocket;console.log('PASS comments 22 full ArticleView and actual CommentComposer retain unsent draft while ordinary token rotation refreshes content')
+globalThis.WebSocket=class{close(){}};globalThis.__parentFetch=originalRead;view=mountParent();await tick();click(view,'写回复');await tick();input(view,'UNSENT_AFTER_ROTATION');await tick();let rotatedReads=0;globalThis.__parentFetch=async()=>{rotatedReads++;return originalRead()};view.user.accessToken='same-owner-rotation';await tick();assert.ok(rotatedReads>0);assert.equal(find(view.root,n=>n.tag==='textarea').props.value,'UNSENT_AFTER_ROTATION');view.app.unmount();globalThis.WebSocket=actualWebSocket;console.log('PASS comments 22 full ArticleView and actual CommentComposer retain unsent draft while ordinary token rotation refreshes content')
 
 // Current visibility can shrink while browsing later comment pages.
 globalThis.document={getElementById:()=>null}
@@ -209,11 +212,41 @@ route.query={comment:'3'};route.hash='#comment3';
 const locationApiURL=url(compile(await fs.readFile('src/api/v3-comment-location.ts','utf8')).replace("from './http'",`from '${http}'`));
 const locationComponentURL=sfc(await fs.readFile('src/components/articles/ArticleCommentLocation.vue','utf8'),[['vue-router',routerURL],['@/api/http',http],['@/stores/auth',authURL],['@/api/v3-comment-location',locationApiURL]]);
 const locationParentPairs=parentPairs.filter(([name])=>name!=='@/components/articles/ArticleCommentLocation.vue');locationParentPairs.push(['@/components/articles/ArticleCommentLocation.vue',locationComponentURL]);const locationParent=(await import(sfc(parentSource,locationParentPairs))).default;
-const locationSocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};const targetedPages=[],targetedScrolls=[];let locationPage=2;
+const locationSocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};const targetedPages=[],targetedScrolls=[];const locationPage=2;
 const priorDocument=globalThis.document;globalThis.document={getElementById:id=>({scrollIntoView(){targetedScrolls.push(id)}})};
-state.dispatch=async path=>{assert.equal(path,'/api/v3/comments/3/location');return env({id:'3',articleId:'2',type:0,page:locationPage,size:20,paragraph:null})};
+state.dispatch=async path=>{assert.equal(path,'/api/v3/comments/3/location?view=threads');return env({id:'3',articleId:'2',type:0,page:locationPage,size:20,paragraph:null,rootId:'3',replyPage:0})};
 globalThis.__parentFetch=async(id,p)=>{targetedPages.push(p);return{...policyBase,articleCommentable:true,articleComments:p===locationPage?[{oId:'3',commentAuthorId:'1',commentAuthorName:'owner',commentContent:'<p>targeted actual comment</p>',commentContentVisible:true}]:[],articleCommentCount:41,pagination:{paginationCurrentPageNum:p,paginationPageCount:3}}};
-const targetRoot={children:[]},targetApp=renderer.createApp(locationParent);targetApp.use(createPinia());targetApp.mount(targetRoot);const targetView={root:targetRoot,text:()=>text(targetRoot)};await tick();assert.ok(targetedPages.includes(2));assert.ok(find(targetRoot,n=>n.props?.id==='comment3'));assert.ok(targetedScrolls.includes('comment3'));locationPage=3;click(targetView,'重新定位评论');await tick();assert.ok(targetedPages.includes(3));assert.match(targetView.text(),/3 \/ 3/);targetApp.unmount();globalThis.document=priorDocument;globalThis.WebSocket=locationSocket;delete route.query;delete route.hash;
-console.log('PASS comments 32 full production ArticleView + locator + comment DOM: current location selects page two, scrolls actual comment ID and GET-only re-location loads changed page three')
+const targetRoot={children:[]},targetApp=renderer.createApp(locationParent);targetApp.use(createPinia());targetApp.mount(targetRoot);const targetView={root:targetRoot,text:()=>text(targetRoot)};await tick();assert.ok(targetedPages.includes(2));assert.ok(find(targetRoot,n=>n.props?.id==='comment3'));assert.ok(targetedScrolls.includes('comment3'));assert.doesNotMatch(targetView.text(),/评论位置已读取|重新定位评论/);targetApp.unmount();globalThis.document=priorDocument;globalThis.WebSocket=locationSocket;delete route.query;delete route.hash;
+console.log('PASS comments 32 full production ArticleView + locator + comment DOM: current location selects page two, scrolls actual comment ID with no success banner or retry button')
+
+route.query={};route.hash='';
+const replySocket=globalThis.WebSocket;globalThis.WebSocket=class{close(){}};
+const rootComment={oId:'20',commentAuthorName:'other',commentAuthorId:'9',commentContent:'<p>原评论</p>',commentContentVisible:true};
+let sentReply=false;
+globalThis.__parentFetch=async()=>({
+  ...policyBase,articleCommentable:true,articleComments:[{...rootComment,commentThreadReplyCount:sentReply?1:0,commentThreadReplies:sentReply
+    ? [{oId:'21',commentOriginalCommentId:'20',commentAuthorName:'owner',commentAuthorId:'1',commentContent:'<p>跨页回复</p>',commentContentVisible:true}] : []}],
+  pagination:{paginationCurrentPageNum:1,paginationPageCount:1}
+});
+state.confirmWork=async()=>true;
+state.dispatch=async(path,init)=>{
+  assert.equal(path,'/api/v3/articles/2/comments');
+  assert.equal(init.method,'POST');
+  assert.equal(JSON.parse(init.body).parentId,'20');
+  sentReply=true;
+  return env({id:'21',permalink:'/article/2#comment21'});
+};
+globalThis.__commentNavigation=null;
+const replyRoot={children:[]},replyApp=renderer.createApp(parent);
+replyApp.use(createPinia());replyApp.mount(replyRoot);
+view={root:replyRoot,app:replyApp,text:()=>text(replyRoot)};
+await tick();click(view,'回复');await tick();input(view,'跨页回复');await tick();click(view,'发表评论');await tick();
+assert.ok(sentReply);
+assert.deepEqual(globalThis.__commentNavigation,{query:{comment:'21'},hash:'#comment21'});
+const renderedRoot=find(view.root,n=>n.props?.id==='comment20');
+assert.ok(find(renderedRoot,n=>n.props?.id==='comment21'),'已确认回复从新的服务端线程快照挂在原评论下');
+view.app.unmount();globalThis.WebSocket=replySocket;
+console.log('PASS ordinary reply sends the direct parent, reloads its thread and updates the comment link to the receipt ID')
+
 
 globalThis.window=actualWindow

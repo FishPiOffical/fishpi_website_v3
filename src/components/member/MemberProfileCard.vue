@@ -4,7 +4,10 @@ import { RouterLink } from 'vue-router'
 import type { PublicUser } from '@/api/v3-public-user'
 import { useAuthStore } from '@/stores/auth'
 import { coverStyle, avatarStyle, avatarUrl, DEFAULT_AVATAR, avatarThumbnail } from '@/utils/avatar'
+import { getAuthContextVersion } from '@/api/http'
+import { formatPartnerValue, readPartnerCard } from '@/api/v3-partners'
 import MemberProfileBadges from './MemberProfileBadges.vue'
+import MemberProfileDates from './MemberProfileDates.vue'
 import VipNickname from '@/components/user/VipNickname.vue'
 import UserRoleBadge from '@/components/user/UserRoleBadge.vue'
 import UserFollowButton from '@/components/user/UserFollowButton.vue'
@@ -17,6 +20,19 @@ defineEmits<{ retry: [] }>()
 const auth = useAuthStore(), mounted = ref(false), showTransfer = ref(false)
 const self = computed(() => mounted.value && !!props.profile && auth.account?.oId === props.profile.id)
 const canAct = computed(() => mounted.value && auth.isLoggedIn && !props.fromCache)
+const partnerCard = ref<Awaited<ReturnType<typeof readPartnerCard>>>(null)
+const partnerError = ref(false), retryPartner = ref(0)
+watch([canAct, () => props.profile?.id, () => auth.account?.oId, getAuthContextVersion, retryPartner], async ([allowed, id], _, cleanup) => {
+  let current = true
+  cleanup(() => { current = false })
+  partnerCard.value = null
+  partnerError.value = false
+  if (!allowed || typeof id !== 'string') return
+  try {
+    const card = await readPartnerCard(id)
+    if (current) partnerCard.value = card
+  } catch { if (current) partnerError.value = true }
+}, { flush: 'sync' })
 const points = computed(() => props.profile?.userPoint ?? null)
 const onlineTime = computed(() => {
   const minutes = props.profile?.onlineMinute
@@ -40,7 +56,11 @@ function fallback(event: Event) {
       <div class="profile-body">
         <img :key="profile.userAvatarURL" class="member-avatar" :src="avatarThumbnail(avatarUrl(profile, 'large'), 80)" :data-user-card="profile.userName" alt="" @error="fallback" />
         <h1><VipNickname :user-id="profile.id" :user-name="profile.userName" :text="profile.userNickname || profile.userName" /></h1>
-        <p class="profile-handle"><span>@{{ profile.userName }}</span><UserRoleBadge v-if="profile.userRole" :name="profile.userRole" :role-id="profile.userRoleId" /></p>
+        <p class="profile-handle">
+          <span>@{{ profile.userName }}</span>
+          <UserRoleBadge v-if="profile.userRole" :name="profile.userRole" :role-id="profile.userRoleId" />
+          <span v-if="profile.userNo" class="profile-number" :aria-label="`用户编号 ${profile.userNo}`">#{{ profile.userNo }}</span>
+        </p>
         <MemberProfileBadges :key="profile.id" :user-name="profile.userName" />
         <p v-if="profile.userIntro" class="profile-intro">{{ profile.userIntro }}</p>
         <a v-if="profile.userURL" :href="profile.userURL" class="profile-website" target="_blank" rel="noopener noreferrer" :title="profile.userURL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2" /></svg><span>{{ websiteLabel }}</span><span aria-hidden="true">↗</span></a>
@@ -48,7 +68,13 @@ function fallback(event: Event) {
           <div><dt>积分</dt><dd>{{ points === null ? '—' : points?.toLocaleString() }}</dd></div>
           <div :title="profile.onlineMinute === undefined ? undefined : `累计 ${profile.onlineMinute.toLocaleString()} 分钟`"><dt>在线时长</dt><dd>{{ onlineTime }}</dd></div>
         </dl>
+        <MemberProfileDates :member-id="profile.id" :last-login-time="profile.userLatestLoginTime" />
         <template v-if="canAct">
+          <RouterLink class="profile-website" :to="self ? '/parking' : { path: '/parking', query: { host: profile.id } }">{{ self ? '我的停车场' : '去鱼友停车场' }} ↗</RouterLink>
+          <RouterLink v-if="partnerCard" class="profile-website" :to="self ? '/partners' : { path:'/partners', query:{ peer:partnerCard.id } }">
+            <span v-if="partnerCard.displayValue">身价 {{ formatPartnerValue(partnerCard.displayValue) }} · </span>{{ self ? '我的搭子' : partnerCard.mine ? '查看我的搭子' : partnerCard.full ? '查看搭子名片' : '请 TA 当搭子 · '+partnerCard.price+' 币' }} ↗
+          </RouterLink>
+          <button v-else-if="partnerError" class="profile-website" @click="retryPartner++">重试搭子名片</button>
           <RouterLink v-if="self" to="/settings" class="profile-edit">编辑资料</RouterLink>
           <template v-else>
             <div class="profile-actions">
@@ -68,13 +94,15 @@ function fallback(event: Event) {
   </aside>
 </template>
 <style scoped lang="scss">
-.member-profile {  overflow:hidden; min-width:0; border:1px solid var(--fp-border); border-radius:12px; background:var(--fp-card); box-shadow:var(--fp-card-shadow); overflow-wrap:anywhere; }
+.member-profile { min-width:0; border:1px solid var(--fp-border); border-radius:12px; background:var(--fp-card); box-shadow:var(--fp-card-shadow); overflow-wrap:anywhere; }
+.profile-cover { overflow:hidden; border-radius:11px 11px 0 0; }
 .profile-cover { height:112px; background-size:cover; background-position:center 38%; position:relative; &::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.06),color-mix(in srgb,var(--fp-card) 45%,transparent) 75%,var(--fp-card)); backdrop-filter:blur(3px); } }
 .profile-cover.has-background::after { background:linear-gradient(180deg,transparent 65%,rgba(0,0,0,.08)); backdrop-filter:none; }
 .profile-body { position:relative; padding:0 20px 18px; text-align:center; }
 .member-avatar { display:block; position:relative; width:80px; height:80px; margin:-40px auto 12px; border:4px solid var(--fp-card); border-radius:var(--fp-avatar-radius); object-fit:cover; box-shadow:0 4px 14px rgba(0,0,0,.1); }
 h1 { margin:0; color:var(--fp-title); font-size:20px; line-height:1.4; font-weight:650; }
 .profile-handle { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px; margin:4px 0 0; color:var(--fp-muted); font-size:12px; }
+.profile-number { padding:2px 6px; border-radius:4px; background:var(--fp-surface-subtle); color:var(--fp-text); font-size:11px; font-variant-numeric:tabular-nums; }
 .profile-intro { margin:14px 0 0; font-size:13px; line-height:1.65; color:var(--fp-text); white-space:pre-wrap; }
 .profile-website { display:flex; align-items:center; justify-content:center; gap:6px; max-width:100%; width:fit-content; margin:12px auto 0; color:var(--fp-muted); font-size:12px; text-decoration:none; svg { flex:none; width:13px; height:13px; } span:first-of-type { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } &:hover { text-decoration:underline; text-underline-offset:3px; } }
 .profile-stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:18px 0 14px; padding:13px 0; border-top:1px solid var(--fp-border); border-bottom:1px solid var(--fp-border); div+div { border-left:1px solid var(--fp-border); } dt { color:var(--fp-muted); font-size:11px; } dd { margin:5px 0 0; color:var(--fp-title); font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; } }

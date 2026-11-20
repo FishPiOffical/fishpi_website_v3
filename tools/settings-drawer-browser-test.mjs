@@ -14,22 +14,27 @@ const imports = {
   pinia: data(fs.readFileSync('node_modules/pinia/dist/pinia.esm-browser.prod.js', 'utf8')),
 }
 // 实际编译设置、所有本机设置 store 和模块列表；仅隔离账号服务、路由和不属于本次的业务弹窗。
-const services = data(`import {reactive} from 'vue';import {defineStore} from 'pinia';
-export const useAuthStore=defineStore('fixtureAuth',()=>reactive({isLoggedIn:true,accessToken:'fixture',account:{oId:'fixture',userName:'fixture'}}));
-export const usePrivateInboxStore=defineStore('fixtureInbox',()=>reactive({unreadTotal:0,error:'',inboxOpen:false,showInbox(){this.inboxOpen=true}}));
+const services = data(`import {reactive,ref} from 'vue';import {defineStore} from 'pinia';
+export const useAuthStore=defineStore('fixtureAuth',()=>({isLoggedIn:ref(true),accessToken:ref('fixture'),account:ref({oId:'fixture',userName:'fixture'})}));
+export const usePrivateInboxStore=defineStore('fixtureInbox',()=>{const inboxOpen=ref(false);return {unreadTotal:ref(0),error:ref(''),inboxOpen,showInbox(){inboxOpen.value=true}}});
 export const useAppearanceShopStore=defineStore('fixtureShop',()=>reactive({open:false,show(){this.open=true}}));
 export const useFeedbackPanelStore=defineStore('fixtureFeedback',()=>reactive({open:false,target:'',show(target){this.target=target;this.open=true}}));
 export const feedbackEnabled=true;
 export const route=reactive({path:'/cr',params:{},query:{}});export const useRoute=()=>route;export const useRouter=()=>({push:async path=>{route.path=path}});`)
 for (const spec of ['@/stores/auth', '@/stores/privateInbox', '@/stores/appearanceShop', '@/feedback/panel', '@/feedback/api', 'vue-router']) imports[spec] = services
 const stub = data(`export default {render(){return null}}`)
-const stubComponents = new Set(['FeedbackDialog.vue', 'HiddenChatConversations.vue', 'WhisperConversations.vue', 'ChatTailSettingsDialog.vue'])
+const chatTailDialog = data(`import {h} from 'vue';
+export default {props:['open'],emits:['close'],render(){return this.open ? h('section',{role:'dialog','aria-label':'聊天室小尾巴'},[
+  h('button',{onClick:()=>this.$emit('close')},'关闭小尾巴设置')
+]) : null}}`)
+const stubComponents = new Set(['FeedbackDialog.vue', 'HiddenChatConversations.vue', 'WhisperConversations.vue'])
 let css = ''
 const compiled = new Map()
 function compile(file) {
   const key = 'fixture:' + file
   if (compiled.has(file)) return key
   compiled.set(file, key)
+  if (path.basename(file) === 'ChatTailSettingsDialog.vue') { imports[key] = chatTailDialog; return key }
   if (stubComponents.has(path.basename(file))) { imports[key] = stub; return key }
   let code, id
   if (file.endsWith('.vue')) {
@@ -64,9 +69,9 @@ const drawerStore = compile('src/stores/settingsDrawer.ts'), pageStore = compile
 const html = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>
 *{box-sizing:border-box}body{margin:0;font:14px system-ui;background:#f4f6f8;--fp-card:#fff;--fp-border:#e0e4e9;--fp-text:#292e36;--fp-title:#252a31;--fp-muted:#77808d;--fp-primary:#62ae37;--fp-hover:#f3f5f7;--fp-bg:#f5f6f8;--fp-link:#4386ec;--fp-panel-radius:12px;--fp-income:#62ae37;--fp-accent:#e88828}body.dark{--fp-card:#282b2e;--fp-border:#41474d;--fp-text:#e3e6e8;--fp-title:#f2f4f5;--fp-muted:#aab2ba;--fp-primary:#9acb78;--fp-hover:#343b41;--fp-bg:#202529}button,input,select{font:inherit}.fp-input{width:100%;padding:10px;border:1px solid var(--fp-border);border-radius:8px;background:var(--fp-hover);color:var(--fp-text)}.fp-btn{padding:9px 14px;border:1px solid var(--fp-border);border-radius:7px;background:var(--fp-card);color:var(--fp-text)}.fp-btn--primary{background:var(--fp-primary);color:#fff}.page{max-width:1100px;margin:70px auto;color:#8b949d;padding:24px}.page h1{font-size:26px}${css}
 </style><script type="importmap">${JSON.stringify({ imports })}</script><div class="page"><h1>摸鱼派 · 设置预览</h1><p>隔离本地夹具，所有设置使用真实组件。</p></div><div id="app"></div><script type="module">
-import {createApp,h} from 'vue';import {createPinia} from 'pinia';import Drawer from '${component}';import {useSettingsDrawerStore} from '${drawerStore}';import {usePageSidebarStore} from '${pageStore}';import {useChatSidebarStore} from '${chatStore}';import {useAppearanceShopStore} from '@/stores/appearanceShop';
+import {createApp,h} from 'vue';import {createPinia} from 'pinia';import Drawer from '${component}';import {useSettingsDrawerStore} from '${drawerStore}';import {usePageSidebarStore} from '${pageStore}';import {useChatSidebarStore} from '${chatStore}';import {useAppearanceShopStore} from '@/stores/appearanceShop';import {useAuthStore} from '@/stores/auth';
 const app=createApp({render:()=>h(Drawer)});app.use(createPinia());app.mount('#app');
-const drawer=useSettingsDrawerStore(),page=usePageSidebarStore(),chat=useChatSidebarStore(),shop=useAppearanceShopStore();window.fixture={drawer,page,chat,shop};drawer.show('pageSidebar');
+const drawer=useSettingsDrawerStore(),page=usePageSidebarStore(),chat=useChatSidebarStore(),shop=useAppearanceShopStore();window.fixture={drawer,page,chat,shop,auth:useAuthStore()};drawer.show('pageSidebar');
 </script></html>`
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const errors = [], requests = [], checks = []
@@ -101,7 +106,7 @@ try {
   await check('旧配置中资料位于中间时，箭头排序仍按可见顺序移动', async () => {
     await page.evaluate(() => {fixture.page.pref.order=['income','profile','appearance','checkin','download','breezemoons','ad']})
     await row('income').getByRole('button', { name: '下移上下班时间' }).click()
-    assert.deepEqual((await page.locator('[data-module-id]').evaluateAll(rows => rows.map(row => row.dataset.moduleId))).slice(0, 3), ['profile','appearance','income'])
+    assert.deepEqual((await page.locator('[data-module-id]').evaluateAll(rows => rows.map(row => row.dataset.moduleId))).slice(0, 3), ['profile','checkin','income'])
     await row('income').getByRole('button', { name: '上移上下班时间' }).click()
     assert.equal(await page.locator('[data-module-id]').nth(1).getAttribute('data-module-id'), 'income')
   })
@@ -118,14 +123,28 @@ try {
   await check('聊天显示开关与文案横向排列，精简模式保留座驾开关联动', async () => {
     await nav('聊天室输入').click()
     const switches = page.locator('.setting-toggle')
-    assert.equal(await switches.count(), 2)
-    assert.deepEqual(await switches.evaluateAll(rows => rows.map(row => getComputedStyle(row).flexDirection)), ['row', 'row'])
+    assert.equal(await switches.count(), 3)
+    assert.deepEqual(await switches.evaluateAll(rows => rows.map(row => getComputedStyle(row).flexDirection)), ['row', 'row', 'row'])
     await switches.first().getByRole('checkbox').check()
     assert.equal(await switches.nth(1).getByRole('checkbox').isDisabled(), true)
     await switches.first().getByRole('checkbox').uncheck()
     assert.equal(await switches.nth(1).getByRole('checkbox').isDisabled(), false)
     await page.screenshot({path:path.join(output, 'settings-chat-input-desktop.png')})
     await nav('聊天室侧栏').click()
+  })
+  await check('小尾巴入口位于聊天室输入首项，可用键盘开启，游客显示登录说明', async () => {
+    await nav('聊天室输入').click()
+    const entry = page.getByRole('button', { name: /^小尾巴设置/ })
+    const dialog = page.getByRole('dialog', { name: '聊天室小尾巴' })
+    assert.ok(await entry.evaluate(el => el === el.parentElement.firstElementChild))
+    await entry.press('Enter')
+    await dialog.waitFor()
+    assert.equal(await page.evaluate(() => fixture.drawer.open), false)
+    await dialog.getByRole('button', { name: '关闭小尾巴设置' }).click()
+    await page.evaluate(() => { fixture.auth.isLoggedIn = false; fixture.drawer.show('chatInput') })
+    assert.equal(await entry.isDisabled(), true)
+    assert.match(await entry.innerText(), /登录后可设置/)
+    await page.evaluate(() => { fixture.auth.isLoggedIn = true; fixture.drawer.show('chatSidebar') })
   })
   await check('上下班设置保持按模块启用条件显示', async () => {
     await page.evaluate(() => {if(fixture.chat.isOn('income'))fixture.chat.toggle('income');if(fixture.page.isOn('income'))fixture.page.toggle('income')})
@@ -165,6 +184,46 @@ try {
     assert.equal(await row('breezemoons').getByRole('button', {name:'独立卡片',exact:true}).getAttribute('aria-pressed'), 'true')
     await page.keyboard.press('Escape')
     assert.equal(await page.evaluate(() => fixture.drawer.open), false)
+  })
+  await check('左侧入口悬浮时贴住屏幕，焦点提示按输入方式显示', async () => {
+    await page.evaluate(() => fixture.drawer.show('chatBlock'))
+    const filter = page.locator('.content input[type="checkbox"]').first()
+    await filter.check()
+    await page.getByRole('button', { name: '关闭设置' }).click()
+    await page.locator('.fp-set-panel').waitFor({ state: 'hidden' })
+
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 844 })
+      for (const selector of ['.fp-set-handle', '.fp-hidden-handle', '.fp-whisper-handle']) {
+        const handle = page.locator(selector)
+        await page.mouse.move(70, 300)
+        await handle.waitFor({ state: 'visible' })
+        await page.waitForFunction(selector => document.querySelector(selector)?.getBoundingClientRect().width === 28, selector)
+        const { y, height } = await handle.boundingBox()
+        await page.mouse.move(1, y + height / 2)
+        await page.waitForFunction(selector => document.querySelector(selector).getBoundingClientRect().width === 32, selector)
+        const bounds = await handle.boundingBox()
+        assert.equal(bounds.x, 0)
+        assert.equal(bounds.y, y)
+        assert(await handle.evaluate((element) => {
+          const { top, height } = element.getBoundingClientRect()
+          return element.contains(document.elementFromPoint(1, top + height / 2))
+        }))
+      }
+    }
+    const settings = page.locator('.fp-set-handle')
+    await settings.click()
+    assert.equal(await settings.getAttribute('aria-expanded'), 'true')
+    assert.equal(await settings.evaluate(element => getComputedStyle(element).outlineStyle), 'none')
+    await page.locator('.fp-set-panel .head h2').click()
+    assert.equal(await page.locator('.fp-set-panel .head h2').evaluate(element => document.activeElement === element), false)
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Tab')
+    await settings.focus()
+    assert.equal(await settings.evaluate(element => element.matches(':focus-visible') && getComputedStyle(element).outlineWidth === '2px'), true)
+    await page.keyboard.press('Enter')
+    assert.equal(await settings.getAttribute('aria-expanded'), 'true')
+    await page.keyboard.press('Escape')
   })
   assert.deepEqual(errors, [])
   assert.deepEqual(requests, [])

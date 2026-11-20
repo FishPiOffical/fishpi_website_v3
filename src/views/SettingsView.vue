@@ -6,6 +6,7 @@ import { storeToRefs } from 'pinia'
 import AppearancePicker from '@/components/packs/AppearancePicker.vue'
 import EmojiPacks from '@/components/EmojiPacks.vue'
 import OwnerProfileSettings from '@/components/settings/OwnerProfileSettings.vue'
+import OwnerCardBackground from '@/components/settings/OwnerCardBackground.vue'
 import OwnerPreferences from '@/components/settings/OwnerPreferences.vue'
 import OwnerGameSaves from '@/components/settings/OwnerGameSaves.vue'
 import OwnerAppLogin from '@/components/settings/OwnerAppLogin.vue'
@@ -108,6 +109,7 @@ onMounted(() => { mounted.value = true; if (tab.value === 'account') scrollToHas
           <AppearancePicker />
         </section>
         <OwnerPreferences v-if="isLoggedIn" key="site-skins" resource="display" title="站点皮肤" :fields="['skin', 'mobileSkin']" />
+        <OwnerCardBackground v-if="isLoggedIn" />
       </div>
 
       <section v-if="tab === 'avatar' && isLoggedIn" class="card fp-card">

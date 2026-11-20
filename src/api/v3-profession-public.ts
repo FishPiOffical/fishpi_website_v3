@@ -9,7 +9,7 @@ export type PublicProfessionProfile = {
   professions?: PublicJob[]
   majorContributions?: (Contribution & { actionCode: string })[]
   contributionStats?: Contribution[]
-  activityFeed?: { professionId: string; actionCode: string; occurredAt: number; experienceDelta?: number }[]
+  activityFeed?: { professionId: string; actionCode: string; sourceDescription?: string; occurredAt: number; experienceDelta?: number }[]
   levelHistory?: { professionId: string; beforeLevelCode: string; afterLevelCode: string; occurredAt: number }[]
   rewards?: { professionId: string; levelCode: string; rewardCode: string; rewardType: 'POINT' | 'MEDAL'; status: 'PENDING' | 'GRANTED' | 'REVOKED'; grantedAt: number }[]
   ranking?: (PublicRarity & { professionId: string })[]
@@ -56,14 +56,14 @@ export async function fetchV3ProfessionSummary(userName: string, signal: AbortSi
 }
 export async function fetchV3PublicProfessions(userName: string): Promise<PublicProfessionProfile> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(userName)) throw new ApiError('用户名不合法', 422)
-  const response = await request<{ code: number; msg?: string; data?: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}/professions`)
+  const response = await request<{ code: number; msg?: string; data?: unknown }>(`/api/v3/users/${encodeURIComponent(userName)}/professions`, { cache: 'no-store' })
   if (response.code !== 0) throw new ApiError(response.msg || '公开职业资料读取失败', 400)
   const source = object(response.data), output: PublicProfessionProfile = {}
   if ('primaryProfession' in source) output.primaryProfession = job(source.primaryProfession, true)
   if ('professions' in source) output.professions = list(source.professions, value => job(value, false))
   if ('majorContributions' in source) output.majorContributions = list(source.majorContributions, value => ({ ...contribution(value), actionCode: action(object(value).actionCode) }))
   if ('contributionStats' in source) output.contributionStats = list(source.contributionStats, contribution)
-  if ('activityFeed' in source) output.activityFeed = list(source.activityFeed, value => { const row = object(value); return { professionId: id(row.professionId), actionCode: action(row.actionCode), occurredAt: integer(row.occurredAt), ...('experienceDelta' in row ? { experienceDelta: integer(row.experienceDelta, true) } : {}) } }, 30)
+  if ('activityFeed' in source) output.activityFeed = list(source.activityFeed, value => { const row = object(value); return { professionId: id(row.professionId), actionCode: action(row.actionCode), ...('sourceDescription' in row ? { sourceDescription: text(row.sourceDescription, 64) } : {}), occurredAt: integer(row.occurredAt), ...('experienceDelta' in row ? { experienceDelta: integer(row.experienceDelta, true) } : {}) } }, 30)
   if ('levelHistory' in source) output.levelHistory = list(source.levelHistory, value => { const row = object(value); return { professionId: id(row.professionId), beforeLevelCode: text(row.beforeLevelCode, 64), afterLevelCode: text(row.afterLevelCode, 64), occurredAt: integer(row.occurredAt) } }, 30)
   if ('rewards' in source) output.rewards = list(source.rewards, value => { const row = object(value); return { professionId: id(row.professionId), levelCode: text(row.levelCode, 64), rewardCode: text(row.rewardCode, 64), rewardType: choice(row.rewardType, ['POINT', 'MEDAL']), status: choice(row.status, ['PENDING', 'GRANTED', 'REVOKED']), grantedAt: integer(row.grantedAt) } })
   if ('ranking' in source) output.ranking = list(source.ranking, value => ({ professionId: id(object(value).professionId), ...rarity(value) }))

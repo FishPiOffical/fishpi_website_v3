@@ -43,7 +43,9 @@ const snapshot = extra => ({ serverNow: time, today: '2026-11-13', pet: pet(extr
 const auth = reactive({ accessToken: 'token-a', account: { oId: 'A' }, isLoggedIn: true })
 const route = reactive({ path: '/pets', hash: '', fullPath: '/pets' })
 let refreshHandler = () => { pets.state = snapshot({ hunger: 99, water: 98 }); pets.receivedAt = time }
-const pets = reactive({ state: snapshot(), catalog: { species: [], rules: {}, places: [], courses: [], jobs: [], skills: [],
+const pets = reactive({ state: snapshot(), catalog: { species: [],
+  rules: { waterGain: 40, petMood: 10, playMood: 20, playEnergy: 10, restEnergyPerHour: 20 },
+  places: [], courses: [], jobs: [], skills: [],
   items: [{ id: 'food', category: 'food', effects: { hunger: 35, water: 0, mood: 0, energy: 0 } }] },
   receivedAt: time, loading: false, busy: false, pending: null, refreshNeeded: false, offline: false, catalogError: '', catalogLoading: false,
   get pet() { return this.state?.pet }, get coins() { return this.state?.wallet.coins }, foodQuantity: 6,
@@ -100,7 +102,10 @@ try {
   pets.state = snapshot({ careAvailableAt: { feed: time + 2000, water: time + 1000 } })
   mount({ setup: () => () => h('div', [h(Actions, { active: active.value }), h(Actions, { compact: true, active: active.value })]) })
   await flush(); assert(button('喂食').disabled && button('饮水').disabled)
-  assert.deepEqual([...document.querySelectorAll('.pet-actions .feed-gain')].map(node => node.textContent), ['饱食 +35', '饱食 +35'])
+  for (const panel of document.querySelectorAll('.pet-actions')) {
+    assert.deepEqual([...panel.querySelectorAll('.action-gain, .action-cost')].map(node => node.textContent),
+      ['饱食 +35', '水分 +40', '心情 +10', '心情 +20', '精力 −10', '每小时精力 +20'])
+  }
   await advance(999); assert.equal(reads, 0); assert.equal(pets.pet.hunger, 100, '不能客户端模拟衰减')
   await advance(1); assert.equal(reads, 1, '家园与桌宠只共用一次核验'); assert(!button('喂食').disabled && !button('饮水').disabled)
   button('喂食').click(); await flush(); assert.equal(writes, 1)
@@ -122,12 +127,24 @@ try {
   pets.state = snapshot(); pets.receivedAt = time; await flush(); await advance(60000); assert.equal(reads, 3, '旧后端无时间字段时不猜阈值或循环请求')
   assert(button('喂食').disabled && button('饮水').disabled)
   console.log('PASS 未确认操作、忙碌、后台标签与旧后端可选字段')
+  const restAt = time + 1_000
+  refreshHandler = () => {
+    pets.state = snapshot({ activity: { kind: 'rest', startedAt: restAt, endsAt: restAt + 4 * 3600_000 } })
+    pets.receivedAt = time
+  }
+  pets.state = snapshot({ energy: 10, autoRestAt: restAt }); pets.receivedAt = time
+  await flush(); await advance(999); assert.equal(reads, 3)
+  await advance(1); assert.equal(reads, 4, '自动休息到点仅请求一次状态')
+  assert.equal(pets.pet.activity.kind, 'rest')
+  assert(button('唤醒'), '沿用现有休息状态和唤醒入口')
+  await advance(60000); assert.equal(reads, 4)
+  console.log('PASS 自动休息到点两面板共用一次只读请求，使用真实返回的休息状态')
   refreshHandler = () => { pets.refreshNeeded = true; pets.state = null }
   pets.state = snapshot({ careAvailableAt: { feed: time + 1000, water: time + 1000 } }); pets.receivedAt = time
-  await flush(); await advance(1000); assert.equal(reads, 4); await advance(60000); assert.equal(reads, 4, '失败不循环重试')
+  await flush(); await advance(1000); assert.equal(reads, 5); await advance(60000); assert.equal(reads, 5, '失败不循环重试')
   pets.refreshNeeded = false; pets.state = snapshot({ careAvailableAt: { feed: time + 1000, water: time + 1000 } }); pets.receivedAt = time
   await flush(); context++; auth.account = { oId: 'B' }; auth.accessToken = ''; auth.isLoggedIn = false; pets.state = null
-  await flush(); await advance(1000); assert.equal(reads, 4, '旧身份计时器不继续读取')
+  await flush(); await advance(1000); assert.equal(reads, 5, '旧身份计时器不继续读取')
   unmount(); assert.equal(timers.size, 0)
   console.log('PASS 弱网失败、换号和卸载清理')
 

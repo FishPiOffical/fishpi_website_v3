@@ -9,7 +9,7 @@ const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.E
 const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`
 globalThis.__points={context:1,requests:[],responses:[]};const state=__points
 const http=url(`export class ApiError extends Error{constructor(message,status=0,code){super(message);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__points.context}export async function request(path){globalThis.__points.requests.push(path);const r=globalThis.__points.responses.shift();if(r instanceof Error)throw r;if(!r)throw Error('Missing fixture '+path);return r}`)
-const api=await import(url(compile(await fs.readFile('src/api/v3-points.ts','utf8')).replace("from './http'",`from '${http}'`))),{ApiError}=await import(http)
+const api=await import(url(compile(await fs.readFile('src/api/v3-points.ts','utf8')).replace("from './http'",`from '${http}'`).replace("from '@/utils/time'",`from '${url('export const formatDateTime=String')}'`))),{ApiError}=await import(http)
 const entry={time:1792800000000,amount:100,operation:'-',balance:9900,type:55,displayType:'转账',descriptionHtml:'<a href="/member/Alice">Alice</a> 备注',fromId:'PRIVATE',toBalance:123,internalKey:'PRIVATE'}
 const page=(p=1,total=21,list=[entry])=>({list,pagination:{p,size:20,total,pageCount:Math.ceil(total/20)}}),env=data=>({code:0,data})
 state.responses.push(env(page()));const result=await api.fetchV3PointPage();assert.equal(state.requests.at(-1),'/api/v3/me/points?p=1&size=20');assert.deepEqual(Object.keys(result.list[0]),['time','amount','operation','balance','type','displayType','descriptionHtml']);assert.equal(result.total,21);assert.equal(result.pageCount,2)
@@ -17,6 +17,12 @@ assert.equal(api.pointChange(result.list[0]),'-100');assert.equal(api.pointChang
 for(const [p,size] of [[0,20],[42949673,20],[1,51],[1.5,20]])await assert.rejects(api.fetchV3PointPage(p,size),e=>e.status===422)
 for(const change of [{pagination:{p:2,size:20,total:21,pageCount:2}},{pagination:{p:1,size:20,total:21,pageCount:1}},{list:[{...entry,operation:'income'}]},{list:[{...entry,time:9e15}]},{list:[{...entry,balance:'9900'}]},{list:[{...entry,amount:Number.MAX_SAFE_INTEGER+1}]}]){state.responses.push(env({...page(),...change}));await assert.rejects(api.fetchV3PointPage(),e=>e.status===502)}
 state.responses.push(env({id:'1',userPoint:0,userPhone:'private'}));assert.equal(await api.fetchV3PointBalance(),0);assert.equal(state.requests.at(-1),'/api/v3/me');state.responses.push(env({userPoint:'100'}));await assert.rejects(api.fetchV3PointBalance())
+state.responses.push(env(page(2)))
+const memberPoints = await api.fetchV3MemberPoints('Alice', 2, new AbortController().signal)
+assert.equal(state.requests.at(-1), '/api/v3/users/Alice/points?p=2&size=20')
+assert.deepEqual(Object.keys(memberPoints.list[0]), ['time', 'amount', 'operation', 'balance', 'type', 'displayType'])
+state.responses.push(new ApiError('积分记录未公开', 403, 'point_history_private'))
+await assert.rejects(api.fetchV3MemberPoints('Alice', 1, new AbortController().signal), e => e.code === 'point_history_private')
 console.log('PASS points 1 exact pagination, typed private-field projection, true amounts/signs/zero/balance and invalid-response rejection')
 const auth=defineStore('points-auth',()=>({accessToken:ref('A'),account:ref({oId:'1'})}));globalThis.__pointsAuth=auth
 globalThis.__pointsAPI={...api};const apiURL=url(['fetchV3PointBalance','fetchV3PointPage','pointChange','pointTime'].map(k=>`export const ${k}=(...args)=>globalThis.__pointsAPI.${k}(...args)`).join('\n'))

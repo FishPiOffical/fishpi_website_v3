@@ -144,6 +144,7 @@ function preview(line: (typeof messages.value)[number]) {
                   :avatar="line.userAvatarURL"
                   :medals="line.sysMetal"
                   :time="line.time"
+                  :client="line.client"
                   :html="line.html || ''"
                   :source="line.content"
                   :self="line.userName === account?.userName"

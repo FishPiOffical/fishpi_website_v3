@@ -10,9 +10,10 @@ import { securityProof, passwordDigest, fetchV3MfaState, changeV3Password, prepa
 import { profileOperationKey } from '@/api/v3-profile'
 import { useGeetest4 } from '@/composables/useGeetest4'
 import { fpConfirm } from '@/composables/useDialog'
+import OwnerLoginDevices from './OwnerLoginDevices.vue'
 const auth = useAuthStore(), { accessToken, account } = storeToRefs(auth), router = useRouter(), route = useRoute()
-type Mode = 'password' | 'mfa' | 'phone' | 'email'
-const mode = ref<Mode>('password'), labels = { password: '修改密码', mfa: '两步验证', phone: '修改手机', email: '修改邮箱' }
+type Mode = 'password' | 'mfa' | 'phone' | 'email' | 'devices'
+const mode = ref<Mode>('password'), labels = { password: '修改密码', mfa: '两步验证', phone: '修改手机', email: '修改邮箱', devices: '登录设备' }
 const currentPassword = ref(''), currentTotp = ref(''), newPassword = ref(''), repeatPassword = ref(''), newTotp = ref(''), target = ref(''), contactCode = ref('')
 const enabled = ref<boolean | null>(null), loading = ref(false), busy = ref(false), error = ref(''), message = ref(''), preparation = ref<MfaPreparation | null>(null)
 const captchaEl = ref<HTMLElement | null>(null), challenge = ref(false), codeTarget = ref(''), codeExpiresAt = ref(0), now = ref(Date.now())
@@ -25,8 +26,16 @@ function clearSecrets() { confirmation?.abort(); confirmation = null; eraseProof
 function clear() { generation++; statusRead++; clearSecrets(); enabled.value = null; loading.value = busy.value = false; error.value = message.value = '' }
 function capture() { const g = generation, context = getAuthContextVersion(), id = account.value?.oId; return () => mounted && !!accessToken.value && !!id && id === account.value?.oId && context === getAuthContextVersion() && generation === g }
 watch([accessToken, () => account.value?.oId], () => { const context = getAuthContextVersion(), id = account.value?.oId; if (!accessToken.value || context !== boundary || id !== owner) clear(); boundary = context; owner = id }, { flush: 'sync' })
-function select(value: Mode) { if (busy.value || loading.value || value === mode.value) return; generation++; clearSecrets(); error.value = message.value = ''; mode.value = value }
-function hashMode() { const next = route.hash === '#bind-phone' ? 'phone' : route.hash === '#bind-email' ? 'email' : route.hash === '#mfaCode' ? 'mfa' : null; if (next) select(next) }
+function select(value: Mode) {
+  if (busy.value || (loading.value && value !== 'devices') || value === mode.value) return
+  generation++
+  clearSecrets()
+  loading.value = false
+  error.value = message.value = ''
+  mode.value = value
+  if (value !== 'devices' && enabled.value === null && mounted) void loadStatus()
+}
+function hashMode() { const next = route.hash === '#bind-phone' ? 'phone' : route.hash === '#bind-email' ? 'email' : route.hash === '#mfaCode' ? 'mfa' : route.hash === '#login-devices' ? 'devices' : null; if (next) select(next) }
 watch(() => route.hash, hashMode)
 async function loadStatus() { const valid = capture(), read = ++statusRead; if (!valid() || busy.value) return; enabled.value = null; loading.value = true; error.value = ''; try { const result = await fetchV3MfaState(); if (valid() && read === statusRead) { enabled.value = result; if (result) { preparation.value = null; newTotp.value = '' } } } catch (e) { if (valid() && read === statusRead) error.value = e instanceof Error ? e.message : '安全状态读取失败' } finally { if (valid() && read === statusRead) loading.value = false } }
 async function reauthenticate(reason: 'security-updated' | 'security-unconfirmed') { clearSecrets(); void auth.logout(); await router.replace({ path: '/login', query: { redirect: '/settings/account', reason } }) }
@@ -87,13 +96,15 @@ async function applyContact() {
     contactCode.value = ''; await run(() => changeV3Contact(kind, frozen, p, code), true)
   } catch (e) { localFailure(e) }
 }
-onMounted(() => { mounted = true; hashMode(); void loadStatus(); timer = setInterval(() => { now.value = Date.now(); if (preparation.value && preparation.value.expiresAt <= now.value) { preparation.value = null; newTotp.value = ''; message.value = '绑定资料已过期，请重新准备。' } if (codeExpiresAt.value && codeExpiresAt.value <= now.value) { codeTarget.value = ''; codeExpiresAt.value = 0; contactCode.value = ''; message.value = '绑定验证码可能已过期，请重新申请。' } }, 1000) })
+onMounted(() => { mounted = true; hashMode(); if (mode.value !== 'devices' && !loading.value) void loadStatus(); timer = setInterval(() => { now.value = Date.now(); if (preparation.value && preparation.value.expiresAt <= now.value) { preparation.value = null; newTotp.value = ''; message.value = '绑定资料已过期，请重新准备。' } if (codeExpiresAt.value && codeExpiresAt.value <= now.value) { codeTarget.value = ''; codeExpiresAt.value = 0; contactCode.value = ''; message.value = '绑定验证码可能已过期，请重新申请。' } }, 1000) })
 onBeforeUnmount(() => { mounted = false; if (timer) clearInterval(timer); clear() })
 </script>
 <template>
   <section class="owner-security" aria-label="账号安全设置">
-    <h2>账号安全</h2><p class="hint">每次操作需当前密码；已启用两步验证时还需当前验证器码。密码、手机、邮箱或两步验证修改成功后，所有设备与应用需要重新登录授权。</p>
-    <nav aria-label="安全设置类型"><button class="fp-control" v-for="(label, value) in labels" :key="value" type="button" :disabled="busy || loading" :aria-pressed="mode === value" @click="select(value)">{{ label }}</button></nav>
+    <h2>账号安全</h2><p v-if="mode !== 'devices'" class="hint">每次操作需当前密码；已启用两步验证时还需当前验证器码。密码、手机、邮箱或两步验证修改成功后，所有设备与应用需要重新登录授权。</p>
+    <nav aria-label="安全设置类型"><button class="fp-control" v-for="(label, value) in labels" :key="value" type="button" :disabled="busy || (loading && value !== 'devices')" :aria-pressed="mode === value" @click="select(value)">{{ label }}</button></nav>
+    <OwnerLoginDevices v-if="mode === 'devices'" />
+    <template v-else>
     <p v-if="loading">正在读取安全状态…</p><p v-else-if="enabled !== null">两步验证：{{ enabled ? '已启用' : '未启用' }}</p><button class="fp-control settings-refresh" type="button" :disabled="busy || loading" @click="loadStatus" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取安全状态</span></button>
     <fieldset :disabled="blocked"><label>当前密码<input class="fp-control" v-model="currentPassword" aria-label="安全设置当前密码" type="password" autocomplete="current-password" /></label><label>当前验证器码（已启用时必填）<input class="fp-control" v-model="currentTotp" aria-label="安全设置当前验证器码" inputmode="numeric" maxlength="6" autocomplete="one-time-code" /></label></fieldset>
     <form v-if="mode === 'password'" @submit.prevent="changePassword"><h3>修改密码</h3><fieldset :disabled="blocked"><label>新密码<input class="fp-control" v-model="newPassword" aria-label="安全设置新密码" type="password" minlength="6" maxlength="128" autocomplete="new-password" /></label><label>确认新密码<input class="fp-control" v-model="repeatPassword" aria-label="安全设置确认新密码" type="password" minlength="6" maxlength="128" autocomplete="new-password" /></label><p class="hint">6至128个字符，保留首尾空白，不能包含控制字符。</p><button data-tone="primary" class="fp-control" type="submit">核对并修改密码</button></fieldset></form>
@@ -102,6 +113,7 @@ onBeforeUnmount(() => { mounted = false; if (timer) clearInterval(timer); clear(
     </section>
     <form v-else :id="mode === 'phone' ? 'bind-phone' : 'bind-email'" @submit.prevent="applyContact"><h3>{{ labels[mode] }}</h3><fieldset :disabled="blocked"><label>{{ mode === 'phone' ? '新手机号' : '新邮箱' }}<input class="fp-control" v-model="target" :aria-label="mode === 'phone' ? '安全设置新手机号' : '安全设置新邮箱'" :type="mode === 'phone' ? 'tel' : 'email'" :maxlength="mode === 'phone' ? 11 : 255" :readonly="challenge || !!codeTarget" autocomplete="off" /></label><button class="fp-control" type="button" :disabled="challenge" @click="startCode">{{ codeTarget ? '重新申请验证码' : '申请绑定验证码' }}</button><div v-if="challenge" ref="captchaEl" class="captcha" /><button class="fp-control" v-if="challenge" type="button" @click="challenge = false; captcha.destroy()">取消本次验证</button><p v-if="captcha.error.value" role="alert" class="error">{{ captcha.error.value }}</p><template v-if="codeTarget"><p>验证码目标：{{ codeTarget }}。新码受理后旧码失效，请在十分钟内完成修改。</p><label>收到的绑定验证码<input class="fp-control" v-model="contactCode" aria-label="联系方式绑定验证码" maxlength="6" inputmode="numeric" autocomplete="one-time-code" /></label><button data-tone="primary" class="fp-control" type="submit" :disabled="challenge">核对并修改绑定</button></template><button class="fp-control" type="button" @click="generation++; clearSecrets(); error = message = ''">取消本次绑定并清除输入</button></fieldset></form>
     <p v-if="error" role="alert" class="error">{{ error }}</p><p v-if="message" role="status">{{ message }}</p>
+    </template>
   </section>
 </template>
 <style scoped lang="scss" src="./owner-security.scss"></style>

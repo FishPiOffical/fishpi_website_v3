@@ -17,6 +17,12 @@ watch([selected,()=>auth.account?.oId,()=>!!auth.accessToken,()=>getAuthContextV
 watch(()=>store.completed,c=>{if(c?.kind==='comment'&&c.id===selected.value&&c.content===submitted.value&&comment.value===submitted.value){comment.value='';submitted.value=''}})
 async function sendComment(){if(!game.value||store.pending||store.busy)return;submitted.value=comment.value;await store.comment(game.value.id,comment.value)}
 onMounted(()=>{mounted.value=true})
+const parkGames = [
+  { to: '/pets', theme: 'pet', title: '宠物家园', description: '领养、喂养，陪宠物一起长大。', image: petPortrait('hexiaotun'), symbol: '🌿' },
+  { to: '/partners', theme: 'partner', title: '抢搭子', description: '请鱼友搭班，一起赚游园币。', symbol: '🤝' },
+  { to: '/parking', theme: 'parking', title: '抢车位', description: '开车串门，去鱼友家停车赚币。', image: '/images/parking/punch.webp', symbol: '🛵' },
+]
+
 const official = [
   { href: '/games/adarkroom/', icon: 'https://file.fishpi.cn/adarkroom/img/adr.png', title: 'A Dark Room', tip: '黑暗房间' },
   { href: '/games/lifeRestart/view/', icon: '/images/games/restart.png', title: '人生重开', tip: '模拟器' },
@@ -51,7 +57,16 @@ watch(selected,id=>{if(id)void nextTick(()=>{if(selected.value===id)detailPanel.
       <svg class="hero-art" viewBox="0 0 200 160" fill="none" aria-hidden="true"><circle cx="104" cy="80" r="66" fill="currentColor" opacity=".06"/><g transform="translate(27 15) scale(6)"><path :d="gamepad" stroke="currentColor" stroke-width=".45" stroke-linecap="round" stroke-linejoin="round"/></g><path d="M38 29v12m-6-6h12m120 79v12m-6-6h12" stroke="currentColor" stroke-width="2" opacity=".5"/></svg>
     </header>
     <nav class="section-nav" aria-label="游戏分区"><a href="#official">官方游戏 <span>{{ official.length }}</span></a><a href="#activities">活动小游戏 <span>{{ activities.length }}</span></a><a href="#community">社区鱼游 <span v-if="games">{{ games.total }}</span></a><a href="#submission" class="submit-shortcut" @click="submissionOpen=true">分享游戏 <span aria-hidden="true">＋</span></a></nav>
-    <RouterLink to="/pets" class="pet-game-entry"><span class="pet-game-art"><img :src="petPortrait('hexiaotun')" alt="" width="72" height="72" /></span><span><strong>宠物家园</strong><span>领养一位摸鱼伙伴，喂食、陪伴，一起慢慢长大。</span></span><span class="pet-game-arrow" aria-hidden="true">↗</span></RouterLink>
+    <nav class="park-games" aria-label="游园游戏">
+      <RouterLink v-for="entry in parkGames" :key="entry.to" :to="entry.to" class="park-entry" :data-theme-color="entry.theme">
+        <span class="park-art" aria-hidden="true">
+          <img v-if="entry.image && !failedIcons.includes(entry.image)" :src="entry.image" alt="" width="76" height="76" @error="failIcon(entry.image)" />
+          <span v-else>{{ entry.symbol }}</span>
+        </span>
+        <span class="park-copy"><strong>{{ entry.title }}</strong><span>{{ entry.description }}</span></span>
+        <span class="park-chevron" aria-hidden="true">›</span>
+      </RouterLink>
+    </nav>
     <section v-for="section in sections" :id="section.id" :key="section.id" class="catalog-section" :aria-labelledby="section.id+'-title'">
       <header class="section-head"><span class="section-number" aria-hidden="true">{{ section.number }}</span><div><h2 :id="section.id+'-title'">{{ section.title }}</h2><p>{{ section.description }}</p></div><RouterLink v-if="section.id==='activities'" to="/activity" class="section-more">签到与昨日活跃 ↗</RouterLink><span v-else class="section-more">在经典站点打开</span></header>
       <ul class="official-grid"><li v-for="g in section.items" :key="g.href"><a class="official-game" :href="'https://fishpi.cn'+g.href" target="_blank" rel="noopener noreferrer"><span class="catalog-icon"><img :src="g.icon" alt="" width="34" height="34" referrerpolicy="no-referrer" /></span><span class="catalog-copy"><strong>{{ g.title }}</strong><span>{{ g.tip }}</span></span><span class="card-arrow" aria-hidden="true">↗</span></a></li></ul>
@@ -79,12 +94,51 @@ watch(selected,id=>{if(id)void nextTick(()=>{if(selected.value===id)detailPanel.
   </div>
 </template>
 <style scoped>
-.pet-game-entry { display: flex; align-items: center; gap: 20px; margin-bottom: 24px; padding: 12px 24px; border: 1px solid var(--fp-border); border-radius: var(--fp-panel-radius, 14px); background: var(--fp-card); color: var(--fp-text); text-decoration: none; transition: border-color .18s, transform .18s; }
-.pet-game-entry:hover { border-color: color-mix(in srgb, var(--fp-primary) 45%, var(--fp-border)); transform: translateY(-2px); text-decoration: none; }
-.pet-game-art { flex: none; width: 72px; height: 72px; }.pet-game-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.pet-game-entry > span:nth-child(2) { display: grid; gap: 7px; min-width: 0; }.pet-game-entry strong { color: var(--fp-title); font-size: 18px; }.pet-game-entry > span:nth-child(2) > span { color: var(--fp-muted); font-size: 13px; line-height: 1.6; }.pet-game-arrow { margin-left: auto; color: var(--fp-primary); font-size: 22px; }
-@media(max-width:600px) { .pet-game-entry { gap: 12px; padding: 12px 16px; }.pet-game-art { width: 56px; height: 56px; }.pet-game-entry strong { font-size: 16px; } }
-@media(prefers-reduced-motion:reduce) { .pet-game-entry { transition: none; } }
+.park-games {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.park-entry {
+  --park-color: #77a44b;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(8px, 1vw, 16px);
+  padding: clamp(12px, 1.5vw, 20px);
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-panel-radius);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--park-color) 9%, var(--fp-card)), var(--fp-card) 75%);
+  color: var(--fp-title);
+  text-decoration: none;
+}
+.park-entry[data-theme-color='partner'] { --park-color: #cb925e; }
+.park-entry[data-theme-color='parking'] { --park-color: #518eb2; }
+.park-art {
+  display: grid;
+  place-items: center;
+  inline-size: clamp(48px, 5.5vw, 76px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--park-color) 14%, var(--fp-card));
+  font-size: clamp(28px, 3vw, 42px);
+  line-height: 1;
+}
+.park-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.park-copy { display: grid; gap: 4px; }
+.park-copy strong { color: var(--fp-title); font-size: 18px; }
+.park-copy > span { color: var(--fp-muted); font-size: 13px; line-height: 1.55; }
+.park-chevron { color: var(--fp-muted); font-size: 20px; line-height: 1; }
+.park-entry:hover, .park-entry:focus-visible {
+  border-color: color-mix(in srgb, var(--park-color) 65%, var(--fp-border));
+  text-decoration: none;
+}
+@media (max-width: 780px) {
+  .park-games { grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 20px; }
+  .park-entry { padding: 9px 14px; gap: 12px; }
+  .park-copy strong { font-size: 16px; }
+}
 .games-page{padding-bottom:20px;color:var(--fp-text)}
 .games-hero{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:30px 32px;border:1px solid var(--fp-border);border-radius:var(--fp-panel-radius);background:linear-gradient(115deg,var(--fp-card) 35%,var(--fp-primary-soft));overflow:hidden}
 .eyebrow{font-size:12px;color:var(--fp-primary);font-weight:600;letter-spacing:2px}.games-hero h1{font-size:30px;line-height:1.45;letter-spacing:-.8px;margin:10px 0 8px;color:var(--fp-title);font-weight:650}.games-hero h1>span{color:var(--fp-primary)}.games-hero p{font-size:14px;line-height:1.7;color:var(--fp-muted);margin:0}.hero-art{width:200px;height:160px;flex:none;color:var(--fp-primary)}

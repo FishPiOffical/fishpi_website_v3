@@ -26,8 +26,15 @@ for(const target of [' 13900000001','23900000001','123'])assert.throws(()=>api.c
 console.log('PASS security 2 normalized new contacts, captcha four-field projection/budgets and six-digit proof contracts; missing reauth acknowledgement fails closed')
 const authDefinition=defineStore('security-auth',()=>{const accessToken=ref('A'),account=ref({oId:'1'});return{accessToken,account,logout:async()=>{state.logout++;accessToken.value=null;account.value=null}}});globalThis.__securityAuth=authDefinition;globalThis.__securityAPI={...api};globalThis.__securityRoute=reactive({hash:''})
 const authPort=url('export const useAuthStore=globalThis.__securityAuth'),apiPort=url(['securityProof','passwordDigest','fetchV3MfaState','changeV3Password','prepareV3Mfa','setV3Mfa','contactTarget','requestV3ContactCode','changeV3Contact'].map(k=>`export const ${k}=(...args)=>globalThis.__securityAPI.${k}(...args)`).join('\n')),routerPort=url('export function useRouter(){return{replace:async target=>globalThis.__security.routes.push(target)}}export function useRoute(){return globalThis.__securityRoute}'),keyPort=url('export function profileOperationKey(){return `security-${++globalThis.__security.keys}`}'),dialogPort=url('export function fpConfirm(value){return globalThis.__security.confirm(value)}'),captchaPort=url(`import{ref}from'${import.meta.resolve('vue')}';export function useGeetest4(container,fn){globalThis.__security.captcha=fn;return{error:ref(''),mount:async()=>{},destroy:()=>{}}}`)
+const timePort=url(compile(await fs.readFile('src/utils/time.ts','utf8')))
+const devicesApi=url(compile(await fs.readFile('src/api/v3-login-devices.ts','utf8')).replace("from './http'", `from '${http}'`))
+const devicesDescriptor=parse(await fs.readFile('src/components/settings/OwnerLoginDevices.vue','utf8')).descriptor
+let devicesCode=compile(compileScript(devicesDescriptor,{id:'devices-test',inlineTemplate:true}).content)
+for (const [from,to] of [['vue',import.meta.resolve('vue')],['@/stores/auth',authPort],['@/api/http',http],['@/api/v3-login-devices',devicesApi],['@/composables/useDialog',dialogPort],['@/utils/time',timePort]]) {
+  devicesCode=devicesCode.replaceAll(`from '${from}'`,`from '${to}'`).replaceAll(`from "${from}"`,`from '${to}'`)
+}
 const descriptor=parse(await fs.readFile('src/components/settings/OwnerSecurity.vue','utf8')).descriptor;let componentCode=compile(compileScript(descriptor,{id:'security-test',inlineTemplate:true}).content)
-for(const[from,to]of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['vue-router',routerPort],['@/api/http',http],['@/api/v3-security',apiPort],['@/api/v3-profile',keyPort],['@/stores/auth',authPort],['@/composables/useDialog',dialogPort],['@/composables/useGeetest4',captchaPort]])componentCode=componentCode.replace(new RegExp(`from ['"]${from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}['"]`,'g'),`from '${to}'`)
+for(const[from,to]of [['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['vue-router',routerPort],['@/utils/time',timePort],['./OwnerLoginDevices.vue',url(devicesCode)],['@/api/http',http],['@/api/v3-security',apiPort],['@/api/v3-profile',keyPort],['@/stores/auth',authPort],['@/composables/useDialog',dialogPort],['@/composables/useGeetest4',captchaPort]])componentCode=componentCode.replace(new RegExp(`from ['"]${from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}['"]`,'g'),`from '${to}'`)
 const component=(await import(url(componentCode))).default
 const insert=(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}const i=a?p.children.indexOf(a):-1;p.children.splice(i<0?p.children.length:i,0,n);n.parent=p}
 globalThis.Document=class {};globalThis.ShadowRoot=class {};
@@ -55,3 +62,65 @@ __securityAPI.fetchV3MfaState=async()=>{throw new ApiError('state unavailable',5
 __securityAPI.requestV3ContactCode=async()=>{};view=mount();await tick();view.click('修改邮箱');await tick();view.input('安全设置当前密码','old-password');view.input('安全设置新邮箱','new@example.com');view.click('申请绑定验证码');await tick();await state.captcha(captcha);await tick();view.input('安全设置当前密码','old-password');__securityAPI.requestV3ContactCode=async()=>{throw new ApiError('resend unavailable',503)};view.click('重新申请验证码');await tick();await state.captcha(captcha);await tick();assert.match(view.text(),/new@example.com/);assert.ok(find(view.root,n=>n.props?.['aria-label']==='联系方式绑定验证码'));assert.match(view.text(),/resend unavailable/);view.app.unmount()
 console.log('PASS security 7 missing state blocks writes until successful read; failed resend preserves the previous verified target/code workflow')
 __securityAPI.prepareV3Mfa=async()=>preparation;__securityAPI.fetchV3MfaState=async()=>false;view=mount();await tick();view.click('两步验证');await tick();view.input('安全设置当前密码','old-password');view.click('准备新的验证器密钥');await tick();assert.ok(find(view.root,n=>n.props?.['aria-label']==='验证器手动密钥'));__securityAPI.fetchV3MfaState=async()=>true;view.click('重新读取安全状态');await tick();assert.ok(!find(view.root,n=>n.props?.['aria-label']==='验证器手动密钥'));view.app.unmount()
+
+const deviceId = c => `${c.repeat(43)}.${'x'.repeat(43)}`
+const knownBrowser = { id: deviceId('a'), label: 'Chrome · macOS', current: true, lastActiveAt: Date.now() }
+const otherBrowser = { id: deviceId('b'), label: 'Safari · iPhone', current: false, lastActiveAt: Date.now() }
+const listPath = '/api/v3/me/security/devices'
+const loginDevices = await import(devicesApi)
+const readDevices = () => loginDevices.fetchLoginDevices(new AbortController().signal)
+state.responses.push(env({list: [knownBrowser, knownBrowser]}))
+await assert.rejects(readDevices(), e => e.code === 'invalid_response')
+state.responses.push(env({list: [{...otherBrowser, current: 'false'}]}))
+await assert.rejects(readDevices(), e => e.code === 'invalid_response')
+state.responses.push(env({list: [{...otherBrowser, privateToken: 'private'}]}))
+assert.deepEqual(await readDevices(), [otherBrowser])
+
+view = mount()
+await tick()
+const readsBeforeOpening = state.requests.length
+state.responses.push(env({list: [knownBrowser, otherBrowser]}))
+view.click('登录设备')
+await tick()
+assert.equal(state.requests.length, readsBeforeOpening + 1)
+assert.equal(state.requests.at(-1).path, listPath)
+assert.match(view.text(), /当前设备/)
+let releaseConfirmation
+state.confirm = opts => new Promise(resolve => {
+  releaseConfirmation = resolve
+  assert.match(opts.message, /Safari · iPhone/)
+})
+view.click('退出登录')
+await tick()
+state.context++
+state.responses.push(env({list: []}))
+view.user.accessToken = 'new-account-token'
+releaseConfirmation(true)
+await tick()
+assert.equal(state.requests.at(-1).path, listPath)
+assert.ok(!view.text().includes('Safari'))
+assert.match(view.text(), /暂无可管理/)
+view.app.unmount()
+console.log('PASS security 8 device list is lazy, rejects malformed rows, projects only safe fields and cancels remote logout confirmation on account change')
+
+state.confirm = async () => true
+state.responses.push(env({list: [knownBrowser, otherBrowser]}))
+view = mount()
+await tick()
+view.click('登录设备')
+await tick()
+const targetPath = listPath + '/' + otherBrowser.id
+state.responses.push(new ApiError('未取得回执', 503))
+view.click('退出登录')
+await tick()
+assert.equal(state.requests.at(-1).path, targetPath)
+assert.equal(state.requests.at(-1).init.method, 'DELETE')
+assert.match(view.text(), /退出结果尚未确认/)
+const mutations = state.requests.filter(r => r.path === targetPath).length
+state.responses.push(env({list: [knownBrowser]}))
+find(view.root, n => n.props?.['aria-label'] === '刷新登录设备').props.onClick()
+await tick()
+assert.ok(!view.text().includes('Safari'))
+assert.equal(state.requests.filter(r => r.path === targetPath).length, mutations)
+view.app.unmount()
+console.log('PASS security 9 remote device revocation keeps the current login and recovers a lost acknowledgement by reading the list')

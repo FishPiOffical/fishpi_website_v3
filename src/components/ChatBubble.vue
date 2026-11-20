@@ -6,10 +6,12 @@ import { useChatPreferencesStore } from '@/stores/chatPreferences'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
 import { formatDisplayTime } from '@/utils/time'
 
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
+import { CHAT_QUICK_QUOTE } from '@/chat/messageShortcuts'
 import { RouterLink } from 'vue-router'
 import CollectChatEmoji from '@/components/chat/CollectChatEmoji.vue'
+import ChatGameStatus from '@/components/chat/ChatGameStatus.vue'
 import ChatQuoteCard from '@/components/chat/ChatQuoteCard.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import MedalList from '@/components/medal/MedalList.vue'
@@ -33,6 +35,7 @@ const props = withDefaults(
     avatar?: string
     avatarSize?: number
     time?: string
+    client?: string
     html?: string
     /** 当前可见消息的原文，仅用于恢复被清洗掉的引用来源，不作为 HTML 渲染。 */
     source?: string
@@ -49,12 +52,29 @@ const props = withDefaults(
 )
 
 const auth = useAuthStore()
-const ownPet = computed(() => !!props.userId && props.userId === auth.account?.oId)
-const petDestination = computed(() => ownPet.value
+const clientIcons = new Map([
+  ['Web', 'fish'], ['Mobile', 'mobile'], ['PC', 'pc2'], ['iOS', 'apple'], ['macOS', 'apple'],
+  ['Android', 'apk'], ['Windows', 'windows'], ['Linux', 'linux'], ['Bird', 'bird'], ['Dart', 'dart'],
+  ['ElvesOnline', 'moon'], ['IceNet', 'icenet'], ['Extension', 'extension'], ['Edge', 'edge'],
+  ['Chrome', 'chrome'], ['VSCode', 'vscode'], ['IDEA', 'idea'], ['Python', 'python'],
+  ['Golang', 'golang'], ['Harmony', 'harmony'], ['Rust', 'rust'], ['CLI', 'cli'], ['uTools', 'utools'],
+  ['Deepseek Harness', 'deepseek-harness'], ['Codex', 'codex'], ['WPS', 'wps'],
+])
+const messageClient = computed(() => {
+  const [name, ...parts] = (props.client || '').trim().split('/')
+  if (!name) return null
+  const version = parts.join('/').trim()
+  const icon = clientIcons.get(name) || 'other'
+  return { href: `/images/chat-client-icons.svg#ic-${icon}`, label: version ? `${name} ${version}` : name }
+})
+const isOwnUser = computed(() => !!props.userId && props.userId === auth.account?.oId)
+const petDestination = computed(() => isOwnUser.value
   ? { name: 'pets' }
   : { name: 'chat-pet-profile', params: { messageId: props.messageId } })
 const mention = inject(CHAT_MENTION, null)
 const canMention = computed(() => props.chatroom && !props.self && !!chatMentionText(props.userName) && !!mention?.enabled())
+const canQuickMention = computed(() => canMention.value && !!props.userId && !isOwnUser.value)
+const quickQuote = inject(CHAT_QUICK_QUOTE, null)
 const chatPreferences = useChatPreferencesStore()
 const simpleMode = computed(() => mounted.value && props.chatroom && chatPreferences.simpleMode)
 const functionPreferences = useFunctionPreferencesStore()
@@ -66,6 +86,7 @@ const sakuraFrame = computed(() => props.chatroom && !simpleMode.value && isLoop
 const managedStyle = computed(() => props.chatroom && !simpleMode.value && !isStandalone.value ? snapshot.value.bubbleStyle : undefined)
 const zoomed = ref('')
 const originalImage = ref('')
+const authorLine = ref<HTMLElement | null>(null)
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
 const singleImage = computed(() => props.chatroom && isSingleImageMessage(props.html))
@@ -104,9 +125,101 @@ const display = computed(() => {
   }
   return { html: template.innerHTML.trim(), quote }
 })
+const isQuoteOnly = computed(() => !!display.value.quote && !display.value.html && !props.standalone)
 const isStandalone = computed(() => props.chatroom && (
-  props.standalone || singleImage.value || (!display.value.html && !!display.value.quote)
+  props.standalone || singleImage.value || isQuoteOnly.value
 ))
+
+const MOUSE_DOUBLE_CLICK_WINDOW_MS = 500
+const bubbleControls = 'a, button, input, textarea, select, summary, [role="button"], [role="link"], [contenteditable], img, picture, video, audio, iframe, .chat-image-frame, .fp-chat-tail'
+let pointerType = ''
+let pointerStartX = 0
+let pointerStartY = 0
+let avatarNavigation: ReturnType<typeof setTimeout> | undefined
+let imagePreview: { image: HTMLImageElement; timer: ReturnType<typeof setTimeout> } | undefined
+
+function onPointerDown(event: PointerEvent) {
+  pointerType = event.pointerType
+  pointerStartX = event.clientX
+  pointerStartY = event.clientY
+}
+
+function cancelAvatarNavigation() {
+  clearTimeout(avatarNavigation)
+  avatarNavigation = undefined
+}
+
+watch([() => props.userId, () => props.userName, () => auth.account?.oId], cancelAvatarNavigation)
+function cancelImagePreview() {
+  clearTimeout(imagePreview?.timer)
+  imagePreview = undefined
+}
+
+watch([() => props.messageId, () => props.html, () => auth.account?.oId], cancelImagePreview)
+onBeforeUnmount(() => {
+  cancelAvatarNavigation()
+  cancelImagePreview()
+})
+
+function plainMouseActivation(event: MouseEvent) {
+  return pointerType === 'mouse' && event.button === 0 && event.detail > 0 &&
+    !event.defaultPrevented && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey
+}
+
+function onAvatarClick(event: MouseEvent, navigate: (event?: MouseEvent) => unknown) {
+  if (!canQuickMention.value || !plainMouseActivation(event)) {
+    cancelAvatarNavigation()
+    void navigate(event)
+    return
+  }
+  event.preventDefault()
+  cancelAvatarNavigation()
+  if (event.detail === 1) {
+    avatarNavigation = setTimeout(() => {
+      avatarNavigation = undefined
+      void navigate()
+    }, MOUSE_DOUBLE_CLICK_WINDOW_MS)
+  }
+}
+
+function onAvatarDoubleClick(event: MouseEvent) {
+  if (!canQuickMention.value || !plainMouseActivation(event)) return
+  cancelAvatarNavigation()
+  mention?.insert(props.userName)
+}
+
+function bodyImage(target: EventTarget | null) {
+  const image = target instanceof Element ? target.closest<HTMLImageElement>('img:not(.emoji)') : null
+  return image?.closest('.vditor-reset') ? image : null
+}
+
+function onBubbleDoubleClick(event: MouseEvent) {
+  const id = props.messageId
+  if (!props.chatroom || !props.userName || props.standalone || !display.value.html || !id ||
+      !plainMouseActivation(event) || !quickQuote?.enabled(id)) return
+  const target = event.target
+  if (!(target instanceof Element)) return
+  // 快速单击后拖选时，部分浏览器仍可能派发双击。保留这时的原生选区。
+  if (Math.hypot(event.clientX - pointerStartX, event.clientY - pointerStartY) > 4) return
+
+  const image = bodyImage(target)
+  if (image) {
+    if (imagePreview?.image !== image) return
+    cancelImagePreview()
+    event.preventDefault()
+    quickQuote.quote(id)
+    return
+  }
+
+  if (isStandalone.value || target.closest(bubbleControls)) return
+  cancelImagePreview()
+  event.preventDefault()
+  const selection = window.getSelection()
+  const bubble = event.currentTarget
+  if (bubble instanceof Element && selection && !selection.isCollapsed &&
+      bubble.contains(selection.anchorNode) && bubble.contains(selection.focusNode)) selection.removeAllRanges()
+  quickQuote.quote(id)
+}
 
 
 function onAvatarError(e: Event) {
@@ -114,10 +227,31 @@ function onAvatarError(e: Event) {
   if (img.getAttribute('src') !== DEFAULT_AVATAR) img.src = DEFAULT_AVATAR
 }
 
-function onBodyClick(e: MouseEvent) {
-  const img = (e.target as HTMLElement | null)?.closest('img')
-  if (!img || img.classList.contains('emoji') || !img.closest('.vditor-reset')) return
-  e.preventDefault()
+function onBodyClick(event: MouseEvent) {
+  const image = bodyImage(event.target)
+  if (!image) return
+  const id = props.messageId
+  const canMouseQuote = props.chatroom && !props.standalone && !!props.userName && !!id &&
+    plainMouseActivation(event) && !!quickQuote?.enabled(id)
+  event.preventDefault()
+
+  if (!canMouseQuote) {
+    cancelImagePreview()
+    openBodyImage(image)
+    return
+  }
+  if (event.detail > 1 && imagePreview?.image === image) return
+
+  // 只有鼠标单击且能引用时才等第二击，触屏和不能引用的消息立即看大图。
+  cancelImagePreview()
+  const timer = setTimeout(() => {
+    imagePreview = undefined
+    if (image.isConnected) openBodyImage(image)
+  }, MOUSE_DOUBLE_CLICK_WINDOW_MS)
+  imagePreview = { image, timer }
+}
+
+function openBodyImage(img: HTMLImageElement) {
   const displayed = img.currentSrc || img.src
   const original = img.getAttribute('data-chat-original')
   const source = img.getAttribute('src')
@@ -132,14 +266,18 @@ function onBodyClick(e: MouseEvent) {
 </script>
 
 <template>
-  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'has-sakura-arrival': animateSakura && mounted && chatPreferences.showSakuraEffects, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }">
-    <RouterLink :to="`/member/${userName}`" class="fp-avatar-frame" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`">
-      <img class="fp-avatar" :src="avatarThumbnail(avatar, avatarSize)" alt="" loading="lazy" @error="onAvatarError" />
-      <SakuraDecoration v-if="sakuraFrame" :style-id="sakuraFrame" kind="frame" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
+  <article :data-appearance-snapshot="chatroom ? 'v1' : undefined" :data-bubble="chatroom ? (simpleMode ? 'none' : snapshot.bubbleId) : undefined" :data-frame="chatroom ? (simpleMode ? 'none' : snapshot.frameId) : undefined" class="fp-msg" :class="{ 'is-simple': simpleMode, 'has-sakura-arrival': animateSakura && mounted && chatPreferences.showSakuraEffects, 'blur-chat-images': mounted && chatroom && functionPreferences.blurChatImages, 'is-self': alignSelf ?? self, 'is-room': chatroom, 'is-standalone': isStandalone, 'is-image': singleImage }" @pointerdown="onPointerDown">
+    <RouterLink :to="`/member/${userName}`" custom v-slot="{ href, navigate, isActive, isExactActive }">
+      <a :href="href" class="fp-avatar-frame" :class="{ 'router-link-active': isActive, 'router-link-exact-active': isExactActive }"
+        :aria-current="isExactActive ? 'page' : undefined" :data-user-card="userName" :title="userName" :aria-label="`查看 ${nickname || userName} 的主页`"
+        @click="onAvatarClick($event, navigate)" @dblclick="onAvatarDoubleClick">
+        <img class="fp-avatar" :src="avatarThumbnail(avatar, avatarSize)" alt="" loading="lazy" @error="onAvatarError" />
+        <SakuraDecoration v-if="sakuraFrame" :style-id="sakuraFrame" kind="frame" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
+      </a>
     </RouterLink>
     <div class="message-stack">
       <div v-if="chatroom" class="head">
-        <div class="chat-author">
+        <div ref="authorLine" class="chat-author">
           <component :is="canMention ? 'button' : RouterLink" v-bind="canMention ? { type: 'button' } : { to: `/member/${userName}` }" class="name" :class="{ 'name--mention': canMention }" :data-user-card="canMention ? undefined : userName" :aria-label="canMention ? `点击 @${nickname || userName}` : undefined" @click="canMention && mention?.insert(userName)">
             <span v-if="canMention" class="mention-prefix" aria-hidden="true">@</span>
             <span class="chat-author-name">
@@ -151,45 +289,58 @@ function onBodyClick(e: MouseEvent) {
             </span>
           </component>
           <RouterLink v-if="petStatus && messageId && !simpleMode" :to="petDestination" class="fp-chat-pet-status" :data-species="petStatus.speciesId"
-            :title="`宠物：${petStatus.name} · ${chatPetStatusLabels[petStatus.state]}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${ownPet ? '前往宠物家园' : '查看宠物资料'}`">
+            :title="`宠物：${petStatus.name} · ${chatPetStatusLabels[petStatus.state]}${petStatus.level ? ' · Lv.' + petStatus.level : ''} · ${isOwnUser ? '前往宠物家园' : '查看宠物资料'}`">
             <span class="fp-chat-pet-info">
               <span class="fp-chat-pet-name">{{ petStatus.name }}</span>
               <span class="fp-chat-pet-state">{{ chatPetStatusLabels[petStatus.state] }}</span>
             </span>
             <span v-if="petStatus.level" class="fp-chat-pet-level" :data-tier="Math.floor(petStatus.level / 10)">Lv.{{ petStatus.level }}</span>
           </RouterLink>
+          <ChatGameStatus v-if="mounted && auth.isLoggedIn && !simpleMode && messageId && /^[1-9][0-9]{0,18}$/.test(userId)"
+            :author-line="authorLine" :user-id="userId" :name="nickname || userName" :own="isOwnUser" :pet="petStatus" :pet-to="petDestination" />
         </div>
         <MedalList class="chat-medals" :items="medals" variant="mini" />
       </div>
-      <div v-if="!display.quote || display.html || $slots.default" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick">
-        <SakuraDecoration v-if="sakuraBubble" :style-id="sakuraBubble" kind="bubble" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
-        <ManagedBubbleShape v-if="managedStyle?.shape" :shape="managedStyle.shape" />
-        <img v-if="managedStyle?.image" class="managed-bubble-mark" :src="managedStyle.shape ? imageThumbnail(managedStyle.image, 34, 34) : managedStyle.image" alt="" loading="lazy">
-        <div v-if="!chatroom" class="head">
-          <RouterLink :to="`/member/${userName}`" class="name">
-            <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>
-            <template v-else>{{ nickname || userName }}</template>
-            <small v-if="nickname && nickname !== userName">({{ userName }})</small>
-          </RouterLink>
-          <MedalList :items="medals" variant="chat" />
-        </div>
-        <slot>
-          <div v-if="display.html" class="vditor-reset body" v-html="display.html" />
-        </slot>
-        <p v-if="chatroom && tail && !simpleMode && !isStandalone" class="fp-chat-tail" data-chat-tail><svg class="tail-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="小尾巴"><title>小尾巴</title><path fill="currentColor" stroke="none" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"/></svg><span class="tail-content">{{ tail.text }}</span></p>
-        <template v-if="!chatroom">
-          <slot name="reactions" />
-          <div class="foot">
-            <span class="actions"><slot name="actions" /></span>
-            <time>{{ formatDisplayTime(time) }}</time>
+      <div class="message-content-row">
+        <div v-if="!isQuoteOnly" class="fp-bubble" v-bind="bubbleAttributes(managedStyle, alignSelf ?? self)" @click="onBodyClick" @dblclick="onBubbleDoubleClick">
+          <SakuraDecoration v-if="sakuraBubble" :style-id="sakuraBubble" kind="bubble" :enabled="chatPreferences.showSakuraEffects" :own="alignSelf ?? self" />
+          <ManagedBubbleShape v-if="managedStyle?.shape" :shape="managedStyle.shape" />
+          <img v-if="managedStyle?.image" class="managed-bubble-mark" :src="managedStyle.shape ? imageThumbnail(managedStyle.image, 34, 34) : managedStyle.image" alt="" loading="lazy">
+          <div v-if="!chatroom" class="head">
+            <RouterLink :to="`/member/${userName}`" class="name">
+              <VipNickname v-if="vipNickname" :user-id="userId" :user-name="userName">{{ nickname || userName }}</VipNickname>
+              <template v-else>{{ nickname || userName }}</template>
+              <small v-if="nickname && nickname !== userName">({{ userName }})</small>
+            </RouterLink>
+            <MedalList :items="medals" variant="chat" />
           </div>
-        </template>
+          <slot>
+            <div v-if="display.html" class="vditor-reset body" v-html="display.html" />
+          </slot>
+          <p v-if="chatroom && tail && !simpleMode && !isStandalone" class="fp-chat-tail" data-chat-tail><svg class="tail-label" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="小尾巴"><title>小尾巴</title><path fill="currentColor" stroke="none" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"/></svg><span class="tail-content">{{ tail.text }}</span></p>
+          <template v-if="!chatroom">
+            <slot name="reactions" />
+            <div class="foot">
+              <span class="actions"><slot name="actions" /></span>
+              <time>{{ formatDisplayTime(time) }}</time>
+            </div>
+          </template>
+        </div>
+        <div v-else-if="display.quote" class="chat-quote-stack">
+          <ChatQuoteCard :quote="display.quote" standalone />
+        </div>
+        <div v-if="$slots.repeat" class="message-repeat"><slot name="repeat" /></div>
       </div>
-      <div v-if="display.quote" class="chat-quote-stack">
+      <div v-if="display.quote && !isQuoteOnly" class="chat-quote-stack">
         <ChatQuoteCard :quote="display.quote" />
       </div>
       <div v-if="chatroom" class="foot">
-        <time>{{ formatDisplayTime(time) }}</time>
+        <span class="message-meta">
+          <time>{{ formatDisplayTime(time) }}</time>
+          <span v-if="messageClient" class="message-client" :title="messageClient.label" role="img" :aria-label="messageClient.label">
+            <svg aria-hidden="true"><use :href="messageClient.href" /></svg>
+          </span>
+        </span>
         <CollectChatEmoji v-if="/<img\b/i.test(html)" :html="html" />
         <div v-if="$slots.reactions" class="message-reactions"><slot name="reactions" /></div>
         <span v-if="$slots.actions" class="actions"><slot name="actions" /></span>
@@ -300,7 +451,7 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
   padding-top: 6px;
   border-top: 1px solid color-mix(in srgb, var(--fp-muted) 22%, transparent);
   color: var(--fp-muted);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -543,7 +694,18 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
 }
 .chat-quote-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-width: 100%; min-width: 0; }
 .is-room.is-self .chat-quote-stack { justify-items: end; }
-.fp-bubble + .chat-quote-stack { margin-top: 2px; }
+.message-content-row + .chat-quote-stack { margin-top: 2px; }
+.message-content-row { display: contents; }
+.is-room .message-content-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+}
+.is-room.is-self .message-content-row { flex-direction: row-reverse; }
+.message-repeat { flex: none; }
+.message-repeat:empty { display: none; }
 .is-room .body :deep(p + p) { margin-top: 6px; }
 .is-room .body :deep(.chat-image-frame) {
   display: inline-flex;
@@ -615,6 +777,9 @@ a.fp-chat-pet-status:focus-visible .fp-chat-pet-info {
 }
 .is-room.is-self .foot { flex-direction: row-reverse; }
 .is-room time { font-variant-numeric: tabular-nums; }
+.message-meta { display: inline-flex; align-items: center; gap: 5px; }
+.message-client { display: inline-flex; flex: none; color: var(--fp-muted); }
+.message-client svg { width: 13px; height: 13px; fill: currentColor; }
 .is-room .actions, .is-room.is-self .actions {
   position: static;
   padding: 0;

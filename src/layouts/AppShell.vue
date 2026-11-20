@@ -29,6 +29,7 @@ import PetRiskVerification from '@/components/pets/PetRiskVerification.vue'
 import ChatBarrageOverlay from '@/components/chat/ChatBarrageOverlay.vue'
 import SettingsDrawer from '@/components/settings/SettingsDrawer.vue'
 import MemberLayout from '@/components/member/MemberLayout.vue'
+import SideBar from '@/components/SideBar.vue'
 import UserHoverCard from '@/components/user/UserHoverCard.vue'
 import { useEmojiPreferencesStore } from '@/stores/emojiPreferences'
 import { useFunctionPreferencesStore } from '@/stores/functionPreferences'
@@ -478,9 +479,14 @@ onUnmounted(() => {
           <component :is="Component" ref="routeView" />
         </MemberLayout>
         <component v-else-if="!viewRoute.meta.list" :is="Component" ref="routeView" />
-        <KeepAlive :key="listingCacheIdentity" :max="6">
-          <component v-if="!ssrAuthShell && viewRoute.meta.list" :is="Component" :key="viewRoute.fullPath" :listing-route="viewRoute" />
-        </KeepAlive>
+        <div v-show="!ssrAuthShell && viewRoute.meta.list" class="fp-page fp-page--wide fp-ui fp-list-page">
+          <div class="content">
+            <KeepAlive :key="listingCacheIdentity" :max="6">
+              <component v-if="!ssrAuthShell && viewRoute.meta.list" :is="Component" :key="viewRoute.fullPath" :listing-route="viewRoute" />
+            </KeepAlive>
+          </div>
+          <div v-if="!ssrAuthShell && viewRoute.meta.list" class="side"><SideBar /></div>
+        </div>
       </RouterView>
     </main>
     <footer v-if="!isModernChat && !immersive" class="foot">

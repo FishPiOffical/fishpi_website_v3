@@ -1,43 +1,71 @@
 <script setup lang="ts">
-import { onMounted, onScopeDispose, ref, watch } from 'vue'
-import { getAuthContextVersion } from '@/api/http'
-import { chatMessageDetail } from '@/api/v3-chat-messages'
+import { onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useV3ChatPublicationStore } from '@/stores/v3ChatPublication'
-const props = defineProps<{id:string;label?:string;compact?:boolean}>(), auth = useAuthStore(), publication = useV3ChatPublicationStore()
-const mounted = ref(false), reading = ref(false), error = ref('')
-let sequence = 0, abort: AbortController | null = null
-const identity = () => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, auth.account?.oId || ''])
-function cancel() { sequence++; abort?.abort(); abort = null; reading.value = false; error.value = '' }
+
+const props = defineProps<{ content?: string }>()
+const auth = useAuthStore()
+const publication = useV3ChatPublicationStore()
+const mounted = ref(false)
+const sending = ref(false)
+
 async function repeat() {
-  if (!mounted.value || !auth.accessToken || !auth.account?.oId || reading.value || publication.busy || publication.pending) return
-  cancel()
-  const run = sequence, reader = identity(), id = props.id, controller = new AbortController()
-  abort = controller; reading.value = true
-  const valid = () => mounted.value && run === sequence && reader === identity() && id === props.id && !controller.signal.aborted
+  const content = props.content
+  if (!mounted.value || !auth.accessToken || !auth.account?.oId || !content?.trim() || sending.value || publication.busy || publication.pending) return
+  sending.value = true
   try {
-    const message = await chatMessageDetail(id, controller.signal)
-    if (!valid()) return
-    if (message.type !== 'text' || !message.content.trim()) { error.value = '当前消息无法复读'; return }
-    await publication.send(message.content, 'repeat')
-  } catch (e) { if (valid()) error.value = e instanceof Error ? e.message : '原消息读取失败' }
-  finally { if (valid()) { reading.value = false; abort = null } }
+    await publication.send(content, 'repeat')
+  } finally {
+    sending.value = false
+  }
 }
 onMounted(() => { mounted.value = true })
-watch([identity, () => props.id], cancel, {flush:'sync'})
-onScopeDispose(() => { mounted.value = false; cancel() })
 </script>
 <template>
-  <span v-if="mounted && auth.accessToken && auth.account?.oId" class="chat-repeat" :class="{ 'chat-repeat--compact': compact }">
-    <button type="button" title="复读这条消息" aria-label="复读这条消息" :disabled="reading || publication.busy || !!publication.pending" :aria-busy="reading" @click="repeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4M3 11V8a2 2 0 0 1 2-2h16M7 22l-4-4 4-4m14-1v3a2 2 0 0 1-2 2H3"/></svg><span>{{ reading ? '…' : (label || '复读') }}</span></button>
-    <small v-if="error" role="alert">{{ error }}</small>
-  </span>
+  <button v-if="mounted && auth.accessToken && auth.account?.oId && content?.trim()" type="button"
+    class="chat-repeat" title="复读这条消息" aria-label="复读这条消息"
+    :disabled="sending || publication.busy || !!publication.pending" :aria-busy="sending" @click="repeat">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M8 21H5a2 2 0 0 1-2-2v-1.5L1.5 16V9a2 2 0 0 1 2-2H5m5-3h9a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-1v4l-5-4h-3a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Zm4.5 3.75v5.5m-2.75-2.75h5.5" />
+    </svg>
+  </button>
 </template>
 <style scoped>
-.chat-repeat{display:inline-flex;align-items:center;gap:6px;max-width:100%}.chat-repeat button{display:inline-flex;align-items:center;gap:3px;font:inherit;color:inherit;background:transparent;border:0;padding:2px 0;cursor:pointer}.chat-repeat svg{width:13px;height:13px;flex:none}.chat-repeat button:disabled{opacity:.45;cursor:default}.chat-repeat button:focus-visible{outline:2px solid var(--fp-primary);outline-offset:2px}.chat-repeat small{font-size:11px;color:var(--fp-danger);overflow-wrap:anywhere}
-/* 折叠组的 +1 保持独立触点，其他消息操作仍用原来的轻量文本样式。 */
-.chat-repeat--compact button { min-width: 56px; min-height: 30px; justify-content: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-hover); color: var(--fp-text); font-weight: 600; transition: background .15s, border-color .15s; }
-.chat-repeat--compact button:hover:not(:disabled) { border-color: var(--fp-primary); color: var(--fp-primary); }
-.chat-repeat--compact button:active:not(:disabled) { background: var(--fp-border); }
-.chat-repeat--compact svg { width: 14px; height: 14px; }
+.chat-repeat {
+  display: grid;
+  place-items: center;
+  min-inline-size: 26px;
+  min-block-size: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fp-muted);
+  cursor: pointer;
+}
+.chat-repeat svg { width: 16px; height: 16px; }
+.chat-repeat:disabled { opacity: .5; cursor: default; }
+.chat-repeat:focus-visible { outline: 2px solid var(--fp-link); outline-offset: 2px; }
+.chat-repeat:enabled:is(:focus-visible, :active) {
+  background: var(--fp-hover);
+  color: var(--fp-title, var(--fp-text));
+}
+@media (hover: hover) and (pointer: fine) {
+  .chat-repeat:enabled:hover {
+    background: var(--fp-primary-soft, var(--fp-hover));
+    color: var(--fp-primary-ink, var(--fp-title, var(--fp-text)));
+  }
+  .chat-repeat:enabled:active { background: var(--fp-border); }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .chat-repeat:enabled:hover svg { animation: repeat-turn 260ms ease-out; }
+}
+@media (pointer: coarse) {
+  .chat-repeat { min-inline-size: 44px; min-block-size: 44px; }
+}
+@keyframes repeat-turn {
+  0%, 100% { transform: rotate(0); }
+  48% { transform: rotate(14deg) scale(1.12); }
+}
 </style>

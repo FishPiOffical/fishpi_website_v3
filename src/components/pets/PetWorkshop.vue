@@ -34,7 +34,7 @@ function reason(recipe: Recipe) {
     if (experience === undefined || experience < requirement.experience) return `需要${skillName(requirement.skillId)}经验 ${requirement.experience}`
   }
   if (recipe.ingredients.some(item => owned(item.itemId) < item.quantity)) return '材料尚未集齐'
-  if ((pets.coins ?? 0) < recipe.coins) return '宠物币不足'
+  if ((pets.coins ?? 0) < recipe.coins) return `${pets.currencyName}不足`
   return ''
 }
 function craft(recipe: Recipe) {
@@ -61,7 +61,7 @@ watch(() => `${getAuthContextVersion()}:${auth.account?.oId ?? ''}:${!!auth.acce
           </div>
         </div>
         <p class="recipe-requirement"><span v-for="requirement in recipe.requirements" :key="requirement.skillId">{{ skillName(requirement.skillId) }}经验 {{ requirement.experience }}</span></p>
-        <footer><span><PetIcon name="coin" /><b>{{ recipe.coins }}</b>宠物币</span><button type="button" :disabled="locked || !!reason(recipe)" :title="reason(recipe) || `制作${recipe.name}`" :aria-label="`制作${recipe.name}`" @click="craft(recipe)">{{ reason(recipe) || '制作收藏' }}</button></footer>
+        <footer><span><PetIcon name="coin" /><b>{{ recipe.coins }}</b>{{ pets.currencyName }}</span><button type="button" :disabled="locked || !!reason(recipe)" :title="reason(recipe) || `制作${recipe.name}`" :aria-label="`制作${recipe.name}`" @click="craft(recipe)">{{ reason(recipe) || '制作收藏' }}</button></footer>
       </article>
     </div>
     <div v-else class="collection-grid">

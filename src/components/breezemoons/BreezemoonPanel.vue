@@ -6,16 +6,18 @@ import { fetchV3Breezemoon } from '@/api/v3-breezemoons'
 import { useV3BreezemoonStore } from '@/stores/v3Breezemoons'
 import { useAuthStore } from '@/stores/auth'
 import { getAuthContextVersion } from '@/api/http'
-import { consumeBreezemoonPagePayload } from '@/seo/payload'
+import { consumeBreezemoonPagePayload, consumeHomeBreezemoonFetchedAt } from '@/seo/payload'
 import BreezemoonComposer from './BreezemoonComposer.vue'
 import BreezemoonList from './BreezemoonList.vue'
 const props=withDefaults(defineProps<{size?:number;previewLimit?:number;compact?:boolean;avatarOnly?:boolean;collapsible?:boolean;manage?:boolean;ssrScope?:'global'|'home'}>(),{size:20,compact:false,avatarOnly:false,manage:false})
 const emit = defineEmits<{ summary: [text: string] }>()
 const{accessToken,account}=storeToRefs(useAuthStore()),operations=useV3BreezemoonStore(),editor=ref<{id:string;content:string}|null>(null),editLoading=ref(false),editError=ref('')
 const bootstrap=props.ssrScope?consumeBreezemoonPagePayload(props.ssrScope):null
-const{mounted,result,loading,error,page,load,move,home}=useBreezemoonFeed(props.size,bootstrap)
+const preview = props.compact && props.size === 8
+const fetchedAt = props.ssrScope === 'home' ? consumeHomeBreezemoonFetchedAt() : undefined
+const{mounted,result,loading,error,page,load,move,home}=useBreezemoonFeed(props.size,bootstrap,preview,fetchedAt)
 watch([result, loading, error], ([data, pending, failure]) => {
-  emit('summary', pending ? '读取中' : failure ? '暂不可用' : data?.total ? `${data.total} 条动态` : '暂无动态')
+  emit('summary', failure ? '暂不可用' : data?.total ? `${data.total} 条动态` : pending ? '读取中' : '暂无动态')
 }, { immediate: true })
 const canManage=computed(()=>props.manage&&mounted.value&&!!accessToken.value&&!!account.value)
 async function edit(id:string){
@@ -34,7 +36,7 @@ watch([accessToken,()=>account.value?.oId],()=>{const next=`${getAuthContextVers
     <BreezemoonComposer :target="editor" @cancel="editor=null" @saved="editor=null" />
     <p v-if="editError" role="alert">{{ editError }}</p>
     <div class="controls"><button type="button" :disabled="loading" @click="load()">重新读取清风</button><span v-if="result">共 {{ result.total }} 条</span></div>
-    <p v-if="loading" role="status">正在读取清风明月…</p>
+    <p v-if="loading && !result" role="status">正在读取清风明月…</p>
     <template v-else-if="error"><p role="alert">{{ error }}</p><button v-if="page>1" type="button" @click="home">返回第一页</button></template>
     <template v-else-if="result">
       <BreezemoonList v-if="result.list.length" :items="previewLimit ? result.list.slice(0, previewLimit) : result.list" :compact="compact" :avatar-only="avatarOnly" :collapsible="collapsible"><template #actions="{item}"><template v-if="canManage&&item.author.id===account?.oId"><button type="button" :disabled="editLoading||!!operations.pending||operations.busy||operations.confirming" @click="edit(item.id)">编辑</button><button type="button" :disabled="editLoading||!!operations.pending||operations.busy||operations.confirming" @click="remove(item.id)">删除</button></template></template></BreezemoonList>

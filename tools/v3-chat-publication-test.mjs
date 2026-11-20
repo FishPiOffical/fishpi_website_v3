@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import ts from 'typescript';import{parse,compileScript}from'@vue/compiler-sfc';import{createRenderer,h,ref,reactive,nextTick}from'vue';import{createPinia,defineStore}from'pinia'
 const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64'),replace=(s,pairs)=>{for(const[a,b]of pairs)s=s.replaceAll(`from '${a}'`,`from '${b}'`).replaceAll(`from "${a}"`,`from '${b}'`);return s}
 const state=globalThis.__chatPublication={context:1,calls:[],dispatch:null,confirm:async()=>true};const http=url(`export class ApiError extends Error{constructor(m,status=0,code){super(m);this.status=status;this.code=code}}export function getAuthContextVersion(){return globalThis.__chatPublication.context}export async function request(path,init){globalThis.__chatPublication.calls.push({path,init});return globalThis.__chatPublication.dispatch(path,init)}`),{ApiError}=await import(http)
-const apiURL=url(compile(await fs.readFile('src/api/v3-chat-publication.ts','utf8')).replace("from './http'",`from '${http}'`)),api=await import(apiURL),detailURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replace("from '@/utils/chatAppearance'",`from '${url(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')))}'`).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'").replace("from './http'",`from '${http}'`))
+const apiURL=url(compile(await fs.readFile('src/api/v3-chat-publication.ts','utf8')).replace("from './http'",`from '${http}'`)),api=await import(apiURL),detailURL=url(compile(await fs.readFile('src/api/v3-chat-messages.ts','utf8')).replace("from '@/utils/chatAppearance'",`from '${url(replace(compile(await fs.readFile('src/utils/chatAppearance.ts','utf8')), [['@/utils/bubbleStyle', url(compile(await fs.readFile('src/utils/bubbleStyle.ts','utf8')))]]))}'`).replaceAll("'./v3-reactions'", "'"+url(compile(await fs.readFile('src/api/v3-reactions.ts','utf8')).replace("from './http'",`from '${http}'`))+"'").replace("from './http'",`from '${http}'`))
 const auth=defineStore('chat-send-auth',()=>({accessToken:ref('A'),account:ref({oId:'1',userName:'owner'}),apiKey:ref(null)}));globalThis.__chatSendAuth=auth;const authURL=url('export const useAuthStore=globalThis.__chatSendAuth'),keyURL=url("let n=0;export function profileOperationKey(){return 'chat-test-'+(++n)}")
 const storeURL=url(replace(compile((await fs.readFile('src/stores/v3ChatPublication.ts','utf8')).replaceAll('import.meta.env.SSR','false')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-profile',keyURL],['@/api/v3-chat-publication',apiURL],['@/api/v3-chat-messages',detailURL],['@/stores/auth',authURL]])),{useV3ChatPublicationStore}=await import(storeURL),dialogURL=url('export async function fpConfirm(options){return globalThis.__chatPublication.confirm(options)}')
 const d=parse(await fs.readFile('src/components/chat/ChatPublicationRecovery.vue','utf8')).descriptor,Component=(await import(url(replace(compile(compileScript(d,{id:'chat-recover',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/stores/auth',authURL],['@/stores/v3ChatPublication',storeURL],['@/composables/useDialog',dialogURL]])))).default
 const insert=(n,p,a)=>{if(n.parent){const i=n.parent.children.indexOf(n);if(i>=0)n.parent.children.splice(i,1)}const i=a?p.children.indexOf(a):-1;p.children.splice(i<0?p.children.length:i,0,n);n.parent=p},renderer=createRenderer({patchProp(n,k,o,v){n.props[k]=v},insert,remove(n){if(n.parent)n.parent.children=n.parent.children.filter(c=>c!==n)},createElement(tag){return{tag,props:{},children:[]}},createText(text){return{text,children:[]}},createComment(){return{children:[]}},setText(n,t){n.text=t},setElementText(n,t){n.children=[{text:t,children:[]}]},parentNode:n=>n.parent,nextSibling(n){const c=n.parent?.children||[];return c[c.indexOf(n)+1]||null},insertStaticContent(t,p,a){const n={text:t,children:[]};insert(n,p,a);return[n,n]}})
 const text=n=>[n.text||'',...(n.children||[]).map(text)].join(' '),find=(n,f)=>f(n)?n:(n.children||[]).map(c=>find(c,f)).find(Boolean),tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()},env=data=>({code:0,data})
-function mount(pinia=createPinia()){const root={children:[]},events=[],app=renderer.createApp({setup(){return()=>h(Component,{onConfirmed:v=>events.push(v)})}});app.use(pinia);app.mount(root);return{app,pinia,root,events,text:()=>text(root),user:auth(pinia),store:useV3ChatPublicationStore(pinia)}}
+function mount(pinia=createPinia()){const root={children:[]},events=[],app=renderer.createApp({setup(){return()=>h(Component,{onConfirmed:(content,replyId)=>events.push(replyId===undefined?content:[content,replyId])})}});app.use(pinia);app.mount(root);return{app,pinia,root,events,text:()=>text(root),user:auth(pinia),store:useV3ChatPublicationStore(pinia)}}
 function click(v,name){const b=find(v.root,n=>n.tag==='button'&&text(n).trim()===name);assert.ok(b,'Missing '+name);assert.ok(!b.props.disabled);return b.props.onClick()}
 const msg={id:'3',createdAt:3,type:'text',content:'current raw',contentHtml:'<p>current authorized HTML</p>',author:{id:'1',userName:'owner',userNickname:'',userAvatarURL:''},client:'Web/PC网页端',card:{}}
 let writes=[],lose=false,readFails=false,receipts=new Map();const dispatch=async(path,init)=>{if(init?.method){writes.push({path,init});const key=init.headers['Idempotency-Key'];if(receipts.has(key))return env(receipts.get(key));const r={id:'3',createdAt:3,secret:'DO_NOT_RETURN'};receipts.set(key,r);if(lose){lose=false;throw Error('ACK lost')}return env(r)}if(readFails)throw new ApiError('detail503',503);return env(msg)};state.dispatch=dispatch
@@ -19,6 +19,17 @@ writes=[];receipts.clear();let view=mount();await view.store.send('actual send')
 console.log('PASS chat publication 3 confirmed write independently reads current message instead of rendering a receipt body')
 lose=true;writes=[];receipts.clear();let pinia=createPinia();view=mount(pinia);await view.store.send('frozen\nquote body');await tick();const frozen=writes[0];assert.match(view.text(),/结果未确认/);view.app.unmount();view=mount(pinia);await click(view,'恢复本次聊天室发送');await tick();assert.equal(writes[1].init.body,frozen.init.body);assert.equal(writes[1].init.headers['Idempotency-Key'],frozen.init.headers['Idempotency-Key']);assert.deepEqual(view.events,['frozen\nquote body']);assert.equal(receipts.size,1);view.app.unmount()
 console.log('PASS chat publication 4 actual recovery SFC survives SPA remount, same key/body/client and only one saved message')
+lose=true;writes=[];receipts.clear();view=mount()
+await view.store.send('我写的正文',undefined,'52')
+assert.deepEqual(JSON.parse(writes[0].init.body),{content:'我写的正文',client:'Web/PC网页端',replyToMessageId:'52'})
+await click(view,'恢复本次聊天室发送')
+assert.deepEqual(writes[1],writes[0]);assert.deepEqual(view.events,[['我写的正文','52']]);assert.equal(receipts.size,1)
+await view.store.send('',undefined,'53')
+assert.deepEqual(JSON.parse(writes[2].init.body),{content:'',client:'Web/PC网页端',replyToMessageId:'53'})
+for(const replyToMessageId of ['', 'x', '5'.repeat(33)])await assert.rejects(api.publishChat({content:'body',client:'Web/PC网页端',key:'key',replyToMessageId}),e=>e.status===422)
+assert.equal(writes.length,3);view.app.unmount()
+console.log('PASS 正文与引用 ID 分字段、纯引用、无效 ID、未知结果重试及恢复事件')
+
 readFails=true;writes=[];view=mount();await view.store.send('committed read failure');await tick();assert.equal(view.store.pending,null);assert.equal(view.store.currentMessage,null);assert.match(view.text(),/detail503/);const writeCount=writes.length;readFails=false;await click(view,'重读已发送消息');await tick();assert.equal(writes.length,writeCount);assert.equal(view.store.currentMessage.id,'3');view.app.unmount()
 console.log('PASS chat publication 5 post-commit GET failure is separate, GET-only retry never repeats send')
 state.dispatch=async()=>{throw new ApiError('平台确认',409,'confirmation_required')};writes=[];view=mount();await view.store.send('confirm body');assert.equal(view.store.needsConfirmation,true);const original=view.store.pending.key;state.confirm=async()=>false;await click(view,'再次确认原消息');assert.equal(view.store.pending.key,original);state.confirm=async()=>true;state.dispatch=dispatch;await click(view,'再次确认原消息');await tick();assert.equal(writes[0].init.headers['Idempotency-Key'],original);assert.deepEqual(view.events,['confirm body']);view.app.unmount()
@@ -34,10 +45,10 @@ console.log('PASS chat publication 10 unmount cancels pending confirmation and c
 // Actual production chat store projects the current GET into both main/drawer message lists.
 const fishpi=url('export async function fetchChatHistory(){return[]}export async function fetchChatNodeBundle(){}export async function fetchChatOnlineUsers(){return{}}export async function fetchMutes(){return[]}export async function openRedPacket(){}export async function revokeChat(){}export async function sendChat(){throw Error("legacy must not send plain text")}'),card=url('export function parseChatCard(){}'),reactions=url('export function useV3ReactionsStore(){return{invalidate(){}}}')
 const timelineURL=url(replace(compile((await fs.readFile('src/stores/v3ChatTimeline.ts','utf8')).replaceAll('import.meta.env.SSR','false')),[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/http',http],['@/api/v3-chat-messages',detailURL],['@/api/v3-realtime',url('export function subscribeChatChanges(){return()=>{}}')],['@/stores/auth',authURL],['@/stores/v3Reactions',reactions]]))
-const chatCode=compile((await fs.readFile('src/stores/chat.ts','utf8')).replaceAll('import.meta.env.SSR','false')),chatURL=url(replace(chatCode,[['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/fishpi',fishpi],['@/utils/chatCard',card],['./auth',authURL],['./v3Reactions',reactions],['./v3ChatPublication',storeURL],['./v3ChatOnline',url('export function useV3ChatOnlineStore(){return{users:[],total:null,connect:async()=>{},disconnect(){},refresh:async()=>{}}}')],['./v3ChatTimeline',timelineURL]])),{useChatStore}=await import(chatURL)
+const chatCode=compile((await fs.readFile('src/stores/chat.ts','utf8')).replaceAll('import.meta.env.SSR','false')),chatURL=url(replace(chatCode,[['@/utils/chatConnectionOwners',url(compile(await fs.readFile('src/utils/chatConnectionOwners.ts','utf8')))],['vue',import.meta.resolve('vue')],['pinia',import.meta.resolve('pinia')],['@/api/fishpi',fishpi],['@/utils/chatCard',card],['./auth',authURL],['./v3Reactions',reactions],['./v3ChatPublication',storeURL],['./v3ChatOnline',url('export function useV3ChatOnlineStore(){return{users:[],total:null,connect:async()=>{},disconnect(){},refresh:async()=>{}}}')],['./v3ChatTimeline',timelineURL]])),{useChatStore}=await import(chatURL)
 pinia=createPinia();const chat=useChatStore(pinia),publication=useV3ChatPublicationStore(pinia);assert.equal(await chat.send('no legacy apiKey'),true);await tick();assert.equal(chat.messages[0].userOId,'1');assert.equal(chat.messages[0].html,msg.contentHtml);assert.equal(chat.messages[0].oId,'3');await publication.readCurrent();await tick();assert.equal(chat.messages.length,1);auth(pinia).accessToken=null;await tick();assert.equal(chat.messages.length,0);publication.$dispose();chat.$dispose()
 console.log('PASS chat publication 11 actual shared chat store uses Bearer send, inserts current GET once, clears projected own data across identity')
-const page=await fs.readFile('src/views/ChatroomView.vue','utf8'),drawer=await fs.readFile('src/components/chat/WhisperConversations.vue','utf8');assert.ok(page.includes('if(await chat.send(content)&&reader===')&&page.includes('acceptConfirmed(content.trim())'));assert.ok(page.includes('buildQuoteSuffix()')&&page.includes('ChatPublicationRecovery'));assert.ok(drawer.includes('if(await chat.send(text)&&reader===')&&drawer.includes('acceptRoomConfirmed(text.trim())'));assert.ok(drawer.includes(':disabled="!!publication.pending"'));console.log('PASS chat publication 12 full/compact parent integrations preserve draft until confirmed and provide shared recovery')
+const page=await fs.readFile('src/views/ChatroomView.vue','utf8'),drawer=await fs.readFile('src/components/chat/WhisperConversations.vue','utf8');assert.ok(page.includes('if(await chat.send(content, replyToMessageId)&&reader===')&&page.includes('acceptConfirmed(content.trim(), replyToMessageId)'));assert.ok(!page.includes('buildQuoteSuffix()')&&page.includes('ChatPublicationRecovery'));assert.ok(drawer.includes('if(await chat.send(text, replyToMessageId)&&reader===')&&drawer.includes('acceptRoomConfirmed(text.trim(), replyToMessageId)'));assert.ok(drawer.includes(':disabled="!!publication.pending || !!quoteBusy"'));console.log('PASS chat publication 12 full/compact parent integrations preserve draft until confirmed and provide shared recovery')
 let firstRead;state.dispatch=async(path,init)=>{if(init?.method){const content=JSON.parse(init.body).content;return env({id:content==='first'?'3':'4',createdAt:4})}if(path.endsWith('/3'))return new Promise(r=>firstRead=r);return env({...msg,id:'4',content:'newest'})};view=mount();await view.store.send('first');await tick();await view.store.send('second');await tick();assert.equal(view.store.currentMessage.id,'4');firstRead(env(msg));await tick();assert.equal(view.store.currentMessage.id,'4');view.app.unmount()
 console.log('PASS chat publication 13 late prior current-detail read cannot replace a newer confirmed publication')
 state.dispatch=async()=>{throw new ApiError('confirm',409,'confirmation_required')};view=mount();await view.store.send('cancel known confirmation');const callsBefore=state.calls.length;view.store.cancelRequestedConfirmation();assert.equal(view.store.pending,null);assert.equal(state.calls.length,callsBefore);view.user.accessToken=null;await view.store.send('guest');assert.equal(state.calls.length,callsBefore);view.app.unmount()
@@ -46,11 +57,66 @@ let postRelease;state.dispatch=()=>new Promise(r=>postRelease=r);view=mount();co
 console.log('PASS chat publication 15 in-flight send hides the recovery banner and blocks duplicate writes')
 
 const repeatDescriptor=parse(await fs.readFile('src/components/chat/ChatRepeatAction.vue','utf8')).descriptor
-const RepeatAction=(await import(url(replace(compile(compileScript(repeatDescriptor,{id:'chat-repeat',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['@/api/http',http],['@/api/v3-chat-messages',detailURL],['@/stores/auth',authURL],['@/stores/v3ChatPublication',storeURL]])))).default
-function mountRepeat(pinia=createPinia()) {const root={children:[]},events=[],app=renderer.createApp({setup(){return()=>h('div',[h(RepeatAction,{id:'3'}),h(Component,{onConfirmed:v=>events.push(v)})])}});app.use(pinia);app.mount(root);return{root,app,pinia,events,user:auth(pinia),store:useV3ChatPublicationStore(pinia),text:()=>text(root)}}
-state.dispatch=dispatch;state.confirm=async()=>true;readFails=false;lose=false;msg.content='**复读原文**\n\n![图片](https://example.test/p.png)';
-msg.tail={text:'不要复读对方的小尾巴'};
-let repeated=mountRepeat();await tick();const beforeRepeat=writes.length;await click(repeated,'复读');await tick();assert.equal(writes.length,beforeRepeat+1);assert.equal(JSON.parse(writes.at(-1).init.body).content,msg.content);assert.ok(!JSON.stringify(JSON.parse(writes.at(-1).init.body)).includes('origin'));assert.equal(repeated.store.completed.origin,'repeat');assert.ok(!writes.at(-1).init.body.includes('不要复读对方的小尾巴'));repeated.app.unmount();repeated.store.$dispose();console.log('PASS publication repeat 1 current authorized Markdown, images and line breaks use normal send without copying rendered HTML or adding API fields')
-repeated=mountRepeat();await tick();lose=true;await click(repeated,'复读');await tick();const repeatCommand=repeated.store.pending;assert.equal(repeatCommand.origin,'repeat');assert.equal(find(repeated.root,n=>n.tag==='button'&&text(n).trim()==='复读').props.disabled,true);const repeatPinia=repeated.pinia;repeated.app.unmount();repeated=mountRepeat(repeatPinia);await tick();await click(repeated,'恢复本次聊天室发送');await tick();assert.equal(writes.at(-1).init.headers['Idempotency-Key'],repeatCommand.key);assert.deepEqual(repeated.events,[]);assert.equal(repeated.store.pending,null);repeated.app.unmount();repeated.store.$dispose();console.log('PASS publication repeat 2 unknown result preserves original key across SPA and recovery never emits composer draft-clearing events')
-let finishRepeat;state.dispatch=path=>new Promise(resolve=>finishRepeat=resolve);repeated=mountRepeat();await tick();const beforeLate=writes.length;const lateRepeat=click(repeated,'复读');await tick();await find(repeated.root,n=>n.tag==='button'&&text(n).trim()==='…').props.onClick();assert.equal(writes.length,beforeLate);repeated.app.unmount();finishRepeat(env(msg));await lateRepeat;await tick();assert.equal(writes.length,beforeLate);repeated.store.$dispose();console.log('PASS publication repeat 3 duplicate source reads are blocked and leaving before source read completes cannot publish')
-state.dispatch=async()=>env({id:'3',createdAt:3,type:'unavailable'});repeated=mountRepeat();await tick();await click(repeated,'复读');await tick();assert.match(repeated.text(),/无法复读/);assert.equal(writes.length,beforeLate);repeated.user.accessToken=null;await tick();assert.ok(!find(repeated.root,n=>n.tag==='button'&&text(n).trim()==='复读'));repeated.app.unmount();repeated.store.$dispose();state.dispatch=dispatch;console.log('PASS publication repeat 4 unavailable source is not replayed and logout removes the repeat action')
+const RepeatAction=(await import(url(replace(compile(compileScript(repeatDescriptor,{id:'chat-repeat',inlineTemplate:true}).content),[['vue',import.meta.resolve('vue')],['@/stores/auth',authURL],['@/stores/v3ChatPublication',storeURL]])))).default
+const repeatSource = '**复读原文**\n\n![图片](https://example.test/p.png)'
+function mountRepeat(pinia=createPinia(), content=repeatSource) {
+  const root={children:[]},events=[],source=ref(content)
+  const app=renderer.createApp({setup(){return()=>h('div',[h(RepeatAction,{content:source.value}),h(Component,{onConfirmed:(...args)=>events.push(args)})])}})
+  app.use(pinia);app.mount(root)
+  return {root,app,pinia,events,source,user:auth(pinia),store:useV3ChatPublicationStore(pinia),text:()=>text(root)}
+}
+const repeatButton = view => find(view.root,node=>node.tag==='button'&&node.props?.['aria-label']==='复读这条消息')
+const clickRepeat = view => { const button=repeatButton(view);assert.ok(button&&!button.props.disabled);return button.props.onClick() }
+state.dispatch=dispatch;state.confirm=async()=>true;readFails=false;lose=false
+msg.tail={text:'不要复读对方的小尾巴'}
+let repeated=mountRepeat();await tick()
+const beforeRepeat=state.calls.length
+await clickRepeat(repeated);await tick()
+assert.deepEqual(state.calls.slice(beforeRepeat).map(({path,init})=>[init.method || 'GET',path]), [
+  ['POST','/api/v3/chat/messages'], ['GET','/api/v3/chat/messages/3'],
+])
+assert.deepEqual(JSON.parse(writes.at(-1).init.body),{content:repeatSource,client:'Web/PC网页端'})
+assert.equal(repeated.store.completed.origin,'repeat')
+repeated.app.unmount();repeated.store.$dispose()
+console.log('PASS 复读直接提交列表原始 Markdown，保留图片和换行，首个请求就是 POST')
+
+repeated=mountRepeat();await tick();lose=true;await clickRepeat(repeated);await tick()
+const repeatCommand=repeated.store.pending
+assert.equal(repeatCommand.origin,'repeat')
+assert.equal(repeatButton(repeated).props.disabled,true)
+const repeatPinia=repeated.pinia
+repeated.app.unmount();repeated=mountRepeat(repeatPinia,'快照已经变更');await tick()
+await click(repeated,'恢复本次聊天室发送');await tick()
+assert.equal(writes.at(-1).init.headers['Idempotency-Key'],repeatCommand.key)
+assert.equal(JSON.parse(writes.at(-1).init.body).content,repeatSource)
+assert.deepEqual(repeated.events,[]);assert.equal(repeated.store.pending,null)
+repeated.app.unmount();repeated.store.$dispose()
+console.log('PASS 复读结果未知时，换页后仍重试原正文和原键，且不清空编辑草稿')
+
+let confirmRepeat
+state.dispatch=(path,init)=>init.method==='POST'?new Promise(resolve=>confirmRepeat=resolve):env(msg)
+repeated=mountRepeat();await tick()
+const beforeDouble=state.calls.length
+const button=repeatButton(repeated)
+const pendingRepeat=button.props.onClick()
+await button.props.onClick()
+assert.equal(state.calls.length,beforeDouble+1)
+repeated.user.accessToken=null
+confirmRepeat(env({id:'3',createdAt:3}));await pendingRepeat;await tick()
+assert.equal(state.calls.length,beforeDouble+1)
+assert.equal(repeated.store.receipt,null)
+assert.ok(!repeatButton(repeated))
+repeated.app.unmount();repeated.store.$dispose()
+console.log('PASS 复读连点只有一次发送，退出后不接收迟到回执、不补读')
+
+for(const content of ['', '  \n  ']) {
+  repeated=mountRepeat(createPinia(),content);await tick()
+  assert.ok(!repeatButton(repeated))
+  repeated.app.unmount();repeated.store.$dispose()
+}
+assert.equal(state.calls.length,beforeDouble+1)
+repeated=mountRepeat();await tick()
+repeated.source.value=undefined;await tick()
+assert.ok(!repeatButton(repeated))
+repeated.app.unmount();repeated.store.$dispose()
+console.log('PASS 缺失或空白正文不提供复读入口，也不额外读取详情')

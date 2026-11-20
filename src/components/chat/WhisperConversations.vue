@@ -2,11 +2,15 @@
 import { useChatScrollFollow } from '@/composables/useChatScrollFollow'
 import { useSakuraArrivals } from '@/composables/useSakuraArrivals'
 import { useChatQuoteNavigation } from '@/composables/useChatQuoteNavigation'
+import { useChatMessageSource } from '@/composables/useChatMessageSource'
 import {getAuthContextVersion} from '@/api/http'
 import { computed, nextTick, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
+import { CHAT_QUICK_QUOTE } from '@/chat/messageShortcuts'
+import ChatQuotePreview from '@/components/chat/ChatQuotePreview.vue'
+import { chatMessageQuotePreview } from '@/utils/chatQuote'
 import ChatRepeatList from '@/components/chat/ChatRepeatList.vue'
 import ChatRepeatAction from '@/components/chat/ChatRepeatAction.vue'
 import ChatBubble from '@/components/ChatBubble.vue'
@@ -54,11 +58,14 @@ const selectedPeer = ref('__private__')
 const draft = ref('')
 const roomComposer = ref<InstanceType<typeof ChatComposer> | null>(null)
 const roomInput = ref<HTMLTextAreaElement | null>(null)
+const isChatroomSelected = computed(() => selectedPeer.value === CHATROOM_PEER)
+const roomInputAvailable = () => props.modelValue && isChatroomSelected.value &&
+  !!auth.accessToken && !publication.pending && !!(roomComposer.value || roomInput.value)
 provide(CHAT_MENTION, {
-  enabled: () => !!auth.accessToken && !publication.pending,
+  enabled: roomInputAvailable,
   insert: userName => {
     const text = chatMentionText(userName)
-    if (!auth.accessToken || publication.pending || !text) return
+    if (!roomInputAvailable() || !text) return
     if (roomComposer.value) {
       roomComposer.value.insert(text)
       roomComposer.value.focus()
@@ -71,11 +78,26 @@ provide(CHAT_MENTION, {
     }
   },
 })
-const isChatroomSelected = computed(() => selectedPeer.value === CHATROOM_PEER)
+const { quote, quoteBusy, quoteErr, quoteMessage: readQuote, clearQuote } = useChatMessageSource()
+const roomQuotes = computed(() => quote.value ? [chatMessageQuotePreview(quote.value)] : [])
+const roomIdentity = computed(() => JSON.stringify([getAuthContextVersion(), !!auth.accessToken, account.value?.oId || '']))
+function canQuote(messageId: string) {
+  return roomInputAvailable() && !!account.value?.oId && !roomSending.value && quoteBusy.value !== messageId
+}
+async function quoteRoomMessage(messageId: string) {
+  if (!canQuote(messageId)) return
+  await readQuote(messageId)
+  if (quote.value?.messageId !== messageId) return
+  await nextTick()
+  if (quote.value?.messageId !== messageId || !canQuote(messageId)) return
+  if (roomComposer.value) roomComposer.value.reveal()
+  else roomInput.value?.focus({ preventScroll: true })
+}
+provide(CHAT_QUICK_QUOTE, { enabled: canQuote, quote: quoteRoomMessage })
 const sakuraArrivals = useSakuraArrivals(() => props.modelValue && isChatroomSelected.value && !chatPreferences.simpleMode)
 const roomRepeatEntries = computed(() => visibleRoomMessages.value.map(message => ({ key: message.oId, message })))
 const visibleRoomMessages = computed(() => roomMessages.value.filter((line) => chatFilter.modeFor(line) === 'show'))
-const canSend = computed(()=>Boolean(draft.value.trim())&&!roomSending.value&&!publication.pending)
+const canSend = computed(() => Boolean(draft.value.trim() || quote.value) && !roomSending.value && !publication.pending && !quoteBusy.value)
 function onCompactComposerKeydown(event: KeyboardEvent) {
   if (!matchesChatSendShortcut(event, chatPreferences.sendShortcut)) return
   event.preventDefault()
@@ -283,12 +305,14 @@ function stopResizing(e: PointerEvent) {
 }
 
 function selectPrivate(){
+ clearQuote()
  selectedPeer.value='__private__';chat.floatingChatroomOpen=false
 }
 
 async function selectChatroom() {
   selectedPeer.value = CHATROOM_PEER
   draft.value = ''
+  clearQuote()
   chat.floatingChatroomOpen = true
   await nextTick()
   scrollFollow.jump()
@@ -315,13 +339,17 @@ async function loadOlder() {
 }
 
 async function submit() {
-  const text = draft.value
-  if (!text.trim() || roomSending.value) return
-  const reader=JSON.stringify([getAuthContextVersion(),!!auth.accessToken,account.value?.oId||''])
-  if(await chat.send(text)&&reader===JSON.stringify([getAuthContextVersion(),!!auth.accessToken,account.value?.oId||'']))acceptRoomConfirmed(text.trim())
+  if (!canSend.value) return
+  const text = draft.value, reader = roomIdentity.value
+  const replyToMessageId = quote.value?.messageId
+  if(await chat.send(text, replyToMessageId)&&reader===roomIdentity.value)acceptRoomConfirmed(text.trim(), replyToMessageId)
 }
 
-function acceptRoomConfirmed(content:string){if(draft.value.trim()===content)draft.value=''}
+function acceptRoomConfirmed(content: string, replyToMessageId?: string) {
+  if (draft.value.trim() !== content || quote.value?.messageId !== replyToMessageId || quoteBusy.value) return
+  draft.value = ''
+  clearQuote()
+}
 
 async function observePanelWidth() {
   await nextTick()
@@ -346,6 +374,7 @@ watch(
       void observePanelWidth()
       void refreshInbox()
     } else {
+      clearQuote()
       savePanelGeometry()
       chat.floatingChatroomOpen = false
       window.removeEventListener('keydown', onKeyDown)
@@ -371,7 +400,7 @@ watch(() => route.path, () => {
   if (props.modelValue) observeNavigation()
 }, { flush: 'post' })
 
-watch(()=>account.value?.oId,()=>{draft.value='';privateFullId.value='';selectedPeer.value='__private__'})
+watch(roomIdentity, () => { draft.value = ''; privateFullId.value = ''; selectedPeer.value = '__private__' })
 
 onUnmounted(() => {
   chat.floatingChatroomOpen=false
@@ -471,8 +500,23 @@ onUnmounted(() => {
                   <button v-if="roomHasMore&&roomMessages.length" type="button" class="more" :disabled="roomLoadingMore" @click="loadOlder">{{ roomLoadingMore?'加载中…':'加载更早消息' }}</button>
                   <FpLoading v-if="roomLoading&&!roomMessages.length" />
                   <p v-else-if="!visibleRoomMessages.length" class="empty-content">聊天室暂时没有消息</p>
-                  <ChatRepeatList :entries="roomRepeatEntries" :own-name="account?.userName" v-slot="{ entry: { message: line }, alignSelf }"><ChatBubble :key="line.oId" :appearance="line.appearance" :animate-sakura="sakuraArrivals.has(line.oId)" :tail="line.tail" :pet-status="line.petStatus" :medals="line.sysMetal" :message-id="line.oId" :user-id="line.userOId" :user-name="line.userName" :avatar="line.userAvatarURL" :avatar-size="isCompactPanel ? 24 : 36" :time="line.time" chatroom :standalone="Boolean(line.redPacket || line.card)" :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :source="line.content" :self="line.userOId===account?.oId" :align-self="alignSelf"><ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" /><ChatCard v-else-if="line.card" :card="line.card" /><template #actions><ChatRepeatAction v-if="!line.redPacket&&!line.card" :id="line.oId" /><ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" /></template></ChatBubble></ChatRepeatList>
+                  <ChatRepeatList :entries="roomRepeatEntries" :own-name="account?.userName" v-slot="{ entry: { message: line }, alignSelf }">
+                    <ChatBubble :key="line.oId" :appearance="line.appearance" :animate-sakura="sakuraArrivals.has(line.oId)" :tail="line.tail" :pet-status="line.petStatus" :medals="line.sysMetal" :message-id="line.oId" :user-id="line.userOId" :user-name="line.userName" :avatar="line.userAvatarURL" :avatar-size="isCompactPanel ? 24 : 36" :time="line.time" :client="line.client" chatroom :standalone="Boolean(line.redPacket || line.card)" :html="line.html||(line.redPacket?'[红包]':line.card?'[聊天室消息]':'')" :source="line.content" :self="line.userOId===account?.oId" :align-self="alignSelf">
+                      <ChatRedPacketCard v-if="line.redPacket" :packet="line.redPacket" :packet-id="line.oId" />
+                      <ChatCard v-else-if="line.card" :card="line.card" />
+                      <template #repeat>
+                        <ChatRepeatAction v-if="!line.redPacket&&!line.card" :content="line.content" />
+                      </template>
+                      <template #actions>
+                        <ChatRevokeAction :id="line.oId" :author-id="line.userOId" :red-packet="!!line.redPacket" />
+                        <button v-if="!line.redPacket && !line.card && auth.accessToken" type="button" title="引用消息"
+                          :disabled="!canQuote(line.oId)" @click="quoteRoomMessage(line.oId)">{{ quoteBusy === line.oId ? '…' : '引用' }}</button>
+                      </template>
+                    </ChatBubble>
+                  </ChatRepeatList>
                 </div>
+                <p v-if="quoteErr" class="hint" role="alert">{{ quoteErr }}</p>
+                <ChatQuotePreview v-if="roomQuotes.length" class="room-quote-preview" :quotes="roomQuotes" @remove="clearQuote" />
                 <Transition name="composer-swap" mode="out-in">
                   <form v-if="isCompactPanel" key="compact" class="compact-composer composer" @submit.prevent="submit">
                     <textarea ref="roomInput" v-model="draft" rows="1" aria-label="聊天室消息" placeholder="说点什么吧…"
@@ -480,7 +524,7 @@ onUnmounted(() => {
                     <button type="submit" :disabled="!canSend">{{ roomSending ? '发送中' : '发送' }}</button>
                   </form>
                   <ChatComposer v-else ref="roomComposer" v-model="draft" class="composer" :height="100" compact cache-id="chatroom-drawer"
-                    :chat-send-shortcut="chatPreferences.sendShortcut" :sending="roomSending" :disabled="!!publication.pending"
+                    :chat-send-shortcut="chatPreferences.sendShortcut" :sending="roomSending" :disabled="!!publication.pending || !!quoteBusy" :allow-empty="Boolean(quote)"
                     placeholder="说点什么吧，友善第一哦。" @submit="submit" />
                 </Transition>
               </section>
@@ -923,6 +967,7 @@ onUnmounted(() => {
   padding: 9px 12px;
   border-top: 1px solid var(--fp-border);
 }
+.room-quote-preview { flex: none; padding: 6px 12px; }
 .compact-composer {
   display: flex;
   align-items: center;

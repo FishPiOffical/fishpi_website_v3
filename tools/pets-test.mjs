@@ -137,6 +137,9 @@ for (const name of ['鱼'.repeat(13), ' ', '\ud800', 'a\nb', 'a\u202eb', 'a\u00a
 }
 assert.deepEqual(api.decodePetState(empty()), empty())
 assert.deepEqual(api.decodePetCatalog(catalog), catalog)
+const careRules = { ...catalog.rules, waterGain: 40, petMood: 10, playMood: 20, playEnergy: 10 }
+assert.deepEqual(api.decodePetCatalog({ ...catalog, rules: careRules }).rules, careRules)
+assert.throws(() => api.decodePetCatalog({ ...catalog, rules: { ...careRules, playEnergy: -1 } }))
 for (const patch of [{ today: '2026-02-30' }, { wallet: { coins: -1 } }, { pet: undefined },
   { inventory: [{ itemId: 'food', quantity: 1 }, { itemId: 'food', quantity: 2 }] }]) {
   assert.throws(() => api.decodePetState({ ...empty(), ...patch }))

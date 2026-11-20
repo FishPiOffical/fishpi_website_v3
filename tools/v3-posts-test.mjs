@@ -49,6 +49,18 @@ let releaseConfirm,writes=[];state.confirmWork=options=>new Promise(r=>{releaseC
 console.log('PASS posts 5 only originating confirmation is cancelled; late approval after cancellation cannot publish')
 let postWrites=[];state.confirmWork=async()=>false;state.dispatch=(path,init)=>{if(init?.method){postWrites.push({path,init});return articleReceipt('8')}return env(page())};let view=mount();await tick();field(view,titleInput,'new post');field(view,bodyInput,'  user Markdown  ');await tick();submit(view);await tick();assert.equal(postWrites.length,0);state.confirmWork=async()=>true;submit(view);await tick();assert.equal(postWrites.length,1);assert.equal(postWrites[0].path,'/api/v3/articles');assert.equal(JSON.parse(postWrites[0].init.body).content,'  user Markdown  ');assert.deepEqual(state.nav,['/article/8']);assert.ok(!JSON.stringify(state.nav).includes('evil'));view.app.unmount()
 console.log('PASS posts 6 actual PostView new publication preserves Markdown, cancelled confirmation sends nothing, success navigates only to constructed ID')
+const goodPostCheckbox=view=>find(view.root,n=>n.tag==='input'&&n.props['aria-describedby']==='good-post-hint')
+postWrites=[];state.dispatch=(path,init)=>{if(init?.method){postWrites.push({path,init});return path==='/api/v3/articles'?articleReceipt('8'):env(draft())}return env(page())}
+view=mount();await tick();field(view,titleInput,'new post');field(view,bodyInput,'ordinary Markdown');const goodPost=goodPostCheckbox(view);assert.ok(goodPost);assert.equal(goodPost.checked,false)
+for(const tag of ['新人报道','新人报到']){
+  goodPost.props['onUpdate:modelValue'](true);await tick();assert.equal(goodPost.checked,true)
+  field(view,'前端,摸鱼','日常,'+tag);await tick();assert.equal(goodPost.props.disabled,true);assert.equal(goodPost.checked,false);assert.match(view.text(),/新人报道帖不能标记为好帖/)
+  field(view,'前端,摸鱼','日常');await tick();assert.equal(goodPost.props.disabled,false);assert.equal(goodPost.checked,false)
+}
+goodPost.props['onUpdate:modelValue'](true);await tick();click(view,'存草稿');await tick();assert.ok(!('goodPost'in JSON.parse(postWrites[0].init.body)));assert.equal(goodPost.checked,true)
+submit(view);await tick();assert.equal(JSON.parse(postWrites[1].init.body).goodPost,true);assert.equal(JSON.parse(postWrites[1].init.body).draftId,'3');assert.deepEqual(state.nav,['/article/8']);view.app.unmount()
+assert.ok(!('goodPost'in api.postInput('publish',full(),null)))
+console.log('PASS good post defaults off, clears for introduction tags, and is sent only on publish')
 postWrites=[];state.dispatch=(path,init)=>{if(init?.method){postWrites.push({path,init});return articleReceipt('2')}return env(original)};view=mount(createPinia(),{id:'2'});await tick();assert.ok(find(view.root,n=>n.tag==='textarea'&&n.props.value==='paid raw'));field(view,titleInput,'updated title');await tick();submit(view);await tick();assert.equal(postWrites[0].init.method,'PUT');assert.deepEqual(JSON.parse(postWrites[0].init.body),{title:'updated title'});assert.deepEqual(state.nav,['/article/2']);view.app.unmount()
 console.log('PASS posts 7 actual owner edit reads raw paid source and PUTs only changed title, no anonymous/status/editor/cover overwrite')
 let failSource=true;state.dispatch=()=>{if(failSource)throw new ApiError('source503',503);return env(source({status:2}))};postWrites=[];view=mount(createPinia(),{id:'2'});await tick();assert.match(view.text(),/source503/);assert.ok(!find(view.root,n=>n.tag==='input'&&n.props.placeholder===titleInput));failSource=false;click(view,'重试原文');await tick();assert.match(view.text(),/当前文章不可编辑/);const confirmationCount=state.confirmations.length;submit(view);await tick();assert.equal(state.confirmations.length,confirmationCount);view.app.unmount()

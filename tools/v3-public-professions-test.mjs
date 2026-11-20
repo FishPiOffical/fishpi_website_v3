@@ -14,13 +14,13 @@ const api=await import(url(compile((await fs.readFile('src/api/v3-profession-pub
 const definition={professionId:'10',professionCode:'writer',displayName:'创作者',shortName:'创作',description:'<b>仅作文本</b>'}
 const progress={...definition,state:'ACTIVE',levelCode:'L1',levelName:'初学者'}
 const contribution={professionId:'10',actionCode:'article.publish',eventCount:2,lastOccurredAt:1792800000000}
-const activity={professionId:'10',actionCode:'article.publish',occurredAt:1792800000000}
+const activity={professionId:'10',actionCode:'article.publish',sourceDescription:'发布帖子',occurredAt:1792800000000}
 const rarity={rank:2,totalUsers:10,surpassedPercent:80}
 const profile={primaryProfession:progress,majorContributions:[contribution],activityFeed:[activity]}
 const envelope=data=>({code:0,data})
 __publicResponses.push(envelope({...profile,userPhone:'must-not-project',configJson:'private'}));let result=await api.fetchV3PublicProfessions('Alice')
 assert.deepEqual(result,profile);assert.equal(Object.hasOwn(result,'ranking'),false);assert.equal(Object.hasOwn(result.primaryProfession,'totalExperience'),false);assert.equal(Object.hasOwn(result.majorContributions[0],'experienceSum'),false);assert.equal(Object.hasOwn(result.activityFeed[0],'experienceDelta'),false)
-assert.equal(__publicRequests.at(-1).path,'/api/v3/users/Alice/professions');assert.equal(__publicRequests.at(-1).init,undefined)
+assert.equal(__publicRequests.at(-1).path,'/api/v3/users/Alice/professions');assert.deepEqual(__publicRequests.at(-1).init,{cache:'no-store'})
 console.log('PASS public professions 1 optional modules/experience remain absent across progress/contributions/activity; extra sensitive or raw fields never project')
 const selected={primaryProfession:{...definition,state:'SELECTED'}}
 __publicResponses.push(envelope(selected));assert.deepEqual(await api.fetchV3PublicProfessions('Alice'),selected)
@@ -36,6 +36,9 @@ const authURL=url('export const useAuthStore=globalThis.__publicAuth'),apiURL=ur
 const source=await fs.readFile('src/components/profession/PublicProfessions.vue','utf8'),descriptor=parse(source).descriptor
 let componentCode=compile(compileScript(descriptor,{id:'public-profession-test',inlineTemplate:true}).content).replace(/from ['"]vue['"]/g,`from '${import.meta.resolve('vue')}'`).replace(/from ['"]pinia['"]/g,`from '${import.meta.resolve('pinia')}'`).replace("from '@/stores/auth'",`from '${authURL}'`).replace("from '@/api/http'",`from '${http}'`).replace("from '@/api/v3-profession-public'",`from '${apiURL}'`)
 componentCode=componentCode.replace("from '@/utils/time'",`from '${url('export const formatDateTime=String')}'`)
+const table = compile(compileScript(parse(await fs.readFile('src/components/member/MemberRecordsTable.vue','utf8')).descriptor, {id:'member-table-test',inlineTemplate:true}).content).replace(/from ['"]vue['"]/g,`from '${import.meta.resolve('vue')}'`)
+componentCode=componentCode.replace("from '@/components/member/MemberRecordsTable.vue'", `from '${url(table)}'`)
+  .replace("from '@/api/v3-professions'", `from '${url("export const professionTriggers={'article.published':'发布帖子'}")}'`)
 const component=(await import(url(componentCode))).default
 const tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();await nextTick()}
 const insert=(node,parent,anchor)=>{if(node.parent){const i=node.parent.children.indexOf(node);if(i>=0)node.parent.children.splice(i,1)}const i=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(i<0?parent.children.length:i,0,node);node.parent=parent}
@@ -43,7 +46,7 @@ const renderer=createRenderer({patchProp(el,key,old,value){el.props[key]=value},
 const content=node=>[node.text||'',...(node.children||[]).map(content)].join(' ')
 function mount(name='Alice'){const target=ref(name),root={children:[]};const app=renderer.createApp({setup:()=>()=>h(component,{userName:target.value})});app.use(createPinia());app.mount(root);return{app,target,root,text:()=>content(root)}}
 __publicAPI.fetchV3PublicProfessions=async()=>profile;let view=mount();await tick();let visible=view.text();assert.match(visible,/初学者/);assert.match(visible,/<b>仅作文本<\/b>/);assert.ok(!visible.includes('累计经验')&&!visible.includes('可见榜名次')&&!visible.includes('贡献统计')&&!visible.includes('暂无可展示的奖励'))
-__publicAPI.fetchV3PublicProfessions=async()=>full;auth.accessToken='A';await tick();visible=view.text();assert.match(visible,/累计经验 0/);assert.match(visible,/-2 经验/);assert.match(visible,/80.00%/);assert.match(visible,/待发放/)
+__publicAPI.fetchV3PublicProfessions=async()=>full;auth.accessToken='A';await tick();visible=view.text();assert.match(visible,/累计经验 0/);assert.match(visible,/-2 经验/);assert.match(visible,/发布帖子/);assert.match(visible,/80.00%/);assert.match(visible,/待发放/)
 view.app.unmount();console.log('PASS public professions 4 actual compiled Vue template omits hidden sections/numbers while rendering zero, signed changes, rarity and reward state as text')
 auth.accessToken=null;__publicAPI.fetchV3PublicProfessions=async()=>selected;view=mount();await tick();assert.match(view.text(),/已选择，尚无经验进度/);assert.ok(!view.text().includes('累计经验')&&!view.text().includes('初学者'));view.app.unmount()
 let reads=0;__publicAPI.fetchV3PublicProfessions=async()=>{reads++;return full};const app=createSSRApp(component,{userName:'Alice'});app.use(createPinia());const html=await renderToString(app);assert.equal(reads,0);assert.ok(!html.includes('初学者')&&!html.includes('80.00%'))
@@ -53,8 +56,8 @@ let releaseReader;__publicAPI.fetchV3PublicProfessions=async()=>auth.accessToken
 console.log('PASS public professions 6 actual target/credential changes replace reader-bound output and reject delayed old target/private summaries')
 __publicAPI.fetchV3PublicProfessions=async()=>{throw new ApiError('concealed',404)};view=mount();await tick();assert.match(view.text(),/当前没有可展示的职业资料/);assert.ok(!view.text().includes('concealed'));view.app.unmount()
 __publicAPI.fetchV3PublicProfessions=async()=>{throw new ApiError('temporary unavailable',503)};view=mount();await tick();assert.match(view.text(),/职业详情暂不可用/);assert.ok(!view.text().includes('temporary unavailable'));assert.ok(!view.text().includes('当前没有可展示的职业资料'));view.app.unmount()
-const member=await fs.readFile('src/components/member/MemberProfileBadges.vue','utf8');assert.doesNotMatch(member,/<PublicProfessions/);assert.match(member,/<RouterLink v-if="summary" to="\/top\/profession"/);assert.ok(!source.includes('重新读取公开职业资料'))
-console.log('PASS public professions 7 concealed 404 and real failures remain distinct; member badge links to the ranking instead of mounting details')
+const member=await fs.readFile('src/components/member/MemberProfileBadges.vue','utf8');assert.doesNotMatch(member,/<PublicProfessions/);assert.match(member,/aria-label="查看职业动态"/);assert.ok(!source.includes('重新读取公开职业资料'))
+console.log('PASS public professions 7 concealed 404 and real failures remain distinct; member badge links to the profile profession route')
 
 __publicResponses.push(envelope({primaryProfession:{...progress,iconUrl:'/images/profession/writer.svg'}}))
 const summary=await api.fetchV3ProfessionSummary('Alice',new AbortController().signal)

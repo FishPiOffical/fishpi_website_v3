@@ -264,17 +264,19 @@ const routes = [
         : memberTab === 'followingTags' || memberTab === 'followingArticles' || memberTab === 'watchingArticles'
           ? () => import('@/views/SavedContentView.vue')
           : () => import('@/views/MemberView.vue'),
-    meta: { memberTab },
+    meta: { memberTab, ...(memberTab === 'points' ? { robots: 'noindex' } : {}) },
   })),
-  ...(['profession', 'medals'] as const).map(section => ({
-    path: `/member/:userName/${section}`,
-    redirect: (to: RouteLocation) => ({ path: `/member/${encodeURIComponent(String(to.params.userName))}`, query: to.query, hash: `#member-${section}` }),
-  })),
+  { path: '/member/:userName/profession', component: () => import('@/views/MemberProfessionView.vue') },
+  {
+    path: '/member/:userName/medals',
+    redirect: (to: RouteLocation) => ({ path: `/member/${encodeURIComponent(String(to.params.userName))}`, query: to.query, hash: '#member-medals' }),
+  },
   { path: '/domains', component: () => import('@/views/DomainView.vue') },
   { path: '/tags', component: () => import('@/views/TagsView.vue') },
   { path: '/breezemoons', component: () => import('@/views/BreezemoonView.vue') },
   { path: '/repeater', component: () => import('@/views/RepeaterView.vue') },
   { path: '/logs', component: () => import('@/views/LogsView.vue'), meta: { auth: true, robots: 'noindex' } },
+  { path: '/top/parking', component: () => import('@/views/TopView.vue'), meta: { auth: true, robots: 'noindex' } },
   { path: '/top/pets', component: () => import('@/views/TopView.vue') },
   { path: '/pets/profile/:petId', name: 'ranked-pet-profile', component: () => import('@/views/PetProfileView.vue'), meta: { robots: 'noindex' } },
   { path: '/top/links', component: () => import('@/views/TopView.vue') },
@@ -393,6 +395,8 @@ const routes = [
     component: () => import('@/views/PetBrawlView.vue'),
     meta: { auth: true, robots: 'noindex' },
   },
+  { path: '/partners', name: 'partners', component: () => import('@/views/PartnersView.vue'), meta: { auth: true, robots: 'noindex' } },
+  { path: '/parking', name: 'parking', component: () => import('@/views/ParkingView.vue'), meta: { auth: true, robots: 'noindex' } },
   {
     path: '/pets',
     name: 'pets',

@@ -17,6 +17,7 @@ const props = withDefaults(
     /** 私信等场景只保留常用的格式、链接和图片工具 */
     compact?: boolean
     adaptiveHeight?: boolean
+    instantInput?: boolean
     resizeEdge?: 'top' | 'bottom'
     chatSendShortcut?: ChatSendShortcut
   }>(),
@@ -72,8 +73,8 @@ function onEditorKeydown(event: KeyboardEvent) {
 
 function reveal() {
   void nextTick(() => {
+    editor.value?.focus({ preventScroll: true })
     root.value?.scrollIntoView({ block: 'nearest' })
-    editor.value?.focus()
   })
 }
 
@@ -81,7 +82,7 @@ defineExpose({
   flush,
   focus: () => editor.value?.focus(),
   reveal,
-  insert: (text: string) => editor.value?.insert(text),
+  insert: (text: string) => editor.value?.insertText(text),
 })
 </script>
 
@@ -93,6 +94,7 @@ defineExpose({
       :model-value="modelValue"
       :height="height"
       :adaptive-height="adaptiveHeight"
+      :instant-input="instantInput"
       :resize-edge="resizeEdge"
       mode="reply"
       :toolbar-preset="compact ? 'message' : 'default'"
@@ -134,6 +136,7 @@ defineExpose({
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  container: chat-composer / inline-size;
 }
 .bar {
   display: flex;
@@ -186,7 +189,7 @@ defineExpose({
   .emoji-trigger { padding: 6px 8px; span { display: none; } }
 }
 .inline-context { min-width: 0; }
-@media (max-width: 600px) {
+@container chat-composer (max-width: 600px) {
   .bar.has-inline-context {
     grid-template-columns: minmax(0, 1fr) max-content;
     .tools, .actions { flex-wrap: wrap; }

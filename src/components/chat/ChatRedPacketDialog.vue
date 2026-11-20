@@ -24,6 +24,19 @@ watch(()=>store.detail,()=>{cancel();gesture.value='';localError.value=''});watc
 const hands=[{value:0,label:'石头',image:'/images/redpacket/gesture/rock.png'},{value:1,label:'剪刀',image:'/images/redpacket/gesture/scissors.png'},{value:2,label:'布',image:'/images/redpacket/gesture/paper.png'}] as const
 const hand=(g:number)=>hands[g]?.label||'未知'
 const detail=computed(()=>store.detail)
+const luckiestUserId = computed(() => {
+  const packet = detail.value
+  if (!packet || packet.got !== packet.count) return ''
+  let highest = 0
+  let winner = ''
+  for (const claim of packet.claims) {
+    if (claim.amount > highest) {
+      highest = claim.amount
+      winner = claim.user.id
+    }
+  }
+  return winner
+})
 const recipientLabel=computed(()=>{
   const packet=detail.value
   if (packet?.type!=='specify') return ''
@@ -105,14 +118,17 @@ function fallback(event:Event){const img=event.target as HTMLImageElement;if(img
       </section>
       <p v-else-if="canClaim&&detail.type==='heartbeat'" class="risk-note">心跳红包可能领取负积分并扣款，领取前余额需至少 {{ detail.poolPoints }} 积分。</p>
 
-      <div v-if="canClaim && !isDuel" class="claim-action"><button type="button" class="claim-button" :disabled="store.busy||!!store.pending||confirming" @click="claim">{{ store.busy?'正在领取…':confirming?'等待确认…':detail.type==='heartbeat'?'接受扣分风险并领取':'领取一份' }}</button></div>
+      <div v-if="canClaim && !isDuel" class="claim-action"><button type="button" class="claim-button" :disabled="store.busy||!!store.pending||confirming" @click="claim">{{ store.busy?'正在领取…':confirming?'等待确认…':'领取一份' }}</button></div>
       <p v-if="localError" class="inline-error" role="alert">{{ localError }}</p>
 
       <section class="claim-records" aria-label="红包领取记录">
         <header><h3>领取记录 <span>{{ detail.got }}</span></h3><button type="button" class="refresh-button" :disabled="store.loading" @click="store.open()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5 M4 17v-5h5 M6 7a7 7 0 0 1 12-2l2 2 M4 17l2 2a7 7 0 0 0 12-2" /></svg>刷新详情</button></header>
         <ul v-if="detail.claims.length"><li v-for="row in detail.claims" :key="row.user.id">
           <RouterLink v-if="row.user.userName" :to="`/member/${encodeURIComponent(row.user.userName)}`" :data-user-card="row.user.userName" class="record-avatar" @click="store.close" :aria-label="`查看 ${row.user.userNickname||row.user.userName} 的主页`"><img :src="avatarThumbnail(avatarUrl(row.user), 28)" alt="" @error="fallback" /></RouterLink><img v-else class="record-avatar" :src="avatarThumbnail(avatarUrl(row.user), 28)" alt="" @error="fallback" />
-          <div class="record-person"><strong>{{ row.user.userNickname||row.user.userName||row.user.id }}</strong><time v-if="row.claimedAt">{{ formatDateTime(row.claimedAt) }}</time><small v-if="row.gesture!==undefined" class="record-duel">{{ hand(row.gesture) }} · {{ resultLabel(row.outcome) }}<span v-if="row.senderRefundPoints!==undefined"> · 退回发送者 {{ row.senderRefundPoints }} 积分</span></small></div>
+          <div class="record-person"><strong>{{ row.user.userNickname||row.user.userName||row.user.id }}</strong>
+            <span v-if="row.user.id===luckiestUserId" class="record-badge is-luckiest">来自老王的认可</span>
+            <span v-else-if="row.amount===0" class="record-badge is-zero">0溢事件</span>
+            <time v-if="row.claimedAt">{{ formatDateTime(row.claimedAt) }}</time><small v-if="row.gesture!==undefined" class="record-duel">{{ hand(row.gesture) }} · {{ resultLabel(row.outcome) }}<span v-if="row.senderRefundPoints!==undefined"> · 退回发送者 {{ row.senderRefundPoints }} 积分</span></small></div>
           <div class="record-amount" :class="{'is-debit':row.amount<0}"><strong>{{ signed(row.amount) }}</strong><small>{{ row.amount<0?'积分 · 扣款':'积分' }}</small></div>
         </li></ul>
         <p v-else class="records-empty">暂无领取记录</p>
@@ -146,6 +162,21 @@ button:disabled { opacity:.55; cursor:default; }
 .refresh-button,.subtle-button { display:inline-flex; align-items:center; gap:4px; padding:5px 7px; border:0; border-radius:6px; background:transparent; color:var(--fp-muted); font-size:11px; cursor:pointer; &:hover:not(:disabled) { background:var(--fp-hover); color:var(--fp-title); } svg { width:13px; height:13px; } }
 .record-avatar { display:block; flex:none; width:28px; height:28px; border-radius:var(--fp-avatar-radius); object-fit:cover; img { display:block; width:100%; height:100%; border-radius:inherit; object-fit:cover; } }
 .record-person { display:flex; min-width:0; flex:1; flex-direction:column; gap:3px; strong { color:var(--fp-title); font-size:12px; font-weight:500; } time,.record-duel { color:var(--fp-muted); font-size:10px; line-height:1.5; } }
+.record-badge {
+  align-self:flex-start;
+  padding:2px 6px;
+  border-radius:4px;
+  font-size:10px;
+  line-height:1.5;
+  &.is-luckiest {
+    color:color-mix(in srgb,var(--fp-success,#278045) 50%,var(--fp-title));
+    background:color-mix(in srgb,var(--fp-success,#278045) 10%,var(--fp-card));
+  }
+  &.is-zero {
+    color:var(--fp-danger-ink,#bc5142);
+    background:color-mix(in srgb,var(--fp-danger,#bc5142) 10%,var(--fp-card));
+  }
+}
 .record-amount { display:flex; flex:none; flex-direction:column; align-items:flex-end; gap:3px; color:#b78244; strong { font-size:17px; font-weight:600; font-variant-numeric:tabular-nums; } small { font-size:10px; color:var(--fp-muted); } &.is-debit { color:#c45c4c; } }
 .records-empty { margin:0; padding:21px 8px; text-align:center; color:var(--fp-muted); font-size:12px; }
 .quiet-note { margin:12px 0 0; color:var(--fp-muted); font-size:11px; line-height:1.6; }

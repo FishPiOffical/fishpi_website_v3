@@ -14,7 +14,8 @@ const imports = {
   '@/components/EmojiPicker.vue': stub,
   '@/stores/appearance': url('export function useAppearanceStore(){return {state:{theme:"light"}}}'),
   '@/utils/markdownPreview': url('export function createMarkdownPreview(){return {reset(){},dispose(){},transform(){},parse(){}}}'),
-  '@/utils/editorUpload': url('export function createEditorUpload(){return {cancel(){},dispose(){},handler(){}}}'),
+  '@/utils/markdownEditorAssets': url(ts.transpileModule(await fs.readFile('src/utils/markdownEditorAssets.ts', 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText),
+  '@/utils/editorUpload': url('export const editorUploadAccept = ""; export function createEditorUpload(){return {cancel(){},dispose(){},handler(){}}}'),
   '@/utils/mentionHints': url('export function createMentionHints(){return {cancel(){},dispose(){},hint(){}}}'),
   '@/api/http': url('export function getAuthContextVersion(){return 1} export function onAccessTokenChange(){return ()=>{}}'),
   '@/utils/chatSendShortcut': url('export function matchesChatSendShortcut(){return false}'),
@@ -26,12 +27,13 @@ async function component(path) {
   return url(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
 }
 let instance
+let delayReady = false
 window.Vditor = class {
   constructor(host, options) {
     instance = this; this.options = options
     this.el = document.createElement('div'); this.el.setAttribute('contenteditable', 'true')
     host.append(this.el); this.el.textContent = options.value
-    queueMicrotask(options.after)
+    if (!delayReady) queueMicrotask(options.after)
   }
   getValue() { return this.el.textContent }
   setValue(value) { this.el.textContent = value }
@@ -44,8 +46,21 @@ const Composer = (await import(await component('src/components/ChatComposer.vue'
 const draft = ref(''), busy = ref(false), blocked = ref(false), sent = []
 const app = createApp({ render: () => h(Composer, { modelValue: draft.value, sending: busy.value, disabled: blocked.value,
   'onUpdate:modelValue': value => { draft.value = value }, onSubmit: () => sent.push(draft.value) }) })
+const assets = await import(imports['@/utils/markdownEditorAssets'])
+assets.preloadMarkdownEditor()
+const firstLoad = assets.loadVditor()
+const failedSheet = document.querySelector('link[rel="stylesheet"]')
+failedSheet.dispatchEvent(new Event('error'))
+await assert.rejects(firstLoad, /样式加载失败/)
+assert.equal(failedSheet.isConnected, false)
 app.mount('#app')
 const tick = async () => { await Promise.resolve(); await nextTick(); await Promise.resolve(); await nextTick() }
+await tick()
+assert.equal(instance, undefined, '脚本已就绪也要等真正的样式表加载')
+assert.equal(document.querySelectorAll('link[rel="preload"]').length, 2)
+const stylesheet = document.querySelector(`link[rel="stylesheet"][href="${assets.VDITOR_CDN}/index.css"]`)
+assert.ok(stylesheet, '脚本预加载不能替代样式表')
+stylesheet.dispatchEvent(new Event('load'))
 await tick()
 const button = () => document.querySelector('button.send')
 async function input(text) { instance.el.textContent = text; instance.el.dispatchEvent(new Event('input', { bubbles: true })); await tick() }
@@ -67,5 +82,39 @@ draft.value = ''; await tick(); assert.equal(button().disabled, true)
 assert.equal(instance.options.preview.delay, 750)
 assert.equal(instance.options.undoDelay, undefined, '保留 Vditor 默认撤销节流')
 instance.el.dispatchEvent(new Event('input', { bubbles: true })); app.unmount(); await tick()
-dom.window.close()
 console.log('PASS 输入即时启用、清空/空白禁用、最新正文发送、发送中/未确认禁用、IME、外部清空及卸载；撤销和预览节流不变')
+
+delayReady = true
+let nextFrame
+globalThis.requestAnimationFrame = callback => { nextFrame = callback; return 1 }
+globalThis.cancelAnimationFrame = () => { nextFrame = undefined }
+const replyDraft = ref(''), replies = []
+const reply = createApp({ render: () => h(Composer, { modelValue: replyDraft.value, instantInput: true, allowEmpty: true,
+  'onUpdate:modelValue': value => { replyDraft.value = value }, onSubmit: () => replies.push(replyDraft.value) }) })
+reply.mount('#app'); await tick()
+const textarea = document.querySelector('textarea')
+assert.ok(textarea, '编辑器就绪前显示可输入的正文')
+textarea.value = '起始：'
+textarea.dispatchEvent(new Event('input', { bubbles: true }))
+await tick()
+assert.equal(replyDraft.value, '起始：')
+textarea.dispatchEvent(new Event('compositionstart', { bubbles: true }))
+textarea.value = '起始：zhongwen'
+textarea.dispatchEvent(new Event('input', { bubbles: true }))
+instance.options.after(); await tick()
+assert.equal(document.querySelector('textarea'), textarea, '选字时保留原输入节点')
+assert.equal(replyDraft.value, '起始：', '组合中的拼音不写入草稿')
+button().click()
+assert.deepEqual(replies, [], '选字期间不提交')
+textarea.dispatchEvent(new Event('compositionend', { bubbles: true }))
+textarea.value = '起始：中文'
+textarea.dispatchEvent(new Event('input', { bubbles: true }))
+await tick()
+assert.equal(document.querySelector('textarea'), textarea, '等待确认选字后的最后一次 input')
+nextFrame(); await tick()
+assert.equal(document.querySelector('textarea'), null)
+assert.equal(instance.getValue(), '起始：中文')
+button().click(); await tick()
+assert.deepEqual(replies, ['起始：中文'])
+reply.unmount(); dom.window.close()
+console.log('PASS 回复可提前输入，选字期间不接管或提交，Vditor 接管最后确认的正文')

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChatSidebarModuleId } from './meta'
 
-defineProps<{ name: ChatSidebarModuleId | 'settings' | 'chevron' | 'checkin' | 'download' }>()
+defineProps<{ name: ChatSidebarModuleId | 'settings' | 'chevron' | 'checkin' | 'download' | 'pencil' }>()
 const paths = {
   profile: 'M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z',
   // 风绕月使用 20px 画布，月牙与两道风线留出间隙，避免小尺寸下粘连。
@@ -17,6 +17,7 @@ const paths = {
   download: 'M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4',
   settings: 'M10 3h4l.6 2.4 2 .9 2.2-1.1 2 3.5-1.7 1.8v3l1.7 1.8-2 3.5-2.2-1.1-2 .9L14 21h-4l-.6-2.4-2-.9-2.2 1.1-2-3.5 1.7-1.8v-3L3.2 8.7l2-3.5 2.2 1.1 2-.9L10 3ZM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
   chevron: 'm8 10 4 4 4-4',
+  pencil: 'M13.5 6.5l4 4M4 20l4.5-1 11-11a2.8 2.8 0 0 0-4-4l-11 11L4 20Z',
 }
 </script>
 

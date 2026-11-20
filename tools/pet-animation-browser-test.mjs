@@ -36,11 +36,17 @@ for (const skill of serverState.pet.skills) skill.experience = 30
 serverState.wallet.coins = 920
 let fault = '', hold = null
 let riskRequired = false, riskVerified = false, riskRetryAt = 0, challenge = null, careDue = null
+let autoRestDue = null
 export const setRisk = mode => { riskRequired = mode === 'verification'; riskVerified = false; riskRetryAt = mode === 'cooldown' ? Date.now() + 1000 : 0 }
 export const setFullCareSoon = () => {
   serverState.pet.hunger = serverState.pet.water = 100
   serverState.pet.careAvailableAt = { feed: now + 1000, water: now + 1000 }
   careDue = { at: Date.now() + 1000, server: now + 1000 }
+}
+export const setAutoRestSoon = () => {
+  serverState.pet.energy = 10
+  serverState.pet.autoRestAt = now + 1500
+  autoRestDue = Date.now() + 1500
 }
 const receipts = new Map()
 const clockBase = now, clockStarted = Date.now()
@@ -52,6 +58,14 @@ const care = createPetPreviewCare({ getState: () => serverState, catalog,
 const syncClock = () => {
   now = clockBase + clockOffset + (fixedClock ? 0 : Date.now() - clockStarted)
   care.settle(now)
+  if (autoRestDue !== null && Date.now() >= autoRestDue) {
+    const startedAt = serverState.pet.autoRestAt
+    clockOffset += 1500
+    now = serverState.serverNow = startedAt
+    serverState.pet.activity = { kind: 'rest', startedAt, endsAt: startedAt + catalog.rules.restDurationMs }
+    delete serverState.pet.autoRestAt
+    autoRestDue = null
+  }
   if (careDue && Date.now() >= careDue.at) {
     clockOffset += 1001; now = careDue.server + 1; careDue = null
     serverState.serverNow = now
@@ -603,25 +617,24 @@ try {
   await evaluate('petFixture.finishActivity();petFixture.pets.refresh()')
   await until(sceneAction('idle'), '活动到期待领取使用待机')
   results.push('休息、外出、上课、工作使用循环动作；到期待领取不继续活动动画')
-  const beforeSupply = await evaluate('({ coins:petFixture.pets.coins, food:petFixture.pets.foodQuantity, calls:petFixture.calls.length, reward:{ coins:petFixture.pets.state.dailySupply.coins, food:petFixture.pets.state.dailySupply.food } })')
-  await evaluate("document.querySelector('.supply-panel button').click()")
+  assert.equal(await evaluate("document.querySelector('.supply-panel, .pet-guide-supply') === null"), true)
+  const beforeSupply = await evaluate('({ coins:petFixture.pets.coins, food:petFixture.pets.foodQuantity, calls:petFixture.calls.length })')
+  await evaluate('petFixture.pets.claimSupply()')
   await until(sceneAction('celebrate'), '补给确认后庆祝')
   assert.deepEqual(await evaluate('({ coins:petFixture.pets.coins, food:petFixture.pets.foodQuantity, claimed:petFixture.pets.state.dailySupply.claimed })'),
-    { coins: beforeSupply.coins + beforeSupply.reward.coins, food: beforeSupply.food + beforeSupply.reward.food, claimed: true })
-  assert.equal(await evaluate("document.querySelector('.supply-panel button').textContent"), '今日已领取')
-  assert.equal(await evaluate("document.querySelector('.supply-panel button').disabled"), true)
-  assert.equal(await evaluate("document.querySelector('.pet-guide-supply') === null"), true)
+    { coins: beforeSupply.coins, food: beforeSupply.food, claimed: true })
+  assert.equal(await evaluate("document.querySelector('.supply-panel, .pet-guide-supply') === null"), true)
   assert.deepEqual(await evaluate(`petFixture.calls.slice(${beforeSupply.calls}).map(x=>x.method)`), ['POST', 'GET'])
   const afterSupplyCalls = await evaluate('petFixture.calls.length')
-  await evaluate("document.querySelector('.supply-panel button').click();petFixture.pets.claimSupply()")
+  await evaluate('petFixture.pets.claimSupply()')
   assert.equal(await evaluate('petFixture.calls.length'), afterSupplyCalls)
   await evaluate(`(()=>{const v=${sceneVideo};v.currentTime=v.duration-.15})()`)
   await until(sceneAction('idle'), '庆祝完回待机')
-  results.push('补给实际到账并禁用领取按钮，重复点击不请求；庆祝一次后回待机')
+  results.push('兼容补给只更新领取状态，重复调用不请求，庆祝一次后回待机')
 
-  // 模拟已发奖但响应丢失，恢复原幂等键只能核对结果，不能再发一份。
+  // 模拟已登记领取但丢失回包，恢复原幂等键后只同步领取状态。
   await navigate()
-  const recoverySupply = await evaluate('({ coins:petFixture.pets.coins, food:petFixture.pets.foodQuantity, reward:{ coins:petFixture.pets.state.dailySupply.coins, food:petFixture.pets.state.dailySupply.food } })')
+  const recoverySupply = await evaluate('({ coins:petFixture.pets.coins, food:petFixture.pets.foodQuantity })')
   await evaluate("petFixture.setFault('unknown');petFixture.pets.claimSupply()")
   assert.equal(await evaluate('!!petFixture.pets.pending'), true)
   assert.equal(await evaluate('petFixture.pets.confirmedEvent'), null)
@@ -630,10 +643,10 @@ try {
   await evaluate('petFixture.pets.retryPending()')
   await until(sceneAction('celebrate'), '补给未知结果恢复后庆祝')
   assert.deepEqual(await evaluate('({ coins:petFixture.pets.coins, food:petFixture.pets.foodQuantity, claimed:petFixture.pets.state.dailySupply.claimed })'),
-    { coins: recoverySupply.coins + recoverySupply.reward.coins, food: recoverySupply.food + recoverySupply.reward.food, claimed: true })
+    { coins: recoverySupply.coins, food: recoverySupply.food, claimed: true })
   await evaluate(`(()=>{const v=${sceneVideo};v.currentTime=v.duration-.15})()`)
   await until(sceneAction('idle'), '补给恢复动作结束回待机')
-  results.push('补给响应丢失保持未知，原键恢复只发一次奖励且正确更新领取状态')
+  results.push('补给响应丢失保持未知，原键恢复正确更新领取状态，资产保持原值')
 
   await call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
   await until(`!${sceneVideo} || ${sceneVideo}.paused`, '减少动态停止播放')
@@ -643,7 +656,7 @@ try {
   results.push('系统减少动态偏好即时停播并回退静态')
 
   // 真实滚动使主画面离开视口，检查播放暂停，而非直接篡改可见性判断。
-  await setViewport(1440, 450)
+  await setViewport(1440, 300)
   await evaluate('window.scrollTo(0, document.documentElement.scrollHeight)')
   await until(`!${sceneVideo} || ${sceneVideo}.paused`, '离开视口暂停')
   await evaluate('window.scrollTo(0,0)')
@@ -655,6 +668,7 @@ try {
     await setViewport(width, 900)
     await delay(250)
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true)
+    assert.equal(await evaluate("document.querySelector('.supply-panel, .pet-guide-supply') === null"), true)
     await screenshot(`home-${width}.png`)
   }
   results.push('390px与320px布局无横向溢出')
@@ -671,6 +685,20 @@ try {
   await evaluate('petFixture.display.hide()')
   await until(`!document.querySelector('.pet-desktop')`, '隐藏桌宠释放')
   results.push('桌宠展开播放、收起停播、隐藏卸载')
+
+  for (const [width, desktop] of [[1440, false], [390, true]]) {
+    await setViewport(width)
+    await navigate(desktop ? '?desktop' : '')
+    await evaluate('petFixture.setAutoRestSoon();petFixture.pets.refresh()')
+    await until('!!petFixture.pets.pet.autoRestAt', '自动休息时间已读')
+    const before = await evaluate('petFixture.calls.length')
+    await until("petFixture.pets.pet.activity?.kind === 'rest'", '自动休息到点更新')
+    assert.deepEqual(await evaluate(`petFixture.calls.slice(${before}).map(call=>call.method)`), ['GET'])
+    assert.equal(await evaluate(desktop
+      ? "!!document.querySelector('.pet-desktop [aria-label=休息中]') && !document.querySelector('.pet-desktop-panel')"
+      : "!!document.querySelector('.pet-status .sleeping')"), true)
+  }
+  results.push('家园和未打开照顾面板的桌宠到点刷新一次，展示休息状态')
 
   const speciesChecks = []
   for (const species of ['momota', 'yubingmiao', 'paixiaoyu']) {
@@ -722,13 +750,13 @@ try {
     }
     await evaluate('petFixture.finishActivity();petFixture.pets.refresh()')
     await until(sceneAction('idle'), `${species}活动到期回待机`)
-    await evaluate("document.querySelector('.supply-panel button').click()")
+    await evaluate('petFixture.pets.claimSupply()')
     await until(sceneAction('celebrate'), `${species}补给庆祝`)
     await until(`${desktopVideo}?.currentSrc.includes('/celebrate.webm') && !${desktopVideo}.paused`, `${species}桌宠补给庆祝`)
     assert.equal(await evaluate('petFixture.pets.state.dailySupply.claimed'), true)
-    assert.equal(await evaluate('petFixture.pets.coins'), 940)
+    assert.equal(await evaluate('petFixture.pets.coins'), 920)
     await finishCare(`${species}补给庆祝`)
-    results.push(`${species}：四种长期活动两处同步循环、到期回待机，补给到账后两处庆祝一次`)
+    results.push(`${species}：四种长期活动两处同步循环、到期回待机，兼容补给回执确认后两处庆祝一次`)
 
     await evaluate('petFixture.display.setCollapsed(true)')
     await until(`!${desktopVideo} || ${desktopVideo}.paused`, `${species}桌宠收纳停播`)

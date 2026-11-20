@@ -5,6 +5,7 @@ import { useSakuraArrivals } from '@/composables/useSakuraArrivals'
 import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { RouterLink,useRoute,useRouter } from 'vue-router'
 import { CHAT_MENTION, chatMentionText } from '@/chat/mention'
+import { CHAT_QUICK_QUOTE } from '@/chat/messageShortcuts'
 import ChatToolDialog from '@/components/chat/ChatToolDialog.vue'
 import ChatContextPanel from '@/components/chat/ChatContextPanel.vue'
 import { useChatQuoteNavigation } from '@/composables/useChatQuoteNavigation'
@@ -50,7 +51,7 @@ const { simpleMode } = storeToRefs(chatPreferences)
 const { account, isLoggedIn, accessToken } = storeToRefs(auth)
 const composerRef = ref<InstanceType<typeof ChatComposer> | null>(null)
 provide(CHAT_MENTION, {
-  enabled: () => isLoggedIn.value && !publication.pending,
+  enabled: () => isLoggedIn.value && !!composerRef.value && !publication.pending,
   insert: userName => {
     const text = chatMentionText(userName)
     if (!isLoggedIn.value || publication.pending || !text) return
@@ -118,7 +119,11 @@ function togglePanel(panel: typeof chatTools[number]['id']) { activeTool.value =
 watch(()=>JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']),()=>{activeTool.value=''},{flush:'sync'})
 
 const showNodes = ref(false)
-const {quote,quoteBusy,quoteErr,quoteMessage:readQuote,clearQuote,buildQuoteSuffix}=useChatMessageSource()
+const {quote,quoteBusy,quoteErr,quoteMessage:readQuote,clearQuote}=useChatMessageSource()
+provide(CHAT_QUICK_QUOTE, {
+  enabled: id => isLoggedIn.value && !!composerRef.value && !sending.value && !publication.pending && quoteBusy.value !== id,
+  quote: id => { void quoteMessage({oId:id}) },
+})
 const composerQuotes = computed(() => quote.value
   ? [chatMessageQuotePreview(quote.value), ...breezemoonQuotes.value]
   : breezemoonQuotes.value)
@@ -223,19 +228,19 @@ function revealComposer() {
 }
 
 function composedContent() {
-  const text = `${draft.value}${buildQuoteSuffix()}`
-  return [text, ...breezemoonQuotes.value.map(breezemoonQuoteMarkdown)].filter(Boolean).join('\n\n')
+  return [draft.value, ...breezemoonQuotes.value.map(breezemoonQuoteMarkdown)].filter(Boolean).join('\n\n')
 }
 
 async function submit() {
   const content = composedContent()
-  if (!content.trim()) return
+  const replyToMessageId = quote.value?.messageId
+  if ((!content.trim() && !replyToMessageId) || quoteBusy.value) return
   const reader=JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||''])
-  if(await chat.send(content)&&reader===JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']))acceptConfirmed(content.trim())
+  if(await chat.send(content, replyToMessageId)&&reader===JSON.stringify([getAuthContextVersion(),!!accessToken.value,account.value?.oId||'']))acceptConfirmed(content.trim(), replyToMessageId)
 }
 
-function acceptConfirmed(content: string) {
-  if (composedContent().trim() !== content) return
+function acceptConfirmed(content: string, replyToMessageId?: string) {
+  if (composedContent().trim() !== content || quote.value?.messageId !== replyToMessageId || quoteBusy.value) return
   draft.value = ''
   breezemoonQuotes.value = []
   clearQuote()
@@ -449,6 +454,7 @@ function clearScreen() {
                 :animate-sakura="sakuraArrivals.has(entry.message.oId)"
                 :tail="entry.message.tail" :pet-status="entry.message.petStatus" :message-id="entry.message.oId"
                 :time="entry.message.time"
+                :client="entry.message.client"
                 :html="entry.message.html || ''"
                 :source="entry.message.content"
                 :self="entry.message.userName === me"
@@ -459,8 +465,10 @@ function clearScreen() {
                 <template #reactions>
                   <V3ReactionBar kind="chat" :target-id="entry.message.oId" :initial-state="entry.message.reactions" :reactions-unavailable="entry.message.reactionsUnavailable" :initial-read-started="entry.message.reactionReadStarted" />
                 </template>
+                <template #repeat>
+                  <ChatRepeatAction v-if="!entry.message.redPacket && !entry.message.card" :content="entry.message.content" />
+                </template>
                 <template #actions>
-                  <ChatRepeatAction v-if="!entry.message.redPacket && !entry.message.card" :id="entry.message.oId" />
                   <ChatRevokeAction :id="entry.message.oId" :author-id="entry.message.userOId" :red-packet="!!entry.message.redPacket" />
                   <template v-if="!entry.message.redPacket && accessToken">
                     <button type="button" title="引用消息" :disabled="quoteBusy === entry.message.oId" @click="quoteMessage(entry.message!)">
@@ -566,6 +574,7 @@ function clearScreen() {
                 :animate-sakura="sakuraArrivals.has(entry.message.oId)"
                 :tail="entry.message.tail" :pet-status="entry.message.petStatus" :message-id="entry.message.oId"
                 :time="entry.message.time"
+                :client="entry.message.client"
                 :html="entry.message.html || ''"
                 :source="entry.message.content"
                 :self="entry.message.userName === me"
@@ -576,8 +585,10 @@ function clearScreen() {
                 <template #reactions>
                   <V3ReactionBar kind="chat" :target-id="entry.message.oId" :initial-state="entry.message.reactions" :reactions-unavailable="entry.message.reactionsUnavailable" :initial-read-started="entry.message.reactionReadStarted" />
                 </template>
+                <template #repeat>
+                  <ChatRepeatAction v-if="!entry.message.redPacket && !entry.message.card" :content="entry.message.content" />
+                </template>
                 <template #actions>
-                  <ChatRepeatAction v-if="!entry.message.redPacket && !entry.message.card" :id="entry.message.oId" />
                   <ChatRevokeAction :id="entry.message.oId" :author-id="entry.message.userOId" :red-packet="!!entry.message.redPacket" />
                   <template v-if="!entry.message.redPacket && accessToken">
                     <button type="button" title="引用消息" :disabled="quoteBusy === entry.message.oId" @click="quoteMessage(entry.message!)">
@@ -751,7 +762,11 @@ function clearScreen() {
   &.style-toggle { background: var(--fp-surface-subtle,var(--fp-bg)); color: var(--fp-text); }
 }
 
-/* 输入框容器与文本域：100% 占满宽度 */
+.cr-classic-reply :deep(.composer),
+.cr-composer-panel :deep(.composer) {
+  scroll-margin-top: calc(var(--fp-nav-h, 58px) + 12px);
+  scroll-margin-bottom: max(12px, env(safe-area-inset-bottom));
+}
 
 .comment-login-hint {
   text-align: center;
@@ -800,7 +815,11 @@ function clearScreen() {
   svg { width: 14px; height: 14px; }
   &:hover, &[aria-expanded='true'] { background: var(--fp-hover); color: var(--fp-accent); }
 }
-@media(max-width:600px){.composer-tool-btn { padding: 6px 10px; gap: 0; span { display: none; } }.classic-topic-pill { gap: 6px; .topic-text { white-space: normal; overflow-wrap: anywhere; } }}
+@media(max-width:600px){.composer-tool-btn { padding: 6px 10px; gap: 0; span { display: none; } }}
+@container chat-composer (max-width: 600px) {
+  .classic-topic-pill { gap: 6px; }
+  .topic-quote .topic-text { white-space: normal; overflow-wrap: anywhere; }
+}
 
 .classic-online-bar {
   margin-top: 12px;

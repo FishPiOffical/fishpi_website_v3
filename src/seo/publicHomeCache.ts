@@ -1,5 +1,7 @@
+export const PUBLIC_HOME_CACHE_TTL_MS = 300_000
+
 /** Only anonymous public DTOs belong here; never cache an app, HTML or private state. */
-export function createPublicHomeCache(ttlMs = 300_000, capacity = 16) {
+export function createPublicHomeCache(ttlMs = PUBLIC_HOME_CACHE_TTL_MS, capacity = 16) {
   type Entry = { expires: number; value: unknown }
   const values = new Map<string, Entry>()
   const pending = new Map<string, Promise<Entry>>()

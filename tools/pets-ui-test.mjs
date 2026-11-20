@@ -149,6 +149,9 @@ function journalEvent(kind, action, name, changes = {}) {
 }
 const response = data => ({ code: 0, data: structuredClone(data) })
 const success = async (url, options) => {
+  if (url === '/api/v3/me/pet/coffee' && !options?.method) return response({
+    enabled: false, price: 64, version: 1, today: serverState.today, dailyLimit: 3, remaining: 3, energy: 30, balance: 0,
+  })
   if (options?.method) {
     const body = JSON.parse(options.body), kind = url.split('/').at(-1)
     if (kind === 'adoption') serverState = adopted('pet-a', body.name, body.speciesId)
@@ -156,8 +159,6 @@ const success = async (url, options) => {
     if (kind === 'supplies') {
       if (body.expectedDate !== serverState.today) throw new ApiError('补给日期已变化', 409, 'date_changed')
       if (serverState.dailySupply.claimed) throw new ApiError('今天的补给已经领取了', 409, 'supply_claimed')
-      serverState.wallet.coins += serverState.dailySupply.coins
-      changeInventory('food', serverState.dailySupply.food)
       serverState.dailySupply.claimed = true
     }
     if (url.endsWith('/stories/claim')) {
@@ -511,7 +512,7 @@ try {
   serverState.income = { date: '2026-11-12', earned: 60, limit: 60, remaining: 0 }
   await pets.refresh(); await settle()
   assert(document.querySelector('[aria-label="开始图书助理"]').disabled)
-  assert(document.querySelector('[aria-label="开始图书助理"]').title.includes('今日工作收入已达上限'))
+  assert(document.querySelector('[aria-label="开始图书助理"]').title.includes('今日活动收益已达上限'))
   serverState.income = { date: '2026-11-12', earned: 55, limit: 60, remaining: 5 }
   await pets.refresh(); await settle()
   await click(document.querySelector('[aria-label="开始图书助理"]'))
@@ -878,8 +879,10 @@ try {
   assert.equal(retainedQuantity.value, '10')
   await click(sectionButton('activities'))
   assert.equal(document.querySelector('#pet-work-tab').getAttribute('aria-selected'), 'true')
-  assert.equal(calls.length, navigationReadCount, '普通分区切换不得读取聚合状态或提交操作')
-  console.log('PASS 家园六区只显示当前面板，切换保留购买数量和活动选择且零额外请求')
+  assert.deepEqual(calls.slice(navigationReadCount).map(({ url, options }) => [url, options?.method ?? 'GET']), [
+    ['/api/v3/me/pet/coffee', 'GET'], ['/api/v3/me/pet/coffee', 'GET'],
+  ], '切换只允许商店读取咖啡商品，不读取聚合状态或提交操作')
+  console.log('PASS 家园六区只显示当前面板，切换保留购买数量和活动选择，商店只读咖啡商品')
 
   await click(sectionButton('care'))
   const navigationKeys = calls.length
@@ -910,7 +913,7 @@ try {
   await click(sectionButton('workshop'))
   assert(document.querySelector('[aria-label="查看森林种子来源：森林寻种"]'))
   assert.equal(document.querySelector('[aria-label="查看森林种子来源：家园小铺"]'), null, '非卖品不能伪造购买来源')
-  assert.equal(calls.length, materialRequestCount, '材料指引只能定位，不能自动探索、购买或刷新')
+  assert.equal(calls.slice(materialRequestCount).filter(call => call.url !== '/api/v3/me/pet/coffee').length, 0, '材料指引只能定位，不能自动探索、购买或刷新')
   console.log('PASS 缺材料显示目录中的真实来源，导航聚焦正确条目，不把锁定活动或非卖品变成可执行操作')
 
   await click(sectionButton('shop'))
@@ -920,7 +923,7 @@ try {
   const navigationPending = structuredClone(vue.toRaw(pets.pending)), pendingCalls = calls.length
   for (const section of ['stories', 'care', 'activities', 'shop']) await click(sectionButton(section))
   assert.deepEqual(structuredClone(vue.toRaw(pets.pending)), navigationPending)
-  assert.equal(calls.length, pendingCalls, '切区不得自动恢复未知写入')
+  assert.equal(calls.slice(pendingCalls).filter(call => call.url !== '/api/v3/me/pet/coffee').length, 0, '切区不得自动恢复未知写入')
   auth.accessToken = 'token-d-rotated'; await settle()
   selectedSection('shop')
   assert.deepEqual(structuredClone(vue.toRaw(pets.pending)), navigationPending)
@@ -969,10 +972,6 @@ try {
   await click(document.querySelector('.pet-guide-activity'))
   selectedSection('activities')
   assert.equal(document.activeElement, document.querySelector('#pet-activities-title'))
-  await click(document.querySelector('.pet-guide-supply'))
-  selectedSection('care')
-  assert.equal(document.activeElement, document.querySelector('#pet-daily-supplies'))
-  assert.equal(pets.state.dailySupply.claimed, false, '补给摘要不能代替用户领取')
   await click(document.querySelector('.pet-guide-journey'))
   selectedSection('stories')
   assert.equal(calls.length, guideRequests)
@@ -1000,7 +999,7 @@ try {
   selectedSection('care')
   assert.equal(pets.pet.activity.kind, 'rest', '休息摘要不可自动唤醒')
   assert.equal(calls.length, restGuideRequests)
-  console.log('PASS 近况、补给和旅程摘要只导航，领取与唤醒必须由用户单独操作')
+  console.log('PASS 近况和旅程摘要只导航，领取与唤醒必须由用户单独操作')
 
   serverState.pet.activity = null; await pets.refresh(); await settle()
   const rapidNavigationRequests = calls.length
@@ -1014,7 +1013,7 @@ try {
     selectedSection('stories')
     assert.equal(document.activeElement, sectionButton('stories'), '旧材料来源的延迟聚焦不能抢走新分区焦点')
   }
-  assert.equal(calls.length, rapidNavigationRequests)
+  assert.equal(calls.slice(rapidNavigationRequests).filter(call => call.url !== '/api/v3/me/pet/coffee').length, 0)
   console.log('PASS 外出与小铺来源异步定位期间快速切区，不聚焦已经隐藏的旧目标')
 
   const originalNavigationCatalog = pets.catalog, removedTargetRequests = calls.length
@@ -1040,7 +1039,7 @@ try {
     assert.equal(document.querySelector('h3[data-pet-item="reed"]'), null)
     pets.catalog = originalNavigationCatalog; await settle()
   }
-  assert.equal(calls.length, removedTargetRequests)
+  assert.equal(calls.slice(removedTargetRequests).filter(call => call.url !== '/api/v3/me/pet/coffee').length, 0)
   console.log('PASS 定位期间目录移除目标时回到当前分区，不聚焦旧条目或发起补查')
 
   await click(sectionButton('history'))
@@ -1053,28 +1052,63 @@ try {
   assert.equal(historyCount(), changedPetHistoryCount)
   console.log('PASS 同账号更换宠物回到照顾分区并关闭旧日志，后续状态读取不后台刷日志')
 
-  // 补给须同时改变资产和今日状态，不能只凭成功回执或动画判定领取完成。
   serverState = adopted('supply-preview-pet', '补给测试', 'hexiaotun')
   await pets.refresh(); await settle()
-  const supplyCoins = pets.coins, supplyFood = pets.foodQuantity, supplyCalls = calls.length
-  const supplyButton = () => document.querySelector('.supply-panel button')
-  await click(supplyButton())
-  assert.equal(pets.coins, supplyCoins + serverState.dailySupply.coins)
-  assert.equal(pets.foodQuantity, supplyFood + serverState.dailySupply.food)
-  assert.equal(pets.state.dailySupply.claimed, true)
-  assert.equal(supplyButton().textContent, '今日已领取')
-  assert.equal(supplyButton().disabled, true)
-  assert.equal(document.querySelector('.pet-guide-supply'), null)
-  assert.deepEqual(calls.slice(supplyCalls).map(call => call.options?.method || 'GET'), ['POST', 'GET'])
-  const afterSupply = calls.length
-  await click(supplyButton())
-  assert.equal(await pets.claimSupply(), false)
-  assert.equal(calls.length, afterSupply, '已领取后点击或直接调用均不能重发请求')
+  assert.equal(pets.state.dailySupply.claimed, false)
+  assert.equal(document.querySelector('.pet-guide-supply, .supply-panel, #pet-daily-supplies'), null)
+  assert.doesNotMatch(document.body.textContent, /每日补给|领取补给/)
+  console.log('PASS 旧接口仍返回未领取补给时，家园也不显示每日补给入口')
+
+  serverState.catalogVersion = catalog.version = 4
+  catalog.activityVersion = 6
+  catalog.items.find(item => item.id === 'food').price = 50
+  serverState.wallet.coins = 3250
+  serverState.income = { date: serverState.today, earned: 480, limit: 600, remaining: 120 }
+  serverState.dailySupply.coins = 200
   await pets.refresh(); await settle()
-  assert.equal(pets.coins, supplyCoins + serverState.dailySupply.coins)
-  assert.equal(pets.foodQuantity, supplyFood + serverState.dailySupply.food)
-  assert.equal(supplyButton().disabled, true)
-  console.log('PASS 补给领取增加宠物币和口粮，更新已领取状态；重复点击及重新读取不重复发奖')
+  assert.equal(pets.catalog.version, 4)
+  assert.match(document.querySelector('.pet-wallet').textContent, /3,250游园币/)
+  assert.match(document.querySelector('.income-summary').textContent, /480 游园币.*120 游园币/)
+  console.log('PASS 目录从旧版切换到统一钱包，余额和收入额度直接显示服务端数值')
+
+  const coffeePath = '/api/v3/me/pet/coffee'
+  const coffeeOffer = { enabled: true, price: 64, version: 1, today: serverState.today, dailyLimit: 3, remaining: 3, energy: 30, balance: 128 }
+  const { activeDialogState } = await import(await compileFile('src/composables/useDialog.ts'))
+  let chargedKey
+  serverState.pet.energy = 50
+  handler = async (url, options) => {
+    if (url !== coffeePath) return success(url, options)
+    if (!options?.method) return response(coffeeOffer)
+    const key = options.headers['Idempotency-Key']
+    const receipt = { operation: 'coffee', petId: serverState.pet.id, committedAt: now }
+    assert.deepEqual(JSON.parse(options.body), { petId: serverState.pet.id, expectedDate: coffeeOffer.today, version: 1 })
+    if (chargedKey) {
+      assert.equal(key, chargedKey)
+      return response(receipt)
+    }
+    chargedKey = key
+    coffeeOffer.balance -= coffeeOffer.price
+    coffeeOffer.remaining--
+    serverState.pet.energy += 30
+    throw new ApiError('网络中断', 503, 'temporarily_unavailable')
+  }
+  await pets.refresh()
+  await click(sectionButton('shop'))
+  await click(shopFilter('全部'))
+  const coffeeButton = () => [...document.querySelectorAll('.shop-buy button')].find(button => button.textContent === '购买并使用')
+  await click(coffeeButton())
+  assert.match(activeDialogState.value.message, /64 积分.*30 点精力/)
+  activeDialogState.value.resolve(false); await settle()
+  assert.equal(chargedKey, undefined)
+  await click(coffeeButton())
+  activeDialogState.value.resolve(true); await settle()
+  assert.equal(pets.pending.key, chargedKey)
+  await click(document.querySelector('[aria-label="核对上次宠物操作"]'))
+  assert.equal(pets.pending, null)
+  assert.equal(pets.pet.energy, 80)
+  assert.match(document.querySelector('.shop-grid').textContent, /今日剩余 2 \/ 3 次/)
+  assert.equal(coffeeOffer.balance, 64)
+  console.log('PASS 购买前显示费用、取消不提交、丢回包后同键恢复及更新精力和次数')
 } finally {
   app?.unmount()
   await fs.rm(temporary, { recursive: true, force: true })

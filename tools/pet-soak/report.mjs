@@ -100,7 +100,7 @@ export function renderSoakReport(config, state, live, updatedAt = Date.now()) {
     '## 真实接口覆盖',
     Object.entries(live?.coverage || {}).map(([name, count]) => '- ' + name + '：' + count).join('\n') || '等待首批结果。',
     '## 自然计时完成的活动',
-    activities ? '| 测试账号 | 类型 | 名称 | 条目 | 经验 | 宠物币 | 核验时间 |\n|---|---|---|---|---|---|---|\n' + activities : '尚无自然到期并成功领取的活动。',
+    activities ? '| 测试账号 | 类型 | 名称 | 条目 | 经验 | 游戏币收益 | 核验时间 |\n|---|---|---|---|---|---|---|\n' + activities : '尚无自然到期并成功领取的活动。',
     '未列出的活动不算真实 HTTP 完成，完整目录由隔离专项分别验证。技能、工作熟练度与物品增量见 live-summary.json。',
     '## 服务资源观察',
     resources,

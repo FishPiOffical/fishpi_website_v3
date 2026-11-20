@@ -16,6 +16,7 @@ export interface PetConfirmedEvent {
   action?: PetAction
   matchId?: string
   orderId?: string
+  targetPetId?: string
   upgrade?: { weapon: BrawlWeapon; previousLevel: number }
 }
 
@@ -38,6 +39,7 @@ export const usePetsStore = defineStore('pets', () => {
   const offline = ref(typeof navigator !== 'undefined' && navigator.onLine === false)
   const pet = computed(() => state.value?.pet ?? null)
   const coins = computed(() => state.value?.wallet.coins ?? null)
+  const currencyName = computed(() => (state.value?.catalogVersion ?? catalog.value?.version ?? 0) >= 4 ? '游园币' : '宠物币')
   const foodQuantity = computed(() => state.value?.inventory.find(item => item.itemId === 'food')?.quantity ?? 0)
   const ready = computed(() => state.value !== null)
   let generation = 0, sequence = 0, catalogSequence = 0
@@ -207,6 +209,10 @@ export const usePetsStore = defineStore('pets', () => {
         // 在途读取之后收到的失效信号不能被旧快照清掉，合并为一次后续读取。
         if (invalidated) { refreshNeeded.value = true; return }
         state.value = result
+        if (catalog.value && catalog.value.version !== result.catalogVersion) {
+          catalog.value = null
+          void reloadCatalog()
+        }
         receivedAt.value = Date.now()
         refreshNeeded.value = false
         stateFailures = stateRetryAt = 0
@@ -243,6 +249,11 @@ export const usePetsStore = defineStore('pets', () => {
       try {
         const result = await readPetCatalog(controller.signal)
         if (valid() && run === catalogSequence && !controller.signal.aborted) {
+          if (state.value && state.value.catalogVersion !== result.version) {
+            await loadState()
+            if (!valid() || run !== catalogSequence || controller.signal.aborted) return
+            if (state.value?.catalogVersion !== result.version) throw new Error('宠物目录版本已变更，请刷新家园')
+          }
           catalog.value = result
           catalogFailures = catalogRetryAt = 0
         }
@@ -362,6 +373,7 @@ export const usePetsStore = defineStore('pets', () => {
       if (command.kind.startsWith('brawl-')) {
         confirmedEvent.value = { sequence: ++confirmationSequence, petId: receipt.petId,
           kind: command.kind, matchId: receipt.matchId, orderId: receipt.orderId,
+          ...(command.kind === 'brawl-invite' ? { targetPetId: command.targetPetId } : {}),
           ...(command.kind === 'brawl-upgrade' ? { upgrade: { weapon: command.weapon, previousLevel: command.level } } : {}) }
         return true
       }
@@ -451,6 +463,11 @@ export const usePetsStore = defineStore('pets', () => {
   function buyFood(quantity: number): Promise<boolean> {
     return buyItem('food', quantity)
   }
+  function buyCoffee(petId: string, expectedDate: string, version: number): Promise<boolean> {
+    if (!canWrite() || pet.value?.id !== petId || state.value?.today !== expectedDate) return Promise.resolve(false)
+    return execute({ kind: 'coffee', petId, expectedDate, version, key: profileOperationKey() })
+  }
+
   function buyItem(itemId: string, quantity: number): Promise<boolean> {
     if (!canWrite() || !pet.value || !catalog.value) return Promise.resolve(false)
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 20) {
@@ -514,7 +531,7 @@ export const usePetsStore = defineStore('pets', () => {
     return execute({ kind: 'activities/claim', petId: pet.value.id, activityId: activity.id, key: profileOperationKey() })
   }
   function executeBrawl(command: BrawlCommand) {
-    if (pending.value || (command.kind !== 'brawl-season-claim' && !command.petId)) return Promise.resolve(false)
+    if (pending.value || ('petId' in command && !command.petId)) return Promise.resolve(false)
     return execute({ ...command, key: profileOperationKey() })
   }
   function retryPending(): Promise<boolean> {
@@ -544,10 +561,10 @@ export const usePetsStore = defineStore('pets', () => {
     }
   })
   return {
-    state, catalog, pet, coins, foodQuantity, ready, receivedAt, confirmedEvent,
+    state, catalog, pet, coins, currencyName, foodQuantity, ready, receivedAt, confirmedEvent,
     loading, catalogLoading, error, catalogError, busy, pending, pendingError, refreshNeeded, offline,
     riskStage, riskOpen, riskBusy, riskError, riskUntil, riskChallenge, pendingUncertain,
     prepareRisk, submitRiskProof, closeRisk, cancelRejectedOperation,
-    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, craft, claimStory, readopt, startActivity, claimActivity, retryPending, executeBrawl,
+    ensureLoaded, refresh, reloadCatalog, adopt, rename, act, claimSupply, buyFood, buyItem, buyCoffee, craft, claimStory, readopt, startActivity, claimActivity, retryPending, executeBrawl,
   }
 })

@@ -4,8 +4,7 @@ export type PetHomeSection = 'care' | 'activities' | 'stories' | 'shop' | 'works
 export type PetHomeTarget =
   | { section: 'activities'; kind?: PetActivityKind; entryId?: string }
   | { section: 'shop'; itemId?: string }
-  | { section: 'care'; anchor?: 'supplies' }
-  | { section: Exclude<PetHomeSection, 'activities' | 'shop' | 'care'> }
+  | { section: Exclude<PetHomeSection, 'activities' | 'shop'> }
 
 export interface PetMaterialSource {
   name: string

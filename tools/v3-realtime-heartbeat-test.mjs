@@ -62,4 +62,53 @@ assert.equal(intervals().length,1)
 window.dispatchEvent(new Event('fp:captcha-passed'));await tick();assert.equal(captchaTickets,2)
 dispose();window.dispatchEvent(new Event('fp:captcha-passed'));await tick();assert.equal(captchaTickets,2);assert.equal(timers.size,0)
 console.log('PASS captcha-blocked realtime: no unavailable callback, fresh ticket after proof, no duplicate connection and listener cleanup')
+
+let ticketFailure, ticketCalls=0
+globalThis.__heartbeat.request=async path=>{
+ ticketCalls++
+ if(ticketFailure)throw Object.assign(new Error('ticket failed'),ticketFailure)
+ return originalRequest(path)
+}
+async function startFailedChat(failure){
+ ticketCalls=0;ticketFailure=failure
+ const states=[]
+ const stop=captchaRt.subscribeChatChanges(()=>{},state=>states.push(state))
+ await tick()
+ assert.equal(ticketCalls,1)
+ ticketFailure=null
+ return {stop,states}
+}
+for(const [failure,delay] of [
+ [{status:429,retryAfter:'3'},3_000],
+ [{status:429,retryAfter:'date'},5_000],
+ [{status:429},60_000],
+ [{status:0,code:'home_reads_paused',retryAfter:'60'},60_000],
+]){
+ if(failure.retryAfter==='date')failure.retryAfter=new Date(now+delay).toUTCString()
+ const {stop,states}=await startFailedChat(failure)
+ assert.equal(states.at(-1),'closed')
+ assert.equal([...timers.values()][0].delay,delay)
+ window.dispatchEvent(new Event('online'));window.dispatchEvent(new Event('focus'));await tick()
+ assert.equal(ticketCalls,1)
+ now+=delay-1;await retry();assert.equal(ticketCalls,1)
+ assert.equal([...timers.values()][0].delay,1)
+ now++;socket=await retry();assert.equal(ticketCalls,2)
+ message(socket,'authentication.required');message(socket,'ready',{channel:'chat'})
+ assert.equal(states.at(-1),'ready')
+ window.dispatchEvent(new Event('fp:home-reads-resumed'));await tick();assert.equal(ticketCalls,2)
+ stop();assert.equal(timers.size,0)
+}
+for(const failure of [{status:0,code:'home_reads_paused'},{status:0,code:'home_reads_paused',retryAfter:'60'},{status:401},{status:403}]){
+ const {stop,states}=await startFailedChat(failure)
+ const paused=failure.code==='home_reads_paused'
+ assert.equal(states.at(-1),paused?'closed':'blocked')
+ window.dispatchEvent(new Event('fp:home-reads-resumed'))
+ window.dispatchEvent(new Event('fp:home-reads-resumed'));await tick()
+ assert.equal(ticketCalls,paused?2:1)
+ stop();assert.equal(timers.size,0)
+}
+const cooldown=await startFailedChat({status:429})
+cooldown.stop();assert.equal(timers.size,0)
+window.dispatchEvent(new Event('fp:home-reads-resumed'));await tick();assert.equal(ticketCalls,1)
+console.log('PASS chat 429 and homepage recovery: deadline, fresh ticket, no duplicates, auth handling and cleanup')
 Date.now=originalNow

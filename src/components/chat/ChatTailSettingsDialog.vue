@@ -154,7 +154,7 @@ onBeforeUnmount(() => { sequence++; unlock() })
   gap: 6px;
   padding-top: 6px;
   border-top: 1px solid color-mix(in srgb, var(--fp-muted) 22%, transparent);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.4;
   color: var(--fp-muted);
   white-space: pre-wrap;

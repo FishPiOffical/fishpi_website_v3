@@ -9,7 +9,8 @@ const self=computed(()=>mounted.value && auth.isLoggedIn && auth.account?.userNa
 const tabs=computed(()=>[
   ['', '帖子'],['long','长文章'],['comments','回帖'],['breezemoons','清风明月'],
   ['following/users','关注用户'],['followers','关注者'],['following/tags','关注标签'],['watching/articles','关注帖子'],['following/articles','收藏帖子'],
-  ...(self.value?[['articles/anonymous','匿贴'],['comments/anonymous','匿回'],['points','我的积分']]:[]),
+  ['points','积分记录'],['profession','职业动态'],
+  ...(self.value?[['articles/anonymous','匿贴'],['comments/anonymous','匿回']]:[]),
 ])
 function active(path:string) {
   const full=base.value+(path?'/'+path:'')

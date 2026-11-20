@@ -11,21 +11,23 @@ const mocks = data(`import {reactive} from '${vue}';
 export const prefs=reactive({simpleMode:false,blurChatImages:false});window.prefs=prefs;
 export const useChatPreferencesStore=()=>prefs,useFunctionPreferencesStore=()=>prefs;
 export const useAuthStore=()=>({accessToken:'fixture',account:{oId:'me'}}),getAuthContextVersion=()=>1;
-const publication=reactive({busy:false,pending:null,async send(content){publication.busy=true;window.sent=(window.sent||0)+1;await new Promise(r=>setTimeout(r,120));publication.busy=false}});
+const publication=reactive({busy:false,pending:null,async send(content,origin){publication.busy=true;window.sent.push({content,origin});await new Promise(r=>setTimeout(r,120));publication.busy=false}});
 export const useV3ChatPublicationStore=()=>publication;
 export const chatPetStatusLabels={idle:'空闲'},formatDisplayTime=()=> '12:30';
 export const chatMessageDetail=async()=>{window.reads=(window.reads||0)+1;await new Promise(r=>setTimeout(r,80));return {type:'text',content:'一起摸鱼'}};`)
 const modules = {vue, '@/utils/chatRepeatGroups':data(transpile(fs.readFileSync('src/utils/chatRepeatGroups.ts','utf8'))), '@/utils/avatar':data(transpile(fs.readFileSync('src/utils/avatar.ts','utf8')))}
 for (const name of ['@/stores/chatPreferences','@/stores/functionPreferences','@/stores/auth','@/stores/v3ChatPublication','@/api/http','@/api/v3-chat-messages','@/utils/time']) modules[name]=mocks
-for (const name of ['chatAppearance','chatMessage','chatQuote']) {
+for (const name of ['bubbleStyle','chatAppearance','chatMessage','chatQuote']) {
   const source = transpile(fs.readFileSync('src/utils/' + name + '.ts', 'utf8'))
-  modules['@/utils/' + name] = data(source.replace("'@/utils/chatMessage'", `'${modules['@/utils/chatMessage']}'`))
+  modules['@/utils/' + name] = data(source.replace("'@/utils/chatMessage'", `'${modules['@/utils/chatMessage']}'`)
+    .replaceAll("'@/utils/bubbleStyle'", `'${modules['@/utils/bubbleStyle']}'`))
 }
 modules['@/chat/mention']=data(transpile(fs.readFileSync('src/chat/mention.ts','utf8')))
+modules['@/chat/messageShortcuts']=data(transpile(fs.readFileSync('src/chat/messageShortcuts.ts','utf8')))
 // 路由导航和外围服务隔离；实际气泡仍负责昵称、@ 行为、身份及方向。
-modules['vue-router']=data(`import {h} from '${vue}';export const RouterLink={props:['to'],setup(p,{slots}){return()=>h('a',{href:typeof p.to==='string'?p.to:JSON.stringify(p.to)},slots.default?.())}}`)
+modules['vue-router']=data(`import {h} from '${vue}';export const RouterLink={props:{to:{},custom:Boolean},setup(p,{slots}){return()=>{const href=typeof p.to==='string'?p.to:JSON.stringify(p.to);return p.custom?slots.default?.({href,navigate(){}}):h('a',{href},slots.default?.())}}}`)
 const noop=data('export default {setup(){return()=>null}}')
-for(const name of ['@/components/chat/CollectChatEmoji.vue','@/components/ImageLightbox.vue','@/components/medal/MedalList.vue','@/components/user/VipNickname.vue']) modules[name]=noop
+for(const name of ['@/components/chat/ChatGameStatus.vue','@/components/chat/CollectChatEmoji.vue','@/components/ImageLightbox.vue','@/components/medal/MedalList.vue','@/components/user/VipNickname.vue','@/components/packs/ManagedBubbleShape.vue','@/components/packs/SakuraDecoration.vue']) modules[name]=noop
 let css=''
 function compile(file,id) {
   const {descriptor}=parse(fs.readFileSync(file,'utf8'))
@@ -43,12 +45,12 @@ const packs=['candy','fishpond-blue','star-route'].map(id=>fs.readFileSync(`src/
 const html=`<!DOCTYPE html><meta charset="utf-8"><style>
 *{box-sizing:border-box}body{margin:0;font:14px system-ui;background:#f4f6f8;--fp-card:#fff;--fp-border:#dfe4e9;--fp-text:#252a31;--fp-muted:#737c89;--fp-primary:#62ae37;--fp-hover:#f4f6f8}
 .fixture-panel{padding:24px;background:white;max-width:760px;margin:16px auto}.vditor-reset p{margin:0}a{color:inherit}body{--fp-avatar-radius:8px;--fp-bg:#f4f6f8;--fp-self:#edf4e7}${css}${packs}</style><div id="app"></div><script type="module">
-import {createApp,h,ref,provide} from '${vue}';import List from '${list}';import Bubble from '${bubble}';import {CHAT_MENTION} from '${modules['@/chat/mention']}';
+import {createApp,h,ref,provide} from '${vue}';import List from '${list}';import Bubble from '${bubble}';import Repeat from '${modules['./ChatRepeatAction.vue']}';import {CHAT_MENTION} from '${modules['@/chat/mention']}';
 const make=(id,name,content='一起摸鱼')=>({key:id,message:{oId:id,userName:name,userNickname:name,userAvatarURL:'${avatar}',html:'<p>'+content+'</p>',content,appearance:{version:1,frameId:'none',bubbleId:name==='我'?'candy':'fishpond-blue'}}});
 const entries=ref([make('1','小羊'),{key:'join',message:null,notice:{kind:'join'}},make('2','冰岚'),{key:'claim',message:null,notice:{kind:'claim'}},make('3','我')]);
 const reverse=ref(false),ownName=ref('我');window.entries=entries;window.make=make;window.reverse=reverse;window.ownName=ownName;
-window.mentions=[];
-createApp({setup(){provide(CHAT_MENTION,{enabled:()=>true,insert:name=>window.mentions.push(name)});return()=>h('div',{class:'fixture-panel'},[h(List,{entries:entries.value,ownName:ownName.value,reverse:reverse.value},{default:({entry,alignSelf})=>entry.notice?h('p',{'data-notice':entry.key},entry.notice.kind):h(Bubble,{chatroom:true,self:entry.message.userName==='我',alignSelf,userName:entry.message.userName,userId:entry.message.userName==='我'?'me':'other',avatar:'${avatar}',html:entry.message.html,source:entry.message.content,appearance:entry.message.appearance,'data-message':entry.key,'data-author':entry.message.userName})})])}}).mount('#app');
+window.mentions=[];window.sent=[];window.reads=0;
+createApp({setup(){provide(CHAT_MENTION,{enabled:()=>true,insert:name=>window.mentions.push(name)});return()=>h('div',{class:'fixture-panel'},[h(List,{entries:entries.value,ownName:ownName.value,reverse:reverse.value},{default:({entry,alignSelf})=>entry.notice?h('p',{'data-notice':entry.key},entry.notice.kind):h(Bubble,{chatroom:true,self:entry.message.userName==='我',alignSelf,userName:entry.message.userName,userId:entry.message.userName==='我'?'me':'other',avatar:'${avatar}',html:entry.message.html,source:entry.message.content,appearance:entry.message.appearance,'data-message':entry.key,'data-author':entry.message.userName},{repeat:()=>h(Repeat,{content:entry.message.content})})})])}}).mount('#app');
 </script>`
 const browser=await chromium.launch({channel:'chrome',headless:true})
 try {
@@ -65,6 +67,9 @@ try {
    const own=(await message.getAttribute('data-author'))==='我'
    assert.equal(await message.locator('button.name--mention').count(),own?0:1,'方向强制不能改变本人判断及 @ 行为')
    assert.equal(await message.locator('.name').evaluate(el=>el.tagName),own?'A':'BUTTON')
+   const bubble = await message.locator('.fp-bubble').boundingBox()
+   const repeat = await message.locator('.chat-repeat').boundingBox()
+   assert.ok(self ? repeat.x + repeat.width <= bubble.x : repeat.x >= bubble.x + bubble.width, '复读图标在气泡外侧，跟随整组方向')
   }
  }
  async function compactLayers() {
@@ -95,8 +100,10 @@ try {
  }
  await page.screenshot({path:'/tmp/chat-repeat-compact-320.png'})
  await page.setViewportSize({width:1000,height:1000});await page.screenshot({path:'/tmp/chat-repeat-compact-1000.png'})
- await page.locator('.chat-repeat--compact button').evaluate(el=>{el.click();el.click()})
- await page.waitForTimeout(250);assert.equal(await page.evaluate(()=>window.sent),1);assert.equal(await page.evaluate(()=>window.reads),1)
+ assert.equal(await page.locator('.repeat-controls .chat-repeat').count(),0)
+ assert.equal(await page.locator('.repeat-front .message-repeat > .chat-repeat').count(),1)
+ await page.locator('.repeat-front .chat-repeat').evaluate(el=>{el.click();el.click()})
+ await page.waitForFunction(()=>window.sent.length===1);assert.deepEqual(await page.evaluate(()=>window.sent),[{content:'一起摸鱼',origin:'repeat'}]);assert.equal(await page.evaluate(()=>window.reads),0)
  await page.locator('.repeat-controls > button').click();assert.equal(await page.locator('[data-message]').count(),3)
  await direction(false)
  await page.locator('.repeat-controls > button').click()
@@ -157,5 +164,16 @@ try {
  assert.equal(await page.locator('button.name--mention').count(),1)
  await page.evaluate(()=>entries.value=[]);await page.waitForTimeout(40);assert.equal(await page.locator('.repeat-group').count(),0)
  assert.deepEqual(errors,[])
- console.log('PASS 实际复读组件：首条固定方向、真实身份保留、后层仅头像和切片、最新完整前层、六层上限、倒序/展开/追加、320px 至桌面、通知跨越、图片、+1 防连击、精简/模糊和清屏')
+
+ const touch = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true })
+ await touch.route('http://repeat.test/**', route => route.fulfill({ contentType: 'text/html', body: html }))
+ await touch.goto('http://repeat.test/')
+ const touchButton = touch.locator('.repeat-front .chat-repeat')
+ await touchButton.waitFor()
+ const target = await touchButton.boundingBox()
+ assert.ok(target.width >= 44 && target.height >= 44)
+ await touchButton.tap()
+ await touch.waitForFunction(() => window.sent.length === 1)
+ await touch.close()
+ console.log('PASS 复读折叠、图标左右镜像、窄屏防溢出、触屏点按、连点防重、精简/模糊和清屏')
 } finally {await browser.close()}
