@@ -63,14 +63,6 @@ const partnerCards = [
     icon: 'https://file.fishpi.cn/2024/11/lanyiyun-e749f98f.png',
   },
   {
-    href: 'https://www.svyun.com/',
-    title: '云集群由速维云支持',
-    desc: '速维云，安全可靠的云服务',
-    color: '#ff6000',
-    bg: '#ffefc3c9',
-    icon: 'https://file.fishpi.cn/2025/11/09fa5df84a83a0e2bf9edcfed93655e01760763018gwsy1-cea09de1.png',
-  },
-  {
     href: 'https://zhuayuya.com/',
     title: '抓鱼鸭 - 新标签页',
     desc: '是一个有趣的新标签页',
@@ -495,7 +487,7 @@ onUnmounted(() => {
           <a
             v-for="p in partnerCards"
             :key="p.href"
-            class="partner"
+            class="partner partner-support"
             :href="p.href"
             target="_blank"
             rel="noopener"
@@ -977,7 +969,7 @@ main.main--cr-modern {
 }
 .partner-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto repeat(3, minmax(0, 1fr));
   align-items: stretch;
   gap: 10px;
 }
@@ -1211,7 +1203,13 @@ html[data-theme='classic-dark'] .partner {
     gap: 18px;
   }
   .partner-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .partner-row .partner {
+    grid-column: span 2;
+  }
+  .partner-row .partner-support {
+    grid-column: span 3;
   }
   .partner-divider {
     grid-column: 1 / -1;
