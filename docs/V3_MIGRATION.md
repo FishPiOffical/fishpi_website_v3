@@ -160,7 +160,7 @@ tools/v3-notifications-test.mjs六组通过（真实TS adapter/realtime与Pinia 
 
 ## 常用表情与图片分组（2026-10-25）
 
-已接入真实v3常用别名/目录、分组与成员分页、创建/删除自定义组、添加/移除图片、保存/恢复常用表情。入口为/settings/function的表情包区域及共享EmojiPicker；其余功能设置仍是旧链路。新适配src/api/v3-emojis.ts区分私有成员id和全局emojiId，保留签名URL；失败不回退旧接口或伪造图片。fishpi保留调用参数位置而不把Bearer作为apiKey。
+已接入真实v3常用别名/目录、分组与成员分页、创建/删除自定义组、添加/移除图片、保存/恢复常用表情。管理入口为 `/settings/emojis`，`/settings/function` 保留直达链接，编辑器等使用共享 EmojiPicker。新适配src/api/v3-emojis.ts区分私有成员id和全局emojiId，保留签名URL；失败不回退旧接口或伪造图片。fishpi保留调用参数位置而不把Bearer作为apiKey。
 
 EmojiPacks与EmojiPicker按内存accessToken清状态、废弃旧身份响应；写操作保留未确认结果的同内容幂等键，成功或凭据变化清理。EmojiPacks源码SCSS经构建生成，移除父功能卡片内的重复卡片容器。SettingsView的认证分支仅挂载后显示，修复提前恢复token时的SSR水合不一致。移除了mockEmotions中的旧带版本Vditor图片URL；Vditor自己的旧emoji hint、上传及发送链路未随选择器完成迁移。
 

@@ -118,60 +118,67 @@ onBeforeUnmount(() => { mounted = false; reset() })
 
 <template>
   <div class="owner-profile">
+    <header class="settings-section-head"><h2>{{ mode === 'avatar' ? '更换头像' : '基本资料' }}</h2><button class="fp-control settings-refresh" type="button" :disabled="loading || busy" @click="load" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取</span></button></header>
     <p v-if="loading" role="status">正在读取设置…</p>
-    <header class="settings-section-head"><h2>{{ mode === 'avatar' ? '头像设置' : '个人资料' }}</h2><button class="fp-control settings-refresh" type="button" :disabled="loading || busy" @click="load" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取</span></button></header>
     <template v-if="mode === 'profile'">
       <form @submit.prevent="saveProfile" aria-label="公开资料">
         <fieldset :disabled="loading || busy || !loaded.profile">
-          <label>昵称<input class="fp-control" v-model="nickname" maxlength="20" /></label>
-          <label>网址<input class="fp-control" v-model="website" maxlength="100" placeholder="https://" /></label>
+          <legend class="settings-visually-hidden">公开资料</legend>
+          <label>昵称<input class="fp-control" v-model="nickname" maxlength="20" autocomplete="nickname" /></label>
+          <label>网址<input class="fp-control" v-model="website" maxlength="100" placeholder="https://" inputmode="url" autocapitalize="none" spellcheck="false" /></label>
           <label>简介<textarea class="fp-control" v-model="intro" rows="3" maxlength="255" /></label>
           <button data-tone="primary" class="fp-control" type="submit">保存资料</button>
         </fieldset>
         <p v-if="errors.profile" role="alert" class="error">{{ errors.profile }}</p>
         <p v-if="messages.profile" role="status">{{ messages.profile }}</p>
       </form>
-      <form @submit.prevent="savePersonality" aria-label="MBTI">
-        <fieldset :disabled="loading || busy || !loaded.personality">
-          <label>MBTI<input class="fp-control" v-model="mbti" list="owner-mbti-options" maxlength="6" placeholder="如 ENFP-A，留空清除" /></label>
+      <form class="profile-inline-form" @submit.prevent="savePersonality" aria-label="MBTI">
+        <fieldset class="inline-fields" :disabled="loading || busy || !loaded.personality">
+          <legend class="settings-visually-hidden">MBTI</legend>
+          <label>MBTI<input class="fp-control" v-model="mbti" list="owner-mbti-options" maxlength="6" placeholder="如 ENFP-A，留空清除" spellcheck="false" /></label>
           <datalist id="owner-mbti-options"><option v-for="choice in options" :key="choice" :value="choice" /></datalist>
-          <button data-tone="primary" class="fp-control" type="submit">保存 MBTI</button>
+          <button class="fp-control" type="submit">保存 MBTI</button>
         </fieldset>
         <p v-if="errors.personality" role="alert" class="error">{{ errors.personality }}</p>
         <p v-if="messages.personality" role="status">{{ messages.personality }}</p>
       </form>
-      <form @submit.prevent="saveTags" aria-label="个人标签">
-        <fieldset :disabled="loading || busy || !loaded.tags">
-          <label>个人标签<input class="fp-control" v-model="tags" maxlength="128" placeholder="逗号分隔，留空清除" /></label>
-          <button data-tone="primary" class="fp-control" type="submit">保存个人标签</button>
+      <form class="profile-inline-form" @submit.prevent="saveTags" aria-label="个人标签">
+        <fieldset class="inline-fields" :disabled="loading || busy || !loaded.tags">
+          <legend class="settings-visually-hidden">个人标签</legend>
+          <label>个人标签<input class="fp-control" v-model="tags" maxlength="128" placeholder="逗号分隔，留空清除" aria-describedby="profile-tags-hint" /></label>
+          <button class="fp-control" type="submit">保存个人标签</button>
         </fieldset>
-        <p>支持中英文逗号、顿号及分号，最多4项，每项最多12字符，白名单标签除外。</p>
+        <p id="profile-tags-hint">支持中英文逗号、顿号及分号，最多4项，每项最多12字符，白名单标签除外。</p>
         <p v-if="errors.tags" role="alert" class="error">{{ errors.tags }}</p>
         <p v-if="messages.tags" role="status">{{ messages.tags }}</p>
       </form>
-      <form @submit.prevent="saveQq" aria-label="QQ">
-        <fieldset :disabled="loading || busy || !loaded.qq">
-          <label>QQ<input class="fp-control" v-model="qq" inputmode="numeric" maxlength="12" placeholder="留空清除" /></label>
-          <button data-tone="primary" class="fp-control" type="submit">保存 QQ</button>
+      <form class="profile-inline-form" @submit.prevent="saveQq" aria-label="QQ">
+        <fieldset class="inline-fields" :disabled="loading || busy || !loaded.qq">
+          <legend class="settings-visually-hidden">QQ</legend>
+          <label>QQ<input class="fp-control" v-model="qq" inputmode="numeric" maxlength="12" placeholder="留空清除" aria-describedby="profile-qq-hint" /></label>
+          <button class="fp-control" type="submit">保存 QQ</button>
         </fieldset>
-        <p>QQ 仅供本人查看和编辑。</p>
+        <p id="profile-qq-hint">QQ 仅供本人查看和编辑。</p>
         <p v-if="errors.qq" role="alert" class="error">{{ errors.qq }}</p>
         <p v-if="messages.qq" role="status">{{ messages.qq }}</p>
       </form>
     </template>
     <template v-else>
-      <img class="owner-avatar" :src="avatarThumbnail(displayAvatar(avatar), 80)" alt="当前头像" @error="fallbackAvatar" />
-      <form @submit.prevent="saveAvatar">
+      <form aria-label="头像设置" @submit.prevent="saveAvatar">
         <fieldset :disabled="loading || busy || !loaded.avatar">
-          <label class="settings-wide-field">头像图片地址<input class="fp-control" v-model="avatarDraft" maxlength="255" placeholder="https://" /></label>
-          <div class="settings-wide-field avatar-upload-field">
-            <label class="avatar-upload">
-              <input class="settings-visually-hidden" type="file" accept="image/jpeg,image/png,image/gif" aria-describedby="avatar-upload-hint" @change="onUpload" />
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3" /></svg>
-              上传头像
-            </label>
-            <small id="avatar-upload-hint">JPEG、PNG、GIF，最大 1 MB</small>
+          <legend class="settings-visually-hidden">头像设置</legend>
+          <div class="settings-wide-field avatar-preview">
+            <img class="owner-avatar" :src="avatarThumbnail(displayAvatar(avatar), 80)" width="80" height="80" alt="当前头像" @error="fallbackAvatar" />
+            <div class="avatar-upload-field">
+              <label class="avatar-upload">
+                <input class="settings-visually-hidden" type="file" accept="image/jpeg,image/png,image/gif" aria-describedby="avatar-upload-hint" @change="onUpload" />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3" /></svg>
+                上传头像
+              </label>
+              <small id="avatar-upload-hint">JPEG、PNG、GIF，最大 1 MB</small>
+            </div>
           </div>
+          <label class="settings-wide-field">头像图片地址<input class="fp-control" v-model="avatarDraft" maxlength="255" placeholder="https://" inputmode="url" autocapitalize="none" spellcheck="false" /></label>
           <button data-tone="primary" class="fp-control" type="submit">保存头像地址</button>
         </fieldset>
       </form>
@@ -182,16 +189,59 @@ onBeforeUnmount(() => { mounted = false; reset() })
   </div>
 </template>
 
-<style scoped lang="scss">
-form { margin-top: 16px; }
-fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; }
-label { display: grid; gap: 6px; }
-input, textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--fp-border); border-radius: 8px; background: var(--fp-bg); color: var(--fp-text); padding: 9px 12px; }
-button { width: fit-content; border: 1px solid var(--fp-border); border-radius: 8px; background: transparent; color: var(--fp-text); padding: 7px 14px; cursor: pointer; }
-button:disabled { opacity: .5; cursor: default; }
-.error { color: var(--fp-danger); }
-.owner-avatar { display: block; width: 80px; height: 80px; object-fit: cover; border-radius: var(--fp-avatar-radius); margin: 16px 0; }
-.avatar-upload-field { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+<style scoped>
+.owner-profile {
+  container-type: inline-size;
+}
+.owner-profile form button[type=submit] {
+  margin: 0;
+}
+.owner-profile .profile-inline-form > .inline-fields {
+  grid-template-columns: minmax(0, 1fr) 8rem;
+  align-items: end;
+  gap: 8px 12px;
+}
+.owner-profile form.profile-inline-form + .profile-inline-form {
+  padding-block-start: 16px;
+  margin-block-start: 16px;
+}
+.owner-profile input.fp-control {
+  block-size: max(40px, 2.5em);
+}
+.owner-profile .profile-inline-form button[type=submit] {
+  grid-column: 2;
+  width: 100%;
+  min-height: 40px;
+  background: var(--fp-card);
+  border-color: var(--fp-border);
+  color: var(--fp-text);
+}
+.owner-profile .profile-inline-form button[type=submit]:hover:enabled {
+  background: var(--fp-hover);
+  color: var(--fp-title);
+}
+@container (max-width: 28rem) {
+  .owner-profile .profile-inline-form > .inline-fields {
+    grid-template-columns: minmax(0, 1fr) 7rem;
+  }
+  .owner-profile .profile-inline-form button[type=submit] {
+    padding-inline: 10px;
+  }
+}
+.avatar-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-block-end: 16px;
+  border-block-end: 1px solid var(--fp-divider);
+}
+.owner-profile .avatar-preview img.owner-avatar {
+  flex: none;
+  width: 80px;
+  height: 80px;
+  margin: 0;
+}
+.avatar-upload-field { display: grid; justify-items: start; gap: 6px; }
 .avatar-upload-field small { color: var(--fp-muted); }
 .avatar-upload {
   position: relative;
@@ -202,7 +252,7 @@ button:disabled { opacity: .5; cursor: default; }
   padding: 0 12px;
   border: 1px solid var(--fp-border);
   border-radius: 8px;
-  background: var(--fp-bg);
+  background: var(--fp-card);
   color: var(--fp-text);
   cursor: pointer;
 }

@@ -168,3 +168,37 @@ assert.equal(local.vm.groupId, groupB.oId)
 assert.equal(local.vm.imageFile, null)
 local.app.unmount()
 console.log('PASS local emoji upload adds to the selected group and retries the same write without reuploading')
+
+let catalogReads = 0
+globalThis.__emojiAPI.fetchV3EmotionOptions = async () => {
+  if (++catalogReads === 1) throw Error('目录暂时不可用')
+  return { groups: [['smile', 'heart']], defaults: ['smile'] }
+}
+const frequent = await component('src/components/EmojiPacks.vue', [
+  'openPanel', 'closePanel', 'frequencyError', 'catalogLoaded', 'loadFrequency', 'toggleAlias',
+  'frequency', 'aliasQuery', 'matchingAliases', 'panel', 'groupId', 'imageGroup',
+])
+await tick()
+assert.equal(catalogReads, 0, 'browsing the image library must not request the alias catalog')
+frequent.vm.openPanel('add')
+assert.equal(frequent.vm.imageGroup, groupB.oId, 'new images default to the selected user group')
+frequent.vm.openPanel('frequent')
+await tick()
+assert.match(frequent.vm.frequencyError, /目录暂时不可用/)
+await frequent.vm.loadFrequency()
+assert.equal(frequent.vm.catalogLoaded, true)
+frequent.vm.aliasQuery = 'Hea'
+assert.deepEqual(frequent.vm.matchingAliases, ['heart'])
+frequent.vm.toggleAlias('heart')
+assert.equal(frequent.vm.frequency, 'smile,heart')
+frequent.vm.closePanel()
+frequent.vm.openPanel('frequent')
+await tick()
+assert.equal(catalogReads, 2, 'reopening preserves the draft and its loaded catalog')
+assert.equal(frequent.vm.frequency, 'smile,heart')
+auth.accessToken = null
+assert.equal(frequent.vm.panel, null)
+assert.equal(frequent.vm.frequency, '')
+assert.equal(frequent.vm.catalogLoaded, false)
+frequent.app.unmount()
+console.log('PASS emoji library loads aliases on demand, retries the catalog, retains unsaved order and clears private panels on logout')

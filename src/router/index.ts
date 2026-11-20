@@ -311,6 +311,11 @@ const routes = [
     meta: { robots: 'noindex', settingsTab: 'function' },
   },
   {
+    path: '/settings/emojis',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { robots: 'noindex', settingsTab: 'emojis' },
+  },
+  {
     path: '/settings/system',
     component: () => import('@/views/SettingsView.vue'),
     meta: { robots: 'noindex', settingsTab: 'system' },
