@@ -122,7 +122,7 @@ function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promi
     if ((!sessionRead && generation !== homeReadGeneration) || (init.credentials !== 'omit' && version !== authVersion) || init.signal?.aborted) {
       throw new ApiError('请求已取消', 0, 'aborted')
     }
-    if (homeReadPause) throw new ApiError(homeReadPause.message, 0, 'home_reads_paused')
+    if (!priority && homeReadPause) throw new ApiError(homeReadPause.message, 0, 'home_reads_paused')
   }
   const execute = async () => {
     while (true) {
@@ -143,12 +143,9 @@ function queueHomeRead<T>(path: string, init: RequestInitExtra, run: () => Promi
     try {
       return await request
     } catch (error) {
-      // Rhythm uses structured unauthorized when a visitor has no refresh cookie.
-      const guestRefresh = path === '/api/v3/auth/refresh' && !accessToken &&
-        error instanceof ApiError && error.status === 401 && error.code === 'unauthorized'
       const petAccountLimit = /^\/api\/v3\/me\/pet(?:\/|\?|$)/.test(path) && error instanceof ApiError &&
         (error.code === 'pet_rate_limited' || error.code === 'pet_transport_limited')
-      if (generation === homeReadGeneration && version === authVersion && !guestRefresh && !petAccountLimit &&
+      if (!priority && generation === homeReadGeneration && version === authVersion && !petAccountLimit &&
         error instanceof ApiError && !isCaptchaRequired(error) && (error.status === 401 || error.status === 429 || error.code === 'offline')) {
         const now = Date.now()
         const header = error.retryAfter
