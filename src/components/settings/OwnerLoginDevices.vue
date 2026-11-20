@@ -34,7 +34,11 @@ async function read() {
   } catch (cause) {
     if (!signal.aborted) {
       devices.value = null
-      error.value = cause instanceof Error ? cause.message : '登录设备暂时无法读取'
+      if (cause instanceof ApiError && cause.status === 404) {
+        error.value = '登录设备服务暂未开放，请稍后刷新。'
+      } else {
+        error.value = cause instanceof Error ? cause.message : '登录设备暂时无法读取'
+      }
     }
   } finally {
     finish(signal)

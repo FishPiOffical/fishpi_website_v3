@@ -197,29 +197,60 @@ await tick()
 assert.equal(state.requests.length, readsAtStart + 4)
 view.app.unmount()
 state.confirm = async () => true
-delete globalThis.document
-delete globalThis.window
 console.log('PASS 登录设备只在面板可见时读取，切回事件合并，进行中读取和退出确认结束后统一核对，离开面板释放监听')
 
-const compatApi = deviceBuild(undefined)
-const compat = await import(compatApi)
-assert.equal(compat.loginDevicesEnabled, false)
-assert.equal((await import(devicesApi)).loginDevicesEnabled, true)
-assert.equal((await import(deviceBuild(undefined, true))).loginDevicesEnabled, true)
-assert.equal((await import(deviceBuild('false', true))).loginDevicesEnabled, false)
-__securityRoute.hash = '#login-devices'
-const compatPage = (await import(url(componentCode.replaceAll(devicesApi, compatApi)))).default
-const beforeCompat = state.requests.length
-view = mount(compatPage)
-await tick()
-assert.doesNotMatch(view.text(), /登录设备/)
-assert.match(view.text(), /核对并修改密码/)
-await assert.rejects(compat.fetchLoginDevices(new AbortController().signal), e => e.code === 'feature_unavailable')
-await assert.rejects(compat.revokeLoginDevice(otherBrowser.id, new AbortController().signal), e => e.code === 'feature_unavailable')
-assert.equal(state.requests.length, beforeCompat)
-view.app.unmount()
+const deviceBuilds = [
+  [deviceBuild(undefined), false],
+  [deviceBuild(undefined, true), true],
+  [deviceBuild('false'), false],
+  [deviceBuild('false', true), false],
+  [devicesApi, true],
+  [deviceBuild('true', true), true],
+]
+for (const [feature, sendHint] of deviceBuilds) {
+  assert.equal((await import(feature)).sendLoginDeviceHint, sendHint)
+  const devicesFixture = url(devicesCode.replaceAll(devicesApi, feature))
+  const page = (await import(url(componentCode.replaceAll(url(devicesCode), devicesFixture).replaceAll(devicesApi, feature)))).default
+  __securityRoute.hash = ''
+  const start = state.requests.length
+  view = mount(page)
+  await tick()
+  assert.equal(state.requests.length, start)
+  state.responses.push(new ApiError('Not Found', 404))
+  view.click('登录设备')
+  await tick()
+  assert.match(view.text(), /登录设备服务暂未开放，请稍后刷新。/)
+  assert.doesNotMatch(view.text(), /暂无可管理/)
+  state.responses.push(env({list: [knownBrowser, otherBrowser]}))
+  find(view.root, n => n.props?.['aria-label'] === '刷新登录设备').props.onClick()
+  await tick()
+  assert.match(view.text(), /当前设备/)
+  assert.match(view.text(), /Safari · iPhone/)
+  assert.doesNotMatch(view.text(), /暂未开放/)
+  state.responses.push(env({revoked: true}), env({list: [knownBrowser]}))
+  view.click('退出登录')
+  await tick()
+  assert.match(view.text(), /Safari · iPhone」已退出登录/)
+  assert.match(view.text(), /当前设备/)
+  assert.ok(!find(view.root, n => n.props?.['aria-label'] === '退出 Safari · iPhone'))
+  assert.deepEqual(state.requests.slice(start).map(r => [r.init.method ?? 'GET', r.path]), [
+    ['GET', listPath], ['GET', listPath], ['DELETE', targetPath], ['GET', listPath],
+  ])
+  view.app.unmount()
+
+  __securityRoute.hash = '#login-devices'
+  state.responses.push(env({list: [knownBrowser]}))
+  view = mount(page)
+  await tick()
+  assert.match(view.text(), /已登录的网页设备/)
+  assert.match(view.text(), /当前设备/)
+  assert.equal(state.requests.at(-1).path, listPath)
+  view.app.unmount()
+}
 __securityRoute.hash = ''
-console.log('PASS 兼容模式隐藏设备入口，设备直链回到账号安全，设备列表和退出操作均无请求')
+delete globalThis.document
+delete globalThis.window
+console.log('PASS 开发和生产各配置均显示登录设备、支持直链、404 后刷新恢复和退出其他设备')
 
 const loginSource = compile(await fs.readFile('src/api/fishpi.ts', 'utf8'))
   .replace("from './http'", `from '${http}'`)
@@ -230,8 +261,9 @@ const fakeId = '01234567-89ab-4cde-8000-123456789abc'
 let storageReads = 0
 globalThis.window = { localStorage: { getItem() { storageReads++; return fakeId } } }
 try {
-  for (const [feature, enabled] of [[compatApi, false], [devicesApi, true]]) {
+  for (const [feature, enabled] of deviceBuilds) {
     const { login } = await import(url(loginSource.replace("from './v3-login-devices'", `from '${feature}'`)))
+    const readsBeforeLogin = storageReads
     state.responses.push(env({accessToken: 'fixture'}))
     assert.equal(await login('fixture', 'fixture-password', '012345'), 'fixture')
     const req = state.requests.at(-1)
@@ -239,7 +271,7 @@ try {
     const expected = { nameOrEmail: 'fixture', userPassword: md5('fixture-password'), mfaCode: '012345' }
     if (enabled) expected.deviceId = fakeId
     assert.deepEqual(JSON.parse(req.init.body), expected)
-    assert.equal(storageReads, enabled ? 1 : 0)
+    assert.equal(storageReads - readsBeforeLogin, enabled ? 1 : 0)
   }
 } finally {
   delete globalThis.window

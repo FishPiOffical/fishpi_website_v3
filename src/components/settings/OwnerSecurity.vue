@@ -6,7 +6,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { getAuthContextVersion, ApiError } from '@/api/http'
-import { loginDevicesEnabled } from '@/api/v3-login-devices'
 import { securityProof, passwordDigest, fetchV3MfaState, changeV3Password, prepareV3Mfa, setV3Mfa, contactTarget, requestV3ContactCode, changeV3Contact, type MfaPreparation } from '@/api/v3-security'
 import { profileOperationKey } from '@/api/v3-profile'
 import { useGeetest4 } from '@/composables/useGeetest4'
@@ -14,7 +13,7 @@ import { fpConfirm } from '@/composables/useDialog'
 import OwnerLoginDevices from './OwnerLoginDevices.vue'
 const auth = useAuthStore(), { accessToken, account } = storeToRefs(auth), router = useRouter(), route = useRoute()
 type Mode = 'password' | 'mfa' | 'phone' | 'email' | 'devices'
-const mode = ref<Mode>('password'), labels = { password: '修改密码', mfa: '两步验证', phone: '修改手机', email: '修改邮箱', ...(loginDevicesEnabled ? { devices: '登录设备' } : {}) }
+const mode = ref<Mode>('password'), labels = { password: '修改密码', mfa: '两步验证', phone: '修改手机', email: '修改邮箱', devices: '登录设备' }
 const currentPassword = ref(''), currentTotp = ref(''), newPassword = ref(''), repeatPassword = ref(''), newTotp = ref(''), target = ref(''), contactCode = ref('')
 const enabled = ref<boolean | null>(null), loading = ref(false), busy = ref(false), error = ref(''), message = ref(''), preparation = ref<MfaPreparation | null>(null)
 const captchaEl = ref<HTMLElement | null>(null), challenge = ref(false), codeTarget = ref(''), codeExpiresAt = ref(0), now = ref(Date.now())
@@ -28,7 +27,6 @@ function clear() { generation++; statusRead++; clearSecrets(); enabled.value = n
 function capture() { const g = generation, context = getAuthContextVersion(), id = account.value?.oId; return () => mounted && !!accessToken.value && !!id && id === account.value?.oId && context === getAuthContextVersion() && generation === g }
 watch([accessToken, () => account.value?.oId], () => { const context = getAuthContextVersion(), id = account.value?.oId; if (!accessToken.value || context !== boundary || id !== owner) clear(); boundary = context; owner = id }, { flush: 'sync' })
 function select(value: Mode) {
-  if (value === 'devices' && !loginDevicesEnabled) return
   if (busy.value || (loading.value && value !== 'devices') || value === mode.value) return
   generation++
   clearSecrets()
@@ -105,7 +103,7 @@ onBeforeUnmount(() => { mounted = false; if (timer) clearInterval(timer); clear(
   <section class="owner-security" aria-label="账号安全设置">
     <h2>账号安全</h2><p v-if="mode !== 'devices'" class="hint">每次操作需当前密码；已启用两步验证时还需当前验证器码。密码、手机、邮箱或两步验证修改成功后，所有设备与应用需要重新登录授权。</p>
     <nav aria-label="安全设置类型"><button class="fp-control" v-for="(label, value) in labels" :key="value" type="button" :disabled="busy || (loading && value !== 'devices')" :aria-pressed="mode === value" @click="select(value)">{{ label }}</button></nav>
-    <OwnerLoginDevices v-if="loginDevicesEnabled && mode === 'devices'" />
+    <OwnerLoginDevices v-if="mode === 'devices'" />
     <template v-else>
     <p v-if="loading">正在读取安全状态…</p><p v-else-if="enabled !== null">两步验证：{{ enabled ? '已启用' : '未启用' }}</p><button class="fp-control settings-refresh" type="button" :disabled="busy || loading" @click="loadStatus" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-2l2 2M4 17l2 2a7 7 0 0 0 12-2" /></svg><span class="settings-visually-hidden">重新读取安全状态</span></button>
     <fieldset :disabled="blocked"><label>当前密码<input class="fp-control" v-model="currentPassword" aria-label="安全设置当前密码" type="password" autocomplete="current-password" /></label><label>当前验证器码（已启用时必填）<input class="fp-control" v-model="currentTotp" aria-label="安全设置当前验证器码" inputmode="numeric" maxlength="6" autocomplete="one-time-code" /></label></fieldset>

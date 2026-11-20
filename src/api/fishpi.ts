@@ -2,7 +2,7 @@ import {repeaterList,type RepeaterEntry} from './v3-repeater'
 import { md5 } from 'js-md5'
 import type { DomainItem } from './content-types'
 import { ApiError, request } from './http'
-import { loginDevicesEnabled } from './v3-login-devices'
+import { sendLoginDeviceHint } from './v3-login-devices'
 import { v3Article } from './v3-content'
 
 export type { DomainItem }
@@ -494,7 +494,7 @@ export async function login(username: string, passwd: string, mfaCode = '') {
       nameOrEmail: username,
       userPassword: md5(passwd),
       mfaCode,
-      ...(loginDevicesEnabled ? { deviceId: browserDeviceHint() } : {}),
+      ...(sendLoginDeviceHint ? { deviceId: browserDeviceHint() } : {}),
     }),
   })
   if (res.code !== 0 || !res.data?.accessToken) {

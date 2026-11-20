@@ -1,7 +1,7 @@
 import { ApiError, request } from './http'
 
 const deviceFlag = import.meta.env.VITE_LOGIN_DEVICES_ENABLED
-export const loginDevicesEnabled = deviceFlag === 'true' || (deviceFlag === undefined && import.meta.env.DEV)
+export const sendLoginDeviceHint = deviceFlag === 'true' || (deviceFlag === undefined && import.meta.env.DEV)
 
 export interface LoginDevice {
   id: string
@@ -14,12 +14,7 @@ const path = '/api/v3/me/security/devices'
 const deviceId = /^[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}$/
 const invalid = () => new ApiError('登录设备响应格式错误', 502, 'invalid_response')
 
-function requireLoginDevices() {
-  if (!loginDevicesEnabled) throw new ApiError('登录设备暂未开放', 404, 'feature_unavailable')
-}
-
 export async function fetchLoginDevices(signal: AbortSignal): Promise<LoginDevice[]> {
-  requireLoginDevices()
   const response = await request<{code: number; data: {list: LoginDevice[]}}>(path, { signal, cache: 'no-store' })
   if (response?.code !== 0 || !Array.isArray(response.data?.list)) throw invalid()
   const seen = new Set<string>()
@@ -33,7 +28,6 @@ export async function fetchLoginDevices(signal: AbortSignal): Promise<LoginDevic
 }
 
 export async function revokeLoginDevice(id: string, signal: AbortSignal): Promise<void> {
-  requireLoginDevices()
   if (!deviceId.test(id)) throw invalid()
   const response = await request<{code: number; data: {revoked: boolean}}>(`${path}/${id}`, {
     method: 'DELETE', cache: 'no-store', signal,

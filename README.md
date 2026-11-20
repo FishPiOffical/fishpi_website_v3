@@ -41,7 +41,7 @@ VITE_SITE_ORIGIN=https://fishpi.cn
 
 同一浏览器的新旧站使用 Rhythm 签发的设备 Cookie 归组。在支持 Web Locks 的浏览器中，新站同源标签页的登录、续期、会话核对和退出请求按顺序发送，访问令牌仍各自保存在页内存中。浏览器未提供或禁止使用 Web Locks 时沿用单页队列。回归测试为 `node tools/v3-credential-tabs-test.mjs`。
 
-生产构建默认隐藏「登录设备」，密码登录沿用原有三个字段。本地开发默认开启，可设置 `VITE_LOGIN_DEVICES_ENABLED=false` 测试兼容模式。上线设备管理时，先执行 Rhythm 的 `sql/20261120_api_v3_website_devices.sql` 并更新 Rhythm，再以 `VITE_LOGIN_DEVICES_ENABLED=true` 重新构建并发布前端。开启后登录可携带 `deviceId`，浏览器禁用本地存储时也能登录。
+已登录用户在所有构建中均可打开「登录设备」。读取和退出设备需要配套 Rhythm 接口及 `sql/20261120_api_v3_website_devices.sql` 迁移。旧服务返回 404 时页面提示服务暂未开放，后端上线后点击刷新即可读取列表。`VITE_LOGIN_DEVICES_ENABLED` 仅控制密码登录时是否附带可选的 `deviceId` 提示。生产默认省略，开发默认携带；浏览器禁用本地存储时也能登录。
 
 - 图片预览默认使用 `imageThumbnail(url, 显示宽度, 显示高度)`，受支持的 RhyPic 公开原图按显示尺寸请求二倍图，单边最多 1024px。正文中已清洗的图片可用 `withImageThumbnailSrcset` 保留原地址并添加缩略图地址。签名链接、已有缩放参数及外站图片保留原地址。
 
