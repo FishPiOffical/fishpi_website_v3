@@ -18,7 +18,7 @@ export const preferenceFields: Record<PreferenceResource, PreferenceField[]> = {
   privacy: [bool('articles', '公开帖子列表'), bool('comments', '公开回帖列表'), bool('breezemoons', '公开清风明月列表'),
     bool('points', '公开积分列表'), bool('followers', '公开关注者列表'), bool('followingUsers', '公开关注用户列表'),
     bool('followingTags', '公开关注标签列表'), bool('followingArticles', '公开收藏帖子列表'), bool('watchingArticles', '公开关注帖子列表'),
-    bool('online', '公开在线状态'), bool('userAgent', '公开 UA 信息'), bool('joinPointRank', '参与财富排行'), bool('joinUsedPointRank', '参与消费排行')],
+    bool('online', '公开资料在线状态'), bool('userAgent', '公开 UA 信息'), bool('joinPointRank', '参与财富排行'), bool('joinUsedPointRank', '参与消费排行')],
   location: [bool('publicLocation', '公开地理位置')],
   locale: [{ key: 'language', label: '语言', kind: 'string', max: 64 }, { key: 'timezone', label: '时区', kind: 'string', max: 64 }],
 }
