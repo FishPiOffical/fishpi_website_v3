@@ -10,6 +10,18 @@ npm run build && npm run preview
 npm run sitemap      # 生成 public/sitemap.xml
 ```
 
+### API v3 开发文档
+
+启动后打开 [Scalar 接口参考](http://127.0.0.1:5173/api-docs/index.html)。页面提供接口搜索、中文字段说明和代码示例，也可下载同目录的 OpenAPI JSON 或阅读完整 Markdown。网页端关闭请求试跑，不向外部代理转发凭据。
+
+文档源为 Rhythm `api_v3` 工作区的 `API.md` 和 Java 路由。修改接口后，先更新 Rhythm 的说明，再将下列命令生成的 `public/api-docs/openapi.json` 与 `reference.md` 一起提交。生成器会检查每条 v3 路由是否有对应章节。
+
+```sh
+python3 tools/generate-v3-openapi.py /path/to/rhythm-api-v3-worktree
+```
+
+原文以段落或内联结构定义的字段，可在接口说明及完整 Markdown 查阅。WebSocket 首帧和事件格式见完整 Markdown 的实时订阅章节。
+
 开发服务器固定 `http://127.0.0.1:5173`，占用时请先结束旧进程，不会自动换端口。
 
 main 分支仅支持 Rhythm v3 接口，双版本代码已备份至本地 `v1_v3` 分支（`ce9e4dd`，包含最近两次 UI 调整）。版本切换、旧 apiKey 登录及 v1 适配器已移除；旧 `fp.apiMode` Cookie 不会改变请求目标，旧 `/api/` 端点返回 410。开发上游通过 `VITE_API_TARGET` 配置，须指向支持 v3 的 Rhythm，不自动回退现网旧接口。
